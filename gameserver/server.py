@@ -24160,9 +24160,12 @@ class GameSite(server.Site):
             return semaphore
 
     def server_status_func(self):
-        # report server stats
-        if self.nosql_client:
-            self.nosql_client.server_status_update(spin_server_name, admin_stats.get_server_status_json(), reason='server_status_func')
+        try:
+            # report server stats
+            if self.nosql_client:
+                self.nosql_client.server_status_update(spin_server_name, admin_stats.get_server_status_json(), reason='server_status_func')
+        except:
+            self.exception_log.event(server_time, 'server_status_func Exception: ' + traceback.format_exc())
 
     def bgfunc(self):
         try:
