@@ -393,7 +393,7 @@ def reload_gamedata():
 reload_gamedata()
 
 try:
-    SERVER_VERSION = subprocess.Popen('svn info server.py | grep Revision', shell=True, stdout=subprocess.PIPE).stdout.readlines()[0].strip().split(' ')[1]
+    SERVER_VERSION = subprocess.Popen('../scmtool.sh version', shell=True, stdout=subprocess.PIPE).stdout.readlines()[0].strip()
 except:
     SERVER_VERSION = 'unknown'
 
@@ -23936,7 +23936,7 @@ class GameSite(server.Site):
         self.kongregate_log = SpinLog.DailyRawLog(spin_log_dir+'/', '-kongregate.txt')
         self.trace_log = SpinLog.DailyRawLog(spin_log_dir+'/', '-traces.txt')
 
-        self.metrics_log.event(server_time, {'event_name':'1500_server_restart', 'code':1500, 'svn_version':SERVER_VERSION})
+        self.metrics_log.event(server_time, {'event_name':'1500_server_restart', 'code':1500, 'scm_version':SERVER_VERSION})
 
 
         # connect to global chat server, if one is configured
@@ -24502,7 +24502,7 @@ class AdminStats:
                 'game_ws_port': gamesite.config.game_ws_port,
                 'game_wss_port': gamesite.config.game_wss_port,
                 'affinities': gamesite.config.affinities,
-                'svn_version': SERVER_VERSION,
+                'scm_version': SERVER_VERSION,
                 'gamedata_build': gamedata['gamedata_build_info']['date'],
                 'gameclient_build': gameclient_build_date,
                 'uptime': server_time - self.start_time,

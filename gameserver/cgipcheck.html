@@ -616,8 +616,8 @@ var make_gamedata = function() {
         $('#make_gamedata_result')[0].innerHTML = 'OK '+result['gamedata_build'];
     });
 };
-var svn_up = function() {
-    send_request('svn', 'up', {}, function(result) {
+var scm_up = function() {
+    send_request('scm', 'up', {}, function(result) {
         display_response(result);
     });
 };
@@ -1026,7 +1026,7 @@ $(function() {
 
     if(spin_token_data['roles'].indexOf('ADMIN') == -1) {
         // no admin permisison
-        $('#svn_up_button').remove();
+        $('#scm_up_button').remove();
         $('#download_art_button').remove();
         $('#make_gamedata_button').remove();
         $('#server_start_gen').remove();
@@ -1235,7 +1235,7 @@ Status: <span id="payment_status"></span>
 <p>
 <table id="server_status_table" width="100%" style="font-size:12;font-family:sans-serif;"></table>
 <br>
-<button id="svn_up_button" onclick="svn_up()">SVN up</button>
+<button id="scm_up_button" onclick="scm_up()">SCM up</button>
 <button id="download_art_button" onclick="download_art()">Download Art</button>
 <button id="download_art_button" onclick="compile_client()">Compile Client</button>
 <button id="make_gamedata_button" onclick="make_gamedata()">Make Gamedata</button> <span id="make_gamedata_result" style="font-size:12px;"></span>

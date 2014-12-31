@@ -14,6 +14,7 @@ function usage {
     echo ""
     echo "  up - get updates from origin"
     echo "  force-up - get updates from origin, resolving merge conflicts by force (for automated tools only)"
+    echo "  version - get current version"
     echo "  stat - show modified file list"
     echo "  diff - show differences"
     echo "  commit [MESSAGE] - make a commit"
@@ -47,6 +48,9 @@ function do_up_svn {
 }
 function do_force_up_svn {
     (cd "$ROOT" && svn up --force --accept theirs-full)
+}
+function do_version_svn {
+    (cd "$ROOT" && svn info | grep Revision | cut -d' ' -f 2)
 }
 function do_stat_svn {
     (cd "$ROOT" && svn stat)
@@ -92,6 +96,9 @@ function do_force_up_git {
         (cd $dir && git pull -q) # --ff-only ?
     done
 }
+function do_version_git {
+    (cd "$ROOT" && git rev-parse HEAD)
+}
 function do_stat_git {
     for dir in $GIT_DIRS; do
         (cd $dir && git status -s | sed "s|^|$dir |")
@@ -130,6 +137,9 @@ else
             force-up)
                 do_force_up_git $@
                 ;;
+            version)
+                do_version_git $@
+                ;;
             stat)
                 do_stat_git $@
                 ;;
@@ -156,6 +166,9 @@ else
                 ;;
             force-up)
                 do_force_up_svn $@
+                ;;
+            version)
+                do_version_svn $@
                 ;;
             stat)
                 do_stat_svn $@

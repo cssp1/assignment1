@@ -6,7 +6,7 @@ GAME_DIR=/home/ec2-user/thunderrun
 HOST=`hostname | sed 's/.spinpunch.com//'`
 AWSSECRET=/home/ec2-user/.ssh/${HOST}-awssecret
 
-(cd $GAME_DIR && svn up --force --accept theirs-full > /dev/null)
+(cd $GAME_DIR && ./scmtool.sh force-up > /dev/null)
 
 (cd $GAME_DIR/gameserver && ./make-gamedata.sh -n -u > /dev/null)
 

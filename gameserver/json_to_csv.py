@@ -49,7 +49,7 @@ data_fields = {
                 "mission_id", "mission_count", "menu_name",
                 "opponent_level", "opponent_type", "opponent_user_id", "battle_outcome",
                 "attacker_user_id", "attacker_level",
-                "account_creation_time", "last_login_time", "svn_version",
+                "account_creation_time", "last_login_time", "scm_version",
                 "gain_amount", "units_lost", "units_killed",
                 "time_to_loading", "time_to_load_page", "time_to_assetload_essential",
                 "logged_in_times", "campaign_name", "age_group", "recipient_fb_id", "sender_fb_id", "sender_user_id",

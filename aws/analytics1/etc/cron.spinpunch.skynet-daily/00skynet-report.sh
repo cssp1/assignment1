@@ -5,7 +5,8 @@ exit 0 # XXX disabled by default - make executable
 # note: skynet queries should be run from the thunderrun sandbox
 GAME_DIR=/home/ec2-user/thunderrun
 
-(cd $GAME_DIR && svn up --force --accept theirs-full > /dev/null)
+(cd $GAME_DIR && ./scmtool.sh force-up > /dev/null)
+
 #(cd $GAME_DIR/gameserver && \
 #    ./skynet.py --mode adcampaigns-pull > /dev/null && \
 #    ./skynet.py --mode adgroups-pull > /dev/null )

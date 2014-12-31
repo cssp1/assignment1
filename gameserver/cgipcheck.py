@@ -239,14 +239,14 @@ def do_action(path, method, args, spin_token_data, nosql_client):
             else:
                 raise Exception('unknown gameclient method '+method)
 
-        elif path[0] == 'svn':
+        elif path[0] == 'scm':
             check_role(spin_token_data, 'ADMIN')
             do_log = True
 
             if method == 'up':
-                result = {'result': run_shell_command(['svn', 'up', SpinConfig.gameserver_dir()+'/..'])}
+                result = {'result': run_shell_command(['../scmtool.sh', 'up'])}
             else:
-                raise Exception('unknown svn method '+method)
+                raise Exception('unknown scm method '+method)
 
         elif path[0] == 'logs':
             # log retrieval methods
