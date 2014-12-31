@@ -100,7 +100,7 @@ class Slave(object):
         self.procs = []
         self.debug_local_results = None
 
-    # run 'svn up' and './make-gamedata.sh'to make sure the slave's SVN repository is up to date before running analytics
+    # make sure the slave's code and data are up to date before running analytics
     # for speed, we skip this if the mtime of a generated gamedata file on the slave is greater than our own copy
     def update_code_cmd(self):
         TEST_FILE = SpinConfig.gamedata_filename(extension='.json')
@@ -108,7 +108,7 @@ class Slave(object):
         STAT_CMD = 'stat -c %Y '+TEST_FILE # note: stat -f %c on Mac OSX
         #sys.stderr.write('test_mtime is %d\n' % test_mtime)
         if 1:
-            return '(cd %s/gameserver && if ((`%s` < %d)); then (cd .. && svn up --force --accept theirs-full > /dev/null) && ./make-gamedata.sh -n -u > /dev/null; fi)' % (SpinConfig.game_id_long(game_id), STAT_CMD, test_mtime)
+            return '(cd %s/gameserver && if ((`%s` < %d)); then (../scmtool.sh force-up > /dev/null) && ./make-gamedata.sh -n -u > /dev/null; fi)' % (SpinConfig.game_id_long(game_id), STAT_CMD, test_mtime)
         else:
             return 'echo'
 
