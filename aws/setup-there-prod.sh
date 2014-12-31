@@ -5,7 +5,7 @@ GAME_ID_LONG=$2
 
 . ./setup-there-common.sh
 
-YUMPACKAGES="xfsprogs telnet subversion nscd munin-node"
+YUMPACKAGES="xfsprogs telnet subversion nscd munin-node git"
 YUMPACKAGES+=" python-twisted python-simplejson emacs strace"
 YUMPACKAGES+=" python-imaging python-imaging-devel numpy"
 YUMPACKAGES+=" libxml2 libxml2-devel"
@@ -94,8 +94,12 @@ echo "easy_install pymongo requests" # note: this overrides python-requests pack
 echo "easy_install psycopg2 txpostgres" # note: this overrides system psycopg2 with newer version necessary for txpostgres
 echo "easy_install geoip2 - but, install libmaxminddb first for C acceleration from https://github.com/maxmind/libmaxminddb"
 
-echo "SSH key /home/ec2-user/.ssh/spsvnaccess.pem for svn up (also .ssh/config with Host/User/IdentityFile)"
-echo "svn checkout. symlink gameserver/logs to an ephemeral storage location."
+echo "MISSING: SVN: /home/ec2-user/.ssh/spsvnaccess.pem (also .ssh/config with Host/User/IdentityFile)"
+echo "MISSING: GIT: /home/ec2-user/.ssh/${GAME_ID}prod.pem (also .ssh/config with Host/User/IdentityFile)"
+echo "MISSING: GIT: git config --global user.name " # 'SpinPunch Deploy'
+echo "MISSING: GIT: git config --global user.email " # 'awstech@spinpunch.com'
+
+echo "game code checkout. symlink gameserver/logs to an ephemeral storage location."
 
 echo "get keys from spinpunch-config bucket! (use aws to download and gpg to decrypt)"
 echo "SSH key /home/ec2-user/.ssh/analytics1.pem for ANALYTICS2 queries."
