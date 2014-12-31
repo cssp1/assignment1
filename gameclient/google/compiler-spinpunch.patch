@@ -1,0 +1,36 @@
+diff --git a/src/com/google/javascript/jscomp/DiagnosticGroups.java b/src/com/google/javascript/jscomp/DiagnosticGroups.java
+index 98549bd..00b2371 100644
+--- a/src/com/google/javascript/jscomp/DiagnosticGroups.java
++++ b/src/com/google/javascript/jscomp/DiagnosticGroups.java
+@@ -77,7 +77,7 @@ public class DiagnosticGroups {
+   // to parser/ParserConfig.properties
+   static final String DIAGNOSTIC_GROUP_NAMES =
+       "accessControls, ambiguousFunctionDecl, checkEventfulObjectDisposal, " +
+-      "checkRegExp, checkStructDictInheritance, checkTypes, checkVars, " +
++      "checkRegExp, checkStructDictInheritance, checkTypes, checkTypesArgumentCount, checkVars, " +
+       "const, constantProperty, deprecated, duplicateMessage, es3, " +
+       "es5Strict, externsValidation, fileoverviewTags, globalThis, " +
+       "internetExplorerChecks, invalidCasts, misplacedTypeAnnotation, " +
+@@ -186,6 +186,10 @@ public class DiagnosticGroups {
+           TypeValidator.ALL_DIAGNOSTICS,
+           TypeCheck.ALL_DIAGNOSTICS);
+ 
++  public static final DiagnosticGroup CHECK_TYPES_ARGUMENT_COUNT =
++      DiagnosticGroups.registerGroup("checkTypesArgumentCount",
++          TypeCheck.WRONG_ARGUMENT_COUNT);
++
+   public static final DiagnosticGroup CHECK_EVENTFUL_OBJECT_DISPOSAL =
+       DiagnosticGroups.registerGroup("checkEventfulObjectDisposal",
+           CheckEventfulObjectDisposal.EVENTFUL_OBJECT_NOT_DISPOSED,
+diff --git a/src/com/google/javascript/jscomp/parsing/ParserConfig.properties b/src/com/google/javascript/jscomp/parsing/ParserConfig.properties
+index 5e60839..235d9f9 100644
+--- a/src/com/google/javascript/jscomp/parsing/ParserConfig.properties
++++ b/src/com/google/javascript/jscomp/parsing/ParserConfig.properties
+@@ -129,6 +129,7 @@ jsdoc.suppressions =\
+     checkRegExp,\
+     checkStructDictInheritance,\
+     checkTypes,\
++    checkTypesArgumentCount,\
+     checkVars,\
+     const,\
+     constantProperty,\

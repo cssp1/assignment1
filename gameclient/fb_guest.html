@@ -1,0 +1,171 @@
+<html>
+  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8"/>
+  <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1"/>
+  <meta http-equiv="X-Frame-Options" content="GOFORIT"/>
+  <meta property="og:title" content="$FBEXTERNALHIT_TITLE$" />
+  <meta property="og:image" content="$FBEXTERNALHIT_IMAGE$" />
+  <meta property="og:description" content="$FBEXTERNALHIT_DESCRIPTION$" />
+  <head>
+    <title>$FBEXTERNALHIT_TITLE$</title>
+
+
+    <script type="text/javascript">
+// Copyright (c) 2014 SpinPunch. All rights reserved.
+// Use of this source code is governed by an MIT-style license that can be
+// found in the LICENSE file.
+
+var spin_demographics = $DEMOGRAPHICS$;
+var spin_game_container_url = '$GAME_CONTAINER_URL$';
+var spin_game_query_string = '$GAME_QUERY_STRING$';
+var spin_app_namespace = '$APP_NAMESPACE$';
+var spin_app_id = '$APP_ID$';
+var spin_http_origin = $HTTP_ORIGIN$;
+var spin_server_protocol = '$SERVER_PROTOCOL$';
+var spin_server_host = '$SERVER_HOST$';
+var spin_server_port = '$SERVER_PORT$';
+var spin_metrics_url = spin_server_protocol+spin_server_host+":"+spin_server_port+"/METRICSAPI";
+var spin_metrics_anon_id = '$ANON_ID$';
+var spin_facebook_api_versions = $FACEBOOK_API_VERSIONS$;
+var spin_facebook_auth_scope = '$FACEBOOK_AUTH_SCOPE$';
+var spin_art_protocol = '$ART_PROTOCOL$';
+var spin_art_path = '$ART_PATH$';
+var spin_facebook_guest_splash_image = '$FACEBOOK_GUEST_SPLASH_IMAGE$';
+
+$BROWSERDETECT_CODE$
+
+spin_demographics['browser_name'] = BrowserDetect.browser;
+spin_demographics['browser_version'] = BrowserDetect.version;
+spin_demographics['browser_OS'] = BrowserDetect.OS;
+spin_demographics['browser_hardware'] = BrowserDetect.hardware;
+
+function add_demographics(data) {
+        if(spin_demographics) {
+                for(var key in spin_demographics) {
+                        data[key] = spin_demographics[key];
+                }
+        }
+        return data;
+}
+
+$SPLWMETRICS_CODE$
+
+    </script>
+  </head>
+
+
+  <body style="margin:0px;border:0px;background:#ffffff;overflow:hidden;">
+
+    <a href="#" onclick="spin_try_to_log_in()">
+      <div id="splash_image" style="position:absolute;width:100%;height:100%;z-index:999;background:#000000;"></div>
+      <script type="text/javascript">
+(function() { // set up splash image
+    var bg = null, do_cover = false;
+    if(spin_facebook_guest_splash_image.indexOf('#') == 0) {
+        bg = spin_facebook_guest_splash_image; // literal color
+    } else {
+        var url = (spin_art_protocol||spin_server_protocol)+(spin_art_path||(spin_server_host+':'+spin_server_port+'/'))+spin_facebook_guest_splash_image;
+        bg = 'url("'+url+'")'; do_cover = true;
+    }
+    var elem = document.getElementById('splash_image');
+    if(bg) { elem.style.background = bg; }
+    if(do_cover){
+        elem.style.backgroundSize = 'cover';
+        elem.style.backgroundAttachment = 'fixed';
+        elem.style.backgroundPosition = '50% 50%';
+        elem.style.backgroundRepeat = 'no-repeat';
+    }
+})();
+      </script>
+    </a>
+
+    <div id="fb-root"></div>
+    <script src="//connect.facebook.net/en_US/sdk.js"></script>
+    <script type="text/javascript">
+// after loading Facebook SDK synchronously
+var spin_auth_attempts = 0;
+var spin_login_in_progress = false;
+(function() {
+    var spin_facebook_channel = spin_server_protocol+spin_server_host+":"+spin_server_port+"/channel.php";
+    var init_params = {
+        appId      : spin_app_id, // App ID
+        channelURL : spin_facebook_channel, // XD script channel file
+        status     : true, // check login status
+        cookie     : true, // enable cookies to allow the server to access the session
+        oauth      : true, // enable OAuth 2.0
+        xfbml      : true,  // parse XFBML
+        frictionlessRequests : true
+    };
+    if(spin_facebook_api_versions && ('jssdk' in spin_facebook_api_versions)) {
+        init_params.version = spin_facebook_api_versions['jssdk'];
+    } else {
+        init_params.version = 'v2.1'; // fallback default (sync with: FacebookSDK.js, fb_guest.html, gameserver/SpinFacebook.py, gameclient/clientcode/SPFB.js)
+    }
+    FB.init(init_params);
+})();
+
+var spin_login_metric = function(event_name, extra_props) {
+    var props = add_demographics({'scope':spin_facebook_auth_scope, 'method':'fb_guest_page',
+                                  'splash_image': spin_facebook_guest_splash_image,
+                                  'attempts': spin_auth_attempts,
+                                  'query_string': spin_game_query_string
+                                 });
+    if(extra_props) {
+        for(var key in extra_props) {
+            props[key] = extra_props[key];
+        }
+    }
+    SPLWMetrics.send_event(spin_metrics_anon_id, event_name, props);
+
+};
+
+var spin_try_to_log_in = function() {
+    if(!FB || spin_login_in_progress) { return; }
+    spin_login_in_progress = true;
+    spin_login_metric('0031_request_permission_prompt');
+    FB.login(function(response) {
+        spin_login_in_progress = false;
+        console.log('spin_try_to_log_in response:');
+        console.log(response);
+        if(response && response.authResponse) {
+            spin_login_metric('0032_request_permission_prompt_success', {'social_id': 'fb'+response.authResponse.userID.toString()});
+            top.location.href = spin_game_container_url; // redirect to game
+            return;
+        } else {
+            spin_login_metric('0033_request_permission_prompt_fail');
+        }
+
+        spin_auth_attempts += 1;
+
+        if(spin_auth_attempts < 3) {
+            if(spin_facebook_guest_splash_image.indexOf('#') != 0) {
+                // leave on nice splash image - redirect on third cancel
+                return;
+            } else if(spin_auth_attempts < 2) {
+                // repeat prompt - redirect on second cancel
+                spin_try_to_log_in();
+                return;
+            }
+        }
+        // redirect to appcenter
+        top.location.href = 'https://www.facebook.com/appcenter/'+spin_app_namespace;
+
+    }, {scope: spin_facebook_auth_scope});
+};
+
+var spin_on_login_status = function(response) {
+    console.log('spin_on_login_status response:');
+    console.log(response);
+    if(response && response.authResponse) {
+        spin_login_metric('0034_request_permission_prompt_unnecessary');
+        top.location.href = spin_game_container_url; // already logged in - redirect to game
+    } else {
+        spin_try_to_log_in();
+    }
+};
+
+FB.getLoginStatus(spin_on_login_status);
+
+    </script>
+
+  </body>
+</html>

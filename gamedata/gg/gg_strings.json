@@ -1,0 +1,1352 @@
+// Copyright (c) 2014 SpinPunch. All rights reserved.
+// Use of this source code is governed by an MIT-style license that can be
+// found in the LICENSE file.
+
+{
+    // UI strings for various in-game things
+    "game_name": "Example Game",
+
+    "alliance": "Clan", // what alliances are called
+
+    "object_kinds": {
+        "units": { "singular": "unit", "plural": "units" },
+        "buildings": { "singular": "building", "plural": "Buildings" } // note: capitalize, for damage_vs UI display
+    },
+
+    "manufacture_categories": {
+        "rovers": { "singular": "Infantry", "plural": "Infantry" },
+        "transports": { "singular": "Armor", "plural": "Armor" },
+        "starcraft": { "singular": "Aircraft", "plural": "Aircraft" }
+    },
+
+    // this helps drive the GUI research dialogs
+    "research_categories": {
+        // parent category -> child categories
+        "army": [ {"name": "rovers", "ui_name": "Infantry" },
+                  {"name": "transports", "ui_name": "Armor"},
+                  {"name": "starcraft", "ui_name": "Aircraft"} ],
+        "crafting": [ {"name": "mines", "ui_name": "Mines"} ]
+    },
+
+    "climate_restrictions": {
+        "include_manufacture_categories": "Unit types allowed for attack: %s",
+        "exclude_manufacture_categories": "Unit types not allowed for attack: %s",
+        "include_units": "Units allowed for attack: %s",
+        "exclude_units": "Units not allowed for attack: %s",
+        "exclude_air_units": "Flying units may not attack",
+        "exclude_ground_units": "Only flying units may attack",
+        "exclude_missiles": "Artillery rounds and Close-Air Support not available."
+    },
+
+    "squads": { "squad": "Battalion", // what squads are called in this game
+                "base_defenders": "Base Defenders",
+                "in_manuf_queue": "In training queue",
+                "status": { "defending_home_base": "Defending Home Base",
+                            "ready": "Ready to Deploy",
+                            "deployed": "Deployed at %s",
+                            "traveling": "Traveling to %s",
+                            "returning_to_home_base": "Returning to Base",
+                            "quarry": "Guarding Quarry %s",
+                            "in_battle": "In Combat at %s",
+                            "empty": "Empty",
+                            "damaged": "Damaged",
+                            "under_repair": "Under Repair",
+                            "destroyed": "Destroyed" }
+              },
+
+    "store": {
+        "FREE": "FREE", // for prices = 0
+        "buy_for": "Buy for %s"
+    },
+
+    // first entry is the damage_vs_xxx in the unit ui_damage_vs JSON data, second entry is a manufacture_category OR object_kind
+    "damage_vs_categories": [["rover","rovers"],["transport","transports"],["starcraft","starcraft"],["building","buildings"]],
+    // these refer to art sprite names
+    "damage_vs_qualities": ["ineffective", "poor", "good", "excellent"],
+    // only these are user-visible strings
+    "damage_vs_ui_qualities": ["Ineffective", "Fair", "Good", "Excellent"],
+
+    "unboosted_value": "%val (Level %lev Base %stat)",
+    "boosted_value": "(Level %modlev Mod)",
+    "mod_tech_names": { // obsolete
+        "health_boosted": "Health", "armor_boosted": "Armor", "damage_boosted": "DPS"
+    },
+
+    // UI strings for equip slot type names
+    "equip_slots": { "defense": {"ui_name": "Defense"},
+                     "offense": {"ui_name": "Offense"},
+                     "utility": {"ui_name": "Utility"},
+                     "ANY": {"ui_name": "Any"},
+                     "leader": {"ui_name": "Leader"},
+                     "mine": {"ui_name": "Mine"},
+                     "missile": {"ui_name": "Spell", "show": 0} // do not show in GUI
+                   },
+
+    "rarities": ["Common", // actually "Trash", but let's not call it that to users
+                 "Common", "Uncommon", "Rare", "Epic", "Legendary"],
+
+    "relationships": { // for Player Info dialog
+        "facebook_friend": "Facebook Friend",
+        "rival": "Rival",
+        "rival_low_level": "Rival (low level)",
+        "yourself": "Yourself"
+    },
+
+    "trophies_expire_in": "Tournament ends in",
+
+    "percentiles": {
+        "ranknum": "#%d", // used for #1, #2, #3
+        "top_001": "Top 0.1%",
+        "top_pct": "Top %pct%",
+        "top_half": "Top Half"
+    },
+
+    "leaderboard": {
+        "categories": {
+            "tokens_looted": { "title": "Ops Needs Points", "short_title": "ON Points",
+                               "show_if": {"predicate": "LIBRARY", "name": "token_event_happening"},
+                               "description":  "Ops Needs Points earned (points expire at the end of the event)",
+                               "brag_reason": "Ops Needs Points",
+                               "periods": ["week"] },
+            "trophies_pve": { "title": "PvE Tournament Points", "short_title": "Points",
+                              "show_if": {"predicate": "ALWAYS_FALSE" },
+                              "description": "%PVE_CHALLENGE_NAMEPoints earned",
+                              "brag_reason": "Tournament Points",
+                              "periods": ["week"] },
+
+            "conquests": { "title": "Conquests", "short_title": "Conquests",
+                           "show_if": {"predicate": "ALWAYS_FALSE" },
+                           "description": "Victories against rivals your level or higher",
+                           "brag_reason": "Battle Conquests" },
+            "havoc_caused": { "title": "Havoc", "short_title": "Havoc",
+                              "show_if": {"predicate": "ALWAYS_FALSE" },
+                              "description": "Upgrades interrupted while attacking rivals of equal or higher level",
+                              "brag_reason": "Havoc Caused" },
+            "xp": { "title": "XP", "short_title": "XP",
+                    "show_if": {"predicate": "ALWAYS_FALSE" },
+                    "description": "Experience Points earned in battle against rivals",
+                    "brag_reason": "Experience Points" },
+
+            // note: requires Scores2. Otherwise it's region-specific
+            "hive_kill_points": { "title": "Terrorist Camp Kill Points", "short_title": "KP",
+                                  "show_if": {"predicate": "AND", "subpredicates": [
+                                      {"predicate": "LIBRARY", "name": "in_nosql_region" },
+                                      {"predicate": "NOT", "subpredicates": [{"predicate": "LIBRARY", "name": "token_event_happening"}]}
+                                  ] },
+                                  "description": "Terrorist camp kill points earned (New Multiplayer)",
+                                  "brag_reason": "Terrorist Camp Kill Points" },
+
+            "quarry_resources": { "title": "Quarry Resources", "short_title": "Quarries",
+                                  // not enough space to display both this AND strongpoint resources categories during a tournament,
+                                  // so hide it while a strongpoint tournament is going on
+                                  "show_if": {"predicate": "AND", "subpredicates": [
+                                      {"predicate": "LIBRARY", "name": "in_nosql_region" },
+                                      {"predicate": "NOT", "subpredicates": [{"predicate": "EVENT_TIME", "event_kind": "current_stat_tournament", "event_name": "strongpoint_res_tournament", "method": "inprogress"}]}
+                                  ] },
+                                  "description": "Fuel and supplies collected from quarries in %REGION (New Multiplayer)",
+                                  "brag_reason": "Quarry Resources" },
+            "strongpoint_resources": { "title": "Strongpoint Resources", "short_title": "Strongpoint",
+                                       "show_if": {"predicate": "EVENT_TIME", "event_kind": "current_stat_tournament", "event_name": "strongpoint_res_tournament", "method": "inprogress"},
+                                       "description": "Fuel and Supplies collected from Strongpoint quarries",
+                                       "brag_reason": "Strongpoint Resources" },
+            "trophies_pvp": { "title": "PvP Points", "short_title": "PvP",
+                              "show_if": {"predicate": "ALWAYS_TRUE" },
+                              "description": "PvP Points earned in Multiplayer battles",
+                              "brag_reason": "PvP Points"
+                              // note: period shown is restricted to gamedata['matchmaking']['ladder_point_frequency']
+                            },
+            "damage_inflicted": { "title": "Damage", "short_title": "Damage",
+                                  "show_if": {"predicate": "ALWAYS_TRUE" },
+                                  "description":  "Total hitpoint damage caused by your forces against rivals",
+                                  "brag_reason": "Damage Inflicted" },
+            "resources_looted": { "title": "Loot", "short_title": "Loot",
+                                  "show_if": {"predicate": "ALWAYS_TRUE" },
+                                  "description": "Fuel and supplies looted from rivals",
+                                  "brag_reason":  "Resources Looted" }
+        },
+        "default_category": [[{"predicate": "LIBRARY", "name": "token_event_happening"}, "tokens_looted"],
+                             [{"predicate": "ALWAYS_TRUE"}, "trophies_pvp"]],
+        "periods": { "week": { "title": "(This week)", "name": "Week", "short": "weekly", "brag": "This Week" },
+                     "season": { "title": "(Season %SEASON)", "name": "Season", "short": "season", "brag": "This Season" } },
+        "current_stat": "Current %stat",
+        "prev_stat": "%period %d - Ending %stat"
+    },
+
+    "alliance_default_chat_motd": "Welcome to Clan chat!",
+    "alliance_chat_motd_sender": "Clan",
+    "alliance_join_types": { "anyone": "Anyone can join", "invite_only": "Invite only" },
+    "alliance_join_type_tips": { "anyone": "Any player can join this clan if room is available", "invite_only": "Clan leadership must approve requests to join this clan" },
+
+    // format string for displaying alliance membership on base buildings
+    "alliance_building_tag": "Clan:\n%s",
+
+    // string to put under the last mission in Missions dialog (e.g. "Complete missions to unlock more")
+    "missions_dialog_last_row_ui_name": "... Complete missions\n    to unlock more",
+
+    "craft_completed": "%s finished!",
+    "craft_fizzled": "Workshop failed",
+
+    "minefield_armed": "Armed", "minefield_not_armed": "Not Armed",
+
+    // message displayed on game desktop
+    "you_got_reinforcements": "%sender sent you reinforcements: %units",
+
+    // messages displayed in chat window
+    "unit_donation_chat": {
+        // your own reinforcement requests
+        "you": ":: [color=#ffff00]You requested units[/color]\n:: [color=#c0c0c0]%pct% of maximum space donated[/color]",
+
+        // reinforcement requests put in by other players
+        "other": {
+            // if you have not donated units yet
+            "you_have_not_donated": ":: [color=#ffff00]%recipient requests units. *Click to donate*[/color]\n:: [color=#c0c0c0]%pct% of maximum space donated[/color]",
+
+            // if you have donated units
+            "you_have_donated": ":: [color=#ffff00]%recipient requests units. *Click to donate*[/color]\n:: [color=#c0c0c0]%pct% of maximum space donated[/color]\n:: Thank you! : [color=#ff00ff]You earned +%xp XP[/color]",
+            "stale": ":: [color=#ffff00]%recipient withdraws this unit request[/color]"
+        }
+    },
+
+    "chat_age": "Sent %s ago", // used on tooltip for chat messages
+
+    "chat_templates": {
+        // ordinary chat messages
+        "default": "[color=#ffff00][player=%sender_id]%sender_name%tag: [/player][/color]%body",
+
+        // chat messages sent by current turf winners
+        "turf_winner": "[color=#ffff00][player=%sender_id]%sender_name%tag: [/player][/color][color=#ff80ff]%body[/color]",
+
+        // alliance tags - note, use \u005c (which becomes a '\' when parsed) to escape the [] brackets
+        "alliance_tag": " [color=#ff8000][alliance=%alliance_id]\u005c[%alliance_tag\u005c][/alliance][/color]",
+
+        // clickable map coordinates
+        "map_coords": "[color=#ffff00][map_coords=%region,%x,%y]%x,%y[/map_coords][/color]",
+
+        // channel welcome messages
+        "welcome": ":: [color=#00ff00]%sender_name: %body[/color] ::\n",
+
+        // system-wide announcements
+        "system": "\n[color=#fff000]*** %sender_name: %body ***[/color]\n\n",
+
+        // used for specially-marked developer accounts in public channels
+        "official": "[color=#ffffff]%sender_name: [/color][color=#00ffff]%body[/color]",
+
+        // notice that YOU are gagged
+        "you_are_gagged": "[color=#ffff00]System:[/color] Message not sent - you are muted.",
+
+        // notice that someone has been gagged
+        "i_got_gagged": "[color=#ff0000][player=%sender_id]%sender_name[/player] has been muted for 15 minutes.[/color]",
+
+        // notice that you sent a warning
+        "you_sent_chat_report": "[color=#ffff00]You reported [player=%target_id]%target_name[/player] for abusive behavior.[/color]",
+
+        // an alliance member logged in
+        "logged_in": "[color=#008000][player=%sender_id]%sender_name logged in[/player][/color]",
+
+        // a new member joined or was accepted into the alliance
+        "joined_alliance": "[color=#00ff00][player=%sender_id]%sender_name joined the clan[/player][/color]",
+        "accepted_alliance_member": "[color=#00ff00][player=%target_id]%target_name joined the clan[/player][/color]",
+
+        // a member earned an achievement
+        "earned_achievement": "[color=#00ff00][achievement=%sender_id:%achievement_id]%sender_name earned the achievement:\n [color=#ffff00]\u005c[%achievement_name\u005c][/color][/achievement][/color]",
+
+        // a member left the alliance
+        "left_alliance": "[color=#ff0000][player=%sender_id]%sender_name left the clan[/player][/color]",
+
+        // a member was kicked from the alliance
+        "kicked_alliance_member": "[color=#ff0000][player=%sender_id]%sender_name[/player] kicked [player=%target_id]%target_name[/player] from the clan[/color]",
+
+        "promoted_alliance_member": "[color=#00ff00][player=%sender_id]%sender_name[/player] promoted [player=%target_id]%target_name[/player] to %target_role[/color]",
+        "demoted_alliance_member": "[color=#ff0000][player=%sender_id]%sender_name[/player] demoted [player=%target_id]%target_name[/player] to %target_role[/color]",
+
+        "alliance_gift_sent": "[color=#ff00ff][color=#ffff00][player=%sender_id]%sender_name[/player][/color] sent a gift of [color=#ffffff]%item_name[/color] to [color=#ffff00][player=%target_id]%target_name[/player][/color][/color].",
+
+        "alliance_turf_no_participation": ":: [color=#ff00ff]No Clan has the [color=#ffffff]%points_to_win[/color] Strongpoints needed to rule the region. Conquer Strongpoint quarries to win bonus resources for your Clan.[/color] ::",
+        "alliance_turf_insufficient_points": ":: [color=#ff00ff]No Clan has the [color=#ffffff]%points_to_win[/color] Strongpoints needed to rule the region. [color=#ffff00][alliance=%alliance_id]%alliance_name[/alliance][/color] is in the lead with [color=#ffffff]%alliance_points[/color] Strongpoint(s).[/color] ::",
+        "alliance_turf_winner": ":: [color=#ff00ff][color=#ffff00][alliance=%alliance_id]%alliance_name[/alliance][/color] now rules %region_name with [color=#ffffff]%alliance_points[/color] Strongpoints! Members receive bonus quarry resources until another Clan conquers more Strongpoints.[/color] ::",
+        "alliance_turf_winner_transition": ":: [color=#ff00ff][color=#ffff00][alliance=%alliance_id]%alliance_name[/alliance][/color] took rulership of %region_name from [color=#ffff00][alliance=%prev_alliance_id]%prev_alliance_name[/alliance][/color]! Members receive bonus quarry resources until another Clan conquers more Strongpoints.[/color] ::"
+    },
+    "chat_map_coords_regex": "([0-9]+)[, ]([0-9]+)",
+
+    "cc_upgrade_congrats": {
+        "unit_space": {"ui_name": "Unit Space", "ui_before": "max", "ui_after": "total" },
+        "max_level": { "ui_name": "Maximum Level", "ui_before": "level", "ui_after": "max" },
+        "max_number": { "ui_name": "Maximum Number", "ui_before": "max", "ui_after": "total" }
+    },
+
+    "speedup": {
+        "template": "Save %TIME. %FINISH %BEFORE.",
+
+        "finish_repairing": "Finish repairing your %s",
+        "finish_building": "Finish building your %s",
+        "finish_upgrading": "Finish upgrading your %s",
+        "finish_tech_unlock": "Finish unlocking %s",
+        "finish_tech_upgrade": "Finish upgrading %s",
+        "finish_manufacturing": "Finish training",
+        "finish_crafting": "Finish %s activity",
+
+        "before_building": "before starting a new build",
+        "before_manufacturing": "before training units",
+        "before_research": "before starting research",
+        "before_crafting": "before starting new work",
+        "before_generic": "immediately"
+    },
+
+    "combat_messages": {
+        "ladder_victory": "Victory! +%d Point",
+        "ladder_victory_plural": "Victory! +%d Points",
+        "ladder_victory_bonus": "Bonus! +%d Point",
+        "ladder_victory_bonus_plural": "Bonus! +%d Points",
+        "ladder_protection_granted": "%sh Protection Granted to Opponent",
+        "reinforcement_request_sent": "Reinforcements Requested",
+        "item_discovered": "Item Discovered",
+        "item_purchased": "Item Purchased",
+        "purchased": "Purchased",
+        "sent_to_messages": "Sent to Messages",
+        "collected": "+Collected",
+        "added_to_warehouse": "+Added to Warehouse",
+        "adding_to_storage": "+Adding to Storage",
+        "returned_to_warehouse": "Returned to Warehouse",
+        "discarded": "Discarded",
+        "refunded": "Sold",
+        "activated": "Activated",
+        "equipped": "Equipped",
+        "resource_bonus": "(+ %d Bonus)",
+        "ready_in": "Ready in %s" // for quarry colelction cooldowns
+    },
+
+    "cursors": {
+        "outside_perimeter": "Outside base perimeter",
+        "location_blocked": "Location is blocked",
+        "click_to_move": "Click to move %s here",
+        "click_to_build": "Click to build %s here",
+        "level_x_of_y": "Level %cur of %max", // game object mouseover tooltip
+        "no_mine_equipped": "No mine armed",
+        "repairing": "Repairing",
+        "constructing": "Constructing",
+        "upgrading": "Upgrading",
+        "damaged": "Damaged",
+        "researching": "%tech Level %d",
+        "fullness": "%pct% full",
+        "mod_types": { // obsolete
+            "_damage": "DPS",
+            "_health": "HP",
+            "_armor": "Armor"}
+    },
+
+    "idle_buildings": {
+        "pending": { "ui_name": "Working...", "icon": "loading_spinner" },
+        "harvest_in_progress": { "ui_name": "Collecting...", "icon": "loading_spinner" },
+        "harvest_in_progress_pct": { "ui_name": "Collecting (%s%)...", "icon": "loading_spinner" },
+        "harvest_water": { "ui_name": "Collect", "icon": "resource_icon_water" },
+        "harvest_water_full": { "ui_name": "Collect", "icon": "stop_icon_small" },
+        "harvest_iron": { "ui_name": "Collect", "icon": "resource_icon_iron" },
+        "harvest_iron_full": { "ui_name": "Collect", "icon": "stop_icon_small" },
+        "manufacture": { "ui_name": "Train", "icon": "stop_icon_small" },
+        "manufacture_advanced": { "ui_name": "Produce", "icon": "manufacture_icon_small" },
+        "train_advanced": { "ui_name": "Train", "icon": "recruit_icon_small" },
+        "research": { "ui_name": "Research", "icon": "stop_icon_small" },
+        "research_advanced": { "ui_name": "Research", "icon": "research_icon_small" },
+        "craft": { "ui_name": "Produce", "icon": "stop_icon_small" },
+        "craft_advanced": { "ui_name": "Produce", "icon": "manufacture_icon_small" },
+        "craft_done": { "ui_name": "Collect Now", "icon": "stop_icon_small" }, // when a non-auto-collect crafting recipe is complete
+        "craft_done_advanced": { "ui_name": "Collect Now", "icon": "stop_icon_small" }, // when a non-auto-collect crafting recipe is complete
+        "fish": { "ui_name": "Ready for Dispatch", "icon": "stop_icon_small" },
+        "scan": { "ui_name": "Scan", "icon": "stop_icon_small" },
+        "join_alliance": { "ui_name": "Join Clan", "icon": "stop_icon_small" },
+        "join_alliance_advanced": { "ui_name": "Join Clan", "icon": "transmit_icon_small" },
+        "upgrade_to_join_alliance": { "ui_name": "Upgrade to Join Clan", "icon": "transmit_icon_small" },
+        "request_unit_donation": { "ui_name": "Reinforcements", "icon": "stop_icon_small" },
+        "request_unit_donation_advanced": { "ui_name": "Reinforcements", "icon": "transmit_icon_small" },
+        "upgrade": { "ui_name": "Upgrade", "icon": "stop_icon_small" },
+        "upgrade_advanced": { "ui_name": "Upgrade", "ui_name_short": "Up", "icon_delta":[-0.02,-0.02], "text_offset": [18,17], "icon": "upgrade_icon_tiny" },
+        "full": { "ui_name": "Full", "icon": "stop_icon_small" }
+    },
+
+    "regional_map": {
+        "change_region_feature_info": "%NAME Features:\n%DESCR\n\n*You may relocate your base once every 7 days. To exit, relocate to another region.",
+        "under_attack": "Under Attack",
+        "home_base": "Home Base",
+        "loading": "Loading...",
+        "instant_visit_base": "Enter Base",
+        "instant_visit_quarry": "Enter Quarry",
+        "instant_visit_own_squad": "Enter Battalion",
+        "collect_now": "Collect", "collect_in": "Collect in %s",
+        "get_info": "Show Info",
+        "spy": "Spy",
+        "attack": "Attack",
+        "locked": "Locked",
+        "to_unlock": "To Unlock: %s",
+        "cancel_travel": "Cancel Travel",
+        "go_here": "Go Here (%s)",
+        "reinforce": "Reinforce (%s)",
+        "recall": "Return to Base",
+        "deploy": "Deploy Battalion",
+        "call": "Call Battalion",
+        "move": "Move",
+        "halt": "Halt",
+        "guard": "Guard",
+        "withdraw": "Withdraw",
+        "fight_to_escape": "Fight",
+        "relocate": "Relocate Base",
+        "do_deployment": "Deploy",
+        "cancel_deployment": "Cancel",
+        "deployment_blocked": "Blocked",
+        "do_movement": "Move Here",
+        "cancel_movement": "Cancel",
+        "movement_blocked": "Blocked",
+        "add_bookmark": "Add Bookmark",
+        "already_bookmarked": "Bookmarked",
+        "too_close_to_border": "Too Close to Border",
+        "too_close_to_player": "Too Close to Another Player",
+        "unknown_name": "Unknown",
+        "unknown_base": "Unknown Base",
+        "unknown_squad": "Unknown Battalion",
+        "richness": [[10, "S"], [20, "M"], [30, "L"], [40, "XL"]],
+        "all_quarries": "Quarries",
+        "quarry": "Quarry %s",
+        "strongpoint": "Strongpoint %s",
+        "hive": "%s",
+        "hive_with_tokens_subtitle": "%d ONP",
+        "hive_with_tokens": "Event Base (Win %d ONP)",
+        "hive_with_kill_points": "%s (%d KP)",
+        "mystery": "Spy satellites cannot detect\nbase owner",
+        "arriving_in": "Arriving in %s",
+        "this_region_is": "REGION: %s",
+        "cursor": "Cursor Coordinates: %s",
+        "you_control": "You Control",
+        "you_control_quarries": "You Control (%cur/%max Quarries)",
+
+        "your_quarry_is_under_attack": "Your Quarry %basename is under attack by %attacker!",
+        "your_quarry_was_attacked_victory": "Your Quarry %basename repelled the attack by %attacker!",
+        "your_quarry_was_attacked_defeat": "Your Quarry %basename was taken by %attacker!",
+
+        "your_squad_is_under_attack": "Your Battalion %basename is under attack by %attacker!",
+        "your_squad_was_attacked_victory": "Your Battalion %basename repelled the attack by %attacker!",
+        "your_squad_was_attacked_defeat": "Your Battalion %basename was destroyed by %attacker!"
+    },
+
+    "inventory": {
+        "pending": "Waiting for server response",
+        "undiscardable_tooltip": "Item cannot be discarded",
+        "unrefundable_tooltip": "Item cannot be sold: %s",
+        "equip_button": "Equip", "equip_button_pending": "Equipping...",
+        "activate_button": "Activate", "activate_button_pending": "Activating...",
+        "discard_button": "Discard", "discard_button_pending": "Discarding...",
+        "discard_all_button": "Discard All", "discard_all_button_pending": "Discarding...",
+        "refund_button": "Sell", "refund_button_pending": "Selling...",
+        "warehouse_busy": "Warehouse busy",
+        "building_equip_tooltip": "Use the building Upgrade menu to equip into a building",
+        "unit_equip_tooltip": "Use the Research menu to equip onto a unit type"
+    },
+
+    "auras": {
+        "remove_button": "Remove", "remove_button_pending": "Removing..."
+    },
+
+    "item_types": {
+        "unit": "Packaged Unit",
+        "packaged_unit": "Packaged Unit",
+        "battle_consumable": "Battle Consumable",
+        "resource_boost_percent": "Resource Boost",
+        "resource_boost_flat": "Resource Boost",
+        "expedition": "Expedition",
+        "consumable": "Consumable",
+        "blueprint": "Blueprint",
+        "building_equip": "Building %SLOT Equipment",
+        "building_leader": "%NAME Leader",
+        "unit_equip": "Unit %SLOT Equipment",
+        "unit_leader": "%NAME Leader",
+        "equip": "%SLOT Equipment"
+    },
+
+    "predicates": {
+        "ALWAYS_FALSE": { "ui_name": "Locked" },
+        "AURA_ACTIVE": { "ui_name": "Aura active: %s" },
+        "COOLDOWN_ACTIVE": { "ui_name": "Cooldown active: %s" },
+        "ALL_BUILDINGS_UNDAMAGED": { "ui_name": "All buildings undamaged" },
+        "OBJECT_UNDAMAGED": { "ui_name": "Repair %s" },
+        "OBJECT_UNBUSY": { "ui_name": "%s not damaged or busy" },
+        "BUILDING_QUANTITY": { "ui_name": "Build %d %s" },
+        "UNIT_QUANTITY": { "ui_name": "%d %s" },
+        "BUILDING_LEVEL": { "ui_name": "Level %d %s",
+                            "ui_name_multiple": "Needs %qtyx Level %d %s",
+                            "ui_name_all": "Needs All Level %d %s" },
+        "TECH_LEVEL": { "ui_name": "%s Level %d" },
+        "QUEST_COMPLETED": { "ui_name": "%s Completed" },
+        "ATTACKS_LAUNCHED": { "ui_name": "Attacked %d times" },
+        "ATTACKS_VICTORY": { "ui_name": "Conquered %d bases" },
+        "UNITS_MANUFACTURED": { "ui_name": "Trained %d units", "ui_progress": "%d1/%d2 Units Trained" },
+        "RESOURCES_HARVESTED_TOTAL": { "ui_name": "Collected %d %s (total)" },
+        "RESOURCES_HARVESTED_AT_ONCE": { "ui_name": "Collected %d %s (at once)" },
+        "PLAYER_HISTORY": { "ui_name": "%s %d" },
+        "ACCOUNT_CREATION_TIME": { "ui_name": "Account creation time: %d1 - %d2" },
+        "ABSOLUTE_TIME": { "ui_name": "Absolute time: %d1 - %d2" },
+        "AI_BASE_SHOWN": { "ui_name": "AI base shown: %d" },
+        "AI_BASE_ACTIVE": { "ui_name": "AI base active: %d" },
+        "FRIENDS_JOINED": { "ui_name": "%d friends joined", "ui_progress": "%d1/%d2 New friends joined" },
+        "LOGGED_IN_TIMES": { "ui_name": "Logged in %d times", "ui_progress": "%d1/%d2 Logins" },
+        "CONQUESTS": { "ui_name": "%d Conquests", "ui_progress": "%d1/%d2 Conquests" },
+        "HAS_ATTACKED": { "ui_name": "You must be in combat to do this" },
+        "HAS_DEPLOYED": { "ui_name": "You must be in combat and have deployed units to do this" }
+    },
+
+    // HTML to override what goes in the spin_footer_linkbar div
+    "footer_linkbar_content": [
+        // Like only
+        [{"predicate": "ALWAYS_TRUE"},
+         "&nbsp;&nbsp;&nbsp;<font size=\"-1\"><a href=\"\/\/www.facebook.com/141835099310946/?ref=ingame_linkbar\" target=\"_blank\">Like Example Game on Facebook</a>&nbsp;&nbsp;|&nbsp;&nbsp;<a href=\"\/\/www.XXXXXX.com/terms\" target=\"_blank\">Terms of Service</a></font>"
+        ]],
+
+    // unsupported_browser_landing MOVED to config.json:proxyserver
+
+    "account_banned_landing": "//www.XXXXXX.com/error-account-banned/",
+    "bad_chrome_version_landing": "//www.XXXXXX.com/error-google-chrome-update-required/",
+
+    "fullscreen_instructions_flavor_text": "\"Ha! Your Full Screen mode is no\nmatch against my armies. It merely\ngives you a better view of me\ncrushing your puny forces.\"\n\n- Mr. Skilling",
+
+    "settings": {
+        // NOTE! array size of widgets in dialogs.json:settings_dialog must be >= the number of settings here
+        "low_gfx": {"name": "low_gfx", "ui_description": "Graphics Detail:", "preference_key": "low_gfx", "default_val": 0, "requires_reload": 1,
+                    "show_if": {"predicate": "AND", "subpredicates": [
+                        // 2012 Nov 28 - Firefox v16 is crapping out when low_gfx=0, so just ignore this setting for now
+                        { "predicate": "NOT", "subpredicates": [{"predicate": "BROWSER_NAME", "names": ["Firefox"]}] },
+                        { "predicate": "NOT", "subpredicates": [{"predicate": "BROWSER_OS", "os": ["iOS"]}] }
+                    ] },
+                    "choices": [{"ui_name": "High",
+                                 "ui_tooltip": "Best for new computers\nusing Chrome or Internet\nExplorer. Game plays at\nhighest quality.",
+                                 "preference_val": 0},
+                                {"ui_name": "Low",
+                                 "ui_tooltip": "Best for older computers,\nor Firefox users. Game\nplays faster, with lower\nquality graphics.",
+                                 "preference_val": 1}]},
+
+        "auto_unit_control": {"name": "auto_unit_control", "ui_description": "Unit Control:", "preference_key": "auto_unit_control", "default_val": 1, "requires_reload": 0,
+                              "abtest_key": "default_auto_unit_control",
+                              "choices": [{"ui_name": "Auto",
+                                           "ui_tooltip": "Your units find and attack\nenemy targets automatically.\nDouble-click to force movement.\n(Warning: force movement\ncancels unit defenses until\ndestination is reached.)",
+                                           "preference_val": 1},
+                                          {"ui_name": "Manual",
+                                           "ui_tooltip": "Your units defend themselves,\nbut do not attack far-away\nenemies until you command them.",
+                                           "preference_val": 0}]},
+
+        "auto_unit_control_dmove": {"name": "auto_unit_control_dmove",
+                                    "ui_description": "Move priority (Auto control):", "preference_key": "auto_unit_control_dmove", "requires_reload": 0,
+                                    "default_val": [
+                                        [{"predicate": "ANY_ABTEST", "key": "default_auto_unit_control_dmove", "value": 1}, 1], // default ON for players who were in the original A/B test "on" group
+                                        [{"predicate": "ACCOUNT_CREATION_TIME", "range": [-1,1376517209]}, 0], // default OFF for old accounts created before Wed Aug 14 22:00 UTC
+                                        [{"predicate": "ALWAYS_TRUE"}, 1] // default ON otherwise
+                                    ],
+                                    "enable_if": {"predicate": "PLAYER_PREFERENCE", "key": "auto_unit_control", "value": 1},
+                                    "show_if": {"predicate": "ALWAYS_TRUE"} , // {"predicate": "ANY_ABTEST", "key": "show_auto_unit_control_dmove", "value": 1},
+                                    "choices": [{"ui_name": "High",
+                                                 "ui_tooltip": "While moving in Auto mode,\nunits will not stop to fight\nnearby enemy buildings\nunless attacked.",
+                                                 "preference_val": 1},
+                                                {"ui_name": "Low",
+                                                 "ui_tooltip": "While moving in Auto mode,\nunits will always stop to fight\nnearby enemy buildings.",
+                                                 "preference_val": 0}]},
+
+        // note: default is NOT to shoot barriers, unlike MF
+        "target_barriers": {"name": "target_barriers", "ui_description": "Shoot Barriers (Manual control):", "preference_key": "target_barriers", "default_val": 0, "requires_reload": 0,
+                            "abtest_key": "default_target_barriers",
+                            "show_if": {"predicate": "ALWAYS_TRUE"},
+                            "enable_if": {"predicate": "PLAYER_PREFERENCE", "key": "auto_unit_control", "value": 0},
+                            "choices": [{"ui_name": "Yes",
+                                         "ui_tooltip": "In Manual mode,\nunits will automatically\ntarget nearby Barriers.",
+                                         "preference_val": 1},
+                                        {"ui_name": "No",
+                                         "ui_tooltip": "In Manual mode,\nunits will not shoot at\nBarriers unless you\nclick to target the Barrier.",
+                                         "preference_val": 0}]},
+
+        "always_show_unit_health": {"name": "always_show_unit_health", "ui_description": "Show Health Bars On:", "preference_key": "always_show_unit_health", "default_val": 0, "requires_reload": 0,
+                                    "choices": [{"ui_name": "Damaged units",
+                                                 "ui_tooltip": "Health bars are shown only on\ndamaged units",
+                                                 "preference_val": 0},
+                                                {"ui_name": "All units",
+                                                 "ui_tooltip": "Health bars are shown\non all units",
+                                                 "preference_val": 1}]},
+        "show_idle_buildings": {"name": "show_idle_buildings", "ui_description": "Idle Building Indicators:", "preference_key": "show_idle_buildings", "default_val": 1, "requires_reload": 0,
+                                "show_if": {"predicate": "ALWAYS_FALSE"}, // hide for now
+                                "choices": [{"ui_name": "On",
+                                             "ui_tooltip": "Enable icons above idle buildings",
+                                             "preference_val": 1},
+                                            {"ui_name": "Off",
+                                             "ui_tooltip": "Do not show icons above idle buildings",
+                                             "preference_val": 0}]},
+        "chat_filter": {"name": "chat_filter", "ui_description": "Chat Filter:", "preference_key": "chat_filter", "default_val": 1, "requires_reload": 0,
+                        "show_if": {"predicate": "ALWAYS_TRUE"},
+                        "choices": [{"ui_name": "On",
+                                     "ui_tooltip": "Most offensive language will be filtered out\nof your chat window.",
+                                     "preference_val": 1},
+                                    {"ui_name": "Off",
+                                     "ui_tooltip": "Your chat window will not be filtered.",
+                                     "preference_val": 0}]},
+        "enable_fb_notifications": {"name": "enable_fb_notifications", "ui_description": "Facebook Notifications:", "preference_key": "enable_fb_notifications", "default_val": 1, "requires_reload": 0,
+                                    "show_if": {"predicate": "ALWAYS_TRUE"},
+                                    "choices": [{"ui_name": "On",
+                                                 "ui_tooltip": "You will receive Facebook notifications when\nupgrades, research, and training are complete,\nand when your base is attacked.",
+                                                 "preference_val": 1},
+                                                {"ui_name": "Off",
+                                                 "ui_tooltip": "You will not receive any Facebook\nnotifications from Example Game.",
+                                                 "preference_val": 0}]},
+
+        "playfield_zoom": {"name": "playfield_zoom",
+                           "ui_description": "Playfield Zoom:", "preference_key": "playfield_zoom", "requires_reload": 0,
+                           "default_val": [
+                               [{"predicate": "ANY_ABTEST", "key": "default_playfield_zoom_150", "value": 1}, 0.4],
+                               [{"predicate": "ALWAYS_TRUE"}, 0]
+                           ],
+                           "show_if": {"predicate": "ALWAYS_FALSE"}, // internal use only
+                           "choices": []},
+        "playfield_speed": {"name": "playfield_speed",
+                            "ui_description": "Playfield Speed:", "preference_key": "playfield_speed", "requires_reload": 0,
+                            "default_val": [
+                                [{"predicate": "ALWAYS_TRUE"}, 0] // 1.0x
+                            ],
+                            "show_if": {"predicate": "ALWAYS_FALSE"}, // internal use only
+                            "choices": []},
+        "repair_control_squad_id": {"name": "repair_control_squad_id",
+                                    "ui_description": "Repair Control Dialog Default Battalion ID:", "preference_key": "repair_control_squad_id", "requires_reload": 0,
+                                    "default_val": [
+                                        [{"predicate": "ACCOUNT_CREATION_TIME", "range": [-1,1402909017]}, -1], // default to -1 (Reserves) for accounts created before 2014 Jun 16
+                                        [{"predicate": "ALWAYS_TRUE"}, 0] // 0 = Base Defenders
+                                    ],
+                                    "show_if": {"predicate": "ALWAYS_FALSE"}, // internal use only
+                                    "choices": []},
+        "enable_fishing_notifications": {"name": "enable_fishing_notifications",
+                                         "ui_description": "FB Notifications for Logistics Dispatch:", "preference_key": "enable_fishing_notifications", "requires_reload": 0,
+                                         "default_val": [
+                                             [{"predicate": "ALWAYS_TRUE"}, 1]
+                                         ],
+                                         "show_if": {"predicate": "ALWAYS_FALSE"}, // internal use only
+                                         "choices": []}
+    },
+
+    "inventory_intro_mail": { "ui_from": "Narrator", // sender,
+                              "duration": -1,
+                              "ui_subject": "Your First Item", // subject line
+                              "ui_body": "Greetings Commander,\n\nHere's your first message. This message contains an item. Win more items via battles or missions.\n\nWARNING: Messages expire, store items quickly.",
+                              "attachments": [{"spec":"packaged_tutorial_droid","undiscardable":1}] },
+    "free_transmitter_mail": { "ui_from": "Narrator",
+                               "duration": -1,
+                               "ui_subject": "Free Transmitter",
+                               "ui_body": "Greetings Commander! As of today, a Transmitter is required to access the Regional Map.\n\nIn gratitude for your commitment to Example Game, here is an item that will build your Transmitter for free.",
+                               "attachments": [{"spec":"transmitter_kit"}] },
+
+    "trim_unit_space_mail_townhall": { "ui_from": "Narrator",
+                                       "duration": 604800,
+                                       "ui_subject": "Army Units Returned",
+                                       "ui_body": "Greetings Commander,\n\nWe have more units than our Tactical Ops Center can control!\n\nI've saved the extra units for you. Click to store them in the Warehouse until you need them." },
+    "trim_unit_space_mail_reserves": { "ui_from": "Narrator",
+                                       "duration": 604800,
+                                       "ui_subject": "Army Units Returned",
+                                       "ui_body": "Greetings Commander,\n\nWe have more units than our Reserves Bay can control!\n\nI've saved the extra units for you. Click to store them in the Warehouse until you need them." },
+
+    "trim_unit_space_mail_base_defenders": { "ui_from": "Narrator",
+                                             "duration": 604800,
+                                             "ui_subject": "Army Units Returned",
+                                             "ui_body": "Greetings Commander,\n\nWe had more units in Base Defenders than our Tactical Ops Center can control!\n\nI've returned the extra %s unit(s) to reserves." },
+
+    "trim_unit_space_mail_squad": { "ui_from": "Narrator",
+                                    "duration": 604800,
+                                    "ui_subject": "Army Units Returned",
+                                    "ui_body": "Greetings Commander,\n\nBattalion %level had more units than our Reserves Bay can control!\n\nI've returned the extra %s unit(s) to reserves." },
+
+    // generic refund message, e.g. for credit card chargebacks
+    "gamebucks_refund_mail": { "ui_from": "Narrator",
+                               "duration": -1,
+                               "ui_subject": "Refund complete",
+                               "ui_body": "Your refund for %QUANTITY %GAMEBUCKS_NAME from %DAY at %TIME GMT is now complete.\n\nPayment ID: %PAYMENT_ID"},
+    /// refund message used when Facebook returns a "declined" status (asynchronous rejection of the transaction - sometimes happens with debit cards when your bank account has insufficient funds)
+    "gamebucks_refund_mail_decline": { "ui_from": "Narrator",
+                                       "duration": -1,
+                                       "ui_subject": "Refund complete",
+                                       "ui_body": "Your purchase of %QUANTITY %GAMEBUCKS_NAME from %DAY at %TIME GMT was declined by Facebook, and has been refunded.\n\nYou will not be charged for this purchase.\n\nPayment ID: %PAYMENT_ID"},
+
+    "gift_order_refund_mail": { "ui_from": "Narrator",
+                                "duration": -1,
+                                "ui_subject": "Gift Refunded",
+                                "ui_body": "%SENDER has refunded the gift of %QUANTITY %GAMEBUCKS_NAME sent to you on %DAY at %TIME GMT.\n\nPayment ID: %PAYMENT_ID"},
+
+    "loot_mail": { "ui_from": "Narrator",
+                   "duration": 86400,
+                   "ui_subject": "%s L%level Loot",
+                   "ui_body": "Commander,\n\nWe recovered a special item from our victory over %s on %day at %time GMT.\n\nWARNING: Messages expire, store items quickly."},
+
+    "quest_reward_mail": { "ui_from": "Narrator",
+                           "duration": 604800,
+                           "ui_subject": "%s Reward",
+                           "ui_body": "Commander,\n\nWe received this reward for completing the mission \"%s\" on %day at %time GMT.\n\nWARNING: Messages expire, store items quickly."},
+
+    "level_up_reward_mail": { "ui_from": "Narrator",
+                              "duration": 604800,
+                              "ui_subject": "Level Up Reward",
+                              "ui_body": "Commander,\n\nWe received this reward for achieving level %s on %day at %time GMT.\n\nWARNING: Messages expire, store items quickly."},
+
+    "lottery_mail": { "ui_from": "Narrator",
+                      "duration": 86400,
+                      "ui_subject": "Scanner Results",
+                      "ui_body":"Commander,\n\nHere is the special item received from our Long-Range Scanner.\n\nWARNING: Messages expire, store items quickly."},
+
+    "promo_code_mail": { "ui_from": "Narrator",
+                         "duration": 86400,
+                         "ui_subject": "Promotional Item",
+                         "ui_body":"Commander,\n\nHere is the special promotional item we received."},
+
+    "buy_gamebucks_bonus_mail": { "ui_from": "Narrator",
+                                  "duration": 2592000, // 30 days
+                                  "ui_subject": "Bonus units",
+                                  "ui_body":"Bonus units from purchase on %day at %time GMT\n\nWARNING: Messages expire, store items quickly."},
+
+    "gift_order_mail": { "ui_subject": "%GAMEBUCKS_NAME from %sender",
+                         "ui_body": "%GAMEBUCKS_NAME provides speed-ups, resource, instant upgrades, and unlocks.\n\n%sender sent you this gift on %day at %time GMT."},
+
+    "buy_item_mail": { "ui_from": "Narrator",
+                       "duration": 604800,
+                       "ui_subject": "%level", // XXX horrible hack - use %level replacement for first item name
+                       "ui_body":"Store purchase on %day at %time GMT:\n\n%s\n\nWARNING: Messages expire, store items quickly."},
+
+    "alliance_invite_mail": { "ui_subject": "Join our Clan?",
+                              "ui_from": "%LEADER_NAME, %LEADER_ROLE_NAME, %ALLIANCE_NAME",
+                              "ui_body": "%LEADER_NAME, %LEADER_ROLE_NAME, invites you to join:\n\n%ALLIANCE_NAME\n\nSearch for us by name using the \"C\" button, then click Join!"},
+    "alliance_kick_mail": { "ui_subject": "Kicked from Clan",
+                            "ui_from": "%LEADER_NAME, %LEADER_ROLE_NAME, %ALLIANCE_NAME",
+                            "duration": -1,
+                            "ui_body": "%LEADER_NAME, %LEADER_ROLE_NAME, kicked you from %ALLIANCE_NAME."},
+    "alliance_promote_mail": { "ui_subject": "Promoted to %NEW_ROLE_NAME",
+                               "ui_from": "%LEADER_NAME, %LEADER_ROLE_NAME, %ALLIANCE_NAME",
+                               "duration": 604800,
+                               "ui_body":"%LEADER_NAME, %LEADER_ROLE_NAME, promoted you to %NEW_ROLE_NAME in %ALLIANCE_NAME."},
+    "alliance_demote_mail": { "ui_subject": "Demoted to %NEW_ROLE_NAME",
+                              "ui_from": "%LEADER_NAME, %LEADER_ROLE_NAME, %ALLIANCE_NAME",
+                              "duration": 604800,
+                              "ui_body":"%LEADER_NAME, %LEADER_ROLE_NAME, demoted you to %NEW_ROLE_NAME in %ALLIANCE_NAME."},
+    "alliance_join_request_accepted_mail": { "ui_subject": "Joined Clan",
+                                             "ui_from": "%LEADER_NAME, %LEADER_ROLE_NAME, %ALLIANCE_NAME",
+                                             "duration": -1,
+                                             "ui_body":"Welcome to my clan:\n\n%ALLIANCE_NAME"},
+    "alliance_join_request_rejected_mail": { "ui_subject": "Cannot Join Clan",
+                                             "ui_from": "%LEADER_NAME, %LEADER_ROLE_NAME, %ALLIANCE_NAME",
+                                             "duration": -1,
+                                             "ui_body":"You may not join:\n\n%ALLIANCE_NAME\n\nClan full, or request to join rejected."},
+
+    "alliance_gift_mail": { "ui_from": "%SENDER_NAME, %SENDER_ROLE_NAME, %ALLIANCE_NAME",
+                            "duration": 604800,
+                            "ui_subject": "Gift from %SENDER_NAME",
+                            "ui_body": "Commander,\n\n%SENDER_NAME, %SENDER_ROLE_NAME sent us this gift on %day at %time GMT.\n\nWARNING: Messages expire, store items quickly."},
+
+    "weak_zombie_tip": { "ui_title": "Random Failures Suffered",
+                         "ui_description": "Units with more than %one_minus_threshold% damage now suffer speed and damage reductions due to random equipment failures.\n\nOur forces desperately need repairs." },
+
+    "no_equipment_tip": { "ui_title": "You Lack Equipment",
+                          "ui_description": "Your Warehouse lacks equipment items for this slot.\n\nWin equipment during limited-time special events by fighting featured opponents on the Attack menu." },
+
+    "human_rivals_tip": { "ui_title": "Human Rivals",
+                          "ui_description": "This menu shows other Example Game players.\n\nIf you attack them, your own base will become vulnerable to attacks." },
+    "map_quarries_tip": { "ui_title": "About Quarries: BETA Feature",
+                          "ui_description": "Destroy all enemy units and turrets in a quarry to take control.\n\nOwning a quarry entitles you to collect supplies and fuel from the yards within.\n\nQuarries lie far from your outpost, and require travel time for units to reach.\n\nQuarries contain limited resources and will disappear after becoming drained of resources." },
+
+    "map_feature_strongpoint_tip": { "ui_title": "Strongpoints",
+                                     "ui_description": "Make your Clan ruler of the region by holding more than half of all Strongpoints.\n\nAll members of the ruling Clan receive double the normal amount of Fuel and Supplies from Strongpoint quarries.\n\nRulership bonus applies only to Clan members in this region." },
+
+    "quarry_conquer_tip2": { "ui_title": "Quarry Conquered!",
+                             "ui_description": "You now control this quarry. Click \"Collect All\" in your home base to collect quarry resources.\n\nThis quarry is lost if another player defeats its defenses. Click \"Reinforce\" to add units to this quarry. Reinforcements cannot be repaired or sent home.\n\nThis quarry has a 50% chance of expiring every 7 days." },
+    "quarry_conquer_tip2_nosql": { "ui_title": "Quarry Conquered!",
+                                   "ui_description": "This quarry is yours. From your home base, click \"Collect All\" to collect its resources.\n\nTo guard this quarry, move a Battalion here. This quarry is lost if another player defeats its defenses. Move buildings and barriers to improve its protection.\n\nAfter quarries expire, guarding battalions remain on map." },
+    "hive_battle_victory_tip": { "ui_title": "Terrorist Camp Destroyed!",
+                                 "ui_description": "You destroyed the Tactical Ops Center, wiping this terrorist camp off the island." },
+    "hive_battle_victory_tip_with_kill_points": { "ui_title": "Terrorist Camp Destroyed!",
+                                                  "ui_description": "You destroyed the Tactical Ops Center, wiping this terrorist camp off the island.\n\nYou earned %s KILL POINTS!" },
+    "hive_battle_victory_tip_with_tokens": { "ui_title": "Terrorist Camp Destroyed!",
+                                             "ui_description": "You destroyed the Tactical Ops Center, wiping this terrorist camp off the island.\n\nYou earned %d %s!" },
+    "hive_battle_defeat_tip": { "ui_title": "Terrorist Camp Still Active",
+                                "ui_description": "The terrorist camp endured your attack with its Tactical Ops Center still standing.\n\nYou can attack again, but beware, this camp will expire soon, and other players might destroy it first." },
+
+    "system_refund": { "ui_title": "Resources Refunded",
+                       "ui_description": "Resources were refunded to you for the following reason: (Unknown)" },
+
+    "server_going_down_short": { "ui_title": "Server Maintenance", "dialog": "message_dialog_big",
+                                 "ui_description": "The game server has received upgrades, and needs to restart.\n\nYou will be reconnected to the game automatically in just a moment.\n\nPlease return to home base." },
+
+    // the ubiquitous generic timeout message
+    "timeout_message": { "ui_title": "Commander, are you there?",
+                         "ui_description": "I await your orders.",
+                         "ui_button": "I'm back",
+                         "ui_button_pending": "Reloading..." },
+    "network_error": { "ui_title": "Communications Problem",
+                       "ui_description": "Sorry, there has been a temporary network error.\nPlease reconnect to Example Game. (code %d)",
+                       "ui_button": "Reconnect",
+                       "ui_button_pending": "Reloading..." },
+    "reload_required": { "ui_title": "Reload Required",
+                         "ui_button": "Reload" },
+
+    "connecting_to_server": { "interval": 0.125, "frames": ["Connecting to server","Connecting to server.","Connecting to server..","Connecting to server...","Connecting to server...."] },
+    "loading_screen_beta": "BETA",
+    "loading_screen_loading": "Loading art (%pct%)...",
+
+    "report_sent": { "ui_title": "Report Sent",
+                     "ui_description": "This player has been reported, and is blocked from contacting you again.\n\nTo unblock, click the \"Unblock\" button on the Player Info menu."
+                   },
+
+    "gamebucks_discovered_in_deposit": { "ui_title": "%s discovered",
+                                         "ui_description": "Commander, we have discovered %s in this cache. Check daily to discover more." },
+    "deposits_mined_out": { "ui_title": "Today's Caches Mined Out",
+                            "ui_description": "We've collected all the caches on our base today. If we check back daily we should find some %s." },
+
+    "chat_gag_success": { "ui_title": "User Muted",
+                          "ui_description": "User ID %d (%s) has been muted." },
+    "chat_ungag_success": { "ui_title": "User Unmuted",
+                            "ui_description": "User ID %d (%s) has been unmuted." },
+
+    "skip_tutorial_confirm": { "ui_title": "Skip Tutorial Missions?",
+                               "ui_button": "Skip",
+                               "ui_description": "To resume, click the \"?\" button at the top of your screen." },
+
+    "dev_skip_rails_tutorial_confirm": { "ui_title": "DEVELOPER ONLY",
+                                         "ui_button": "Skip",
+                                         "ui_description": "\"Skip Tutorial\" is for developer testing ONLY.\n\nThe following \"Attack an Outpost\" mission will seem to be broken the first time you accept it.\n\nThis is expected behavior when you use the \"Skip Tutorial\" developer option. It is not a bug." },
+
+    "join_alliance_confirm": { "ui_title": "Join Clan?",
+                               "ui_description": "You will become a member of %s." },
+    "send_alliance_join_request_confirm": { "ui_title": "Request to Join Clan",
+                                            "ui_description": "Ask to join %s?",
+                                            "ui_button": "Send" },
+
+    "leave_alliance_confirm": { "ui_title": "Leave Clan?",
+                                "ui_description": "After leaving, you must wait 24 hours before joining a new Clan." },
+    "leave_alliance_leader_confirm": { "ui_title": "Leave Clan?",
+                                       "ui_description": "After leaving, you must wait 24 hours before joining a new Clan.\n\nBecause you are currently Clan leader, upon leaving the next-highest ranked Clan member will be promoted to leader. Any ties in succession will be broken by player level, then earliest join date." },
+
+    "disband_alliance_confirm": { "ui_title": "Disband Clan?",
+                                  "ui_description": "You are the last member. If you leave, %s will be disbanded." },
+    "join_alliance_finish": { "ui_title": "Clan Joined",
+                              "ui_description": "Welcome to %s!" },
+    "modify_alliance_finish": { "ui_title": "Clan Modified",
+                                "ui_description": "New settings applied." },
+    "leave_alliance_finish": { "ui_title": "Clan Left",
+                               "ui_description": "You are no longer in a Clan." },
+    "alliance_invite_finish": { "ui_title": "Invitation Sent",
+                                "ui_description": "%s has been invited to your Clan." },
+    "alliance_kick_confirm": { "ui_title": "Kick member?", "ui_button": "Kick",
+                               "ui_description": "%s will be removed from your Clan and cannot join a new Clan for 24 hours." },
+    "alliance_kick_finish": { "ui_title": "Player Kicked",
+                              "ui_description": "%s has been kicked from your Clan." },
+    "alliance_promote_finish": { "ui_title": "Player Rank Changed",
+                                 "ui_description": "%s's new rank will take effect in a few moments." },
+    "alliance_role_changed": { "ui_title": "Clan Rank Update",
+                               "ui_description": "Your rank in Clan %alliance is now %role." },
+    "send_alliance_join_request_success": { "ui_title": "Request Sent",
+                                            "ui_description": "The leadership of %s will see your request next time they log in to the game." },
+    "send_alliance_join_request_failure": { "ui_title": "Request Error",
+                                            "ui_description": "Unable to join %s." },
+
+    "inventory_confirm_discard_one": { "ui_title": "Are you sure?",
+                                       "ui_description": "Your %s will be discarded.",
+                                       "ui_button": "Discard" },
+    "inventory_confirm_discard_all": { "ui_title": "Are you sure?",
+                                       "ui_description": "%d%s will be discarded.",
+                                       "ui_button": "Discard" },
+    "inventory_confirm_refund": { "ui_title": "Are you sure?",
+                                  "ui_description": "%d%s will be sold for %refund",
+                                  "ui_button": "Sell" },
+    "inventory_refund": "[color=#ff0000]Can be sold for %s.[/color]",
+    "inventory_expires": "[color=#ff0000]Expires in %s. Use it or lose it![/color]",
+    "inventory_expired": "[color=#ff0000]Already expired.[/color]",
+
+    "loot_help_tip": { "ui_title": "Looting",
+                       "ui_description": "The Loot screen lets you store or discard loot you've won.\n\nTo STORE loot, hit [Enter], the \"Store All Loot\" button, or click on the loot item.\n\nTo ABANDON loot, hit [Esc] or close the window.\n\nTo ACTIVATE or DISCARD a Warehouse item to make room for loot, click on the item and select an option."},
+
+    "loot_abandon_confirm": { "ui_title": "Abandon loot?",
+                              "ui_button": "Abandon",
+                              "ui_description": "Unstored loot items will be lost." },
+
+    "player_aura_confirm_cancel": { "ui_title": "Are you sure?",
+                                    "ui_description": "%s will be removed.",
+                                    "ui_button": "Remove" },
+    "player_aura_confirm_overwrite": { "ui_title": "Replace current effect?",
+                                       "ui_description": "%item will replace your existing \"%existing\" effect.\n\nThese two effects cannot both be active at the same time.",
+                                       "ui_button": "Replace" },
+
+    "damage_protection_notice": { "ui_title": "Damage Protection Awarded",
+                                  "ui_description": "During our last battle, we won a randomly-allocated damage protection award.\n\nThis protection against rivals begins now.\n\nUse this time to upgrade our defenses - especially towers - and rebuild our army.",
+                                  "dialog": "message_dialog_big" },
+
+    "mail_confirm_delete": { "ui_title": "Delete this message?",
+                             "ui_description": "Press [ENTER] to confirm.",
+                             "ui_button": "Delete" },
+
+    "squad_delete_confirm": { "ui_title": "Disband Battalion?",
+                              "ui_button": "Disband",
+                              "ui_description": "Units in this battalion will be returned to your reserves. No units will be lost." },
+
+    "transmitter_confirm_upgrade": { "ui_title": "Are you sure?",
+                                     "ui_description": "Reinforcements will not be available until this upgrade is complete.",
+                                     "ui_button": "Upgrade" },
+    "warehouse_confirm_upgrade": { "ui_title": "Are you sure?",
+                                   "ui_description": "Inventory will not be available until this upgrade is complete.",
+                                   "ui_button": "Upgrade" },
+
+    "manufacture_overflow_to_reserves_tip": { "ui_title": "New Units in Reserves",
+                                              "ui_description": "Base Defenders full - new units added to Reserves.\n\nUse Army -> Battalions menu to assign reserve units to a battalion." },
+
+    "reset_game_confirm": { "ui_title": "Are you sure?",
+                            "ui_description": "Game state will be reset.",
+                            "ui_button": "Reset" },
+
+    "load_ai_base_success": { "ui_title": "AI base loaded",
+                              "ui_description": "AI base %s loaded." },
+    "save_ai_base_success": { "ui_title": "AI base saved",
+                              "ui_description": "AI base %s saved.\n\nRemember to publish it!" },
+    "publish_ai_base_success": { "ui_title": "AI base published",
+                                 "ui_description": "AI base %s was published and can now be visited." },
+
+    "abandon_quarry_confirm": { "ui_title": "Are you sure?",
+                                "ui_description": "You will no longer be able to collect from this quarry, and units deployed here will be lost.",
+                                "ui_button": "Abandon" },
+
+    "abandon_quarry_confirm_nosql": { "ui_title": "Are you sure?",
+                                      "ui_description": "You will no longer be able to collect from this quarry.",
+                                      "ui_button": "Abandon" },
+
+    "map_bookmark_delete_confirm": { "ui_title": "Delete Bookmark?",
+                                     "ui_button": "Delete",
+                                     "ui_description": "%s will be removed from your Bookmarks list." },
+
+    // region-change confirmation dialog
+    "change_region_confirm": { "ui_title": "Move to %s?",
+                               "ui_description": "All battalions will return to home base. Any quarries you own will be abandoned.",
+                               "ui_button": "Yes, Relocate" },
+    "change_region_confirm_within_region": { "ui_title": "Relocate Home Base?",
+                                             "ui_description": "Your Home base will be moved to a new place in the same region.",
+                                             "ui_button": "Yes, Relocate" },
+
+    // region-change confirmation dialog
+    "change_region_confirm_ladder_reset": { "ui_title": "Exit PvP Ladder?",
+                                            "ui_description": "You are moving to a region that does not have instant PvP Ladder battles.\n\nYOU WILL LOSE ALL YOUR PVP LADDER POINTS!",
+                                            "ui_button": "Yes, Relocate" },
+
+    // pop-ups shown after moving to a new region
+    "change_region_finish": { "ui_title": "Welcome to %s!",
+                              "ui_description": "Your home base is at (%loc).\n\n%s Properties:\n"
+                            },
+
+    "find_in_different_region": { "ui_title": "Different Region",
+                                  "ui_button": "Relocate",
+                                  "ui_description": "This player is in %region. Relocate your home base now?" },
+
+    "find_in_different_region_locked": { "ui_title": "Out of Range",
+                                         "ui_button": "Understood",
+                                         "ui_description": "This player is in %region, which is out of range for us.\n\nYou will not be able to play together on the same map." },
+    "find_in_different_region_locked_bridge": { "ui_title": "Out of Range",
+                                                "ui_button": "Understood",
+                                                "ui_description": "This player is in %region.\n\nTo relocate there, acquire and activate a Region Bridge item." },
+
+    "join_alliance_different_continent_locked":  { "ui_title": "Out of Range",
+                                                   "ui_button": "Understood",
+                                                   "ui_description": "This Clan is based in the continent \"%continent\", which is out of range for us.\n\nYou will not be able to play together on the same map or contribute points in Clan tournaments." },
+    "join_alliance_different_continent_locked_bridge":  { "ui_title": "Out of Range",
+                                                          "ui_button": "Understood",
+                                                          "ui_description": "This Clan is based in the continent \"%continent\", which is out of range for us.\n\nTo relocate there, acquire and activate a Region Bridge item." },
+
+    "battle_end": { "away": { "victory": { "ui_title": "Victory!",
+                                           "log_outcome": { "attacker": "TOC\nDestroyed", "defender": "TOC\nSurvived" },
+                                           "ui_description": "Tactical Ops Center destroyed!" },
+                              "defeat": { "ui_title": "Withdraw",
+                                          "log_outcome": { "attacker": "Withdrew", "defender": "TOC\nDestroyed" },
+                                          "ui_description": "You failed to destroy the Tactical\nOps Center. Rebuild and try again." }
+                            },
+                    "ladder": { "victory": { "ui_title": "Victory!",
+                                             "log_outcome": { "attacker": "Victory", "defender": "Victory" },
+                                             "ui_description": "You achieved %LADDER_WIN_DAMAGE% Base Damage." },
+                                "defeat": { "ui_title": "Withdraw",
+                                            "log_outcome": { "attacker": "Loss", "defender": "Loss" },
+                                            "ui_description": "You failed to achieve %LADDER_WIN_DAMAGE% Base Damage. Rebuild and try again." }
+                              },
+                    "quarry": { "victory":  { "ui_title": "Victory!",
+                                              "log_outcome": { "attacker": "Quarry\nTaken", "defender": "Quarry\nDefended" },
+                                              "ui_description": "You destroyed all the defenses. Excellent job, Commander." },
+                                "defeat": { "ui_title": "Withdraw",
+                                            "log_outcome": { "attacker": "Withdrew", "defender": "Quarry\nLost" },
+                                            "ui_description": "You failed to destroy all defending units and turrets." }
+                              },
+                    "squad": { "victory":  { "ui_title": "Victory!",
+                                             "log_outcome": { "attacker": "Battalion\nDestroyed", "defender": "Battalion\nDefended" },
+                                             "ui_description": "You destroyed the entire battalion. Excellent job, Commander." },
+                               "defeat": { "ui_title": "Withdraw",
+                                           "log_outcome": { "attacker": "Withdrew", "defender": "Battalion\nLost" },
+                                           "ui_description": "You failed to destroy all enemy units." }
+                             }
+                  },
+
+    "climate_ice_tip": { "ui_title": "Dangerous Conditions: Blizzard",
+                         "ui_description": "This base is protected by blizzard conditions. The ice and wind will slow our ground and air units, unless we have Blizzard Shield technology."
+                       },
+
+    "climate_air_tip": { "ui_title": "Coastal Encounter", //airborne
+                         "ui_description": "This base floats off of the coast. Only aircraft can reach it."
+                       },
+    "climate_space_tip": { "ui_title": "Outer Space Encounter", //outer space
+                           "ui_description": "This base orbits far above the world. Only aircraft can reach it."
+                         },
+    "climate_lunar_tip": { "ui_title": "Lunar Encounter",
+                           "ui_description": "This base lies on a moon. Infantry, armor, and aircraft can all be deployed normally."
+                         },
+    "climate_cave_tip": { "ui_title": "Underground Encounter",
+                          "ui_description": "This cave is deep under the surface of the world.\n\nAircraft cannot fly here.\n\nMissiles and XM982 shells cannot be used either."
+                        },
+    "climate_deep_cave_tip": { "ui_title": "Deep Cavern",
+                               "ui_description": "This cave is very deep under the surface of the world.\n\nOnly infantry units may deploy here.\n\nMissiles and XM982 shells cannot be used."
+                             },
+
+    "storages_full": { "ui_title": "No room in %s Depot",
+                       "ui_description": "Build another %s1 Depot from the Buildings\nmenu, or upgrade existing %s2 Depots." },
+    "storages_damaged": { "ui_title": "Depots are damaged",
+                          "ui_description": "Repair your depots to make room\nbefore collecting resources." },
+
+    "unmet_requirements": "Unmet requirements: %s",
+    "more_resources_needed": "More %res needed.",
+
+    "requirements_help": {
+        "generic": { "generic": { "ui_title": "Unmet Requirement", "ui_description": "%s" } },
+
+        "crafting": {
+            "obtain_ingredients": { "ui_title": "Items needed",
+                                    "ui_description": "Obtain %s by fighting selected enemies on the Attack menu or from the Store." }
+        },
+
+        "resources": {
+            "iron": { "ui_title": "%s more supplies needed",
+                      "ui_description": "Gain supplies by attacking bases, collecting from Supply Yards, or claiming mission rewards.\n\nYou can also buy supplies from the Store.",
+                      "ui_button": "Go to Store" },
+            "water":  { "ui_title": "%s more fuel needed",
+                        "ui_description": "Gain fuel by attacking bases, collecting from Fuel Yards, or claiming mission rewards.\n\nYou can also buy fuel from the Store.",
+                        "ui_button": "Go to Store" },
+            "res3": { "ui_title": "More Hardware needed",
+                      "ui_description": "Gain Hardware by attacking special event enemies on the Attack -> Multiplayer Map." } // or conquering Hardware Quarries
+        },
+
+        "insufficient_resources_to_repair_units": {
+            "iron": { "ui_title": "Need %s more supplies",
+                      "ui_description": "We cannot repair all damaged units.\n\nObtain more supplies, then attempt repairs again.\n\nGain supplies by attacking bases, collecting from Supply Yards, or claiming mission rewards. You can also buy supplies from the Store.",
+                      "ui_button": "Go to Store"
+                    },
+            "water": { "ui_title": "Need %s more fuel",
+                       "ui_description": "We cannot repair all damaged units.\n\nObtain more fuel, then attempt repairs again.\n\nGain fuel by attacking bases, collecting from Fuel Yards, or claiming mission rewards. You can also buy fuel from the Store.",
+                       "ui_button": "Go to Store"
+                     }
+        },
+
+        "insufficient_resources_to_repair_squad": {
+            "iron": { "ui_title": "Need %s more supplies",
+                      "ui_description": "We cannot repair Battalion: %d.\n\nObtain more supplies, or reassign some damaged units out of the Battalion, then attempt repairs again.\n\nGain supplies by attacking bases, collecting from Supply Yards, or claiming mission rewards. You can also buy supplies from the Store.",
+                      "ui_button": "Go to Store"
+                    },
+            "water": { "ui_title": "Need %s more fuel",
+                       "ui_description": "We cannot repair Battalion: %d.\n\nObtain more fuel, or reassign some damaged units out of the Battalion, then attempt repairs again.\n\nGain fuel by attacking bases, collecting from Fuel Yards, or claiming mission rewards. You can also buy fuel from the Store.",
+                       "ui_button": "Go to Store"
+                     }
+        },
+
+        "insufficient_resources_to_repair_a_unit": { // not used by get_requirements_help
+            "any": { "ui_title": "Not Enough Resources",
+                     "ui_description": "We need %res to repair\nthis unit." }
+        },
+
+        // trying to Collect, but no room in storage
+        "storages_full": {
+            "build_first": { "ui_title": "No %s",
+                             "ui_description": "To add capacity, build a %s."
+                           },
+            "build_more": { "ui_title": "No room in %s",
+                            "ui_description": "To add capacity, build another %s."
+                          },
+            "upgrade": { "ui_title": "No room in %s",
+                         "ui_description": "To add capacity, upgrade our %s."
+                       },
+            "upgrade_cc": { "ui_title": "No room in %s",
+                            "ui_description": "To add capacity, upgrade our Tactical Ops Center, so that we can build more depots."
+                          },
+            "trying_to_collect_deposit": { "ui_title": "Commander, your storage is full.",
+                                           "ui_description": "Construct a new storage unit from the Buildings\nmenu, or upgrade existing storage buildings." }
+        },
+
+        // trying to Attack, but no room in storage
+        "storages_almost_full_attack": {
+            "build_more": { "ui_title": "Warning: %s Nearly Full",
+                            "ui_description": "We cannot loot much %d from this base because our depot is almost full.\n\nIf you wish to profit from attacking, build another %s to increase capacity.",
+                            "ui_button": "More Info",
+                            "ui_cancel_button": "Proceed"
+                          },
+            "upgrade": { "ui_title": "Warning: %s Nearly Full",
+                         "ui_description": "We cannot loot much %d from this base because our depot is almost full.\n\nIf you wish to profit from attacking, upgrade our %s to increase capacity.",
+                         "ui_button": "More Info",
+                         "ui_cancel_button": "Proceed"
+                       },
+            "upgrade_cc": { "ui_title": "Not enough %s",
+                            "ui_description": "We cannot loot much %d from this base because our depot is almost full.\n\nIf you wish to profit from attacking, upgrade our Tactical Ops Center, so that we can build more depots.",
+                            "ui_button": "More Info",
+                            "ui_cancel_button": "Proceed"
+                          }
+        },
+        "storages_full_attack": {
+            "build_first": { "ui_title": "Warning: No %s",
+                             "ui_description": "We cannot loot any %d from this base because we have no place to store it.\n\nIf you wish to profit from attacking, build a %s.",
+                             "ui_button": "More Info",
+                             "ui_cancel_button": "Proceed"
+                           },
+            "build_more": { "ui_title": "Warning: %s Full",
+                            "ui_description": "We cannot loot any %d from this base because our depot is full.\n\nIf you wish to profit from attacking, build another %s to increase capacity.",
+                            "ui_button": "More Info",
+                            "ui_cancel_button": "Proceed"
+                          },
+            "upgrade": { "ui_title": "Warning: %s Full",
+                         "ui_description": "We cannot loot any %d from this base because our depot is full.\n\nIf you wish to profit from attacking, upgrade our %s to increase capacity.",
+                         "ui_button": "More Info",
+                         "ui_cancel_button": "Proceed"
+                       },
+            "upgrade_cc": { "ui_title": "Not enough %s",
+                            "ui_description": "We cannot loot any %d from this base because our depot is full.\n\nIf you wish to profit from attacking, upgrade our Tactical Ops Center, so that we can build more depots.",
+                            "ui_button": "More Info",
+                            "ui_cancel_button": "Proceed"
+                          }
+        },
+
+        // trying to do an upgrade but you don't have enough storage to hold the kickoff amount
+        "need_more_storage": {
+            "build_first": { "ui_title": "No %s",
+                             "ui_description": "To add capacity, build a %s."
+                           },
+            "build_more": { "ui_title": "Not enough %s",
+                            "ui_description": "To add capacity, build another %s."
+                          },
+            "upgrade": { "ui_title": "Not enough %s",
+                         "ui_description": "To add capacity, upgrade our %s."
+                       },
+            "upgrade_cc": { "ui_title": "Not enough %s",
+                            "ui_description": "To add capacity, upgrade our Tactical Ops Center, so that we can build more depots."
+                          }
+        },
+
+        "power": {
+            "build_more": { "ui_title": "Insufficient Power",
+                            "ui_description": "We need to build another Generator." },
+            "upgrade": { "ui_title": "Insufficient Power",
+                         "ui_description": "We need to upgrade our Generators." },
+            "unknown": { "ui_title": "Insufficient Power",
+                         "ui_description": "We need to upgrade our Generators, or build\nmore of them to provide enough power." }
+        },
+        "building": {
+            "build_first": { "ui_title": "Need %s",
+                             "ui_description": "To advance, we need to build %s."
+                           },
+            "build_more": { "ui_title": "Need %s",
+                            "ui_description": "To advance, we need to build another %s."
+                          },
+            "upgrade": { "ui_title": "Upgrade %s",
+                         "ui_description": "To advance, we need to upgrade our %s to level %d."
+                       },
+            "repair": { "ui_title": "Repair %s",
+                        "ui_description": "To advance, we must repair our %s."
+                      },
+            "speedup": { "ui_title": "Speed up %s",
+                         "ui_description": "To advance, our %s must finish its current activity."
+                       }
+        },
+        "tech": {
+            "research": { "ui_title": "Need Research",
+                          "ui_description": "We must first research %s to level %d."
+                        }
+        },
+        "tech_for_repair": {
+            "research": { "ui_title": "Need Research",
+                          "ui_description": "We must unlock %s production technology in order to repair this unit from zero health."
+                        }
+        },
+        // OLD, non-squads case
+        "unit_space": {
+            "upgrade": { "ui_title": "Not Enough Unit Space",
+                         "ui_description": "Dismiss existing units or upgrade your Tactical Ops Center.",
+                         "ui_button": "Upgrade"
+                       }
+        },
+        // squads cases
+        "unit_space_base_defenders": {
+            "manage_base_defenders": {
+                "ui_title": "Base Defenders Full",
+                "ui_description": "Not enough room in Base Defenders battalion for new units.\n\nUse \"Battalions\" menu to reassign some Base Defenders to reserves, or upgrade Tactical Ops Center to raise Base Defenders space limit.",
+                "ui_button": "Reassign"
+            }
+        },
+        "unit_space_total_army": {
+            "upgrade": { "ui_title": "Not Enough Unit Space",
+                         "ui_description": "Maximum army size reached.\n\nDismiss existing units, or upgrade Reserves Bay to raise army space limit.",
+                         "ui_button": "Upgrade"
+                       },
+            "build_first": { "ui_title": "Need Reserves Bay",
+                             "ui_description": "We need to build a Reserves Bay to hold more units."
+                           },
+            "recycle": { "ui_title": "Not Enough Unit Space",
+                         "ui_description": "Maximum army size reached.\n\nDismiss existing units to make room.",
+                         "ui_button": "Recycle"
+                       }
+        },
+        "inventory_space_need": { // when current space is totally exhausted and you try to do something that requires space
+            "build_first": { "ui_title": "Need %s",
+                             "ui_description": "We need to build %s to store special items."
+                           },
+            "upgrade": { "ui_title": "%s is full",
+                         "ui_description": "Discard inventory items or upgrade our %s."
+                       },
+            "discard_items": { "ui_title": "%s is full",
+                               "ui_description": "Discard inventory items to make room."
+                             }
+        },
+        "inventory_space_offer": { // for offering to unlock more spaces (when current space is not exhausted)
+            "build_first": { "ui_title": "Need %s",
+                             "ui_description": "We need to build %s to store special items."
+                           },
+            "upgrade": { "ui_title": "Get More Space",
+                         "ui_description": "Upgrade our %s to store more items."
+                       }
+        },
+        "cc_limit": {
+            "upgrade": { "ui_title": "Need %s Upgrade",
+                         "ui_description": "We must upgrade our %s to build another %d."
+                       }
+        },
+        "invalid_building_location": {
+            "any": { "ui_title": "Cannot Build Here",
+                     "ui_description": "Buildings must be constructed in open space within the perimeter of your base."
+                   }
+        },
+        "player_aura_limit": {
+            "any": { "ui_title": "Player Boost Limit Reached",
+                     "ui_description": "You have already activated the maximum number of player boosts.\n\nTo activate more, remove an existing boost.\n\nRemove a boost from the top left of your screen by clicking on it and choosing \"Remove\"."
+                   }
+        },
+        "alliance": {
+            "join": { "ui_title": "Must a Clan Member",
+                      "ui_description": "You must join a Clan to perform this action." },
+            "need_mates": { "ui_title": "Need Clan Mates",
+                            "ui_description": "Another player must join your Clan before you can perform this action." }
+        }
+    },
+
+
+    "modstats": {
+        "base_value": "Level %level %stat: %value",
+        "bonuses": "Bonuses:",
+        "mod_value": "%delta from %thing",
+        "mod_value_item_set": "%delta from %thing (%itemset %setcur/%setmax bonus)",
+        "mod_value_ends": "%delta from %thing (ends in %togo)",
+        "mod_value_sep": "\n",
+        "tooltip_base": "%NAME: %DESCRIPTION",
+        "tooltip_mods": "%NAME: %DESCRIPTION\n\n%MODS",
+        "none": "(None)",
+        "on_destroy_widget": "Yes",
+        "security_team": "Spawns %units",
+        "security_team_unit": "%qtyx %name",
+        "stats": {
+            "armor": { "ui_name": "Armor", "ui_tooltip": "Subtracted from damage taken on each hit", "display": "integer" },
+            "consumes_space": { "ui_name": "Space", "ui_tooltip": "Space occupied by this unit.\nUpgrade Tactical Ops Center and Reserves Bay to increase limit.", "display": "integer" },
+            "damage_taken": { "ui_name": "Damage Resist", "ui_tooltip": "Reduces all damage taken by a percentage", "display": "one_minus_pct" },
+            "anti_missile": { "ui_name": "Missile Defense", "ui_tooltip": "Percentage chance to intercept a missile\nbefore it lands within this building's weapon range.", "display": "one_minus_pct" },
+
+            // well, we could use on_destroy for other things, like self-destructs...
+            "on_destroy": { "ui_name": "Security Team", "ui_tooltip": "Temporary units that spawn when this object is destroyed.\nSecurity team fights for revenge until the battle is over.", "display": "on_destroy" },
+
+            // for GUI only - rebased version of provides_space
+            "deployable_unit_space": { "ui_name": "Attack Size", "ui_tooltip": "Unit space that can be deployed into battle at once", "display": "integer" },
+
+            // properties of the FACTORY
+            "manufacture_speed": { "ui_name": "Train Speed", "ui_tooltip": "Bonus to unit production speed", "display": "pct" },
+            "unit_repair_speed": { "ui_name": "Repair Speed", "ui_tooltip": "Bonus to unit healing/repair speed", "display": "pct" },
+            "crafting_speed": { "ui_name": "Production Rate", "ui_tooltip": "Bonus to item production speed", "display": "pct" },
+
+            // properties of the UNIT
+            "repair_speed": { "ui_name": "Repair Speed", "ui_tooltip": "Bonus to unit healing/repair speed", "display": "pct" },
+
+
+            // for GUI only - display build limits on townhall
+            "limit:storages": { "ui_name": "Depots", "check_spec": "supply_depot", // which spec whose "limit" to check
+                                "ui_tooltip": "Number of Fuel and Supply storage Depots allowed (each)" },
+            "limit:harvesters": { "ui_name": "Yards", "check_spec": "supply_yard",
+                                  "ui_tooltip": "Number of Fuel and Supply Yards allowed (each)" },
+            "limit:energy":  { "ui_name": "Generators", "check_spec": "generator",
+                               "ui_tooltip": "Number of Generators allowed" },
+            "limit:turrets": { "ui_name": "Turrets", "check_spec": "mg_tower",
+                               "ui_tooltip": "Number of Heavy MG Towers and Mortar Emplacements allowed (each)" },
+            "limit:barriers": { "ui_name": "Barriers", "check_spec": "barrier",
+                                "ui_tooltip": "Number of HESCO Barriers allowed"},
+            "limit:minefield": { "ui_name": "Mines", "check_spec": "minefield", "check_method": "limit_requires",
+                                 "ui_tooltip": "Number of land mine placements allowed"},
+
+            "maxvel": { "ui_name": "Speed", "ui_tooltip": "How fast the unit moves across the battlefield", "display": "fixed:2" },
+            "max_hp": { "ui_name": "Health", "ui_tooltip": "Amount of damage that can be taken before being destroyed", "display": "integer" },
+
+            "production_capacity": { "ui_name": "Capacity", "ui_tooltip": "Storage space for resources awaiting collection", "display": "integer" },
+            "produces_iron": { "ui_name": "Gather Rate", "ui_tooltip": "Rate at which resources build up", "display": "pct" },
+            "produces_water": { "ui_name": "Gather Rate", "ui_tooltip": "Rate at which resources build up", "display": "pct" },
+            "produces_res3": { "ui_name": "Gather Rate", "ui_tooltip": "Rate at which hardware builds up", "display": "pct" },
+
+            "provides_donated_space": { "ui_name": "Donations", "ui_tooltip": "Total space for one-time use reinforcement units donated by your clanmates", "display": "integer" },
+            "max_individual_donation_space": { "ui_name": "Send Size", "ui_tooltip": "Maximum space of a unit you can donate to your clanmates", "display": "integer" },
+
+            "provides_deployed_squads": { "ui_name": "Deployments", "ui_tooltip": "Number of battalions you can have deployed on the map at once", "display": "integer" },
+            "provides_inventory": { "ui_name": "Item Space", "ui_tooltip": "Slots to store items", "display": "integer" },
+            "provides_power": { "ui_name": "Output", "ui_tooltip": "Power generated", "display": "integer" },
+            "provides_quarry_control": { "ui_name": "Quarry Limit", "ui_tooltip": "Maximum number of quarries you can control", "display": "integer" },
+            "provides_space": { "ui_name": "Base Defenders", "ui_tooltip": "Space available for your Base Defenders battalion", "display": "integer" },
+            "provides_squads": { "ui_name": "Battalions", "ui_tooltip": "Number of battalions you can form", "display": "integer" },
+            "provides_squad_space": { "ui_name": "Battalion Size", "ui_tooltip": "Space available within each deployable battalion", "display": "integer" },
+            "provides_total_space": { "ui_name": "Army Size", "ui_tooltip": "Total space available for your entire army", "display": "integer" },
+
+            "storage_iron": { "ui_name": "Capacity", "ui_tooltip": "Storage capacity", "display": "integer" },
+            "storage_water": { "ui_name": "Capacity", "ui_tooltip": "Storage capacity", "display": "integer" },
+            "storage_res3": { "ui_name": "Capacity", "ui_tooltip": "Storage capacity", "display": "integer" },
+
+            "research_level": { "ui_name": "Research Level", "ui_tooltip": "Ability to unlock new units and upgrade existing ones", "display": "integer" },
+            "research_speed": { "ui_name": "Research Rate", "ui_tooltip": "Bonus to unlock and upgrade speed", "display": "pct" },
+
+            "crafting_level": { "ui_name": "Workshop Level", "ui_tooltip": "Ability to create more powerful items", "display": "integer" },
+            "crafting_queue_space": { "ui_name": "Operations", "ui_tooltip": "Storage for completed and in-progress operation rewards", "display": "integer" },
+
+            "weapon": { "ui_name": "Weapon", "ui_tooltip": "Type of main armament", "display": "spellname" },
+
+            "permanent_auras": { "ui_name": "Effects", "ui_tooltip": "Passive effects", "display": "auras" },
+
+            // Special case! The game engine internally manages "weapon_damage" as a multiplier with a base value of 1.0
+            // but in the GUI, we display the multiplier times the weapon's base dps ("damage" from spells.json)
+            "weapon_damage": { "ui_name": "DPS", "ui_tooltip": "Main weapon damage per second", "display": "integer",
+                               "ui_extra": "Effective DPS %DPS (%SHOT damage per shot with %COOLDOWN sec between shots)" },
+            // different version of DPS stat used for one-shot weapons
+            "weapon_damage_kills_self": { "ui_name": "Damage", "ui_tooltip": "Main weapon damage (dealt instantly)", "display": "integer",
+                                          "ui_extra": "Effective Damage %SHOT" }, // %SHOT will be the one-shot damage
+
+            // similarly for ranges, the internal value is a multiplier, but the GUI displays the product with the weapon's base range
+            "weapon_range": { "ui_name": "Max Range", "ui_tooltip": "Maximum distance main weapon can shoot", "display": "integer" },
+            "effective_weapon_range": { "ui_name": "Effective Range", "ui_tooltip": "Distance at which main weapon accuracy starts to degrade", "display": "integer" },
+
+            "accuracy": { "ui_name": "Accuracy", "ui_tooltip": "Chance to hit a target within effective weapon range. Degrades at longer distances.", "display": "pct" },
+            "rate_of_fire": { "ui_name": "Rate of Fire", "ui_tooltip": "Bonus to main weapon firing speed", "display": "pct" },
+            "splash_range": { "ui_name": "Splash", "ui_tooltip": "Radius of explosion around point of impact.\nTargets far from the impact point take less damage.", "display": "integer" },
+
+            "ice_effects": { "ui_name": "Ice Shield", "ui_tooltip": "Reduces movement-slowing effect when in blizzard conditions", "display": "one_minus_pct" },
+            "swamp_effects": { "ui_name": "Amphibious", "ui_tooltip": "Reduces movement-slowing effect when driving through swamps", "display": "one_minus_pct" },
+            "damage_taken_from:radiation": { "ui_name": "Rad Shield", "ui_tooltip": "Reduces damage taken from radioactive sources", "display": "one_minus_pct" },
+            "damage_taken_from:aoefire": { "ui_name": "FASCAM Shield", "ui_tooltip": "Reduces damage taken from FASCAM Emplacements", "display": "one_minus_pct" },
+            "damage_taken_from:mine": { "ui_name": "Mine Shield", "ui_tooltip": "Reduces damage taken from landmines", "display": "one_minus_pct" },
+            "damage_taken_from:lava_climate": { "ui_name": "Heat Shield", "ui_tooltip": "Reduces damage taken in extremely hot climates", "display": "one_minus_pct" },
+            "weapon_damage_vs:tank": { "ui_name": "Anti-Tank", "ui_tooltip": "Extra damage against Main Battle Tank units", "display": "pct" },
+            "weapon_damage_vs:transport": { "ui_name": "Anti-Armor", "ui_tooltip": "Extra damage against all Armor units", "display": "pct" }
+        }
+    },
+
+    "greek_alphabet": ["Alpha", "Beta", "Gamma", "Delta", "Epsilon", "Zeta", "Eta", "Theta", "Iota", "Kappa",
+                       "Lambda", "Mu", "Nu", "Xi", "Omicron", "Pi", "Rho", "Sigma", "Tau", "Upsilon", "Phi",
+                       "Chi", "Psi", "Omega"],
+    "icao_alphabet": ["Alpha", "Bravo", "Charlie", "Delta", "Echo", "Foxtrot", "Golf", "Hotel", "Indigo",
+                      "Juliet", "Kilo", "Lima", "Mike", "November", "October", "Papa", "Quebec", "Romeo",
+                      "Sierra", "Tango", "Uniform", "Victor", "Whiskey", "X-Ray", "Yankee", "Zulu"],
+    "months_short": ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"],
+    "unknown": "Unknown"
+}

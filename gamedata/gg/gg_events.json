@@ -1,0 +1,96 @@
+// Copyright (c) 2014 SpinPunch. All rights reserved.
+// Use of this source code is governed by an MIT-style license that can be
+// found in the LICENSE file.
+
+{
+    "challenge_pvp_ladder": {
+        "name": "challenge_pvp_ladder",
+        "kind": "current_trophy_pvp_challenge",
+        "logo": "pvp_tournament_logo",
+        "ui_name": "PvP",
+        "ui_name_top_alliances": "Clan PvP Standings",
+        "ui_description": "Earn PvP Points for your Clan by winning battles against\nchallenging opponents (on Attack menu under \"Multiplayer\").\n\nAll points reset at the end of the season.",
+        "prizes": [0, 0, 0] // first, second, third place prizes, in units of FB Credits (NOT gamebucks!)
+        // (if you change the number of "in the money" places, you must also change header_prize_rank/amount in dialogs.json:alliance_list_top_tab!)
+    },
+
+    "challenge_pvp_ladder_with_prizes": {
+        "name": "challenge_pvp_ladder_with_prizes",
+        "kind": "current_trophy_pvp_challenge",
+        "logo": "pvp_tournament_logo",
+        "ui_name": "PvP",
+        "ui_name_top_alliances": "Clan PvP Tournament",
+        "ui_top_alliances_header_title": "Clan\nTournament",
+        "ui_description": "Earn PvP Points for your Clan by winning battles against\nchallenging opponents (on Attack menu under \"Multiplayer\").\n\nAll points reset at the end of the season.",
+        "prizes": [1000, 500, 300] // first, second, third place prizes, in units of FB Credits (NOT gamebucks!)
+        // (if you change the number of "in the money" places, you must also change header_prize_rank/amount in dialogs.json:alliance_list_top_tab!)
+    },
+
+    "event_clan_pvp_tournament": {
+        "name": "event_clan_pvp_tournament",
+        "kind": "current_event",
+        "gui_mode": "event_preview",
+        "ui_title": "Clan Tournament",
+        "ui_subtitle": "Ends in: %togo",
+        "info_url": "http://on.fb.me/1g1bexD",
+        "portrait_action": { "consequent": "INVOKE_TOP_ALLIANCES_DIALOG" },
+        "ui_portrait_tooltip": "Click to view top Clans",
+        "activation": { "predicate": "ALWAYS_TRUE" },
+        "console_portrait": "trophy_pvp_50x50"
+    },
+
+    "event_tutorial08": {
+        "name": "event_tutorial08",
+        "kind": "event_tutorial",
+
+        // NOTE: matches origin/period of immortal AI resets
+        "time_origin": 1356627600,
+        "time_period": 604800,
+
+        // predicate that determines whether to show the event
+        "activation": { "predicate": "AND", "subpredicates": [
+            {"predicate": "LIBRARY", "name": "extended_tutorial_complete"},
+            {"predicate": "PLAYER_HISTORY", "key": "ai_tutorial08_progress", "value": 8, "method": "<"}
+        ] },
+
+        "chain": [
+            // visit all tutorial08 bases in ascending order
+            [{"predicate": "AI_BASE_ACTIVE", "user_id": 999},
+             {"ui_title": "Next Challenge: Red Pole", "console_portrait": "ai_redpole_console",
+              "ui_speech": "Defeat 1 more base in:", "fight_button_action": {"visit_base": 999}}],
+            [{"predicate": "AI_BASE_ACTIVE", "user_id": 998},
+             {"ui_title": "Next Challenge: Red Pole", "console_portrait": "ai_redpole_console",
+              "ui_speech": "Defeat 2 more bases in:", "fight_button_action": {"visit_base": 998}}],
+            [{"predicate": "AI_BASE_ACTIVE", "user_id": 997},
+             {"ui_title": "Next Challenge: Red Pole", "console_portrait": "ai_redpole_console",
+              "ui_speech": "Defeat 3 more bases in:", "fight_button_action": {"visit_base": 997}}],
+            [{"predicate": "AI_BASE_ACTIVE", "user_id": 996},
+             {"ui_title": "Next Challenge: Red Pole", "console_portrait": "ai_redpole_console",
+              "ui_speech": "Defeat 4 more bases in:", "fight_button_action": {"visit_base": 996}}],
+            [{"predicate": "AI_BASE_ACTIVE", "user_id": 995},
+             {"ui_title": "Next Challenge: Red Pole", "console_portrait": "ai_redpole_console",
+              "ui_speech": "Defeat 5 more bases in:", "fight_button_action": {"visit_base": 995}}],
+            [{"predicate": "AI_BASE_ACTIVE", "user_id": 994},
+             {"ui_title": "Next Challenge: Red Pole", "console_portrait": "ai_redpole_console",
+              "ui_speech": "Defeat 6 more bases in:", "fight_button_action": {"visit_base": 994}}],
+            [{"predicate": "AI_BASE_ACTIVE", "user_id": 993},
+             {"ui_title": "Next Challenge: Red Pole", "console_portrait": "ai_redpole_console",
+              "ui_speech": "Defeat 7 more bases in:", "fight_button_action": {"visit_base": 993}}],
+            [{"predicate": "AI_BASE_ACTIVE", "user_id": 992},
+             {"ui_title": "Next Challenge: Red Pole", "console_portrait": "ai_redpole_console",
+              "ui_speech": "Defeat 8 more bases in:", "fight_button_action": {"visit_base": 992}}]
+
+        ]
+    },
+
+    "event_fbpayments_D1SALE": { // hidden internal event used to expose D1SALE gamebucks SKU slates
+        "name": "event_fbpayments_D1SALE",
+        "kind": "facebook_sale",
+        "activation": { "predicate": "ALWAYS_FALSE" }
+    },
+    "event_fbpayments_D2SALE": { // hidden internal event used to expose D2SALE gamebucks SKU slates
+        "name": "event_fbpayments_D2SALE",
+        "kind": "facebook_sale",
+        "activation": { "predicate": "ALWAYS_FALSE" }
+    }
+}

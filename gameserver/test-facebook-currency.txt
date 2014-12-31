@@ -1,0 +1,9 @@
+{
+   "currency": {
+      "user_currency": "USD",
+      "currency_exchange": 10,
+      "currency_exchange_inverse": 0.1,
+      "currency_offset": 100
+   },
+   "id": "example1"
+}

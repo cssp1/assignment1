@@ -1,0 +1,27 @@
+// Copyright (c) 2014 SpinPunch. All rights reserved.
+// Use of this source code is governed by an MIT-style license that can be
+// found in the LICENSE file.
+
+[
+    // this array maps the pixel values in the region_terrain to sprites and climates
+
+    // 0:water
+    {"sprite": "waterA", "climate": "ocean"},
+
+    // 1-5:desert
+    {"sprite": "desertA", "climate": "desert"},
+    {"sprite": "desertB", "climate": "desert"},
+    {"sprite": "desertC", "climate": "desert"},
+    {"sprite": "desertD", "climate": "desert"},
+    {"sprite": "desertE", "climate": "desert"},
+
+    // 6-8:mountain
+    {"sprite": "mountainA", "climate": "cave"},
+    {"sprite": "mountainB", "climate": "cave"},
+    {"sprite": "mountainC", "climate": "cave"},
+
+    // 9-11:grass
+    {"sprite": "grassA", "climate": "grass"},
+    {"sprite": "grassB", "climate": "grass"},
+    {"sprite": "grassC", "climate": "grass"}
+]

@@ -1,0 +1,9 @@
+[diskstats]
+user munin
+
+[iostat_ios]
+user munin
+
+[iostat]
+env.SHOW_NUMBERED 1
+

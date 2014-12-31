@@ -1,0 +1,177 @@
+<html>
+  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8"/>
+  <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1"/>
+  <meta http-equiv="X-Frame-Options" content="GOFORIT"/>
+  <meta property="og:title" content="$FBEXTERNALHIT_TITLE$" />
+  <meta property="og:image" content="$FBEXTERNALHIT_IMAGE$" />
+  <meta property="og:description" content="$FBEXTERNALHIT_DESCRIPTION$" />
+  <head>
+  <title>SpinPunch</title>
+
+<script type="text/javascript">
+// Copyright (c) 2014 SpinPunch. All rights reserved.
+// Use of this source code is governed by an MIT-style license that can be
+// found in the LICENSE file.
+var spin_pageload_begin = (new Date()).getTime()/1000;
+var spin_demographics = $DEMOGRAPHICS$;
+var spin_page_url = '$CANVAS_URL$';
+var spin_game_container = '$GAME_CONTAINER_URL$';
+var spin_app_namespace = '$APP_NAMESPACE$';
+var spin_app_id = '$APP_ID$';
+var spin_http_origin = $HTTP_ORIGIN$;
+var spin_server_protocol = '$SERVER_PROTOCOL$';
+var spin_server_host = '$SERVER_HOST$';
+var spin_server_port = '$SERVER_PORT$';
+var spin_server_http_port = '$SERVER_HTTP_PORT$';
+var spin_server_ssl_port = '$SERVER_SSL_PORT$';
+var spin_game_server_host = '$GAME_SERVER_HOST$';
+var spin_game_server_http_port = '$GAME_SERVER_HTTP_PORT$';
+var spin_game_server_ssl_port = '$GAME_SERVER_SSL_PORT$';
+var spin_game_server_ws_port = '$GAME_SERVER_WS_PORT$';
+var spin_game_server_wss_port = '$GAME_SERVER_WSS_PORT$';
+var spin_game_query_string = '$GAME_QUERY_STRING$';
+var spin_game_direct_connect = $DIRECT_CONNECT$;
+if(document.URL.indexOf('direct_connect=0') != -1) {
+    spin_game_direct_connect = false;
+}
+var spin_game_use_websocket = false;
+if(document.URL.indexOf('websocket=1') != -1) {
+    spin_game_use_websocket = true;
+}
+var spin_ajax_config = '$AJAX_CONFIG$';
+var spin_metrics_url = spin_server_protocol+spin_server_host+":"+spin_server_port+"/METRICSAPI";
+var spin_metrics_anon_id = '$ANON_ID$';
+var spin_user_id = $USER_ID$;
+var spin_login_country = '$LOGIN_COUNTRY$';
+var spin_session_id = '$SESSION_ID$';
+var spin_session_time = $SESSION_TIME$;
+var spin_session_signature = '$SESSION_SIGNATURE$';
+var spin_session_data = '$SESSION_DATA$';
+var spin_secure_mode = $SECURE_MODE$;
+var spin_kissmetrics_enabled = $KISSMETRICS_ENABLED$;
+var spin_frame_platform = '$FRAME_PLATFORM$';
+var spin_social_id = '$SOCIAL_ID$';
+var spin_kongregate_enabled = $KONGREGATE_ENABLED$;
+var spin_kongregate_user = $KONGREGATE_ID$;
+var spin_facebook_enabled = $FACEBOOK_ENABLED$;
+var spin_facebook_user = $FACEBOOK_ID$;
+var spin_facebook_signed_request = $SIGNED_REQUEST$;
+var spin_facebook_oauth_token = '$OAUTH_TOKEN$';
+var spin_facebook_login_permissions = '$FACEBOOK_PERMISSIONS$';
+var spin_facebook_api_versions = $FACEBOOK_API_VERSIONS$;
+var spin_art_protocol = '$ART_PROTOCOL$';
+var spin_art_path = '$ART_PATH$';
+var spin_unsupported_browser_landing = '$UNSUPPORTED_BROWSER_LANDING$';
+var spin_init_messages = [];
+var spin_gamedata_loaded = false;
+var spin_code_loaded = false;
+
+if (!window.console) console = {};
+console.log = console.log || function(){};
+
+window.SM2_DEFER = true;
+
+$BROWSERDETECT_CODE$
+
+spin_demographics['browser_name'] = BrowserDetect.browser;
+spin_demographics['browser_version'] = BrowserDetect.version;
+spin_demographics['browser_OS'] = BrowserDetect.OS;
+spin_demographics['browser_hardware'] = BrowserDetect.hardware;
+
+function add_demographics(data) {
+        if(spin_demographics) {
+                for(var key in spin_demographics) {
+                        data[key] = spin_demographics[key];
+                }
+        }
+        return data;
+}
+
+$SPLWMETRICS_CODE$
+
+var spin_allow_start = true;
+var spin_try_start = function(module) {
+    if(module == 'gamedata') { spin_gamedata_loaded = true; }
+    if(module == 'code') { spin_code_loaded = true; }
+    if(spin_gamedata_loaded && spin_code_loaded && spin_allow_start) {
+          spin_allow_start = false; //spin_try_start = function(module) {};
+          SPINPUNCHGAME_EXPORT.init();
+     }
+};
+
+var spin_check_browser = function() {
+    var supported = true;
+    var method = null;
+
+    if(supported) {
+        if(typeof(JSON) == 'undefined') {
+            supported = false; method = 'JSON';
+        }
+    }
+
+    if(supported) {
+        var canvas = document.getElementById('canvas');
+        var ctx = null;
+        if(canvas.getContext) {
+            ctx = canvas.getContext('2d');
+        }
+        if(!ctx || !ctx.fillText) {
+            supported = false; method = 'HTML5 Canvas';
+        }
+    }
+
+    if(!supported) {
+        spin_allow_start = false;
+        console.log('Browser does not support '+method);
+        // delay redirect to hopefully allow metrics to fire
+        window.setTimeout(function() { location.href = spin_unsupported_browser_landing; }, 1500);
+        if(method) {
+            SPLWMetrics.send_event(spin_metrics_anon_id, '0940_unsupported_browser', add_demographics({'method':method}));
+        }
+    }
+
+    return supported;
+}
+
+if(typeof(JSON) == 'undefined') { // hack to inject JSON library into old browsers (IE7)
+    document.write('<'+'script src="http://ajax.cdnjs.com/ajax/libs/json2/20110223/json2.js"></'+'script>');
+}
+
+var spin_async_load_progress = {'code': [0,0], 'gamedata': [0,0]};
+function spin_async_load_show_progress() {
+    var total = 0, loaded = 0;
+    for(var module in spin_async_load_progress) {
+        var entry = spin_async_load_progress[module];
+        total += entry[1]; loaded += entry[0];
+    }
+    if(total > 0) {
+        document.getElementById('startup_msg').innerHTML = "Loading Game ("+(100*loaded/total).toFixed(0)+"%)...";
+    }
+}
+</script>
+
+$KONGREGATE_SDK$
+
+$LOAD_GAME_DATA$
+$LOAD_GAME_CODE$
+
+<style type="text/css">
+div.spin_footer {font-family: sans-serif; color:#d5d5d5;}
+div.spin_footer a {color:#d5d5d5;}
+div.spin_footer a:link {text-decoration: none;}
+div.spin_footer a:hover {text-decoration: underline;}
+
+:-webkit-full-screen {
+position: fixed; width: 100%; top:0; background: none;
+}
+</style>
+</head>
+
+<body onload="if(0) { SPLWMetrics.send_event(spin_metrics_anon_id, '0021_page_load_finish', {'time_to_load_page':(new Date()).getTime()/1000 - spin_pageload_begin}); }; if(spin_check_browser()) { $ONLOAD$ }" style="margin:0px;border:0px;background:#ffffff;overflow:hidden;">
+
+$FACEBOOK_SDK$
+
+$INDEX_BODY$
+
+</body>
+</html>

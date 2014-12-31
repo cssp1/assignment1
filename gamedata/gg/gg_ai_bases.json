@@ -1,0 +1,72 @@
+// Copyright (c) 2014 SpinPunch. All rights reserved.
+// Use of this source code is governed by an MIT-style license that can be
+// found in the LICENSE file.
+
+{
+    // max number of (non-story) AI opponents to show a player
+    // does not include the "progression story" opponents, who always show
+    "max_ai_opponents": 5,
+
+    "ai_starting_conditions": {
+        // tech automatically given to all AIs, unless overridden with "tech" in ai_bases_*.json
+        "tech": { }
+    },
+
+    // table giving TOTAL amount of iron/water lootable from these base structures
+    // (e.g. if a base has 3 harvesters then each harvester will yield 1/3rd of the listed amount)
+    // indexed by building's history_category and player_level of the AI base
+    // used for new-style AI bases (with use_loot_table = 1)
+    "loot_table": { "harvesters": [5000, 5000, 5000, 5250, 5750, 6250, 6400, 6700, 7200, 12400, 14400, 17500, 18500, 19500, 20500, 25500, 30500, 31500, 32700, 33200, 34300, 36700, 39200, 39800, 42500, 55500, 75500, 85900, 198000, 216000, 216000, 216000, 216000, 216000, 216000],
+                    "storages": [3200, 3200, 3500, 3500, 3900, 3900, 3900, 3900, 3900, 9000, 11000, 11500, 12000, 16000, 24000, 24000, 36000, 48000, 51000, 82000, 120000, 130000, 150000, 170000, 180000, 190000, 210000, 220000, 230000, 240000, 240000, 240000, 240000, 240000, 240000],
+                    // note: central computers drop this much iron AND water (e.g. a level 1 AI's CC drops 5,500 water and 5,500 iron)
+                    "tocs": [5500, 5500, 5500, 5500, 5500, 18500, 18500, 18500, 18500, 29500, 32500, 48500, 62500, 79500, 98000, 125000, 135000, 135000, 145000, 162000, 195000, 225000, 250000, 280000, 330000, 375000, 425000, 475000, 475000, 500000, 525000, 550000, 575000, 600000, 650000] },
+    "loot_randomness": 0.25, // +/- fraction by which loot table amounts are adjusted
+
+    // THE SINGLE MOST IMPORTANT VARIABLE IN ALL OF MARS FRONTIER RIGHT HERE!
+    // "loot_scale" = overall scale on AI iron/water drops
+    // Started at 1.0, went down to 0.55 in late July 2012 since A/B testing showed higher monetization,
+    // however at the same time we also shut down some easy "exploits" to accumulate iron/water (mainly
+    // we started enforcing storage limits strictly, and got rid of cheesy attack spam). This had the
+    // effect of crippling mid-game resources, and CC2->CC3 conversions plummeted. Now on Oct 30 2012
+    // we are going back up to 0.95.
+    // TR Sep 25 2013 1.25 -> 2.50 based on T175_ai_loot helping spend at CC2,CC3, and whaleishness
+    "loot_scale": 2.50,
+
+    // when auto_level=1 for an AI base, its units and buildings are automatically leveled up to one less than the highest
+    // level unit/building of that type the player possesses. However, you can optionally override the level with these arrays,
+    // indexed by the AI's level. Useful for making sure turrets stay strong no matter what.
+    "auto_level": {
+        "toc": [1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 3, 3, 3, 3, 3, 4, 4, 4, 4, 4, 4, 4, 4, 5, 5, 5, 5, 5, 5, 6, 6], // 5 at level 28
+        "supply_depot":     [1, 1, 1, 1, 2, 2, 2, 2, 2, 3, 3, 3, 3, 4, 5, 5, 5, 5, 6, 7, 7, 7, 7, 7, 8, 8, 8, 8, 8, 9, 9, 9, 9, 9, 9],
+        "fuel_depot":    [1, 1, 1, 1, 2, 2, 2, 2, 2, 3, 3, 3, 3, 4, 5, 5, 5, 5, 6, 7, 7, 7, 7, 7, 8, 8, 8, 8, 8, 9, 9, 9, 9, 9, 9],
+        "supply_yard":   [1, 1, 1, 1, 2, 2, 2, 2, 2, 3, 3, 3, 3, 4, 5, 5, 5, 5, 6, 7, 7, 7, 7, 7, 8, 8, 8, 8, 8, 9, 9, 9, 9, 9, 9],
+        "fuel_yard":  [1, 1, 1, 1, 2, 2, 2, 2, 2, 3, 3, 3, 3, 4, 5, 5, 5, 5, 6, 7, 7, 7, 7, 7, 8, 8, 8, 8, 8, 9, 9, 9, 9, 9, 9],
+        "mg_tower":       [1, 1, 1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 3, 3, 3, 4, 4, 4, 5, 5, 5, 6, 6, 7, 7, 7, 7, 8, 8, 8, 8, 8, 8, 9, 9],
+        "mortar_emplacement": [1, 1, 1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 3, 3, 3, 4, 4, 4, 5, 5, 5, 6, 6, 6, 6, 7, 7, 7, 7, 7, 7, 7, 7, 8, 8],
+        // note: emp_cannon is ALWAYS level 1 - otherwise it's overpowered
+        "emp_cannon":       [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+        "tow_emplacement":      [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 3, 4, 5, 5, 6, 6]
+    },
+
+    // AI bases that are available for ladder pvp
+    // do not just put any random AI base here!! it must not be farmable, and not have loot!!
+    "ladder_pvp_bases": [
+        // note: "min_level" and "max_level" are the min/max levels of HUMAN PLAYERS who can see these bases
+        // ladder_point_incr for the attacker is the number of trophy points you win or lose for fighting the base
+        //{"base_id": 512, "min_level": 30, "max_level": 99, "ladder_point_incr": { "attacker_victory": 1, "attacker_defeat": -10, "defender_victory": 10, "defender_defeat": -1 } },
+
+    ],
+
+    // NOTE! AI base ID numbers must be allocated carefully. We use this Google Doc to track them:
+    // https://docs.google.com/a/spinpunch.com/spreadsheet/ccc?key=0AqygPYUHpgOddDJkRC1lS0JPUENzWmxTdUJVTXVPRnc#gid=9
+
+    "bases": {
+#include_stripped "$GAME_ID_ai_bases_tutorial01.json"
+        ,
+#include_stripped "$GAME_ID_ai_bases_tutorial02.json"
+        ,
+#include_stripped "$GAME_ID_ai_bases_tutorial08.json"
+        ,
+#include_stripped "$GAME_ID_ai_bases_tutorial25.json"
+    }
+}

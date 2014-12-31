@@ -1,0 +1,208 @@
+#!/bin/bash
+
+# Copyright (c) 2014 SpinPunch. All rights reserved.
+# Use of this source code is governed by an MIT-style license that can be
+# found in the LICENSE file.
+
+function usage {
+    echo "Usage: $0 <command>"
+    echo "Commands include:"
+    echo "  help or any other wrong command - print this list"
+    echo ""
+    echo "  ** General Commands **"
+    echo "  game [<game]> - gets or sets the current game"
+    echo "  player <playerid> - edit the given player's playerdb file for the current game"
+    echo "  refresh - refresh the gamedata"
+    echo "  restart - refresh the gamedata and then restart the server"
+    echo "  recompile - recompile all clientside code"
+    echo "  make-ai-skeleton <ai> or make_ai_skeleton <ai>- calls make_ai_skeleton.py for the specified ai and the current game"
+    echo "  log - tail the server's exception logs"
+    echo ""
+    echo "  ** Hive/Quarry Commands **"
+    echo "  (hives/quarries) spawn [<time-override>] - spawns hives/quarries in player 1112's region"
+    echo "  (hives/quarries) clear - clears hives/quarries in player 1112's region"
+    echo ""
+    echo "  ** Stash Commands **"
+    echo "  patch stash <patch-name> - stores all changes to the working copy as a patch"
+    echo "  patch apply <patch-name> - re-applies a stored patch to the working copy"
+    echo "  patch view <patch-name> - shows the contents of a stored patch"
+    echo "  patch list - list all stored patches"
+        echo ""
+        echo "  ** Misc Commands **"
+        echo "  cleanup - removes all *.rej and *.orig files left over from using the unix patch program"
+
+    return 1
+}
+
+function make_ai_skeleton {
+    SKELETON=${game}/${game}_ai_bases_${2}.skel
+    SKELETONPATH=${GAMEDIR}/gamedata/${SKELETON}
+
+    if [ -r "${SKELETONPATH}" ] ; then
+        cd "$GAMEDIR/gamedata" && \
+        PYTHONPATH=../gameserver \
+        ./make_ai_skeleton.py -g $game "${SKELETON}" > "$game/${game}_ai_bases_${2}.json"
+    else
+        cd "$GAMEDIR/gamedata" && \
+        PYTHONPATH=../gameserver \
+        ./make_ai_skeleton.py -g $game "$2" > "$game/${game}_ai_bases_${2}.json"
+    fi
+}
+
+function manage_hives {
+    if [ $# == 2 ] ; then
+        cd "$GAMEDIR/gameserver" &&
+        ./maptool.py ${region1} ${1} ${2} --yes-i-am-sure
+    elif [ $# == 3 ] ; then
+        cd "$GAMEDIR/gameserver" &&
+        ./maptool.py ${region1} ${1} ${2} --yes-i-am-sure --event-time-override ${3}
+    else
+        usage
+    fi
+}
+
+if [ "$GAMEDIR" == "" ] ; then
+    GAMEDIR="$HOME/game"
+fi
+
+game=`cat "$GAMEDIR/gameserver/config.json" | grep "\"game_id\":\"\(tr\|mf\|mf2\|bfm\|dv\|sg\)test\"" | grep -oh "\(tr\|mf\|mf2\|bfm\|dv\|sg\)"`
+region1=`cat "$GAMEDIR/gameserver/playerdb/1112_${game}test.txt" | grep "\"home_region\":" | cut -d "\"" -f 4`
+region2=`cat "$GAMEDIR/gameserver/playerdb/1113_${game}test.txt" | grep "\"home_region\":" | cut -d "\"" -f 4`
+
+if [ $# == 0 ] || [ "$1" == "help" ] ; then
+    usage
+else
+    case "$1" in
+        restart)
+            cd "$GAMEDIR/gameserver" && \
+            ./stopserver.sh && \
+            ./runserver.sh
+            ;;
+        refresh)
+            cd "$GAMEDIR/gameserver" && \
+            ./make-gamedata.sh -u && \
+            kill -HUP `cat server_default.pid` `cat proxyserver.pid`
+            ;;
+        game)
+            if [ $# == 1 ] ; then
+                echo $game
+            elif [ "$2" == "mf" ] || [ "$2" == "tr" ] || [ "$2" == "mf2" ] || [ "$2" == "bfm" ] || [ "$2" == "dv" ] || [ "$2" == "sg" ] ; then
+                                if [[ $OSTYPE == darwin* ]] ; then
+                                        sed -i "" "s/\"game_id\":\"${game}test\"/\"game_id\":\"${2}test\"/g" "$GAMEDIR/gameserver/config.json"
+                                else
+                                        sed -i "s/\"game_id\":\"${game}test\"/\"game_id\":\"${2}test\"/g" "$GAMEDIR/gameserver/config.json"
+                                fi
+            else
+                echo "Invalid game specified"
+                set $?=1
+            fi
+            ;;
+        make_ai_skeleton)
+            make_ai_skeleton $@
+            ;;
+        make-ai-skeleton)
+            make_ai_skeleton $@
+            ;;
+        make)
+            make_ai_skeleton $@
+            ;;
+        log)
+            date=`date +"%Y%m%d"`
+            tail -f "$GAMEDIR/gameserver/logs/$date-exceptions.txt"
+            ;;
+        recompile)
+            cd "$GAMEDIR/gameserver" && \
+            ./make-compiled-client.sh
+            ;;
+        player)
+            if [ $# == 2 ] ; then
+                if [ "$EDITOR" == "" ]; then
+                    EDITOR=vi
+                fi
+
+                "$EDITOR" "$GAMEDIR/gameserver/playerdb/${2}_${game}test.txt"
+            else
+                usage
+            fi
+            ;;
+        hives)
+            manage_hives $@
+            ;;
+        quarries)
+            manage_hives $@
+            ;;
+        patch)
+            patchdir=~/.gm/patch/
+            mkdir -p "${patchdir}"
+
+            if [ $# == 3 ] ; then
+                if [ "$2" == "stash" ] ; then
+                    abort=0
+
+                    if [ -e "${patchdir}/$3.patch" ] ; then
+                        echo "Are you sure you want to overwrite patch $3? [y/N]"
+
+                        read conf
+
+                        if [ "$conf" == "y" ] || [ "$conf" == "Y" ] ; then
+                            cd "$GAMEDIR" && \
+                            svn diff > "${patchdir}/$3.patch"
+                        else
+                            abort=1
+                        fi
+                    else
+                        cd "$GAMEDIR" && \
+                        svn diff > "${patchdir}/$3.patch"
+                    fi
+
+                    if [ $abort != 1 ] && [ $? == 0 ] ; then
+                        echo "Revert workspace? [y/N]"
+
+                        read revert
+
+                        if [ "$revert" == "y" ] || [ "$revert" == "Y" ] ; then
+                            cd "$GAMEDIR" && \
+                            svn revert -R .
+                        fi
+                    fi
+                elif [ "$2" == "apply" ] ; then
+                    if [ -e "${patchdir}/$3.patch" ] ; then
+                        cd "$GAMEDIR" && \
+                        patch -p0 < "${patchdir}/$3.patch"
+                    else
+                        echo "Specified patch does not exist"
+                        $?=1
+                    fi
+                elif [ "$2" == "view" ] ; then
+                    if [ -e "${patchdir}/$3.patch" ] ; then
+                        cat "${patchdir}/$3.patch" | less
+                    else
+                        echo
+                        $?=1
+                    fi
+                elif [ "$2" == "remove" ] ; then
+                    echo "Not yet implemented"
+                else
+                    usage
+                fi
+            elif [ $# == 2 ] ; then
+                if [ "$2" == "list" ] ; then
+                    ls ${patchdir}
+                else
+                    usage
+                fi
+            else
+                usage
+            fi
+            ;;
+                cleanup)
+                        # this may not work if we happen to have a version of find that doesn't support -delete
+                        find . -name '*.orig' -delete
+                        find . -name '*.rej' -delete
+                        ;;
+        *)
+            usage
+    esac
+fi
+
+exit $?

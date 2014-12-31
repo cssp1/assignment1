@@ -1,0 +1,92 @@
+// Copyright (c) 2014 SpinPunch. All rights reserved.
+// Use of this source code is governed by an MIT-style license that can be
+// found in the LICENSE file.
+
+{
+    // this a really important predicate that enables all sorts of other things (missions, UI features, etc)
+    "extended_tutorial_complete": { "predicate": "PLAYER_HISTORY", "key":"toc_level", "method": ">=", "value": 2,
+                                    "ui_name": "Tactical Ops Center L2" },
+
+    // this specifies whether or not to enable the messages button on the missions dialog
+    "enable_messages": { "predicate": "LIBRARY", "name": "extended_tutorial_complete" },
+
+    // NOTE! this semi-hard-coded - while logged in, the server will only check the predicate on quest completions and central computer upgrades
+    // server.py will need to be modified if this predicate can be triggered in any other way.
+    "send_inventory_intro_mail_when": { "predicate":"PLAYER_HISTORY", "key": "toc_level", "method": ">=", "value": 2 },
+
+    // minimum requirement to be able to join an alliance
+    "alliance_join_requirement": { "predicate": "BUILDING_LEVEL", "building_type": "transmitter", "trigger_level": 2 },
+
+    // minimum requirement to be able to create an alliance
+    "alliance_create_requirement": { "predicate": "BUILDING_LEVEL", "building_type": "transmitter", "trigger_level": 2 },
+
+    // whether to make a tutorial_event ON by default
+    "enable_tutorial_event": { "predicate": "ALWAYS_TRUE" },
+
+    // global requirement to participate in any kind of PvP
+    // this is a little complicated because it needs to be evaluated by the client when not at home base
+    // (so a plain BUILDING_LEVEL won't work, because that needs the home base buildings to be loaded)
+    "pvp_requirement": { "predicate": "PLAYER_HISTORY", "key": "toc_level", "method": ">=", "value": 3,
+                         "ui_name": "Tactical Ops Center Level 3",
+                         "help_predicate": { "predicate": "BUILDING_LEVEL", "building_type": "toc", "trigger_level": 3 } },
+
+    // used for regional PvP rule hacks
+    "special_pvp_aggressor": {"predicate": "AND", "subpredicates": [
+        {"predicate": "PLAYER_HISTORY", "key": "player_level", "method": ">=", "value": 30}, // level >= L30 AND
+        {"predicate": "PVP_AGGRESSED_RECENTLY", "seconds_ago": 86400}, // launched a PvP attack within the last 24 hours AND
+        {"predicate": "LOGGED_IN_RECENTLY", "seconds_ago": 3600} // was logged in within last 60 minutes
+    ]},
+
+    // requirement to participate in the Regional Map
+    "quarry_requirement": { "predicate": "BUILDING_LEVEL", "building_type": "toc", "trigger_level": 3 },
+
+    // requirement to open and access the Regional Map
+    "quarry_play_requirement": {"predicate": "AND", "subpredicates": [
+        // be sure to list all conditions that would prevent the regional map from opening
+        { "predicate":"LIBRARY", "name": "quarry_requirement" },
+        { "predicate":"OBJECT_UNBUSY", "spec": "transmitter" }
+    ] },
+
+    // requirement to access the Change Region feature
+    "change_region_requirement": { "predicate":"LIBRARY", "name": "quarry_requirement" },
+
+    "in_nosql_region": { "predicate": "AND", "subpredicates": [
+        { "predicate": "LIBRARY", "name": "quarry_requirement" },
+        { "predicate": "REGION_PROPERTY", "key": "enable_map", "value": 1, "default": 1,
+          "ui_name": "Use \"Relocate Base\" option on Tactical Ops Center or Transmitter to enter a NEW Multiplayer region." }
+    ] },
+
+    "squads_enabled": {"predicate": "ALWAYS_TRUE"},
+
+    "squad_play_requirement": {"predicate": "AND", "subpredicates": [
+        // be sure to list all conditions that would prevent the regional map from opening
+        { "predicate":"LIBRARY", "name": "squads_enabled" },
+        { "predicate":"OBJECT_UNBUSY", "spec": "squad_bay" }
+    ] },
+
+    "ai_tutorial08_complete": { "predicate": "PLAYER_HISTORY", "key": "ai_tutorial08_progress", "method": ">=", "value": 8,
+                                "ui_name": "Conquer all of Enemy08's bases up to Level 8" },
+
+    // hide "evil Valentina" event character and event-related daily tips until this is satisfied
+    "hide_event_info_until": {"predicate": "AND", "subpredicates": [
+        // TOC level 2
+        { "predicate":"PLAYER_HISTORY", "key": "toc_level", "method": ">=", "value": 2 },
+
+        // must complete Red Pole AI
+        { "predicate": "LIBRARY", "name": "ai_tutorial08_complete" }
+    ] },
+
+    // Facebook virtual currency sale
+    "fbpayments_D1SALE_in_effect": {"predicate": "EVENT_TIME", "event_kind": "facebook_sale", "event_name": "event_fbpayments_D1SALE", "method": "inprogress", "ignore_activation": 1},
+    "fbpayments_D2SALE_in_effect": {"predicate": "EVENT_TIME", "event_kind": "facebook_sale", "event_name": "event_fbpayments_D2SALE", "method": "inprogress", "ignore_activation": 1},
+
+    // whether an ONP event is currently happening - controls visibility of ONP category on leaderboard.
+    "token_event_happening": { "predicate": "OR", "subpredicates": [
+        //{"predicate": "EVENT_TIME", "event_name": "event_queen", "method": "inprogress", "ignore_activation": 1},
+    ] },
+    // controls availability of ONP Event Prizes in store.
+    "token_event_store_open": { "predicate": "OR", "subpredicates": [
+        //{"predicate": "EVENT_TIME", "event_kind": "current_event_store", "event_name": "event_queen_store", "method": "inprogress", "ignore_activation": 1},
+    ],  "ui_name": "Wait for next ONP event" }
+
+}

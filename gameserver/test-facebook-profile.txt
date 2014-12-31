@@ -1,0 +1,40 @@
+{
+   "id": "example1",
+   "birthday": "01/01/1951",
+   "name": "Example User",
+   "first_name": "Example",
+   "last_name": "User",
+   "link": "http://www.facebook.com/example1",
+   "username": "example1",
+   "location": {
+      "id": "114952118516947",
+      "name": "San Francisco, California"
+   },
+   "favorite_athletes": [
+      {
+         "id": "109311932421142",
+         "name": "Mark Madsen"
+      }
+   ],
+   "inspirational_people": [
+      {
+         "id": "108440279180316",
+         "name": "John D. Carmack"
+      },
+      {
+         "id": "106083232757300",
+         "name": "Joel Spolsky"
+      }
+   ],
+   "gender": "male",
+   "timezone": -8,
+   "locale": "en_US",
+   "languages": [
+      {
+         "id": "106059522759137",
+         "name": "English"
+      }
+   ],
+   "verified": true,
+   "updated_time": "2011-11-10T06:00:27+0000"
+}

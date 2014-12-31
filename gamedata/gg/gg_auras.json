@@ -1,0 +1,479 @@
+// Copyright (c) 2014 SpinPunch. All rights reserved.
+// Use of this source code is governed by an MIT-style license that can be
+// found in the LICENSE file.
+
+{
+    // by default, all auras are client-side ("client": 1, "server": 0)
+
+    // PLAYER AURAS
+    "attack_space_boosted": {
+        "name": "attack_space_boosted",
+        "icon": "inventory_arrow_up",
+        "client": 0, "server": 1,
+        "help": 1,
+        "ui_name": "Attack Space Boost",
+        "ui_description": "Unit space limit for attacks raised by %pct%",
+        "effects": [{"code": "modstat", "affects": "player", "stat": "deployable_unit_space", "method": "*=(1+strength)"}]
+    },
+
+    // used for the tutorial - artificially limits unit space below normal cap so there is always room for tutorial units
+    "hold_unit_space": {
+        "name": "hold_unit_space",
+        "icon": "hold_unit_space",
+        "client": 0, "server": 1,
+        "help": 1, "cancelable": 0, // "show": 0,
+        "ui_name": "Army Size Limited", "name_color": [1,0.5,0,1],
+        "ui_description": "Complete all tutorial missions to increase army size limit by %stack.",
+        "effects": [{"code": "hold_unit_space"}]
+    },
+
+    // "dummy" aura used to show damage protection as an aura
+    // for UI only, has no actual effect
+    "damage_protection": {
+        "name": "damage_protection",
+        "icon": "inventory_protection",
+        "help": 1, "cancelable": 0,
+        "ui_name": "Damage Protection", "name_color": [1,0.5,0,1],
+        "ui_description": "Your base is protected from attack."
+    },
+
+    // dummy aura for donated units
+    // for UI only, has no actual effect
+    "donated_units": {
+        "name": "donated_units",
+        "icon": "alicon_circstar",
+        "help": 1, "cancelable": 0,
+        "ui_name": "Clan Reinforcements",
+        "ui_description": "One-time use units donated by clan members: ",
+        "ui_space": "(Space used: %cur/%max)"
+    },
+
+    "combat_time_warped_faster": {
+        "name": "combat_time_warped_faster",
+        "icon": "inventory_clock_fastforward_blue",
+        "client": 0, "server": 1,
+        "help": 1,
+        "ui_name": "Combat Fast Forward",
+        "ui_description": "Fast-forwarding combat action by %abspct% until the end of this battle.\n\nTo cancel, click this effect and select \"Remove\".",
+        "ends_on": "session_change",
+        "effects": [{"code": "modstat", "affects": "player", "stat": "combat_time_scale", "method": "*=(1+strength)"}],
+        "on_apply": {"consequent": "REMOVE_AURA", "aura_name": "combat_time_warped_slower"}
+    },
+    "combat_time_warped_slower": {
+        "name": "combat_time_warped_slower",
+        "icon": "inventory_clock_slowmotion_green",
+        "client": 0, "server": 1,
+        "help": 1,
+        "ui_name": "Combat Slow Motion",
+        "ui_description": "Slowing down combat action to %abspct% of normal speed until the end of this battle.\n\nTo cancel, click this effect and select \"Remove\".",
+        "ends_on": "session_change",
+        "effects": [{"code": "modstat", "affects": "player", "stat": "combat_time_scale", "method": "*=(1+strength)"}],
+        "on_apply": {"consequent": "REMOVE_AURA", "aura_name": "combat_time_warped_faster"}
+    },
+
+    "sandstorm": {
+        "name": "sandstorm",
+        "icon": "sandstorm_icon",
+        "client": 0, "server": 1,
+        "harm": 1, "cancelable": 0,
+        "ui_name": "Sandstorm",
+        "ui_description": "A random sandstorm temporarily blocks your path. Loot and DPS are reduced by %pct%.",
+        // note: for the tooltip to work right, set aura strength to 0.2 * stack count
+        "ends_on": "session_change",
+        "effects": [
+            // lose 20% damage per stack of the aura, up to a max of 100% with 5 stacks
+            {"code": "modstat", "affects_unit": "ALL", "stat": "weapon_damage", "method": "*=(1+strength)", "strength_per_stack": -0.2},
+            // lose 20% loot per stack of the aura, up to a max of 100% with 5 stacks
+            {"code": "modstat", "affects": "player", "stat": "loot_factor_pvp", "method": "*=(1+strength)", "strength_per_stack": -0.2}
+        ]
+    },
+    "sandstorm_max": {
+        "name": "sandstorm_max",
+        "icon": "sandstorm_max_icon",
+        "client": 0, "server": 1,
+        "harm": 1, "cancelable": 0,
+        "ui_name": "Intense Sandstorm",
+        "ui_description": "A random intense sandstorm temporarily blocks your path. You cannot attack now.",
+        "effects": [{"code": "sandstorm_max"}],
+        "ends_on": "session_change"
+    },
+
+    "pvp_loot_malus": {
+        "name": "pvp_loot_malus",
+        "icon": "inventory_loot_reduction",
+        "client": 0, "server": 1,
+        "harm": 1, "cancelable": 0,
+        "ui_name": "Loot Reduced",
+        "ui_description": "This rival has a lower Tactical Ops Center level. Fuel and Supply loot reduced by %pct%.",
+        // note: for the tooltip to work right, set aura strength to loot_change_per_stack * stack count
+        // max would be -1.00 at 100 stacks
+        "effects": [{"code": "modstat", "affects": "player", "stat": "loot_factor_pvp", "method": "*=(1+strength)", "strength_per_stack": -0.01}],
+        "ends_on": "session_change"
+    },
+    "pvp_loot_bonus": {
+        "name": "pvp_loot_bonus",
+        "icon": "inventory_loot_boost",
+        "client": 0, "server": 1,
+        "help": 1, "cancelable": 0,
+        "ui_name": "Loot Bonus",
+        "ui_description": "This rival has a higher Tactical Ops Center level. Fuel and Supply loot increased by %pct%.",
+        // max would be +0.66 at 66 stacks (since loot_defender_loses caps out at 0.6 * 1.66 = 1.0)
+        "effects": [{"code": "modstat", "affects": "player", "stat": "loot_factor_pvp", "method": "*=(1+strength)", "strength_per_stack": 0.01}],
+        "ends_on": "session_change"
+    },
+
+    // this is a long-lasting player aura, triggerable by special item
+    "pve_loot_boosted": {
+        "name": "pve_loot_boosted",
+        "icon": "inventory_loot_boost",
+        "client": 0, "server": 1,
+        "help": 1,
+        "ui_name": "Single-Player Loot Boost",
+        "ui_description": "Computer opponents drop %pct% more Fuel and Supplies. Applies only to Yards, Depots, and Tactical Ops Centers owned by Single-Player enemies.",
+        "effects": [{"code": "modstat", "affects": "player", "stat": "loot_factor_pve", "method": "*=(1+strength)"}]
+    },
+
+    // used for map turf bonuses
+    "quarry_yield_bonus": {
+        "name": "quarry_yield_bonus",
+        "icon": "inventory_loot_boost",
+        "client": 0, "server": 1,
+        "help": 1, "cancelable": 0,
+        "ui_name": "Clan Rulership Bonus",
+        "ui_description": "Your quarries give %pct% more Fuel and Supplies. Refreshed hourly until another Clan takes rulership.",
+        "effects": [{"code": "modstat", "affects": "player", "stat": "quarry_yield_bonus", "method": "*=(1+strength)"}]
+    },
+    "turf_quarry_yield_bonus": {
+        "name": "turf_quarry_yield_bonus",
+        "icon": "inventory_loot_boost",
+        "client": 0, "server": 1,
+        "help": 1, "cancelable": 0,
+        "ui_name": "Clan Rulership Bonus",
+        "ui_description": "Your Strongpoint quarries give %pct% more Fuel and Supplies. Refreshed hourly until another Clan takes rulership.",
+        "effects": [{"code": "modstat", "affects": "player", "stat": "turf_quarry_yield_bonus", "method": "*=(1+strength)"}]
+    },
+    "special_chat_template": {
+        "name": "special_chat_template",
+        "icon": "inventory_loot_boost",
+        "client": 0, "server": 1, "show": 0,
+        "help": 1, "cancelable": 0,
+        "ui_name": "Special Chat Template",
+        "ui_description": "Your chat messages have a special color.",
+        "effects": [{"code": "modstat", "affects": "player", "stat": "chat_template", "method": "replace"}]
+    },
+    "chat_gagged": {
+        "name": "chat_gagged",
+        "icon": "chat_gag_icon",
+        "client": 0, "server": 1,
+        "harm": 1, "cancelable": 0,
+        "ui_name": "Chat Muted", "name_color": [1,0,0],
+        "ui_description": "Due to reports of abusive behavior, you may not speak in Global or Region chat.",
+        "effects": [{"code": "modstat", "affects": "player", "stat": "chat_gagged", "method": "max", "strength": 1}]
+    },
+
+    // these are only applied during AI base visits or attacks, triggered by the consequents generated in make_ai_skeleton.py
+    "ai_base_first_time_loot_bonus": {
+        "name": "ai_base_first_time_loot_bonus",
+        "icon": "inventory_loot_boost",
+        "client": 0, "server": 1,
+        "help": 1, "cancelable": 0, "ends_on": "session_change",
+        "ui_name": "Enemy Resource Bonus", "show": 1, "name_color": [0,1,0,1],
+        "ui_description": "Enemy base is fresh and full of resources. Yards, Depots, and Tactical Ops Center give more Fuel and Supply when destroyed.",
+        "effects": [{"code": "modstat", "affects": "player", "stat": "loot_factor_pve", "method": "*=(1+strength)"}]
+    },
+    "ai_attack_first_time_loot_bonus": {
+        "name": "ai_attack_first_time_loot_bonus",
+        "icon": "inventory_loot_boost",
+        "client": 0, "server": 1,
+        "help": 1, "cancelable": 0, "ends_on": "session_change",
+        "ui_name": "Enemy Resource Bonus", "show": 1, "name_color": [0,1,0,1],
+        "ui_description": "This attack wave is fresh and carries resources to loot.",
+        // currently, all AI attack wave loot is manually given, so this is more just for the GUI
+        "effects": [{"code": "modstat", "affects": "player", "stat": "loot_factor_pve", "method": "*=(1+strength)"}]
+    },
+    "ai_base_replay_loot_malus": {
+        "name": "ai_base_replay_loot_malus",
+        "icon": "inventory_loot_reduction",
+        "client": 0, "server": 1,
+        "harm": 1, "cancelable": 0, "ends_on": "session_change",
+        "ui_name": "Enemy Resources Depleted", "show": 1, "name_color": [1,0.5,0,1],
+        "ui_description": "Enemy resources previously looted. Yards, Depots, and Tactical Ops Center give less Fuel and Supply when destroyed.",
+        // note: code uses negative strength to apply penalty
+        "effects": [{"code": "modstat", "affects": "player", "stat": "loot_factor_pve", "method": "*=(1+strength)"}]
+    },
+    "ai_attack_replay_loot_malus": {
+        "name": "ai_attack_replay_loot_malus",
+        "icon": "inventory_loot_reduction",
+        "client": 0, "server": 1,
+        "harm": 1, "cancelable": 0, "ends_on": "session_change",
+        "ui_name": "Enemy Resources Depleted", "show": 1, "name_color": [1,0.5,0,1],
+        "ui_description": "Attack wave previously looted. Resource loot no longer available.",
+        // currently, all AI attack wave loot is manually given, so this is more just for the GUI
+        // note: code uses negative strength to apply penalty
+        "effects": [{"code": "modstat", "affects": "player", "stat": "loot_factor_pve", "method": "*=(1+strength)"}]
+    },
+
+    // these two auras are used to prevent players from using missiles too frequently
+    "missile_heat": {
+        "name": "missile_heat", "name_color": [1,0.5,0,1],
+        "icon": "spell_icon_missile_heat",
+        "client": 0, "server": 1,
+        "harm": 1, "cancelable": 0,
+        "ui_name": "XM982 Battery Heating",
+        "ui_description": "Your XM982 battery is at %stack% heat. When heat reaches 100%, you will be unable to fire XM982 rounds for 3 minutes.",
+        // "when this aura is applied, if the total stack count gets >= 100, then replce this aura with missile_overheat"
+        "on_apply": {"consequent": "IF", "if": { "predicate": "AURA_ACTIVE", "aura_name": "missile_heat", "min_stack": 100 },
+                     "then": { "consequent": "AND", "subconsequents": [
+                         {"consequent": "REMOVE_AURA", "aura_name": "missile_heat"},
+                         {"consequent": "APPLY_AURA", "aura_name": "missile_overheat", "aura_duration": 180 }
+                     ] }
+                    }
+    },
+    "missile_overheat": {
+        "name": "missile_overheat", "name_color": [1,0,0,1],
+        "icon": "spell_icon_missile_overheat",
+        "harm": 1, "cancelable": 0,
+        "ui_name": "XM982 Battery Overheat",
+        "ui_description": "Your XM982 battery overheated and must cool down before firing again."
+        // no effect - the missiles look for the presence of aura to inhibit firing
+    },
+
+    "travel_speed_boosted": {
+        "name": "travel_speed_boosted",
+        "icon": "inventory_travel_speed_boost",
+        "client": 0, "server": 1,
+        "help": 1,
+        "ui_name": "Travel Speed Boost",
+        "ui_description": "Your battalions travel across the Regional Map %pct% faster.",
+        "effects": [{"code":"modstat", "affects": "player", "stat": "travel_speed", "method": "*=(1+strength)"}]
+    },
+
+    // auras applied to the player when visiting a base or starting an AI attack that yields trophies
+    "trophy_pvp_plus": {
+        "name": "trophy_pvp_plus",
+        "icon": "trophy_pvp_50x50", "stack_font_color": [1,1,0.8,1], "stack_prefix": "+",
+        "client": 0, "server": 1, "cancelable": 0,
+        "help": 1,
+        "ends_on": "battle_end", "on_battle_end_victory": { "consequent": "GIVE_TROPHIES", "trophy_kind": "pvp", "amount_from_aura": "trophy_pvp_plus" },
+        "ui_name": "PvP Point Reward",
+        "ui_description": "Win %stack PvP Point by achieving over 50% Base Damage in this attack. Do even more damage for extra bonus points.",
+        "ui_description_plural": "Win %stack PvP Points by achieving over 50% Base Damage in this attack. Do even more damage for extra bonus points.",
+        "ui_expires": "Tournament ends in %s"
+    },
+    "trophy_pvp_minus": {
+        "name": "trophy_pvp_minus",
+        "icon": "trophy_pvp_50x50", "stack_font_color": [1,0.08,0,1], "stack_prefix": "\u2013", // use en dash so it is more obvious
+        "client": 0, "server": 1, "cancelable": 0,
+        "help": 1,
+        "ends_on": "battle_end", "on_battle_end_defeat": { "consequent": "GIVE_TROPHIES", "trophy_kind": "pvp", "amount_from_aura": "trophy_pvp_minus", "method": "-" },
+        "ui_name": "PvP Point Risk",
+        "ui_description": "Lose %stack PvP Point if you fail to achieve 50% Base Damage in this attack.",
+        "ui_description_plural": "Lose %stack PvP Points if you fail to achieve 50% Base Damage in this attack.",
+        "ui_expires": "Tournament ends in %s"
+    },
+
+    "trophy_pvp_minus_minloss": {
+        "name": "trophy_pvp_minus_minloss",
+        "icon": "trophy_pvp_50x50", "stack_font_color": [1,0.08,0,1], "stack_prefix": "\u2013", // use en dash so it is more obvious
+        "client": 0, "server": 1, "cancelable": 0, "show": 0, // internal use only
+        "help": 1,
+        "ends_on": "battle_end",
+        "on_battle_end": { "consequent": "IF",
+                           "if": { "predicate": "VIEWING_BASE_DAMAGE", "method": ">=", "value": 0.50, "assert_owner": "self_home" },
+                           "then": { "consequent": "GIVE_TROPHIES", "trophy_kind": "pvp", "amount_from_aura": "trophy_pvp_minus_minloss", "method": "-" } },
+        "ui_name": "PvP Point Risk",
+        "ui_description": "Lose %stack PvP Point if the attacker achieves more than 50% Base Damage in this attack.",
+        "ui_description_plural": "Lose %stack PvP Points if the attacker achieves more than 50% Base Damage in this attack.",
+        "ui_expires": "Tournament ends in %s"
+    },
+
+    "trophy_pvp_decay": {
+        "name": "trophy_pvp_decay",
+        "icon": "trophy_pvp_minus_50x50", "stack_font_color": [1,0.08,0], "stack_prefix": "\u2013", // use en dash so it is more obvious
+        "client": 0, "server": 1, "cancelable": 0,
+        "harm": 1,
+        "effects": [{"code": "trophy_pvp_decay"}],
+        "ui_name": "Severe Base Damage", "name_color": [1,0,0],
+        "ui_description": "Your PvP Points will decay over time. Repair base to stop loss of points."
+    },
+
+    "trophy_reward_pve_away": {
+        "name": "trophy_reward_pve_away",
+        "icon": "trophy_50x50",
+        "client": 0, "server": 1, "cancelable": 0,
+        "help": 1,
+        "ends_on": "battle_end", "on_battle_end_victory": { "consequent": "GIVE_TROPHIES", "trophy_kind": "pve", "amount_from_aura": "trophy_reward_pve_away" },
+        "ui_name": "Tournament Points",
+        "ui_description": "Win %stack Tournament Point by destroying the Tactical Ops Center.",
+        "ui_description_plural": "Win %stack Tournament Points by destroying the Tactical Ops Center.",
+        "ui_expires": "Tournament ends in %s"
+    },
+    "trophy_reward_pve_away_bonus": {
+        "name": "trophy_reward_pve_away_bonus",
+        "icon": "trophy_bonus_50x50",
+        "client": 0, "server": 1, "cancelable": 0,
+        "help": 1,
+        "ends_on": "battle_end", "on_battle_end_victory": { "consequent": "GIVE_TROPHIES", "trophy_kind": "pve", "amount_from_aura": "trophy_reward_pve_away_bonus" },
+        "ui_name": "First-Attack Bonus Points",
+        "ui_description": "Win %stack extra Tournament Point by destroying the Tactical Ops Center with your very first attack.",
+        "ui_description_plural": "Win %stack extra Tournament Points by destroying the Tactical Ops Center with your very first attack.",
+        "ui_expires": "Tournament ends in %s"
+    },
+    "trophy_reward_pve_home": {
+        "name": "trophy_reward_pve_home",
+        "icon": "trophy_50x50",
+        "client": 0, "server": 1, "cancelable": 0,
+        "help": 1,
+        "ends_on": "battle_end", "on_battle_end_victory": { "consequent": "GIVE_TROPHIES", "trophy_kind": "pve", "amount_from_aura": "trophy_reward_pve_home" },
+        "ui_name": "Tournament Points",
+        "ui_description": "Win %stack Tournament Point by destroying all attacking units.",
+        "ui_description_plural": "Win %stack Tournament Points by destroying all attacking units.",
+        "ui_expires": "Tournament ends in %s"
+    },
+
+    // note: these are PLAYER auras that stack (multiplicatively) on top of UNIT auras through player.stattab
+
+    // this is created on server side, but applies its effect on client side
+    "emitting_sonic_pulses": {
+        "name": "emitting_sonic_pulses",
+        "icon": "inventory_transmitter",
+        "help": 1, "client": 1,
+        "ui_name": "Emits Infrasonic Radiation",
+        "ui_name_short": "Sonic", // used on upgrade dialog
+        "ui_description": "Constantly emitting dangerous infrasonic radiation.",
+        "effects": [{"code": "cast_spell_continuously", "spell": "EMIT_SONIC"}]
+    },
+
+    // CLIENT-SIDE OBJECT AURAS
+
+    "damage_boosted": {
+        "name": "damage_boosted",
+        "help": 1, "client": 1,
+        "ui_name": "Damage Boost",
+        "ui_description": "Weapon damage increased %pct%",
+        "visual_effect": {"type": "explosion", "duration": 0.25, "sprite": "muzzle_flash_rocket", "opacity": 0.12, "sprite_scale": [1.5,1.5], "composite_mode": "lighter"},
+        "effects": [{"code": "damage_boosted"}]
+    },
+
+    "weak_zombie": {
+        "name": "weak_zombie",
+        "harm": 1, "client": 1,
+        "ui_name": "Badly damaged",
+        "ui_description": "Unit was badly damaged in a previous battle. Damage and movement speed reduced by 75%.",
+        "effects": [{"code": "weak_zombie"}],
+        "zombie_speed": 0.25,
+        "zombie_damage": 0.25
+    },
+
+    "armor_boosted": {
+        "name": "armor_boosted",
+        "help": 1, "client": 1,
+        "ui_name": "Armor Boost",
+        "ui_description": "Armor boosted by %d",
+        "effects": [{"code": "armor_boosted"}]
+    },
+
+    "range_reduction": {
+        "name": "range_reduction",
+        "client": 1, "harm": 1,
+        "ui_name": "Range Reduced",
+        "ui_description": "Target's weapon range is reduced",
+        "effects": [{"code": "range_reduction"}]
+    },
+
+    "defense_reduction": {
+        "name": "defense_reduction",
+        "client": 1, "harm": 1,
+        "ui_name": "Damage Resistance Reduced",
+        "ui_description": "Target's resistance to damage is reduced",
+        "effects": [{"code": "defense_boosted"}] // used with a negative strength
+    },
+
+    "damage_booster": {
+        "name": "damage_booster",
+        "client": 1, "server": 0,
+        "help": 1,
+        "ui_name": "Defense Booster",
+        "ui_description": "Weapon damage of nearby friendly units increased",
+        "effects": [{"code": "damage_booster"}]
+    },
+
+    "ice_encrusted": {
+        "name": "ice_encrusted",
+        "harm": 1, "client": 1,
+        "ui_name": "Ice Encrusted",
+        "ui_description": "Ground units slowed and aircraft pushed by wind, unless protected by ice shields",
+        "effects": [{"code": "ice_encrusted"}]
+    },
+
+    "stunned": {
+        "name": "stunned",
+        "harm": 1, "client": 1,
+        "ui_name": "Stun",
+        "ui_description": "Unit cannot move or fire",
+        "effects": [{"code": "stunned"}]
+    },
+
+    "arming": {
+        "name": "arming",
+        "harm": 1, "client": 1,
+        "color": [1,1,0],
+        "ui_name": "Arming",
+        "ui_description": "Unit is loading its weapon",
+        "effects": [{"code": "disarmed"}]
+    },
+
+    "dashing": {
+        "name": "dashing",
+        "client": 1, "server": 0,
+        "help": 1,
+        "ui_name": "Dashing", "show": 0,
+        "ui_description": "Movement speed boosted temporarily",
+        "effects": [{"code": "speed_boosted"}]
+    },
+
+    // applied to all units in the "lava" climate
+    "on_fire_lava_climate": {
+        "name": "on_fire_lava_climate",
+        "harm": 1, "client": 1,
+        "ui_name": "Lava Heat",
+        "ui_description": "Units take damage continuously unless protected by heat shields.",
+        // to defend against this, you need to apply a damage_taken_from:lava_climate modstat somehow
+        "effects": [{"code": "on_fire", "apply_interval": 10, "damage_vs": {"lava_climate":1,"starcraft":0.1,"rover":0.2,"transport":0.4}}]
+        // XXX apply_interval:10 is probably exploitable by ending the battle before 10 seconds is up.
+    },
+
+    "moving_in_swamp": {
+        "name": "moving_in_swamp",
+        "client": 1, "server": 0,
+        "harm": 1, "show": 0, // do not draw red clock graphic
+        "ui_name": "Slowed by swamp",
+        "ui_description": "The unit is stuck in a swamp. Movement and turning speed slowed.",
+        "effects": [{"code": "moving_in_swamp"}]
+    },
+
+    // This needs to be converted to a player aura that affects a unit class, like the unit_secteam auras above
+    //    "swamp_shielded": {
+    //  "name": "swamp_shielded",
+    //  "help": 1, "client": 1, "server": 0,
+    //  "ui_name": "Amphibious Kit",
+    //  "ui_description": "Unit movement on swamp improved",
+    //  "effects": [{"code": "swamp_shielded"}]
+    //    },
+
+    "on_fire": {
+        "name": "on_fire",
+        "harm": 1, "client": 1,
+        // right now, the aura is only applied once to a target, even if it is hit multiple times by multiple attackers
+        //"stacking": "independent", // uncomment this to make multiple hits create multiple auras
+        "ui_name": "On fire",
+        "ui_description": "It burns!",
+        "effects": [{"code": "on_fire"}],
+        "visual_effect": { "type": "particles",
+                           "require_detail": 0,
+                           "emit_instant": 0, "max_count": 300, "radius": 0.9, "speed": 3.0, "randomize_vel": 0.5, "gravity": -1,
+                           "emit_pattern": "circle", "emit_by_area": 1, "width": 2,
+                           "emit_continuous_rate": 140, "emit_continuous_for": 0.25,
+                           "max_age": 0.8, "color": [1,0.7,0.2,1] }
+    }
+}

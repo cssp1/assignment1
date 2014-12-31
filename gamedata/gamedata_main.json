@@ -1,0 +1,940 @@
+// Copyright (c) 2014 SpinPunch. All rights reserved.
+// Use of this source code is governed by an MIT-style license that can be
+// found in the LICENSE file.
+
+// master gamedata file that gets compiled to gamedata.json
+
+{
+    "version": "TESTING001",
+    "gamedata_build_info": $GAMEDATA_BUILD_INFO$,
+
+    "browser_caps":  ["canvas", "webgl", "websocket", "audio_element", "audio_ogg", "audio_wav", "audio_mp3", "audio_aac", "audio_context",
+                      "retina_display"],
+
+    // integrity-checkable parts of gamedata
+    "contents": ["units", "buildings", "spells", "auras", "map", "items", "art"],
+
+    "client": {
+        // report verbose loading metrics
+        "enable_loading_metrics": false,
+        "instrument_tutorial": 1, // enable detailed logging of tutorial state changes
+
+        "max_exception_msg_length": 1500, // max # of characters to send with client_exception messages
+
+        "debug_art_check": false, // enable checksumming on gamedata.art to track down Chrome v33 bug
+
+        // enable manual setting of canvas_div size to work around buggy Facebook iframe resizing
+        "facebook_iframe_resize_hack": true,
+        "facebook_iframe_footer_peek": 30, // how many pixels to shrink the game canvas vertically to reveal the top of the footer
+
+        // true if the HTML5 fullscreen API is available
+        "truefullscreen": {"predicate": "OR", "subpredicates":[
+            {"predicate": "FRAME_PLATFORM", "platform":"fb"},
+            {"predicate": "FRAME_PLATFORM", "platform":"kg"}
+        ]},
+
+        // true if app is able to to send out social platform friend invitations
+        "friend_invites_enabled": {"predicate": "OR", "subpredicates": [
+            {"predicate": "FRAME_PLATFORM", "platform":"fb"}
+            // {"predicate": "FRAME_PLATFORM", "platform":"kg"} // note: requires whitelisting to call kongregate.services.showInvitationBox()
+        ]},
+
+        // true if friend bar should be shown at bottom of screen
+        "friend_bar_enabled": {"predicate": "FRAME_PLATFORM", "platform":"fb"},
+
+        "canvas_div_offset_snoop_time": 1, // refresh cached offsetLeft/offsetTop properties every so often to handle browser reflows
+
+        "enable_perfect_audience": false,
+
+        "global_cooldown": 1.5, // default GCD duration (seconds) after combat spell casts
+
+        "use_map_accel": 1, // use voxel-grid map acceleration data structure for spatial object queries
+        "map_accel_limit": 32, // once query gets larger than this radius (in map cell units), stop using the voxel accelerator and switch to global list
+        "map_accel_chunk": 8, // voxel grid size, in map cell units
+        // the optimal value will depend on the general weapon ranges/map sizes in game, around 8-16 seems optimal for TR.
+
+        "astar_heuristic": "manhattan", // use "manhattan" or "euclidean" A* heuristic (see astar.js)
+        // max number of iterations for A* search, stops pathological cases (units trying to path outside of locked "corrals")
+        // we use a stricter limit in PvP because clever players can exploit this. In PvE, we control the base layout, so
+        // we want to favor pathing.
+        "astar_iter_limit": { "pvp": 500, "pve": 10000 },
+
+        // The "unstick" behavior tries to let units with pathological A* problems make progress.
+        // Normally, once a unit hits the end of a problematic path, it stops. However, if it moved
+        // at least this many map units since the last stoppage, the unit will get one chance to
+        // run A* again and get a new path. The idea is to let units with long, winding paths continue
+        // on their way, while stopping units that are locked inside of a "corral" from wasting CPU
+        // in futile attempts to get out. (<0 disables this behavior)
+        "astar_unstick_radius": 3,
+
+        // game-specific client options
+#include_stripped "$GAME_ID/$GAME_ID_client_options.json"
+        ,
+
+        // must periodically send keepalives to the proxyserver when in direct connect mode,
+        // so that it continues to forward those awesome CREDITAPI requests for us
+        "proxy_keepalive_interval": -1,
+
+        "ajax_min_flush_interval": 0.5, // limit AJAX requests to ocurring no more frequently than one per this number of seconds
+
+        "ajax_config": {
+            "default": {
+                // number of seconds to wait before deciding that an outstanding AJAX request has failed
+                "message_timeout_hello": 12, // timeout used for CLIENT_HELLO connection attempt
+                "message_timeout_gameplay": 120, // timeout used for normal gameplay messages
+                "enable_proxy": 1 },
+            "high_latency": {
+                // for bad internet connections (non-Tier 1/2), extend the initial timeout instead of falling back to proxy,
+                // since it's more likely people just have slow connections instead of business firewalls.
+                "message_timeout_hello": 120,
+                "message_timeout_gameplay": 120,
+                "enable_proxy": 0 }
+        },
+        "websocket_keepalive_interval": 50, // always send something down the websocket this frequently
+
+        "ajax_message_buffer": 10, // number of out-of-order server AJAX requests to buffer before giving up due to lag/packet loss
+
+        "enable_ajax_longpoll": 1, // use longpoll request mechanism
+        "ajax_longpoll_timeout": 120, // standard timeout (sec) for longpoll requests - MUST be longer than gamedata.server.ajax_longpoll_wait + bgtask interval
+
+        // parameters that control the code that tries to make the client's idea of the server's clock ("server_time" in main.js) accurate
+        "clock_slew_limit": 8.0, // if clocks differ by more than this many seconds, snap instantly rather than slewing
+        "clock_slew_min_interval": 0.05, // don't update client clock more often than once per this many seconds
+        "clock_slew_rate": 0.2, // max rate of slewing client clock, seconds per second
+
+        "player_ping_interval": 29.0, // max number of seconds between automatic PING_PLAYER requests
+        "combat_state_save_interval": 44.0, // max number of seconds between flushing dirty position/HP values with OBJECT_COMBAT_STATES message
+        "unit_repair_ping_interval": 8.0, // min number of seconds between UNIT_REPAIR_TICK requests when looking for completed repairs
+        "base_damage_ping_interval": 5.0, // min number of seconds between pings of base damage during ladder battles
+        "base_damage_ping_detail": true, // whether to send detailed info with the base damage ping, for debugging only
+
+        "quarry_collect_poll_interval": -1, // delay before polling for quarry collect results after a Collect All, in seconds (no longer needed since quarry collection is synchronous in NoSQL-land)
+
+        "enable_score_history": 1, // whether to show scores from past weeks/seasons in GUI (requires server enable_scores2_read_sql to be on)
+        "score_history_show_other_url": null, // URL for "Show other stats" button (can be overridden by A/B tests)
+
+        "player_cache": {
+            "query_max": 150, // max # of player cache entries to query in a single batch
+            "query_interval": 3.0 // min # of seconds between queries
+        },
+
+        "delay_load_art": 1, // if true, use delayed loading on art assets (after "Loading..." screen, but do load everything unconditionally)
+        "lazy_art": true, // if true, do not even begin loading images or sounds until an attempt is made to draw/play them
+
+        // maximum number of art asset download requests to give the browser at any one time
+        "concurrent_art_downloads": { "default": 20, "iOS": 5 },
+
+        // number of seconds before asset-load-failure watchdog fires (-1 to disable)
+        "art_download_timeout": { "image": 180, "audio": 360 },
+
+        "min_speak_interval": 1.5, // don't repeat same unit speech sound effect within this many seconds
+
+        "map_ping_interval": 10, // number of seconds between polling the server for region map updates (when region map is up) - disabled if longpoll is active
+        "chat_ping_interval": 60, // number of seconds between polling the server for new chat replies (only when chat window is up) - extended now that longpoll is on
+
+        // number of seconds that must pass after a VISIT_BASE request before showing the "Loading Base..." message (-1 to disable, 0 to always show)
+        "loading_base_time": 0, // used to be 1.0, but in production the S3 request *always* takes at least 1-2 sec, so just show it always
+
+        "enable_playfield_zoom": 1,
+        "view_zoom_limits": [-1,0.4], // zoom limits, exp(-1) to exp(1)
+        "view_zoom_click_increment": 0.2, // amount by which to increment view_zoom per click of the +/- buttons
+        "view_zoom_tile_border": [0.35, 0.75], // amount (source pixels) by which to enlarge dynamic backdrop tiles to hide seams [minify,maximize]
+
+        // playfield speed controls (enabled by enable_playfield_speed_bar)
+        "playfield_speed_limits": [0,2], // min/max speed (0 = legacy default)
+        "playfield_speeds": { "0": 1.0, "1": 1.5, "2": 2.0 }, // coefficient corresponding to each linear increment
+
+        "backdrop_whole_fringe": 90, // size (in zoom=100% pixels) of gradient fringe to draw surrounding "whole" backdrop images when zoomed out
+
+        "enable_keyboard_shortcuts_jewel": 1, // show "1" notifcation on keyboard shortcuts button until clicked at least once
+
+        "max_unit_orders": 16, // max number of waypoints in unit movement order queue
+        "unit_declump_radius": 2, // map unit radius within which to avoid other units for the declumping AI
+        "unit_declump_urgently": false, // prioritize declumping over shooting/moving
+
+        "tut_battle_interact": "manual", // if "auto", automatically move units for user during first step of tutorial
+
+        "default_deploy_ai_order": {
+            // default orders given to player-controlled units deploying into hostile territory when on manual mode
+            // can be overridden by per-unit settings in units.json
+            "manual": {"state": "AI_ATTACK_ANY", "aggressive": false },
+
+            // note: some of the auto behavior is hard-coded, this is for reference only
+            "auto": {"state": "AI_ATTACK_ANY", "aggressive": true }
+        },
+        "drip_deployment_rate": 2.5, // default rate of units/sec dropped by the "dripper" (before acceleration)
+        "drip_startup_delay": 0.20, // number of seconds we wait between mousedown and deploying the first unit (in case player wants to scroll instead)
+
+        "map_bookmarks_max": 64, // max # of bookmarks per region
+
+        // SQUAD MAP DEPLOYMENT
+        "squad_deploy_spread": 15, // initial spread radius of squad units when deployed onto the map
+        "squad_deploy_ai_orders": null,
+
+        "squad_pre_attack": 1, // whether "Spy" button becomes "Attack" on regional map when looking at hostile squad
+
+        // if true, ALWAYS shove the Missions dialog in the player's face and "click here" on the "Claim" button
+        // as soon as any quest is completable, even the one that is not tracked!
+        "always_auto_complete_quests": 0,
+
+        // if this predicate is true, force the Missions dialog to pop up on login
+        "popup_notification_on_login_if": { "predicate": "ALWAYS_FALSE" },
+
+        "map_dialog_warn_rivals": true, // show Valentina warning about breaking attack protection when viewing list of human rivals
+
+        "enable_enemy_unit_tips": true, // show tips about new enemy units the first time you see them (see gamedata['strings']['enemy_unit_*'])
+        "map_dialog_ai_difficulty": true, // show difficulty indicator for AIs on Attack menu
+
+        "plus_buttons": 1, // enable "+" help from Valentina
+        "friendly_build_dialog": 1, // DO show "Upgrade CC for more" prompt on Build dialog
+        "build_dialog_jewels": 1,
+
+        // in "unfriendly" mode, show error tooltips for units you cannot unlock yet due to unfulfilled requirements
+        // in "friendly" mode, do not show tooltips, let player click through to view unit (and see "+" button help)
+        "friendly_research_dialog": 1,
+
+        // enable new fancy victory dialog
+        "fancy_victory_dialog": 1,
+
+        "loot_storage_warning": 1, // warn player when about to go to battle against an enemy when iron/water storage needs upgrading
+        "loot_storage_warning_threshold": 0.95, // warn player when about to go to battle against an enemy when storage is more than this fraction of full
+        "loot_storage_warning_min_cc_level": 2, // don't show the warning until CC reaches this number
+        "loot_storage_warning_max_cc_level": 4, // stop showing the warning once CC level exceeds this number
+
+        "upgrade_dialog_clickhelp": 1, // allow player to click disabled Upgrade buttons to get help on how to fulfill unmet requirements
+
+        // enable explicit message about getting a new damage protection timer after "You've been attacked" dialog
+        "enable_damage_protection_notice": 1,
+
+        // show battle log (client side) after You Were Attacked message closes
+        "auto_show_battle_log": true,
+
+        // maximize alliance chat frame when requesting unit donations
+        "unit_donation_request_maximize_chat": 1,
+
+        // enable "Achievements" tab on player info dialog
+        "enable_ingame_achievements": 1,
+        // show "CATEGORY Achievements Complete: xx%" on top of the Achievements tab
+        "show_achievement_complete_pct": 1,
+
+        "enable_idle_icons": 1, // enable building idle notification icons
+        "idle_icon_type": "old", // building idle notification icons: "old" = legacy (stop signs), "advanced" = new system (SuperCell-like)
+        "harvester_idle_seconds": 60, // show "Collect" idle icon when harvester has more than this many seconds of product in it
+
+        // enable Equipment UI
+        "enable_equipment": 1,
+        "enable_unit_equipment": 1, // enable equipment slot UI on units
+
+        "item_tooltip_stack_max": 0, // show (Max stack: NN) in item tooltip
+
+        // enable Alliance stuff (for both server and client)
+        "enable_alliances": 1,
+        "enable_alliance_chat_tags": 1,
+        "enable_alliance_role_gui": 1,
+
+        "default_chat_tab": [[{"predicate":"HOME_REGION", "regions": ["ANY"]}, "REGION"],
+                             [{"predicate":"ALWAYS_TRUE"}, "GLOBAL"]],
+        "maximize_chat_on_login_if": {"predicate": "AND", "subpredicates":[
+            { "predicate": "PLAYER_HISTORY", "key": "logged_in_times", "method": ">=", "value": 5 },
+            { "predicate": "LIBRARY", "name": "extended_tutorial_complete" }
+        ]},
+        "show_alliance_mate_last_played_time": 1, // show "Last Played: X days ago" for members of your own alliance
+
+        // for UI purposes only, treat tournament "togo" intervals shortert than this many seconds as infinite (so don't show expiry timer)
+        "infinite_trophy_togo": 2592000,
+
+        "enable_trophy_backend": 1, // enable server-side code for PvP/PvE player/alliance trophy system
+        "enable_trophy_ui": 1, // enable UI display of trophy stuff
+
+        // number of pixels (horizontal,vertical) beyond the diamond playfield that you can see by scrolling to the extreme edge
+        "playfield_scroll_margin": [100,200],
+
+        "unit_control_detail": 1, // if >=1, enable some slow-but-pretty features like arcs, if >= 2, enable all arcs
+        // colors for drawing unit control paths
+        "unit_control_colors": {
+            "target": "rgba(255,0,0,0.6)",
+            "amove_later": "rgba(255,0,0,0.5)",
+            "amove_now": "rgba(255,0,0,0.8)",
+            "move_later": "rgba(0,255,0,0.5)",
+            "move_now": "rgba(0,255,0,0.8)"
+        },
+        // draw method for unit selection - affects graphics performance
+        "unit_selection_shape": "diamond", // "rectangle", "diamond", "arc" ("sprite" not implemented)
+
+        // colors for drawing unit selection highlights
+        "unit_highlights": {
+            // used for enemy units
+            "enemy": { "basecol": "rgba(255,50,50,", // base color **NOTE** alpha part is cut off, it will be appended in code!
+                       "stroke_alpha": 0, // alpha of the stroke around the perimeter of the circle
+                       "altitude_alpha": 0.3, // alpha of the "altitude stick" underneath flying units
+                       "fill_alpha": 0.25, // alpha of the area within the circle
+                       "ring_size": 0.85 // size of the circle relative to the unit's gridsize (1.0 = normal)
+                     },
+            // used for units in hold-position mode
+            "hold_position": { "basecol": "rgba(255,255,0,",
+                               "stroke_alpha": 0.8,
+                               "altitude_alpha": 0.3,
+                               "fill_alpha": 0.18,
+                               "ring_size": 1  },
+            // used for units in "relentless pursuit" mode
+            "aggressive": { "basecol": "rgba(255,0,0,",
+                            "stroke_alpha": 0.8,
+                            "altitude_alpha": 0.3,
+                            "fill_alpha": 0.18,
+                            "ring_size": 1 },
+            // used for all other friendly units
+            "normal": { "basecol": "rgba(0,255,0,",
+                        "stroke_alpha": 0.8,
+                        "altitude_alpha": 0.3,
+                        "fill_alpha": 0.18,
+                        "ring_size": 1 }
+        },
+
+        // if true, always draw weapon range of selected units
+        // otherwise, only draw weapon range of HOLD_POSITION cloaked units (i.e. Phantoms)
+        "always_draw_mobile_weapon_range": false,
+
+        "highlight_enemy_units": true, // draw faint circles under enemy units
+
+        // fill colors for health/progress bars on the battlefield.
+        // these break our convention of using floating-point linear RGB :( but it's very performance-critical.
+        "health_bar_colors_friendly": {
+            "bg": "rgba(0,0,0,0.25)",
+            "fg": "rgba(0,204,0,1.0)",
+            "fg_transition": "rgba(0,102,0,1.0)",
+            "highlight": "rgba(0,255,0,1.0)",
+            "outline": "rgba(0,0,0,1)"
+        },
+        "health_bar_colors_enemy": {
+            "bg": "rgba(0,0,0,0.25)",
+            "fg": "rgba(220,50,50,1.0)",
+            "fg_transition": "rgba(110,25,25,1.0)",
+            "highlight": "rgba(255,95,95,1.0)",
+            "outline": "rgba(0,0,0,1)"
+        },
+        "progress_bar_colors": {
+            "bg": "rgba(102,102,102,0.70)",
+            "fg": "rgba(106,213,242,1.0)",
+            "fg_transition": "rgba(106,213,242,1.0)",
+            "highlight": "rgba(106,255,255,1.0)",
+            "outline": "rgba(0,0,0,0.66)"
+        },
+
+        "use_enemy_sprites": false, // call for separate "enemy" and "enemy_damaged" states
+
+        // substitute some sprite states to minimize number loaded
+        "merge_sprites": {
+            "normal": {
+                // do not load separate sprites for enemy units/buildings, use same sprites as "normal"/"damaged" states
+                "enemy": "normal",
+                "enemy_damaged": "damaged"
+            },
+            "low_gfx": {
+                // in addition to the above, do not load damaged unit/building sprites, just use "normal" state for everything
+                "enemy": "normal",
+                "damaged": "normal",
+                "enemy_damaged": "normal"
+            }
+        },
+
+        // name of audio driver to use - can be overridden by ?audio_driver= URL parameter
+        "default_audio_driver": [
+            [{"predicate":"BROWSER_NAME", "names": ["Chrome"]}, "AudioContext"],
+            [{"predicate":"AND", "subpredicates":[
+                {"predicate":"BROWSER_NAME", "names": ["Firefox"]},
+                {"predicate":"BROWSER_VERSION", "versions": [25,-1]}
+            ]}, "AudioContext"],
+            [{"predicate":"BROWSER_NAME", "names": ["Firefox"]}, "buzz"], // switched back from sm2->buzz 2013 Aug 26
+            [{"predicate":"BROWSER_NAME", "names": ["Safari"]}, "buzz"], // Flash audio trick causes severe memory/thread pressure in Safari as of 2012 May 27
+            [{"predicate":"BROWSER_NAME", "names": ["Explorer"]}, "sm2"],
+            [{"predicate":"BROWSER_NAME", "names": ["Opera"]}, "sm2"],
+            [{"predicate":"ALWAYS_TRUE"}, "sm2"]
+        ],
+
+        // maximum number of simultaneous audio effects to play, by audio driver API and browser name
+        // (the game uses the smallest of these that applies to the player's browser)
+        "max_audio_channels": {"buzz": 24, "sm2": 24, "AudioContext": 24,
+                               "Chrome": 24, "Firefox": 24, "Explorer": 24 },
+        "global_audio_volume": 0.36,
+
+        "enable_websockets": 1, // use websockets by default, if browser supports them
+
+        // wait until account is at least 2 hours old before showing any of the below popups
+        "motd_filter": { "predicate": "RETAINED", "duration": 7200 },
+
+        "gift_prompt_interval": 86400, // minimum number of seconds between times the user will be prompted to give gifts upon login
+        "friend_invite_prompt_interval": 1814400, // same for interval between prompts to invite Facebook friends
+        "motd_interval": 36000, // minimum number of seconds between times the user will be shown the "Message of the Day" upon login
+
+        "graphics_detail": { "low": 0.25, "high": 2, "default": 2 },
+        "force_low_gfx_by_browser": {"Firefox": true}, // special-case Firefox to have lower graphics options
+        "force_low_gfx_by_os": {"iOS": true}, // special-case iOS to have lower graphics options
+        "force_lazy_art_by_browser": {"Firefox": true}, // special-case Firefox to have lower graphics options
+
+        "enable_loot_burst_effects": false,
+        // color of loot-related SPFX.CombatText rising out of harvesters and looted buildings
+        "loot_text_color": {
+            // note: iron/water/res3/etc was moved to resources.json "loot_text_color"
+            "gamebucks": [1,1,0,1],
+            "cooldown": [0.6, 0.6, 0.6, 1] // for quarries on cooldown
+        },
+
+        // used for coloring inventory items by rarity
+        "loot_rarity_colors": [
+            [0.87,0.87,0.87], // -1 = trash
+            [1,1,1], //  0 = common (default)
+            [0,1,0],     //  1 = uncommon
+            [0,0.5,1],     //  2 = rare
+            [0.8,0.05,0.33],   //  3 = epic
+            [1,1,0]    //  4 = legendary
+        ],
+
+        // enable tinting and spot-color effects using HTMLImageElement.getImageData() and toDataUrl()
+        "enable_pixel_manipulation": true,
+        "enable_pixel_manipulation_in_low_gfx": true, // even in low_gfx mode
+
+        // default visual effects
+        "vfx":
+#include "$GAME_ID/$GAME_ID_client_vfx.json"
+        ,
+        "inert_warn_count": 100, // warn developers if more than this many inert objects are used
+
+        // controls overall intensity of weapon projectile glow effect (only in high_gfx mode)
+        "projectile_glow_intensity": 0.15,
+        "projectile_glow_mode": "lighter",  // HTML5 Canvas globalCompositeOperation mode for projectile glows: "lighter" or "source-over (default)
+
+        // duration (seconds) of harvester halo glow effect
+        "harvest_glow_time": 0.7,
+        // delay (seconds) between resource collection at harvester and first iron/water bar flash
+        "harvest_flash_delay": 0.3,
+
+        // delay (seconds) between getting combat loot and first resource bar flash
+        "loot_flash_delay": 0.9, // use 1.8 with enable_loot_burst_effects
+
+        // duration (seconds) of iron/water bar number flash effect
+        "harvest_flash_time": 0.9,
+        // number of flashes in iron/water bar number flash effect
+        "harvest_flash_count": 3,
+
+        // delay (seconds) between start of iron/water bar flash effect and start of number jump effect
+        "resource_ticker_delay": 0.9, // 1.0
+        // duration (seconds) of iron/water amount number jump effect
+        "resource_ticker_duration": 1.4, // 1.5
+        // time of greatest iron/water text size relative to entire jump effect (range: 0-1)
+        "resource_ticker_grow_peak": 0.2,
+        // largest size of iron/water numbers during jump effect (relative to normal size = 1)
+        "resource_ticker_grow_amount": 1.1,
+        // how quickly the number-grow effect fades (exp(-decay*t))
+        "resource_ticker_decay_speed": 20,
+
+        // duration (seconds) of XP bar flash effect
+        "xp_bar_flash_duration": 1.8,
+
+        "show_xp_gains": 0, // show "+123 XP" text on playfield when you gain XP, and on Missions dialog
+
+        "valentina_dialog_anim_time": 0.5, // number of seconds it takes the Missions/Messages dialogs to zoom out of Valentina (-1 to disable the effect)
+
+        "show_notification_counter": 1, // show Facebook jewel-style count of unread mails/unclaimed quests on the Valentina "!" mark
+
+        "notification_icon_glow_intensity": 0.55, // maximum intensity of notification "!" icon glow effect
+        "notification_icon_glow_freq": 0.7, // frequency (Hz) of notification "!" icon glow effect
+
+        "turret_scan_speed": 75.0, // idle turret rotation rate, degrees/sec
+
+        "ui_quiet_time": 0.6, // time (sec) to allow UI to settle down between guided tutorial steps
+        "ui_quest_complete_pop_time": 0.33, // time (sec) after a tip-enabled quest is completed before automatically popping up the Missions dialog
+
+        "mouse_scroll_dead_zone": 40, // scrolling movement smaller than this number of pixels does not block mouseup events
+        "mouse_scroll_dead_zone_dripper": 100, // scrolling movement smaller than this number of pixels does not stop Dripper operations
+
+        "force_scroll_enable": 1, // whether to enable forced scrolling to appropriate objects during tutorial
+        "force_scroll_speed": 0.06, // speed (unitless) of forced scroll moves during tutorial
+
+        "battle_end_delay": 0.5, // time (sec) between final enemy being destroyed and battle automatically ending
+        "surrender_delay": 2.5, // time (sec) between hitting Surrender (during an AI attack) and triggering the session change
+
+        "default_equip_icon_offset": [0.95, 0.25], // default offset of equip_icon for buildings that do not specify it, as a fraction of gridsize/2
+        "default_equip_icon_delta": [1.5, 0], // default map-cell offset between successive equip icons on the same building
+
+        "cloaked_opacity": 0.66, // alpha value to draw (player-owned, visible) cloaked units
+        "invisible_opacity": 0.33, // alpha value to draw (player-owned, invisible or enemy-owned, visible) cloaked units
+        "cloak_transition_time": 3.0, // seconds it takes for a cloaked unit to visually cloak or uncloak (combat engine effect is instant)
+        // note: this value is the time to go from alpha=0 to alpha=1, so it will take less time to go between intermediate alpha values
+
+        "unit_fade_time": 1.0, // seconds it takes for a new unit to visually appear (combat engine effect is instant)
+        "unit_spawn_opacity": 0, // units initially spawn invisible and fade in. Set to 1 to disable this effect.
+        "chat_filter":
+#include "chat_filter.json"
+    },
+
+    "map":
+#include "$GAME_ID/$GAME_ID_map.json"
+    ,
+
+    // "territory" refers to the base-control metagame (regional map)
+    "territory":
+#include "territory.json"
+    ,
+
+    "continents":
+#include "$GAME_ID/$GAME_ID_continents.json"
+    ,
+
+    "regions":
+#include "$GAME_ID/$GAME_ID_regions.json"
+    ,
+
+    "region_terrain":
+#include "$GAME_ID/$GAME_ID_region_terrain.json"
+    ,
+
+    "search_player_match_mode": "prefix", // match on prefix of name (other option is "full" which requires typing entire name)
+    "search_player_name_field": "ui_name_searchable", // for speed, do case-sensitive queries on a lowercased version of the ui_name
+    "search_player_list_limit": 100, // max number of players to display on "Search Player" list (-1 to disable - but this has performance implications)
+
+    "alliances": {
+        "invite_duration": 172800, // how long (in seconds) an invite or join request is good for
+
+        "status_change_mail_duration": 864000, // how long (in seconds) status-change notifications persist
+
+        "join_request_cooldown": 3600, // how long (in seconds) player must wait before re-sending a join request to a specific alliance
+        "invite_cooldown": 86400, // how long (in seconds) a leader msut wait before re-sending an invitation to join their alliance
+
+        "max_members": 50, // temporary, until we figure out a better way to do this
+
+        // weighting of individual player trophy counts into the alliance trophy count, by rank
+        "trophy_weights": [0.50,0.50,0.50,0.50,0.50,0.50,0.50,0.50,0.50,0.50, // # 1-#10 50%
+                           0.25,0.25,0.25,0.25,0.25,0.25,0.25,0.25,0.25,0.25, // #11-#20 25%
+                           0.12,0.12,0.12,0.12,0.12,0.12,0.12,0.12,0.12,0.12, // #21-#30 12%
+                           0.10,0.10,0.10,0.10,0.10,0.10,0.10,0.10,0.10,0.10, // #31-#40 10%
+                           0.03,0.03,0.03,0.03,0.03,0.03,0.03,0.03,0.03,0.03  // #41-#50  3%
+                          ],
+
+        "search_list_limit": 50, // max number of alliances to display for "Search Alliance" results (-1 to disable - but this has performance implications)
+        "join_list_limit": 100, // max number of alliances to display on "Join Alliance" list (-1 to disable - but this has performance implications)
+        "join_list_show_private": 1, // show invite-only alliances in join list
+        "join_list_match_continent": 1 // show only alliances in your own continent in join list
+    },
+
+    "climates":
+#include "$GAME_ID/$GAME_ID_climates.json"
+    ,
+
+    "enable_repair_bay": true, // default setting for repair bay, if no A/B test applies
+    "resurrect_requires_tech": true, // players may not resurrect a dead unit from 0 HP unless they have unlocked the tech to produce that unit
+
+    "skip_quest_claim": 0, // make QUEST_COMPLETED predicates react to goal satisfaction rather than reward claim
+
+    "enable_leaderboard": true, // default setting for leaderboard, if no A/B test applies
+
+    "enable_inventory": 1,
+    "inventory_available_during_warehouse_upgrade": false,
+    "inventory_available_during_warehouse_repair": false,
+
+    "enable_item_loot": 1,
+    "modal_looting": 1,
+
+    "enable_mod_techs": 0,
+
+    "enable_lottery": 0,
+    "lottery_reseed_cooldown": 64800, // reseed lottery on a long cooldown, to avoid exploits
+    // note: this is NOT an ordinary loot table
+    // each entry corresponds to one of the lottery "slots"
+    "lottery_slot_tables": [[{"table": "lottery_test"}],
+                            [{"table": "lottery_test"}],
+                            [{"table": "lottery_test"}],
+                            [{"table": "lottery_test"}]
+                           ],
+    "lottery_available_during_scanner_upgrade": false,
+    "lottery_available_during_scanner_repair": false,
+
+    "player_aura_limit": 4, // maximum number of player auras that can be active simultaneously
+
+    // minimum time gap between base lock state queries, in seconds
+    "lock_state_poll_cooldown": 50.0,
+
+    // minimum time gap between between rival and map query requests (from receipt of response to next launch), in seconds
+    "rival_query_cooldown": 2.0,
+
+    "global_harvest_coeff": 1.0, // global scale on how fast harvesters operate (adjusts AFTER value shown in UI)
+
+    "harvest_rate_detail": false, // whether or not to show actual Units/hour harvest rate in upgrade dialog(instead of just percent relative to level 1)
+
+    "enemy_tooltip_detail": { "mobile": 1, "building": 0 }, // whether or not to show detailed info (unit/mod levels etc) in tooltips of enemy-owned objects
+    "enemy_storage_detail": true, // whether or not to show fullness of enemy-owned storage buildings
+
+    "battle_log_detail": false, // whether or not to show unit/building levels in battle logs
+
+    "allow_self_attack": false, // do not allow players (non-developers) to order units to attack their own units/buildings
+
+
+    "tutorial_attack_time": 600, // attack time used during the Lion Stone tutorial attack
+    "tutorial_post_deploy_attack_time": 60, // how long the battle is allowed to last once player deploys units
+
+    "reinforce_time": 420, // maximum time a player has to reinforce/manipulate units at remote bases (while holding lock)
+
+    // if iron/water levels reach this factor times the player's
+    // max storage capacity, then further combat loot is lost
+    // rather than banked.
+    "loot_storage_limit": 1.0,
+
+    "matchmaking" :
+#include "$GAME_ID/$GAME_ID_matchmaking.json"
+    ,
+
+    // how low a player's trophy count can go
+    "trophy_floor": { "pve": 0,
+                      "pvp": 0
+                    },
+
+    // offset between true database value of trophy count and the UI displayed value
+    "trophy_display_offset": { "pve": 0,
+                               "pvp": 0
+                             },
+
+    "prevent_alt_attacks": true, // prevent players making attacks against their own known alt accounts
+    "prevent_same_alliance_attacks": true, // prevent attacks between alliance-mates
+
+    "battle_log_max_summary_num": 50, // maximum number of battle summaries to keep in battle history (total, ALL opponents)
+    "battle_log_max_summary_age": 2592000, // maximum age (seconds) of battle summaries to keep in battle history (30 days)
+    "battle_log_max_age": 2592000, // maximum age (seconds) to keep any playerdb battle history data at all (30 days)
+
+    "repeat_attack_cooldown": {
+        // "ai" for AI opponents, "human" for human opponents
+        "ai": { "freebies": 10, // number of instant attacks allowed before repeat cooldown kicks in (1 for cooldown starting on second attack)
+                "base": 15, // base number of seconds cooldown between repeated attacks on same victim
+                "growth": 1.25, // amount by which cooldown increases on subsequent attacks
+                "reset": 300}, // time after which cooldown resets to base value
+        "human": { "freebies": 1,
+                   "base": 1800,
+                   "growth": 2.0,
+                   "reset": 2700 }
+    },
+
+    "anti_bullying":
+#include "$GAME_ID/$GAME_ID_anti_bullying.json"
+    ,
+
+    "chat_length_limit": 120, // max # of characters in a chat message
+    // gag player for "penalty" seconds after spamming chat (when more than "threshold" messages are sent within "cooldown" seconds)
+    "chat_spam_cooldown": 5,
+    "chat_spam_threshold": 5,
+    "chat_spam_penalty": 15,
+
+    "enable_chat_police": 0, // whether to make player chat reports apply the new warned/gagged auras on targets
+    "chat_report_window": 1800, // how long after saying something in global or regional chat that you are subject to warnings
+    "chat_report_cooldown": 1800, // how often you can report a given player for abusive chat (should be >= chat_warn_duration, otherwise players can "vote" twice)
+    "chat_warn_duration": 1800, // how long the "you have been reported" aura lasts
+
+    // cond chain that determines the report_stack sent with a chat report
+    "chat_report_send_stack": [[{"predicate":"PLAYER_HISTORY", "key": "money_spent", "method": ">=", "value": 10},2],
+                               [{"predicate":"ALWAYS_TRUE"},1]],
+    // consequent executed when you are the recipient of a chat report
+    "chat_report_recv_action": { "consequent": "APPLY_AURA", "aura_name": "chat_warned",
+                                 "stack": 1, "stack_from_context": "report_stack", "aura_duration": 1800 }, // aura_duration should match chat_warn_duration above
+
+    // global chat channel assignment
+    "global_chat_channel_assignment": [
+        // Kongregate
+        [{"predicate": "FRAME_PLATFORM", "platform":"kg"}, "global_kong"],
+
+        // random Tier 4
+        [{"predicate": "COUNTRY", "countries": ["ph"]}, "global_ph"],
+        [{"predicate": "COUNTRY", "countries": ["id"]}, "global_id"],
+        [{"predicate": "COUNTRY", "countries": ["my"]}, "global_my"],
+        [{"predicate": "COUNTRY", "countries": ["eg"]}, "global_eg"],
+        [{"predicate": "COUNTRY", "countries": ["iq"]}, "global_iq"],
+        [{"predicate": "COUNTRY", "countries": ["tr"]}, "global_tr"],
+        [{"predicate": "COUNTRY", "countries": ["br"]}, "global_br"],
+        [{"predicate": "COUNTRY", "countries": ["th"]}, "global_th"],
+        [{"predicate": "COUNTRY", "countries": ["in"]}, "global_in"],
+        [{"predicate": "COUNTRY", "countries": ["ba"]}, "global_ba"],
+        [{"predicate": "COUNTRY", "countries": ["pe"]}, "global_pe"],
+        [{"predicate": "COUNTRY", "countries": ["ae"]}, "global_ae"],
+        [{"predicate": "COUNTRY", "countries": ["mx","es"]}, "global_spanish"],
+
+        // non-English continental Europe
+        [{"predicate": "COUNTRY", "countries": ["de","at","ch"]}, "global_de"],
+        [{"predicate": "COUNTRY", "countries": ["be"]}, "global_be"],
+        [{"predicate": "COUNTRY", "countries": ["fr"]}, "global_fr"],
+        [{"predicate": "COUNTRY", "countries": ["it"]}, "global_it"],
+        [{"predicate": "COUNTRY", "countries": ["ro"]}, "global_ro"],
+        [{"predicate": "COUNTRY", "countries": ["hu"]}, "global_hu"],
+
+        // English-speaking countries and Tier 1 countries with generally good English
+        [{"predicate": "COUNTRY", "countries": ["us","ca","gb","au","nz","za","ie","dk","fi","nl","no","se","is"]}, "global_english"],
+
+        [{"predicate": "COUNTRY", "countries": ["tw","cn"]}, "global_zh"],
+        [{"predicate": "ALWAYS_TRUE"}, "global_default"]
+    ],
+
+    "repair_time": 5, // how long structures take to repair from full damage (NOT USED ANYMORE, see buildings.json for repair times)
+
+#include_stripped "$GAME_ID/$GAME_ID_main_options.json"
+    ,
+
+    "resources":
+#include "$GAME_ID/$GAME_ID_resources.json"
+    ,
+
+    "upgrade_cancel_refund": 0.50, // fraction of original cost that is refunded when building upgrades are cancelled
+    "research_cancel_refund": 0.50, // fraction of original cost that is refunded when tech research is cancelled
+
+    "enable_zombie_debuff": 1, // reduce combat effectiveness of units deployed into battle at low health
+    "zombie_debuff_threshold": 0.1, // fraction of HP below which zombie debuff applies
+
+    "minimum_combat_power_factor": 0.30, // minimum effectiveness of turrets if all energy plants are inoperative
+
+    "produce_to_reserves": true, // send unit production that overflows Base Defenders to reserves instead of failing. Only applies if squads are enabled.
+
+    "daily_quest_reward_ratio": 0.33, // reduce daily quest rewards this much
+
+    // minimum level for bonus reward units (from quests and gamebucks purchases)
+    // this will be rounded UP to the next-highest packaged-unit item level (1, 4, or 8)
+
+    "reward_unit_level_by_cc_level": [1,1,1,1,1,1],
+
+    "enable_daily_attacks": false,
+    "daily_attack_interval": 86400, // minimum number of seconds between auto-generated AI attacks
+    "daily_attack_chance": 0.10, // probability of receiving a daily attack, per login, once you are otherwise eligible
+
+    "gift_interval": 86400, // minimum number of seconds between times users can send free gifts to each other
+
+    "gift_amount_base": 0.03, // base iron/water gift amount, as fraction of max resource capacity
+    "gift_amount_randomness": 0.25, // gift amount varies by +/- this much (fraction of base amount, 0-1)
+    "gift_amount_decay": 0.50, // size of gift N+1 relative to gift N (per day), for diminishing returns (1.0 to disable)
+
+    "gamebucks_in_deposits": 1, // whether iron_deposits can contain gamebucks
+
+    // see https://developers.facebook.com/docs/payments/payer_promotion/
+    "enable_payer_promo": true, // whether or not to enable the Facebook Payer Promotion system by default
+    "payer_promo_interval": 1814400, // minimum interval (sec) between Facebook Payer Promotion offer prompts
+    "payer_promo_min_logins": 110, // minimum number of logins before promo can be shown
+
+    "permissions_request_interval": 604800, // minimum interval (sec) between prompts for additional Facebook permissions
+    "permissions_request_display": "popup", // 'popup' or 'iframe' FB.ui mode - note that 'popup' must be triggered by a click to avoid popup blockers
+
+    "store":
+#include "$GAME_ID/$GAME_ID_store.json"
+    ,
+
+    // starting conditions for brand-new players
+    "starting_conditions":
+#include "$GAME_ID/$GAME_ID_starting_conditions.json"
+    ,
+
+    "event_schedule":
+#include "$GAME_ID/$GAME_ID_event_schedule.json"
+    ,
+
+    // which event to use to guide new players through their first AIs with event-like character in lower right corner
+    "tutorial_event":
+#include "$GAME_ID/$GAME_ID_tutorial_event.json"
+    ,
+
+    "events":
+#include "$GAME_ID/$GAME_ID_events.json"
+    ,
+
+    "player_xp":
+#include "$GAME_ID/$GAME_ID_player_xp.json"
+    ,
+
+    "spells":
+#include "$GAME_ID/$GAME_ID_spells.json"
+    ,
+
+    "auras":
+#include "$GAME_ID/$GAME_ID_auras.json"
+    ,
+
+    "tech":
+#include "$GAME_ID/$GAME_ID_tech.json"
+    ,
+
+    "items": {
+#include_stripped "$GAME_ID/$GAME_ID_items.json"
+        ,
+#include_stripped "$GAME_ID/built/$GAME_ID_items_auto.json"
+        ,
+#include_stripped "$GAME_ID/built/$GAME_ID_items_units.json"
+        ,
+#include_stripped "$GAME_ID/built/$GAME_ID_items_boosts.json"
+    },
+    "count_unequipped_items_in_sets": false,
+    "item_sets":
+#include "$GAME_ID/$GAME_ID_item_sets.json"
+    ,
+
+    "crafting":
+#include "$GAME_ID/$GAME_ID_crafting.json"
+    ,
+
+    "buildings":
+#include "$GAME_ID/$GAME_ID_buildings.json"
+    ,
+
+    "inert_limit": 25, // limit on # of client-creatable inert objects in base to prevent DoS attack
+    "inert":
+#include "$GAME_ID/$GAME_ID_inert.json"
+    ,
+
+    "units":
+#include "$GAME_ID/$GAME_ID_units.json"
+    ,
+
+    "virtual_units": {
+        "PLAYER": { "ui_name": "PLAYER", "kind": "virtual" },
+        "BUILDMENU": {
+            "ui_name": "BUILDMENU",
+            "kind": "virtual",
+            "spells": ["BUILD"]
+        },
+        "DEPLOYER": {
+            "ui_name": "DEPLOYER",
+            "kind": "virtual",
+            "spells": ["DEPLOY_UNITS"]
+        },
+        "STOREMENU": {
+            "ui_name": "STOREMENU",
+            "kind": "virtual"
+        },
+        "CHEATMENU": {
+            "ui_name": "CHEATMENU",
+            "kind": "virtual"
+        }
+    },
+
+    // this is a library of common predicates, which can be over-ridden in A/B tests
+    "predicate_library":
+#include "$GAME_ID/$GAME_ID_predicate_library.json"
+    ,
+
+    // this is a library of common consequents, which can be over-ridden in A/B tests
+    "consequent_library":
+#include "$GAME_ID/$GAME_ID_consequent_library.json"
+    ,
+
+    "quests":
+#include "$GAME_ID/$GAME_ID_quests.json"
+    ,
+
+    // client-visible subset of loot_tables.json
+    "loot_tables_client":
+#include "$GAME_ID/built/$GAME_ID_loot_tables_client.json"
+    ,
+    // client-visible subset of ai_bases.json
+    "ai_bases_client":
+#include "$GAME_ID/built/$GAME_ID_ai_bases_client.json"
+    ,
+    // client-visible subset of quarries.json
+    "quarries_client":
+#include "$GAME_ID/built/$GAME_ID_quarries_client.json"
+    ,
+    // client-visible subset of hives.json
+    "hives_client":
+#include "$GAME_ID/built/$GAME_ID_hives_client.json"
+    ,
+
+    "ai_attacks_client": {
+        // time from login to daily attack warning, in seconds
+        "after_login_time": 30,
+
+        "surrender_cc_health": 0.75, // how much health the CC is reduced to if you surrender
+        "surrender_cc_min_health": 0.51, // minimum health of CC after blowing up for a surrender
+
+        // speech is randomly picked from this list
+        "flavor_text": [ "Commander, you will bow to my will.\nSurrender or perish." ],
+
+        // directions from which attacks are launched (x,y coordinates of spawn location as fraction of game board size)
+        "directions": { "n": [0.5,0.1], "ne": [0.8, 0.2], "e": [0.9, 0.5], "se": [0.8, 0.8],
+                        "s": [0.5,0.9], "sw": [0.2,0.8], "w": [0.1,0.5], "nw": [0.2,0.2] }
+    },
+
+    "tutorial":
+#include "$GAME_ID/$GAME_ID_tutorial.json"
+    ,
+
+    "errors":
+#include "errors.json"
+    ,
+
+    "abtests":
+#include "$GAME_ID/$GAME_ID_abtests.json"
+    ,
+
+    "strings":
+#include "$GAME_ID/$GAME_ID_strings.json"
+    ,
+    "dialogs":
+#include "dialogs.json"
+    ,
+    "art":
+#include "$GAME_ID/$GAME_ID_art.json"
+    ,
+    "daily_tips":
+#include "$GAME_ID/$GAME_ID_daily_tips.json"
+    ,
+    "daily_messages":
+#include "$GAME_ID/$GAME_ID_daily_messages.json"
+    ,
+    "daily_banners":
+#include "$GAME_ID/$GAME_ID_daily_banners.json"
+    ,
+    "virals":
+#include "$GAME_ID/$GAME_ID_virals.json"
+    ,
+    "achievement_categories":
+#include "$GAME_ID/$GAME_ID_achievement_categories.json"
+    ,
+    "achievements":
+#include "$GAME_ID/$GAME_ID_achievements.json"
+    ,
+    "adnetworks":
+#include "$GAME_ID/$GAME_ID_adnetworks.json"
+    ,
+    "enable_fb_notifications": true, // enable notifications "X attacked you in Mars Frontier"
+    "fb_notifications":
+#include "$GAME_ID/$GAME_ID_fb_notifications.json"
+    ,
+
+#include_stripped "$GAME_ID/$GAME_ID_fb_scores.json"
+    ,
+
+    "enable_fb_achievements": false, // enable use of Achievements API
+
+    "enable_fb_open_graph": true,
+    "fb_open_graph":
+#include "$GAME_ID/$GAME_ID_fb_open_graph.json"
+    ,
+
+    "enable_fb_app_events": true, // enable use of FB App Events API
+
+    // if >0, then when doing Facebook friend invites with the v2+ API,
+    // instantly invite this many of the top friends instead of showing selector (like Throne Rush)
+    "fb_friend_invite_v2_instant": 0,
+
+    // CURRENCY DISPLAY DATA
+    // NOTE! This has nothing at all to do with the actual ordering/payments code!
+    // This data is ONLY used for the purpose of displaying currency amounts in the GUI.
+    "currencies": {
+        "Facebook Credits": { "decimals": 0 }, // for compatibility with old FB Credits system
+        "Kongregate Kreds": { "decimals": 0 },
+        "USD": { "prefix": "$", "decimals": 2 },
+        "CAD": { "prefix": "$", "decimals": 2 },
+        "AUD": { "prefix": "$", "decimals": 2 },
+        "NZD": { "prefix": "$", "decimals": 2 },
+        "EUR": { "prefix": "\u20ac", "decimals": 2 },
+        "GBP": { "prefix": "\u00a3", "decimals": 2 },
+        "UKP": { "prefix": "\u00a3", "decimals": 2 }, // note: old facebook_currency API returns UKP rather than GBP
+        "TRY": { "prefix": "TL ", "decimals": 2 },
+        "ISK": { "prefix": "kr. ", "suffix": " ISK", "decimals": 0 },
+        "NOK": { "prefix": "NOK ", "decimals": 2 },
+        "SEK": { "prefix": "kr. ", "decimals": 2 },
+        "DKK": { "prefix": "DKK ", "decimals": 2 },
+        "KRW": { "suffix": " KRW", "decimals": 0 },
+        "QAR": { "suffix": " QR", "decimals": 2 },
+        "ZAR": { "suffix": " R", "decimals": 2 },
+        "JPY": { "prefix": "\u00a5", "suffix": "", "decimals": 0 }
+    }
+}

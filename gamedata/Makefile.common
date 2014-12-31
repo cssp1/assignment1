@@ -1,0 +1,97 @@
+# -*- mode: makefile -*-
+# gamedata Make rules common to all game titles
+
+# Copyright (c) 2014 SpinPunch. All rights reserved.
+# Use of this source code is governed by an MIT-style license that can be
+# found in the LICENSE file.
+
+.SUFFIXES:
+
+.PHONY: clean dep
+
+# remove all build products
+clean:
+	rm -f built/*
+
+# gather all dependency info
+# this is done for gamedata_main.json as well as the individual JSON files that are built but not linked into it
+dep:
+	rm -f built/deps
+	../preprocess.py -g ${GAME_ID} --get-deps ${GAME_ID}_server.json --get-deps-as built/${GAME_ID}_server_compiled.json >> built/deps
+	../preprocess.py -g ${GAME_ID} --get-deps ${GAME_ID}_ai_bases.json --get-deps-as built/${GAME_ID}_ai_bases_compiled.json >> built/deps
+	../preprocess.py -g ${GAME_ID} --get-deps ${GAME_ID}_ai_attacks.json --get-deps-as built/${GAME_ID}_ai_attacks_compiled.json >> built/deps
+	../preprocess.py -g ${GAME_ID} --get-deps ${GAME_ID}_quarries.json --get-deps-as built/${GAME_ID}_quarries_compiled.json >> built/deps
+	../preprocess.py -g ${GAME_ID} --get-deps ${GAME_ID}_hives.json --get-deps-as built/${GAME_ID}_hives_compiled.json >> built/deps
+	../preprocess.py -g ${GAME_ID} --get-deps ../gamedata_main.json --get-deps-as built/gamedata-${GAME_ID}.json.unverified >> built/deps
+
+-include built/deps
+
+# non-shipped compiled JSON
+built/${GAME_ID}_server_compiled.json: ${GAME_ID}_server.json
+	@echo "    ${GAME_ID}_server_compiled.json..." && ../preprocess.py ${PROCESSOR_ARGS} $< -o $@
+built/${GAME_ID}_ai_bases_compiled.json: ${GAME_ID}_ai_bases.json
+	@echo "    ${GAME_ID}_ai_bases_compiled.json..." && ../preprocess.py ${PROCESSOR_ARGS} $< -o $@
+built/${GAME_ID}_ai_attacks_compiled.json: ${GAME_ID}_ai_attacks.json
+	@echo "    ${GAME_ID}_ai_attacks_compiled.json..." && ../preprocess.py ${PROCESSOR_ARGS} $< -o $@
+built/${GAME_ID}_hives_compiled.json: ${GAME_ID}_hives.json
+	@echo "    ${GAME_ID}_hives_compiled.json..." && ../preprocess.py ${PROCESSOR_ARGS} $< -o $@
+built/${GAME_ID}_quarries_compiled.json: ${GAME_ID}_quarries.json
+	@echo "    ${GAME_ID}_quarries_compiled.json..." && ../preprocess.py ${PROCESSOR_ARGS} $< -o $@
+
+# client versions of non-shipped JSON
+built/${GAME_ID}_ai_bases_client.json: ../make_ai_bases_client.py built/${GAME_ID}_ai_bases_compiled.json
+	@echo "    ${GAME_ID}_ai_bases_client.json..." && ../make_ai_bases_client.py built/${GAME_ID}_ai_bases_compiled.json $@
+built/${GAME_ID}_hives_client.json: ../make_hives_client.py built/${GAME_ID}_hives_compiled.json
+	@echo "    ${GAME_ID}_hives_client.json..." && ../make_hives_client.py built/${GAME_ID}_hives_compiled.json $@
+built/${GAME_ID}_quarries_client.json: ../make_quarries_client.py built/${GAME_ID}_quarries_compiled.json
+	@echo "    ${GAME_ID}_quarries_client.json..." && ../make_quarries_client.py built/${GAME_ID}_quarries_compiled.json $@
+built/${GAME_ID}_loot_tables_client.json: ../make_loot_tables_client.py built/${GAME_ID}_loot_tables.json
+	@echo "    ${GAME_ID}_loot_tables_client.json..." && ../make_loot_tables_client.py built/${GAME_ID}_loot_tables.json $@
+
+# shipped JSON
+built/${GAME_ID}_spells_gamebucks_skus.json: ../make_country_skus2.py
+	@echo "    ${GAME_ID}_spells_gamebucks_skus.json..." && ../make_country_skus2.py --game-id ${GAME_ID} ${VERIFY_ARGS} $@
+built/${GAME_ID}_spells_kgcredits_skus.json: ../make_kgcredits_skus.py
+	@echo "    ${GAME_ID}_spells_kgcredits_skus.json..." && ../make_kgcredits_skus.py --game-id ${GAME_ID} ${VERIFY_ARGS} $@
+built/${GAME_ID}_items_auto.json built/${GAME_ID}_spells_auto.json: ${GAME_ID}_make_items_auto.py ${GAME_ID}_resources.json
+	@echo "    ${GAME_ID}_items_auto.json..." && ./${GAME_ID}_make_items_auto.py ${GAME_ID}_resources.json built/${GAME_ID}_items_auto.json built/${GAME_ID}_spells_auto.json
+built/${GAME_ID}_art_items.json: ../make_art_items.py ${GAME_ID}_units.json
+	@echo "    ${GAME_ID}_art_items.json..." && ../make_art_items.py --game-id ${GAME_ID} ${GAME_ID}_units.json $@
+built/${GAME_ID}_items_units.json: ${GAME_ID}_make_items_units.py ${GAME_ID}_units.json
+	@echo "    ${GAME_ID}_items_units.json..." && ./${GAME_ID}_make_items_units.py ${GAME_ID}_units.json $@
+built/${GAME_ID}_items_boosts.json: ${GAME_ID}_make_items_boosts.py ${GAME_ID}_units.json
+	@echo "    ${GAME_ID}_items_boosts.json..." && ./${GAME_ID}_make_items_boosts.py ${GAME_ID}_units.json $@
+built/${GAME_ID}_loot_tables.json: ${GAME_ID}_make_loot_tables.py
+	@echo "    ${GAME_ID}_loot_tables.json..." && ./${GAME_ID}_make_loot_tables.py $@
+built/${GAME_ID}_loot_tables_compiled.json: built/${GAME_ID}_loot_tables.json
+	@echo "    ${GAME_ID}_loot_tables_compiled.json..." && ../preprocess.py ${PROCESSOR_ARGS} $< -o $@
+built/${GAME_ID}_promo_codes_compiled.json: ${GAME_ID}_promo_codes.json
+	@echo "    ${GAME_ID}_promo_codes_compiled.json..." && ../preprocess.py ${PROCESSOR_ARGS} $< -o $@
+built/${GAME_ID}_tech_mods.json: ../make_tech_mods.py ${GAME_ID}_tech_units.json
+	@echo "    ${GAME_ID}_tech_mods.json..." && ../make_tech_mods.py -g ${GAME_ID} ${GAME_ID}_tech_units.json $@
+built/${GAME_ID}_quests_tech_mods.json: ../make_quests_tech_mods.py ${GAME_ID}_main_options.json ${GAME_ID}_tech_units.json
+	@echo "    ${GAME_ID}_quests_tech_mods.json..." && ../make_quests_tech_mods.py -g ${GAME_ID} ${GAME_ID}_main_options.json ${GAME_ID}_tech_units.json $@
+
+built/gamedata-${GAME_ID}.json.unverified: ../gamedata_main.json
+	@echo "    gamedata-${GAME_ID}.json..." && ../preprocess.py ${PROCESSOR_ARGS} $< -o $@
+
+all: built/gamedata-${GAME_ID}.json.unverified \
+	built/${GAME_ID}_server_compiled.json \
+	built/${GAME_ID}_loot_tables.json \
+	built/${GAME_ID}_loot_tables_compiled.json \
+	built/${GAME_ID}_promo_codes_compiled.json \
+	built/${GAME_ID}_ai_bases_compiled.json \
+	built/${GAME_ID}_ai_attacks_compiled.json \
+	built/${GAME_ID}_hives_compiled.json \
+	built/${GAME_ID}_quarries_compiled.json
+
+# create a localization
+.PRECIOUS: built/gamedata-${GAME_ID}-%.json
+built/gamedata-${GAME_ID}-%.json: built/gamedata-${GAME_ID}.json localize/${GAME_ID}-%.po
+	@echo "Creating localization gamedata-${GAME_ID}-${*}.json..." && \
+	../localize.py -g $GAME_ID --mode apply --quiet --locale $* $< localize/${GAME_ID}-${*}.po $@
+
+# linebreak and .js-format a localization
+built/gamedata-${GAME_ID}-%.js: built/gamedata-${GAME_ID}-%.json
+	@echo "  Formatting final gamedata-${GAME_ID}-${*}.js..." && \
+	/bin/echo -n "var gamedata = " > $@ && "../${LINEBREAK}" < $< >> $@

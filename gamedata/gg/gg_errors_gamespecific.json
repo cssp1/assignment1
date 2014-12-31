@@ -1,0 +1,27 @@
+// Copyright (c) 2014 SpinPunch. All rights reserved.
+// Use of this source code is governed by an MIT-style license that can be
+// found in the LICENSE file.
+
+// Ths file is only for error messages that must be different from other game titles. Common error messages go in gamedata/errors.json.
+"INSUFFICIENT_IRON": { "ui_name": "Need %d Supply to do this" },
+"INSUFFICIENT_WATER": { "ui_name": "Need %d Fuel to do this" },
+"INSUFFICIENT_GAMEBUCKS": { "ui_name": "Need %d Gold to do this" },
+"INSUFFICIENT_ITEMS": { "ui_title": "Insufficient Items", "ui_name": "Need %dx %s. Earn them by fighting selected Single Player opponents on the Attack menu, or by conquering epic event bases on the Multiplayer regional map." },
+
+"UNIT_SPACE_LIMIT": { "ui_name": "Not enough unit space - upgrade Tactical Ops Center or disband old units" },
+"POWER_LIMIT": { "ui_name": "Not enough power - repair, build, or upgrade Generator" },
+
+"HARVESTER_DAMAGED": { "ui_name": "Cannot collect because the yard is damaged" },
+"HARVESTER_UNDER_CONSTRUCTION": { "ui_name": "Cannot collect because the yard is under construction" },
+
+// this does a redirect
+"CANNOT_LOG_IN_LOGIN_ABUSE": { "ui_name": "Your account is on login cooldown",
+                               "redirect": "//www.XXXXXX.com/error-cooldown-period-engaged/" },
+"CANNOT_LOG_IN_LOGIN_ABUSE_SEVERE": { "ui_name": "Your account is on login cooldown",
+                                      "redirect": "//www.XXXXXX.com/error-illegal-software-detected/" },
+"CANNOT_LOG_IN_LOGIN_ABUSE_FREQUENCY": { "ui_name": "Your account is on login cooldown",
+                                         "redirect": "//www.XXXXXX.com/error-login-spam/" },
+
+"CANNOT_SQUAD_ASSIGN_UNIT_LIMIT_REACHED_BASE_DEFENDERS": { "ui_title": "Not Enough Space", "ui_name": "Base Defenders does not have enough space for this unit. Upgrade Tactical Ops Center to raise limit." },
+
+"CANNOT_DEPLOY_SQUAD_NO_NOSQL": { "ui_title": "Deployment Unavailable", "ui_name": "Your current region does not support battalion combat.\n\nUse \"Relocate Base\" option on Tactical Ops Center or Transmitter to enter a NEW Multiplayer region." }

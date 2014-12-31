@@ -1,0 +1,66 @@
+// Copyright (c) 2014 SpinPunch. All rights reserved.
+// Use of this source code is governed by an MIT-style license that can be
+// found in the LICENSE file.
+
+{
+    // generation number of XP calculation - if player.history.xp_gen is less than this, the server
+    // will overwrite the player's XP and level on login.
+    "xp_gen": 2,
+
+    // cumulative total experience points required to reach level N
+    // this is hand-tweaked to ensure a good predator:prey ratio at most levels, where attackability is primarily determined by CC level
+    // (since it is the biggest component of your total XP). Note that there is a "soft cap" around L38-40 that prevents CC L6/L7 players
+    // from climbing out of attack range.
+    "level_xp": [0, 1, 323, 864, 1460, 2116, 2838, 3633, 4508, 5471, 6531, 7697, 8980, 10392, 11946, 14515, 18579, 23781, 30440, 38963, 49873, 63838, 81712, 104592, 133877, 171363, 219344, 280761, 359374, 459999, 588798, 753662, 964687, 1234800, 1580544, 2023096, 2589563, 3314640, 5303424, 8485479, 25456436],
+
+    // if 0, do not show the player the "Level Up!" message on this level
+    // "level_up_notify": [0,0,1,0,0,0,1], // show at level 2, then hold until level 6
+    "level_up_reward": [{"consequent": "HEAL_ALL_UNITS"}], // all levels
+
+    // XP gain as fraction of resources earned
+    "harvest": 0.002,
+    "collect_deposit": 0.002,
+    "loot": 0.002,
+    "loot_victory_bonus": 0, // ADDITIONAL XP you get for looting if/when you win the battle
+
+    "donate_units": 0.05, // fraction of unit space donated
+
+    // XP gain as fraction of unit/building level
+    "destroy_unit_offense": 0,
+    "destroy_unit_defense": 0,
+    "destroy_building": 0,
+    "destroy_building_victory_bonus": 0,
+    // minimum XP given by destroy_building, applies to barriers and other "worthless" buildings
+    "destroy_building_min_xp": 0,
+
+    // XP gain as fraction of resources spent to upgrade a tech
+    "research": 0,
+
+    // XP gain when finished constructing or upgrading a building, as fraction of resources spent
+    "buildings": { // XXXXXX check that all buildings are present (and enable the check in verify.py)
+        "level_1": 0.03, // used for L1 of any building listed here
+        "toc": 0.010,
+        "barracks": 0.011,
+        "academy": 0.011,
+        "maintenance_bay": 0.011,
+        "mg_tower": 0.013,
+        "mortar_emplacement": 0.013,
+        "generator": 0.0085,
+        "supply_yard": 0.007,
+        "supply_depot": 0.007,
+        "fuel_yard": 0.007,
+        "fuel_depot": 0.007
+    },
+
+    // this can become an array with one entry per level
+    "level_up_text": "Congratulations Commander,\nyou progress more quickly than I anticipated.",
+
+    "quests": 0, // multiply XP gained from quests (0 to disable)
+    "quests_min": 0, // floor of XP gained from quests where reward_xp > 0 (0 to disable)
+
+    "quest_reward_resources": 0.002, // new iron/water-based quest XP
+
+    // these multiply the effect of "loot" and "loot_victory_bonus" above, depending on the type of opponent
+    "pvp_loot_xp": 1.0, // human opponent
+    "pve_loot_xp": 1.0 // AI opponent
+}

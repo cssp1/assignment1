@@ -1,0 +1,11 @@
+#
+LABEL=/     /           ext4    defaults,noatime  1   1
+tmpfs       /dev/shm    tmpfs   defaults        0   0
+devpts      /dev/pts    devpts  gid=5,mode=620  0   0
+sysfs       /sys        sysfs   defaults        0   0
+proc        /proc       proc    defaults        0   0
+#/dev/sdb	/media/ephemeral0	auto	defaults,comment=cloudconfig	0	2
+#/dev/sdc        /media/ephemeral1       auto    defaults,comment=cloudconfig    0       2
+#/dev/sdd        /media/ephemeral2       auto    defaults,comment=cloudconfig    0       2
+#/dev/sde        /media/ephemeral3       auto    defaults,comment=cloudconfig    0       2
+#LABEL=mfprod-logs3 /storage/mfprod-logs3  ext4 defaults,noatime 0 0

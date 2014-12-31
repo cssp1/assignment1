@@ -1,0 +1,24 @@
+// Copyright (c) 2014 SpinPunch. All rights reserved.
+// Use of this source code is governed by an MIT-style license that can be
+// found in the LICENSE file.
+
+// MASTER EVENT SCHEDULE
+// A/B tests with "event_schedule" entries will append to these for that player
+[
+    //    {"name": "challenge_pvp_ladder_with_prizes",
+    //     // PVP TOURNAMENT (drives scoreboard)
+    //     "start_time": 1375981200,  // 17:00pm UTC (10:00am Pacific) Thu  8/8  2013
+    //     "end_time":   1383238800  // 17:00pm UTC (10:00am Pacific) Thu 10/31 2013
+    //    },
+    //    {"name": "challenge_pvp_ladder_with_prizes",
+    //     // PVP TOURNAMENT (drives scoreboard)
+    //     "start_time": 1383238800, // 17:00pm UTC (10:00am Pacific) Thu 10/31 2013
+    //     "end_time":   1383843600  // 17:00pm UTC (09:00am Pacific) Thu 11/7  2013
+    //    },
+
+    //    {"name": "challenge_pvp_ladder",
+    //     // smoothly continue the leaderboard, without prizes after Nov 7
+    //     "start_time": 1383843600, // 17:00pm UTC (09:00am Pacific) Thu 11/7  2013
+    //     "end_time":   1429894800  // 17:00pm UTC (10:00am Pacific) Thu  4/24 2015 <-- note, this needs to be kept "infinitely" ahead to keep the tournament going
+    //    },
+]

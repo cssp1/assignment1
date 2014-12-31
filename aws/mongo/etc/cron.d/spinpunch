@@ -1,0 +1,3 @@
+# run daily tasks at 0700 UTC time (usually lowest load)
+0 7 * * * ec2-user run-parts /etc/cron.spinpunch.daily
+# 30 * * * * ec2-user run-parts /etc/cron.spinpunch.hourly

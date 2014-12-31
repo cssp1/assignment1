@@ -1,0 +1,177 @@
+// "territory" refers to the base-control metagame (regional map)
+
+// Copyright (c) 2014 SpinPunch. All rights reserved.
+// Use of this source code is governed by an MIT-style license that can be
+// found in the LICENSE file.
+
+{
+    "default_quarry_landlord_id": 901, // used for abandoned quarries
+
+    "enable_muffin_on_map": 0, // whether to allow PvP attacking/spying via regional Map (OBSOLETE)
+    "show_coords_in_player_info": 1, // whether to show home base location of other players in their Player Info
+    "travel_time_per_hex": 0.5, // seconds of travel time per map hex
+    "travel_time_per_id_gap": 5, // NOT USED ANYMORE - set travel time by difference in final digit of player/base IDs
+    "travel_time_by_remoteness": [0,30,90], // NOT USED ANYMORE
+    "deployments_per_travel": 1, // number of times you can attack/reinforce per travel "trip"
+
+    "unit_travel_speed_factor": 0.25, // coefficient that relates unit maxvel to map travel_speed (in hexes per second)
+
+    "quarry_requirement": { "predicate": "LIBRARY", "name": "quarry_requirement" },
+    "quarry_play_requirement": { "predicate": "LIBRARY", "name": "quarry_play_requirement" },
+    "change_region_requirement": { "predicate": "LIBRARY", "name": "change_region_requirement" },
+
+    // whether regional map is available when the transmitter building is under upgrade or repair
+    "region_map_available_during_transmitter_upgrade": false,
+    "region_map_available_during_transmitter_repair": false,
+
+    // if true, always refresh regional map when opening it after a session change
+    "dirty_region_map_after_session_change": false,
+
+    "quarry_collect_cooldown": 60, // minimum number of seconds between quarry collection attempts (to avoid excessive map queries and lock holding)
+    "quarry_dump_on_conquer": true, // whether harvester production gets zeroed out upon conquer
+    "quarries_affect_protection": true, // whether attacking a player-owned quarry removes your own home base protection
+    "squads_affect_protection": true, // whether attacking a player-owned squad removes your own home base protection
+    "quarries_affect_pvp_level_exception": false, // whether attacking a quarry owned by a much higher level player allows them to attack your home base
+    "base_defenders_can_attack_neighbors": false, // whether or not base defenders squad can be used in attacks against things 1 hex away from your home
+
+    // color of NAME (LNN) labels on regional map
+    "label_colors": {
+        "locked": "rgba(200,200,200,1)", // unattackable due to lock contention or protection
+
+        "your_home": "rgba(146,255,80,1)", // your home base
+        "owned": "rgba(146,255,80,1)", // other bases you own
+
+        "other_home": "rgba(255,255,255,1)", // home bases of other players
+        "other_home_level_too_low": "rgba(200,200,200,1)", // home bases of other players whose levels are too low to attack
+        "other_home_level_too_high": "rgba(200,200,200,1)", // home bases of other players whose levels are too high to attack
+
+        "your_squad": "rgba(146,255,80,1)", // your squad
+        "other_squad": "rgba(255,255,255,1)", // squads of other players
+
+        "alliance_friendly": "rgba(255,80,255,1)",
+        "alliance_friendly_xl": "rgba(255,80,255,1)",
+        "alliance_friendly_level_too_low": "rgba(200,80,200,1)",
+        "alliance_friendly_level_too_high": "rgba(200,80,200,1)",
+        "alliance_friendly_squad": "rgba(255,80,255,1)",
+        "alliance_hostile": "rgba(255,80,80,1)",
+        "alliance_hostile_xl": "rgba(255,80,80,1)",
+        "alliance_hostile_level_too_low": "rgba(200,80,80,1)",
+        "alliance_hostile_level_too_high": "rgba(200,80,80,1)",
+        "alliance_hostile_squad": "rgba(255,80,80,1)",
+
+        "quarry_water": "rgba(125,221,255,1)", // water quarries you don't own
+        "quarry_water_xl": "rgba(125,221,255,1)", // XL water quarries you don't own
+        "quarry_water_xl_blink": "rgba(125,221,255,1)", // blink color for above
+
+        "quarry_iron": "rgba(255,0,0,1)", // iron quarries you don't own
+        "quarry_iron_xl": "rgba(255,0,0,1)", // XL iron quarries you don't own
+        "quarry_iron_xl_blink": "rgba(255,0,0,1)", // blink color for above
+
+        "hive": "rgba(255,225,57,1)", // AI hives
+        "hive_blink": "rgba(255,225,57,1)", // blink color for above
+        "hive_ice": "rgba(255,225,57,1)", // hive with ice climate
+        "hive_ice_blink": "rgba(255,225,57,1)", // blink color for above
+
+        "default": "rgba(255,255,255,1)" // other
+    },
+
+    // make labels for certain features bigger or smaller than usual (1.0 = normal size)
+    "label_sizes": {
+        "alliance_friendly_xl": 1.25,
+        "alliance_friendly_xl_blink": 1.25,
+        "alliance_hostile_xl": 1.25,
+        "alliance_hostile_xl_blink": 1.25,
+        "quarry_water_xl": 1.25,
+        "quarry_water_xl_blink": 1.25,
+        "quarry_iron_xl": 1.25,
+        "quarry_iron_xl_blink": 1.25
+    },
+
+    "label_blink_period": 2.7, // length of blink cycle, in seconds
+    "label_blink_on": 0.14, // length of blink cycle spent at "bright" setting, seconds
+
+    "label_font_size": 13, // label font size in pixels, when zoom = 1.0
+    "label_font_leading": 15, // label font line leading in pixels, when zoom = 1.0
+
+    // parameters for "influence blobs" drawn on map ("halos" that surround the base or quarry)
+    "influence_max_radius": 300,
+    "influence": {
+        // note: colors have the alpha values "cut off" at the end because they are appended in code to do the circular gradient
+
+        // glow around hives
+        //"hive": {"color": "rgba(255,0,255,", "radius": 120, "alpha": 0.75},
+        //"hive_ice": {"color": "rgba(255,0,255,", "radius": 120, "alpha": 0.75},
+
+        // glow around strongpoints
+        "turf_control_friendly": {"color": "rgba(0,255,0,", "radius": 300, "alpha": 0.75, "min_alpha": 0.3},
+        "turf_control_hostile": {"color": "rgba(255,0,0,", "radius": 300, "alpha": 0.75, "min_alpha": 0.3},
+
+        // green glow around your home base and quarries that you won
+        "your_home": {"color": "rgba(146,255,80,", "radius": 240, "alpha": 0.75},
+        "owned": {"color": "rgba(146,255,80,", "radius": 120, "alpha": 0.75},
+
+        // friendly/enemy alliance highlights, when mouse is hovering over a base
+        "hover_alliance_friendly": {"color": "rgba(255,80,255,", "label_color": [1,0.1,1,1], "radius": 240, "alpha": 1},
+        "hover_alliance_friendly_squad": {"color": "rgba(255,80,255,", "label_color": [1,0.1,1,1], "radius": 120, "alpha": 1},
+        "hover_alliance_hostile": {"color": "rgba(255,80,80,", "label_color": [1,0.1,0.1,1], "radius": 240, "alpha": 1},
+        "hover_alliance_hostile_squad": {"color": "rgba(255,80,80,", "label_color": [1,0.1,0.1,1], "radius": 120, "alpha": 1}
+
+        // glow around XL quarries you don't own
+        //"quarry_water_xl": {"color": "rgba(125,221,255,", "radius": 300, "alpha": 0.75},
+        //"quarry_iron_xl": {"color": "rgba(255,71,79,", "radius": 300, "alpha": 0.75}
+    },
+
+    "last_defended_blink_period": 2.0, // seconds between cycles of "Home or Protection"/"Last Defended x ago"
+
+    "scroll_help": 1, // whether to enable help dialog that teaches scrolling
+
+    "hive_finder": 1, // whether to enable "Find nearest token hive" button
+    "attacker_finder": 1, // whether to enable "Find nearest attacker" button
+    "strongpoint_finder": 1, // whether to enable "Find nearest Strongpoint" button
+    "finder_reset_time": 30, // reset list of already-found bases if this much time has passed since last click on finder button
+
+    "escaping_soon_time": 3600, // mark hives as "escaping soon" when this many seconds or fewer remain before expiration
+    "depletes_soon_time": 3600, // mark quarries as "depleting soon" when this many seconds or fewer remain before expiration
+
+    "pan_speed": 0.15, // speed (unitless) of panning movement
+
+    "default_zoom": -1.1, // default zoom when you first open the Regional Map (linear units, see RegionMap.js)
+    "default_zoom_nosql": -0.4, // default zoom for NoSQL (squad) regions
+
+    "zoom_limits": [-1.5, 0.0], // minimum/maximum zoom amounts (linear units)
+    "max_label_zoom": 4.5, // max factor by which label text can grow when zoomed out
+    "tile_fade_zoom": [0.60, 0.33], // zoom levels between which tiles fade into the background sprite (exponential zoom units)
+    "abbreviate_labels_below_zoom": 0.5, // use shorter feature labels when more zoomed out than this (exponential zoom units)
+    "show_alliance_membership_above_zoom": 0.5, // show alliance tags on features if zoomed in more than this
+
+    // controls the grid lines that are drawn beyond the boundary of the map
+    "grid": {
+        "edge_margin": [0.1,0.1], // how far off the map the view can be panned, as fraction of widget pixel size
+        "stroke_color": "rgba(100,150,100,1)",
+        "fill_color": null, // "rgba(0,30,40,1)",
+        "line_width": 8, // units: pixels at zoom=1
+        "spacing": 16, // units: map cells
+
+        // minor "in between" grid lines
+        "minor_line_width": 2,
+        "minor_spacing": 4
+    },
+
+    "cell_size": [80,48], // dimensions of a cell as displayed on screen, in pixels
+    "cell_rowoffset": [40,36], // pixel offset between successive rows of hexes
+    "cell_overlap": [8,8], // size of fuzzy border with partial alpha, in pixels
+    "cell_hexinset": 12, // base size of triangles forming the four corners of hexes, in pixels
+
+    "clip_features": 1, // clip map features against the visible area before drawing for speed
+
+    "border_zone_player": 10, // do not allow players to put their bases within this many hexes of a map edge
+    "border_zone_ai": 4, // same for AI placement
+
+    "exclusive_zone_player": 2, // minimum hex distance spacing of player base from other objects
+    "neighbor_search_radius": 8, // when relocating base, how far away from the desired location to search for an empty spot
+    "map_placement_gen": 3, // temporary - generation number for successive map placement trials
+
+    "tiles":
+#include "$GAME_ID/$GAME_ID_territory_tiles.json"
+
+}

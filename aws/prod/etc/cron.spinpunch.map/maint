@@ -1,0 +1,15 @@
+#!/bin/bash
+
+exit 0 # XXX disabled by default
+
+. /etc/spinpunch
+
+cd $GAME_DIR/gameserver
+
+for REGION in `./get_region_names.py`; do
+    TODAY=`date +%Y%m%d`
+    TIME_NOW=`date`
+    LOG="logs/${TODAY}-${REGION}-region-maint.txt"
+    echo "=== ${TIME_NOW} ===" >> $LOG
+    ./maptool.py $REGION ALL maint --quiet >> $LOG
+done

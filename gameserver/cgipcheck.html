@@ -1,0 +1,1308 @@
+<html><head><title>$GAME_NAME$ Support Tools</title>
+<link rel="stylesheet" href="https://code.jquery.com/ui/1.10.3/themes/smoothness/jquery-ui.css" />
+<script src="https://code.jquery.com/jquery-1.10.2.min.js"></script>
+<script src="https://code.jquery.com/ui/1.10.3/jquery-ui.min.js"></script>
+<script src="https://s3.amazonaws.com/$SPIN_PUBLIC_S3_BUCKET$/jquery.elastic.source.js"></script>
+<script src="https://s3.amazonaws.com/$SPIN_PUBLIC_S3_BUCKET$/jquery.flot.min.js"></script>
+<script src="https://s3.amazonaws.com/$SPIN_PUBLIC_S3_BUCKET$/jquery.flot.time.min.js"></script>
+<script src="https://s3.amazonaws.com/$SPIN_PUBLIC_S3_BUCKET$/jquery.flot.threshold.min.js"></script>
+<script src="https://s3.amazonaws.com/$SPIN_PUBLIC_S3_BUCKET$/jquery.flot.navigate.min.js"></script>
+<style type="text/css">
+body { font-size: 14px;
+font-family: Trebuchet MS,Tahoma,Verdana,Arial,sans-serif;
+background: #dddddd; color: #000000;
+padding:0; margin: 10px; }
+label { font-size: 14px; }
+select { height:28px; font-size: 16px; }
+input { font-family: monospace; font-size: 16px; height:28px; padding:0; }
+.spin_button { width: 150px; height: 35px; font-size: 16px; padding:0; margin-left: 5px; margin-right: 5px; }
+.spin_button_tiny { line-height: 0px; font-size: 9px !important; }
+.spin_radio { vertical-align: bottom; }
+.ui-widget select { font-size: 18px; }
+table, th, td { border: 1px solid #808080; border-collapse: collapse; }
+</style>
+
+<script type="text/javascript">
+// Copyright (c) 2014 SpinPunch. All rights reserved.
+// Use of this source code is governed by an MIT-style license that can be
+// found in the LICENSE file.
+var spin_token = '$SPIN_TOKEN$'; var spin_token_data = $SPIN_TOKEN_DATA$;
+var spin_url = '$SPIN_URL$'; var spin_game_id = '$SPIN_GAME_ID$';
+var spin_token_cookie_name = '$SPIN_TOKEN_COOKIE_NAME$';
+var spin_token_domain = '$SPIN_TOKEN_DOMAIN$';
+var spin_giveable_items = $SPIN_GIVEABLE_ITEMS$;
+var spin_ai_base_ids = $SPIN_AI_BASE_IDS$;
+var spin_log_bookmark = $SPIN_LOG_BOOKMARK$;
+var spin_log_bookmark_dirty = true;
+var spin_ssl_available = $SPIN_SSL_AVAILABLE$;
+var spin_wss_available = $SPIN_WSS_AVAILABLE$;
+
+var delete_cookie = function() {
+    document.cookie = spin_token_cookie_name+'=;path=/;domain=.'+spin_token_domain+';expires=Thu, 01 Jan 1970 00:00:01 GMT;';
+}
+
+var gui_locked = false;
+var lock_gui = function() { if(!gui_locked) { gui_locked = true; $('\#loading_dialog').dialog({modal:true,closeOnEscape:false,buttons:[]}); } };
+var unlock_gui = function() { if(gui_locked) { gui_locked = false; $('\#loading_dialog').dialog('close'); } };
+var display_error = function(msg) { $('\#error_dialog_msg')[0].innerHTML = msg; $('\#error_dialog').dialog({modal:true,width:'auto'}); };
+var display_response = function(msg) { $('\#response_dialog_msg')[0].innerHTML = msg; $('\#response_dialog').dialog({modal:true,width:'auto'}); };
+
+var confirm_dialog = function(msg, yes_cb) {
+    $('#confirm_dialog_msg')[0].innerHTML = msg;
+    $('#confirm_dialog').dialog({
+        modal: true, autoOpen: true,
+        width: 'auto', resizable: false,
+        buttons: {
+            'No': function () {
+                $(this).dialog('close');
+            },
+            'Yes': (function (_yes_cb) { return function () {
+                _yes_cb();
+                $(this).dialog('close');
+            }; })(yes_cb)
+        }
+    });
+};
+
+var payment_lookup = function() {
+    var payment_id = $("#payment_id")[0].value;
+    if(payment_id) {
+        $('#per_payment').hide();
+        $('#payment_lookup_output')[0].value = '';
+        send_request('payment', 'lookup', {'payment_id': payment_id}, function(result) {
+            var data = JSON.parse(result);
+            $('#per_payment').show();
+            $('#payment_lookup_output')[0].value = JSON.stringify(data, null, 2);
+            $('#payment_lookup_output').elastic("update");
+
+            var status = 'Unknown';
+            var is_disputed = false, is_refundable = false;
+
+            if('disputes' in data) {
+                for(var i = 0; i < data['disputes'].length; i++) {
+                    if(data['disputes'][i]['status'] != 'resolved') {
+                        is_disputed = true;
+                        break;
+                    }
+                }
+            }
+            if(('refundable_amount' in data) && parseFloat(data['refundable_amount']['amount']) > 0) {
+                is_refundable = true;
+            }
+
+            if(is_refundable) {
+                status = '<font color="#00c000">Paid. SpinPunch will receive payment.</font>';
+            } else {
+                status = '<font color="#ff0000">Not Paid. SpinPunch will not receive payment (check "actions" below for details).</font>';
+            }
+
+            if(is_disputed) {
+                status += ' <font color="#ff0000">This payment has been disputed and needs to be resolved.</font>';
+            }
+
+            $('#payment_status')[0].innerHTML = status;
+
+            if(spin_token_data['roles'].indexOf('ADMIN') != -1) {
+                $('#payment_tools').show();
+
+                if(is_refundable) {
+                    $('#payment_refund_button').removeAttr('disabled');
+                    $('#payment_refund_button').click((function (_data) { return function() {
+                        var do_refund_cb = (function (__data) { return function() {
+                            $('#payment_refund_button').attr('disabled', 'disabled');
+                            send_request('payment', 'refund', {'payment_id': __data['id'],
+                                                               'currency': __data['refundable_amount']['currency'],
+                                                               'amount': __data['refundable_amount']['amount']},
+                                         function(result) { display_response(result); });
+                        }; })(_data);
+                        confirm_dialog('Refund this payment for '+_data['refundable_amount']['amount']+' '+_data['refundable_amount']['currency']+'?',
+                                       do_refund_cb);
+                    }; })(data));
+                } else {
+                    $('#payment_refund_button').attr('disabled', 'disabled');
+                }
+
+                if(is_disputed) {
+                    $('input:radio[name=payment_resolve_reason]').removeAttr('disabled');
+                    $('#payment_resolve_button').removeAttr('disabled');
+                    $('#payment_resolve_button').click((function (_data) { return function() {
+                        $('#payment_resolve_button').attr('disabled', 'disabled');
+                        send_request('payment', 'resolve_dispute', {'payment_id': _data['id'],
+                                                                    'reason': $('input:radio[name=payment_resolve_reason]:checked').val()},
+                                     function(result) { display_response(result); });
+                    }; })(data));
+                } else {
+                    $('input:radio[name=payment_resolve_reason]').attr('disabled', 'disabled');
+                    $('#payment_resolve_button').attr('disabled', 'disabled');
+                }
+            }
+        });
+    }
+};
+
+var get_ident_type = function() {
+    return {0: 'user_id', 1: 'facebook_id'}[$('#player_lookup').tabs("option","active")];
+};
+
+var get_ident = function() {
+    var t = get_ident_type();
+    if(t == 'user_id') {
+        var suser_id = $("#user_id")[0].value;
+        if(!suser_id) { return null; }
+        var user_id = parseInt(suser_id);
+        if(isNaN(user_id)) { alert("Bad User ID value: "+suser_id); return null; }
+        return {'user_id':user_id};
+    } else if(t == 'facebook_id') {
+        var sid = $("#facebook_id")[0].value;
+        if(!sid) { return null; }
+        var id = parseInt(sid);
+        if(isNaN(id)) { alert("Bad Facebook ID value: "+sid); return null; }
+        return {'facebook_id':id};
+    }
+};
+
+var check_ui_reason = function(reason) {
+    if(!reason || reason.length < 1) {
+        display_error('Please type the reason you are taking this action in the "Reason" field');
+        return null;
+    }
+    return reason;
+};
+
+var send_request = function(path, method, args, cb, async, fail_cb) {
+    args['spin_token'] = spin_token; args['method'] = method;
+    $.ajax(spin_url+'/'+path, { data: args,
+                       dataType: 'json',
+                       success: (function (_cb, _fail_cb, _async) { return function(result) {
+                           if(!async) { unlock_gui(); }
+                           if(result['error']) {
+                               display_error(result['error']);
+                               if(_fail_cb) { _fail_cb(result['error']); }
+                           } else {
+                               if(_cb) { _cb(result['result']); }
+                           }
+                       }; })(cb, fail_cb, async),
+                       error: (function (_fail_cb, _async) { return function(xhr, status, msg) {
+                           if(!async) { unlock_gui(); }
+                           display_error("XHR Error: "+msg);
+                           if(_fail_cb) { _fail_cb(result['error']); }
+                       }; })(fail_cb, async),
+                       timeout: 30*1000, type: 'POST' });
+    if(!async) { lock_gui(); }
+};
+
+var method_lookup = function() {
+    var ident = get_ident();
+    if(ident) {
+        $('#per_player').hide();
+        $('#lookup_output')[0].value = '';
+        send_request('player', 'lookup', ident, function(result) {
+            $('#per_player').show();
+            $('#player_tools').show();
+            $('#lookup_output')[0].value = result.toString();
+            $('#lookup_output').elastic("update");
+        });
+    }
+}
+
+var method_give_gamebucks = function() {
+    var ident = get_ident();
+    var amount = $("#gamebucks_amount").spinner("value");
+    var ui_reason = check_ui_reason($("#give_gamebucks_reason")[0].value);
+    if(ident && !isNaN(amount) && amount > 0 && ui_reason) {
+        send_request('player', 'give_item', $.extend(ident, {'spec':'$GAMEBUCKS_ITEM$', 'stack':amount, 'undiscardable':1, 'log':'PCHECK', 'ui_reason':ui_reason}), function(result) { alert("Success!"); });
+    }
+};
+var method_clear_cooldown = function() {
+    var ident = get_ident();
+    var name = $("#cooldown_name")[0].value;
+    var ui_reason = check_ui_reason($("#cooldown_reason")[0].value);
+    if(ident && name && ui_reason) {
+        send_request('player', 'clear_cooldown', $.extend(ident, {'name':name, 'ui_reason':ui_reason}), function(result) { alert("Success!"); });
+    }
+};
+var method_give_item = function() {
+    var ident = get_ident();
+    var ui_reason = check_ui_reason($("#item_to_give_reason")[0].value);
+    var spec = $("#item_to_give_text")[0].value || $("#item_to_give")[0].value;
+    var stack = $("#item_to_give_qty").spinner("value");
+    if(ident && spec && stack > 0 && ui_reason) {
+        var do_send = true;
+        if(stack > 10) {
+            do_send = confirm("You are trying to give " + stack.toFixed() + "x " + spec + ".\n\nAre you sure you want to do this?");
+        }
+        if(do_send) {
+            send_request('player', 'give_item', $.extend(ident, {'spec': spec, 'stack':stack, 'ui_reason':ui_reason}), (function(_spec, _stack) { return function(result) { alert("Successfully gave " + _stack.toFixed() + "x " + _spec + "!"); }; })(spec, stack));
+        }
+    }
+};
+var method_chat_gag = function(duration) {
+    var ident = get_ident();
+    var ui_reason = check_ui_reason($("#chat_reason")[0].value);
+    if(ident && ui_reason) {
+        if(duration < 0) { duration = -1; }
+        send_request('player', 'chat_gag', $.extend(ident, {'duration': duration.toString(), 'ui_reason':ui_reason}), function(result) { alert("Success!"); });
+    }
+};
+var method_chat_ungag = function() {
+    var ident = get_ident();
+    var ui_reason = check_ui_reason($("#chat_reason")[0].value);
+    if(ident && ui_reason) {
+        send_request('player', 'chat_ungag', $.extend(ident, {'ui_reason':ui_reason}), function(result) { alert("Success!"); });
+    }
+};
+var method_ban = function() {
+    var ident = get_ident();
+    var ui_reason = check_ui_reason($("#ban_reason")[0].value);
+    if(ident && ui_reason) {
+        send_request('player', 'ban', $.extend(ident, {'ui_reason':ui_reason}), function(result) { alert("Success!"); });
+    }
+};
+var method_unban = function() {
+    var ident = get_ident();
+    var ui_reason = check_ui_reason($("#ban_reason")[0].value);
+    if(ident && ui_reason) {
+        send_request('player', 'unban', $.extend(ident, {'ui_reason':ui_reason}), function(result) { alert("Success!"); });
+    }
+};
+var method_make_developer = function() {
+    var ident = get_ident();
+    var ui_reason = check_ui_reason($("#make_developer_reason")[0].value);
+    if(ident && ui_reason) {
+        send_request('player', 'make_developer', $.extend(ident, {'ui_reason':ui_reason}), function(result) { alert("Success!"); });
+    }
+};
+var method_unmake_developer = function() {
+    var ident = get_ident();
+    var ui_reason = check_ui_reason($("#make_developer_reason")[0].value);
+    if(ident && ui_reason) {
+        send_request('player', 'unmake_developer', $.extend(ident, {'ui_reason':ui_reason}), function(result) { alert("Success!"); });
+    }
+};
+var method_clear_lockout = function() {
+    var ident = get_ident();
+    var ui_reason = check_ui_reason($("#cooldown_reason")[0].value);
+    if(ident && ui_reason) {
+        send_request('player', 'clear_lockout', $.extend(ident, {'ui_reason':ui_reason}), function(result) { alert("Success!"); });
+    }
+};
+
+var method_send_message = function() {
+    var ident = get_ident();
+    var sender = $("#send_message_sender")[0].value;
+    var subject = $("#send_message_subject")[0].value;
+    var body = $("#send_message_body")[0].value;
+    var ui_reason = check_ui_reason($("#send_message_reason")[0].value);
+    if(ident && sender.length>0 && subject.length>0 && body.length>0 && ui_reason) {
+        send_request('player', 'send_message', $.extend(ident, {'message_sender': sender, 'message_subject': subject, 'message_body': body, 'ui_reason':ui_reason}), function(result) { alert("Success!"); });
+    }
+
+};
+var method_get_raw_player = function() {
+    var ident = get_ident();
+    if(ident) {
+        if(0) {
+            send_request('player', 'get_raw_player', $.extend(ident, {'stringify':1}), function(result) {
+                var content = 'data:text/javascript,'+encodeURIComponent(result);
+                window.open(content, '_blank');
+            });
+        } else {
+            var attachment_name = ('user_id' in ident ? ident['user_id'].toString() : 'fb'+ident['facebook_id']) + '_'+spin_game_id+'.txt';
+            var args = $.extend(ident, {'spin_token':spin_token, 'method':'get_raw_player', 'stringify':0, 'attachment_name':attachment_name, 'gzip_encode':1});
+            window.open(spin_url+'/player?'+$.param(args), '_blank');
+        }
+    }
+};
+var update_item_to_give_widget_state = function() {
+    if($("#item_to_give_text")[0].value) {
+        $("#item_to_give").attr('disabled', 'disabled');
+    } else {
+        $('select').removeAttr('disabled');
+    }
+};
+
+// extract mongodb timestamp from a log entry "_id" field
+// alternatively, could use the "time" field if present
+var log_entry_time = function(entry) {
+    return parseInt(entry['_id'].slice(0,8), 16);
+};
+
+// prettify timestamps for GUI
+var pretty_print_ts = function(ts) {
+    return (new Date(ts*1000)).toUTCString().slice(5,25);
+};
+
+// return pretty HTML version of log entry
+var log_ignore_re = new RegExp('Object expected', 'g');
+var log_formats = [
+    // cheating
+    [(new RegExp('gamedata checksum FAIL|REFUND|DISPUTE|LOGIN_ABUSE')), function(t) { return '<font color="#dd0000"><b>'+t+'</b></font>'; }],
+    // unimportant
+    [(new RegExp('bad client message|extremely long session|got stale data|but acquirer gen|attack spam|raises object HP|PING_BASE_DAMAGE|found when decoding array|squad is locked|squad moved|has foreign squad|trim_unit_space|squad_exit_map |oversize army|Setting up AI|starting up|shutdown complete|mismatched gamedata build|repair speedup time|repair queue is empty')), function(t) { return '<font color="#c0c0c0">'+t+'</font>'; }],
+];
+var newline_re = new RegExp('\n', 'g');
+var tab_re = new RegExp('\t', 'g');
+var client_exception_re = new RegExp('"location":"[^"]*"|"method":"[^"]*stack', 'g');
+var client_exception_stack_keep_re = new RegExp('http.*/(.+)-CSV.*\\.js', 'g');
+var client_exception_stack_remove_re = new RegExp('message.*', 'gm');
+var TAB = '&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;';
+var NEWLINE = '<br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;';
+
+var quote_for_html = function(text) {
+    return text.replace(/[<&>]/g, function(s) { return {'<':'&lt;','&':'&amp;','>':'&gt;'}[s]; });
+};
+
+var pretty_log_entry = function(e) {
+    var text;
+    if(e['code'] == 970) {
+        // special handling for client exceptions
+        $.each(['_id','time','ip','player_state','event_name','locale','code','anon_id','acquisition_ad_skynet',
+                'gameclient_build_date','gamedata_build_info','browser_hardware','User-Agent','ident'], function(index, field) {
+            if(field in e) { delete e[field]; }
+        });
+
+        var location = null, method = null;
+        if('method' in e) {
+            method = e['method'];
+            delete e['method'];
+
+            // trim to just the first few stack frames
+            var trim_index = method.indexOf('message:');
+            if(trim_index >= 0) {
+                method = method.slice(0, trim_index);
+            }
+            method = method.replace(client_exception_stack_keep_re, '$1');
+            method = method.replace(client_exception_stack_remove_re, '');
+            method = method.trimRight().replace(newline_re, NEWLINE);
+            //method = '<font color="#000000">'+method+'</font>';
+        }
+        if('location' in e) {
+            location = '<font color="#000000">'+e['location'].trimRight()+'</font>';
+            delete e['location'];
+        }
+
+        text = JSON.stringify(e);
+        if(location) { text = text + NEWLINE+location; }
+        if(method) { text = text + NEWLINE+method; }
+        //text = text.replace(new RegExp('","','g'), '",<br>"');
+        text = '<font color="#c0c0c0">' + text + '</font>';
+        //text = text.replace('"location":', '"<font color="#dd0000"><b>location":</b></font>');
+        //text = text.replace('"method":', '"<font color="#dd0000"><b>method":</b></font>');
+    } else if('text' in e) {
+        text = quote_for_html(e['text'].trimRight());
+        $.each(log_formats, function(index, pattern_func) {
+            if(text.search(pattern_func[0]) >= 0) {
+                text = pattern_func[1](text);
+            }
+        });
+    } else {
+        text = JSON.stringify(e);
+    }
+
+    if(text.search(log_ignore_re) != -1) { return null; }
+
+    text = text.trimRight();
+    text = text.replace(tab_re, TAB);
+    text = text.replace(newline_re, NEWLINE);
+    return text;
+};
+
+var LOGS = [{'log_name': 'log_exceptions',
+             'last_id': '', // last seen ID
+             'pending': false},
+            {'log_name': 'log_client_exceptions',
+             //'code_filter': 970,
+             'last_id': '', // last seen ID
+             'pending': false}];
+var log_gen = 0;
+var log_buf = [];
+var log_interval = 10;
+var log_init = false;
+var log_last_time = -1; // last seen timestamp
+var log_start_time = spin_log_bookmark; // start of query range
+var log_end_time = -1; // end of query range
+var log_timer = null;
+
+var reset_logs = function() {
+    log_gen += 1;
+    if(log_timer) {
+        window.clearTimeout(log_timer);
+        log_timer = null;
+    }
+
+    $.each(LOGS, function(index, log_data) {
+        log_data['pending'] = false;
+        log_data['last_id'] = '';
+    });
+    log_buf = [];
+    log_last_time = -1;
+    log_end_time = -1;
+    $('#logs_output').empty();
+    $('#log_area_status')[0].innerHTML = 'Ready';
+};
+
+// reset to the beginning of today
+var logs_today = function() {
+    reset_logs();
+    var time_now = (new Date()).getTime()/1000;
+    log_start_time = 86400*(Math.floor(time_now/86400)); // beginning of UTC day
+    refresh_logs();
+};
+
+// reset to the beginning of yesterday
+var logs_yesterday = function() {
+    reset_logs();
+    var time_now = (new Date()).getTime()/1000;
+    log_end_time = 86400*(Math.floor(time_now/86400)); // beginning of UTC day
+    log_start_time = log_end_time - 86400;
+    refresh_logs();
+};
+
+var logs_clear = function() {
+    $('#logs_output').empty();
+
+    // go back to today, starting now
+    reset_logs();
+    log_start_time = (new Date()).getTime()/1000;
+    $('#log_area_status')[0].innerHTML = 'Following...';
+    //log_timer = window.setTimeout(refresh_logs, 1000*log_interval);
+    spin_log_bookmark_dirty = true;
+    refresh_logs();
+};
+
+var refresh_logs = function() {
+    //console.log('refresh_logs');
+    log_timer = null;
+    var time_now = (new Date()).getTime()/1000;
+
+    if(log_start_time < 0) {
+        logs_today();
+    }
+
+    if(log_last_time < 0) {
+        log_last_time = 0;
+        $('#logs_output')[0].innerHTML = pretty_print_ts(log_start_time) + '&nbsp;--------------------<br>';
+    }
+
+    $.each(LOGS, function(junk, log_data) {
+
+        if(log_data['pending']) {
+            return;
+        }
+
+        log_data['pending'] = true;
+
+        var method;
+        var qs = {'log_name':log_data['log_name']};
+        if(log_data['last_id']) {
+            method = 'get_more';
+            qs['start_id'] = log_data['last_id'];
+        } else {
+            method = 'get_by_time';
+            qs['start_time'] = log_start_time.toFixed(0);
+        }
+        if(log_end_time > 0) { qs['end_time'] = log_end_time.toFixed(0); }
+        if('code_filter' in log_data) { qs['code'] = log_data['code_filter'].toString(); }
+
+        if(log_start_time > 0 && log_end_time < 0 && spin_log_bookmark_dirty) {
+            // if actively tailing logs, update bookmark
+            spin_log_bookmark_dirty = false;
+            qs['bookmark'] = log_start_time.toFixed(0);
+        }
+
+        $('#log_area_status')[0].innerHTML += '.'; //+log_data['log_name'];
+        send_request('logs', method, qs,
+                     (function (_log_data, _log_gen) { return function(result) {
+                         _log_data['pending'] = false;
+
+                         if(_log_gen != log_gen) {
+                             //console.log('aborted query on '+_log_data['log_name']);
+                             return;
+                         }
+                         //console.log('done '+_log_data['log_name']+' at '+time_now.toFixed(0));
+
+                         $.each(result, function(index, entry) {
+                             log_buf.push(entry);
+                             if(!_log_data['last_id'] || _log_data['last_id'] < entry['_id']) {
+                                 _log_data['last_id'] = entry['_id'];
+                             }
+                         });
+
+                         for(var i = 0; i < LOGS.length; i++) { if(LOGS[i]['pending']) { return; } }
+
+                         $('#log_area_status')[0].innerHTML = 'Ready';
+
+                         log_buf.sort(function(a,b) {
+                             var ta = log_entry_time(a), tb = log_entry_time(b);
+                             if(ta < tb) { return -1; } else if(ta > tb) { return 1; } else { return 0; }
+                         });
+
+                         var buf = '';
+                         $.each(log_buf, function(index, entry) {
+                             var ts = log_entry_time(entry);
+                             log_last_time = Math.max(log_last_time, ts);
+
+                             var pentry = pretty_log_entry(entry);
+                             if(pentry) {
+                                 var txt = pretty_print_ts(ts);
+                                 if(1 && ('ident' in entry)) {
+                                     txt += ' ';
+                                     var ids = 12 - entry['ident'].length;
+                                     txt += entry['ident'];
+                                     for(var i = 0; i < ids; i++) {
+                                         txt += '&nbsp;';
+                                     }
+                                 }
+                                 txt += '&nbsp;&nbsp;';
+                                 txt += pentry+'<br>';
+                                 buf += txt;
+                             }
+                         });
+                         var logs_output = $('#logs_output');
+                         logs_output[0].innerHTML += buf;
+
+                         // scroll to show latest entries if there is
+                         // more than one screenfull of text, and if
+                         // window is already near the very bottom
+                         if(logs_output[0].scrollHeight >= logs_output.height() &&
+                            logs_output[0].scrollTop + logs_output.height() - logs_output[0].scrollHeight > -200) {
+                             var new_scrollTop = logs_output[0].scrollHeight - logs_output.height();
+                             if(Math.abs(new_scrollTop - logs_output[0].scrollTop) >= 10) {
+                                 // only scroll if the delta is substantial
+                                 logs_output.scrollTop(logs_output[0].scrollHeight);
+                                 //logs_output.scrollTop(logs_output[0].scrollHeight);
+                             }
+                         }
+
+                         log_buf = [];
+                         //console.log('done ALL at '+time_now.toFixed(0));
+                         if(!log_timer && log_end_time < 0 && log_start_time > 0 && (time_now - log_start_time < 86400) && $('#mode_logs').is(":visible")) {
+                             log_timer = window.setTimeout(refresh_logs, 1000*log_interval);
+                             $('#log_area_status')[0].innerHTML = 'Following...';
+                         }
+
+                     }; })(log_data, log_gen), true);
+    });
+};
+
+var refresh_credits = function() {
+    $('#credits_status_button').prop('disabled',true);
+    //$('#credits_status')[0].innerHTML = '-';
+    send_request('logs', 'get_credits', {'log_name': 'log_credits'}, function (result) {
+        $('#credits_status')[0].innerHTML = $.map(result, function(entry) {
+            var ret = entry['date'] + ': $' + Math.floor(entry['net']).toFixed(0);
+            if('proj' in entry) {
+                ret += ' (24h proj $'+Math.floor(entry['proj']).toFixed(0)+')';
+            }
+            return ret;
+        }).join('&nbsp;&nbsp;');
+        $('#credits_status_button').prop('disabled',false);
+    }, true);
+};
+
+var send_server_control_cmd = function(server_name, cmd, args, cb) {
+    send_request('server', cmd, $.extend(args, {'server':server_name}), (function (_cmd, _cb) { return function(result) {
+        if(_cmd == 'shutdown') {
+            refresh_server_status(); // other commands return new status
+        }
+        if(_cb) {
+            _cb();
+        }
+    }; })(cmd, cb), true);
+};
+
+var make_gamedata = function() {
+    send_request('gamedata', 'make', {}, function(result) {
+        $('#make_gamedata_result')[0].innerHTML = 'OK '+result['gamedata_build'];
+    });
+};
+var svn_up = function() {
+    send_request('svn', 'up', {}, function(result) {
+        display_response(result);
+    });
+};
+var download_art = function() {
+    send_request('gamedata', 'download_art', {}, function(result) {
+        display_response(result);
+    });
+};
+var compile_client = function() {
+    send_request('gameclient', 'compile', {}, function(result) {
+        display_response(result);
+    });
+};
+
+var setup_ai_base = function() {
+    var sid_range = $("#setup_ai_base_id")[0].value;
+    if(!sid_range) { return; }
+    var id_list;
+    if(sid_range.indexOf('-') != -1) {
+        id_list = [];
+        var fields = sid_range.split('-');
+        for(var i = parseInt(fields[0]); i < parseInt(fields[1])+1; i+= 1) {
+            id_list.push(i);
+        }
+    } else {
+        id_list = [parseInt(sid_range)];
+    }
+
+    // filter out invalid base IDs
+    id_list = $.grep(id_list, function (idnum) { return spin_ai_base_ids.indexOf(idnum) != -1; });
+
+    console.log(id_list);
+    function do_setup(id_list) {
+        if(id_list.length < 1) { return; }
+        send_request('server', 'setup_ai_base', {'idnum': id_list[0].toString()},
+                     (function (_next_id_list) { return function(result) {
+                         do_setup(_next_id_list);
+                     }; })(id_list.slice(1)), false);
+    }
+    do_setup(id_list);
+}
+
+var server_start = function() {
+    var generation = $("#server_start_gen")[0].value;
+    var qty = Math.min(Math.max(parseInt($("#server_start_qty")[0].value), 1), 20);
+    var port_range = [8002,8100];
+
+    var configs = [];
+    for(var n = 0; n < qty; n++) {
+        var port = port_range[0];
+        var start_letter = 'A';
+
+        var to_check = cur_server_status.concat(configs);
+        for(var i = 0; i < to_check.length; i++) {
+            var entry = to_check[i];
+            if(entry['server_name'].indexOf('server')==0 &&
+               entry['server_name'].slice(-3,-1) == generation) {
+                var last_letter = entry['server_name'].slice(-1);
+                if(start_letter <= last_letter) {
+                    start_letter = String.fromCharCode(last_letter.charCodeAt(0)+1);
+                }
+            }
+        }
+
+        while(port < port_range[1]) {
+            var conflict = false;
+            for(var i = 0; i < to_check.length; i++) {
+                var entry = to_check[i];
+                var iport = entry['external_http_port'] || entry['game_http_port'];
+                if(iport == port) {
+                    conflict = true;
+                    break;
+                }
+            }
+            if(!conflict) {
+                break;
+            }
+            port += 2;
+        }
+        if(port >= port_range[1]) {
+            display_error('no open ports');
+            return;
+        }
+
+        var server_name = 'server'+generation+start_letter;
+        var config = {'server_name':server_name,
+                      'game_http_port':port, 'game_ssl_port': (spin_ssl_available ? port+1 : -1),
+                      'game_ws_port': port, 'game_wss_port': (spin_ssl_available && spin_wss_available ? port+1 : -1)};
+        configs.push(config);
+    }
+    console.log(configs);
+    function do_launch(config_list) {
+        if(config_list.length < 1) { return; }
+        var launch_config = $.extend({}, config_list[0]);
+        var server_name = launch_config['server_name']; delete launch_config['server_name'];
+        launch_config['start_state'] = 'closed';
+        send_request('server', 'start', {'server':server_name, 'config':JSON.stringify(launch_config)},
+                     (function (_next_config_list) { return function(result) {
+                         refresh_server_status();
+                         do_launch(_next_config_list);
+                     }; })(config_list.slice(1)), false);
+    }
+    do_launch(configs);
+};
+
+var cur_server_status = []; // updated from refresh_server_status
+var server_status_pending = false, server_latency_pending = false;
+var server_status_interval = 15;
+
+var continue_server_status = function() {
+    if(!server_status_pending && !server_latency_pending && $('#mode_server').is(":visible")) {
+        window.setTimeout(function() {
+            if($("#auto_refresh_server_status")[0].checked) {
+                refresh_server_status();
+            }
+        }, 1000*server_status_interval);
+    }
+};
+
+var refresh_server_status = function() {
+    if(!server_status_pending) {
+        server_status_pending = true;
+        $('#server_status_loading')[0].innerHTML = 'Loading...';
+        send_request('server', 'get_status', {}, function(result) {
+            server_status_pending = false;
+            cur_server_status = result;
+
+            $('#server_status_loading')[0].innerHTML = 'Ready';
+            $('#server_status_table').empty();
+
+            var proxy_builds = {'gameclient_build':null, 'gamedata_build':null};
+            $.each(result, function(index, item) {
+                if(item['type'] == 'proxyserver' && item['state'] == 'ok') {
+                    proxy_builds['gameclient_build'] = item['gameclient_build'];
+                    proxy_builds['gamedata_build'] = item['gamedata_build'];
+                }
+            });
+
+            var FIELDS = [{'name':'server_name','type':'server_name'},
+                          {'name':'state','type':'state'},
+                          {'name':'active_sessions','type':'active_sessions'},
+                          {'name':'paying_sessions','type':'int'},
+                          {'name':'load_unhalted','type':'load'},
+                          {'name':'machine_stats:machine_mem_free_mb','type':'memory_mb'},
+                          {'name':'gameclient_build','type':'build'},
+                          {'name':'gamedata_build','type':'build'}
+                         ];
+            var header_row = $('<tr>');
+            $.each(FIELDS, function(index, field) {
+                var ls = field['name'].split(':');
+                var s = ls[ls.length-1];
+                header_row.append($('<td>', {html:'<b>'+s+'</b>'}));
+            });
+            $('#server_status_table').append(header_row);
+
+            result.sort(function(a,b) {
+                var aproxy = a['server_name'].indexOf('proxy') == 0, bproxy = b['server_name'].indexOf('proxy') == 0;
+                if(aproxy && !bproxy) {
+                    return -1;
+                } else if(!aproxy && bproxy) {
+                    return 1;
+                } else if(a['server_name'] < b['server_name']) {
+                    return -1;
+                } else if(a['server_name'] > b['server_name']) {
+                    return 1;
+                } else {
+                    return 0;
+                }
+            });
+
+            $.each(result, function(index, item) {
+                var row = $('<tr>');
+                $.each(FIELDS, function(index, field) {
+                    var val = null;
+                    var path = field['name'].split(':');
+                    for(var p = item, i = 0; i < path.length; i++) {
+                        if(path[i] in p) {
+                            if(i == path.length-1) {
+                                val = p[path[i]];
+                                break;
+                            } else {
+                                p = p[path[i]];
+                            }
+                        } else {
+                            break;
+                        }
+                    }
+                    var s = '';
+                    if(val !== null) {
+                        if(field['type'] == 'text') {
+                            s = val;
+                        } else if(field['type'] == 'int') {
+                            s = val.toFixed(0);
+                        } else if(field['type'] == 'pct') {
+                            s = (100*val).toFixed(0)+'%';
+                        } else if(field['type'] == 'load') {
+                            s = (100*val).toFixed(0)+'%';
+                            if(val > 0.3) {
+                                s = '<font color="#ff0000">'+s+'</font>';
+                            }
+                        } else if(field['type'] == 'state') {
+                            s = val;
+                            if(val != 'ok') {
+                                s = '<font color="#c00000">'+s+'</font>';
+                            }
+                        } else if(field['type'] == 'memory_mb') {
+                            s = val.toFixed(0);
+                            if(s < 2000) {
+                                s = '<font color="#ff0000">'+s+'</font>';
+                            }
+                        } else if(field['type'] == 'active_sessions') {
+                            s = val.toFixed(0);
+                            if(('game_http_port' in item) && val >= 100) {
+                                s = '<font color="#ff0000">'+s+'</font>';
+                            }
+                        } else if(field['type'] == 'server_name') {
+                            s = val;
+                            var url = null;
+                            if('game_ssl_port' in item && item['game_ssl_port'] > 0) {
+                                url = 'https://'+item['hostname']+':'+item['game_ssl_port'].toString()+'/ADMIN';
+                            } else if('game_http_port' in item && item['game_http_port'] > 0) {
+                                url = 'http://'+item['hostname']+':'+item['game_http_port'].toString()+'/ADMIN';
+                            }
+                            if(url) { s = '<a href="'+url+'" target="_blank">'+s+'</a>'; }
+
+                            if(proxy_builds['gameclient_build']) {
+                                if(item['gameclient_build'] != proxy_builds['gameclient_build'] || item['gamedata_build'] != proxy_builds['gamedata_build']) {
+                                    s += ' <font color="#c00000">(mismatch)</font>';
+                                }
+                            }
+
+                            var server_name = val;
+
+                            if(spin_token_data['roles'].indexOf('ADMIN') != -1) {
+                                var btn_list = [{'name':'reconfig','ui_name':'HUP'},
+                                                {'name':'maint_kick','ui_name':'maint'},
+                                                {'name':'change_state','args':{'state':'ok'},'ui_name':'open'},
+                                                {'name':'change_state','args':{'state':'closed'},'ui_name':'close'},
+                                                {'name':'shutdown','ui_name':'stop'}];
+                                if(item['state'] == 'maint_kick') {
+                                    btn_list.push({'name':'panic_kick','ui_name':'panic'});
+                                }
+                                $.each(btn_list,
+                                       function(index, btn) {
+                                           var btn_id = 'server_'+server_name+'_btn_'+index.toString()+btn['name'];
+                                           var args = btn['args'] || {};
+                                           var onclick = "$('#"+btn_id+"').attr('disabled','disabled'); send_server_control_cmd('"+val+"','"+btn['name']+"',"+JSON.stringify(args).replace(new RegExp('"','g'), "'")+", function() { $('#"+btn_id+"').removeAttr('disabled'); });";
+                                           s += ' <button id="'+btn_id+'" onclick="'+onclick+'" class="spin_button_tiny">'+btn['ui_name']+'</button>';
+                                       });
+                            }
+
+                        } else if(field['type'] == 'build') {
+                            s = val;
+                            if(proxy_builds['gameclient_build']) {
+                                if(item['gameclient_build'] != proxy_builds['gameclient_build'] || item['gamedata_build'] != proxy_builds['gamedata_build']) {
+                                    s = '<font color="#c00000">'+s+'</font>';
+                                } else {
+                                    s = '<font color="#008000">'+s+'</font>';
+                                }
+                            }
+                        }
+                    }
+                    var cell = $('<td>', {html: s});
+                    row.append(cell);
+                });
+                $('#server_status_table').append(row);
+            });
+            continue_server_status();
+        }, true);
+    }
+
+    if(!server_latency_pending) {
+        server_latency_pending = true;
+        send_request('server', 'get_latency', {}, function(result) {
+            server_latency_pending = false;
+            $("#server_graph_area").empty();
+            //console.log("LATENCY RESULT"); console.log(result);
+            if(result['graphs'].length > 0) {
+                for(var graph_id = 0; graph_id < result['graphs'].length; graph_id++) {
+                    if('ui_name' in result['graphs'][graph_id]) { $("#server_graph_area").append('<p>'+result['graphs'][graph_id]['ui_name']); }
+                    $("#server_graph_area").append('<p><div id="server_graph'+graph_id.toString()+'" style="width:1000px; height:150px;">');
+                    $.plot("#server_graph"+graph_id.toString(), result['graphs'][graph_id]['series'],
+                          $.extend(result['graphs'][graph_id]['plot_params'],
+                                   {'grid': {'hoverable':true}, 'zoom': {'interactive':true, 'frameRate':30}, 'pan': {'interactive':true, 'frameRate':30}}
+                                  ));
+                    $("#server_graph"+graph_id.toString()).bind("plothover", function (event, pos, item) {
+                        if(item) {
+                            //console.log(item);
+                            var tip;
+                            if(item.series.tooltips) {
+                                tip = item.series.tooltips[item.dataIndex];
+                            } else {
+                                var ts = new Date(item.datapoint[0]);
+                                //var x = (ts.getUTCMonth()+1).toString()+'/'+ts.getUTCDate().toString()+' '+ts.getUTCHours()+':'+ts.getUTCMinutes();//item.datapoint[0].toFixed(2);
+                                var x = ts.toUTCString();
+                                var y = item.datapoint[1].toFixed((item.datapoint[1] >= 1000 ? 0 : 2));
+                                tip = x + ' ' + item.series.label +': ' + y;
+                            }
+                            $("#graph_tooltip").html(tip).css({top: item.pageY+5, left: item.pageX+5}).fadeIn(30);
+                        } else {
+                            $("#graph_tooltip").hide();
+                        }
+                    });
+                }
+            }
+            continue_server_status();
+        }, true);
+    }
+};
+
+var method_skynet_query = function() {
+    var query = $("#skynet_query")[0].value;
+    if(query && query.length>0) {
+        var interval = $('input:radio[name=skynet_interval]:checked').val();
+        send_request('skynet', 'graph', {'query':query, 'time_interval':interval.toString()}, function(result) {
+            $("#skynet_graph_area").empty();
+            //console.log(result);
+            $('#skynet_info')[0].innerHTML = 'Skynet: %s (%d ads)'.replace('%s', result['query']).replace('%d', result['adgroup_list_len'].toString());
+            if(result['graphs'].length > 0) {
+                for(var graph_id = 0; graph_id < result['graphs'].length; graph_id++) {
+                    if('ui_name' in result['graphs'][graph_id]) { $("#skynet_graph_area").append('<p>'+result['graphs'][graph_id]['ui_name']); }
+                    $("#skynet_graph_area").append('<div id="skynet_graph'+graph_id.toString()+'" style="width:650px; height:200px;">');
+                    $.plot("#skynet_graph"+graph_id.toString(), result['graphs'][graph_id]['series'],
+                           $.extend(result['graphs'][graph_id]['plot_params'],
+                                    {'legend':{'position':'nw'},
+                                     'grid': {'hoverable':true},
+                                     'zoom': {'interactive':true},
+                                     'pan': {'interactive':true}
+                                    }));
+                    $("#skynet_graph"+graph_id.toString()).bind("plothover", function (event, pos, item) {
+                        if(item) {
+                            var x = item.datapoint[0].toFixed(2),
+                            y = item.datapoint[1].toFixed((item.datapoint[1] >= 1000 ? 0 : 2));
+                            $("#graph_tooltip").html(item.series.label +': ' + y).css({top: item.pageY+5, left: item.pageX+5}).fadeIn(30);
+                        } else {
+                            $("#graph_tooltip").hide();
+                        }
+                    });
+                }
+            }
+            if(result['ui_info']) {
+                $("#skynet_graph_area").append('<p><font color="#ff0000">Info: '+result['ui_info']+'</color>');
+            }
+        });
+    }
+};
+
+var refresh_clock = function() {
+    var text = (new Date()).toUTCString().slice(0,22)+' UTC.';
+    text += ' Logged in as <b>$SPIN_USERNAME$</b>.';
+    $('#clock')[0].innerHTML = text;
+    window.setTimeout(refresh_clock, 10*1000);
+};
+
+$(function() {
+    // hide server controls if ADMIN role is missing
+    if(spin_token_data['roles'].indexOf('ADMIN') == -1) {
+       $('#mode_server_tab').remove();
+       $('#mode_server').remove();
+       $('#mode_logs_tab').remove();
+       $('#mode_logs').remove();
+    } else {
+       $('#server_status').bind('show', function() { console.log("HERE"); });
+    }
+
+    // whenever server mode is made active, send a status query
+    var on_mode_activate = function(panel) {
+        if(panel.is('#mode_server')) {
+            refresh_server_status();
+        } else if(panel.is('#mode_logs')) {
+            refresh_logs();
+            if(spin_token_data['roles'].indexOf('SKYNET') != -1) {
+                refresh_credits();
+            }
+        } else if(panel.is('#mode_skynet')) {
+            $('#skynet_query').focus();
+        }
+    };
+
+    $('#modes').tabs({
+        activate: function(event, ui) { on_mode_activate(ui.newPanel); },
+        create: function(event, ui) { on_mode_activate(ui.panel); }
+    });
+
+    if(spin_token_data['roles'].indexOf('PCHECK-BAN') == -1) {
+        // no ban or developer flag permission
+        $('#player_tools_ban').remove();
+        $('#player_tools_ban_header').remove();
+        $('#player_tools_developer').remove();
+        $('#player_tools_developer_header').remove();
+    }
+
+    if(spin_token_data['roles'].indexOf('PCHECK-WRITE') == -1) {
+        // no write permission
+        $('#mode_payment_tab').remove();
+        $('#mode_payment').remove();
+        $('#player_tools_give_item').remove();
+        $('#player_tools_give_item_header').remove();
+        $('#player_tools_give_gamebucks').remove();
+        $('#player_tools_give_gamebucks_header').remove();
+        $('#player_tools_send_message').remove();
+        $('#player_tools_send_message_header').remove();
+        $('#player_tools_clear_cooldown').remove();
+        $('#player_tools_clear_cooldown_header').remove();
+    }
+
+    if(spin_token_data['roles'].indexOf('ADMIN') == -1) {
+        // no admin permisison
+        $('#svn_up_button').remove();
+        $('#download_art_button').remove();
+        $('#make_gamedata_button').remove();
+        $('#server_start_gen').remove();
+        $('#server_start_qty').remove();
+        $('#server_start_button').remove();
+        $('#setup_ai_base_id').remove();
+        $('#setup_ai_base_button').remove();
+    }
+
+
+    if(spin_token_data['roles'].indexOf('SKYNET') == -1) {
+        // no skynet permission, no credits display
+       $('#mode_skynet_tab').remove();
+       $('#mode_skynet').remove();
+       $('#credits_status_area').remove();
+    } else {
+        // skynet enabled
+        $('#skynet_interval_1h')[0].checked = true;
+    }
+
+    $('#player_lookup').tabs();
+    $('#user_id').spinner({min:0, step:1});
+    $('#player_tools').tabs();
+    $('#lookup_output').elastic();
+    $('#send_message_body').elastic();
+    $('#chat_gag_duration').spinner({max:240, min:1, step:1});
+    $('#gamebucks_amount').spinner({max:50000, min:0, step:100});
+    $('#item_to_give_qty').spinner({max:50, min:1, step:1});
+    spin_giveable_items.forEach(function(entry) {
+        $('#item_to_give').append('<option value="'+entry['name']+'">'+entry['ui_name']+'</option>');
+    });
+    $('#skynet_query').bind('enterKey', method_skynet_query);
+    $('#skynet_query').keyup(function(e) { if(e.keyCode == 13) { $(this).trigger('enterKey'); } });
+
+    refresh_clock();
+});
+</script>
+
+</head><body>
+
+<div id="header" style="width:100%;height:100px">
+<div style="float:right;"><img src="$GAME_LOGO_URL$" width="150" height="100"></div>
+<div style="float:left;"><img src="https://s3.amazonaws.com/$SPIN_PUBLIC_S3_BUCKET$/spinpunch_logo_bonw_256x43.png" width="256" height="43"></div>
+<center>
+<div style="width:25%;line-height:18px;">
+  <div id="clock" style="float:left;"></div>
+  <button style="float:right;" onclick="delete_cookie(); var location_href_is_not='https://accounts.google.com/o/oauth2/revoke?token=$GOOGLE_ACCESS_TOKEN$'; location.href='//www.google.com/';">Log out</button>
+</div>
+</center>
+</div>
+<hr>
+
+<div id="modes">
+   <ul>
+    <li><a href="#mode_player">Player</a></li>
+    <li id="mode_payment_tab"><a href="#mode_payment">FB Payment</a></li>
+    <li id="mode_server_tab"><a href="#mode_server">Server</a></li>
+    <li id="mode_logs_tab"><a href="#mode_logs">Logs</a></li>
+    <li id="mode_skynet_tab"><a href="#mode_skynet">Skynet</a></li>
+   </ul>
+
+<div id="mode_player">
+
+<div id="player_lookup">
+  <ul>
+    <li><a href="#player_lookup_by_user_id">Find by User ID</a></li>
+    <li><a href="#player_lookup_by_facebook_id">Find by Facebook ID</a></li>
+  </ul>
+    <div id="player_lookup_by_user_id">
+        User ID: <input type="text" id="user_id" name="user_id" autofocus><button onclick="method_lookup()" class="spin_button">Lookup</button>
+    </div>
+    <div id="player_lookup_by_facebook_id">
+        Facebook ID: <input type="text" id="facebook_id" name="facebook_id"><button onclick="method_lookup()" class="spin_button">Lookup</button>
+    </div>
+</div>
+
+<hr>
+
+<div id="per_player" style="position:relative;display:none;">
+
+<div style="position:absolute;top:5px;right:5px;"><button onclick="method_get_raw_player()" style="width:150px;height:30px;">Get PlayerDB File</button></div>
+<textarea id="lookup_output" readonly style="width:100%;height:10%;font-family:monospace;font-size:12px;"></textarea>
+
+<hr>
+<div id="player_tools" style="display:none;">
+  <ul>
+    <li><a href="#player_tools_give_item" id="player_tools_give_item_header">Give Item</a></li>
+    <li><a href="#player_tools_give_gamebucks" id="player_tools_give_gamebucks_header">Give $GAMEBUCKS_NAME$</a></li>
+    <li><a href="#player_tools_chat_gag" id="player_tools_chat_gag_header">Chat Mute</a></li>
+    <li><a href="#player_tools_send_message" id="player_tools_send_message_header">Send Message</a></li>
+    <li><a href="#player_tools_clear_cooldown" id="player_tools_clear_cooldown_header">Cooldowns</a></li>
+    <li><a href="#player_tools_ban" id="player_tools_ban_header">Ban</a></li>
+    <li><a href="#player_tools_developer" id="player_tools_developer_header">Developer</a></li>
+  </ul>
+    <div id="player_tools_give_gamebucks">
+      $GAMEBUCKS_NAME$ amount: <input type="text" id="gamebucks_amount" name="gamebucks_amount" value="100">
+      <button onclick="method_give_gamebucks()" class="spin_button">Give</button>
+      <p>
+      Reason for this action:
+      <br>
+      <input type="text" id="give_gamebucks_reason" style="width:500px;">
+    </div>
+    <div id="player_tools_chat_gag">
+      <button onclick="method_chat_ungag()" class="spin_button">Unmute</button>
+      Duration: <input type="text" id="chat_gag_duration" name="chat_gag_duration" value="12"> Hours
+      <button onclick="method_chat_gag($('#chat_gag_duration').spinner('value')*3600)" class="spin_button">Mute (Temporary)</button>
+      <button onclick="method_chat_gag(-1)" class="spin_button">Mute (Permanent)</button>
+      <p>
+      Reason for this action:
+      <br>
+      <input type="text" id="chat_reason" style="width:500px;">
+    </div>
+    <div id="player_tools_give_item">
+      Pick an item from the list:
+      <br>
+      <select id="item_to_give" name="item_to_give" class="spin_select"></select>
+      <br><br>
+      Or type the internal item name (from items.json) below:
+      <br>
+      <input type="text" id="item_to_give_text" onkeyup="update_item_to_give_widget_state()" style="width:250px;">
+      <br><br>
+      Quantity: <input type="text" id="item_to_give_qty" name="item_to_give_qty" value="1" style="width:80px;">
+      <button onclick="method_give_item()" class="spin_button">Give</button>
+      <p>
+      Reason for this action:
+      <br>
+      <input type="text" id="item_to_give_reason" style="width:500px;">
+
+    </div>
+
+    <div id="player_tools_send_message">
+<table cellpadding="5">
+<tr><td>From:</td><td><input type="text" id="send_message_sender" name="send_message_sender" value="Customer Support" style="width:200px"></td></tr>
+<tr><td>Subject:</td><td><input type="text" id="send_message_subject" name="send_message_subject" value="Support Issue" style="width:200px"></td></tr>
+<tr><td>Body:</td><td><textarea id="send_message_body" name="send_message_body" value="" style="width:600px;height:100px"></textarea></td></tr>
+<tr><td><button onclick="method_send_message()" class="spin_button">Send</button></td></tr>
+</table>
+      <p>
+      Reason for this action:
+      <br>
+      <input type="text" id="send_message_reason" style="width:500px;">
+    </div>
+
+    <div id="player_tools_clear_cooldown">
+      <button onclick="method_clear_lockout()" class="spin_button">Clear 48h Lockout</button>
+    &nbsp;&nbsp;&nbsp;&nbsp;
+      Cooldown Name: <input type="text" id="cooldown_name" name="cooldown_name" value="alliance_deserter">
+      <button onclick="method_clear_cooldown()" class="spin_button">Clear</button>
+      <p>
+      Reason for this action:
+      <br>
+      <input type="text" id="cooldown_reason" style="width:500px;">
+    </div>
+
+    <div id="player_tools_ban">
+      <button onclick="method_ban()" class="spin_button">Ban</button>
+      <button onclick="method_unban()" class="spin_button">Unban</button>
+      <p>
+      Reason for this action:
+      <br>
+      <input type="text" id="ban_reason" style="width:500px;">
+    </div>
+    <div id="player_tools_developer">
+      Enables developer-only features and excludes this player from analytics.
+      <button onclick="method_make_developer()" class="spin_button">Make Developer</button>
+      <button onclick="method_unmake_developer()" class="spin_button">Unmake Developer</button>
+      <p>
+      Reason for this action:
+      <br>
+      <input type="text" id="make_developer_reason" style="width:500px;">
+    </div>
+  </div>
+</div>
+
+</div> <!-- END mode_player -->
+
+<div id="mode_payment">
+
+<div id="payment_lookup">
+FB Payment ID: <input type="text" id="payment_id" name="payment_id" autofocus><button onclick="payment_lookup()" class="spin_button">Lookup</button>
+</div>
+
+<hr>
+
+<div id="per_payment" style="position:relative;display:none;">
+Status: <span id="payment_status"></span>
+<div id="payment_tools" style="display:none;">
+<p>
+<button id="payment_refund_button" class="spin_button" style="height:33px;">Refund</button>
+<button id="payment_resolve_button" class="spin_button" style="height:33px;">Resolve Dispute</button>
+    Reason:
+<input type="radio" name="payment_resolve_reason" class="spin_radio" value="DENIED_REFUND" checked>Denied Refund</input>
+<input type="radio" name="payment_resolve_reason" class="spin_radio" value="GRANTED_REPLACEMENT_ITEM">Gave Item</input>
+<input type="radio" name="payment_resolve_reason" class="spin_radio" value="BANNED_USER">Banned User</input>
+</div>
+<hr>
+<textarea id="payment_lookup_output" readonly style="width:100%;height:10%;font-family:monospace;font-size:12px;"></textarea>
+</div>  <!-- END per_payment -->
+
+</div> <!-- END mode_payment -->
+
+<div id="mode_server">
+<div id="server_status" style="position:relative;">
+<div id="server_status_loading">STATUS</div>
+<div style="position:absolute;top:0px;right:0px;"><label style="margin:10px;"><input id="auto_refresh_server_status" type="checkbox" checked="1" style="height:initial;"></input>Auto</label><button onclick="refresh_server_status()" style="width:150px;height:30px;">Refresh</button></div>
+<p>
+<table id="server_status_table" width="100%" style="font-size:12;font-family:sans-serif;"></table>
+<br>
+<button id="svn_up_button" onclick="svn_up()">SVN up</button>
+<button id="download_art_button" onclick="download_art()">Download Art</button>
+<button id="download_art_button" onclick="compile_client()">Compile Client</button>
+<button id="make_gamedata_button" onclick="make_gamedata()">Make Gamedata</button> <span id="make_gamedata_result" style="font-size:12px;"></span>
+<input type="text" id="server_start_gen" style="width:30px;" value="00"/> x<input type="text" id="server_start_qty" style="width:30px;" value="1"/>
+<button id="server_start_button" onclick="server_start()">START</button> <span></span>
+
+<span style="float:right;"><input type="text" id="setup_ai_base_id" value="1-1002"/><button id="setup_ai_base_button" onclick="setup_ai_base()">Setup AI Bases</button></span>
+
+<p>
+<div id="server_graph_area"></div>
+</div>
+</div> <!-- END mode_server -->
+
+<div id="mode_logs" style="position:relative;">
+<div id="log_area_status" style="float:left;line-height:28px;"></div>
+
+    <div id="credits_status_area" style="position:absolute;top:0x;left:200px;">
+    <button id="credits_status_button" onclick="refresh_credits()" style="height:30px;float:left;">Get Credits</button>
+    <div id="credits_status" style="width:500px;line-height:20px;margin-left:120px;border-style:inset;padding:2px;color:#008000;"></div>
+    <div style="clear:both;"></div>
+    </div>
+
+
+<div style="float:right;">
+<button onclick="logs_yesterday()" style="width:150px;height:30px;">Yesterday</button>
+<button onclick="logs_today()" style="width:150px;height:30px;">Today</button>
+<button onclick="logs_clear()" style="width:150px;height:30px;">Clear</button>
+</div>
+<div style="clear:both;"></div>
+
+<div style="margin-top:10px;">
+<div id="logs_output" style="width:100%;height:70%;font-family:monospace;font-size:12px;overflow:auto;border-style:inset;padding:3px;"></div>
+</div>
+
+</div> <!-- END mode_logs -->
+
+<div id="mode_skynet">
+<input type="text" id="skynet_query" name="skynet_query" value="">
+<button onclick="method_skynet_query()" class="spin_button" style="height:33px;">Go</button>
+    Interval:
+<input type="radio" name="skynet_interval" id="skynet_interval_1h" class="spin_radio" value="3600" checked>1 Hour</input>
+<input type="radio" name="skynet_interval" id="skynet_interval_4h" class="spin_radio" value="14400">4 Hours</input>
+<input type="radio" name="skynet_interval" id="skynet_interval_8h" class="spin_radio" value="28800">8 Hours</input>
+<input type="radio" name="skynet_interval" id="skynet_interval_24h" class="spin_radio" value="68400">24 Hours</input>
+<p>
+<div id="skynet_info">SKYNET</div>
+<p>
+<div id="skynet_graph_area"></div>
+</div>
+</div> <!-- END mode_skynet -->
+
+<div id="loading_dialog" title="Working..." style="display:none;" >
+Contacting server...
+</div>
+
+<div id="error_dialog" title="Error" style="display:none;background: #ffcccc;" >
+<pre><div id="error_dialog_msg" style="font-size:66%;"></div></pre>
+</div>
+
+<div id="response_dialog" title="Response" style="display:none;background: #ffffff;" >
+<pre><div id="response_dialog_msg" style="font-size:66%;"></div></pre>
+</div>
+
+<div id="confirm_dialog" title="Confirm" style="display:none;background: #ffffff;" >
+<div id="confirm_dialog_msg">Are you sure?</div>
+</div>
+
+<div id="graph_tooltip" style="position:absolute; diplay:none; border: 1px solid #fdd; padding: 2px; background-color: #fee; opacity: 0.8;"></div>
+
+</body></html>

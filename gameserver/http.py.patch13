@@ -1,0 +1,75 @@
+Copyright (c) 2014 SpinPunch. All rights reserved.
+Use of this source code is governed by an MIT-style license that can be
+found in the LICENSE file.
+
+This patch fixes a few annoying problems with Twisted's shipped http.py
+
+--- http.py.orig	2013-12-22 22:34:57.000000000 -0800
++++ http.py.twisted13	2013-12-22 22:34:36.000000000 -0800
+@@ -298,10 +298,14 @@
+     else:
+         raise ValueError("Unknown datetime format %r" % dateString)
+ 
+-    day = int(day)
+-    month = int(monthname_lower.index(month.lower()))
+-    year = int(year)
+-    hour, min, sec = map(int, time.split(':'))
++    try:
++        day = int(day)
++        month = int(monthname_lower.index(month.lower()))
++        year = int(year)
++        hour, min, sec = map(int, time.split(':'))
++    except:
++        # DJM
++        raise ValueError("bad dateString %s" % repr(dateString))
+     return int(timegm(year, month, day, hour, min, sec))
+ 
+ 
+@@ -673,14 +677,21 @@
+         if self.producer:
+             log.err(RuntimeError("Producer was not unregistered for %s" % self.uri))
+             self.unregisterProducer()
+-        self.channel.requestDone(self)
+-        del self.channel
+-        try:
+-            self.content.close()
+-        except OSError:
+-            # win32 suckiness, no idea why it does this
++        if not hasattr(self, 'channel'):
++            # DJM - this occurs periodically when serving up static art files. Probably harmless, so don't log an exception...
++            #raise Exception('DJM TWISTED '+repr(self))
+             pass
+-        del self.content
++        else:
++            self.channel.requestDone(self)
++            del self.channel
++        if hasattr(self, 'content'):
++            # DJM - again, spurious exception
++            try:
++                self.content.close()
++            except OSError:
++                # win32 suckiness, no idea why it does this
++                pass
++            del self.content
+         for d in self.notifications:
+             d.callback(None)
+         self.notifications = []
+@@ -925,6 +936,8 @@
+         Indicate that all response data has been written to this L{Request}.
+         """
+         if self._disconnected:
++            # DJM - spurious message when using ReverseProxyClient
++            return
+             raise RuntimeError(
+                 "Request.finish called on a request after its connection was lost; "
+                 "use Request.notifyFinish to keep track of this.")
+@@ -1814,7 +1827,8 @@
+             self.transport.loseConnection()
+ 
+     def timeoutConnection(self):
+-        log.msg("Timing out client: %s" % str(self.transport.getPeer()))
++        # DJM - don't print this stupid log message
++        #log.msg("Timing out client: %s" % str(self.transport.getPeer()))
+         policies.TimeoutMixin.timeoutConnection(self)
+ 
+     def connectionLost(self, reason):

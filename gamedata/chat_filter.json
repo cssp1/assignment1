@@ -1,0 +1,49 @@
+{
+    // regexp matching options (case-insensitive, greedy)
+    "options": "ig",
+
+    // other characters that are considered the same as a letter,
+    // e.g. "o":"0" means that "c0ck" will match with "cock"
+    "leet_speak": {
+        "word_space": "\\._\\|-", // can be inserted between any letters, e.g. "_sh.it_"
+        "a": "4@",
+        "i": "1y\\|!",
+        "l": "1\\|!",
+        "o": "0",
+        "s": "\\$",
+        "t": "1\\|!"
+    },
+
+    // not necessarily in any order
+    "bad_words": [
+        "arse","ass","assed","asses","asshole","assholes","anus",
+        "bloody","bollocks",
+        "bastard","bastards",
+        "bitch","bitches","bitched","bitching","bullshit",
+        "blowjob","blowjobs",
+        "boner","boners",
+        "bugger","buggers","buggering",
+        "chink","cock","cocks","cocksucker","cocksucking",
+        "clit", "clits",
+        "cunt","cunts",
+        "dafaq","dick","dicks","dickhead","dickheads",
+        "dong","dongs",
+        "fag","faggot","fuck","fucking","fucked","fucker","fucks","fuc","fck","fuk","fux","firefux",
+        "gook",
+        "kike",
+        "mongoloid","motherfucker","motherfuckers",
+        "nigga","nigger","niggers",
+        "nipple", "nipples",
+        "penis", "penises",
+        "piss","pisses","pissed",
+        "prick","pricks",
+        "puss","pusses","pussy","pussys","pussies",
+        "rape","rapes","raped","raper","rapist","retard","retarded",
+        "shit","shits","shithead","shitface","shitter","shitty","slut","sluts","spic",
+        "tits","titties",
+        "turd",
+        "twat","twats",
+        "vagina",
+        "wank","wanks","wanker","wankers","wetback"
+    ]
+}

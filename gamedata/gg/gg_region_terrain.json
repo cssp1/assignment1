@@ -1,0 +1,7 @@
+// Copyright (c) 2014 SpinPunch. All rights reserved.
+// Use of this source code is governed by an MIT-style license that can be
+// found in the LICENSE file.
+{
+    "dv_island2_256":
+#include "$GAME_ID_region_terrain_island2_256.json"
+}
