@@ -44244,12 +44244,14 @@ function draw_backdrop(want_scenery) {
         return;
     }
     var climate_data = (session.viewing_base && goog.object.getCount(session.viewing_base.base_climate_data)>0 ? session.viewing_base.base_climate_data : gamedata['climates'][gamedata['default_climate']]);
-    if('backdrop_tiles' in climate_data && (SPFX.detail >= 2)) {
-        var drawn = draw_backdrop_tiled(climate_data['backdrop_tiles']);
+    var ncells = (session.viewing_base ? session.viewing_base.ncells() : null);
+
+    if(('backdrop_whole' in climate_data) && ncells && (ncells[0].toString()+'x'+ncells[1].toString() in climate_data['backdrop_whole'])) {
+        var drawn = draw_backdrop_whole(climate_data['backdrop_whole'][ncells[0].toString()+'x'+ncells[1].toString()]);
         if(drawn && want_scenery) { draw_backdrop_scenery(); }
         if(session.viewing_base && (!drawn || PLAYFIELD_DEBUG)) { draw_backdrop_area_bounds(); }
-    } else if('backdrop_whole' in climate_data) {
-        var drawn = draw_backdrop_whole(climate_data['backdrop_whole']);
+    } else if('backdrop_tiles' in climate_data && (SPFX.detail >= 2)) {
+        var drawn = draw_backdrop_tiled(climate_data['backdrop_tiles']);
         if(drawn && want_scenery) { draw_backdrop_scenery(); }
         if(session.viewing_base && (!drawn || PLAYFIELD_DEBUG)) { draw_backdrop_area_bounds(); }
     } else {

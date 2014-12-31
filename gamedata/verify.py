@@ -2474,7 +2474,11 @@ def check_climate(name, data):
     error = 0
     for ASSET in ('backdrop', 'backdrop_whole'):
         if ASSET in data:
-            error |= require_art_asset(data[ASSET], name+':'+ASSET)
+            if type(data[ASSET]) is dict:
+                for key, val in data[ASSET].iteritems():
+                    error |= require_art_asset(val, name+':'+ASSET+':'+key)
+            else:
+                error |= require_art_asset(data[ASSET], name+':'+ASSET)
     if 'building_bases' in data:
         for k, asset in data['building_bases'].iteritems():
             error |= require_art_asset(asset, name+':'+asset)
