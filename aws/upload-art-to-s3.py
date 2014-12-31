@@ -54,14 +54,10 @@ if __name__ == "__main__":
     master_only = True
 
     for key, val in opts:
-    if key == '--dry-run':
-        dry_run = True
-        if key == '--write':
-            dry_run = False
-        if key == '--parallel':
-            proc_count = int(val)
-        if key == '--all':
-            master_only = Fase
+        if key == '--dry-run': dry_run = True
+        elif key == '--write': dry_run = False
+        elif key == '--parallel': proc_count = int(val)
+        elif key == '--all': master_only = Fase
 
     if master_only:
         # only upload the master art.tar.gz file
@@ -73,7 +69,7 @@ if __name__ == "__main__":
                                    #'"Last-Modified: %s"' % last_mod,
                                    aws_bucket+'/art.tar.gz', src_file], ' ')
         print aws_command
-        sys.exit(subprocess.check_call(aws_command , shell=True))
+        sys.exit(subprocess.check_call(aws_command, shell=True))
         #sys.exit(0)
 
     file_list = []
