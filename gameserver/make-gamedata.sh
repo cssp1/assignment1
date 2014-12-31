@@ -110,7 +110,7 @@ else
 fi
 export LINEBREAK
 
-MYLOC_LIST=`find ${SPIN_GAMEDATA}/${GAME_ID}/localize -name '*.po' | cut -d- -f2 | cut -d. -f1 | sort`
+MYLOC_LIST=`find ${SPIN_GAMEDATA}/${GAME_ID}/localize -name '*.po' | xargs basename -a -s .po | sed "s/^${GAME_ID}-//" | sort`
 
 MYTARGETS=""
 for MYLOC in $MYLOC_LIST; do
