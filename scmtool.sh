@@ -119,7 +119,7 @@ function do_commit_git {
 function do_push_git {
     for dir in $GIT_DIRS; do
         echo "pushing game-${dir}..."
-        (cd $dir && git push -q)
+        (cd $dir && git push)
     done
 }
 
