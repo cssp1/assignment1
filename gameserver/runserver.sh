@@ -26,8 +26,10 @@ if [[ "$DO_ART" == 1 ]]; then
         ./download-art.sh -q -f
 fi
 
-echo "Running SVN maintenance..."
-svn cleanup ..
+if [ -e ../.svn ]; then
+    echo "Running SVN maintenance..."
+    svn cleanup ..
+fi
 
 echo "Clearing gamedata build directories..."
 rm -f ../gamedata/*/built/*
@@ -55,17 +57,11 @@ if [[ $? != 0 ]]; then
     exit 1
 fi
 
-VERSION=`svnversion`
-echo $VERSION > version.txt
-
-#if [ ! -e "dbserver.pid" ]; then
-#    echo "Running database server..."
-#    ./dbserver.py
-#    if [[ $? != 0 ]]; then
-#       echo "dbserver startup error!"
-#       exit 1
-#    fi
-#fi
+if [ -e ../.svn ]; then
+    svnversion > version.txt
+elif [ -e ../.git ]; then
+    git rev-parse HEAD > version.txt
+fi
 
 if grep -q "chatserver" config.json; then
     if [ ! -e "chatserver.pid" ]; then
