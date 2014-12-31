@@ -88,7 +88,7 @@ function do_init_git {
 function do_up_git {
     for dir in $GIT_DIRS; do
         echo "pulling game-${dir}..."
-        (cd $dir && git pull -q)
+        (cd $dir && git pull)
     done
 }
 function do_force_up_git {
