@@ -36,6 +36,12 @@ else
     exit 1
 fi
 
+function do_init_svn {
+    PREFIX="$2" # e.g. 'summonersgate'
+    if [ ! -e "${ROOT}/.svn" ]; then
+        (cd "$ROOT/.." && svn co svn+ssh://gamemaster.spinpunch.com/var/svn/game/trunk "${PREFIX}")
+    fi
+}
 function do_up_svn {
     (cd "$ROOT" && svn up)
 }
@@ -52,6 +58,29 @@ function do_commit_svn {
     (cd "$ROOT" && svn ci -m "$2")
 }
 
+function do_init_git {
+    PREFIX="$2" # e.g. 'summonersgate'
+    TITLES="$3" # e.g. 'mf tr mf2 bfm dv sg'
+    #REPO="https://github.com/spinpunch" # requires interactive password input
+    REPO="git@github.com:spinpunch" # note: requires ~/.ssh/config setup
+    if [ ! -e "$ROOT/.git" ]; then
+        (cd "$ROOT/.." && git clone "${REPO}/game.git" ${PREFIX})
+    fi
+    if [ ! -e "$ROOT/../${PREFIX}-spinpunch-private/.git" ]; then
+        (cd "$ROOT/.." && git clone "${REPO}/game-spinpunch-private.git" "${PREFIX}-spinpunch-private")
+    fi
+    if [ ! -e "$ROOT/spinpunch-private" ]; then
+        (cd "$ROOT" && ln -s "../${PREFIX}-spinpunch-private" "spinpunch-private")
+    fi
+    for TITLE in $TITLES; do
+        if [ ! -e "$ROOT/../${PREFIX}-gamedata-${TITLE}/.git" ]; then
+            (cd "$ROOT/.." && git clone "${REPO}/game-gamedata-${TITLE}.git" "${PREFIX}-gamedata-${TITLE}")
+        fi
+        if [ ! -e "$ROOT/gamedata/${TITLE}" ]; then
+            (cd "$ROOT/gamedata" && ln -s "../../${PREFIX}-gamedata-${TITLE}" "$TITLE")
+        fi
+    done
+}
 function do_up_git {
     for dir in $GIT_DIRS; do
         echo "pulling game-${dir}..."
@@ -92,23 +121,26 @@ if [ $# == 0 ] || [ "$1" == "help" ] ; then
 else
     if [ $SCM == git ]; then
         case "$1" in
+            init)
+                do_init_git $@
+                ;;
             up)
-                do_up_git
+                do_up_git $@
                 ;;
             force-up)
-                do_force_up_git
+                do_force_up_git $@
                 ;;
             stat)
-                do_stat_git
+                do_stat_git $@
                 ;;
             diff)
-                do_diff_git
+                do_diff_git $@
                 ;;
             commit)
-                do_commit_git
+                do_commit_git $@
                 ;;
             push)
-                do_push_git
+                do_push_git $@
                 ;;
             *)
                 usage
@@ -116,20 +148,23 @@ else
         esac
     elif [ $SCM == svn ]; then
         case "$1" in
+            init)
+                do_init_svn $@
+                ;;
             up)
-                do_up_svn
+                do_up_svn $@
                 ;;
             force-up)
-                do_force_up_svn
+                do_force_up_svn $@
                 ;;
             stat)
-                do_stat_svn
+                do_stat_svn $@
                 ;;
             diff)
-                do_diff_svn
+                do_diff_svn $@
                 ;;
             commit)
-                do_commit_svn
+                do_commit_svn $@
                 ;;
             *)
                 usage
