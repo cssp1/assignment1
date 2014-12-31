@@ -56,25 +56,27 @@ fi
 PROCESSOR_ARGS+=" --game-id $GAME_ID"
 
 echo "Compiling gamedata-${GAME_ID}.json..."
-export PYTHONPATH="${PWD}:${PWD}/../gamedata" # so that gamedata/*.py can pick up gameserver libraries
-export SPIN_GAMESERVER=$PWD # for SpinConfig to work correctly when invoked outside of gameserver/ dir
+export SPIN_GAMESERVER="${PWD}" # for SpinConfig to work correctly when invoked outside of gameserver/ dir
+export SPIN_GAMEDATA="${PWD}/../gamedata" # for gamedata Makefiles to work correctly when invoked outside of gameserver/ dir
+export SPIN_GAMECLIENT="${PWD}/../gameclient" # for gamedata Makefiles to work correctly when invoked outside of gameserver/ dir
+export PYTHONPATH="${SPIN_GAMESERVER}:${SPIN_GAMEDATA}:${PYTHONPATH}" # so that gamedata/*.py can pick up gameserver libraries
 export GAME_ID
 
-if [ ! -e ../gamedata/$GAME_ID/built/deps ]; then
+if [ ! -e ${SPIN_GAMEDATA}/$GAME_ID/built/deps ]; then
     echo "    Calculating JSON file dependencies..."
-    (cd ../gamedata/$GAME_ID && make PROCESSOR_ARGS="$PROCESSOR_ARGS" VERIFY_ARGS="$VERIFY_ARGS" dep)
+    (cd $SPIN_GAMEDATA && make -f $GAME_ID/Makefile PROCESSOR_ARGS="$PROCESSOR_ARGS" VERIFY_ARGS="$VERIFY_ARGS" dep)
 fi
 
-(cd ../gamedata/$GAME_ID && make PROCESSOR_ARGS="$PROCESSOR_ARGS" VERIFY_ARGS="$VERIFY_ARGS" -j all)
+(cd $SPIN_GAMEDATA && make -f $GAME_ID/Makefile PROCESSOR_ARGS="$PROCESSOR_ARGS" VERIFY_ARGS="$VERIFY_ARGS" -j all)
 if [[ $? != 0 ]]; then
     echo "Error in gamedata source files! Aborting build."
-    (cd ../gamedata/$GAME_ID && rm -f "built/gamedata-${GAME_ID}.json.unverified")
+    (cd $SPIN_GAMEDATA && rm -f "${GAME_ID}/built/gamedata-${GAME_ID}.json.unverified")
     exit 1
 fi
 
 if [[ $DO_VERIFY == 1 ]]; then
     echo "Checking gamedata-${GAME_ID}.json for errors..."
-    (cd ../gamedata && ./verify.py $VERIFY_ARGS \
+    (cd $SPIN_GAMEDATA && ./verify.py $VERIFY_ARGS \
         "$GAME_ID/built/gamedata-${GAME_ID}.json.unverified" \
         "$GAME_ID/built/${GAME_ID}_ai_bases_compiled.json" \
         "$GAME_ID/built/${GAME_ID}_ai_attacks_compiled.json" \
@@ -85,22 +87,22 @@ if [[ $DO_VERIFY == 1 ]]; then
         "$GAME_ID/built/${GAME_ID}_server_compiled.json")
     if [[ $? != 0 ]]; then
         echo "Error in gamedata!"
-        (cd ../gamedata/$GAME_ID && rm -f "built/gamedata-${GAME_ID}.json.unverified")
+        (cd $SPIN_GAMEDATA && rm -f "${GAME_ID}/built/gamedata-${GAME_ID}.json.unverified")
         exit 1
     fi
 fi
 
-(cd ../gamedata/$GAME_ID && mv "built/gamedata-${GAME_ID}.json.unverified" "built/gamedata-${GAME_ID}.json")
+(cd $SPIN_GAMEDATA && mv "${GAME_ID}/built/gamedata-${GAME_ID}.json.unverified" "${GAME_ID}/built/gamedata-${GAME_ID}.json")
 
 # NOTE! gamedata.js is no longer exposed to players, instead one of the -locale.js files must be used!
 # we generate gamedata.js from gamedata.json ONLY for debugging with ?locale_override=null
-# (cd ../gamedata && echo -n "var gamedata = " > "$GAME_ID/built/gamedata-${GAME_ID}.js" && cat "$GAME_ID/built/gamedata-${GAME_ID}.json" >> "$GAME_ID/built/gamedata-${GAME_ID}.js")
+# (cd ${SPIN_GAMEDATA} && echo -n "var gamedata = " > "$GAME_ID/built/gamedata-${GAME_ID}.js" && cat "$GAME_ID/built/gamedata-${GAME_ID}.json" >> "$GAME_ID/built/gamedata-${GAME_ID}.js")
 
 # now we have built/gamedata-mf.json
 # create built/gamedata-mf-en_US.json (localization) and .js (prepending "var gamedata = " and linebreaking)
 
 # linebreak tool, relative to gamedata directory
-if [ -x ../gamedata/linebreak/built/linebreak ]; then
+if [ -x ${SPIN_GAMEDATA}/linebreak/built/linebreak ]; then
     LINEBREAK=./linebreak/built/linebreak
 else
     echo "Fast linebreak tool not found, falling back to linebreak.py."
@@ -108,13 +110,13 @@ else
 fi
 export LINEBREAK
 
-MYLOC_LIST=`find ../gamedata/${GAME_ID}/localize -name '*.po' | cut -d- -f2 | cut -d. -f1 | sort`
+MYLOC_LIST=`find ${SPIN_GAMEDATA}/${GAME_ID}/localize -name '*.po' | cut -d- -f2 | cut -d. -f1 | sort`
 
 MYTARGETS=""
 for MYLOC in $MYLOC_LIST; do
-    MYTARGETS+=" built/gamedata-${GAME_ID}-${MYLOC}.js"
+    MYTARGETS+=" ${GAME_ID}/built/gamedata-${GAME_ID}-${MYLOC}.js"
 done
-(cd "../gamedata/${GAME_ID}" && make -j $MYTARGETS)
+(cd "${SPIN_GAMEDATA}" && make -f "${GAME_ID}/Makefile" -j $MYTARGETS)
 if [[ $? != 0 ]]; then
     echo "Error creating localization!"
     exit 1
@@ -124,10 +126,10 @@ fi
 SNAPSRC="$GAME_ID/built/gamedata-${GAME_ID}-en_US.json"
 SNAPREF="$GAME_ID/built/gamedata-${GAME_ID}-en_US.json.good"
 if [[ $DO_SNAPSHOT == 1 ]]; then
-    (cd ../gamedata && cp $SNAPSRC $SNAPREF)
+    (cd ${SPIN_GAMEDATA} && cp $SNAPSRC $SNAPREF)
     echo "Created snapshot $SNAPREF"
 fi
 if [[ $DO_COMPARE == 1 ]]; then
     echo "Checking against snapshot:"
-    (cd ../gamedata && diff -s $SNAPSRC $SNAPREF)
+    (cd ${SPIN_GAMEDATA} && diff -s $SNAPSRC $SNAPREF)
 fi

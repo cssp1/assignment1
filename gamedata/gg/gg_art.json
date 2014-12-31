@@ -3252,7 +3252,7 @@
                             "damaged":  {"images": ["art/missing_13x13.png"], "dimensions": [260,130]} } },
 
     // AUTO-GENERATED PORTION BELOW
-#include_stripped "../../gameclient/art/art_auto.json"
+#include_stripped "$SPIN_GAMECLIENT/art/art_auto.json"
     ,
 #include_stripped "built/$GAME_ID_art_items.json"
 }

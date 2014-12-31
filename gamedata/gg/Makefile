@@ -2,4 +2,5 @@
 # Use of this source code is governed by an MIT-style license that can be
 # found in the LICENSE file.
 
-include ../Makefile.common
+# note: runs in gamedata directory, NOT in gamedata/$GAME_ID
+include Makefile.common

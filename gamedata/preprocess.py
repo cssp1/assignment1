@@ -24,8 +24,14 @@ comment_remover = re.compile('(?<!tp:|ps:|: "|":"|=\\\\")//.*?$')
 include_detector = re.compile('^#include "(.+)"')
 include_stripped_detector = re.compile('^#include_stripped "(.+)"')
 build_info_detector = re.compile('\$GAMEDATA_BUILD_INFO\$')
+spin_gameclient = os.getenv('SPIN_GAMECLIENT'); assert spin_gameclient
 
 profile = False
+
+def filename_replace_vars(filename, game_id):
+    filename = filename.replace('$GAME_ID', game_id)
+    filename = filename.replace('$SPIN_GAMECLIENT', spin_gameclient)
+    return filename
 
 # parse_input()
 
@@ -41,7 +47,7 @@ profile = False
 def parse_input_subfile(filename, game_id, build_info, depth = 0, stripped = False):
     start_time = time.time()
 
-    filename = filename.replace('$GAME_ID', game_id)
+    filename = filename_replace_vars(filename, game_id)
 #    if profile: print >> sys.stderr, 'subfile', '  '*depth, filename, '...'
 
     dir = os.path.dirname(filename) or '.'
@@ -168,24 +174,28 @@ def get_deps_from(fd, game_id, prefix = '.'):
         # detect includes
         match = include_detector.search(line) or include_stripped_detector.search(line)
         if match:
-            relative_filename = match.group(1).replace('$GAME_ID', game_id)
+            relative_filename = filename_replace_vars(match.group(1), game_id)
             relative_dir = os.path.dirname(relative_filename) or '.'
             base = os.path.basename(relative_filename)
 
-            if relative_dir != '.':
-                child_prefix = prefix+'/'+relative_dir
-            else:
+            if relative_dir.startswith('/'): # absolute path
+                child_prefix = relative_dir
+                ret_key = relative_filename
+            elif relative_dir == '.': # no change in path
                 child_prefix = prefix
+                ret_key = prefix + '/' + relative_filename
+            else:
+                child_prefix = prefix+'/'+relative_dir
+                ret_key = prefix + '/' + relative_filename
 
             save_dir = os.getcwd()
             try:
                 os.chdir(relative_dir)
-                ret_key = (prefix+'/' if prefix != '.' else '')+relative_filename
                 if relative_dir.endswith('built'): # or relative_filename.endswith('art_auto.json'):
                     child_deps = {} # do not recurse on built files
                 else:
                     child_deps = get_deps_from(open(base), game_id, prefix = child_prefix)
-                ret[(prefix+'/' if prefix != '.' else '')+relative_filename] = child_deps
+                ret[ret_key] = child_deps
             finally:
                 os.chdir(save_dir)
     return ret
