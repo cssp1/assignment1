@@ -41,11 +41,12 @@ def get_stats(filesystems = ['/']):
     # disk space
     for filesystem in filesystems:
         vfs = os.statvfs(filesystem)
+        safe_name = filesystem.replace('.', '&#46;') # for safety, in case we stick this into MongoDB
         free_space_gb = float(vfs.f_bsize*vfs.f_bavail)/float(1024*1024*1024)
         total_space_gb = float(vfs.f_frsize*vfs.f_blocks)/float(1024*1024*1024)
-        stats['disk_space_free_gb (%s)' % filesystem] = free_space_gb
-        stats['disk_space_total_gb (%s)' % filesystem] = total_space_gb
-        stats['disk_space_used_gb (%s)' % filesystem] = total_space_gb - free_space_gb
+        stats['disk_space_free_gb (%s)' % safe_name] = free_space_gb
+        stats['disk_space_total_gb (%s)' % safe_name] = total_space_gb
+        stats['disk_space_used_gb (%s)' % safe_name] = total_space_gb - free_space_gb
 
     # meminfo stats
     if fake:
