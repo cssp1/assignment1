@@ -2,7 +2,7 @@
 
 . ./setup-there-common.sh
 
-YUMPACKAGES="nscd xfsprogs subversion"
+YUMPACKAGES="nscd xfsprogs subversion git"
 YUMPACKAGES+=" python-twisted python-simplejson strace"
 YUMPACKAGES+=" python-imaging python-imaging-devel numpy"
 YUMPACKAGES+=" libxml2 libxml2-devel gcc"
@@ -26,54 +26,6 @@ echo "SETUP(remote): Unpacking filesystem overlay..."
 
 echo "SETUP(remote): Installing mongodb from mongodb.org repo..."
 sudo yum -y -q install mongodb-org mongodb-org-server mongodb-org-shell mongodb-org-tools # note: MongoDB server + client + python libs (below)
-
-sudo groupadd -g 1013 -f iantien
-sudo useradd -g 1013 -u 1013 iantien
-sudo passwd -l iantien
-
-sudo groupadd -g 1016 -f sean
-sudo useradd -g 1016 -u 1016 sean
-sudo passwd -l sean
-
-sudo groupadd -g 1021 -f lindsay
-sudo useradd -g 1021 -u 1021 lindsay
-sudo usermod -a -G proj lindsay
-sudo passwd -l lindsay
-
-sudo groupadd -g 1023 -f doohwanoh
-sudo useradd -g 1023 -u 1023 doohwanoh
-sudo usermod -a -G proj doohwanoh
-sudo passwd -l doohwanoh
-
-sudo groupadd -g 1029 -f eric
-sudo useradd -g 1029 -u 1029 eric
-sudo usermod -a -G proj eric
-sudo passwd -l eric
-
-sudo groupadd -g 1035 -f josh
-sudo useradd -g 1035 -u 1035 josh
-sudo usermod -a -G proj josh
-sudo passwd -l josh
-
-sudo groupadd -g 1036 -f manny
-sudo useradd -g 1036 -u 1036 manny
-sudo usermod -a -G proj manny
-sudo passwd -l manny
-
-sudo groupadd -g 1041 -f harrison
-sudo useradd -g 1041 -u 1041 harrison
-sudo usermod -a -G proj harrison
-sudo passwd -l harrison
-
-sudo groupadd -g 1045 -f jason
-sudo useradd -g 1045 -u 1045 jason
-sudo usermod -a -G proj jason
-sudo passwd -l jason
-
-sudo groupadd -g 1051 -f conrad
-sudo useradd -g 1051 -u 1051 conrad
-sudo usermod -a -G proj conrad
-sudo passwd -l conrad
 
 # fix permissions
 sudo chown -R root:root /etc
@@ -102,8 +54,10 @@ echo "SETUP(remote): analytics1 setup done!"
 echo "MISSING: /etc/fstab, /etc/sysconfig/network hostname"
 echo "MISSING: /etc/cron.spinpunch.mysql-daily/99-report-slow-queries.sh email"
 echo "MISSING: compile/install ujson library"
-echo "MISSING: /home/ec2-user/.ssh/spsvnaccess.pem for svn up (also .ssh/config with Host/User/IdentityFile)"
-echo "MISSING: /home/ec2-user/.ssh/hipchat.token for reminders"
+echo "MISSING: SVN: /home/ec2-user/.ssh/spsvnaccess.pem (also .ssh/config with Host/User/IdentityFile)"
+echo "MISSING: GIT: /home/ec2-user/.ssh/analytics1.pem (also .ssh/config with Host/User/IdentityFile)"
+echo "MISSING: GIT: git config --global user.name " # 'SpinPunch Deploy'
+echo "MISSING: GIT: git config --global user.email " # 'awstech@spinpunch.com'
 echo "MISSING: /home/ec2-user/.ssh/slack.token (with incoming webhook for analytics channel) for automated messages"
 echo "MISSING: /home/ec2-user/.ssh/host-awssecret"
 echo "MISSING: set up scratch space in /media/aux/tmp for backup script"
