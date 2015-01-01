@@ -7,7 +7,8 @@
 # Enforce strict whitespace conventions
 
 import sys, os, re, getopt
-#import sys, cStringIO
+
+# FILTERS that control which files we operate on
 
 # do not descend into directories with these names
 IGNORE_DIRS = {'.svn','.git', # SCM data
@@ -32,46 +33,61 @@ def file_filter(name):
            (name.split('.')[-1] in FILE_EXTENSIONS) and \
            (name not in IGNORE_FILES)
 
-trailing_whitespace = re.compile('[ \t]+$')
-tabs = re.compile('\t')
+# PROCESSORS for finding and fixing problems
 
-def process(fullpath, do_fix, check_tabs, check_trailing):
+class Processor(object):
+    def reset(self): pass
+    def applicable(self, filename): return True
+    def finalize(self): pass
+
+class DOSLineEndings(Processor):
+    ui_name = 'DOS LINE ENDINGS'
+    bad_ending = re.compile('\r\n$')
+    def fix(self, line):
+        return self.bad_ending.sub('\n', line)
+
+class TrailingWhitespace(Processor):
+    ui_name = 'TRAILING WHITESPACE'
+    trailing_whitespace = re.compile('[ \t]+$')
+    def fix(self, line):
+        return self.trailing_whitespace.sub('', line)
+
+class Tabs(Processor):
+    ui_name = 'TABS'
+    tabs = re.compile('\t')
+    def fix(self, line):
+        return self.tabs.sub('    ', line)
+
+def process(fullpath, do_fix, processors):
     fd = open(fullpath, 'r')
     linenum = 0
     need_fix = False
+
     for line in fd:
         if linenum == 0 and ('AUTO-GENERATED FILE' in line): # skip auto-generated files
             return
 
-        if check_trailing:
-            newline = trailing_whitespace.sub('', line)
+        for proc in processors:
+            newline = proc.fix(line)
             if newline != line:
-                print 'TRAILING WHITESPACE', fullpath+':'+str(linenum)+': ', line,
+                print proc.ui_name, fullpath+':'+str(linenum)+': ', line,
                 need_fix = True
-        else:
-            newline = line
-
-        if check_tabs:
-            newline2 = tabs.sub('    ', newline)
-            if newline2 != newline:
-                print 'TABS', fullpath+':'+str(linenum)+': ', line,
-                need_fix = True
-        else:
-            newline2 = newline
-
+                line = newline
         linenum += 1
-    fd.close()
 
+    fd.close()
+    for proc in processors: proc.finalize()
+
+    # optional second pass to fix problems
     if do_fix and need_fix:
+        for proc in processors: proc.reset()
         fd = open(fullpath, 'r')
         temp_filename = fullpath + '.inprogress'
         out = open(temp_filename, 'w')
         try:
             for line in fd:
-                if check_trailing:
-                    line = trailing_whitespace.sub('', line)
-                if check_tabs:
-                    line = tabs.sub('    ', line)
+                for proc in processors:
+                    line = proc.fix(line)
                 out.write(line)
             out.flush()
             os.rename(temp_filename, fullpath)
@@ -83,28 +99,33 @@ def process(fullpath, do_fix, check_tabs, check_trailing):
 
 if __name__ == '__main__':
     do_fix = False
-    check_tabs = True
-    check_trailing = True
+    processors = []
 
-    opts, args = getopt.gnu_getopt(sys.argv, '', ['fix','tabs','trailing-whitespace'])
+    opts, args = getopt.gnu_getopt(sys.argv, '', ['fix','tabs','trailing-whitespace','dos-line-endings','all'])
     for key, val in opts:
         if key == '--fix': do_fix = True
-        elif key == '--tabs': check_tabs = True
-        elif key == '--trailing-whitespace': check_trailing = True
+        elif key == '--tabs': processors.append(Tabs())
+        elif key == '--trailing-whitespace': processors.append(TrailingWhitespace())
+        elif key == '--dos-line-endings': processors.append(DOSLineEndings())
 
-    if not (check_tabs or check_trailing):
-        print 'need at least one of: --tabs, --trailing-whitespace'
-        sys.exit(1)
+    if not processors:
+        processors = [Tabs(), TrailingWhitespace(), DOSLineEndings()]
 
     if len(args) >= 2:
         root = args[1]
     else:
         root = '.'
 
-    for dirpath, dirnames, filenames in os.walk(root):
+    if os.path.isfile(root):
+        it = [('.', [], [root])]
+    else:
+        it = os.walk(root)
+
+    for dirpath, dirnames, filenames in it:
         # note: have to modify dirnames in place
         dirnames[:] = filter(dir_filter, dirnames)
         filenames = filter(file_filter, filenames)
         for name in filenames:
-            process(dirpath+'/'+name, do_fix, check_tabs, check_trailing)
+            for proc in processors: proc.reset()
+            process(dirpath+'/'+name, do_fix, filter(lambda proc: proc.applicable(name), processors))
 
