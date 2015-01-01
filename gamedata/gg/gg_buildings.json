@@ -540,7 +540,7 @@
                       "generator_L2",
                       "generator_L3",
                       "generator_L4"
-                      ],
+                     ],
         "equip_icon_offset": [-4,5], "equip_icon_delta": [1.5,0],
         "max_hp": [5000,8000,11000,14000],
         "defense_types": ["building"],
@@ -668,7 +668,7 @@
         "unit_collision_gridsize": [2,2],
         "art_asset": ["tr_barrier2_L1",
                       "tr_barrier2_L2"
-                      ],
+                     ],
         "draw_as_wall": 1, // tells game engine to use special drawing routine for NS/EW wall segments
         "quantize_location": 2, // force positioning that makes the walls look good
 

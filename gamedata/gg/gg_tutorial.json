@@ -188,9 +188,9 @@
     "deploy_robots_action2": { "kind": "deploy_robots_action",
                                "button": "DEPLOY_UNIT:rifleman",
                                "next": "place_robots_message" },
-//    "deploy_robots_action3": { "kind": "deploy_robots_action",
-//                             "button": "DEPLOY_UNIT:xxx",
-//                             "next": "place_robots_message" },
+    //    "deploy_robots_action3": { "kind": "deploy_robots_action",
+    //                             "button": "DEPLOY_UNIT:xxx",
+    //                             "next": "place_robots_message" },
 
     "place_robots_message": { "kind": "valentina_nonmodal_message",
                               "ui_description": "Click at the edge of Aruj's base to deploy\nyour units.",
@@ -201,9 +201,9 @@
                              "next": "multi_select_message" },
 
     "multi_select_message": { "kind": "valentina_nonmodal_message", "bg_emphasis": 1, // use red background
-                               "ui_description": "Right-click and drag to select multiple units at once.",
-                               "show_if": { "predicate": "NOT", "subpredicates": [{"predicate": "PLAYER_HISTORY", "key": "feature_used:drag_select", "value": 1, "method": ">="}] },
-                               "y_position": 0.15,
+                              "ui_description": "Right-click and drag to select multiple units at once.",
+                              "show_if": { "predicate": "NOT", "subpredicates": [{"predicate": "PLAYER_HISTORY", "key": "feature_used:drag_select", "value": 1, "method": ">="}] },
+                              "y_position": 0.15,
                               // "ui_description": "Destroy the Tactical Ops Center!",
                               // "boxes": {
                               //     "enemy_townhall": {
@@ -212,7 +212,7 @@
                               //         "grid_pad": 0.3
                               //     }
                               // },
-                               "next": "wait_battle_finish2" },
+                              "next": "wait_battle_finish2" },
 
     "wait_battle_finish2": { "kind": "wait_battle_finish2",
                              "enable_desktop_control_buttons": 1,

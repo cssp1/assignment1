@@ -4,11 +4,11 @@
 
 {
     "categories": {
-//        "mines": { "name": "mines", "ui_name": "Mines", "ui_name_singular": "Mine", "ui_verb": "Produce", "exclusive": 1,
-//                   "delivery": "building_slot", "delivery_slot_type": "mine", "delivery_building_for_ui": "minefield",
-//                   "display_stats": ["weapon_damage", "splash_range"] // which stats to display on the crafting_dialog_recipe
-//                 }
-//        "missiles": { "name": "missiles", "ui_name": "Missiles", "ui_name_singular": "Missile", "exclusive": 1 }
+        // "mines": { "name": "mines", "ui_name": "Mines", "ui_name_singular": "Mine", "ui_verb": "Produce", "exclusive": 1,
+        //            "delivery": "building_slot", "delivery_slot_type": "mine", "delivery_building_for_ui": "minefield",
+        //            "display_stats": ["weapon_damage", "splash_range"] // which stats to display on the crafting_dialog_recipe
+        //          }
+        // "missiles": { "name": "missiles", "ui_name": "Missiles", "ui_name_singular": "Missile", "exclusive": 1 }
     },
 
     "recipes": {
