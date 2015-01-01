@@ -1328,8 +1328,8 @@ class User:
                                                                                       'tax_country': session.user.country,
                                                                                       'actions':[{'type':'charge','status':'completed',
                                                                                                   'currency':payment_data['client_currency'],
-                                                                                                  'amount':str(payment_data['client_price']),
-                                                                                                  'tax_amount':str(0.1*payment_data['client_price'])
+                                                                                                  'amount':str(0.6*payment_data['client_price']),
+                                                                                                  'tax_amount':str(0.4*payment_data['client_price'])
                                                                                                   }]
                                                                                       }]})
             return
@@ -1463,7 +1463,7 @@ class User:
                                                              'code':1310,
                                                              'Billing Amount': usd_equivalent,
                                                              'currency': paid_currency,
-                                                             'currency_amount': paid_amount,
+                                                             'currency_amount': paid_amount + tax_amount,
                                                              'tax_amount': tax_amount,
                                                              'refund_tax_amount': refund_tax_amount,
                                                              'tax_country': payment.get('tax_country',None),
@@ -1478,9 +1478,9 @@ class User:
                 else:
                     dry_run = '(dry run) '
 
-                gamesite.exception_log.event(server_time, '%sREFUND (%s) payment %s player %d amount %d gamebucks (balance %d) paid_amount %f paid_currency %s refund_amount %f refund_currency %s gift_order %s' % \
+                gamesite.exception_log.event(server_time, '%sREFUND (%s) payment %s player %d amount %d gamebucks (balance %d) paid_amount %f + %f tax paid_currency %s refund_amount %f refund_currency %s gift_order %s' % \
                                              (dry_run, refund_type, str(payment['id']), session.player.user_id, gamebucks, session.player.resources.gamebucks,
-                                              paid_amount, paid_currency, refund_amount, refund_currency, repr(gift_order)))
+                                              paid_amount, tax_amount, paid_currency, refund_amount, refund_currency, repr(gift_order)))
 
             except:
                 gamesite.exception_log.event(server_time, ('ping_fbpayment_post_complete player %d payment_id %s error:\n' % (session.user.user_id, str(payment_id)))+traceback.format_exc())
@@ -1563,9 +1563,9 @@ class User:
                     try:
                         # note: estimate post FB tax order receipts, in USD. This is what will appear in metrics as the receipts amount.
                         # XXX is tax_amount taken before or after the 30% cut?
-                        usd_equivalent = 0.01*int(100*float(payment['payout_foreign_exchange_rate']) * (paid_amount * 0.7 - tax_amount))
+                        usd_equivalent = 0.01*int(100*float(payment['payout_foreign_exchange_rate']) * (paid_amount * 0.7)) # - tax_amount))
                         price_description, detail_props = \
-                                           Store.execute_order(gamesite.gameapi, None, session, retmsg, 'fbpayments:'+paid_currency, paid_amount,
+                                           Store.execute_order(gamesite.gameapi, None, session, retmsg, 'fbpayments:'+paid_currency, paid_amount + tax_amount,
                                                                payment_data['unit_id'],
                                                                payment_data['spellname'],
                                                                payment_data['spellarg'],
@@ -1581,7 +1581,7 @@ class User:
                                                                                  'Billing Description': descr,
                                                                                  'country_tier': session.player.country_tier,
                                                                                  'currency': paid_currency,
-                                                                                 'currency_amount': paid_amount,
+                                                                                 'currency_amount': paid_amount + tax_amount,
                                                                                  'tax_amount': tax_amount,
                                                                                  'tax_country': payment.get('tax_country',None),
                                                                                  'payout_foreign_exchange_rate':payment.get('payout_foreign_exchange_rate',-1),
@@ -1599,7 +1599,7 @@ class User:
                                                                  'summary': session.player.get_denormalized_summary_props('brief'),
                                                                  'country_tier': session.player.country_tier,
                                                                  'currency': paid_currency,
-                                                                 'currency_amount': paid_amount,
+                                                                 'currency_amount': paid_amount + tax_amount,
                                                                  'tax_amount': tax_amount,
                                                                  'tax_country': payment.get('tax_country',None),
                                                                  'payout_foreign_exchange_rate':payment.get('payout_foreign_exchange_rate',-1),
@@ -1632,7 +1632,7 @@ class User:
                                                                                  'age': -1 if session.player.creation_time < 0 else (server_time - session.player.creation_time),
                                                                                  'dollar_amount': usd_equivalent,
                                                                                  'currency': paid_currency,
-                                                                                 'currency_amount': paid_amount,
+                                                                                 'currency_amount': paid_amount + tax_amount,
                                                                                  'tax_amount': tax_amount,
                                                                                  'tax_country': payment.get('tax_country',None),
                                                                                  'payout_foreign_exchange_rate':payment.get('payout_foreign_exchange_rate',-1),
