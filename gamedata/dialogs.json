@@ -6076,7 +6076,7 @@
                                "ui_name": "Longpoll failure", "text_color": [1,0,0,1], "show": 0
                               },
             "description": {"kind": "TextField", "xy": [37,180], "dimensions": [186,30],
-                            "tests": [//{"name":"framerate", "ui_name":"Framerate"},
+                            "tests": [
                                 {"name":"proxy_http", "ui_name":"pHTTP Test"},
                                 {"name":"proxy_ssl", "ui_name":"pSSL Test"},
                                 {"name":"direct_http", "ui_name":"dHTTP Test"},
