@@ -2413,6 +2413,7 @@ SPUI.FriendPortrait.prototype.set_user = function(user_id) { this.user_id = user
 SPUI.FriendPortrait.prototype.invalidate = function() { this.displayed_user_id = null; };
 
 SPUI.get_facebook_portrait_url = function(facebook_id) {
+    facebook_id = facebook_id.toString(); // just make sure we don't get any numeric IDs
     if(anon_mode || facebook_id.indexOf('example') == 0) {
         var portrait = (facebook_id == spin_facebook_user ? 'anon_portrait.jpg' : 'anon_portrait2.jpg');
         return spin_server_protocol+'s3.amazonaws.com/'+gamedata['public_s3_bucket']+'/'+portrait; // XXX maybe put this in the art pack instead?
