@@ -28,10 +28,7 @@
         "facebook_iframe_footer_peek": 30, // how many pixels to shrink the game canvas vertically to reveal the top of the footer
 
         // true if the HTML5 fullscreen API is available
-        "truefullscreen": {"predicate": "OR", "subpredicates":[
-            {"predicate": "FRAME_PLATFORM", "platform":"fb"},
-            {"predicate": "FRAME_PLATFORM", "platform":"kg"}
-        ]},
+	"truefullscreen": {"predicate": "FRAME_PLATFORM", "platform":"fb"}, // true if the HTML5 fullscreen API is available
 
         // true if app is able to to send out social platform friend invitations
         "friend_invites_enabled": {"predicate": "OR", "subpredicates": [
