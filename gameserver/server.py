@@ -12973,10 +12973,10 @@ class Store:
             store_price = amount_willing_to_pay
 
         if amount_willing_to_pay < store_price:
-            raise Exception(('execute_order(%d %s): Rejecting unfavorable price mismatch! (store %d order %d) by user %d ' % (amount_willing_to_pay, currency, store_price, amount_willing_to_pay, session.user.user_id)) + repr((unit_description, spellname, spellarg)) + ' get_price() reason: '+repr(error_reason))
+            raise Exception(('execute_order(%d %s): Rejecting unfavorable price mismatch! (store %r order %r) by user %d ' % (amount_willing_to_pay, currency, store_price, amount_willing_to_pay, session.user.user_id)) + repr((unit_description, spellname, spellarg)) + ' get_price() reason: '+repr(error_reason))
         elif amount_willing_to_pay > store_price:
             if (amount_willing_to_pay - store_price) > (10 if currency == 'gamebucks' else 1):
-                gamesite.exception_log.event(server_time, (('execute_order(%d %s): Accepting favorable price mismatch! (store %d order %d) by user %d ' % (amount_willing_to_pay, currency, store_price, amount_willing_to_pay, session.user.user_id)) + repr((unit_description, spellname, spellarg)) + ' get_price() reason: '+repr(error_reason)))
+                gamesite.exception_log.event(server_time, (('execute_order(%d %s): Accepting favorable price mismatch! (store %r order %r) by user %d ' % (amount_willing_to_pay, currency, store_price, amount_willing_to_pay, session.user.user_id)) + repr((unit_description, spellname, spellarg)) + ' get_price() reason: '+repr(error_reason)))
 
         if currency == 'fbcredits':
             record_spend_type = 'money'
