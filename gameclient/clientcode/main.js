@@ -22548,6 +22548,7 @@ function invoke_statistics_tab(w) {
     dialog.user_data['user_id'] = user_id;
 
     dialog.widgets['player_name'].str = knowledge['name'] + ' L'+knowledge['level'].toString()+'';
+    dialog.widgets['player_id'].str = dialog.data['widgets']['player_id']['ui_name'].replace('%d', user_id.toString());
 
     var url = player.get_any_abtest_value('score_history_show_other_url', gamedata['client']['score_history_show_other_url'] || null);
     if(url) {

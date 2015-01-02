@@ -5416,8 +5416,10 @@
         "widgets": {
             "sunken": {"kind": "StaticImage", "xy":[10,62], "dimensions":[716,405], "asset": "dialog_sunken_resizable", "bg_image_resizable":1 },
 
-            "player_name": { "kind": "TextField", "xy": [10,70], "dimensions": [716, 28], "text_size": 22, "text_style": "bold",
-                             "text_hjustify": "center", "ui_name": "Loading...", "drop_shadow": 1 },
+            "player_name": { "kind": "TextField", "xy": [45,70], "dimensions": [716, 28], "text_size": 22, "text_style": "normal",
+                             "text_hjustify": "left", "text_vjustify": "center", "ui_name": "Loading...", "drop_shadow": 1 },
+            "player_id": { "kind": "TextField", "xy": [45,70], "dimensions": [658, 30], "text_size": 15, "text_style": "normal",
+                           "text_hjustify": "right", "text_vjustify": "center", "ui_name": "Player ID: %d", "drop_shadow": 1 },
 
             "sunken2": {"kind": "StaticImage", "xy":[25,105], "dimensions":[686,352], "asset": "dialog_sunken_gray_resizable", "bg_image_resizable":1 },
 
