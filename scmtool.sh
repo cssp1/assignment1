@@ -14,6 +14,9 @@ function usage {
     echo ""
     echo "  up - get updates from origin"
     echo "  force-up - get updates from origin, resolving merge conflicts by force (for automated tools only)"
+    echo "  revert - revert changes to origin (leaving new untracked files alone)"
+    echo "  force-revert - revert changes to origin (deleting new untracked files)"
+    echo "  site-patch - apply all patches in the *-private/ directory"
     echo "  version - get current version"
     echo "  stat - show modified file list"
     echo "  diff - show differences"
@@ -45,6 +48,16 @@ function do_init_svn {
 }
 function do_up_svn {
     (cd "$ROOT" && svn up)
+}
+function do_revert_svn {
+    (cd "$ROOT" && svn revert -R . )
+}
+function do_force_revert_svn {
+    # this is a "forceful" revert that also gets rid of all unrecognized files
+    (cd "$ROOT" && svn revert -R . && (svn stat | grep '^\?' | awk '{print $2}' | xargs rm -f) )
+}
+function do_site_patch {
+    (cd "$ROOT" && for p in *private/??*.patch; do patch -p0 < $p; done)
 }
 function do_force_up_svn {
     (cd "$ROOT" && svn up --force --accept theirs-full)
@@ -96,6 +109,13 @@ function do_force_up_git {
         (cd $dir && git pull -q) # --ff-only ?
     done
 }
+function do_revert_git {
+    (cd "$ROOT" && git reset --hard HEAD)
+}
+function do_force_revert_git {
+    # this is a "forceful" revert that also gets rid of all unrecognized files
+    (cd "$ROOT" && git reset --hard HEAD && git clean -f -d)
+}
 function do_version_git {
     (cd "$ROOT" && git rev-parse HEAD)
 }
@@ -137,6 +157,15 @@ else
             force-up)
                 do_force_up_git $@
                 ;;
+            revert)
+                do_revert_git $@
+                ;;
+            force-revert)
+                do_force_revert_git $@
+                ;;
+            site-patch)
+                do_site_patch $@
+                ;;
             version)
                 do_version_git $@
                 ;;
@@ -166,6 +195,15 @@ else
                 ;;
             force-up)
                 do_force_up_svn $@
+                ;;
+            revert)
+                do_revert_svn $@
+                ;;
+            force-revert)
+                do_force_revert_svn $@
+                ;;
+            site-patch)
+                do_site_patch $@
                 ;;
             version)
                 do_version_svn $@
