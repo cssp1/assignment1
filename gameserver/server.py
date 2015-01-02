@@ -1328,7 +1328,7 @@ class User:
                                                                                       'tax_country': session.user.country,
                                                                                       'actions':[{'type':'charge','status':'completed',
                                                                                                   'currency':payment_data['client_currency'],
-                                                                                                  'amount':'%.2f' % (1.0*payment_data['client_price']),
+                                                                                                  'amount':'%.2f' % (1.0*payment_data['client_price'] + 0.005), # use <1.0 to simulate the odd tax fail purchases
                                                                                                   'tax_amount':'%.2f' % (0.2*payment_data['client_price'])
                                                                                                   }]
                                                                                       }]})
@@ -1481,7 +1481,7 @@ class User:
                 else:
                     dry_run = '(dry run) '
 
-                gamesite.exception_log.event(server_time, '%sREFUND (%s) payment %s player %d amount %d gamebucks (balance %d) paid_amount %f + %f tax paid_currency %s refund_amount %f refund_currency %s gift_order %s' % \
+                gamesite.exception_log.event(server_time, '%sREFUND (%s) payment %s player %d amount %d gamebucks (balance %d) paid_amount %r (incl. %r tax) paid_currency %s refund_amount %f refund_currency %s gift_order %s' % \
                                              (dry_run, refund_type, str(payment['id']), session.player.user_id, gamebucks, session.player.resources.gamebucks,
                                               paid_amount, tax_amount, paid_currency, refund_amount, refund_currency, repr(gift_order)))
 
@@ -1661,8 +1661,15 @@ class User:
 
 
                     except Exception:
-                        gamesite.exception_log.event(server_time, 'FBPAYMENT_ORDER Exception: '+traceback.format_exc())
+                        gamesite.exception_log.event(server_time, 'FBPAYMENT_ORDER Exception:\n'+''.join(traceback.format_stack()[-5:-1])+traceback.format_exc())
                         retmsg.append(["ERROR", "ORDER_PROCESSING"])
+
+                        # write the bad fbpayment data to a file for debugging
+                        if gamedata['server']['log_fbpayments'] >= 1:
+                            tm = time.gmtime(server_time)
+                            with open('/tmp/%04d%02d%02d-fbpayment-%s.json' % (tm.tm_year, tm.tm_mon, tm.tm_mday, payment_id), 'w') as fd:
+                                SpinJSON.dump(result, fd, pretty=True, newline=True)
+
                         # XXX refund?
 
                     # note: send AFTER executing spell, so that player state is already updated
@@ -8922,6 +8929,9 @@ class Player(AbstractPlayer):
             time_scope = Scores2.FREQ_SEASON
             if time_loc is None:
                 time_loc = SpinConfig.get_pvp_season(gamedata['matchmaking']['season_starts'], self.get_absolute_time())
+        elif period == 'ALL':
+            time_scope = Scores2.FREQ_ALL
+            time_loc = 0
         else: raise Exception('unhandled period '+period)
         if region and entry.get('region_specific', False) and entry.get('leaderboard_query_is_region_specific', True):
             space_scope = Scores2.SPACE_REGION
@@ -12973,7 +12983,7 @@ class Store:
                 unit_description += '/' + obj.activity_description(session.player)
 
         if store_price < 0:
-            raise Exception(('execute_order(%d %s): Invalid order by user %d: ' % (amount_willing_to_pay, currency, session.user.user_id)) + repr((unit_description, spellname, spellarg)) + ' get_price() failed with reason: '+repr(error_reason))
+            raise Exception(('execute_order(%r %s): Invalid order by user %d: ' % (amount_willing_to_pay, currency, session.user.user_id)) + repr((unit_description, spellname, spellarg)) + ' get_price() failed with reason: '+repr(error_reason))
 
         # to avoid exceptions due to slight clock desync, accept payment amounts slightly below the actual server-determined price for time-based gamebucks orders
         if (amount_willing_to_pay < store_price) and (currency == 'gamebucks') and \
@@ -12982,10 +12992,19 @@ class Store:
             store_price = amount_willing_to_pay
 
         if round(amount_willing_to_pay,2) < round(store_price,2):
-            raise Exception(('execute_order(%d %s): Rejecting unfavorable price mismatch! (store %r order %r) by user %d payment_id %r' % (amount_willing_to_pay, currency, store_price, amount_willing_to_pay, session.user.user_id, payment_id)) + repr((unit_description, spellname, spellarg)) + ' get_price() reason: '+repr(error_reason))
+            raise Exception(('execute_order(%r %s): Rejecting unfavorable price mismatch! (store %r order %r) by user %d payment_id %r ' % \
+                             (amount_willing_to_pay, currency, store_price, amount_willing_to_pay, session.user.user_id, payment_id)) + \
+                            repr((unit_description, spellname, spellarg)) + \
+                            ' get_price() reason: ' + \
+                            repr(error_reason)
+                            )
         elif round(amount_willing_to_pay,2) > round(store_price,2):
             if (amount_willing_to_pay - store_price) > (10 if currency == 'gamebucks' else 1):
-                gamesite.exception_log.event(server_time, (('execute_order(%d %s): Accepting favorable price mismatch! (store %r order %r) by user %d payment_id %r' % (amount_willing_to_pay, currency, store_price, amount_willing_to_pay, session.user.user_id, payment_id)) + repr((unit_description, spellname, spellarg)) + ' get_price() reason: '+repr(error_reason)))
+                gamesite.exception_log.event(server_time, (('execute_order(%r %s): Accepting favorable price mismatch! (store %r order %r) by user %d payment_id %r ' % \
+                                                            (amount_willing_to_pay, currency, store_price, amount_willing_to_pay, session.user.user_id, payment_id)) + \
+                                                           repr((unit_description, spellname, spellarg)) + \
+                                                           ' get_price() reason: ' + \
+                                                           repr(error_reason)))
 
         if currency == 'fbcredits':
             record_spend_type = 'money'
@@ -18576,7 +18595,9 @@ class GAMEAPI(resource.Resource):
 
                             if spellname:
                                 status = 'SYNTHESIZED'
-                                payment_data = { 'request_id': request_id,
+                                payment_data = { 'id': payment_id,
+                                                 'request_id': request_id,
+                                                 'synthesized': 1,
                                                  'unit_id': 0,
                                                  'spellname': spellname,
                                                  'spellarg': spellarg,
