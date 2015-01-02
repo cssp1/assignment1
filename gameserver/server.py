@@ -1403,6 +1403,7 @@ class User:
         paid_time_string = None
         paid_amount = 0
         tax_amount = 0
+        user_facing_amount = 0
         paid_currency = 'unknown'
         refund_amount = 0
         refund_tax_amount = 0
@@ -1415,6 +1416,9 @@ class User:
                 paid_amount = float(action['amount'])
                 if 'tax_amount' in action and payment.get('tax',None) == 'tax_remitted':
                     tax_amount = float(action['tax_amount'])
+                    user_facing_amount = round(paid_amount + tax_amount, 2) # preserve 2 decimal places
+                else:
+                    user_facing_amount = paid_amount
                 paid_currency = action['currency']
             if action['type'] in ('chargeback','refund','decline') and action['status'] == 'completed':
                 refund = True
@@ -1463,7 +1467,7 @@ class User:
                                                              'code':1310,
                                                              'Billing Amount': usd_equivalent,
                                                              'currency': paid_currency,
-                                                             'currency_amount': paid_amount + tax_amount,
+                                                             'currency_amount': user_facing_amount,
                                                              'tax_amount': tax_amount,
                                                              'refund_tax_amount': refund_tax_amount,
                                                              'tax_country': payment.get('tax_country',None),
@@ -1531,9 +1535,12 @@ class User:
             paid = False
             paid_amount = None
             tax_amount = 0
+            user_facing_amount = None
+
             completed = True
             if len(result['data']) > 0:
                 payment = result['data'][0]
+                payment_id = payment['id']
                 if 'request_id' in payment: # Gift Card orders can come without request_ids
                     assert (payment['request_id'] == request_id)
                 assert (not payment.get('test',False)) or session.user.is_developer()
@@ -1547,6 +1554,9 @@ class User:
                         paid_currency = action['currency']
                         if 'tax_amount' in action and payment.get('tax',None) == 'tax_remitted':
                             tax_amount = float(action['tax_amount'])
+                            user_facing_amount = round(paid_amount + tax_amount, 2) # preserve 2 decimal places
+                        else:
+                            user_facing_amount = paid_amount
                     elif action['type'] in ('chargeback','refund','decline') and action['status'] == 'completed':
                         paid = False
                     elif action['type'] == 'chargeback_reversal' and action['status'] == 'completed':
@@ -1565,13 +1575,14 @@ class User:
                         # XXX is tax_amount taken before or after the 30% cut?
                         usd_equivalent = 0.01*int(100*float(payment['payout_foreign_exchange_rate']) * (paid_amount * 0.7)) # - tax_amount))
                         price_description, detail_props = \
-                                           Store.execute_order(gamesite.gameapi, None, session, retmsg, 'fbpayments:'+paid_currency, paid_amount + tax_amount,
+                                           Store.execute_order(gamesite.gameapi, None, session, retmsg, 'fbpayments:'+paid_currency, user_facing_amount,
                                                                payment_data['unit_id'],
                                                                payment_data['spellname'],
                                                                payment_data['spellarg'],
                                                                payment_data['server_time_according_to_client'],
                                                                usd_equivalent = usd_equivalent,
-                                                               gift_order = payment_data.get('gift_order',None))
+                                                               gift_order = payment_data.get('gift_order',None),
+                                                               payment_id = payment_id)
 
                         descr = Store.get_description(session, payment_data['unit_id'], payment_data['spellname'], payment_data['spellarg'], price_description)
 
@@ -1581,7 +1592,7 @@ class User:
                                                                                  'Billing Description': descr,
                                                                                  'country_tier': session.player.country_tier,
                                                                                  'currency': paid_currency,
-                                                                                 'currency_amount': paid_amount + tax_amount,
+                                                                                 'currency_amount': user_facing_amount,
                                                                                  'tax_amount': tax_amount,
                                                                                  'tax_country': payment.get('tax_country',None),
                                                                                  'payout_foreign_exchange_rate':payment.get('payout_foreign_exchange_rate',-1),
@@ -1599,7 +1610,7 @@ class User:
                                                                  'summary': session.player.get_denormalized_summary_props('brief'),
                                                                  'country_tier': session.player.country_tier,
                                                                  'currency': paid_currency,
-                                                                 'currency_amount': paid_amount + tax_amount,
+                                                                 'currency_amount': user_facing_amount,
                                                                  'tax_amount': tax_amount,
                                                                  'tax_country': payment.get('tax_country',None),
                                                                  'payout_foreign_exchange_rate':payment.get('payout_foreign_exchange_rate',-1),
@@ -1632,7 +1643,7 @@ class User:
                                                                                  'age': -1 if session.player.creation_time < 0 else (server_time - session.player.creation_time),
                                                                                  'dollar_amount': usd_equivalent,
                                                                                  'currency': paid_currency,
-                                                                                 'currency_amount': paid_amount + tax_amount,
+                                                                                 'currency_amount': user_facing_amount,
                                                                                  'tax_amount': tax_amount,
                                                                                  'tax_country': payment.get('tax_country',None),
                                                                                  'payout_foreign_exchange_rate':payment.get('payout_foreign_exchange_rate',-1),
@@ -12926,7 +12937,7 @@ class Store:
     def execute_order(cls, gameapi, request, session, retmsg, currency, amount_willing_to_pay,
                       unit_id, spellname, spellarg,
                       server_time_according_to_client,
-                      usd_equivalent = None, gift_order = None):
+                      usd_equivalent = None, gift_order = None, payment_id = None):
 
         # verify that the order is possible and that amount_willing_to_pay is correct
         spell = gamedata['spells'][spellname]
@@ -12945,8 +12956,8 @@ class Store:
         if spell['price_formula'] == 'fb_inapp_currency_fbpayments' and \
            currency.startswith('fbpayments:') and \
            (not any(str(currency.split(':')[1]) == curname for curname, srate in gamedata['store']['gamebucks_open_graph_prices'])):
-            gamesite.exception_log.event(server_time, 'player %d making %s order with unknown currency %s amount %s, trusting Facebook that it is worth %d gamebucks!' % \
-                                         (session.player.user_id, spellname, currency, repr(amount_willing_to_pay), spellarg))
+            gamesite.exception_log.event(server_time, 'player %d making %s order (payment_id %r) with unknown currency %s amount %s, trusting Facebook that it is worth %d gamebucks!' % \
+                                         (session.player.user_id, spellname, payment_id, currency, repr(amount_willing_to_pay), spellarg))
             store_price = amount_willing_to_pay
 
         else:
@@ -12973,10 +12984,10 @@ class Store:
             store_price = amount_willing_to_pay
 
         if amount_willing_to_pay < store_price:
-            raise Exception(('execute_order(%d %s): Rejecting unfavorable price mismatch! (store %r order %r) by user %d ' % (amount_willing_to_pay, currency, store_price, amount_willing_to_pay, session.user.user_id)) + repr((unit_description, spellname, spellarg)) + ' get_price() reason: '+repr(error_reason))
+            raise Exception(('execute_order(%d %s): Rejecting unfavorable price mismatch! (store %r order %r) by user %d payment_id %r' % (amount_willing_to_pay, currency, store_price, amount_willing_to_pay, session.user.user_id, payment_id)) + repr((unit_description, spellname, spellarg)) + ' get_price() reason: '+repr(error_reason))
         elif amount_willing_to_pay > store_price:
             if (amount_willing_to_pay - store_price) > (10 if currency == 'gamebucks' else 1):
-                gamesite.exception_log.event(server_time, (('execute_order(%d %s): Accepting favorable price mismatch! (store %r order %r) by user %d ' % (amount_willing_to_pay, currency, store_price, amount_willing_to_pay, session.user.user_id)) + repr((unit_description, spellname, spellarg)) + ' get_price() reason: '+repr(error_reason)))
+                gamesite.exception_log.event(server_time, (('execute_order(%d %s): Accepting favorable price mismatch! (store %r order %r) by user %d payment_id %r' % (amount_willing_to_pay, currency, store_price, amount_willing_to_pay, session.user.user_id, payment_id)) + repr((unit_description, spellname, spellarg)) + ' get_price() reason: '+repr(error_reason)))
 
         if currency == 'fbcredits':
             record_spend_type = 'money'
