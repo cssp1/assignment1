@@ -22582,10 +22582,13 @@ function invoke_statistics_tab(w) {
     }
 
     // which time_loc is actually displayed
+    // -1 means "ignore time_scope, use ALL scope and 0 loc", i.e. All Time
     dialog.user_data['time_displayed'] = null;
 
     // since queries are asynchronous, make sure that only the last one to arrive actually updates the GUI
     dialog.user_data['query_gen'] = 0;
+
+    dialog.user_data['show_rank'] = true;
 
     player_info_statistics_tab_select(dialog, dialog.user_data['time_cur']);
     return dialog;
@@ -22602,6 +22605,8 @@ function player_info_statistics_tab_select(dialog, new_loc) {
     dialog.user_data['time_displayed'] = new_loc;
 
     // update BBCode for time-loc selection bar
+
+    // CURRENT LOC
     var selector = SPText.cstring_to_ablocks_bbcode(dialog.data['widgets']['selector']['ui_name']);
     var ui_current = dialog.data['widgets']['selector']['ui_name_current'].replace('%scope', gamedata['strings']['leaderboard']['periods'][dialog.user_data['time_scope']]['name']);
     var is_selected = (dialog.user_data['time_displayed'] == dialog.user_data['time_cur']);
@@ -22610,6 +22615,7 @@ function player_info_statistics_tab_select(dialog, new_loc) {
                                                                                    (function(_dialog) { return function() {
                                                                                        player_info_statistics_tab_select(_dialog, _dialog.user_data['time_cur']);
                                                                                    }; })(dialog)})[0]);
+    // HISTORICAL LCOS
     for(var time_loc = dialog.user_data['time_cur'] - 1; time_loc >= dialog.user_data['time_limit']; time_loc -= 1) {
         selector[0] = selector[0].concat(SPText.cstring_to_ablocks_bbcode(dialog.data['widgets']['selector']['ui_separator'])[0]);
         var ui_prev = dialog.data['widgets']['selector']['ui_name_prev'].replace('%scope', gamedata['strings']['leaderboard']['periods'][dialog.user_data['time_scope']]['name']).replace('%loc', (time_loc + (dialog.user_data['time_scope'] == 'season' ? (gamedata['matchmaking']['season_ui_offset']||0) : 0)).toFixed(0));
@@ -22620,6 +22626,17 @@ function player_info_statistics_tab_select(dialog, new_loc) {
                                                                                         player_info_statistics_tab_select(_dialog, _time_loc);
                                                                                     }; })(dialog, time_loc)})[0]);
     }
+
+    // ALL TIME
+    selector[0] = selector[0].concat(SPText.cstring_to_ablocks_bbcode(dialog.data['widgets']['selector']['ui_separator'])[0]);
+    var ui_current = dialog.data['widgets']['selector']['ui_name_alltime'].replace('%scope', gamedata['strings']['leaderboard']['periods'][dialog.user_data['time_scope']]['name']);
+    var is_selected = (dialog.user_data['time_displayed'] == -1);
+    ui_current = dialog.data['widgets']['selector'][(is_selected ? 'ui_format_selected' : 'ui_format_unselected')].replace('%thing', ui_current);
+    selector[0] = selector[0].concat(SPText.cstring_to_ablocks_bbcode(ui_current, {onclick:
+                                                                                   (function(_dialog) { return function() {
+                                                                                       player_info_statistics_tab_select(_dialog, -1);
+                                                                                   }; })(dialog)})[0]);
+
     dialog.widgets['selector'].clear_text();
     dialog.widgets['selector'].append_text(selector);
 
@@ -22627,13 +22644,15 @@ function player_info_statistics_tab_select(dialog, new_loc) {
 
     // list of queries to send
     var qls = [];
+    var scope = (dialog.user_data['time_displayed'] == -1 ? 'ALL' : dialog.user_data['time_scope']);
+    var loc = (dialog.user_data['time_displayed'] == -1 ? 0 : dialog.user_data['time_displayed']);
     goog.array.forEach(dialog.user_data['stats'], function(stat) {
-        qls.push([stat, dialog.user_data['time_scope'], dialog.user_data['time_displayed']]);
+        qls.push([stat, scope, loc]);
     });
     dialog.user_data['query_gen'] += 1;
     query_player_scores([dialog.user_data['user_id']], qls, (function(_dialog, _query_gen) { return function(user_ids, data, status_code) {
         player_info_statistics_tab_receive(_dialog, data, status_code, _query_gen);
-    }; })(dialog, dialog.user_data['query_gen']), {get_rank:0});
+    }; })(dialog, dialog.user_data['query_gen']), {get_rank:dialog.user_data['show_rank']});
 
     dialog.widgets['loading_rect'].show =
         dialog.widgets['loading_text'].show =
@@ -22647,9 +22666,6 @@ function player_info_statistics_tab_receive(dialog, data, status_code, query_gen
     if(query_gen != dialog.user_data['query_gen']) { return; } // over-ridden by a later query
 
     var stats = dialog.user_data['stats'];
-    var time_scope = dialog.user_data['time_scope'];
-    var time_cur = dialog.user_data['time_cur'];
-    var time_limit = dialog.user_data['time_limit'];
 
     if(data !== null && data.length == 1) {
         dialog.widgets['loading_rect'].show =
@@ -22662,7 +22678,13 @@ function player_info_statistics_tab_receive(dialog, data, status_code, query_gen
             if(player_data[i]) {
                 var ui_name = gamedata['strings']['leaderboard']['categories'][stat]['title'];
                 var val = player_data[i]['absolute'] || 0;
-                var ui_stat = dialog.data['widgets']['output']['ui_stat'].replace('%stat', ui_name).replace('%val', pretty_print_number(val));
+                var rank = ('rank' in player_data[i] ? player_data[i]['rank'] : -1);
+                var ui_stat;
+                if(rank >= 0) {
+                    ui_stat = dialog.data['widgets']['output']['ui_stat_ranked'].replace('%stat', ui_name).replace('%val', pretty_print_number(val)).replace('%rank', pretty_print_number(rank+1));
+                } else {
+                    ui_stat = dialog.data['widgets']['output']['ui_stat'].replace('%stat', ui_name).replace('%val', pretty_print_number(val));
+                }
                 all_ls.push(SPText.cstring_to_ablocks_bbcode(ui_stat));
             }
         });
