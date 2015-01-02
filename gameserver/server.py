@@ -1328,8 +1328,8 @@ class User:
                                                                                       'tax_country': session.user.country,
                                                                                       'actions':[{'type':'charge','status':'completed',
                                                                                                   'currency':payment_data['client_currency'],
-                                                                                                  'amount':str(0.6*payment_data['client_price']),
-                                                                                                  'tax_amount':str(0.4*payment_data['client_price'])
+                                                                                                  'amount':'%.2f' % (1.0*payment_data['client_price']),
+                                                                                                  'tax_amount':'%.2f' % (0.2*payment_data['client_price'])
                                                                                                   }]
                                                                                       }]})
             return
@@ -1413,12 +1413,11 @@ class User:
         for action in payment['actions']:
             if action['type'] == 'charge' and action['status'] == 'completed':
                 paid_time_string = action.get('time_updated', None)
-                paid_amount = float(action['amount'])
+                paid_amount = round(float(action['amount']), 2) # preserve 2 decimal places
                 if 'tax_amount' in action and payment.get('tax',None) == 'tax_remitted':
-                    tax_amount = float(action['tax_amount'])
-                    user_facing_amount = round(paid_amount + tax_amount, 2) # preserve 2 decimal places
-                else:
-                    user_facing_amount = paid_amount
+                    tax_amount = round(float(action['tax_amount']), 2)
+                    #user_facing_amount = paid_amount + tax_amount
+                user_facing_amount = paid_amount
                 paid_currency = action['currency']
             if action['type'] in ('chargeback','refund','decline') and action['status'] == 'completed':
                 refund = True
@@ -1437,7 +1436,7 @@ class User:
         if refund:
             if entry.get('refunded',0): return False # already refunded
             try:
-                usd_equivalent = 0.01*int(100*float(payment['payout_foreign_exchange_rate']) * refund_amount * 0.7) # post FB tax
+                usd_equivalent = 0.01*int(100*float(payment['payout_foreign_exchange_rate']) * refund_amount * 0.7 + 0.5) # post FB tax
                 item = payment['items'][0]
                 spellname, spellarg = self.parse_fbpayment_product_url(item['product'], item['quantity'])
                 gamebucks = self.parse_gamebucks_spell(spellname, spellarg)
@@ -1550,13 +1549,12 @@ class User:
                 for action in payment['actions']:
                     if action['type'] == 'charge' and action['status'] == 'completed':
                         paid = True
-                        paid_amount = float(action['amount'])
+                        paid_amount = round(float(action['amount']), 2) # preserve 2 decimal places
                         paid_currency = action['currency']
                         if 'tax_amount' in action and payment.get('tax',None) == 'tax_remitted':
-                            tax_amount = float(action['tax_amount'])
-                            user_facing_amount = round(paid_amount + tax_amount, 2) # preserve 2 decimal places
-                        else:
-                            user_facing_amount = paid_amount
+                            tax_amount = round(float(action['tax_amount']), 2)
+                            #user_facing_amount = round(paid_amount + tax_amount, 2)
+                        user_facing_amount = paid_amount
                     elif action['type'] in ('chargeback','refund','decline') and action['status'] == 'completed':
                         paid = False
                     elif action['type'] == 'chargeback_reversal' and action['status'] == 'completed':
@@ -1573,7 +1571,7 @@ class User:
                     try:
                         # note: estimate post FB tax order receipts, in USD. This is what will appear in metrics as the receipts amount.
                         # XXX is tax_amount taken before or after the 30% cut?
-                        usd_equivalent = 0.01*int(100*float(payment['payout_foreign_exchange_rate']) * (paid_amount * 0.7)) # - tax_amount))
+                        usd_equivalent = 0.01*int(100*float(payment['payout_foreign_exchange_rate']) * (paid_amount * 0.7 - tax_amount) + 0.5)
                         price_description, detail_props = \
                                            Store.execute_order(gamesite.gameapi, None, session, retmsg, 'fbpayments:'+paid_currency, user_facing_amount,
                                                                payment_data['unit_id'],
@@ -12983,9 +12981,9 @@ class Store:
            (('REPAIR' in spellname) or ('SPEEDUP' in spellname)):
             store_price = amount_willing_to_pay
 
-        if amount_willing_to_pay < store_price:
+        if round(amount_willing_to_pay,2) < round(store_price,2):
             raise Exception(('execute_order(%d %s): Rejecting unfavorable price mismatch! (store %r order %r) by user %d payment_id %r' % (amount_willing_to_pay, currency, store_price, amount_willing_to_pay, session.user.user_id, payment_id)) + repr((unit_description, spellname, spellarg)) + ' get_price() reason: '+repr(error_reason))
-        elif amount_willing_to_pay > store_price:
+        elif round(amount_willing_to_pay,2) > round(store_price,2):
             if (amount_willing_to_pay - store_price) > (10 if currency == 'gamebucks' else 1):
                 gamesite.exception_log.event(server_time, (('execute_order(%d %s): Accepting favorable price mismatch! (store %r order %r) by user %d payment_id %r' % (amount_willing_to_pay, currency, store_price, amount_willing_to_pay, session.user.user_id, payment_id)) + repr((unit_description, spellname, spellarg)) + ' get_price() reason: '+repr(error_reason)))
 
