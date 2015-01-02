@@ -5423,16 +5423,23 @@
 
             "sunken2": {"kind": "StaticImage", "xy":[25,105], "dimensions":[686,352], "asset": "dialog_sunken_gray_resizable", "bg_image_resizable":1 },
 
-            "output": { "kind": "TextField", "xy": [45,125], "dimensions": [646,312], "text_size": 15, "text_style": "normal",
-                        "text_hjustify": "left", "text_vjustify": "top" },
+            "selector": { "kind": "ScrollingTextField", "xy": [45,125], "dimensions": [646,312], "text_size": 15, "text_style": "normal",
+                          "text_hjustify": "left", "text_vjustify": "top", "ui_name": "Show stats for: ",
+                          "ui_format_selected": "%thing", "ui_format_unselected": "[u][color=#a0a0a0]%thing[/color][/u]",
+                          "ui_name_current": "Current %scope", "ui_name_prev": "%scope %loc", "ui_separator": " | "},
+            "output": { "kind": "ScrollingTextField", "xy": [45,165], "dimensions": [646,272], "text_size": 15, "text_style": "normal",
+                        "text_hjustify": "left", "text_vjustify": "top",
+                        "ui_stat": "%stat: [color=#1eff66]%val[/color]",
+                        "ui_stat_ranked": "%stat: [color=#1eff66]%val[/color] [color=#ffff00](ranked #%rank)[/color]"
+                      },
 
             "show_other_button": { "show": 0, "kind": "ActionButton", "xy": [40,410], "dimensions": [136,32], "text_size": 13, "text_style": "bold",
                                    "bg_image": "menu_button_136px", "state": "normal", "ui_name": "Show other stats" },
 
-            "loading_rect": { "kind": "SolidRect", "xy": [11,63], "dimensions": [713,402], "color":[0,0,0,0.33] },
-            "loading_text": { "kind": "TextField", "xy": [11,63], "dimensions": [713,402], "text_size": 15, "text_style": "bold", "text_color":[1,1,1,1],
+            "loading_rect": { "show": 0, "kind": "SolidRect", "xy": [11,63], "dimensions": [713,402], "color":[0,0,0,0.33], "alpha": 0 }, // not used for now
+            "loading_text": { "show": 0, "kind": "TextField", "xy": [11,63], "dimensions": [713,402], "text_size": 15, "text_style": "bold", "text_color":[1,1,1,1],
                               "ui_name": "Loading...", "ui_name_unavailable": "Statistics unavailable" },
-            "loading_spinner": { "kind": "StaticImage", "xy":[305,256], "dimensions":[16,16], "asset":"loading_spinner" }
+            "loading_spinner": { "show": 0, "kind": "StaticImage", "xy":[305,256], "dimensions":[16,16], "asset":"loading_spinner" }
         }
     },
 

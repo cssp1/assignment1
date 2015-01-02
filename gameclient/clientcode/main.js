@@ -22564,30 +22564,92 @@ function invoke_statistics_tab(w) {
     parent.widgets['tab'] = dialog;
     parent.add(dialog);
 
-    dialog.user_data['stats'] = ['trophies_pvp','trophies_pvv']; // XXX hard-coded
-    dialog.user_data['time_scope'] = gamedata['matchmaking']['ladder_point_frequency'];
+    // which stats to query - hard-coded for now
+    dialog.user_data['stats'] = ['trophies_pvp','trophies_pvv','tokens_looted'];
+
+    // which time scope to show - pretty much only works with "season"
+    dialog.user_data['time_scope'] = 'season'; // gamedata['matchmaking']['ladder_point_frequency'];
     if(!goog.array.contains(['week','season'], dialog.user_data['time_scope'])) { throw Error('unknown time scope '+dialog.user_data['time_scope']); }
+
+    // time_loc we're at right now
     dialog.user_data['time_cur'] = {'week': current_pvp_week(), 'season': current_pvp_season()}[dialog.user_data['time_scope']];
+
+    // how far back in time we offer queries for
     if(dialog.user_data['time_scope'] == 'week') {
         dialog.user_data['time_limit'] = Math.max(1, dialog.user_data['time_cur']-5); // limit query to 5 historical entries
     } else if(dialog.user_data['time_scope'] == 'season') {
         dialog.user_data['time_limit'] = Math.min(dialog.user_data['time_cur'], Math.max(1, -(gamedata['matchmaking']['season_ui_offset']||0) + 1));
     }
-    dialog.user_data['qls'] = [];
-    for(var time_loc = dialog.user_data['time_cur']; time_loc >= dialog.user_data['time_limit']; time_loc -= 1) {
-        goog.array.forEach(dialog.user_data['stats'], function(stat) {
-            dialog.user_data['qls'].push([stat, dialog.user_data['time_scope'], time_loc]);
-        });
+
+    // which time_loc is actually displayed
+    dialog.user_data['time_displayed'] = null;
+
+    // since queries are asynchronous, make sure that only the last one to arrive actually updates the GUI
+    dialog.user_data['query_gen'] = 0;
+
+    player_info_statistics_tab_select(dialog, dialog.user_data['time_cur']);
+    return dialog;
+}
+
+// select a new time_loc
+function player_info_statistics_tab_select(dialog, new_loc) {
+    if(dialog.user_data['time_displayed'] == new_loc) {
+        // nothing to do
+        return;
     }
-    query_player_scores([user_id], dialog.user_data['qls'], (function(_dialog, _stats, _time_scope, _time_cur, _time_limit) { return function(user_ids, data, info) {
-        player_info_statistics_tab_receive(_dialog, _stats, _time_scope, _time_cur, _time_limit, data, info);
-    }; })(dialog, dialog.user_data['stats'], dialog.user_data['time_scope'], dialog.user_data['time_cur'], dialog.user_data['time_limit']), {get_rank:0});
+    if(dialog.widgets['loading_text'].show) { return; } // don't overlap
+
+    dialog.user_data['time_displayed'] = new_loc;
+
+    // update BBCode for time-loc selection bar
+    var selector = SPText.cstring_to_ablocks_bbcode(dialog.data['widgets']['selector']['ui_name']);
+    var ui_current = dialog.data['widgets']['selector']['ui_name_current'].replace('%scope', gamedata['strings']['leaderboard']['periods'][dialog.user_data['time_scope']]['name']);
+    var is_selected = (dialog.user_data['time_displayed'] == dialog.user_data['time_cur']);
+    ui_current = dialog.data['widgets']['selector'][(is_selected ? 'ui_format_selected' : 'ui_format_unselected')].replace('%thing', ui_current);
+    selector[0] = selector[0].concat(SPText.cstring_to_ablocks_bbcode(ui_current, {onclick:
+                                                                                   (function(_dialog) { return function() {
+                                                                                       player_info_statistics_tab_select(_dialog, _dialog.user_data['time_cur']);
+                                                                                   }; })(dialog)})[0]);
+    for(var time_loc = dialog.user_data['time_cur'] - 1; time_loc >= dialog.user_data['time_limit']; time_loc -= 1) {
+        selector[0] = selector[0].concat(SPText.cstring_to_ablocks_bbcode(dialog.data['widgets']['selector']['ui_separator'])[0]);
+        var ui_prev = dialog.data['widgets']['selector']['ui_name_prev'].replace('%scope', gamedata['strings']['leaderboard']['periods'][dialog.user_data['time_scope']]['name']).replace('%loc', (time_loc + (dialog.user_data['time_scope'] == 'season' ? (gamedata['matchmaking']['season_ui_offset']||0) : 0)).toFixed(0));
+        var is_selected = (dialog.user_data['time_displayed'] == time_loc);
+        ui_prev = dialog.data['widgets']['selector'][(is_selected ? 'ui_format_selected' : 'ui_format_unselected')].replace('%thing', ui_prev);
+        selector[0] = selector[0].concat(SPText.cstring_to_ablocks_bbcode(ui_prev, {onclick:
+                                                                                    (function(_dialog, _time_loc) { return function() {
+                                                                                        player_info_statistics_tab_select(_dialog, _time_loc);
+                                                                                    }; })(dialog, time_loc)})[0]);
+    }
+    dialog.widgets['selector'].clear_text();
+    dialog.widgets['selector'].append_text(selector);
+
+    // perform the query
+
+    // list of queries to send
+    var qls = [];
+    goog.array.forEach(dialog.user_data['stats'], function(stat) {
+        qls.push([stat, dialog.user_data['time_scope'], dialog.user_data['time_displayed']]);
+    });
+    dialog.user_data['query_gen'] += 1;
+    query_player_scores([dialog.user_data['user_id']], qls, (function(_dialog, _query_gen) { return function(user_ids, data, status_code) {
+        player_info_statistics_tab_receive(_dialog, data, status_code, _query_gen);
+    }; })(dialog, dialog.user_data['query_gen']), {get_rank:0});
+
+    dialog.widgets['loading_rect'].show =
+        dialog.widgets['loading_text'].show =
+        dialog.widgets['loading_spinner'].show = true;
 
     return dialog;
 }
 
-function player_info_statistics_tab_receive(dialog, stats, time_scope, time_cur, time_limit, data, info) {
+function player_info_statistics_tab_receive(dialog, data, status_code, query_gen) {
     if(!dialog.parent) { return; } // dialog got closed asynchronously
+    if(query_gen != dialog.user_data['query_gen']) { return; } // over-ridden by a later query
+
+    var stats = dialog.user_data['stats'];
+    var time_scope = dialog.user_data['time_scope'];
+    var time_cur = dialog.user_data['time_cur'];
+    var time_limit = dialog.user_data['time_limit'];
 
     if(data !== null && data.length == 1) {
         dialog.widgets['loading_rect'].show =
@@ -22596,24 +22658,21 @@ function player_info_statistics_tab_receive(dialog, stats, time_scope, time_cur,
 
         var player_data = data[0];
         var all_ls = [];
-        for(var time_loc = time_cur, i = 0; time_loc >= time_limit; time_loc -= 1) {
-            var ls = [];
-            goog.array.forEach(stats, function(stat) {
-                if(player_data[i]) {
-                    var ui_stat = gamedata['strings']['leaderboard']['categories'][stat]['title'];
-                    var val = player_data[i]['absolute'] || 0;
-                    ls.push(gamedata['strings']['leaderboard'][time_loc == time_cur ? 'current_stat' : 'prev_stat'].replace('%period', gamedata['strings']['leaderboard']['periods'][time_scope]['name']).replace('%d', (time_loc + (time_scope == 'season' ? (gamedata['matchmaking']['season_ui_offset']||0) : 0)).toFixed(0)).replace('%stat', ui_stat) + ': '+pretty_print_number(val));
-                }
-                i += 1;
-            });
-            if(ls.length > 0) {
-                all_ls.push(ls.join('\n'));
+        goog.array.forEach(stats, function(stat, i) {
+            if(player_data[i]) {
+                var ui_name = gamedata['strings']['leaderboard']['categories'][stat]['title'];
+                var val = player_data[i]['absolute'] || 0;
+                var ui_stat = dialog.data['widgets']['output']['ui_stat'].replace('%stat', ui_name).replace('%val', pretty_print_number(val));
+                all_ls.push(SPText.cstring_to_ablocks_bbcode(ui_stat));
             }
+        });
+        if(status_code == 'SCORES_OFFLINE') {
+            all_ls.push(SPText.cstring_to_ablocks(gamedata['errors']['SCORES_OFFLINE']['ui_name']));
         }
-        if(info == 'SCORES_OFFLINE') {
-            all_ls.push(gamedata['errors']['SCORES_OFFLINE']['ui_name']);
-        }
-        dialog.widgets['output'].str = all_ls.join('\n\n');
+        dialog.widgets['output'].clear_text();
+        goog.array.forEach(all_ls, function(s) {
+            dialog.widgets['output'].append_text(s);
+        });
     } else {
         dialog.widgets['loading_text'].str = dialog.data['widgets']['loading_text']['ui_name_unavailable'];
         dialog.widgets['loading_spinner'].show = false;

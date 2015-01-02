@@ -103,7 +103,7 @@
 
     "leaderboard": {
         "categories": {
-            "tokens_looted": { "title": "Ops Needs Points", "short_title": "ON Points",
+            "tokens_looted": { "title": "Total ONP Gained", "short_title": "ON Points",
                                "show_if": {"predicate": "LIBRARY", "name": "token_event_happening"},
                                "description":  "Ops Needs Points earned (points expire at the end of the event)",
                                "brag_reason": "Ops Needs Points",
