@@ -5,4 +5,4 @@
 # found in the LICENSE file.
 
 (cd ../gameclient && ./make-compiled-client.sh "$@")
-
+exit $?

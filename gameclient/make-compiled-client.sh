@@ -71,3 +71,5 @@ gzip -9 -c compiled-client.js > compiled-client.js.gz && \
 echo "$BUILD_DATE" > compiled-client.js.date && \
 mv _props_map.out compiled-client_props_map.out && \
 mv _vars_map.out compiled-client_vars_map.out
+
+exit $?
