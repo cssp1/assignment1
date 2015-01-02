@@ -167,9 +167,9 @@ if __name__ == '__main__':
 
                 for row in mongo_stats:
                     assert row['axes']['time'][0] == freq and row['axes']['time'][1] == loc # sanity check
-                    keyvals = [(Scores2.ID_FIELD[kind], row[Scores2.ID_FIELD[kind]]),
+                    keyvals = [(Scores2.ID_FIELD[kind], int(row[Scores2.ID_FIELD[kind]])),
                                ('stat', row['stat']),
-                               ('time_scope', freq), ('time_loc', loc),
+                               ('time_scope', freq), ('time_loc', int(loc)),
                                ('space_scope', row['axes']['space'][0]), ('space_loc', row['axes']['space'][1])]
 
                     has_extra = False
@@ -183,7 +183,7 @@ if __name__ == '__main__':
                     if not has_extra:
                         keyvals += [('extra_scope',None), ('extra_loc',None)]
 
-                    keyvals += [('val', float(row['val'])), ('mtime', row.get('mtime',-1))]
+                    keyvals += [('val', float(row['val'])), ('mtime', int(row.get('mtime',-1)))]
                     batch.append(keyvals)
                     n_updated += 1
 
