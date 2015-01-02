@@ -113,13 +113,13 @@ def check_role(spin_token_data, want_role):
     if (want_role not in spin_token_data['roles']):
         raise Exception('user %s does not have role %s' % (spin_token_data['spin_user'], want_role))
 
-def run_shell_command(argv):
+def run_shell_command(argv, ignore_stderr = False):
      p = subprocess.Popen(argv, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
      out, err = p.communicate()
-     if err:
+     if err and (not ignore_stderr):
          raise Exception(err)
      if p.returncode != 0:
-         raise Exception(out)
+         raise Exception(err or out)
      return out
 
 def do_action(path, method, args, spin_token_data, nosql_client):
@@ -235,7 +235,7 @@ def do_action(path, method, args, spin_token_data, nosql_client):
         elif path[0] == 'gameclient':
             check_role(spin_token_data, 'ADMIN')
             if method == 'compile':
-                result = {'result': run_shell_command(['./make-compiled-client.sh']).strip() or 'Client compiled OK'}
+                result = {'result': run_shell_command(['./make-compiled-client.sh'], ignore_stderr = True).strip() or 'Client compiled OK'}
             else:
                 raise Exception('unknown gameclient method '+method)
 
