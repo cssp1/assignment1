@@ -711,6 +711,11 @@
     "permissions_request_interval": 604800, // minimum interval (sec) between prompts for additional Facebook permissions
     "permissions_request_display": "popup", // 'popup' or 'iframe' FB.ui mode - note that 'popup' must be triggered by a click to avoid popup blockers
 
+    // whether to treat Scores2 time_scope = ALL queries as "hot" and send them to MongoDB (instead of offline SQL)
+    // if enabled, "All time" stats and ranks are always up to date, but it may hurt server performance
+    // if disabled, "All time" stats and ranks are only updated offline (scores2_to_sql.py) but queries won't hurt server
+    "scores2_time_all_is_hot": 1,
+
     "store":
 #include "$GAME_ID/$GAME_ID_store.json"
     ,

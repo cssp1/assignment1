@@ -22002,12 +22002,19 @@ class GAMEAPI(resource.Resource):
                     result.append([None,]*len(query_addrs))
 
                 # split query into "hot" MongoDB and "cold" SQL parts
+                # the "hot" stats are updated basically in realtime via MongoDB
+                # "cold" stats are updated offline by scores2_to_sql.py (and may be in a maintenance window!)
+                # so, any query that affects competition/game rules should use the "hot" stats!
                 mongo_query_i_addrs = []
                 sql_query_i_addrs = []
 
                 def is_hot_point(point, cur_week, cur_season):
+                    # note: time_scope "ALL" queries can go to cold SQL, even though they are otherwise "hot",
+                    # if we need to cut down on synchronous MongoDB queries.
+                    time_all_is_hot = gamedata.get('scores2_time_all_is_hot', True)
                     return (point[1]['time'][0] == Scores2.FREQ_WEEK and point[1]['time'][1] >= cur_week) or \
-                           (point[1]['time'][0] == Scores2.FREQ_SEASON and point[1]['time'][1] >= cur_season)
+                           (point[1]['time'][0] == Scores2.FREQ_SEASON and point[1]['time'][1] >= cur_season) or \
+                           (point[1]['time'][0] == Scores2.FREQ_ALL and time_all_is_hot)
 
                 for i in xrange(len(query_addrs)):
                     point = query_addrs[i]

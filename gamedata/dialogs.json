@@ -5427,12 +5427,13 @@
                           "text_hjustify": "left", "text_vjustify": "top", "ui_name": "Show stats for: ",
                           "ui_format_selected": "%thing", "ui_format_unselected": "[u][color=#a0a0a0]%thing[/color][/u]",
                           "ui_name_current": "Current %scope", "ui_name_prev": "%scope %loc", "ui_name_alltime": "All time", "ui_separator": " | "},
-            "output": { "kind": "ScrollingTextField", "xy": [45,165], "dimensions": [646,272], "text_size": 15, "text_style": "normal",
+            "output": { "kind": "ScrollingTextField", "xy": [45,150], "dimensions": [646,272], "text_size": 15, "text_style": "normal",
                         "text_hjustify": "left", "text_vjustify": "top", "ui_tooltip": "", "tooltip_delay": 0,
                         "ui_group_header": "[b]%group[/b]",
                         "ui_stat": "%stat: [color=#1eff66]%val[/color]",
                         "ui_stat_ranked": "%stat: [color=#1eff66]%val[/color] [color=#ffff00](ranked #%rank)[/color]",
-                        "ui_name_nostats": "No statistics available for this time period."
+                        "ui_name_nostats": "No statistics available for this time period.",
+                        "ui_name_delay": "(Rankings updated every 60 minutes)"
                       },
             "scroll_up": { "kind": "ActionButton", "xy": [670,145], "dimensions": [27,46], "bg_image": "chat_scroll_up", "push_bg_image": 1 },
             "scroll_down": { "kind": "ActionButton", "xy": [670,175], "dimensions": [27,46], "bg_image": "chat_scroll_down", "push_bg_image": 1 },

@@ -22760,8 +22760,19 @@ function player_info_statistics_tab_receive(dialog, data, status_code, query_gen
         }
 
         if(goog.object.getCount(by_group) < 1) {
+            dialog.widgets['output'].append_text([]); // add a blank line
              dialog.widgets['output'].append_text(SPText.cstring_to_ablocks_bbcode(dialog.data['widgets']['output']['ui_name_nostats']));
         } else {
+            // note: please keep in sync with gameserver/server.py: is_hot_point
+            var is_hot = (dialog.user_data['time_displayed'] == dialog.user_data['time_cur'] ||
+                          // technically past-time queries are not "hot", but they can't be affected by players anymore, so don't show delay warning
+                          (dialog.user_data['time_displayed'] >= 0 && dialog.user_data['time_displayed'] < dialog.user_data['time_cur']-1) ||
+                          (dialog.user_data['time_displayed'] == -1 && gamedata['scores2_time_all_is_hot']));
+            if(!is_hot) {
+                dialog.widgets['output'].append_text(SPText.cstring_to_ablocks_bbcode(dialog.data['widgets']['output']['ui_name_delay']));
+            }
+            dialog.widgets['output'].append_text([]); // add a blank line
+
             // sort groups by priority, then alphabet
             var sort_by_priority = function (db) { return function(a,b) {
                 var pa = db[a]['priority'] || 0, pb = db[b]['priority'] || 0;
