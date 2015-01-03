@@ -5432,7 +5432,7 @@
                         "ui_group_header": "[b]%group[/b]",
                         "ui_stat": "%stat: [color=#1eff66]%val[/color]",
                         "ui_stat_ranked": "%stat: [color=#1eff66]%val[/color] [color=#ffff00](ranked #%rank)[/color]",
-                        "ui_name_nostats": "No statistics available"
+                        "ui_name_nostats": "No statistics available for this time period."
                       },
             "scroll_up": { "kind": "ActionButton", "xy": [670,145], "dimensions": [27,46], "bg_image": "chat_scroll_up", "push_bg_image": 1 },
             "scroll_down": { "kind": "ActionButton", "xy": [670,175], "dimensions": [27,46], "bg_image": "chat_scroll_down", "push_bg_image": 1 },
