@@ -5434,6 +5434,8 @@
                         "ui_stat_ranked": "%stat: [color=#1eff66]%val[/color] [color=#ffff00](ranked #%rank)[/color]",
                         "ui_name_nostats": "No statistics available"
                       },
+            "scroll_up": { "kind": "ActionButton", "xy": [670,145], "dimensions": [27,46], "bg_image": "chat_scroll_up", "push_bg_image": 1 },
+            "scroll_down": { "kind": "ActionButton", "xy": [670,175], "dimensions": [27,46], "bg_image": "chat_scroll_down", "push_bg_image": 1 },
 
             "show_other_button": { "show": 0, "kind": "ActionButton", "xy": [40,410], "dimensions": [136,32], "text_size": 13, "text_style": "bold",
                                    "bg_image": "menu_button_136px", "state": "normal", "ui_name": "Show other stats" },

@@ -22663,8 +22663,22 @@ function player_info_statistics_tab_select(dialog, new_loc) {
         dialog.widgets['loading_text'].show =
         dialog.widgets['loading_spinner'].show = true;
     dialog.widgets['output'].clear_text();
-
+    dialog.widgets['scroll_up'].onclick = function (w) { player_info_statistics_tab_scroll(w.parent, -1); };
+    dialog.widgets['scroll_down'].onclick = function (w) { player_info_statistics_tab_scroll(w.parent, 1); };
+    player_info_statistics_tab_scroll(dialog, 0);
     return dialog;
+}
+
+function player_info_statistics_tab_scroll(dialog, incr) {
+    if(incr < 0) {
+        dialog.widgets['output'].scroll_up();
+    } else if(incr > 0) {
+        dialog.widgets['output'].scroll_down();
+    }
+
+    // set clickability of scroll arrows
+    dialog.widgets['scroll_up'].state = (dialog.widgets['output'].can_scroll_up() ? 'normal' : 'disabled');
+    dialog.widgets['scroll_down'].state = (dialog.widgets['output'].can_scroll_down() ? 'normal' : 'disabled');
 }
 
 function player_info_statistics_tab_format_stat(dialog, stat, val, rank, by_group) {
@@ -22768,6 +22782,8 @@ function player_info_statistics_tab_receive(dialog, data, status_code, query_gen
                 });
             });
         }
+        dialog.widgets['output'].scroll_to_top();
+        player_info_statistics_tab_scroll(dialog, 0);
 
     } else {
         dialog.widgets['loading_text'].str = dialog.data['widgets']['loading_text']['ui_name_unavailable'];
