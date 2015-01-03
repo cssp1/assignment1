@@ -5428,9 +5428,11 @@
                           "ui_format_selected": "%thing", "ui_format_unselected": "[u][color=#a0a0a0]%thing[/color][/u]",
                           "ui_name_current": "Current %scope", "ui_name_prev": "%scope %loc", "ui_name_alltime": "All time", "ui_separator": " | "},
             "output": { "kind": "ScrollingTextField", "xy": [45,165], "dimensions": [646,272], "text_size": 15, "text_style": "normal",
-                        "text_hjustify": "left", "text_vjustify": "top",
+                        "text_hjustify": "left", "text_vjustify": "top", "ui_tooltip": "", "tooltip_delay": 0,
+                        "ui_group_header": "[b]%group[/b]",
                         "ui_stat": "%stat: [color=#1eff66]%val[/color]",
-                        "ui_stat_ranked": "%stat: [color=#1eff66]%val[/color] [color=#ffff00](ranked #%rank)[/color]"
+                        "ui_stat_ranked": "%stat: [color=#1eff66]%val[/color] [color=#ffff00](ranked #%rank)[/color]",
+                        "ui_name_nostats": "No statistics available"
                       },
 
             "show_other_button": { "show": 0, "kind": "ActionButton", "xy": [40,410], "dimensions": [136,32], "text_size": 13, "text_style": "bold",
@@ -5438,7 +5440,7 @@
 
             "loading_rect": { "show": 0, "kind": "SolidRect", "xy": [11,63], "dimensions": [713,402], "color":[0,0,0,0.33], "alpha": 0 }, // not used for now
             "loading_text": { "show": 0, "kind": "TextField", "xy": [11,63], "dimensions": [713,402], "text_size": 15, "text_style": "bold", "text_color":[1,1,1,1],
-                              "ui_name": "Loading...", "ui_name_unavailable": "Statistics unavailable" },
+                              "ui_name": "Loading...", "ui_name_unavailable": "No statistics available" },
             "loading_spinner": { "show": 0, "kind": "StaticImage", "xy":[305,256], "dimensions":[16,16], "asset":"loading_spinner" }
         }
     },

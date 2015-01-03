@@ -22359,7 +22359,7 @@ function leaderboard_change_page(dialog, period, mode, chapter, page) {
 
         dialog.widgets['self_loading'].show = (dialog.user_data['self_queries'][chapter+'_'+period] < 2);
 
-        var brag_reason = gamedata['strings']['leaderboard']['categories'][chapter]['brag_reason'].replace('%PVP_CHALLENGE_NAME', gamedata['events']['challenge_pvp_ladder']['ui_name']);
+        var brag_reason = (gamedata['strings']['leaderboard']['categories'][chapter]['brag_reason'] || gamedata['strings']['leaderboard']['categories'][chapter]['title']).replace('%PVP_CHALLENGE_NAME', gamedata['events']['challenge_pvp_ladder']['ui_name']);
         if(brag_reason) {
             brag_reason += ' '+gamedata['strings']['leaderboard']['periods'][period]['brag'];
         }
@@ -22564,9 +22564,6 @@ function invoke_statistics_tab(w) {
     parent.widgets['tab'] = dialog;
     parent.add(dialog);
 
-    // which stats to query - hard-coded for now
-    dialog.user_data['stats'] = ['trophies_pvp','trophies_pvv','tokens_looted'];
-
     // which time scope to show - pretty much only works with "season"
     dialog.user_data['time_scope'] = 'season'; // gamedata['matchmaking']['ladder_point_frequency'];
     if(!goog.array.contains(['week','season'], dialog.user_data['time_scope'])) { throw Error('unknown time scope '+dialog.user_data['time_scope']); }
@@ -22590,7 +22587,8 @@ function invoke_statistics_tab(w) {
 
     dialog.user_data['show_rank'] = true;
 
-    player_info_statistics_tab_select(dialog, dialog.user_data['time_cur']);
+    // show "all time" by default
+    player_info_statistics_tab_select(dialog, -1); // dialog.user_data['time_cur']);
     return dialog;
 }
 
@@ -22605,9 +22603,20 @@ function player_info_statistics_tab_select(dialog, new_loc) {
     dialog.user_data['time_displayed'] = new_loc;
 
     // update BBCode for time-loc selection bar
+    var selector = [[]];
+    selector[0] = selector[0].concat(SPText.cstring_to_ablocks_bbcode(dialog.data['widgets']['selector']['ui_name'])[0]);
+
+    // ALL TIME
+    var ui_current = dialog.data['widgets']['selector']['ui_name_alltime'].replace('%scope', gamedata['strings']['leaderboard']['periods'][dialog.user_data['time_scope']]['name']);
+    var is_selected = (dialog.user_data['time_displayed'] == -1);
+    ui_current = dialog.data['widgets']['selector'][(is_selected ? 'ui_format_selected' : 'ui_format_unselected')].replace('%thing', ui_current);
+    selector[0] = selector[0].concat(SPText.cstring_to_ablocks_bbcode(ui_current, {onclick:
+                                                                                   (function(_dialog) { return function() {
+                                                                                       player_info_statistics_tab_select(_dialog, -1);
+                                                                                   }; })(dialog)})[0]);
 
     // CURRENT LOC
-    var selector = SPText.cstring_to_ablocks_bbcode(dialog.data['widgets']['selector']['ui_name']);
+    selector[0] = selector[0].concat(SPText.cstring_to_ablocks_bbcode(dialog.data['widgets']['selector']['ui_separator'])[0]);
     var ui_current = dialog.data['widgets']['selector']['ui_name_current'].replace('%scope', gamedata['strings']['leaderboard']['periods'][dialog.user_data['time_scope']]['name']);
     var is_selected = (dialog.user_data['time_displayed'] == dialog.user_data['time_cur']);
     ui_current = dialog.data['widgets']['selector'][(is_selected ? 'ui_format_selected' : 'ui_format_unselected')].replace('%thing', ui_current);
@@ -22627,20 +22636,16 @@ function player_info_statistics_tab_select(dialog, new_loc) {
                                                                                     }; })(dialog, time_loc)})[0]);
     }
 
-    // ALL TIME
-    selector[0] = selector[0].concat(SPText.cstring_to_ablocks_bbcode(dialog.data['widgets']['selector']['ui_separator'])[0]);
-    var ui_current = dialog.data['widgets']['selector']['ui_name_alltime'].replace('%scope', gamedata['strings']['leaderboard']['periods'][dialog.user_data['time_scope']]['name']);
-    var is_selected = (dialog.user_data['time_displayed'] == -1);
-    ui_current = dialog.data['widgets']['selector'][(is_selected ? 'ui_format_selected' : 'ui_format_unselected')].replace('%thing', ui_current);
-    selector[0] = selector[0].concat(SPText.cstring_to_ablocks_bbcode(ui_current, {onclick:
-                                                                                   (function(_dialog) { return function() {
-                                                                                       player_info_statistics_tab_select(_dialog, -1);
-                                                                                   }; })(dialog)})[0]);
-
     dialog.widgets['selector'].clear_text();
     dialog.widgets['selector'].append_text(selector);
 
     // perform the query
+
+    // which stats to query - for now, hard-coded to be a subset of the ones recorded in Scores2
+    dialog.user_data['stats'] = goog.array.filter(['trophies_pvp','trophies_pvv','tokens_looted',
+                                                   'havoc_caused','hive_kill_points','quarry_resources','stringpoint_resources'],
+                                                  function(stat) { return (stat in gamedata['strings']['leaderboard']['categories']) &&
+                                                                   ('group' in gamedata['strings']['leaderboard']['categories'][stat]); });
 
     // list of queries to send
     var qls = [];
@@ -22657,8 +22662,37 @@ function player_info_statistics_tab_select(dialog, new_loc) {
     dialog.widgets['loading_rect'].show =
         dialog.widgets['loading_text'].show =
         dialog.widgets['loading_spinner'].show = true;
+    dialog.widgets['output'].clear_text();
 
     return dialog;
+}
+
+function player_info_statistics_tab_format_stat(dialog, stat, val, rank, by_group) {
+    var catdata = gamedata['strings']['leaderboard']['categories'][stat];
+    var display_mode = catdata['display'] || 'integer';
+    var ui_val;
+    if(display_mode == 'integer') {
+        ui_val = pretty_print_number(val);
+    } else if(display_mode == 'seconds') {
+        ui_val = pretty_print_time_brief(val);
+    } else if(display_mode == 'days') {
+        ui_val = (val/86400).toFixed(0);
+    } else {
+        throw Error('unknown display_mode '+display_mode);
+    }
+    var ui_stat = dialog.data['widgets']['output'][(rank >= 0 ? 'ui_stat_ranked' : 'ui_stat')].replace('%stat', catdata['title']).replace('%val', ui_val);
+    if(rank >= 0) { ui_stat = ui_stat.replace('%rank', pretty_print_number(rank+1)); }
+
+    var result = SPText.cstring_to_ablocks_bbcode(ui_stat, {tooltip_func:
+                                                            (function (_catdata) { return function() {
+                                                                return _catdata['description'];
+                                                            }; })(catdata)
+                                                           });
+    // append the result to the proper entry in by_group
+    if(!(catdata['group'] in by_group)) {
+        by_group[catdata['group']] = {};
+    }
+    by_group[catdata['group']][stat] = result;
 }
 
 function player_info_statistics_tab_receive(dialog, data, status_code, query_gen) {
@@ -22672,29 +22706,69 @@ function player_info_statistics_tab_receive(dialog, data, status_code, query_gen
             dialog.widgets['loading_text'].show =
             dialog.widgets['loading_spinner'].show = false;
 
+        dialog.widgets['output'].clear_text();
+
+        if(status_code == 'SCORES_OFFLINE') {
+             dialog.widgets['output'].append_text(SPText.cstring_to_ablocks(gamedata['errors']['SCORES_OFFLINE']['ui_name']));
+        }
+
+        var by_group = {}; // mapping from group name -> stat name -> string to display
         var player_data = data[0];
-        var all_ls = [];
+
         goog.array.forEach(stats, function(stat, i) {
             if(player_data[i]) {
-                var ui_name = gamedata['strings']['leaderboard']['categories'][stat]['title'];
                 var val = player_data[i]['absolute'] || 0;
                 var rank = ('rank' in player_data[i] ? player_data[i]['rank'] : -1);
-                var ui_stat;
-                if(rank >= 0) {
-                    ui_stat = dialog.data['widgets']['output']['ui_stat_ranked'].replace('%stat', ui_name).replace('%val', pretty_print_number(val)).replace('%rank', pretty_print_number(rank+1));
-                } else {
-                    ui_stat = dialog.data['widgets']['output']['ui_stat'].replace('%stat', ui_name).replace('%val', pretty_print_number(val));
-                }
-                all_ls.push(SPText.cstring_to_ablocks_bbcode(ui_stat));
+                player_info_statistics_tab_format_stat(dialog, stat, val, rank, by_group);
             }
         });
-        if(status_code == 'SCORES_OFFLINE') {
-            all_ls.push(SPText.cstring_to_ablocks(gamedata['errors']['SCORES_OFFLINE']['ui_name']));
+
+        // if looking at "all time" data, add some "fake" stats that are just player history keys
+        if(dialog.user_data['time_displayed'] == -1) {
+            goog.object.forEach({
+                'resources_looted_from_human': player.history['resources_looted_from_human'] || 0,
+                'resources_stolen_by_human': player.history['resources_stolen_by_human'] || 0,
+                'attacks_launched_vs_human': player.history['attacks_lauched_vs_human'] || 0,
+                // time_in_game is updated on logout, so add current session time
+                'time_in_game': player.history['time_in_game'] + (client_time - session.connect_time),
+                'account_age': server_time - player.creation_time},
+                                function(val, stat) {
+                                    if((stat in gamedata['strings']['leaderboard']['categories']) &&
+                                       ('group' in gamedata['strings']['leaderboard']['categories'][stat])) {
+                                        player_info_statistics_tab_format_stat(dialog, stat, val, -1, by_group);
+                                    }
+                                });
         }
-        dialog.widgets['output'].clear_text();
-        goog.array.forEach(all_ls, function(s) {
-            dialog.widgets['output'].append_text(s);
-        });
+
+        if(goog.object.getCount(by_group) < 1) {
+             dialog.widgets['output'].append_text(SPText.cstring_to_ablocks_bbcode(dialog.data['widgets']['output']['ui_name_nostats']));
+        } else {
+            // sort groups by priority, then alphabet
+            var sort_by_priority = function (db) { return function(a,b) {
+                var pa = db[a]['priority'] || 0, pb = db[b]['priority'] || 0;
+                var na = db[a]['title'], nb = db[b]['title'];
+                if(pa > pb) { return -1; }
+                else if(pa < pb) { return 1; }
+                else if(na > nb) { return 1; }
+                else if(na < nb) { return -1; }
+                else { return 0; }
+            }; };
+
+            var group_keys = goog.object.getKeys(by_group).sort(sort_by_priority(gamedata['strings']['leaderboard']['stat_groups']));
+            goog.array.forEach(group_keys, function(group_name, i) {
+                var group_data = gamedata['strings']['leaderboard']['stat_groups'][group_name];
+                var ui_group = group_data['title'].toUpperCase();
+                if(i > 0) { dialog.widgets['output'].append_text([]); } // add a blank line
+                dialog.widgets['output'].append_text(SPText.cstring_to_ablocks_bbcode(dialog.data['widgets']['output']['ui_group_header'].replace('%group', ui_group)));
+
+                // sort stats
+                var stat_keys = goog.object.getKeys(by_group[group_name]).sort(sort_by_priority(gamedata['strings']['leaderboard']['categories']));
+                goog.array.forEach(stat_keys, function(stat_name) {
+                    dialog.widgets['output'].append_text(by_group[group_name][stat_name]);
+                });
+            });
+        }
+
     } else {
         dialog.widgets['loading_text'].str = dialog.data['widgets']['loading_text']['ui_name_unavailable'];
         dialog.widgets['loading_spinner'].show = false;

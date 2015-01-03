@@ -811,6 +811,9 @@ def check_leaderboard(leaderboard):
             error |= check_predicate(data['show_if'], reason = 'leaderboard:categories:'+cat_name+':show_if')
         if 'challenge_icon' in data:
             error |= require_art_asset(data['challenge_icon'], reason = 'leaderboard:categories:'+cat_name+':challenge_icon')
+        if 'group' in data:
+            if data['group'] not in leaderboard['stat_groups']:
+                error |= 1; print 'leaderboard: stat %s has invalid group %s' % (cat_name, data['group'])
     return error
 
 def check_scores2_stat(stat, reason):
@@ -2855,6 +2858,8 @@ def main(args):
 
     for name, data in gamedata['spells'].iteritems():
         error |= check_spell('spell:'+name, data)
+
+    error |= check_leaderboard(gamedata['strings']['leaderboard'])
 
     for name, data in gamedata['regions'].iteritems():
         error |= check_region(name, data)

@@ -3123,6 +3123,7 @@ SPUI.ScrollingTextField.prototype.clear_text = function() {
     this.top = this.head;
     this.head.next = this.head.prev = this.head;
     this.n_lines = 0;
+    this.update_text();
 };
 
 SPUI.ScrollingTextField.prototype.destroy = function() {
@@ -3191,6 +3192,14 @@ SPUI.ScrollingTextField.prototype.update_text = function() {
             // can't fit
             break;
         }
+
+        // If we have an empty text node, the intention is to insert a
+        // carriage return. By default, break_lines() assumes empty
+        // text takes no space at all, so for the purposes of this
+        // widget, we have to change the interpretation of empty text
+        // to be "a line with no text" instead of "nothing at all".
+        if(s_n.length < 1) { s_n.push([]); }
+
         if(this.invert) { s_n.reverse(); }
         sblines = s_n.concat(sblines);
         node = node.prev;
