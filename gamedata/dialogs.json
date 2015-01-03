@@ -5443,8 +5443,10 @@
             "scroll_up": { "kind": "ActionButton", "xy": [670,145], "dimensions": [27,46], "bg_image": "chat_scroll_up", "push_bg_image": 1 },
             "scroll_down": { "kind": "ActionButton", "xy": [670,175], "dimensions": [27,46], "bg_image": "chat_scroll_down", "push_bg_image": 1 },
 
-            "show_other_button": { "show": 0, "kind": "ActionButton", "xy": [40,410], "dimensions": [136,32], "text_size": 13, "text_style": "bold",
-                                   "bg_image": "menu_button_136px", "state": "normal", "ui_name": "Show other stats" },
+            "show_other_button": { "show": 0, "kind": "ActionButton", "xy": [186,410], "dimensions": [136,32], "text_size": 13, "text_style": "bold",
+                                   "bg_image": "menu_button_resizable", "bg_image_resizable":1, "ui_name": "Show other stats" },
+            "share_button": { "show": 0, "kind": "ActionButton", "xy": [40,410], "dimensions": [136,32], "text_size": 13, "text_style": "bold",
+                              "bg_image": "action_button_resizable", "bg_image_resizable":1, "ui_name": "Share" },
 
             "loading_rect": { "show": 0, "kind": "SolidRect", "xy": [11,63], "dimensions": [713,402], "color":[0,0,0,0.33], "alpha": 0 }, // not used for now
             "loading_text": { "show": 0, "kind": "TextField", "xy": [11,63], "dimensions": [713,402], "text_size": 15, "text_style": "bold", "text_color":[1,1,1,1],

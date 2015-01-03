@@ -464,6 +464,7 @@ FACEBOOK_CAMPAIGN_MAP = {
     'feed_achievement': 'game_viral',
     'feed_aggregated': 'game_viral',
     'feed_highscore': 'game_viral',
+    'feed_stats_share': 'game_viral',
     'feed_leaderboard_brag': 'game_viral',
     'feed_level_up': 'game_viral',
     'feed_opengraph': 'game_viral',
@@ -474,6 +475,7 @@ FACEBOOK_CAMPAIGN_MAP = {
     'request': 'game_viral',
     'reminders': 'game_viral', # this is a reminder *about* a request
     'search': 'game_viral',
+    'stats_share': 'game_viral',
     'timeline': 'game_viral',
     'timeline_collection': 'game_viral',
     'timeline_og': 'game_viral',

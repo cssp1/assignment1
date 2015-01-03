@@ -55,6 +55,10 @@
         "ui_post_text": "Demonstrating skills superior to %PCT% of players in the game"
     },
 
+    "stats_share": {
+	"ui_post_headline": "Can you beat this score in Example Game?"
+    },
+
     "achievement_brag": {
         "ui_post_headline": "%PLAYER earned an achievement: \"%ACHIEVEMENT\" in Example Game"
     },

@@ -22515,15 +22515,14 @@ function invoke_player_info(user_id, knowledge) {
     dialog.auto_center();
     dialog.modal = true;
     dialog.widgets['close_button'].onclick = close_parent_dialog;
-    dialog.widgets['statistics_button'].onclick = invoke_statistics_tab;
+    dialog.widgets['statistics_button'].onclick = function(w) { invoke_statistics_tab(w.parent); };
     dialog.widgets['achievements_button'].onclick = invoke_achievements_tab;
     dialog.widgets['profile_button'].onclick = invoke_player_profile_tab;
     dialog.widgets['profile_button'].onclick(dialog.widgets['profile_button']);
     return dialog;
 }
 
-function invoke_statistics_tab(w) {
-    var parent = w.parent;
+function invoke_statistics_tab(parent, preselect) {
     var user_id = parent.user_data['user_id'];
     var knowledge = parent.user_data['knowledge'];
 
@@ -22588,7 +22587,16 @@ function invoke_statistics_tab(w) {
     dialog.user_data['show_rank'] = true;
 
     // show "all time" by default
-    player_info_statistics_tab_select(dialog, -1); // dialog.user_data['time_cur']);
+    var default_loc = -1; // dialog.user_data['time_cur']);
+    if(preselect && ('time' in preselect)) {
+        if(preselect['time'][0] == 'ALL') {
+            default_loc = -1;
+        } else {
+            default_loc = preselect['time'][1];
+        }
+    }
+
+    player_info_statistics_tab_select(dialog, default_loc);
     return dialog;
 }
 
@@ -22664,6 +22672,7 @@ function player_info_statistics_tab_select(dialog, new_loc) {
     dialog.widgets['loading_rect'].show =
         dialog.widgets['loading_text'].show =
         dialog.widgets['loading_spinner'].show = true;
+    dialog.widgets['share_button'].show = false;
     dialog.widgets['output'].clear_text();
     dialog.widgets['scroll_up'].onclick = function (w) { player_info_statistics_tab_scroll(w.parent, -1); };
     dialog.widgets['scroll_down'].onclick = function (w) { player_info_statistics_tab_scroll(w.parent, 1); };
@@ -22809,11 +22818,50 @@ function player_info_statistics_tab_receive(dialog, data, status_code, query_gen
         }
         dialog.widgets['output'].scroll_to_top();
         player_info_statistics_tab_scroll(dialog, 0);
-
+        player_info_statistics_tab_setup_share_button(dialog);
     } else {
+        dialog.widgets['share_button'].show = false;
         dialog.widgets['loading_text'].str = dialog.data['widgets']['loading_text']['ui_name_unavailable'];
         dialog.widgets['loading_spinner'].show = false;
     }
+}
+
+function player_info_statistics_tab_setup_share_button(dialog) {
+    if(spin_frame_platform != 'fb' ||
+       !player.get_any_abtest_value('enable_player_info_statistics_share_button',
+                                    gamedata['client']['enable_player_info_statistics_share_button'])) {
+        return;
+    }
+    dialog.widgets['share_button'].show = true;
+    dialog.widgets['share_button'].onclick = function(w) {
+        var dialog = w.parent;
+        var val = {'user_id': dialog.user_data['user_id'],
+                   'preselect': {'time': [dialog.user_data['time_displayed'] == -1 ? 'ALL' : dialog.user_data['time_scope'],
+                                          dialog.user_data['time_displayed']]}};
+        var url = 'https://apps.facebook.com/'+spin_app_namespace+'/';
+        url += '?spin_campaign=feed_stats_share&spin_ref=feed_stats_share&spin_ref_user_id='+session.user_id.toString();
+        url += '&player_info_statistics='+encodeURIComponent(JSON.stringify(val));
+        if(!spin_facebook_enabled) { console.log('player_info_statistics_tab_share_button: '+url); return; }
+
+        call_with_facebook_permissions('publish_actions', (function (_url) { return function() {
+            var viral = gamedata['virals']['stats_share'];
+            var props = {'method':'feed',
+                         'name':viral['ui_post_headline'],
+                         'link':_url,
+                         'picture': gamedata['virals']['common_image_path'] + gamedata['virals']['default_image'],
+                         'ref':'stats_share', // 15-char limit
+                         'show_error': !spin_secure_mode
+                        };
+            metric_event('7270_feed_post_attempted', {'method':'stats_share'});
+
+            SPFB.ui(props, function(response) { // statistics share
+                if(!response) { return; } // cancelled
+                if('id' in response) {
+                   metric_event('7271_feed_post_completed', {'method':'stats_share', 'facebook_post_id':response['id']});
+                } });
+
+        }; }(url)));
+    };
 }
 
 function invoke_achievements_tab(w, preselect_category, preselect_name) {
@@ -39332,12 +39380,6 @@ function handle_server_message(data) {
             })();
         }
 
-        // allow developers to link directly to someone's base
-        var immediate_visit = get_query_string('visit_base');
-        if(player.is_developer && immediate_visit) {
-            visit_base(parseInt(immediate_visit));
-        }
-
     } else if(msg == "SQUADS_UPDATE") {
         player.squads = data[1];
         for(var key in squad_update_receivers) {
@@ -39893,11 +39935,32 @@ function handle_server_message(data) {
         longpoll_send();
         SPLWMetrics.send_event(spin_metrics_anon_id, '0120_client_ingame', add_demographics({}));
 
+        // URL parameter processing
+
+        // benchmark mode
         if(!spin_secure_mode) {
             var benchmark = get_query_string('benchmark');
             if(benchmark) {
                 var context = JSON.parse(decodeURIComponent(benchmark));
                 read_consequent({'consequent':'LIBRARY', 'name':'benchmark'}).execute(context);
+            }
+        }
+
+        // allow developers to link directly to someone's base
+        var immediate_visit = get_query_string('visit_base');
+        if(player.is_developer && immediate_visit) {
+            visit_base(parseInt(immediate_visit));
+        }
+
+        // deep link to player info statistics
+        if(player.tutorial_state == "COMPLETE") {
+            var player_info_statistics = get_query_string('player_info_statistics');
+            if(player_info_statistics) {
+                var request = JSON.parse(decodeURIComponent(player_info_statistics));
+                var dialog = invoke_player_info_dialog_unknown(request['user_id'], null, null, null,
+                                                               (function(_request) { return function(_dialog) {
+                                                                   invoke_statistics_tab(_dialog, _request['preselect'] || null);
+                                                               }; })(request));
             }
         }
 
