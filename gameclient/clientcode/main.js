@@ -22856,8 +22856,8 @@ function player_info_statistics_tab_setup_share_button(dialog) {
 
             SPFB.ui(props, function(response) { // statistics share
                 if(!response) { return; } // cancelled
-                if('id' in response) {
-                   metric_event('7271_feed_post_completed', {'method':'stats_share', 'facebook_post_id':response['id']});
+                if('post_id' in response) {
+                   metric_event('7271_feed_post_completed', {'method':'stats_share', 'facebook_post_id':response['post_id']});
                 } });
 
         }; }(url)));
