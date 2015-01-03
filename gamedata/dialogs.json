@@ -5432,8 +5432,13 @@
                         "ui_group_header": "[b]%group[/b]",
                         "ui_stat": "%stat: [color=#1eff66]%val[/color]",
                         "ui_stat_ranked": "%stat: [color=#1eff66]%val[/color] [color=#ffff00](ranked #%rank)[/color]",
-                        "ui_name_nostats": "No statistics available for this time period.",
-                        "ui_name_delay": "(Rankings updated every 60 minutes)"
+                        "ui_name_nostats": "No stats available for this time period.",
+                        // even though "hot" stats are technially realtime, some are flushed on battle/end log out, so don't make any promises
+                        "ui_name_delay_hot": "(Rankings updated every 15 minutes)",
+                        // normal warning for offline "cold" stats
+                        "ui_name_delay_cold": "(Rankings updated every 60 minutes)",
+                        // historical stats can't be affected by players anymore, so don't show any warning
+                        "ui_name_delay_history": ""
                       },
             "scroll_up": { "kind": "ActionButton", "xy": [670,145], "dimensions": [27,46], "bg_image": "chat_scroll_up", "push_bg_image": 1 },
             "scroll_down": { "kind": "ActionButton", "xy": [670,175], "dimensions": [27,46], "bg_image": "chat_scroll_down", "push_bg_image": 1 },
@@ -5443,7 +5448,7 @@
 
             "loading_rect": { "show": 0, "kind": "SolidRect", "xy": [11,63], "dimensions": [713,402], "color":[0,0,0,0.33], "alpha": 0 }, // not used for now
             "loading_text": { "show": 0, "kind": "TextField", "xy": [11,63], "dimensions": [713,402], "text_size": 15, "text_style": "bold", "text_color":[1,1,1,1],
-                              "ui_name": "Loading...", "ui_name_unavailable": "No statistics available" },
+                              "ui_name": "Loading...", "ui_name_unavailable": "No stats available" },
             "loading_spinner": { "show": 0, "kind": "StaticImage", "xy":[305,256], "dimensions":[16,16], "asset":"loading_spinner" }
         }
     },
