@@ -34,38 +34,13 @@
     "pvp": 300, // home base PvP
     "pve": 600, // map-menu PvE
     "quarry": 300, // quarry attacks
-    "hive": 300, // hive attacks
+    "hive": 300 // hive attacks
 },
 
 // number of seconds attack has been going on (for at least) -> number of seconds it takes to retreat
 "retreat_time_table": [[0,5], // 0-10sec: 5sec retreat
                        [10,1], // 10-20sec: 1sec retreat
-                       [20,1],
-                      ], // 20+sec: 1sec retreat
-
-{ "requires":  [  { "predicate": "AND", "subpredicates": [
-    { "predicate": "BUILDING_LEVEL", "building_type": "toc", "trigger_level": 3 },
-    { "predicate": "BUILDING_QUANTITY", "building_type": "maintenance_bay", "trigger_qty": 1 }
-] },
-                  { "predicate": "ALWAYS_TRUE" }
-               ]
-},
-
-{ "predicate": "AND", "subpredicates": [
-    { "predicate": "BUILDING_QUANTITY", "building_type": "transmitter", "trigger_qty": 1 }
-] },
-
-{ "explosion_effect": [
-    "effects": [
-    ]
-] },
-
-[{ "predicate": "AND", "subpredicates": [
-    { "predicate": "BUILDING_LEVEL", "building_type": "toc", "trigger_level": 3 },
-    { "predicate": "BUILDING_QUANTITY", "building_type": "maintenance_bay", "trigger_qty": 1 }
-] },
- { "predicate": "ALWAYS_TRUE" }
-],
+                       [20,1]], // 20+sec: 1sec retreat
 
 // MAX PvP LEVEL GAP - indexed by your (attacker's) level
 // if two players' levels differ by this much, then the stronger player is prevented from attacking
