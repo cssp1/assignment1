@@ -226,7 +226,7 @@
                                 "dialog": "message_dialog_big" },
 
     "ALLIANCES_OFFLINE": { "ui_title": "Alliance error", "ui_name": "Alliance features are temporarily unavailable" },
-    "SCORES_OFFLINE": { "ui_title": "Database Maintenance", "ui_name": "Stats are temporarily offline due to scheduled database maintenance, check back later." },
+    "SCORES_OFFLINE": { "ui_title": "Database Maintenance", "ui_name": "Some battle stats are temporarily offline due to scheduled database maintenance. Please check back later." },
     "CANNOT_JOIN_ALLIANCE": { "ui_title": "Alliance error", "ui_name": "You cannot join this alliance" },
     "CANNOT_CREATE_ALLIANCE_NAME_BAD": { "ui_title": "Alliance name error", "ui_name": "Names must be between 3 and 24 characters, and may contain only the following letters:\n\nA-Z 0-9 '\n\nThe first three characters of the name must be letters A-Z.\n\nOffensive language is not tolerated." },
     "CANNOT_CREATE_ALLIANCE_TAG_BAD": { "ui_title": "Chat tag error", "ui_name": "Chat tags must be 3 characters, and may contain only the following letters:\n\nA-Z 0-9\n\nOffensive language is not tolerated." },

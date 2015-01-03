@@ -808,7 +808,14 @@ def check_leaderboard(leaderboard):
     error = 0
     for cat_name, data in leaderboard['categories'].iteritems():
         if 'show_if' in data:
-            error |= check_predicate(data['show_if'], reason = 'leaderboard:categories:'+cat_name+':show_if')
+            error |= 1; print 'leaderboard: stat %s has obsolete "show_if" field, replace with "leaderboard_show_if"/"statistics_show_if"' % (cat_name)
+        for PRED in ('leaderboard_show_if','statistics_show_if'):
+            if PRED in data:
+                error |= check_predicate(data[PRED], reason = 'leaderboard:categories:'+cat_name+':'+PRED)
+        if 'statistics_show_if' in data and (not 'group' in data):
+            error |= 1; print 'leaderboard: stat %s has "statistics_show_if" but also needs a "group"' % (cat_name)
+        if 'group' in data and (not 'statistics_show_if' in data):
+            error |= 1; print 'leaderboard: stat %s has "group" but no "statistics_show_if"' % (cat_name)
         if 'challenge_icon' in data:
             error |= require_art_asset(data['challenge_icon'], reason = 'leaderboard:categories:'+cat_name+':challenge_icon')
         if 'group' in data:

@@ -22077,7 +22077,7 @@ function invoke_leaderboard(force_period, force_mode, force_chapter) {
     dialog.user_data['categories'] = [];
 
     goog.object.forEach(gamedata['strings']['leaderboard']['categories'], function(data, name) {
-        var enabled = read_predicate(data['show_if']).is_satisfied(player, null);
+        var enabled = ('leaderboard_show_if' in data && read_predicate(data['leaderboard_show_if']).is_satisfied(player, null));
         if(name == 'money_spent' && player.enable_muffins) { enabled = true; }
         if(enabled) {
             dialog.user_data['categories'].push(name);
@@ -22645,7 +22645,9 @@ function player_info_statistics_tab_select(dialog, new_loc) {
     dialog.user_data['stats'] = goog.array.filter(['trophies_pvp','trophies_pvv','tokens_looted',
                                                    'havoc_caused','hive_kill_points','quarry_resources','stringpoint_resources'],
                                                   function(stat) { return (stat in gamedata['strings']['leaderboard']['categories']) &&
-                                                                   ('group' in gamedata['strings']['leaderboard']['categories'][stat]); });
+                                                                   ('group' in gamedata['strings']['leaderboard']['categories'][stat]) &&
+                                                                   ('statistics_show_if' in gamedata['strings']['leaderboard']['categories'][stat]) &&
+                                                                   read_predicate(gamedata['strings']['leaderboard']['categories'][stat]['statistics_show_if']).is_satisfied(player,null); });
 
     // list of queries to send
     var qls = [];
@@ -22723,7 +22725,8 @@ function player_info_statistics_tab_receive(dialog, data, status_code, query_gen
         dialog.widgets['output'].clear_text();
 
         if(status_code == 'SCORES_OFFLINE') {
-             dialog.widgets['output'].append_text(SPText.cstring_to_ablocks(gamedata['errors']['SCORES_OFFLINE']['ui_name']));
+            dialog.widgets['output'].append_text(SPText.cstring_to_ablocks(gamedata['errors']['SCORES_OFFLINE']['ui_name']));
+            dialog.widgets['output'].append_text([]); // add a blank line
         }
 
         var by_group = {}; // mapping from group name -> stat name -> string to display
@@ -22748,7 +22751,9 @@ function player_info_statistics_tab_receive(dialog, data, status_code, query_gen
                 'account_age': server_time - player.creation_time},
                                 function(val, stat) {
                                     if((stat in gamedata['strings']['leaderboard']['categories']) &&
-                                       ('group' in gamedata['strings']['leaderboard']['categories'][stat])) {
+                                       ('group' in gamedata['strings']['leaderboard']['categories'][stat]) &&
+                                       ('statistics_show_if' in gamedata['strings']['leaderboard']['categories'][stat]) &&
+                                       read_predicate(gamedata['strings']['leaderboard']['categories'][stat]['statistics_show_if']).is_satisfied(player, null)) {
                                         player_info_statistics_tab_format_stat(dialog, stat, val, -1, by_group);
                                     }
                                 });
@@ -25028,7 +25033,10 @@ function invoke_player_profile_tab(w) {
     dialog.user_data['user_id'] = user_id;
     dialog.user_data['alliance_query_sent'] = false;
     dialog.user_data['open_time'] = client_time;
-    dialog.user_data['categories'] = ['conquests', 'resources_looted', 'havoc_caused', 'damage_inflicted'];
+    dialog.user_data['categories'] = goog.array.filter(['conquests', 'resources_looted', 'havoc_caused', 'damage_inflicted'],
+                                                       function(stat) { return (stat in gamedata['strings']['leaderboard']['categories']) &&
+                                                                        ('leaderboard_show_if' in gamedata['strings']['leaderboard']['categories'][stat]) &&
+                                                                        read_predicate(gamedata['strings']['leaderboard']['categories'][stat]['leaderboard_show_if']).is_satisfied(player, null); });
     dialog.user_data['periods'] = ['week', 'season'];
     dialog.user_data['period'] = 'week';
     dialog.user_data['score_query_sent'] = {};
