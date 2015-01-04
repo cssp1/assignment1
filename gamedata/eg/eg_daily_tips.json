@@ -1,0 +1,37 @@
+// Copyright (c) 2014 SpinPunch. All rights reserved.
+// Use of this source code is governed by an MIT-style license that can be
+// found in the LICENSE file.
+
+[
+    // POP-UP (old-style) daily tips:
+    // The player will be shown the first tip in this list that is eligible to be shown
+    // After closing dialog, the player history item "daily_tip:TIP_NAME" will be set to 1
+    // After clicking "Understood", the player history item "daily_tip:TIP_NAME" will be set to 2
+
+    // PAGEABLE (new-style) daily tips:
+    // All applicable tips will be shown, from oldest to newest, starting with the oldest unseen tip.
+
+    //
+    // To test a tip, type in console:
+    // invoke_daily_tip('NAME_OF_TIP')
+    //
+
+    // PAGEABLE TIPS BEGIN HERE
+    // "Message of the day" forms the end of pageable tips.
+    //    {"name": "motd", "kind": "pageable",
+    //     "ui_description": "[b]August 6, 2013[/b]\n\nDisband unit space bug fixed - unit space is now returned immediately when disbanding a unit.\n\nThank you for trying our beta release!"
+    //    },
+
+
+    // PAGEABLE TIPS END HERE
+
+    // {"name": "20121130_like_us_on_facebook",
+    //  "image": "20121130_like_us_on_facebook.jpg",
+    //  "understood_button_xy": [565,368],
+    //  "understood_button_ui_name": "View Page",
+    //  "understood_button_url": "http:\/\/www.facebook.com/141835099310946/?ref=daily_tip",
+    //  "show_if": { "predicate": "AND", "subpredicates": [
+    //   { "predicate": "BUILDING_LEVEL", "building_type": "toc", "trigger_level": 3 }
+    //  ] }
+    // },
+]

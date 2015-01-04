@@ -1,0 +1,657 @@
+
+ "scenery": [{
+    "xy": [87,95],
+    "spec": "concrete1"
+  },{
+    "xy": [73,94],
+    "spec": "dirt_road_ew1"
+  },{
+    "xy": [62,94],
+    "spec": "dirt_road_ew1"
+  },{
+    "xy": [52,94],
+    "spec": "dirt_road_ew1"
+  },{
+    "xy": [41,94],
+    "spec": "dirt_road_ew1"
+  },{
+    "xy": [32,94],
+    "spec": "dirt_road_ew1"
+  },{
+    "xy": [21,94],
+    "spec": "dirt_road_ew1"
+  },{
+    "xy": [110,100],
+    "spec": "lightpost"
+  },{
+    "xy": [110,90],
+    "spec": "lightpost"
+  },{
+    "xy": [66,90],
+    "spec": "lightpost"
+  },{
+    "xy": [66,97],
+    "spec": "lightpost"
+  },{
+    "xy": [94,99],
+    "spec": "lightpost"
+  },{
+    "xy": [81,99],
+    "spec": "lightpost"
+  }],
+ "unit_equipment": {
+   
+ },
+ "buildings": [{
+    "xy": [74,86],
+    "spec": "%RESOURCE_harvester",
+    "force_level": 2
+  },{
+    "xy": [101,86],
+    "spec": "%RESOURCE_harvester",
+    "force_level": 2
+  },{
+    "xy": [74,102],
+    "spec": "%RESOURCE_harvester",
+    "force_level": 2
+  },{
+    "xy": [101,101],
+    "spec": "%RESOURCE_harvester",
+    "force_level": 2
+  },{
+    "xy": [91,105],
+    "spec": "mortar_emplacement",
+    "force_level": 2
+  },{
+    "xy": [84,75],
+    "spec": "mortar_emplacement",
+    "force_level": 2
+  },{
+    "xy": [84,105],
+    "spec": "mg_tower",
+    "force_level": 2
+  },{
+    "xy": [92,75],
+    "spec": "mg_tower",
+    "force_level": 2
+  },{
+    "xy": [90,112],
+    "spec": "barrier",
+    "force_level": 2
+  },{
+    "xy": [92,112],
+    "spec": "barrier",
+    "force_level": 2
+  },{
+    "xy": [94,112],
+    "spec": "barrier",
+    "force_level": 2
+  },{
+    "xy": [96,112],
+    "spec": "barrier",
+    "force_level": 2
+  },{
+    "xy": [98,112],
+    "spec": "barrier",
+    "force_level": 2
+  },{
+    "xy": [98,110],
+    "spec": "barrier",
+    "force_level": 2
+  },{
+    "xy": [98,108],
+    "spec": "barrier",
+    "force_level": 2
+  },{
+    "xy": [100,108],
+    "spec": "barrier",
+    "force_level": 2
+  },{
+    "xy": [108,88],
+    "spec": "barrier",
+    "force_level": 2
+  },{
+    "xy": [102,108],
+    "spec": "barrier",
+    "force_level": 2
+  },{
+    "xy": [104,108],
+    "spec": "barrier",
+    "force_level": 2
+  },{
+    "xy": [106,108],
+    "spec": "barrier",
+    "force_level": 2
+  },{
+    "xy": [108,108],
+    "spec": "barrier",
+    "force_level": 2
+  },{
+    "xy": [108,106],
+    "spec": "barrier",
+    "force_level": 2
+  },{
+    "xy": [108,104],
+    "spec": "barrier",
+    "force_level": 2
+  },{
+    "xy": [108,102],
+    "spec": "barrier",
+    "force_level": 2
+  },{
+    "xy": [108,100],
+    "spec": "barrier",
+    "force_level": 2
+  },{
+    "xy": [108,90],
+    "spec": "barrier",
+    "force_level": 2
+  },{
+    "xy": [108,86],
+    "spec": "barrier",
+    "force_level": 2
+  },{
+    "xy": [108,84],
+    "spec": "barrier",
+    "force_level": 2
+  },{
+    "xy": [108,82],
+    "spec": "barrier",
+    "force_level": 2
+  },{
+    "xy": [108,80],
+    "spec": "barrier",
+    "force_level": 2
+  },{
+    "xy": [106,80],
+    "spec": "barrier",
+    "force_level": 2
+  },{
+    "xy": [104,80],
+    "spec": "barrier",
+    "force_level": 2
+  },{
+    "xy": [102,80],
+    "spec": "barrier",
+    "force_level": 2
+  },{
+    "xy": [100,80],
+    "spec": "barrier",
+    "force_level": 2
+  },{
+    "xy": [98,80],
+    "spec": "barrier",
+    "force_level": 2
+  },{
+    "xy": [98,78],
+    "spec": "barrier",
+    "force_level": 2
+  },{
+    "xy": [98,76],
+    "spec": "barrier",
+    "force_level": 2
+  },{
+    "xy": [98,74],
+    "spec": "barrier",
+    "force_level": 2
+  },{
+    "xy": [98,72],
+    "spec": "barrier",
+    "force_level": 2
+  },{
+    "xy": [98,70],
+    "spec": "barrier",
+    "force_level": 2
+  },{
+    "xy": [96,70],
+    "spec": "barrier",
+    "force_level": 2
+  },{
+    "xy": [94,70],
+    "spec": "barrier",
+    "force_level": 2
+  },{
+    "xy": [92,70],
+    "spec": "barrier",
+    "force_level": 2
+  },{
+    "xy": [90,70],
+    "spec": "barrier",
+    "force_level": 2
+  },{
+    "xy": [88,70],
+    "spec": "barrier",
+    "force_level": 2
+  },{
+    "xy": [86,70],
+    "spec": "barrier",
+    "force_level": 2
+  },{
+    "xy": [84,70],
+    "spec": "barrier",
+    "force_level": 2
+  },{
+    "xy": [82,70],
+    "spec": "barrier",
+    "force_level": 2
+  },{
+    "xy": [80,70],
+    "spec": "barrier",
+    "force_level": 2
+  },{
+    "xy": [78,70],
+    "spec": "barrier",
+    "force_level": 2
+  },{
+    "xy": [78,72],
+    "spec": "barrier",
+    "force_level": 2
+  },{
+    "xy": [78,74],
+    "spec": "barrier",
+    "force_level": 2
+  },{
+    "xy": [78,76],
+    "spec": "barrier",
+    "force_level": 2
+  },{
+    "xy": [76,80],
+    "spec": "barrier",
+    "force_level": 2
+  },{
+    "xy": [78,80],
+    "spec": "barrier",
+    "force_level": 2
+  },{
+    "xy": [78,78],
+    "spec": "barrier",
+    "force_level": 2
+  },{
+    "xy": [74,80],
+    "spec": "barrier",
+    "force_level": 2
+  },{
+    "xy": [72,80],
+    "spec": "barrier",
+    "force_level": 2
+  },{
+    "xy": [70,80],
+    "spec": "barrier",
+    "force_level": 2
+  },{
+    "xy": [68,80],
+    "spec": "barrier",
+    "force_level": 2
+  },{
+    "xy": [68,82],
+    "spec": "barrier",
+    "force_level": 2
+  },{
+    "xy": [68,84],
+    "spec": "barrier",
+    "force_level": 2
+  },{
+    "xy": [68,86],
+    "spec": "barrier",
+    "force_level": 2
+  },{
+    "xy": [68,90],
+    "spec": "barrier",
+    "force_level": 2
+  },{
+    "xy": [68,98],
+    "spec": "barrier",
+    "force_level": 2
+  },{
+    "xy": [68,100],
+    "spec": "barrier",
+    "force_level": 2
+  },{
+    "xy": [68,102],
+    "spec": "barrier",
+    "force_level": 2
+  },{
+    "xy": [68,104],
+    "spec": "barrier",
+    "force_level": 2
+  },{
+    "xy": [68,106],
+    "spec": "barrier",
+    "force_level": 2
+  },{
+    "xy": [68,108],
+    "spec": "barrier",
+    "force_level": 2
+  },{
+    "xy": [70,108],
+    "spec": "barrier",
+    "force_level": 2
+  },{
+    "xy": [72,108],
+    "spec": "barrier",
+    "force_level": 2
+  },{
+    "xy": [74,108],
+    "spec": "barrier",
+    "force_level": 2
+  },{
+    "xy": [76,108],
+    "spec": "barrier",
+    "force_level": 2
+  },{
+    "xy": [78,108],
+    "spec": "barrier",
+    "force_level": 2
+  },{
+    "xy": [80,108],
+    "spec": "barrier",
+    "force_level": 2
+  },{
+    "xy": [80,110],
+    "spec": "barrier",
+    "force_level": 2
+  },{
+    "xy": [80,112],
+    "spec": "barrier",
+    "force_level": 2
+  },{
+    "xy": [82,112],
+    "spec": "barrier",
+    "force_level": 2
+  },{
+    "xy": [84,112],
+    "spec": "barrier",
+    "force_level": 2
+  },{
+    "xy": [86,112],
+    "spec": "barrier",
+    "force_level": 2
+  },{
+    "xy": [88,112],
+    "spec": "barrier",
+    "force_level": 2
+  },{
+    "xy": [68,88],
+    "spec": "barrier",
+    "force_level": 2
+  },{
+    "xy": [88,85],
+    "spec": "generator",
+    "force_level": 2
+  }],
+ "base_climate": "desert",
+ "base_ncells": null,
+ "deployment_buffer": 1,
+ "units": [{
+    "xy": [82,118],
+    "patrol": 1,
+    "spec": "stryker",
+    "orders": [{
+       "dest": [71,120],
+       "state": 6,
+       "aggressive": false
+     },{
+       "dest": [55,100],
+       "state": 6,
+       "aggressive": false
+     },{
+       "dest": [59,68],
+       "state": 6,
+       "aggressive": false
+     },{
+       "dest": [83,54],
+       "state": 6,
+       "aggressive": false
+     },{
+       "dest": [111,71],
+       "state": 6,
+       "aggressive": false
+     },{
+       "dest": [120,90],
+       "state": 6,
+       "patrol_origin": 1
+     },{
+       "dest": [120,90],
+       "state": 6,
+       "aggressive": false
+     },{
+       "dest": [120,113],
+       "state": 6,
+       "aggressive": false
+     }]
+  },{
+    "xy": [113,109],
+    "patrol": 1,
+    "spec": "rifleman",
+    "orders": [{
+       "dest": [114,125],
+       "state": 6,
+       "patrol_origin": 1
+     },{
+       "dest": [90,126],
+       "state": 6,
+       "aggressive": false
+     },{
+       "dest": [66,112],
+       "state": 6,
+       "aggressive": false
+     },{
+       "dest": [62,72],
+       "state": 6,
+       "aggressive": false
+     },{
+       "dest": [111,64],
+       "state": 6,
+       "aggressive": false
+     }]
+  },{
+    "xy": [65,59],
+    "patrol": true,
+    "spec": "rifleman",
+    "orders": [{
+       "dest": [81,49],
+       "state": 5,
+       "aggressive": false
+     },{
+       "dest": [120,67],
+       "state": 5,
+       "aggressive": false
+     },{
+       "dest": [148,106],
+       "state": 5,
+       "aggressive": false
+     },{
+       "dest": [111,154],
+       "state": 5
+     },{
+       "dest": [72,129],
+       "state": 5,
+       "aggressive": false
+     },{
+       "dest": [33,88],
+       "state": 5,
+       "aggressive": false
+     },{
+       "dest": [46,73],
+       "state": 5,
+       "aggressive": false
+     }]
+  },{
+    "xy": [77,93],
+    "patrol": 1,
+    "spec": "oh58",
+    "orders": [{
+       "dest": [75,86],
+       "state": 6,
+       "aggressive": false
+     },{
+       "dest": [94,74],
+       "state": 6,
+       "aggressive": false
+     },{
+       "dest": [104,102],
+       "state": 6,
+       "aggressive": false
+     },{
+       "dest": [73,104],
+       "state": 6,
+       "aggressive": false
+     },{
+       "dest": [78,96],
+       "state": 6,
+       "patrol_origin": 1
+     }]
+  },{
+    "xy": [103,96],
+    "patrol": 1,
+    "spec": "oh58",
+    "orders": [{
+       "dest": [103,104],
+       "state": 6,
+       "aggressive": false
+     },{
+       "dest": [91,106],
+       "state": 6,
+       "aggressive": false
+     },{
+       "dest": [79,105],
+       "state": 6,
+       "patrol_origin": 1
+     },{
+       "dest": [70,93],
+       "state": 6,
+       "aggressive": false
+     },{
+       "dest": [81,73],
+       "state": 6,
+       "aggressive": false
+     },{
+       "dest": [102,76],
+       "state": 6,
+       "aggressive": false
+     }]
+  },{
+    "xy": [120,108],
+    "patrol": 1,
+    "spec": "rifleman",
+    "orders": [{
+       "dest": [107,120],
+       "state": 6,
+       "aggressive": false
+     },{
+       "dest": [60,114],
+       "state": 6,
+       "aggressive": false
+     },{
+       "dest": [65,67],
+       "state": 6,
+       "aggressive": false
+     },{
+       "dest": [104,66],
+       "state": 6,
+       "aggressive": false
+     },{
+       "dest": [124,97],
+       "state": 6,
+       "patrol_origin": 1
+     },{
+       "dest": [121,108],
+       "state": 6,
+       "aggressive": false
+     }]
+  },{
+    "xy": [69,80],
+    "patrol": 1,
+    "spec": "oh58",
+    "orders": [{
+       "dest": [69,80],
+       "state": 6,
+       "aggressive": false
+     },{
+       "dest": [79,70],
+       "state": 6,
+       "aggressive": false
+     },{
+       "dest": [98,70],
+       "state": 6,
+       "aggressive": false
+     },{
+       "dest": [106,83],
+       "state": 6,
+       "aggressive": false
+     },{
+       "dest": [106,105],
+       "state": 6,
+       "aggressive": false
+     },{
+       "dest": [99,113],
+       "state": 6,
+       "patrol_origin": 1
+     },{
+       "dest": [99,113],
+       "state": 6,
+       "aggressive": false
+     },{
+       "dest": [69,107],
+       "state": 6,
+       "aggressive": false
+     }]
+  },{
+    "xy": [62,87],
+    "patrol": 1,
+    "spec": "stryker",
+    "orders": [{
+       "dest": [62,87],
+       "state": 6,
+       "aggressive": false
+     },{
+       "dest": [63,99],
+       "state": 6,
+       "patrol_origin": 1
+     },{
+       "dest": [62,97],
+       "state": 6,
+       "aggressive": false
+     }]
+  },{
+    "xy": [77,93],
+    "spec": "stryker",
+    "orders": [{
+       "state": 4,
+       "aggressive": false
+     }]
+  },{
+    "xy": [74,94],
+    "spec": "rifleman",
+    "orders": [{
+       "state": 4,
+       "aggressive": false
+     }]
+  },{
+    "xy": [94,93],
+    "spec": "rifleman",
+    "orders": [{
+       "state": 4,
+       "aggressive": false
+     }]
+  },{
+    "xy": [71,94],
+    "spec": "rifleman",
+    "orders": [{
+       "state": 4,
+       "aggressive": false
+     }]
+  },{
+    "xy": [100,93],
+    "spec": "rifleman",
+    "orders": [{
+       "state": 4,
+       "aggressive": false
+     }]
+  }],
+ "tech": {
+     "oh58_production": 2,
+     "rifleman_production": 2,
+     "stryker_production": 2
+ }
+

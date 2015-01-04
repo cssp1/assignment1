@@ -1,0 +1,1142 @@
+// Copyright (c) 2014 SpinPunch. All rights reserved.
+// Use of this source code is governed by an MIT-style license that can be
+// found in the LICENSE file.
+
+{
+    // NEW QUEST PRIORITY SYSTEM
+    //
+    // priority >200 is for essential extended-tutorial stuff like Activate An Item
+    //
+    // the next CC upgrade quest ("primary mission") is always priority = 100
+    //
+    // Any quests that fulfill immediate requirements for the CC upgrade should be around 101-120
+    // so they appear immediately above it in the quest list.
+    //
+    // "side quests" that are not essential for the next CC upgrade, like unit unlocks,
+    // should be around 80+ (for robotics lab, through Detonators)
+    // or 70+ (for research center stuff)
+    //
+    // everything else goes lower
+
+
+    "reclaim_base": {
+        // must be the same as the key name above
+        "name": "reclaim_base",
+
+        // name displayed in left-hand column of Missions dialog
+        "ui_name": "Basic Training",
+
+        // title displayed in big font on right-hand side of Missions dialog
+        // "ui_flavor_name": "Initial Training Complete",
+
+        // instructions displayed just below ui_flavor_name in Missions dialog
+        // this should very specifically tell the player what he/she needs to do
+        // (basically just explain the "goal" predicate in English words)
+        // "ui_instructions": "Finish all steps\nin tutorial",
+
+        // This is a longer description displayed at bottom in
+        // Missions dialog. Use \n to create line
+        // breaks. (this will be automated later, but please
+        // enter manual line breaks for now so the text doesn't
+        // run off the end of the dialog!)
+        "ui_description": "Congratulations, you've completed basic training! Missions like this one give you bonuses for\nlearning new features in Example Game.",
+
+        // controls the order in which quests appear in the Missions dialog
+        // also, if auto-accept is enabled, the game will automatically accept
+        // the highest-priority available quest (first scanning for completed quests, then active quests if none are completed)
+        "ui_priority": 999,
+
+        // predicate for activating this quest (displaying it to the player)
+        // ** the mission will NOT show up in the Missions dialog until this requirement fulfilled **
+        // (this is to hide more advanced missions from beginning players)
+        "activation": { "predicate": "ALWAYS_TRUE" },
+
+        // predicate for completing this mission
+        // this is the condition for actually finishing the quest and getting the reward
+        "goal": { "predicate": "ALWAYS_TRUE" },
+
+        // necessary to produce the "click to claim" arrow right after tutorial ends
+        "tips": {"null":1},
+        "tips_in_combat": 1,
+
+        // show tips that force player to claim quest, even if skip_quest_claim option is enabled
+        "force_claim": 1,
+
+        // order within the linear "extended tutorial"
+        "ui_category": "Tutorial Mission",
+        "ui_step": 1,
+
+        // what rewards you get for completing the mission
+        "reward_xp": 10,
+        "reward_iron": 100,
+        "reward_water": 200,
+        "reward_heal_all_units": 1,
+        "reward_heal_all_buildings": 1
+    },
+
+    // Updated 4/7/2012
+    "gather_resources": {
+        "name": "gather_resources",
+        "ui_name": "Collect Supplies & Fuel",
+        "ui_flavor_name": "Time to collect",
+        "ui_description": "Yards fill regularly with supplies and fuel. Collect these resources to upgrade buildings and train units.",
+
+        "activation": {"predicate": "AND", "subpredicates": [
+            { "predicate": "QUEST_COMPLETED", "quest_name": "reclaim_base" } // need this because of accelerated starting conditions
+            //{ "predicate": "QUEST_COMPLETED", "quest_name": "build_storage" }
+        ] },
+
+        "goal": { "predicate": "AND", "subpredicates": [
+            { "predicate": "RESOURCES_HARVESTED_TOTAL", "resource_type": "iron", "amount": 1 },
+            { "predicate": "RESOURCES_HARVESTED_TOTAL", "resource_type": "water", "amount": 1 }] },
+
+        "reward_xp": 10,
+        "reward_iron": 2000,
+        "reward_water": 2000,
+        "force_claim": 1,
+
+        "ui_category": "Tutorial Mission",
+        "ui_step": 2, // order within the linear "extended tutorial"
+
+        "tips": {
+            // this is broken into two sections, first for the water collection, then the iron collection
+
+            "if": {"predicate": "RESOURCES_HARVESTED_TOTAL", "resource_type": "water", "amount": 1},
+            "then": // water has been harvested, show the iron instructions
+            {
+                // if an iron harvester is selected AND the context menu is open
+                "if": {"predicate": "AND", "subpredicates": [ {"predicate": "SELECTED", "type": "supply_yard"},
+                                                              {"predicate": "DIALOG_OPEN", "dialog_name": "context_menu"} ] },
+                // then show instructions to click on the "Collect" button
+                "then": {"consequent": "AND", "subconsequents": [
+                    {"consequent": "TUTORIAL_ARROW", "arrow_type": "button", "dialog_name": "context_menu", "widget_name": "button0", "direction": "down" },
+                    {"consequent": "MESSAGE_BOX", "widgets": { "description": {
+                        "ui_name": "Click \"Collect\" to retrieve supplies. Your supplies available is indicated at the top of your screen."
+                    } } } ] },
+
+                // otherwise, IF there is no major UI dialog currently up, arrow the iron harvester and show instructions to click on it
+                "else": { "if": { "predicate": "UI_CLEAR"},
+                          "then": { "consequent": "AND", "subconsequents": [
+                              {"consequent": "FORCE_SCROLL", "target_name": "supply_yard", "key": "gather_resources_iron" },
+                              {"consequent": "TUTORIAL_ARROW", "arrow_type": "landscape", "target_name": "supply_yard", "direction": "down"},
+                              {"consequent": "MESSAGE_BOX", "widgets": {
+                                  "description": { "ui_name": "Supply Yards receive supply shipments for construction, training, and research. Click to activate." } } }
+                          ]
+                                  }
+                        }
+            },
+
+            "else": // water has not been harvested, show the water instructions (exactly the same as above, but for water rather than iron)
+            {
+                "if": {"predicate": "AND", "subpredicates": [ {"predicate": "SELECTED", "type": "fuel_yard"},
+                                                              {"predicate": "DIALOG_OPEN", "dialog_name": "context_menu"} ] },
+                "then": {"consequent": "AND", "subconsequents": [
+                    {"consequent": "TUTORIAL_ARROW", "arrow_type": "button", "dialog_name": "context_menu", "widget_name": "button0", "direction": "down" },
+                    {"consequent": "MESSAGE_BOX", "y_position": 0.10, "widgets": { "description": {
+                        "ui_name": "Click \"Collect\" to retrieve fuel. Fuel available is indicated at the top of your screen."
+                    } } }
+                ] },
+
+                "else": { "if": { "predicate": "UI_CLEAR"},
+                          "then": { "consequent": "AND", "subconsequents": [
+                              {"consequent": "FORCE_SCROLL", "target_name": "fuel_yard", "key": "gather_resources_water" },
+                              {"consequent": "TUTORIAL_ARROW", "arrow_type": "landscape", "target_name": "fuel_yard", "direction": "down" },
+                              {"consequent": "MESSAGE_BOX", "y_position": 0.10, "widgets": {
+                                  "description": { "ui_name": "Fuel Yards receive fuel shipments for construction, training, and research. Click to activate." } } }
+
+                          ]
+                                  }
+                        }
+            }
+        },
+        "completion": { "consequent": "MESSAGE_BOX", "modal": true, "dialog_template": "tutorial_valentina_help_message", "sound": "level_up_sound",
+                        "widgets": { "description": { "ui_name": "Thank you, Commander. Let's use these supplies and fuel to build our army!" } } }
+    },
+
+    // Updated 4/7/2012
+    "build_7_robots": {
+        "name": "build_7_robots",
+        "ui_name": "Train ten Riflemen",
+        "ui_flavor_name": "Raise your Army",
+        "ui_description": "Riflemen are inexpensive foot soldiers. They are easy to train and attack best in groups.",
+
+        "activation": { "predicate": "QUEST_COMPLETED", "quest_name": "gather_resources" },
+        "goal": { "predicate": "UNITS_MANUFACTURED", "number": 7},
+
+        "reward_xp": 20,
+        "reward_iron": 3000,
+        "reward_water": 3000,
+        "force_claim": 1,
+
+        "ui_category": "Tutorial Mission",
+        "ui_step": 3, // order within the linear "extended tutorial"
+
+        "tips": {
+            "if": {"predicate": "DIALOG_OPEN", "dialog_name": "manufacture_dialog"},
+            // the manufacturing dialog is up
+            "then": { "if": {"predicate": "UNIT_QUANTITY", "unit_type": "rifleman", "trigger_qty": 10, "include_queued": true},
+                      // if enough units are produced (including queued units), tell player to click "Finish"
+                      "then": {"consequent": "AND", "subconsequents": [
+                          {"consequent": "TUTORIAL_ARROW", "arrow_type": "button", "dialog_name": "manufacture_dialog", "widget_name": "finish_button"},
+                          {"consequent": "MESSAGE_BOX", "y_position": 0.10, "widgets": { "description": {
+                              "ui_name": "Click \"Finish\" to speed up training."
+                          } } } ] },
+
+                      // otherwise, tell player to click more times on the Mining Droid icon
+                      // (note: the indentation here is misleading, these are actually cascading if/then/elif blocks)
+                      "else": { "if": {"predicate": "UNIT_QUANTITY", "unit_type": "rifleman", "trigger_qty": 9, "include_queued": true},
+                                "then": {"consequent": "AND", "subconsequents": [
+                                    {"consequent": "TUTORIAL_ARROW", "arrow_type": "button", "dialog_name": "manufacture_dialog", "widget_name": "grid0,0"},
+                                    {"consequent": "MESSAGE_BOX", "y_position": 0.10, "widgets": { "description": {
+                                        "ui_name": "Click the Rifleman icon again to queue more units for training. (1 remaining)"
+                                    } } } ] },
+                                "else": { "if": {"predicate": "UNIT_QUANTITY", "unit_type": "rifleman", "trigger_qty": 8, "include_queued": true},
+                                          "then": {"consequent": "AND", "subconsequents": [
+                                              {"consequent": "TUTORIAL_ARROW", "arrow_type": "button", "dialog_name": "manufacture_dialog", "widget_name": "grid0,0"},
+                                              {"consequent": "MESSAGE_BOX", "y_position": 0.10, "widgets": { "description": {
+                                                  "ui_name": "Click the Rifleman icon again to queue more units for training. (2 remaining)"
+                                              } } } ] },
+                                          "else": { "if": {"predicate": "UNIT_QUANTITY", "unit_type": "rifleman", "trigger_qty": 7, "include_queued": true},
+                                                    "then": {"consequent": "AND", "subconsequents": [
+                                                        {"consequent": "TUTORIAL_ARROW", "arrow_type": "button", "dialog_name": "manufacture_dialog", "widget_name": "grid0,0"},
+                                                        {"consequent": "MESSAGE_BOX", "y_position": 0.10, "widgets": { "description": {
+                                                            "ui_name": "Click the Rifleman icon again to queue more units for training. (3 remaining)"
+                                                        } } } ] },
+                                                    "else": { "if": {"predicate": "UNIT_QUANTITY", "unit_type": "rifleman", "trigger_qty": 6, "include_queued": true},
+                                                              "then": {"consequent": "AND", "subconsequents": [
+                                                                  {"consequent": "TUTORIAL_ARROW", "arrow_type": "button", "dialog_name": "manufacture_dialog", "widget_name": "grid0,0"},
+                                                                  {"consequent": "MESSAGE_BOX", "y_position": 0.10, "widgets": { "description": {
+                                                                      "ui_name": "Click the Rifleman icon again to queue more units for training. (4 remaining)"
+                                                                  } } } ] },
+                                                              "else": { "if": {"predicate": "UNIT_QUANTITY", "unit_type": "rifleman", "trigger_qty": 5, "include_queued": true},
+                                                                        "then": {"consequent": "AND", "subconsequents": [
+                                                                            {"consequent": "TUTORIAL_ARROW", "arrow_type": "button", "dialog_name": "manufacture_dialog", "widget_name": "grid0,0"},
+                                                                            {"consequent": "MESSAGE_BOX", "y_position": 0.10, "widgets": { "description": {
+                                                                                "ui_name": "Click the Rifleman icon again to queue more units for training. (5 remaining)"
+                                                                            } } } ] },
+                                                                        "else": { "if": {"predicate": "UNIT_QUANTITY", "unit_type": "rifleman", "trigger_qty": 4, "include_queued": true},
+                                                                                  "then": {"consequent": "AND", "subconsequents": [
+                                                                                      {"consequent": "TUTORIAL_ARROW", "arrow_type": "button", "dialog_name": "manufacture_dialog", "widget_name": "grid0,0"},
+                                                                                      {"consequent": "MESSAGE_BOX", "y_position": 0.10, "widgets": { "description": {
+                                                                                          "ui_name": "Click the Rifleman icon again to queue more units for training. (6 remaining)"
+                                                                                      } } } ] },
+                                                                                  "else": {"consequent": "AND", "subconsequents": [
+                                                                                      {"consequent": "TUTORIAL_ARROW", "arrow_type": "button", "dialog_name": "manufacture_dialog", "widget_name": "grid0,0"},
+                                                                                      {"consequent": "MESSAGE_BOX", "y_position": 0.10, "widgets": { "description": {
+                                                                                          "ui_name": "Click the Rifleman icon to begin training."
+                                                                                      } } } ] }
+                                                                                } } } } } }
+
+                    },
+            "else": {
+                // the manufacturing dialog is NOT up
+                "if": {"predicate": "AND", "subpredicates": [ {"predicate": "SELECTED", "type": "barracks"},
+                                                              {"predicate": "DIALOG_OPEN", "dialog_name": "context_menu"} ] },
+                // the barracks is selected AND the building context menu is up
+                // -> show instructions to click the "Produce" button
+                "then": { "consequent": "AND", "subconsequents": [
+                    {"consequent": "TUTORIAL_ARROW", "arrow_type": "button", "dialog_name": "context_menu", "widget_name": "button0"},
+                    {"consequent": "MESSAGE_BOX", "widgets": { "description": {
+                        "ui_name": "Click \"Train\" to begin making more Riflemen."
+                    } } } ] },
+
+                // otherwise, if no major dialog is up, tell player to click on the Rover Factory
+                "else": { "if": { "predicate": "UI_CLEAR"},
+                          "then": { "consequent": "AND", "subconsequents": [
+                              {"consequent": "FORCE_SCROLL", "target_name": "barracks", "key": "barracks" },
+                              {"consequent": "TUTORIAL_ARROW", "arrow_type": "landscape", "target_name": "barracks"},
+                              {"consequent": "MESSAGE_BOX", "widgets": {
+                                  "description": { "ui_name": "The Barracks trains foot soldiers. Click it to start training infantry." } } }
+                          ]
+                                  }
+                        }
+            }
+        },
+
+        "completion": { "consequent": "MESSAGE_BOX", "modal": true, "dialog_template": "tutorial_valentina_help_message", "sound": "conquer_sound",
+                        //"ai_threat_hack": 1, // displays ai threat daily tip
+                        "widgets": { "description": { "ui_name": "Excellent! We are ready to go on the offensive!" } } }
+    },
+
+
+    // Updated 4/7/2012
+    "build_storage": {
+        "name": "build_storage",
+        "ui_name": "Build Depot",
+        "ui_flavor_name": "Upgrade Your Base",
+        "ui_description": "Click \"Accept\" to begin a new mission to construct resource depots for your base. Earn rewards on completion.",
+
+        "activation": {"predicate": "ALWAYS_FALSE" }, // { "predicate": "QUEST_COMPLETED", "quest_name": "reclaim_base" },
+        "goal": { "predicate": "AND", "subpredicates": [
+            { "predicate": "BUILDING_QUANTITY", "building_type": "fuel_depot", "trigger_qty": 1 },
+            { "predicate": "BUILDING_QUANTITY", "building_type": "supply_depot", "trigger_qty": 1 }]},
+
+        "reward_xp": 10,
+        "reward_iron": 5500,
+        "reward_water": 5500,
+
+        "ui_category": "Tutorial Mission",
+        "ui_step": -1, // order within the linear "extended tutorial"
+
+        "tips": {
+            "if": {"predicate": "DIALOG_OPEN", "dialog_name": "build_dialog"},
+            // the build dialog is up, draw arrow to storage building icon
+            "then": {
+                // if iron storage built, then point to water storage, else point to iron storage
+                "if": { "predicate": "BUILDING_QUANTITY", "building_type": "supply_depot", "trigger_qty": 1, "under_construction_ok": 1 },
+                "then": {"consequent": "TUTORIAL_ARROW", "arrow_type": "button", "dialog_name": "build_dialog", "widget_name": "BUILD:fuel_depot"},
+                "else": {"consequent": "TUTORIAL_ARROW", "arrow_type": "button", "dialog_name": "build_dialog", "widget_name": "BUILD:supply_depot"}
+            },
+
+            "else": { "if": { "predicate": "UI_CLEAR"},
+                      "then": {
+                          // if building construction hasn't started yet, tell player to click Buildings button
+                          "if": {"predicate": "NOT", "subpredicates": [{ "predicate": "AND", "subpredicates": [
+                              { "predicate": "BUILDING_QUANTITY", "building_type": "fuel_depot", "trigger_qty": 1, "under_construction_ok": 1 },
+                              { "predicate": "BUILDING_QUANTITY", "building_type": "supply_depot", "trigger_qty": 1, "under_construction_ok": 1 }]}] },
+                          "then": {
+                              "if": { "predicate": "BUILDING_QUANTITY", "building_type": "supply_depot", "trigger_qty": 1, "under_construction_ok": 1 },
+                              "then": { "consequent": "AND", "subconsequents": [
+                                  {"consequent": "TUTORIAL_ARROW", "arrow_type": "button", "dialog_name": "desktop_bottom", "widget_name": "buildings_button"},
+                                  {"consequent": "MESSAGE_BOX", "widgets": {
+                                      "description": { "ui_name": "Now build the Fuel Depot. Speed up any ongoing construction if necessary." } } } ] },
+                              "else": { "consequent": "AND", "subconsequents": [
+                                  {"consequent": "TUTORIAL_ARROW", "arrow_type": "button", "dialog_name": "desktop_bottom", "widget_name": "buildings_button"},
+                                  {"consequent": "MESSAGE_BOX", "widgets": {
+                                      "description": { "ui_name": "Build an Supply Depot to store more supplies. Use the \"Buildings\" button at the bottom of your screen." } } } ] }
+                          },
+                          "else": {"consequent": "MESSAGE_BOX", "widgets": {
+                              "description": { "ui_name": "Speed up the construction to finish this mission." }
+                          } }
+                      },
+                      "else": {
+                          // if Build UI cursor is active, tell player to click on base area
+                          "if": { "predicate": "SELECTED", "type": "CURSOR", "spellname": "BUILD", "spellkind": "supply_depot" },
+
+                          "then":  { "consequent": "AND", "subconsequents": [
+                              { "consequent": "TUTORIAL_ARROW", "arrow_type": "landscape", "coordinates": [112,84], "buildable": "supply_depot" },
+                              {"consequent": "MESSAGE_BOX", "widgets": {
+                                  "description": { "ui_name": "Click on empty ground to place the building. The cursor will turn red if the location is blocked or outside your base perimeter." } } }] },
+
+                          "else": { "if": { "predicate": "SELECTED", "type": "CURSOR", "spellname": "BUILD", "spellkind": "fuel_depot" },
+                                    "then": { "consequent": "AND", "subconsequents": [
+                                        { "consequent": "TUTORIAL_ARROW", "arrow_type": "landscape", "coordinates": [115,99], "buildable": "fuel_depot" },
+                                        {"consequent": "MESSAGE_BOX", "widgets": {
+                                            "description": { "ui_name": "Click on empty ground to place the building. The cursor will turn red if the location is blocked or outside your base perimeter." } } }] }
+                                  }
+
+                      }
+                    }
+        },
+
+        "completion": { "consequent": "MESSAGE_BOX", "modal": true, "dialog_template": "tutorial_valentina_help_message", "sound": "conquer_sound",
+                        "widgets": { "description": { "ui_name": "Excellent Commander, these buildings will hold all the supplies and fuel we collect and loot from enemy bases! Protect them carefully - attackers can steal your resources by destroying your depots." } } }
+
+    },
+
+
+    // Updated 4/7/2012
+    "upgrade_energy_level_2": {
+        "name": "upgrade_energy_level_2",
+        "ui_name": "Upgrade Generator",
+        "ui_flavor_name": "Power up buildings and defenses",
+        "ui_description": "Upgrade Generators to build more advanced structures.",
+
+        "activation": { "predicate": "QUEST_COMPLETED", "quest_name": "attack_an_outpost" },
+
+        "goal": { "predicate": "BUILDING_LEVEL", "building_type": "generator", "trigger_level": 2 },
+        "reward_xp": 20,
+        "reward_iron": 5500,
+        "reward_water": 4500,
+        "force_claim": 1,
+        "ui_category": "Tutorial Mission",
+        "ui_step": 5, // order within the linear "extended tutorial"
+        "tips": {
+            "if": {"predicate": "DIALOG_OPEN", "dialog_name": "upgrade_dialog"},
+            "then": {"consequent": "TUTORIAL_ARROW", "arrow_type": "button", "dialog_name": "upgrade_dialog", "widget_name": "use_resources_button", "direction": "down"},
+            "else": { "if": { "predicate": "UI_CLEAR"},
+                      "then": {
+                          "if": { "predicate": "BUILDING_LEVEL", "building_type": "generator", "trigger_level": 2, "upgrading_ok": 1 },
+                          "then": {"consequent": "AND", "subconsequents": [
+                              {"consequent": "TUTORIAL_ARROW", "arrow_type": "landscape", "target_name": "generator"},
+                              {"consequent": "MESSAGE_BOX", "widgets": {
+                                  "description": { "ui_name": "Generators provide power. When damaged or upgrading, power generation stops. Click your Generator to speed up the upgrade." } } }]},
+                          "else": {"consequent": "AND", "subconsequents": [
+                              {"consequent": "FORCE_SCROLL", "target_name": "generator", "key": "generator" },
+                              {"consequent": "TUTORIAL_ARROW", "arrow_type": "landscape", "target_name": "generator"},
+                              {"consequent": "MESSAGE_BOX", "widgets": {
+                                  "description": { "ui_name": "We received blueprints for a new weapon! But first we need more power to construct research facilities. Upgrade your Generator to Level 2." } } }]}
+                      },
+                      "else": { "if": {"predicate": "AND", "subpredicates": [ {"predicate": "SELECTED", "type": "generator"},
+                                                                              {"predicate": "DIALOG_OPEN", "dialog_name": "context_menu"} ] },
+                                "then": {"consequent": "TUTORIAL_ARROW", "arrow_type": "button", "dialog_name": "context_menu", "widget_name": "button0", "direction": "up"},
+                                "else": { "if": {"predicate": "AND", "subpredicates": [ {"predicate": "SELECTED", "type": "generator"},
+                                                                                        {"predicate": "ANY_ABTEST", "key": "tutorial_use_alloys", "value": 1, "default": 0},
+                                                                                        {"predicate": "DIALOG_OPEN", "dialog_name": "speedup_dialog"} ] },
+                                          "then": {"consequent": "AND", "subconsequents": [
+                                              //                                                  {"consequent": "MESSAGE_BOX", "y_position": 0.10, "widgets": {
+                                              //                                                      "description": { "ui_name": "Use Gold to speed up actions." }
+                                              //                                                  } },
+                                              {"consequent": "TUTORIAL_ARROW", "arrow_type": "button", "direction": "up", "dialog_name": "speedup_dialog", "widget_name": "ok_button"}
+                                          ] } } } }
+        },
+        "completion": { "consequent": "MESSAGE_BOX", "modal": true, "dialog_template": "tutorial_valentina_help_message",
+                        "widgets": { "description": { "ui_name": "Power increased! We are ready to construct the Academy." } } }
+
+    },
+
+    // Updated 4/7/2012
+    "build_academy": {
+        "name": "build_academy",
+        "ui_name": "Build an Academy",
+        "ui_flavor_name": "Unlock better trained and equipped soldiers",
+
+        "ui_description": "This academy unlocks and upgrades new soldiers for your army.",
+
+        "activation": {"predicate": "QUEST_COMPLETED", "quest_name": "upgrade_energy_level_2" },
+
+        "goal": { "predicate": "BUILDING_QUANTITY", "building_type": "academy", "trigger_qty": 1 },
+        "reward_xp": 20,
+        "reward_iron": 9100,
+        "reward_water": 9100,
+        "force_claim": 1,
+
+        "ui_category": "Tutorial Mission",
+        "ui_step": 6, // order within the linear "extended tutorial"
+        "tips": {
+            "if": {"predicate": "DIALOG_OPEN", "dialog_name": "build_dialog"},
+            "then": {
+                "if": {"predicate": "DIALOG_OPEN", "dialog_name": "build_dialog", "dialog_category": "production" },
+                "then": {"consequent": "TUTORIAL_ARROW", "arrow_type": "button", "dialog_name": "build_dialog", "widget_name": "BUILD:academy"},
+                "else": {"consequent": "TUTORIAL_ARROW", "arrow_type": "button", "dialog_name": "build_dialog", "widget_name": "production_button", "direction": "up"}
+            },
+
+            "else": {
+                "if": { "predicate": "UI_CLEAR"},
+                "then": {
+                    // if building construction hasn't started yet, tell player to click Buildings button
+                    "if": {"predicate": "NOT", "subpredicates": [
+                        { "predicate": "BUILDING_QUANTITY", "building_type": "academy", "trigger_qty": 1, "under_construction_ok": 1 }] },
+                    "then": {
+                        "consequent": "AND", "subconsequents": [
+                            { "consequent": "FORCE_SCROLL", "coordinates": [74,109], "key": "academy_pos" },
+                            {"consequent": "TUTORIAL_ARROW", "arrow_type": "button", "dialog_name": "desktop_bottom", "widget_name": "buildings_button"},
+                            {"consequent": "MESSAGE_BOX", "widgets": {
+                                "description": { "ui_name": "Open the construction menu by clicking on the Buildings button." } } } ]
+                    },
+                    "else": {"consequent": "AND", "subconsequents": [
+                        {"consequent": "TUTORIAL_ARROW", "arrow_type": "landscape", "target_name": "academy"},
+                        {"consequent": "MESSAGE_BOX", "widgets": { "description": { "ui_name": "Speed up construction to finish the mission." } } }
+                    ] }
+                },
+
+                "else": {
+                    // if Build UI cursor is active, tell player to click on base area
+                    "if": { "predicate": "SELECTED", "type": "CURSOR", "spellname": "BUILD", "spellkind": "academy" },
+                    "then": { "consequent": "AND", "subconsequents": [
+                        { "consequent": "TUTORIAL_ARROW", "arrow_type": "landscape", "coordinates": [74,109], "buildable": "academy" },
+                        {"consequent": "MESSAGE_BOX", "widgets": {
+                            "description": { "ui_name": "Click on empty ground to place the building. The cursor will turn red if the location is blocked or outside your base perimeter." } } }] },
+                    "else": {
+                        "if":  { "predicate": "SELECTED", "type": "academy"},
+                        "then": {
+                            "if": { "predicate": "DIALOG_OPEN", "dialog_name": "context_menu" },
+                            "then": { "if": { "predicate": "SELECTED", "type": "ANY", "state": "under_construction" },
+                                      "then": {"consequent": "TUTORIAL_ARROW", "arrow_type": "button", "dialog_name": "context_menu", "widget_name": "button0", "direction": "up"},
+                                      "else": {"consequent": "TUTORIAL_ARROW", "arrow_type": "button", "dialog_name": "context_menu", "widget_name": "button2", "direction": "down"}
+                                    },
+                            "else": { "if": { "predicate": "DIALOG_OPEN", "dialog_name": "speedup_dialog" },
+                                      "then": {"consequent": "TUTORIAL_ARROW", "arrow_type": "button", "direction": "up", "dialog_name": "speedup_dialog", "widget_name": "ok_button"}
+                                    }
+                        }
+                    }
+                }
+            }
+        },
+        "completion": { "consequent": "MESSAGE_BOX", "modal": true, "dialog_template": "tutorial_valentina_help_message",
+                        "widgets": { "description": { "ui_name": "Blueprints received and ready. Now we can begin research to unlock more powerful infantry." } } }
+
+    },
+
+    // Updated 4/7/2012
+    "unlock_machine_gunners": {
+        "name": "unlock_machine_gunners",
+        "ui_name": "Unlock Machine Gunner",
+        "ui_flavor_name": "Who needs aim when you can keep shooting?",
+        "ui_description": "The Machine Gunner offers powerful, rapid fire defense and offense. Mostly offense.\nComplete mission to raise army size limit.",
+        "activation": { "predicate": "QUEST_COMPLETED", "quest_name": "build_academy" },
+        "goal": { "predicate": "TECH_LEVEL", "tech": "rifleman_production", "min_level": 1 }, // XXXXXX
+        "reward_xp": 100,
+        // this quest is the end of the "extended tutorial" and so it has a large reward,
+        // since this is the last quest most users will complete for a while.
+        // Effectively this is the "starting" iron/water when you get to "the real game".
+        // Upped from 1k/1k to 21k/21k on 2012 Oct 19 based on results of T099B_newgame_ironwater
+        // it was a close call though, and may need to be tested again.
+        "reward_iron": 21000,
+        "reward_water": 21000,
+
+        "reward_consequent": { "consequent": "AND", "subconsequents": [
+            {"consequent": "GIVE_UNITS", "units": { "rifleman": 3 } }, // XXXXXX
+            {"consequent": "REMOVE_AURA", "aura_name": "hold_unit_space", "remove_stack": 90 }
+        ] },
+
+        // need to force claim to ensure Mr. Skilling's Shooting Range shows
+        // up, and to make sure the player actually gets some
+        // Blaster Droids, and the reward iron/water!
+        "force_claim": 1,
+
+        "ui_category": "Tutorial Mission",
+        "ui_step": 7, // order within the linear "extended tutorial"
+
+        "tips": {
+            "if": {"predicate": "DIALOG_OPEN", "dialog_name": "upgrade_dialog"},
+            "then": {"consequent": "AND", "subconsequents": [
+                {"consequent": "TUTORIAL_ARROW", "arrow_type": "button", "dialog_name": "upgrade_dialog", "widget_name": "use_resources_button"},
+                {"consequent": "MESSAGE_BOX", "widgets": {
+                    "description": { "ui_name": "Click to begin unlocking the Machine Gunner." } } }
+            ] },
+            "else": { "if": {"predicate": "DIALOG_OPEN", "dialog_name": "research_dialog", "dialog_category": "rovers" },
+
+                      "then": {
+                          "if": { "predicate": "TECH_LEVEL", "tech": "rifleman_production", "min_level": 1, "researching_ok": 1 }, // XXXXXX
+                          "then": {"consequent": "TUTORIAL_ARROW", "arrow_type": "button", "dialog_name": "research_dialog", "widget_name": "close_button", "direction": "up"},
+                          "else": {"consequent": "TUTORIAL_ARROW", "arrow_type": "button", "dialog_name": "research_dialog", "widget_name": "grid2,0"} },
+
+                      "else": {
+                          "if": { "predicate": "UI_CLEAR" },
+
+                          "then": {
+                              "if": { "predicate": "TECH_LEVEL", "tech": "rifleman_production", "min_level": 1, "researching_ok": 1 }, // XXXXXX
+                              "then": { "consequent": "AND", "subconsequents": [
+                                  {"consequent": "TUTORIAL_ARROW", "arrow_type": "landscape", "target_name": "academy"},
+                                  {"consequent": "MESSAGE_BOX", "widgets": {
+                                      "description": { "ui_name": "Speed up research to finish the mission." } } }]},
+                              "else": { "consequent": "AND", "subconsequents": [
+                                  {"consequent": "FORCE_SCROLL", "target_name": "academy", "key": "academy" },
+                                  {"consequent": "TUTORIAL_ARROW", "arrow_type": "landscape", "target_name": "academy"},
+                                  {"consequent": "MESSAGE_BOX", "widgets": {
+                                      "description": { "ui_name": "Unlock new weapons for your infantry! Click the Academy to research the Machine Gunner." } } }]}
+                          },
+
+                          "else": { "if": {"predicate": "AND", "subpredicates": [ {"predicate": "SELECTED", "type": "academy"},
+                                                                                  {"predicate": "DIALOG_OPEN", "dialog_name": "context_menu"} ] },
+                                    "then": {"consequent": "TUTORIAL_ARROW", "arrow_type": "button", "dialog_name": "context_menu", "widget_name": "button0", "direction": "up"} } }
+                    }
+        },
+
+        "completion": { "consequent": "MESSAGE_BOX", "modal": true, "dialog_template": "tutorial_valentina_help_message",
+                        "widgets": { "description": { "ui_name": "Machine Gunners have superior firepower against enemy Riflemen and Mortarmen." } } }
+    },
+
+    "use_fullscreen": {
+        "ui_priority": 40,
+        "name": "use_fullscreen",
+        "ui_name": "Play in Full Screen",
+        "ui_flavor_name": "Bird's Eye View",
+        "ui_instructions": "Click the \"four arrows\" button at right side of the screen. To exit full screen mode, hit \"F11\" or \"ESC\" on your keyboard.",
+        "ui_description": "Playing in full screen gives us a better view of our enemies' bases, Commander.",
+        "activation": {"predicate": "AND", "subpredicates": [
+            {"predicate": "QUEST_COMPLETED", "quest_name": "upgrade_toc_level_2"},
+            {"predicate": "BROWSER_OS", "os": ["Mac", "Windows"] }
+        ] },
+        "goal": { "predicate": "OR", "subpredicates": [
+            { "predicate": "PLAYER_HISTORY", "key": "feature_used:fullscreen_dialog", "method": ">=", "value": 1 },
+            { "predicate": "PLAYER_HISTORY", "key": "feature_used:truefullscreen", "method": ">=", "value": 1 }
+        ] },
+        "reward_xp": 20,
+        "reward_iron": 2000,
+        "reward_water": 2000
+    },
+
+    "attack_an_outpost": {
+        "name": "attack_an_outpost",
+        "ui_name": "Attack an Outpost",
+        "ui_flavor_name": "Lashing Out",
+        "ui_description": "Commander, you have attacked an AI outpost. Check the Attack menu to find more targets.",
+        "activation": { "predicate": "QUEST_COMPLETED", "quest_name": "build_7_robots" },
+
+        "ui_category": "Tutorial Mission",
+        "ui_step": 4, // order within the linear "extended tutorial"
+
+        "tips_in_enemy_base": 1, // show tips even in enemy base
+        "tips_in_combat": 1, // show tips even during combat
+        "force_claim": 1,
+
+        "tips": {
+            "if": { "predicate": "HOME_BASE" },
+
+            "then": {
+                "if": { "predicate": "UI_CLEAR" },
+                "then": {"consequent": "AND", "subconsequents": [
+                    {"consequent": "TUTORIAL_ARROW", "arrow_type": "button", "dialog_name": "desktop_bottom", "widget_name": "map_button"},
+                    {"consequent": "MESSAGE_BOX", "widgets": {
+                        "description": { "ui_name": "Let's find a base to attack. Open the Attack menu." } } }] },
+                "else": {
+                    "if": {"predicate": "DIALOG_OPEN", "dialog_name": "map_dialog", "dialog_chapter": "computers"},
+                    "then": { "consequent": "AND", "subconsequents": [
+                        {"consequent": "MESSAGE_BOX", "widgets": { "description": { "ui_name": "Spy on the enemy base to prepare for attack." } } },
+                        // NOTE: this relies on Mr. Skilling appearing at the top of the list!
+                        {"consequent": "TUTORIAL_ARROW", "arrow_type": "button", "direction": "up", "dialog_name": "map_dialog", "widget_name": "row_button0"}
+                    ] },
+                    "else": {
+                        "if": {"predicate": "DIALOG_OPEN", "dialog_name": "map_dialog"},
+                        "then": { "consequent": "AND", "subconsequents": [
+                            {"consequent": "MESSAGE_BOX", "widgets": { "description": { "ui_name": "Spy on the enemy base to prepare for attack." } } },
+                            {"consequent": "TUTORIAL_ARROW", "arrow_type": "button", "direction": "up", "dialog_name": "map_dialog", "widget_name": "computers_button"}
+                        ] }
+                    }
+                }
+            },
+
+            "else": {
+                "if": { "predicate": "AND", "subpredicates": [
+                    { "predicate": "SELECTED", "type": "CURSOR", "spellname": "DEPLOY_UNITS" },
+                    { "predicate": "PRE_DEPLOY_UNITS", "spec": "stryker", "qty": "ALL" },
+                    { "predicate": "PRE_DEPLOY_UNITS", "spec": "rifleman", "qty": "ALL" }
+                ] },
+
+                "then": {"consequent": "AND", "subconsequents": [
+                    {"consequent": "FORCE_SCROLL", "key": "attack_pos", "coordinates": [85,140] },
+                    {"consequent": "TUTORIAL_ARROW", "arrow_type": "landscape", "coordinates": [85,140] },
+                    {"consequent": "MESSAGE_BOX", "y_position": 0.13, "widgets": { "description": { "ui_name": "Your units must attack from the side of the base.\nClick and drag to find a place to deploy your forces." } } }
+                ] },
+
+                "else": {
+                    "if": { "predicate": "NOT", "subpredicates": [{"predicate": "HAS_DEPLOYED"}] },
+                    "then": { "if": { "predicate": "NOT", "subpredicates": [{"predicate": "HAS_ATTACKED"}] },
+                              "then": {"consequent": "AND", "subconsequents": [
+                                  {"consequent": "MESSAGE_BOX", "widgets": { "description": { "ui_name": "Click \"Attack\" to begin your assault." } } },
+                                  {"consequent": "TUTORIAL_ARROW", "arrow_type": "button", "dialog_name": "attack_button_dialog", "widget_name": "attack_button", "direction": "up"}
+                              ] },
+                              "else": { "if": { "predicate": "PRE_DEPLOY_UNITS", "spec": "stryker", "qty": "ALL" },
+                                        "then": {"consequent": "AND", "subconsequents": [
+                                            {"consequent": "MESSAGE_BOX", "widgets": { "description": { "ui_name": "And some Riflemen too." } } },
+                                            {"consequent": "TUTORIAL_ARROW", "arrow_type": "button", "dialog_name": "desktop_bottom", "widget_name": "DEPLOY_UNIT:rifleman", "direction": "down"}
+                                        ] },
+                                        "else": {"consequent": "AND", "subconsequents": [
+                                            {"consequent": "MESSAGE_BOX", "widgets": { "description": { "ui_name": "Add the Stryker ICV to our attack force." } } },
+                                            {"consequent": "TUTORIAL_ARROW", "arrow_type": "button", "dialog_name": "desktop_bottom", "widget_name": "DEPLOY_UNIT:stryker", "direction": "down"}
+                                        ] }
+                                      }
+                            },
+
+                    "else": {
+                        // shown during battle
+                        //"consequent": "MESSAGE_BOX", "y_position": 0.13, "widgets": {"description": { "ui_name": "Destroy harvesters and storage buildings to steal iron and water. Destroy the Tactical Ops Center to conquer the base." } }
+                        "if": { "predicate": "BUILDING_DESTROYED", "spec": "toc" },
+                        "then": {"consequent": "AND", "subconsequents": [
+                            {"consequent": "TUTORIAL_ARROW", "arrow_type": "button", "dialog_name": "attack_button_dialog", "widget_name": "attack_button", "direction": "up" },
+                            {"consequent": "MESSAGE_BOX", "y_position": 0.13, "widgets": { "description": { "ui_name": "Tactical Ops Center destroyed!\nClick \"End Attack\" to return to base." } } }
+                        ] },
+                        "else": { "if": { "predicate": "BUILDING_DESTROYED", "spec": "supply_yard" },
+                                  "then": {"consequent": "AND", "subconsequents": [
+                                      //{"consequent": "TUTORIAL_ARROW", "arrow_type": "landscape", "target_name": "toc", "direction": "none" },
+                                      {"consequent": "TUTORIAL_ARROW", "arrow_type": "button", "dialog_name": "attack_button_dialog", "widget_name": "attack_button", "direction": "up" },
+                                      {"consequent": "MESSAGE_BOX", "y_position": 0.13, "widgets": { "description": { "ui_name": "Click \"End Attack\" to return to base." } } }
+                                  ] },
+                                  "else": {"consequent": "AND", "subconsequents": [
+                                      //{"consequent": "TUTORIAL_ARROW", "arrow_type": "landscape", "target_name": "supply_yard", "direction": "none" },
+                                      {"consequent": "MESSAGE_BOX", "y_position": 0.13, "widgets": { "description": { "ui_name": "Destroy buildings to steal precious supplies and fuel.\nClick \"End Attack\" when you are finished." } } }
+                                  ] }
+                                }
+                    }
+                }
+            }
+        },
+
+        "goal": { "predicate": "ATTACKS_LAUNCHED", "number": 2 }, // 2 because the Aruj tutorial offense counts as attack #1
+        "reward_xp": 10,
+        "reward_iron": 4500,
+        "reward_water": 4500,
+
+        "completion": { "consequent": "MESSAGE_BOX", "modal": true, "dialog_template": "tutorial_valentina_help_message",
+                        "widgets": { "description": { "ui_name": "Excellent, Commander!\n\nThis is how to survive in the world.\n\nBuild your army, attack, and loot supplies and fuel!" } } }
+    },
+
+    "blaster_attack": {
+        "name": "blaster_attack",
+        "ui_priority": 250,
+        "ui_name": "Machine Gun Attack",
+        "ui_flavor_name": "Knock 'em Down",
+        "ui_description": "Use our new Machine Gunner to destroy the Tactical Ops Center at Mr. Skilling's Shooting Range.", // XXXXXX
+
+        // note: this depends on AI base tutorial02B activating at the same time
+        "activation": { "predicate": "AND", "subpredicates": [
+            { "predicate": "QUEST_COMPLETED", "quest_name": "unlock_machine_gunners" }
+        ] },
+
+        "ui_category": "Tutorial Mission",
+        "ui_step": 8, // order within the linear "extended tutorial"
+
+        "tips_in_enemy_base": 1, // show tips even in enemy base
+        "tips_in_combat": 1, // show tips even during combat
+        "force_claim": 1,
+
+        "tips": { "if": { "predicate": "HOME_BASE" },
+                  "then": {
+                      "if": { "predicate": "UI_CLEAR" },
+                      "then": {"consequent": "AND", "subconsequents": [
+                          {"consequent": "TUTORIAL_ARROW", "arrow_type": "button", "dialog_name": "desktop_bottom", "widget_name": "map_button"},
+                          {"consequent": "MESSAGE_BOX", "widgets": { "description": { "ui_name": "Let's try Machine Gunner in battle. Open the Attack menu." } } }] },
+                      "else": {
+                          "if": {"predicate": "DIALOG_OPEN", "dialog_name": "map_dialog", "dialog_chapter": "computers"},
+                          "then": { "consequent": "AND", "subconsequents": [
+                              {"consequent": "MESSAGE_BOX", "widgets": { "description": { "ui_name": "Spy on Mr. Skilling's Shooting Range." } } },
+                              // NOTE: this relies on the tutorial02B AI base appearing at the top of the list!
+                              {"consequent": "TUTORIAL_ARROW", "arrow_type": "button", "direction": "up", "dialog_name": "map_dialog", "widget_name": "row_button0"}
+                          ] },
+                          "else": {
+                              "if": {"predicate": "DIALOG_OPEN", "dialog_name": "map_dialog"},
+                              "then": { "consequent": "AND", "subconsequents": [
+                                  {"consequent": "MESSAGE_BOX", "widgets": { "description": { "ui_name": "Spy on Mr. Skilling's Shooting Range." } } },
+                                  {"consequent": "TUTORIAL_ARROW", "arrow_type": "button", "direction": "up", "dialog_name": "map_dialog", "widget_name": "computers_button"}
+                              ] }
+                          }
+                      }
+                  },
+
+                  "else": { // not in home base
+                      "if": { "predicate": "AND", "subpredicates":[
+                          { "predicate": "SELECTED", "type": "CURSOR", "spellname": "DEPLOY_UNITS" },
+                          { "predicate": "PRE_DEPLOY_UNITS", "spec": "stryker", "qty": "ALL" },
+                          { "predicate": "PRE_DEPLOY_UNITS", "spec": "rifleman", "qty": "ALL" }
+                      ] },
+
+                      "then": {"consequent": "AND", "subconsequents": [
+                          {"consequent": "FORCE_SCROLL", "key": "attack_pos2", "coordinates": [85,140] },
+                          {"consequent": "TUTORIAL_ARROW", "arrow_type": "landscape", "coordinates": [85,140] },
+                          {"consequent": "MESSAGE_BOX", "y_position": 0.13, "widgets": { "description": { "ui_name": "Click and drag to find a place to deploy your forces." } } }
+                      ] },
+
+                      "else": {
+                          "if": { "predicate": "NOT", "subpredicates": [{"predicate": "HAS_DEPLOYED"}] },
+                          "then": { "if": { "predicate": "NOT", "subpredicates": [{"predicate": "HAS_ATTACKED"}] },
+                                    "then": {"consequent": "AND", "subconsequents": [
+                                        {"consequent": "MESSAGE_BOX", "widgets": { "description": { "ui_name": "Click \"Attack\" to begin your assault." } } },
+                                        {"consequent": "TUTORIAL_ARROW", "arrow_type": "button", "dialog_name": "attack_button_dialog", "widget_name": "attack_button", "direction": "up"}
+                                    ] },
+                                    "else":
+
+                                    { "if": { "predicate": "PRE_DEPLOY_UNITS", "spec": "stryker", "qty": "ALL" },
+                                      "then": {"consequent": "AND", "subconsequents": [
+                                          {"consequent": "MESSAGE_BOX", "widgets": { "description": { "ui_name": "And some Riflemen too." } } },
+                                          {"consequent": "TUTORIAL_ARROW", "arrow_type": "button", "dialog_name": "desktop_bottom", "widget_name": "DEPLOY_UNIT:rifleman", "direction": "down"}
+                                      ] },
+                                      "else":  {"consequent": "AND", "subconsequents": [
+                                          {"consequent": "MESSAGE_BOX", "widgets": { "description": { "ui_name": "Bring our Stryker ICV." } } },
+                                          {"consequent": "TUTORIAL_ARROW", "arrow_type": "button", "dialog_name": "desktop_bottom", "widget_name": "DEPLOY_UNIT:stryker", "direction": "down"}
+                                      ] }
+                                    }
+                                  },
+                          "else": {
+                              // shown during battle
+                              "if": { "predicate": "BUILDING_DESTROYED", "spec": "toc" },
+                              "then": {"consequent": "AND", "subconsequents": [
+                                  {"consequent": "TUTORIAL_ARROW", "arrow_type": "button", "dialog_name": "attack_button_dialog", "widget_name": "attack_button", "direction": "up" },
+                                  {"consequent": "MESSAGE_BOX", "y_position": 0.13, "widgets": { "description": { "ui_name": "Tactical Ops Center destroyed!\nClick \"End Attack\" to return to base." } } }
+                              ] },
+                              "else":  {"consequent": "AND", "subconsequents": [
+                                  {"consequent": "TUTORIAL_ARROW", "arrow_type": "landscape", "target_name": "toc", "direction": "none" },
+                                  {"consequent": "MESSAGE_BOX", "y_position": 0.13, "widgets": { "description": { "ui_name": "Destroy the Tactical Ops Center to complete the mission." } } }
+                              ] }
+                          }
+                      }
+                  }
+                },
+
+        "goal": { "predicate": "PLAYER_HISTORY", "key": "ai_tutorial02B_progress", "method": ">=", "value": 1 },
+        "reward_xp": 10,
+        "reward_iron": 4500,
+        "reward_water": 4500,
+        "reward_heal_all_units": 1,
+
+        "completion": { "consequent": "MESSAGE_BOX", "modal": true, "dialog_template": "tutorial_valentina_help_message",
+                        "widgets": { "description": { "ui_name": "Excellent, Commander!\n\nUnlock more advanced troops to try their powers.\n\nFind more enemies to conquer on the Attack menu." } } }
+
+    },
+
+    "use_battle_history": {
+        "name": "use_battle_history",
+        "ui_priority": 250,
+        "ui_name": "View Battle History",
+        "ui_flavor_name": "Check Your Wins and Losses",
+        "ui_description": "Use the Battle History to see who attacked you. Click on any player's portrait to Spy and take revenge.",
+        "activation": {"predicate": "AND", "subpredicates": [
+            {"predicate": "LIBRARY", "name": "extended_tutorial_complete" },
+            { "predicate": "PLAYER_HISTORY", "key": "resources_stolen_by_human", "method": ">=", "value": 1 }] },
+        "goal": { "predicate": "PLAYER_HISTORY", "key": "feature_used:battle_history", "method": ">=", "value": 1 },
+        "reward_xp": 50,
+        "reward_iron": 5000,
+        "reward_water": 5000,
+
+        "tips": { "if": { "predicate": "UI_CLEAR" },
+                  "then": {"consequent": "AND", "subconsequents": [
+                      {"consequent": "TUTORIAL_ARROW", "arrow_type": "button", "dialog_name": "desktop_top", "widget_name": "battle_history_button", "direction": "up"},
+                      {"consequent": "MESSAGE_BOX", "widgets": {
+                          "description": { "ui_name": "We've been attacked! Click \"B\" to view Battle History and see who attacked us." } } }] }
+                }
+    },
+
+    "activate_an_item": {
+        "name": "activate_an_item",
+        "ui_priority": 240,
+        "ui_name": "Activate A Special Item",
+        "ui_flavor_name": "Boost yourself with special items",
+        "ui_description": "Build a Warehouse, retrieve the item from your Messages menu, then activate it from the Warehouse inventory. Complete mission to raise army size limit.",
+        "activation": {"predicate": "AND", "subpredicates": [
+            {"predicate": "QUEST_COMPLETED", "quest_name": "upgrade_toc_level_2" },
+            {"predicate": "PLAYER_HISTORY", "key": "mail_attachments_received", "method": ">=", "value": 1 }
+        ] },
+        "goal": { "predicate": "PLAYER_HISTORY", "key": "items_activated", "method": ">=", "value": 1 },
+        "reward_xp": 50,
+        "reward_iron": 4000,
+        "reward_water": 4000,
+        "reward_consequent": {"consequent": "REMOVE_AURA", "aura_name": "hold_unit_space", "remove_stack": 30 },
+        "force_claim": 1,
+        "ui_step": 10, "ui_category": "Tutorial Mission",
+        //"completion": { "consequent": "DISPLAY_MESSAGE", "dialog": "ai_base_conquer_message", "picture": "ai_gala_narcs_attack_portrait", "sound": "level_up_sound",
+        //"ai_name": "Gala Narcs", "ui_description": "Puny Earth Slug.\n\nGala Narcs fears you not.\nAttack me on the Attack menu if you dare.\n\nYou shall never steal my special items!" },
+
+        "tips_when_complete": 1, // continue executing tips logic even when mission is completable
+        "tips_in_missions_dialog": 1, // this surpresses the default tutorial arrow pointing to "Accept" on the missions dialog
+        "tips": {
+            // this catches you right after you activate the item
+            "if":  {"predicate": "PLAYER_HISTORY", "key": "items_activated", "method": ">=", "value": 1 },
+            "then": { "if": {"predicate": "DIALOG_OPEN", "dialog_name": "inventory_dialog"},
+                      "then": {"consequent": "TUTORIAL_ARROW", "arrow_type": "button", "dialog_name": "inventory_dialog", "widget_name": "close_button", "direction": "up"},
+                      "else": { "if": {"predicate": "DIALOG_OPEN", "dialog_name": "missions_dialog"},
+                                "then": {"consequent": "TUTORIAL_ARROW", "arrow_type": "button", "dialog_name": "missions_dialog", "widget_name": "claim_button", "direction": "up"}
+                              }
+                    },
+            "else": {
+
+                "if": { "predicate": "INVENTORY", "num": 1 },
+                // item in inventory
+                "then": { "if": {"predicate": "DIALOG_OPEN", "dialog_name": "inventory_dialog" },
+                          "then": {"consequent": "AND", "subconsequents": [
+                              {"consequent": "TUTORIAL_ARROW", "arrow_type": "button", "dialog_name": "inventory_dialog", "widget_name": "frame0,0", "direction": "down"},
+                              {"consequent": "MESSAGE_BOX", "widgets": { "description": { "ui_name": "Click the item, then click \"Activate\" to use it." } } } ] },
+                          "else": { "if": {"predicate": "AND", "subpredicates": [ {"predicate": "SELECTED", "type": "warehouse"},
+                                                                                  {"predicate": "DIALOG_OPEN", "dialog_name": "context_menu"} ] },
+                                    "then": {"consequent": "AND", "subconsequents": [
+                                        {"consequent": "TUTORIAL_ARROW", "arrow_type": "button", "dialog_name": "context_menu", "widget_name": "button0"},
+                                        {"consequent": "MESSAGE_BOX", "widgets": { "description": {
+                                            "ui_name": "Click \"Show Inventory\" to display your inventory."
+                                        } } } ] },
+                                    "else":  { "if": {"predicate": "DIALOG_OPEN", "dialog_name": "mail_dialog" },
+                                               "then": {"consequent": "AND", "subconsequents": [
+                                                   {"consequent": "TUTORIAL_ARROW", "arrow_type": "button", "dialog_name": "mail_dialog", "widget_name": "close_button", "direction": "up"},
+                                                   {"consequent": "MESSAGE_BOX", "widgets": { "description": { "ui_name": "The item is now inside our Warehouse." } } }
+                                               ] },
+                                               "else": { "if": { "predicate": "UI_CLEAR"},
+                                                         "then": { "consequent": "AND", "subconsequents": [
+                                                             {"consequent": "FORCE_SCROLL", "target_name": "warehouse", "key": "warehouse" },
+                                                             {"consequent": "TUTORIAL_ARROW", "arrow_type": "landscape", "target_name": "warehouse", "direction": "down" },
+                                                             {"consequent": "MESSAGE_BOX", "widgets": { "description": { "ui_name": "Click to open the Warehouse." } } } ] }
+                                                       }
+                                             }
+                                  }
+                        },
+                // item not in inventory yet
+                "else": { "if": { "predicate": "MAIL_ATTACHMENTS_WAITING" },
+                          // note: have to conditionalize all of this on MAIL_ATTACHMENTS_WAITING in case the mail expires, so it won't pop up the UI
+                          "then": { "if": { "predicate": "BUILDING_QUANTITY", "building_type": "warehouse", "trigger_qty": 1, "under_construction_ok": 0 },
+                                    // warehouse is built
+                                    "then": { "if": {"predicate": "DIALOG_OPEN", "dialog_name": "mail_dialog" },
+                                              // mail dialog is up
+                                              "then":  {"consequent": "AND", "subconsequents": [
+                                                  {"consequent": "TUTORIAL_ARROW", "arrow_type": "button", "dialog_name": "mail_dialog", "widget_name": "attach_frame0"},
+                                                  {"consequent": "MESSAGE_BOX", "widgets": { "description": { "ui_name": "Click the attached item to deposit it into your Warehouse." } } } ] },
+                                              "else": { "if": {"predicate": "DIALOG_OPEN", "dialog_name": "missions_dialog" },
+                                                        // missions dialog is up
+
+                                                        "then": {"consequent": "AND", "subconsequents":[
+                                                            {"consequent": "TUTORIAL_ARROW", "arrow_type": "button", "dialog_name": "missions_dialog", "widget_name": "messages_button"},
+                                                            {"consequent": "MESSAGE_BOX", "y_position": 0.4, "widgets": { "description": { "ui_name": "You received a special item! Check your Messages menu." } } }
+                                                        ] },
+
+                                                        "else": {
+                                                            "if": {"predicate": "AND", "subpredicates": [{ "predicate": "UI_CLEAR"}] },
+                                                            "then": { "consequent": "AND", "subconsequents": [
+                                                                {"consequent": "TUTORIAL_ARROW", "arrow_type": "button", "dialog_name": "desktop_bottom", "widget_name": "missions_button"},
+                                                                {"consequent": "MESSAGE_BOX", "widgets": { "description": { "ui_name": "You received a special item! Check your Messages menu." } } } ] }
+                                                        }
+
+
+
+                                                      }
+                                            },
+                                    // warehouse is not built yet
+                                    "else": { "if": { "predicate": "BUILDING_QUANTITY", "building_type": "warehouse", "trigger_qty": 1, "under_construction_ok": 1 },
+                                              // warehouse is under construction
+                                              "then": {"consequent": "AND", "subconsequents": [
+                                                  {"consequent": "TUTORIAL_ARROW", "arrow_type": "landscape", "target_name": "warehouse"},
+                                                  {"consequent": "MESSAGE_BOX", "widgets": { "description": { "ui_name": "The Warehouse stores special items. Speed up construction to proceed with the mission." } } } ] },
+                                              // warehouse not under construction yet
+                                              "else": { "if": { "predicate": "SELECTED", "type": "CURSOR", "spellname": "BUILD", "spellkind": "warehouse" },
+                                                        // build cursor is up
+                                                        "then": { "consequent": "AND", "subconsequents": [
+                                                            { "consequent": "TUTORIAL_ARROW", "arrow_type": "landscape", "coordinates": [90,90], "buildable": "warehouse" },
+                                                            {"consequent": "MESSAGE_BOX", "widgets": {
+                                                                "description": { "ui_name": "Click on empty ground to place the Warehouse. The cursor will turn red if the location is blocked or outside your base perimeter." } } } ] },
+                                                        // build cursor is not up
+                                                        "else": { "if": {"predicate": "DIALOG_OPEN", "dialog_name": "build_dialog"},
+                                                                  "then": { "if": { "predicate": "DIALOG_OPEN", "dialog_name": "build_dialog", "dialog_category": "resources"},
+                                                                            "then": {"consequent": "TUTORIAL_ARROW", "arrow_type": "button", "dialog_name": "build_dialog", "widget_name": "BUILD:warehouse"},
+                                                                            "else": {"consequent": "TUTORIAL_ARROW", "arrow_type": "button", "dialog_name": "build_dialog", "widget_name": "resources_button"}
+                                                                          },
+                                                                  "else": { "if": {"predicate": "AND", "subpredicates": [{ "predicate": "UI_CLEAR"}, {"predicate": "NOT", "subpredicates": [{"predicate": "FOREMAN_IS_BUSY"}] }] },
+                                                                            "then": { "consequent": "AND", "subconsequents": [
+                                                                                {"consequent": "TUTORIAL_ARROW", "arrow_type": "button", "dialog_name": "desktop_bottom", "widget_name": "buildings_button"},
+                                                                                {"consequent": "MESSAGE_BOX", "widgets": { "description": { "ui_name": "You received a special item! Build a Warehouse to retrieve it." } } } ] } }
+                                                                }
+                                                      }
+                                            }
+                                  }
+                        }
+            }
+        }
+    },
+
+    "upgrade_toc_level_2": {
+        "name": "upgrade_toc_level_2",
+        "ui_priority": 150, // ahead of excavator droid
+        "ui_flavor_name": "PRIMARY MISSION",
+        "ui_important": 1,
+        "ui_step": 9, "ui_category": "Tutorial Mission",
+        "force_claim": 1,
+        "ui_name": "Upgrade Tactical Ops Center L2",
+        "ui_instructions": "",
+        "ui_description": "Unlock new missions, rivals, and rewards by advancing your Tactical Ops Center Level.",
+        "activation": {"predicate": "QUEST_COMPLETED", "quest_name": "blaster_attack" },
+        "goal": {"predicate": "BUILDING_LEVEL", "building_type": "toc", "trigger_level": 2 },
+        "tips": { "if": { "predicate": "UI_CLEAR" },
+                  "then": {
+                      "if": { "predicate": "NOT", "subpredicates": [{ "predicate": "BUILDING_LEVEL", "building_type": "toc", "trigger_level": 2, "upgrading_ok": 1 }] },
+                      "then": {"consequent": "AND", "subconsequents": [
+                          {"consequent": "FORCE_SCROLL", "target_name": "toc", "key": "toc" },
+                          {"consequent": "TUTORIAL_ARROW", "arrow_type": "landscape", "target_name": "toc"},
+                          {"consequent": "MESSAGE_BOX", "y_position": 0.1, "widgets": { "description": { "ui_name": "Your training is almost complete, Commander!\nTo unlock new combat units, missions, and rivals, upgrade your Tactical Ops Center to Level 2." } } } ] },
+                      "else": { "consequent": "AND", "subconsequents": [
+                          {"consequent": "FORCE_SCROLL", "target_name": "toc", "key": "toc" },
+                          {"consequent": "TUTORIAL_ARROW", "arrow_type": "landscape", "target_name": "toc"},
+                          {"consequent": "MESSAGE_BOX", "y_position": 0.1, "widgets": { "description": { "ui_name": "Tactical Ops Center Level 2 unlocks:\nMore powerful units, advanced upgrades, and more AI enemies to battle." } } }
+                      ] }
+
+                  },
+                  "else": { "if": { "predicate": "AND", "subpredicates": [{ "predicate": "DIALOG_OPEN", "dialog_name": "context_menu" },
+                                                                          { "predicate": "SELECTED", "type": "toc"}] },
+                            "then": { "if": { "predicate": "NOT", "subpredicates": [{ "predicate": "SELECTED", "type": "toc", "state": "upgrading"}] },
+                                      "then": {"consequent": "TUTORIAL_ARROW", "arrow_type": "button", "dialog_name": "context_menu", "widget_name": "button0", "direction": "up"},
+                                      "else": { "consequent": "TUTORIAL_ARROW", "arrow_type": "button", "dialog_name": "context_menu", "widget_name": "button0", "direction": "up" }
+                                    },
+                            "else": { "if": { "predicate": "AND", "subpredicates": [{ "predicate": "DIALOG_OPEN", "dialog_name": "upgrade_dialog" },
+                                                                                    { "predicate": "SELECTED", "type": "toc"}] },
+                                      "then": {"consequent": "TUTORIAL_ARROW", "arrow_type": "button", "dialog_name": "upgrade_dialog", "widget_name": "use_resources_button", "direction": "up"},
+
+                                      "else": { "if": {"predicate": "DIALOG_OPEN", "dialog_name": "speedup_dialog" },
+                                                "then": {"consequent": "TUTORIAL_ARROW", "arrow_type": "button", "direction": "up", "dialog_name": "speedup_dialog", "widget_name": "ok_button"} }
+                                    }
+                          }
+                },
+        "completion": { "consequent": "IF",
+                        "if": { "predicate": "ANY_ABTEST", "key": "tutorial_delay_invite", "value": 1, "default": 1 },
+                        "then": { "consequent": "AND", "subconsequents": [
+                            {"consequent": "INVITE_FRIENDS_PROMPT", "show_close_button": 0 }
+                        ] }
+                      },
+        "reward_xp": 100,
+        "reward_iron": 8500,
+        "reward_water": 8500
+    },
+
+    "build_maintenance_bay": {
+        "name": "build_maintenance_bay",
+        "ui_priority": 131,
+        "ui_name": "Build Maintenance Bay",
+        "ui_flavor_name": "Sufficiently Advanced Technology",
+        "ui_instructions": "Build a Maintenance Bay, under \"Buildings\" menu, then \"Production\"",
+        "ui_description": "New armored vehicle and aircraft designs are on the horizon. The Maintenance Bay will allow us to unlock far more powerful units.",
+        "activation": { "predicate": "QUEST_COMPLETED", "quest_name": "upgrade_toc_level_2" },
+        "goal": {"predicate": "BUILDING_QUANTITY", "building_type": "maintenance_bay", "trigger_qty": 1 },
+        "reward_xp": 100,
+        "reward_iron": 8500,
+        "reward_water": 8500
+    },
+    "build_motor_pool": {
+        "name": "build_motor_pool",
+        "ui_priority": 130,
+        "ui_name": "Build Motor Pool",
+        "ui_flavor_name": "Indistinguishable From Magic",
+        "ui_instructions": "Build a Motor Pool, under \"Buildings\" menu, then \"Production\"",
+        "ui_description": "This facility trains \"armor\" units, which are tougher and faster than infantry.",
+        "activation": { "predicate": "QUEST_COMPLETED", "quest_name": "upgrade_toc_level_2" },
+        "goal": {"predicate": "BUILDING_QUANTITY", "building_type": "motor_pool", "trigger_qty": 1 },
+        "reward_xp": 100,
+        "reward_iron": 2000,
+        "reward_water": 2000
+    },
+    "unlock_stryker": {
+        "name": "unlock_stryker",
+        "ui_priority": 73,
+        "ui_name": "Unlock Stryker ICV",
+        "ui_flavor_name": "Get Pumped",
+        "ui_instructions": "Unlock Stryker ICVs using your Maintenance Bay",
+        "ui_description": "We've recovered plans for constructing more of this powerful mobile armor...",
+        "activation": { "predicate": "AND", "subpredicates": [
+            { "predicate": "QUEST_COMPLETED", "quest_name": "build_maintenance_bay" },
+            { "predicate": "QUEST_COMPLETED", "quest_name": "build_motor_pool" }
+        ] },
+        "goal": {"predicate": "TECH_LEVEL", "tech": "stryker_production", "min_level": 1 },
+        "reward_xp": 500,
+        "reward_iron": 5000,
+        "reward_water": 5000
+    },
+    "build_airfield": {
+        "name": "build_airfield",
+        "ui_priority": 75,
+        "ui_name": "Build Airfield",
+        "ui_flavor_name": "Take to the Skies",
+        "ui_instructions": "Build an Airfield",
+        "ui_description": "This facility trains aircraft, which are safe from attack by many ground-based weapons.",
+        "activation": { "predicate": "QUEST_COMPLETED", "quest_name": "upgrade_toc_level_3" },
+        "goal": {"predicate": "BUILDING_QUANTITY", "building_type": "airfield", "trigger_qty": 1 },
+        "reward_xp": 200,
+        "reward_iron": 4000,
+        "reward_water": 4000
+    },
+    "unlock_oh58": {
+        "name": "unlock_oh58",
+        "ui_name": "Unlock OH-58 Kiowa",
+        "ui_flavor_name": "Ready for Takeoff",
+        "ui_instructions": "Unlock OH-58 Kiowa using your Maintenancy Bay",
+        "ui_description": "How about some new toys, Commander? These helicopters can't be hit by Mortar Emplacements.",
+        "activation": { "predicate": "QUEST_COMPLETED", "quest_name": "build_airfield" },
+        "goal": {"predicate": "TECH_LEVEL", "tech": "oh58_production", "min_level": 1 },
+        "reward_xp": 300,
+        "reward_iron": 3000,
+        "reward_water": 3000
+    },
+
+
+    "upgrade_toc_level_3": {
+        "name": "upgrade_toc_level_3",
+        "ui_name": "Upgrade Tactical Ops Center L3",
+        "ui_priority": 100,
+        "ui_important": 1,
+        "ui_flavor_name": "PRIMARY MISSION",
+        "ui_instructions": "Upgrade your Tactical Ops Center to Level 3",
+        "ui_description": "Unlock new missions, rivals, and rewards by advancing your Tactical Ops Center Level.",
+        "activation": { "predicate": "QUEST_COMPLETED", "quest_name": "upgrade_toc_level_2" },
+        "goal": {"predicate": "BUILDING_LEVEL", "building_type": "toc", "trigger_level": 3 },
+        "reward_xp": 500,
+        "reward_iron": 100000, "reward_water": 100000,
+        "reward_consequent": { "consequent": "GIVE_LOOT", "reason": "quest", "reason_id": "upgrade_toc_level_3",
+                               "loot": [{"multi": [{"table":"sexy_unlocked_unit"}], "multi_stack": 4}] }
+    },
+
+    "build_transmitter": {
+        "name": "build_transmitter",
+        "ui_name": "Build a Transmitter",
+        "ui_priority": 101,
+        "ui_flavor_name": "",
+        "ui_instructions": "Build a Transmitter, on your \"Buildings\" menu under \"Production\"",
+        "ui_description": "A Transmitter will enable us to join Clans with other players. Clan members have private chat channels and can send reinforcements to each other.",
+        "activation": { "predicate": "ALWAYS_FALSE" }, // { "predicate": "QUEST_COMPLETED", "quest_name": "upgrade_toc_level_3" },
+        "goal": {"predicate": "BUILDING_QUANTITY", "building_type": "transmitter", "trigger_qty": 1 },
+        "reward_xp": 100,
+        "reward_iron": 1500,
+        "reward_water": 1500
+    },
+    "upgrade_transmitter": {
+        "name": "upgrade_transmitter",
+        "ui_name": "Establish Communications",
+        "ui_priority": 101,
+        "ui_flavor_name": "",
+        "ui_instructions": "Upgrade our Transmitter to Level 2",
+        "ui_description": "Upgrade our Transmitter to join Clans with other players. Clan members have private chat channels and can send reinforcements to each other.",
+        "activation": { "predicate": "QUEST_COMPLETED", "quest_name": "upgrade_toc_level_3" },
+        "goal": {"predicate": "BUILDING_LEVEL", "building_type": "transmitter", "trigger_level": 2 },
+        "reward_xp": 100,
+        "reward_iron": 15000,
+        "reward_water": 15000
+    },
+    "join_an_alliance": {
+        "name": "join_an_alliance",
+        "ui_name": "Join a Clan",
+        "ui_priority": 101,
+        "ui_flavor_name": "",
+        "ui_instructions": "Click the Transmitter, view \"Clans\", then \"Join\" a Clan",
+        "ui_description": "Join other players in a Clan. Clan members have private chat channels and can send reinforcements to each other.",
+        "activation": { "predicate": "QUEST_COMPLETED", "quest_name": "upgrade_transmitter" },
+        "goal": {"predicate": "PLAYER_HISTORY", "key": "alliances_joined", "method": ">=", "value": 1 },
+        "reward_xp": 100,
+        "reward_iron": 30000,
+        "reward_water": 30000
+    },
+
+    "friends_in_game_1": {
+        "name": "friends_in_game_1",
+        "ui_name": "Recruit a Friend",
+        "ui_flavor_name": "Join Forces",
+        "ui_instructions": "Use the \"+Add\" button at the \nbottom of your screen to invite friends. Reward unlocks on tutorial \ncompletion.",
+        "ui_description": "Friends can boost your resources and help defeat more powerful opponents. They're fun to battle, too.",
+
+        "activation": {"predicate": "AND", "subpredicates": [
+            { "predicate": "QUEST_COMPLETED", "quest_name": "upgrade_toc_level_2" },
+            { "predicate": "FRAME_PLATFORM", "platform": "fb"}
+        ]},
+
+        "goal": {"predicate": "FRIENDS_JOINED", "number": 1 },
+        "reward_xp": 100,
+
+        "reward_consequent": { "consequent": "GIVE_LOOT", "reason": "quest", "reason_id": "friends_in_game_1",
+                               "loot": [{"multi": [{"table":"sexy_unlocked_unit"}], "multi_stack": 1}] },
+        "reward_iron": 12500,
+        "reward_water": 12500
+    },
+
+    "conquests_1": {
+        "ui_priority": 8,
+        "name": "conquests_1",
+        "ui_name": "Achieve 1 Conquest",
+        "ui_flavor_name": "Show Your Battle Power",
+        "ui_instructions": "Destroy the Tactical Ops Center of an opponent of equal or higher level.",
+        "ui_description": "Grow our influence and status in the world. Show your fearless leadership by picking a fight with strong enemies.",
+        "activation": { "predicate": "QUEST_COMPLETED", "quest_name": "upgrade_toc_level_3" },
+        "goal": {"predicate": "CONQUESTS", "key": "conquests", "value": 1, "method": ">=" },
+        "reward_xp": 100,
+        "reward_iron": 5000,
+        "reward_water": 5000
+    },
+
+    "like_app_page": {
+        "name": "like_app_page",
+        "ui_name": "Join the Elite",
+        "ui_priority": 2,
+        //"ui_flavor_name": "Like the Example Game Facebook page",
+        "ui_instructions": "Click 'Accept' to see the Example Game Facebook page, then click \"Like\".",
+        "ui_accept_url": "http:\/\/www.facebook.com/141835099310946/?ref=like_app_page_quest", // XXXXXX update fan page ID
+        "ui_refresh_likes": 15.0, // while this quest is visible in the UI, refresh Facebook likes every 15 sec
+        "ui_description": "Enjoy early access to our newest content releases and events, provided exclusively to our Facebook fans.",
+        "activation": {"predicate": "AND", "subpredicates": [
+            { "predicate": "QUEST_COMPLETED", "quest_name": "upgrade_toc_level_2" },
+            { "predicate": "FRAME_PLATFORM", "platform": "fb"},
+            { "predicate": "ABSOLUTE_TIME", "range": [-1, 1415145600] } // Facebook policy change takes effect 2014 Nov 5
+        ] },
+        // this is a bit complicated, because the server-side Facebook likes cache is only updated every few hours,
+        // so a player who Likes the page during a session won't see the predicate change from false to true.
+        // To get around this, we simply trust the client. The server treats FACEBOOK_LIKES_CLIENT as always true,
+        // and the client treats FACEBOOK_LIKES_SERVER as always false. This means the server will always accept
+        // quest completion, but the client UI will only display it if the client's query of the Facebook API returns "like".
+        "goal": { "predicate": "OR", "subpredicates": [
+            {"predicate": "FACEBOOK_LIKES_CLIENT", "id": "141835099310946" }, // XXXXXX update fan page ID
+            {"predicate": "FACEBOOK_LIKES_SERVER", "id": "141835099310946" } // XXXXXX update fan page ID
+        ] },
+        "reward_consequent": { "consequent": "GIVE_LOOT", "reason": "quest", "reason_id": "like_app_page",
+                               "loot": [{"multi": [{"table":"sexy_unlocked_unit"}], "multi_stack": 3}] },
+        "reward_gamebucks": 10,
+        "reward_iron": 1000,
+        "reward_water": 1000
+    }
+}

@@ -1,0 +1,159 @@
+// Copyright (c) 2014 SpinPunch. All rights reserved.
+// Use of this source code is governed by an MIT-style license that can be
+// found in the LICENSE file.
+
+{
+    "rifleman": { // Rifleman
+        // copy of name above
+        "name": "rifleman",
+
+        // name displayed to the player
+        "ui_name": "Rifleman",
+        "ui_name_plural": "Riflemen",
+
+        // "Flavor text" displayed in the unit or building info/upgrade dialogs.
+        // Use \n for line breaks
+        "ui_description": "Infantry are the lifeblood of every military force in the world.\n\nEquipped with a standard M4 assault rifle, Riflemen are best used to counter other foot soldiers.",
+
+        // very short one-line tip shown on the unit manufacturing menu right underneath the unit name
+        // and also as a tooltip on the unit deployment bar icon
+        "ui_tip": "Best in groups and against aircraft",
+
+        // note: if "ui_tip2" is present, it is used as a second line in the unit deployment bar tooltip
+        // usually ui_tip2 tells about any drawbacks or special bonuses the unit has.
+
+        // display damage_vs icons. 0=ineffective, 1=fair, 2=good, 3=excellent
+        "ui_damage_vs": {"rover": 2, "transport": 1, "starcraft": 1, "building": 1},
+
+        // must be "mobile" for all units
+        "kind": "mobile",
+
+        "level_determined_by_tech": "rifleman_production",
+
+        // size of the unit in game map cells, for collision-detection purposes
+        "gridsize": [2,2],
+
+        // this string references an asset listed in the GameArt file (art.json)
+        "art_asset": "armyguy",
+        "destroyed_inert": "armyguy_dead",
+        "walk_period": 1.2, // number of seconds that the walk cycle takes to complete (for walking units only, and only affects graphics)
+        "muzzle_height": 0.75, // number of grid units off the ground the gun muzzle is at (for positioning muzzle-flash graphics)
+
+        // the type of factory that can build this unit
+        "manufacture_category": "rovers",
+
+        // number of unit spaces this unit occupies
+        "consumes_space": 15,
+
+        // maximum movement speed, in game map cells per second
+        "maxvel": 1.9, //1.5 Velocity increased to avoid infantry feeling Sluggish, all units have velocities around 2 with vehicles being slightly faster and other foot soldiers being slightly slower to maintain a reasonable flow of combat
+
+        // maximum turning rate, in degrees per second
+        "turn_rate": 450, // default value is 230, if no value is given
+
+        // time to construct, in seconds (can vary by level)
+        "build_time": [12,13],
+
+        "no_free_speedup": 1, // do not allow FREE speedup 5-minute grace period
+
+        // resource costs to construct (can vary by level)
+        "build_cost_iron": [105,140],
+        "build_cost_water": [200,275],
+
+        // hitpoints for a fully-healthy unit (can vary by level)
+        "max_hp": [390,410],
+        "resurrectable": true, // if true, unit becomes "zombie" after death and can be repaired from zero HP
+
+        // list of any special weapon damage modifiers that apply to this unit.
+        // corresponds to the "damage_vs" table for weapon in spells.json.
+        "defense_types": ["unit","rover"],
+
+        // spells the unit can cast. Each unique type of weapon must have its own spell!
+        // these are listed in spells.json
+        "spells": ["RIFLEMAN_SHOOT", "MOVE_UNIT"],
+
+        "sound_click": "rifleman_click_yourorders",
+        "sound_destination": "rifleman_move_copythat",
+        "sound_attack": "rifleman_attack_safteysoff",
+
+        // gory infantry death effect
+        "explosion_effect": { "type": "combine", "effects": [
+            { "type": "explosion", "require_detail": 2, "sprite": "fx/glow_static_red" },
+            { "type": "particles", "emit_instant": 16, "max_count": 16, "radius": 0.9, "speed": 3.5, "max_age": 0.9, "color": [0.5,0,0,1], "elasticity": 0.2 },
+            { "type": "sound", "assets": ["infantry_destroyed_scream_1","infantry_destroyed_scream_2","infantry_destroyed_scream_3","infantry_destroyed_scream_4","infantry_destroyed_scream_5"] } ] }
+    },
+
+    "stryker": {
+        "name": "stryker",
+        "ui_name": "Stryker ICV",
+        "ui_name_plural": "Stryker ICVs",
+        "ui_description": "The Stryker is heavily armored and equipped with a .50-caliber machine gun and 8-wheel drive. The Stryker is capable of delivering a swift end to enemy infantry.",
+        "ui_tip": "A fast moving, infantry killing machine",
+        "ui_tip2": "Lightly armored",
+        "ui_damage_vs": {"rover": 1, "transport": 2, "starcraft": 0, "building": 3},
+        "kind": "mobile",
+        "level_determined_by_tech": "stryker_production",
+        "gridsize": [4,4],
+        "muzzle_height": 1,
+        "art_asset": "stryker",
+        "manufacture_category": "transports",
+        "consumes_space": 65,
+        "maxvel": 2.7,
+        "turn_rate": 120,
+        "build_time":  [1800,1900],
+        "build_cost_iron": [2100,2500],
+        "build_cost_water": [2450,3300],
+        "max_hp": [2000,2000],
+        "defense_types": ["unit","transport"],
+        "armor": 0,
+        "resurrectable": true,
+        "resurrectable_without_tech": true, // can be repaired from 0 HP even if player does not have the unit tech unlocked
+        "spells": ["STRYKER_SHOOT", "MOVE_UNIT"],
+        "requires": { "predicate": "TECH_LEVEL", "tech": "stryker_production", "min_level": 1 },
+        "sound_click": "stryker_click_hunterclick",
+        "sound_destination": "stryker_move_engine",
+        "sound_attack": "stryker_attack_hunterattack",
+        "movement_effect": { "type": "particles",
+                             "require_detail": 2,
+                             "layer": "under",
+                             "emit_instant": 5, "max_count": 5, "speed": 1.0, "randomize_vel": 0.27, "gravity": -3,
+                             "width": 50, "opacity": 0.2, "draw_mode": "circles",
+                             "max_age": 1, "color": [0.02,0.01,0.01,1] }
+    },
+
+    "oh58": {
+        "name": "oh58",
+        "ui_name": "OH-58 Kiowa",
+        "ui_name_plural": "OH-58 Kiowas",
+        "kind": "mobile",
+        "flying": 1, "altitude": 5,
+        "shadow_asset": "gunship_shadow_small",
+        "ui_description": "Armed scout helicopter with an M296 12.7mm MG.",
+        "ui_tip": "Light helicopter, evades artillery fire",
+        "ui_damage_vs": {"rover": 2, "transport": 1, "starcraft": 1, "building": 1},
+        "level_determined_by_tech": "oh58_production",
+        "gridsize": [2,2],
+        "art_asset": "oh58",
+        "muzzle_height": -1,
+        "manufacture_category": "starcraft",
+        "consumes_space": 29,
+        "item_stack_max": 20, // stack_max for packaged units of this type
+        "turn_rate": 600,
+        "defense_types": ["unit", "starcraft"],
+        "spells": ["OH58_SHOOT", "MOVE_UNIT"],
+        "build_cost_water": [800,1040],
+        "build_cost_iron": [1200,1560],
+        "build_time": [550,562],
+        "max_hp": [25,30],
+        "resurrectable": true, // if true, unit becomes "zombie" after death and can be repaired from zero HP
+        "resurrectable_without_tech": true, // can be repaired from 0 HP even if player does not have the unit tech unlocked
+        "armor": 0,
+        "maxvel": [3.1,3.2],
+        "requires": { "predicate": "AND", "subpredicates": [
+            { "predicate": "TECH_LEVEL", "tech": "oh58_production", "min_level": 1 },
+            { "predicate": "BUILDING_QUANTITY", "building_type": "airfield", "trigger_qty": 1}] },
+        "sound_click": "kiowa_click_makeitquick",
+        "sound_destination": "kiowa_move_engine",
+        "sound_attack": "kiowa_attack_finallyigettoshootsomething"
+    }
+}

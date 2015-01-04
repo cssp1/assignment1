@@ -1,0 +1,110 @@
+// Copyright (c) 2014 SpinPunch. All rights reserved.
+// Use of this source code is governed by an MIT-style license that can be
+// found in the LICENSE file.
+
+{
+    "elder_suffix": 1, // use suffix _n for newbies and _e for elders
+    "elder_threshold": 7, // # of logins that makes you an "elder"
+
+    // never send notifications more often than this many seconds
+    // this is a master limit, max() is taken of this and the config-specific min_interval
+    "min_interval": 3600,
+
+    "notifications": {
+        // SENT DIRECTLY BY SERVER
+        "you_got_attacked": {
+            "ref": "you_got_attacked", "priority": 99,
+            "enable_newbie": 0,
+            "enable_elder": 1,
+            "min_interval": 0, // note: for this notification only, its own min_interval overrides the global one
+            "ui_name": "%ATTACKER attacked your base! Take revenge now?"
+        },
+
+        "you_sent_gift_order": {
+            "ref": "you_sent_gift_order", "priority": 100, "elder_suffix": 0, "ui_name": "You sent %GAMEBUCKS_AMOUNT %GAMEBUCKS_NAME to %RECEIVER."
+        },
+        "you_got_gift_order": {
+            "ref": "you_got_gift_order", "priority": 100, "elder_suffix": 0, "ui_name": "%SENDER sent you a gift of %GAMEBUCKS_AMOUNT %GAMEBUCKS_NAME. Check messages now?"
+        },
+        "your_gift_order_was_received": {
+            "ref": "your_gift_order_was_received", "priority": 100, "elder_suffix": 0, "ui_name": "%RECEIVER received your gift of %GAMEBUCKS_AMOUNT %GAMEBUCKS_NAME."
+        },
+
+        //"alliance_promoted": { "ref": "alliance_promoted", "priority": 100, "elder_suffix": 0, "ui_name": "%ACTOR_NAME, %ACTOR_ROLE, promoted you to \"%NEW_ROLE\" in Clan \"%ALLIANCE_NAME\"." },
+        //"alliance_demoted": { "ref": "alliance_demoted", "priority": 100, "elder_suffix": 0, "ui_name": "%ACTOR_NAME, %ACTOR_ROLE, demoted you to \"%NEW_ROLE\" in Clan \"%ALLIANCE_NAME\"." },
+
+        // SENT BY retention_newbie.py
+        "fishing_complete": {
+            "ref": "fishing_complete", "priority": 25,
+            "enable_newbie": 1,
+            "enable_elder": 1,
+            "min_interval": 14400, // these only fire for 4h+ dispatches - see gameserver/retention_newbie.py
+            "ui_name": {"ui_A": "%s complete, collect rewards?"
+                        //"ui_B": "Collect rewards from %s?"
+                       }
+        },
+        "research_complete": {
+            "ref": "research_complete", "priority": 50,
+            "enable_newbie": 0,
+            "enable_elder": 0,
+            "min_interval": 86400,
+            "ui_name": "%s research complete. Ready to fight?"
+        },
+        "upgrade_complete": {
+            "ref": "upgrade_complete", "priority": 40,
+            "enable_newbie": 1,
+            "enable_elder": 0,
+            "min_interval": 86400,
+            "ui_name": "%s upgrade complete. Start another upgrade?"
+        },
+        "production_complete": {
+            "ref": "production_complete", "priority": 30,
+            "enable_newbie": 1,
+            "enable_elder": 1,
+            "min_interval": 86400,
+            "ui_name": "Unit training complete. Launch attack?"
+        },
+        "army_repaired": {
+            "ref": "army_repaired", "priority": 20,
+            "enable_newbie": 1,
+            "enable_elder": 0,
+            "min_interval": 86400,
+            "ui_name": "Your army is repaired. Launch attack?"
+        },
+        "harv_full": {
+            "ref": "harv_full", "priority": 10,
+            "enable_newbie": 0,
+            "enable_elder": 0,
+            "min_interval": 86400,
+            "ui_name": "All yards full. Collect fuel and supplies?"
+        },
+        "168h": { // used for critical Day 7 retention window, if no other notification applies
+            "ref": "168h", "priority": 5,
+            "enable_elder": 1,
+            "enable_newbie": 1,
+            "min_interval": 43200,
+            "ui_name": "Your base was attacked! Take revenge now?"
+        },
+        "24h": {
+            "ref": "24h", "priority": 5,
+            "enable_elder": 1,
+            "enable_newbie": 1,
+            "ui_name": {//"ui_A": "Enemy near your base, Commander! Attack now?",
+                "ui_B": "Your base was attacked! Take revenge now?"}
+        },
+
+        "reacq": { // manual reacquisition campaign
+            "ref": "reacq", "priority": 5,
+            "enable_elder": 1,
+            "enable_newbie": 1,
+            "ui_name": {//"ui_A": "Commander, FREE repairs completed. Your army awaits.",
+                "ui_B": "FREE repairs completed. Your army awaits.",
+                //"ui_C": "FREE repairs completed. Play now?",
+                //"ui_D": "FREE repairs completed. New map, new army awaits.",
+                "ui_E": "Your base was attacked! Take revenge now?"
+                //"ui_F": "Don't miss out: Build the ALL NEW Logistics Dispatch to collect bonus resources.",
+                //"ui_G": "The point of war is not to die for your country, but to make the other poor bastard die for his."
+            }
+        }
+    }
+}

@@ -1,0 +1,17 @@
+// Copyright (c) 2014 SpinPunch. All rights reserved.
+// Use of this source code is governed by an MIT-style license that can be
+// found in the LICENSE file.
+
+"max_astar_queries_per_tick": 2,
+
+// show "Protection or Home" when applicable on battle history dialog.
+"battle_history_show_attackability": 1,
+"battle_history_time_column": 1, // display "Time" in separate column instead of part of "attacker" (must be enabled together with show_attackability)
+"battle_history_location_column": 1, // display "Location" column
+
+"combat_resource_bars_show_space": 1, // enable unit space display on combat resource bars
+"combat_resource_bars_show_time": 1, // enable attack time display on combat resource bars
+
+// note: this opts out of "click here" guidance for the EXTENDED tutorial (after coming home from Lion Stone)
+// there is no way to opt out of the initial "rails" tutorial, because it is completely hard-coded
+"skip_tutorial_button": 1

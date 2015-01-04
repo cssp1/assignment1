@@ -1,0 +1,290 @@
+// Copyright (c) 2014 SpinPunch. All rights reserved.
+// Use of this source code is governed by an MIT-style license that can be
+// found in the LICENSE file.
+
+// INVENTORY ITEMS
+
+// FIELDS:
+// "name": must be same as dictionary key
+// "ui_name": user-visible item name
+// "ui_description": user-visible item tooltip
+// "icon": direct reference to an art.json entry for the (50x50) icon
+// (see main.js: get_inventory_item_asset())
+// "stack_max": max quantity of this item that can be stacked into one inventory slot (default 1)
+// "consumable": if true, item disappears when used (default true)
+// "use": what spell is cast when the item is used, including "spellname" and "spellarg"
+//       "spellarg": can be atomic, or a list that the client appends with specific parameters like a target unit or location (hard-coded)
+// "rarity":
+// -1 = trash (gray)
+//  0 = common (white) <-- this is the default, if none is specified
+//  1 = uncommon (green)
+//  2 = rare (blue)
+//  3 = epic (purple)
+//  4 = legendary (orange)
+// "store_price": optional, used for pricing items in the store (in units of Facebook Credits)
+// "store_requires": optional, predicate that restricts purchasability of item in the store
+
+// note: more items are generated procedurally as part of the gamedata build process by make_items_*.py
+
+"gamebucks": {
+    // NOTE: "gamebucks", "iron", and "water" are special "fungible" resources that skip the inventory system and
+    // go directly from mail attachments into the player's balances. Aside from "gamebucks", these should be used ONLY for customer
+    // support reimbursement purposes, not gameplay-related things.
+    "name": "gamebucks",
+    "name_color": [1,0.75,0],
+    "ui_name": "Gold",
+    "ui_description": "Provides speed-ups, resources, and instant upgrades and unlocks. Click to immediately add more to your existing balance.",
+    "icon": "gamebucks_inventory_icon", // A/B testable, see gamedata_main.json
+    "rarity": 2,
+    "fungible": 1, // allows infinite stacking, and special "take" behavior (adds directly to balance instead of going into inventory)
+    "resource": "gamebucks" // if item is "fungible", MUST be one of "gamebucks", "iron", "water", or "lottery_ticket"
+},
+
+"token": {
+    "name": "token",
+    "ui_name": "Ops Needs Points",
+    "ui_name_plural": "Ops Needs Points",
+    "ui_description": "Use to acquire special items in the Store. Spend before expiration date — use them or lose them!",
+    "ui_activate_button": "Go to Store",
+    "icon": "inventory_ops_needs",
+    "store_icon": "resource_icon_ops_needs",
+    "stack_max": 999999,
+    "rarity": 2,
+    "use": { "spellname": "CLIENT_CONSEQUENT", "spellarg": {"consequent": "INVOKE_STORE_DIALOG", "category": "event_prizes" } },
+
+    "force_expire_by": [
+        [{"predicate": "ALWAYS_TRUE"}, 1403974800] // fallback - should be equal to final event+2 value above
+    ]
+},
+
+// this is for error handling only. Do NOT use this item.
+"unknown_item": {
+    "name": "unknown_item",
+    "ui_name": "Unknown Item",
+    "ui_description": "Server error: item definition missing.",
+    "icon": "inventory_unknown"
+},
+
+// SPECIAL unit item for the tutorial that disregards normal unit space requirement
+"packaged_tutorial_droid": {
+    "name": "packaged_tutorial_droid",
+    "use": { "spellname": "GIVE_UNITS_LIMIT_BREAK", "spellarg": { "rifleman": 1 } },
+    "ui_description": "Adds soldiers to your base when activated.",
+    "stack_max": 1,
+    "ui_name": "Rifleman L1+",
+    "icon": "inventory_rifleman"
+},
+
+"stinger_gunner_blueprint": {
+    "name": "stinger_gunner_blueprint",
+    "ui_name": "FIM-92 Stinger Blueprints",
+    "ui_description": "Activate to unlock the FIM-92 Stinger anti-aircraft missile gunner in your Academy.\n\nMade infamous by the Afghan Mujahideen, this weapon is deadly against helicopters.",
+    "category": "blueprint",
+    "icon": "inventory_stinger_blueprint",
+    "rarity": 3,
+    // set a PLAYER_HISTORY key that will then be picked up by the "stinger_gunner_unlocked" predicate in the predicate library
+    "use": { "consequent": "AND", "subconsequents": [
+        // note that we still use the old player history keys
+        { "consequent": "PLAYER_HISTORY", "key": "stinger_blueprint_unlocked", "method": "max", "value": 1 },
+        { "consequent": "INVOKE_BLUEPRINT_CONGRATS", "item": "stinger_gunner_blueprint", "tech": "stinger_gunner_production" }
+    ] }
+},
+
+"combat_time_warp_200pct": {
+    "name": "combat_time_warp_200pct",
+    "ui_name": "Combat Fast Forward (2x)",
+    "ui_description": "Activate to fast-forward combat action until the end of this battle.",
+    "rarity": 2, "stack_max": 50,
+    "icon": "inventory_clock_fastforward_blue",
+    "use": { "spellname": "APPLY_AURA", "spellarg": ["player", "combat_time_warped_faster", 1.0, -1] }, // normal + 100% = 200%
+    "requires": { "ui_name": "This item can only be activated while defending your base or attacking an enemy base, quarry, or battalion.", "predicate": "HAS_ATTACKED"}
+},
+"combat_time_warp_400pct": {
+    "name": "combat_time_warp_400pct",
+    "ui_name": "Combat Fast Forward (4x)",
+    "ui_description": "Activate to fast-forward combat action until the end of this battle.",
+    "rarity": 3, "stack_max": 50,
+    "icon": "inventory_clock_fastforward_purple",
+    "use": { "spellname": "APPLY_AURA", "spellarg": ["player", "combat_time_warped_faster", 3.0, -1] }, // normal + 300% = 400%
+    "requires": { "ui_name": "This item can only be activated while defending your base or attacking an enemy base, quarry, or battalion.", "predicate": "HAS_ATTACKED"}
+},
+"combat_time_warp_50pct": {
+    "name": "combat_time_warp_50pct",
+    "ui_name": "Combat Slow Motion (0.5x)",
+    "ui_description": "Activate to slow down combat action until the end of this battle.",
+    "rarity": 2, "stack_max": 50,
+    "icon": "inventory_clock_slowmotion_green",
+    "use": { "spellname": "APPLY_AURA", "spellarg": ["player", "combat_time_warped_slower", -0.5, -1] }, // normal - 50% = 50%
+    "requires": { "ui_name": "This item can only be activated while attacking an enemy base, quarry, or battalion",
+                  "predicate": "AND", "subpredicates": [{"predicate": "HAS_ATTACKED"}, {"predicate": "NOT", "subpredicates": [{"predicate": "HOME_BASE"}]}] }
+},
+
+"sensor_charge": {
+    "name": "sensor_charge",
+    "ui_name": "Sensor Charge",
+    "ui_description": "Activate to add charges to your Long-Range Scanner.",
+    "icon": "inventory_sensor_charge",
+    "stack_max": 1, // ensure that they get used immediately rather than stacking in inventory
+    "fungible": 1, "resource": "lottery_ticket"
+},
+
+// this is for showcase dialogs only
+"already_collected": {
+    "name": "already_collected",
+    "ui_name": "Item Previously Rewarded",
+    "ui_description": "This item was previously rewarded after you completed the level.",
+    "icon": "inventory_already_collected"
+},
+
+// this is for the store tooltip ONLY
+"change_region_for_free": {
+    "name": "change_region_for_free",
+    "rarity": 1,
+    "ui_name": "Relocate Base", "ui_category": "Teleport",
+    "ui_description": "Activate to relocate your home base.\n\nAfter you move your base, you must wait 7 days before you can relocate again.",
+    "icon": "inventory_transmitter"
+},
+// this is for the store tooltip ONLY
+"change_region_instantly": {
+    "name": "change_region_instantly",
+    "rarity": 2,
+    "ui_name": "Relocate Base Instantly", "ui_category": "Teleport",
+    "ui_description": "Activate to relocate your home base instantly.",
+    "icon": "inventory_transmitter",
+    "use": { "spellname": "CHANGE_REGION_INSTANTLY",
+             "spellarg": [] // client will append [region,coords] as spellarg
+           }
+},
+// THIS is the item to give players if they need a relocation
+"home_base_relocator": {
+    "name": "home_base_relocator",
+    "rarity": 2,
+    "ui_name": "Instant Base Relocator", "ui_category": "Teleport",
+    "ui_description": "Activate to relocate your home base instantly. Consumed when used.\n\nAfter you move your base, you must wait 7 days before you can relocate again.",
+    "icon": "inventory_transmitter",
+    "use": { "spellname": "CHANGE_REGION_INSTANTLY",
+             "spellarg": [] // client will append [region,coords] as spellarg
+           }
+},
+
+"instant_repair": {
+    "name": "instant_repair",
+    "ui_name": "Instant Repair",
+    "rarity": 1,
+    "stack_max": 10,
+    "ui_description": "Activate to repair all damage to your on-screen units and buildings. If activated during an attack, does not repair destroyed units.",
+    "icon": "inventory_repair_item_green",
+    "use": { "spellname": "USE_INSTANT_REPAIR_ITEM" }
+},
+
+"protection_1h": {
+    "name": "protection_1h",
+    "ui_name": "Shield (1h)",
+    "ui_description": "Activate to add 1h of damage protection time to your base. Consumed when used. Once activated, another Shield (1h) cannot be used for 2 hours.",
+    "rarity": 2,
+    "icon": "inventory_protection_black",
+    "use": { "spellname": "BUY_PROTECTION1H" }
+},
+"protection_3h": {
+    "name": "protection_3h",
+    "ui_name": "Shield (3h)",
+    "ui_description": "Activate to add 3h of damage protection time to your base. Consumed when used. Once activated, another Shield (3h) cannot be used for 5 days.",
+    "rarity": 2,
+    "icon": "inventory_protection_black",
+    "use": { "spellname": "BUY_PROTECTION3H" }
+},
+"protection_6h": {
+    "name": "protection_6h",
+    "ui_name": "Shield (6h)",
+    "ui_description": "Activate to add 6h of damage protection time to your base. Consumed when used. Once activated, another Shield (6h) cannot be used for 12 hours.",
+    "rarity": 2,
+    "icon": "inventory_protection_gray",
+    "use": { "spellname": "BUY_PROTECTION6H" }
+},
+"protection_12h": {
+    "name": "protection_12h",
+    "ui_name": "Shield (12h)",
+    "ui_description": "Activate to add 12h of damage protection time to your base. Consumed when used. Once activated, another Shield (12h) cannot be used for 24 hours.",
+    "rarity": 2,
+    "icon": "inventory_protection_blue",
+    "use": { "spellname": "BUY_PROTECTION12H" }
+},
+"protection_1d": {
+    "name": "protection_1d",
+    "ui_name": "Shield (24h)",
+    "ui_description": "Activate to add 24h of damage protection time to your base. Consumed when used. Once activated, another Shield (24h) cannot be used for 5 days.",
+    "rarity": 2,
+    "icon": "inventory_protection_green",
+    "use": { "spellname": "BUY_PROTECTION1" }
+},
+"protection_7d": {
+    "name": "protection_7d",
+    "ui_name": "Shield (7d)",
+    "rarity": 2,
+    "ui_description": "Activate to add 7 days of damage protection time to your base. Consumed when used. Once activated, another Shield (7d) cannot be used for 14 days.",
+    "icon": "inventory_protection_purple",
+    "use": { "spellname": "BUY_PROTECTION7" }
+},
+"protection_28d": {
+    "name": "protection_28d",
+    "ui_name": "Shield (28d)",
+    "rarity": 3,
+    "ui_description": "Activate to add 28 days of damage protection time to your base. Consumed when used. Once activated, another Shield (28d) cannot be used for 28 days.",
+    "icon": "inventory_protection_orange",
+    "use": { "spellname": "BUY_PROTECTION28" }
+},
+
+// DO NOT USE THIS ITEM, IT DOES NOT WORK, IT IS FOR THE STORE TOOLTIP ONLY!
+"base_expansion_10pct": {
+    "name": "base_expansion_10pct",
+    "ui_name": "Base Expansion 10%",
+    "rarity": 2,
+    "ui_description": "Activate to expand the area of your base by 10%.",
+    "icon": "inventory_base_expansion_blue",
+    "use": { "spellname": "GROW_BASE_PERIMETER1" }
+},
+// DO NOT USE THIS ITEM, IT DOES NOT WORK, IT IS FOR THE STORE TOOLTIP ONLY!
+"barrier_upgrade_L2": {
+    "name": "barrier_upgrade_L2",
+    "ui_name": "HESCO Barrier Upgrade Level 2",
+    "rarity": -1,
+    "ui_description": "Activate to upgrade all HESCO Barriers in your base to Level 2.",
+    "icon": "inventory_barrier_upgrade_black",
+    "use": { "spellname": "UPGRADE_BARRIERS_LEVEL2" }
+},
+// DO NOT USE THIS ITEM, IT DOES NOT WORK, IT IS FOR THE STORE TOOLTIP ONLY!
+"barrier_upgrade_L3": {
+    "name": "barrier_upgrade_L3",
+    "ui_name": "HESCO Barrier Upgrade Level 3",
+    "rarity": 0,
+    "ui_description": "Activate to upgrade all HESCO Barriers in your base to Level 3.",
+    "icon": "inventory_barrier_upgrade_gray",
+    "use": { "spellname": "UPGRADE_BARRIERS_LEVEL3" }
+},
+// DO NOT USE THIS ITEM, IT DOES NOT WORK, IT IS FOR THE STORE TOOLTIP ONLY!
+"barrier_upgrade_L4": {
+    "name": "barrier_upgrade_L4",
+    "ui_name": "HESCO Barrier Upgrade Level 4",
+    "rarity": 1,
+    "ui_description": "Activate to upgrade all HESCO Barriers in your base to Level 4.",
+    "icon": "inventory_barrier_upgrade_green",
+    "use": { "spellname": "UPGRADE_BARRIERS_LEVEL4" }
+},
+// DO NOT USE THIS ITEM, IT DOES NOT WORK, IT IS FOR THE STORE TOOLTIP ONLY!
+"free_random_item": {
+    "name": "free_random_item",
+    "ui_name": "Launch Expedition",
+    "rarity": 0,
+    "ui_description": "Activate to discover a new special item from exploring the world.",
+    "icon": "inventory_random",
+    "use": { "spellname": "FREE_RANDOM_ITEM" }
+},
+// DO NOT USE THIS ITEM, IT DOES NOT WORK, IT IS FOR THE STORE TOOLTIP ONLY!
+"buy_random_item": {
+    "name": "buy_random_item",
+    "ui_name": "Launch Extended Expedition",
+    "rarity": 1,
+    "ui_description": "Activate to discover a new special item from continuing to explore the world.",
+    "icon": "inventory_random",
+    "use": { "spellname": "BUY_RANDOM_ITEM" }
+}

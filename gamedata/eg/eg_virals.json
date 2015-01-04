@@ -1,0 +1,137 @@
+// Copyright (c) 2014 SpinPunch. All rights reserved.
+// Use of this source code is governed by an MIT-style license that can be
+// found in the LICENSE file.
+
+{
+    // when sending Facebok messages to another Example Game player, a random tagline is chosen from this array
+    "facebook_message_text": [
+        "I'm gonna beat you!"
+    ],
+
+    // if true, then in unit unlock/upgrade M&M dialog, substitute the viral for the normal "Produce" button (otherwise ignore the viral)
+    "unit_tech_virals_replace_produce": true,
+
+    "ui_post_description": "Enjoy epic battle in the world's best massively multiplayer real-time strategy game.",
+
+    // this URL fragment is prepended to the "image" names below
+    "common_image_path": "https://s3.amazonaws.com/XXXXXX/facebook_assets/",
+    // default image to use if the specific viral does not include its own "image"
+    "default_image": "XXXXXX_feed_icon.jpg",
+
+    "invite_friends": {
+        "ui_title": "Select Friends for Example Game",
+        "ui_post_message":  "Let's fight together in Example Game and rule the world."
+    },
+
+    "send_gifts": {
+        "ui_post_message": "Here's a Mystery Gift with useful resources. Do me a favor and send one back!",
+        "ui_title": "Send Example Game Gifts",
+        "ui_giftable_filter": "Recipients",
+        "ui_error_cooldown": { "ui_title": "Try again later", "ui_description": "This friend already received a gift from you recently." },
+        "ui_error_nofriends": { "ui_title": "Try again later", "ui_description": "No friends are eligible to receive gifts from you at this time." },
+        // To create the Open Graph object, first create an Open Graph object type (GAME_ID_mystery_gift)
+        // then create one instance here, setting the "title" to "Mystery Gift" and "image" to something in S3
+        // https://developers.facebook.com/tools/object-browser
+        "og_action_type": "send", "og_object_id": "XXXXXX"
+    },
+
+    "say_thanks": {
+        "ui_generic_loot": "a gift",
+        "ui_post_headline": "Received %LOOT",
+        "ui_post_text": "Thanks to %THANKEE",
+        "ui_post_message": "Thank you %THANKEE!"
+    },
+
+    "facebook_message": {
+        "ui_post_headline": "Battlefront Mars",
+        // when sending Facebok messages to another player, a random tagline is chosen from this array
+        "random_text": [
+            "I'm gonna beat you!"
+        ]
+    },
+
+    "leaderboard_brag": {
+        "ui_post_headline": "%PLAYER achieved a new rank: %RANK in Example Game for %REASON",
+        "ui_post_text": "Demonstrating skills superior to %PCT% of players in the game"
+    },
+
+    "stats_share": {
+        "ui_post_headline": "Can you beat this score in Example Game?"
+    },
+
+    "achievement_brag": {
+        "ui_post_headline": "%PLAYER earned an achievement: \"%ACHIEVEMENT\" in Example Game"
+    },
+
+    "level_advancement": {
+        "ui_button_text": "Tell your followers",
+        "ui_post_headline": "%NAME has just advanced a level in Example Game!",
+        "ui_post_text": "%FIRSTNAME grows more powerful by the day."
+    },
+
+    "build_academy": {
+        "ui_button_text": "Tell your friends",
+        "ui_post_headline": "%NAME completed construction of a Academy in Example Game!",
+        "ui_post_text": "A strong and powerful robot army is taking shape."
+    },
+
+    "build_maintenance_bay": {
+        "ui_button_text": "Inform the Media",
+        "ui_post_headline": "%NAME completed construction of a Maintenance Bay",
+        "ui_post_text": "A smarter, more powerful army is soon to dominate."
+    },
+
+    "build_motor_pool": {
+        "ui_button_text": "Inform the Media",
+        "ui_post_headline": "%NAME completed construction of a Motor Pool in Example Game!",
+        "ui_post_text": "A powerful barrage of transport vehicles will soon be roaming."
+    },
+
+    "build_spacecraft_factory": {
+        "ui_button_text": "Inform the Media",
+        "ui_post_headline": "%NAME completed construction of a Airfield in Example Game!",
+        "ui_post_text": "Take to the skies! A new army of gunships is in the making."
+    },
+
+    "upgrade_supply_depot": {
+        "ui_button_text": "Inform the Media",
+        "ui_post_headline": "%NAME upgraded their supply depot in Example Game!",
+        "ui_post_text": "Supplies give your soldiers the breath of life they need to dominate."
+    },
+
+    "upgrade_fuel_depot": {
+        "ui_button_text": "Inform the Media",
+        "ui_post_headline": "%NAME upgraded their fuel depot in Example Game!",
+        "ui_post_text": "More fuel ensures your armor and aircraft can fight on towards total domination."
+    },
+
+    "upgrade_generator": {
+        "ui_button_text": "Inform the Media",
+        "ui_post_headline": "%NAME upgraded their Generator in Example Game!",
+        "ui_post_text": "Electricity is that universal necessity. Without it, the armies and colonies will fail."
+    },
+
+    "upgrade_toc": {
+        "ui_button_text": "Inform the Media",
+        "ui_post_headline": "%NAME upgraded their Tactical Operations Center in Example Game!",
+        "ui_post_text": "A smarter Tactical Operations Center unlocks powerful new units and weapons."
+    },
+
+    "new_unlocks": {
+        "ui_button_text": "Inform the Media",
+        "ui_post_headline": "%NAME unlocked %UNIT in Example Game!",
+        "ui_post_text": "The %UNIT is ready for production and destruction."
+    },
+
+    "defeat_computer": {
+        "ui_button_text": "Inform the Media",
+        "ui_post_headline": "%NAME just conquered %ENEMY Level %ENEMY_LEVEL in Example Game!",
+        "ui_post_text": "Victory tastes sweet."
+    },
+
+    "defeat_facebook_friend": {
+        "ui_button_text": "Brag",
+        "ui_post_headline": "%NAME just defeated %ENEMY (L%ENEMY_LEVEL) in Example Game!",
+        "ui_post_text": "Not even friendship stands in the way of the quest to rule."
+    }
+}

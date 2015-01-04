@@ -1,0 +1,33 @@
+// Copyright (c) 2014 SpinPunch. All rights reserved.
+// Use of this source code is governed by an MIT-style license that can be
+// found in the LICENSE file.
+
+// note: "map" refers to the in-base game playfield, NOT the regional map (regional map stuff is in territory.json)
+{
+    "default_ncells": [180,180], // default number of map cells in X and Y directions (can vary if a base provides base_ncells)
+
+    "base_perimeter": [90,104,118,132], // full side length of base perimeter, in map cells. Indexed by player's base_size
+    "deployment_buffer": 15, // "buffer zone" outside of base perimeter within which attackers cannot deploy units (width in map cells)
+    "range_conversion": 0.0675, // scale ratio between attack spell 'range' units and game map cell units
+    "splash_range_conversion": 0.040, // scale ratio between attack spell 'splash_range' units and game map cell units (for splash damage)
+    "building_hitbox_scale": 0.8, // adjusts size of building hitboxes. At 1.0, it's about equal to the diagonal "radius" of the building
+
+    // range (in map units) within which non-aggressive units will wake up and pursue targets
+    "aggro_radius": { // indexed by the unit's "team" and then whether the unit is attacking or defending a base
+        "player": { "offense": 27, "defense": 40 },
+        "enemy": { "offense": 40, "defense": 40 },
+        "environment": { "offense": 40, "defense": 40 }
+    },
+
+    // range (in map units) from origin location beyond which units in ATTACK_ANY/ATTACK_MOVE_AGGRO state will not go when pursuing targets (ONLY if enable_leash_radius is true -see main_options.json)
+    "leash_radius": {
+        "player": { "offense": 20, "defense": 20 },
+        "enemy": { "offense": 20, "defense": 20 },
+        "environment": { "offense": 20, "defense": 20 }
+    },
+
+    "global_maxvel_scale": 1.25, // global scale factor on all unit speeds
+    "global_projectile_speed_scale": 0.8, // global scale factor on all weapon projectile_speeds
+
+    "random_scenery_spawn": 8 // number of random scenery objects to spawn into new bases
+}

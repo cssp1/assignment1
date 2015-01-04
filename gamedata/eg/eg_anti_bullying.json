@@ -1,0 +1,24 @@
+// Copyright (c) 2014 SpinPunch. All rights reserved.
+// Use of this source code is governed by an MIT-style license that can be
+// found in the LICENSE file.
+
+// detect "bullying" behavior - many attacks by one person against another person within a short period of time (when victim has not fought back)
+{
+    "max_attacks": 5, // detect when greater than this number of attacks
+    "time_window": 604800, // within this many seconds
+
+    // duration (seconds) of battle_fatigue:DEFENDER_ID cooldown applied to attackers
+    "enable_battle_fatigue": 0,
+    "battle_fatigue_duration": [[{"predicate": "ALWAYS_TRUE"}, 604800]],
+
+    "enable_sandstorm": 1,
+    "sandstorm_min_battle_fatigue": 1, // start applying sandstorm stacks after battle fatigue exceeds this stack count
+    "sandstorm_max_battle_fatigue": 6, // apply full "you cannot attack" sandstorm after battle fatigue exceeds this stack count
+    // (this will also happen if the cumulative DPS/loot debuffs reach 100%)
+
+    // SEPARATE system for ladder pvp to prevent repeated matching against the same opponent
+    "enable_ladder_fatigue": 1,
+    "ladder_fatigue_duration": [
+        [{"predicate": "ALWAYS_TRUE"}, 21600] // default: 6 hrs
+    ]
+}

@@ -1,0 +1,46 @@
+// Copyright (c) 2014 SpinPunch. All rights reserved.
+// Use of this source code is governed by an MIT-style license that can be
+// found in the LICENSE file.
+
+// data for Facebook conversion pixels
+// https://developers.facebook.com/docs/reference/ads-api/offsite-pixels/
+{
+    // LEAD - Install/Acquisition
+    // KEY_PAGE_VIEW - CC L2
+    // REGISTRATION - Returned 24-48h
+    // ADD_TO_CART - FTD
+    // CHECKOUT - Purchase
+    // OTHER -
+
+    // filter
+    "master_filter": {"predicate": "ALWAYS_TRUE" },
+
+    "events": {
+        "acquisition_event": { // LEAD
+            "predicate": {"predicate": "ALWAYS_TRUE"},
+            "client": "www.facebook.com/offsite_event.php?id=XXXXXX&value=0"
+        },
+        "cc2_by_day_1": { // KEY_PAGE_VIEW
+            "predicate": {"predicate": "PLAYER_HISTORY", "key": "toc_level", "method": ">=", "value": 2, "by_day": 1 },
+            "client": "www.facebook.com/offsite_event.php?id=XXXXXX&value=0"
+        },
+        "returned_24_48h": { // REGISTRATION
+            "predicate": {"predicate": "RETAINED", "age_range": [86400,172800] }, // returned 24-48h after account creation
+            "client": "www.facebook.com/offsite_event.php?id=XXXXXX&value=0"
+        },
+        "ftd": { // ADD_TO_CART
+            "predicate": {"predicate": "PLAYER_HISTORY", "key": "money_spent", "method": ">=", "value": 0.01 },
+            "client": "www.facebook.com/offsite_event.php?id=XXXXXX&value=0"
+        }
+        //      "upgraded_toc_level_3_by_day_10": { // not used
+        //          "predicate": { "predicate": "PLAYER_HISTORY", "key": "toc_level", "method": ">=", "value": 3, "by_day": 10 }
+        //      }
+        //      "spent_5_hours_in_game_by_day_7": { // not used
+        //          "predicate": { "predicate": "TIME_IN_GAME", "hours": 5, "by_day": 7 },
+        //      }
+    },
+
+    "purchase_event": { // CHECKOUT
+        "client": "www.facebook.com/offsite_event.php?id=XXXXXX&value=$POST_FBTAX_DOLLARS&currency=USD"
+    }
+}

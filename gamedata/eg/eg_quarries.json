@@ -1,0 +1,51 @@
+// Copyright (c) 2014 SpinPunch. All rights reserved.
+// Use of this source code is governed by an MIT-style license that can be
+// found in the LICENSE file.
+
+{
+    // how long quarries should last by default (can be over-ridden by each template)
+    "default_duration_range": [86400, 2592000],  // uniformly random between 1 day and 30 days
+
+    // strongpoint parameters
+    "alliance_turf": {
+        // *approximate* check interval - this is only used for the in-game GUI display of next refresh time
+        "check_interval": 3600,
+
+        // aura that gets applied to alliance members as the reward
+        "reward": { "auras": [{"spec": "turf_quarry_yield_bonus",
+                               "strength": 1.0, // doubles resources from Strongpoint quarries
+                               // 65 minutes - assumes a check interval of 60 minutes, plus some slop time if the script is delayed
+                               "duration": 3900},
+                              {"spec": "special_chat_template",
+                               "strength": "turf_winner",
+                               "duration": 3900}
+                             ]}
+    },
+
+    "spawn": [
+        // NOTE: quarries occupy the base_id ranges from id_start to (id_start+num-1)
+        // different templates should NOT overlap base_id ranges, or they will over-write each other!
+
+        { "template": "small", "resource": "iron", "id_start": 2000, "num": 38 },
+        { "template": "small", "resource": "water", "id_start": 3000, "num": 38 }
+
+        // STRONGPOINTS
+        // { "template": "small_strongpoint_easy", "resource": "water", "id_start": 20800, "num": 0 },
+        // { "template": "small_strongpoint_easy", "resource": "iron", "id_start": 20900, "num": 6 },
+    ],
+
+    "templates": {
+        "small": { "ui_name": "Small", "default_landlord_id": 987,
+                   "remoteness": 0, "base_richness": 10, "icon": "%RESOURCE",
+                   // should have: 4x Harvester L4, 2x MG Tower L2, 2x Mortar Emplacement L2
+#include_stripped "$GAME_ID_quarries/$GAME_ID_quarry_small.json"
+                 },
+
+        // STRONGPOINTS - duration 2-4 days.
+        "small_strongpoint_easy": { "ui_name": "Strongpoint", "default_landlord_id": 990, "turf_points": 1, "duration_range": [172800,345600],
+                                    "info_tip": "strongpoint_tip", // refers to strings.json:map_feature_ tip
+                                    "remoteness": 0, "base_richness": 10, "icon": "%RESOURCE", "rotatable": 1,
+#include_stripped "$GAME_ID_quarries/$GAME_ID_quarry_small_strongpoint_easy.json"
+                                  }
+    }
+}

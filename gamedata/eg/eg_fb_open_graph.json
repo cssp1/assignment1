@@ -1,0 +1,28 @@
+// Copyright (c) 2014 SpinPunch. All rights reserved.
+// Use of this source code is governed by an MIT-style license that can be
+// found in the LICENSE file.
+
+{
+    "developer_only": false,
+    "check_permissions": true,
+
+    "sent_gift": { "enable": false },
+    "thank": { "enable": false },
+    "defeat": { "enable": false },
+
+    // conquer AI base - NOTE! this is only published if the base has an "fb_open_graph" entry (see ai_bases_arsenal.json for an example)
+    "conquer": { "enable": true },
+
+    "upgrade_building": { "enable": false,
+                          "enable_all": false,
+                          "enable_toc": true },
+    "unlock_unit": { "enable": false,
+                     "enable_all": true },
+    "upgrade_unit": { "enable": false },
+    "level_up": { "enable": false },
+    "update_rank": { "enable": false,
+                     "interval": 3600, // skip update if last update occurred fewer than this many seconds ago
+                     "min_level": 5, // do not send leaderboard rank updates below this player_level
+                     "min_percentile": 0.5 // do not send update if player is below this percentile rankg
+                   }
+}

@@ -1,0 +1,142 @@
+// Copyright (c) 2014 SpinPunch. All rights reserved.
+// Use of this source code is governed by an MIT-style license that can be
+// found in the LICENSE file.
+
+// parameters controlling matchmaking for player-vs-player combat
+{
+    // PvP season start times
+    "season_starts": [0 // Season 1 (current)
+                     ],
+
+    "season_ui_offset": 0, // add this to the true internal "season" number before displaying it in the UI
+
+    // starting UNIX UTC time for PvP leaderboard stat weeks
+    // NOTE: may need to be reset occasionally to account for leap seconds
+
+    // ORIGINALLY WAS 1337677200 = Tuesday 2012 May 22 0900 UTC
+    // CHANGED DURING WEEK #37 TO ALIGN WITH AI RESET TIMES (Thursdays 1700 UTC)
+    "week_origin": 1337274000, // Thursday 2012 May 17 1700 UTC
+
+    "scores2_wide_space": "continent", // default leaderboard scope = continent (or ALL)
+
+    // note: combat ratings are a logarithmic scale, equal to ln(sum of DPS of all combat units in your base)
+
+    // approximate PvP rating for the units you have at the end of the tutorial
+    "new_user_rating": 6.14,
+
+    // range of stranger combat ratings (+/- relative to your rating) to consider for inclusion in Rivals list
+    // note: 0.69 is ln(2.0), so this means the range covers strangers with 50% to 200% of your DPS
+    "stranger_range": [-999, 999],
+
+    // if enabled, prevent attacking Facebook friends who are too low level
+    "enforce_level_gap_between_friends": true,
+
+    // after you've been attacked, how long (seconds) you have to counter-attack (breaking the normal level gap limit)
+    "revenge_time": 86400,
+
+    // maximum number of strangers to stuff into Rivals list
+    "max_stranger_rivals": 30,
+
+    // display the top N players in leaderboard (note: due to
+    // AMP protocol limitations, and dbserver data structures,
+    // it's a good idea to keep this as small as possible).
+    "max_leaderboard_entries": 50,
+
+    // LADDER PVP PARAMETERS
+    "ladder_point_frequency": "season", // show "week" or "season" scores as the PvP trophy count
+    "ladder_match_life": 3600, // seconds you must wait before being assigned a new opponent automatically
+    "ladder_match_client_cooldown": 10, // seconds the client blocks repeated match-finding attempts
+    "ladder_match_min_cooldown": 1, // seconds you must wait to get first opponent
+    "ladder_match_switch_cooldown": 10, // seconds you must wait after invoking the "give me a different opponent" button
+
+    "ladder_match_ai_chance": 0, // chance of getting an AI opponent rather than a player.
+    "ladder_match_ai_fallback": false, // use AI opponents rather than falling back to nothing if there is no match
+    "ladder_match_ai_persist": true, // whether to store damage to AI bases fought on the ladder (probably needs to be true to prevent exploits)
+
+    "ladder_match_switch_cost": {"iron": 2500}, // cost of switching opponents
+
+    "ladder_win_damage": 0.50, // % base damage required to win a ladder battle
+
+    // protection time given after ladder battles
+    // [X,Y] means "if damage => X, then give Y seconds"
+    "ladder_protection": [[0.99, 172800], // 48 hours
+                          [0.75, 86400], // 24 hours
+                          [0.50, 43200], // 12 hours
+                          [0.00, 0]],
+
+    // bonus ladder points for extra damage (as portion of normal win points added as bonus)
+    "ladder_bonus_damage": [[0.99, 1.0], // 200% points
+                            [0.75, 0.5], // 150% points
+                            [0.00, 0]],
+
+    "ladder_match_pool_size": 1, // number of matches requested from dbserver before shuffling/filtering
+
+    // number of levels above/below player level that will be considered for matching
+    // this is a "soft" limit that applies to the initial matchmaking query, NOT a "hard" limit like max_pvp_level_gap
+    "ladder_match_down_levels": -1, // no restriction - max_pvp_level_gap takes care of this
+    "ladder_match_up_levels": -1, // no restriction
+
+    "ladder_match_by": "trophies", // enable first-pass matching by trophy count
+    // when matching by trophy count, look up or down this many trophies relative to your own count
+    // arrays indexed by search pass number ([pass 1 down, pass 1 up], [pass 2 down, pass 2 up], ...)
+    "ladder_match_trophy_range": [[0,100],[50,200],[200,500],[10000,10000]], // note: null means "infinite range"
+
+    // basic ladder point increment table for wins/losses, used when ladder_point_incr_by_trophies is OFF
+    "ladder_point_incr": {
+        "attacker_victory": 10,
+        "attacker_defeat": -5,
+        "defender_victory": 10,
+        "defender_defeat": -5
+    },
+    // table used for AI rivals
+    "ladder_point_incr_ai": {
+        "attacker_victory": 1, "attacker_defeat": -5,
+        "defender_victory": 5, "defender_defeat": -1
+    },
+
+    "ladder_point_incr_by_trophies": true, // enable scaling of ladder point increments by trophy count
+    // table for ladder point increments that scale with trophy count delta
+    "ladder_point_incr_by_trophies_table": {
+        // base = default increment when battle is evenly matched
+        // min = smallest increment, max = biggest increment
+        // delta = change in increment per unit of trophy count distance
+
+        // Currently, these parameters are set up to prevent "runaway leader" situations where
+        // one or a handful of players zoom up to ridiculously high trophy counts. We're giving
+        // lots of points for beating someone higher than you, and only 1 point for beating someone
+        // lower than you. Points scale to max deflection at a delta of 100 points.
+
+        "attacker_victory": {"min":  2, "base": 2, "max": 60, "delta": 0.60 },
+        "attacker_defeat":  {"min": -1, "base": -1, "max": -20, "delta": 0.20 },
+        "defender_victory": {"min": 1, "base": 1, "max": 20, "delta": 0.20 },
+        "defender_defeat":  {"min": -1, "base": -1, "max": -50, "delta": 0.50 }
+    },
+    // used for map-based ladder battles
+    "ladder_point_on_map_table": {
+        "attacker_victory": {"min":  2, "base": 2, "max": 60, "delta": 0.60 },
+        "attacker_defeat":  {"min": 0, "base": 0, "max": 0, "delta": 0 },
+        "defender_victory": {"min": 0, "base": 0, "max": 0, "delta": 0 },
+        "defender_defeat":  {"min": -1, "base": -1, "max": -50, "delta": 0.50 }
+    },
+
+    // used to punish players for getting their bases damaged, even when the attacker is not winning ladder points
+    "ladder_point_minloss_table": {
+        "protection_based_on": "storage_only",
+        "attacker_victory": {"min": 0, "base": 0, "max": 0, "delta": 0 },
+        "attacker_defeat":  {"min": 0, "base": 0, "max": 0, "delta": 0 },
+        "defender_victory": {"min": 0, "base": 0, "max": 0, "delta": 0 },
+        "defender_defeat":  {"min": -2, "base": -2, "max": -60, "delta": 0.50 }
+    },
+    "ladder_point_ai_attack_loss_on_damage": -20, // loss when 50%+ damaged by AI attack (not implemented)
+
+    "ladder_point_revenge_scale": 1, // scale points awarded in revenge battles
+
+    "zero_points_on_ladder_exit": 0, // whether to zero out trophy count when going from ladder to non-ladder upon region change
+
+    // loot bonus/malus stack count to apply, indexed by delta in townhall level - see pvp_loot_bonus/malus auras
+    "ladder_loot_bonus": [0,25,50], // +0, +1, +2 or more
+    "ladder_loot_malus": [0,0,0], // max is [0,50,90]  // -0, -1, -2 or more
+
+    "ladder_point_decay_if": {"predicate": "ALWAYS_FALSE"}, // { "predicate": "BUILDING_LEVEL", "building_type": "toc", "trigger_level": 3 },
+    "ladder_point_decay_halflife": 86400 // number of seconds after which PvP points decay to half when base severely damaged
+}

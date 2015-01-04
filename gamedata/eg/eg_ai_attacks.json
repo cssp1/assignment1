@@ -1,0 +1,57 @@
+// Copyright (c) 2014 SpinPunch. All rights reserved.
+// Use of this source code is governed by an MIT-style license that can be
+// found in the LICENSE file.
+
+{
+    // these describe the "daily AI attacks" on player bases
+
+    // min level to get attacked
+    "min_level": 10,
+
+    // min level to get a big attack
+    "min_level_big_attack": 20,
+
+    // if base is more than this % damaged, never do a daily attack
+    "max_base_damage": 0.20,
+    "max_base_damage_big_attack": 0.10,
+
+    "tutorial_attack_warning_time": 30, // for the Aruj attack in the tutorial
+
+    "wave_interval": 6, // time between waves, in seconds
+    "defense_time": 300, // maximum time the defensive battle can last, in seconds
+
+    "default_spread": 10, // default spread radius for incoming unit deployment
+
+    // tech level progression for attacking units
+    "wave_table": [
+        { "player_lacks": "rifleman_production", "major_unit": "rifleman", "peon_unit": "rifleman", "flavor_unit": "rifleman" }
+    ],
+
+    "attack_types": {
+        // only "old-style" AI attack waves go here
+        // modern "refreshing AI" attack waves go in ai_bases_*.json
+
+        // Aruj attack on your base during tutorial
+        "tutorial": { "warning_time": 30, // time from attack warning to forced unit deployment (max), in seconds
+                      // note: tutorial atatck does not use wave_table, it lists units explicitly
+                      "attacker_id": 1002, // user_id of attacking AI (corresponds to the ID in ai_bases_X.json)
+
+                      // NOTE: there are TWO ways to specify the waves of incoming units. The first is to
+                      // list them explicitly as "units". "units" is a list of waves which will be deployed
+                      // at fixed intervals ("wave_interval" above). Each member of this list is a dictionary
+                      // that maps unit spec name to the quantity of that unit.
+                      "units": [{ "rifleman": 4
+                                }] },
+
+        "daily_big": { "warning_time": 300,
+                       "attacker_id":990,
+                       // The other way to specify the waves of incoming units is to use "waves" which
+                       // varies the exact types of units based on how far the player has progressed in the
+                       // tech tree. This looks up "wave_table" below to assign the specific attacking unit types.
+                       "waves":  [{ "major_unit": 1, "peon_unit": 3, "flavor_unit": 1},
+                                  { "major_unit": 1, "peon_unit": 3, "flavor_unit": 1}] },
+        "daily_small": { "warning_time": 300,
+                         "attacker_id": 990,
+                         "waves": [{ "major_unit": 1, "peon_unit": 1, "flavor_unit": 0}] }
+    }
+}
