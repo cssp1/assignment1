@@ -102,11 +102,14 @@ fi
 # create built/gamedata-mf-en_US.json (localization) and .js (prepending "var gamedata = " and linebreaking)
 
 # linebreak tool, relative to gamedata directory
-if [ -x ${SPIN_GAMEDATA}/linebreak/built/linebreak ]; then
-    LINEBREAK=./linebreak/built/linebreak
+if [ -x "${SPIN_GAMEDATA}/linebreak/built/linebreak" ]; then
+    LINEBREAK="./linebreak/built/linebreak"
+elif (cd "${SPIN_GAMEDATA}/linebreak" && make); then
+    echo "Fast linebreak tool built"
+    LINEBREAK="./linebreak/built/linebreak"
 else
     echo "Fast linebreak tool not found, falling back to linebreak.py."
-    LINEBREAK=./linebreak.py
+    LINEBREAK="./linebreak.py"
 fi
 export LINEBREAK
 
