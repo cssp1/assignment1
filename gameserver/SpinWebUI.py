@@ -85,6 +85,7 @@ class JQueryUI (PageContent):
 
         fd.write('var townhall = "'+self.gamedata['townhall']+'";\n')
         fd.write('var spin_game_id_long = "'+self.gamedata['strings']['game_name']+'";\n')
+        fd.write('var public_s3_bucket = "'+SpinConfig.config['public_s3_bucket']+'";\n')
 
         #for line in open('ext-Line-patch.js').xreadlines():
         #    fd.write(line)
@@ -523,7 +524,7 @@ class JQueryUI (PageContent):
               title: 'Upload Ad Report', width: 400, bodyPadding: 10, frame:true,
               items: [
               {xtype:'box',isFormField:false,autoEl: {
-              tag:'div', style: 'padding:10px;', children: [{tag:'img',src:'http://s3.amazonaws.com/'+SpinConfig.config['public_s3_bucket']+'/ad_data_upload2.jpg',width:'663',height:'384'}]
+              tag:'div', style: 'padding:10px;', children: [{tag:'img',src:'http://s3.amazonaws.com/'+public_s3_bucket+'/ad_data_upload2.jpg',width:'663',height:'384'}]
                        }},
                       {xtype: 'filefield', name: 'ad_csv_data', fieldLabel: 'Ad Report CSV File', width: 350, labelWidth: 150,
                        allowBlank: false, buttonText: 'Choose File'},
