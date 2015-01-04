@@ -4,8 +4,10 @@
 # Use of this source code is governed by an MIT-style license that can be
 # found in the LICENSE file.
 
-# utility for wrangling different SCM systems (SVN and Git, where for
-# Git we're putting each game title's gamedata in its own repository).
+# Utility for wrangling different SCM systems (SVN and Git, where for
+# Git we're putting gamedata for each game title in its own repository).
+
+# This is meant to be run from the top-level "game" directory.
 
 function usage {
     echo "Usage: $0 <command>"
@@ -40,12 +42,6 @@ else
     exit 1
 fi
 
-function do_init_svn {
-    PREFIX="$2" # e.g. 'summonersgate'
-    if [ ! -e "${ROOT}/.svn" ]; then
-        (cd "$ROOT/.." && svn co svn+ssh://gamemaster.spinpunch.com/var/svn/game/trunk "${PREFIX}")
-    fi
-}
 function do_up_svn {
     (cd "$ROOT" && svn up)
 }
@@ -75,29 +71,6 @@ function do_commit_svn {
     (cd "$ROOT" && svn ci -m "$2")
 }
 
-function do_init_git {
-    PREFIX="$2" # e.g. 'summonersgate'
-    TITLES="$3" # e.g. 'mf tr mf2 bfm dv sg'
-    #REPO="https://github.com/spinpunch" # requires interactive password input
-    REPO="git@github.com:spinpunch" # note: requires ~/.ssh/config setup
-    if [ ! -e "$ROOT/.git" ]; then
-        (cd "$ROOT/.." && git clone "${REPO}/game.git" ${PREFIX})
-    fi
-    if [ ! -e "$ROOT/../${PREFIX}-spinpunch-private/.git" ]; then
-        (cd "$ROOT/.." && git clone "${REPO}/game-spinpunch-private.git" "${PREFIX}-spinpunch-private")
-    fi
-    if [ ! -e "$ROOT/spinpunch-private" ]; then
-        (cd "$ROOT" && ln -s "../${PREFIX}-spinpunch-private" "spinpunch-private")
-    fi
-    for TITLE in $TITLES; do
-        if [ ! -e "$ROOT/../${PREFIX}-gamedata-${TITLE}/.git" ]; then
-            (cd "$ROOT/.." && git clone "${REPO}/game-gamedata-${TITLE}.git" "${PREFIX}-gamedata-${TITLE}")
-        fi
-        if [ ! -e "$ROOT/gamedata/${TITLE}" ]; then
-            (cd "$ROOT/gamedata" && ln -s "../../${PREFIX}-gamedata-${TITLE}" "$TITLE")
-        fi
-    done
-}
 function do_up_git {
     for dir in $GIT_DIRS; do
         echo "pulling game-${dir}..."
@@ -148,9 +121,6 @@ if [ $# == 0 ] || [ "$1" == "help" ] ; then
 else
     if [ $SCM == git ]; then
         case "$1" in
-            init)
-                do_init_git $@
-                ;;
             up)
                 do_up_git $@
                 ;;
@@ -187,9 +157,6 @@ else
         esac
     elif [ $SCM == svn ]; then
         case "$1" in
-            init)
-                do_init_svn $@
-                ;;
             up)
                 do_up_svn $@
                 ;;
