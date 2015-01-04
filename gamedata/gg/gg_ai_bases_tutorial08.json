@@ -136,7 +136,7 @@
         {"predicate": "AI_BASE_SHOWN", "user_id": 992},
         {"predicate": "PLAYER_HISTORY", "key": "ai_tutorial02A_progress", "method": ">=", "value": 1,
          "ui_name": "Spy on Mr. Skilling Level 1 and destroy his Tactical Ops Center"},
-        { "predicate": "BUILDING_LEVEL", "building_type": "toc", "tri$GAME_IDer_level": 2 }
+        { "predicate": "BUILDING_LEVEL", "building_type": "toc", "trigger_level": 2 }
     ] },
     "completion": { "consequent": "AND", "subconsequents": [
         { "consequent": "PLAYER_HISTORY", "key": "ai_tutorial08_progress", "method": "max", "value": 1 }
