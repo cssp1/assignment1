@@ -72,6 +72,15 @@ else
     elif [ "$SCM" == "svn" ]; then
         do_init_svn $@
     fi
+
+    # set up dummy art_auto.json, for "headless" trees that don't need the art pack
+    ROOT="$2"
+    if [ ! -e "${ROOT}/gameclient/art" ]; then
+	mkdir -p "${ROOT}/gameclient/art"
+    fi
+    if [ ! -e "${ROOT}/gameclient/art/art_auto.json" ]; then
+	echo '"asdf":"asdf"' > "${ROOT}/gameclient/art/art_auto.json"
+    fi
 fi
 
 exit $?
