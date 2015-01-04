@@ -7,18 +7,14 @@
 # dump "fb_conversion_pixels" log events from MongoDB (or S3) to a MySQL database for analytics
 # this runs once per game title, from the game analytics sandbox (like archive_mongodb_logs.py)
 
-import sys, time, calendar, getopt, tempfile, subprocess, traceback
+import sys, time, calendar, getopt, traceback
 import SpinConfig
 import SpinJSON
-import SpinS3
 import SpinUserDB
-import SpinNoSQL
-import SpinNoSQLId
+import SpinETL
 import SpinSQLUtil
 import SkynetLib
 import MySQLdb
-
-id_generator = SpinNoSQLId.Generator()
 
 time_now = int(time.time())
 
@@ -47,56 +43,6 @@ def get_user_data(user_id, verbose):
         'acquisition_ad_skynet': data.get('acquisition_ad_skynet',None)
         }
     return ret
-
-def iterate_from_mongodb(game_id, start_time, end_time):
-    nosql_client = SpinNoSQL.NoSQLClient(SpinConfig.get_mongodb_config(game_id))
-    end_time = min(end_time, time_now - 12*3600) # don't grab data that's *too* recent because the userdb files may be unavailable
-    qs = {'time': {'$gt': start_time, '$lt': end_time}}
-
-    for row in nosql_client.log_buffer_table('log_fb_conversion_pixels').find(qs):
-        row['_id'] = nosql_client.decode_object_id(row['_id'])
-        yield row
-
-def iterate_from_s3(game_id, start_time, end_time):
-    assert start_time > 0
-
-    s3 = SpinS3.S3(SpinConfig.aws_key_file())
-    bucket = 'spinpunch-logs'
-    last_id_time = -1
-    id_serial = 0
-
-    for t in xrange(86400*(start_time//86400), 86400*(end_time//86400), 86400): # for each day
-        y, m, d = SpinConfig.unix_to_cal(t)
-        for entry in s3.list_bucket(bucket, prefix='%04d%02d/%s-%04d%02d%02d-fb_conversion_pixels.json' % (y, m, SpinConfig.game_id_long(override_game_id=game_id), y,m,d)):
-            filename = entry['name'].split('/')[-1]
-            if verbose: print 'reading', filename
-
-            if entry['name'].endswith('.zip'):
-                tf = tempfile.NamedTemporaryFile(prefix='skynet_conversion_pixels_to_sql-'+filename, suffix='.zip')
-                s3.get_file(bucket, entry['name'], tf.name)
-                unzipper = subprocess.Popen(['unzip', '-q', '-p', tf.name],
-                                            stdout = subprocess.PIPE)
-            else:
-                raise Exception('unhandled file extension: '+entry['name'])
-
-            for line in unzipper.stdout.xreadlines():
-                row = SpinJSON.loads(line)
-                if row['time'] < start_time: continue # skip ahead
-                elif row['time'] > end_time: break
-
-                if '_id' not in row:
-                    # synthesize a fake MongoDB row ID
-                    if row['time'] != last_id_time:
-                        last_id_time = row['time']
-                        id_serial = 0
-                    fake_pid = {'mf':0, 'tr':1, 'mf2':2, 'dv':3, 'gg':4, 'bfm':5, 'sg':6}[game_id] # to protect against same-time collisions
-                    row['_id'] = SpinNoSQLId.creation_time_id(row['time'], pid = fake_pid, serial = id_serial)
-                    assert SpinNoSQLId.is_valid(row['_id'])
-                    id_serial += 1
-
-                # note: there's a small chance this could end up duplicating an event at the boundary of an S3 import and MongoDB import
-
-                yield row
 
 if __name__ == '__main__':
     game_id = SpinConfig.game()
@@ -132,6 +78,8 @@ if __name__ == '__main__':
     start_time = calendar.timegm([2013,9,1,0,0,0]) # this is about when we started recording this data
     end_time = time_now - 60 # don't get too close to "now" since we assume if we have one event for a given second, we have them all
 
+    end_time = min(end_time, time_now - 12*3600) # also, don't grab data that's *too* recent because the userdb files may be unavailable
+
     if not dry_run:
         cur.execute("SELECT time FROM "+sql_util.sym(conversions_table)+" WHERE tgt_game = %s ORDER BY time DESC LIMIT 1", game_id)
         row = cur.fetchone()
@@ -147,9 +95,9 @@ if __name__ == '__main__':
     total = 0
 
     if source == 'mongodb':
-        iter = iterate_from_mongodb(game_id, start_time, end_time)
+        iter = SpinETL.iterate_from_mongodb(game_id, 'log_fb_conversion_pixels', start_time, end_time)
     elif source == 's3':
-        iter = iterate_from_s3(game_id, start_time, end_time)
+        iter = SpinETL.iterate_from_s3(game_id, 'spinpunch-logs', 'fb_conversion_pixels', start_time, end_time, verbose = verbose)
 
     for row in iter:
         try:

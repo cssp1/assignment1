@@ -2699,7 +2699,7 @@ class AttackLog:
     def storage_s3_name(cls, base_name):
         unix_time = int(base_name[0:10])
         tm = time.gmtime(unix_time)
-        return '%s-battles-%04d%02d/%04d%02d%02d/%s' % (SpinConfig.config['game_id'], tm.tm_year, tm.tm_mon, tm.tm_year, tm.tm_mon, tm.tm_mday, base_name)
+        return '%s-battles-%04d%02d/%04d%02d%02d/%s' % (game_id, tm.tm_year, tm.tm_mon, tm.tm_year, tm.tm_mon, tm.tm_mday, base_name)
 
     def upload(self):
         if not self.log_file: return # ignore null logs
@@ -11349,6 +11349,7 @@ def ai_base_source_file(id):
     if type(id) is int:
         # look in AI bases
         source_file = gamedata['ai_bases']['bases'][str(id)]['base_source_file']
+        source_file = source_file.replace('$GAME_ID', SpinConfig.game()) # not game_id, because we want to strip 'test' suffix if present
         return SpinConfig.gamedata_component_filename(source_file)
         #return '../gamedata/'+source_file
     else:
@@ -24008,9 +24009,9 @@ class GameSite(server.Site):
 
     def sql_init(self):
         self.sql_scores2_client = None
-        if gamedata['server'].get('enable_scores2_read_sql', False) and ((SpinConfig.config['game_id']+'_scores2') in SpinConfig.config.get('pgsql_servers',{})):
+        if gamedata['server'].get('enable_scores2_read_sql', False) and ((game_id+'_scores2') in SpinConfig.config.get('pgsql_servers',{})):
             import AsyncPostgres
-            self.sql_scores2_client = Scores2.SQLScores2(AsyncPostgres.AsyncPostgres(SpinConfig.get_pgsql_config(SpinConfig.config['game_id']+'_scores2'),
+            self.sql_scores2_client = Scores2.SQLScores2(AsyncPostgres.AsyncPostgres(SpinConfig.get_pgsql_config(game_id+'_scores2'),
                                                                                      verbosity = 0,
                                                                                      log_exception_func = lambda x: self.exception_log.event(server_time, x)))
     def sql_shutdown(self):
@@ -24019,14 +24020,14 @@ class GameSite(server.Site):
 
     def nosql_init(self, is_startup = False):
         if self.nosql_client: return
-        if ('mongodb_servers' not in SpinConfig.config) or (SpinConfig.config['game_id'] not in SpinConfig.config['mongodb_servers']):
+        if ('mongodb_servers' not in SpinConfig.config) or (game_id not in SpinConfig.config['mongodb_servers']):
             if is_startup:
-                raise Exception('mongodb_servers["%s"] not found in config.json. Please ask Dan for help setting up MongoDB.' % SpinConfig.config['game_id'])
+                raise Exception('mongodb_servers["%s"] not found in config.json. Please ask Dan for help setting up MongoDB.' % game_id)
             else:
                 self.exception_log.event(server_time, 'NoSQL init fails - mongodb_servers not found in config.json')
             return
 
-        config = SpinConfig.get_mongodb_config(SpinConfig.config['game_id'])
+        config = SpinConfig.get_mongodb_config(game_id)
         try:
             self.nosql_client = SpinNoSQL.NoSQLClient(config,
                                                       map_update_hook = self.gameapi.broadcast_map_update,
@@ -24111,7 +24112,7 @@ class GameSite(server.Site):
         reload_gamedata()
         status_json = admin_stats.get_server_status_json()
         if self.nosql_client:
-            self.nosql_client.update_dbconfig(SpinConfig.get_mongodb_config(SpinConfig.config['game_id']))
+            self.nosql_client.update_dbconfig(SpinConfig.get_mongodb_config(game_id))
             self.nosql_client.server_status_update(spin_server_name, status_json, reason='reconfig')
         self.reset_interval(False)
         return status_json

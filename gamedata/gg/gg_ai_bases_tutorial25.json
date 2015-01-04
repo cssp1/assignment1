@@ -19,8 +19,8 @@
     "completion": { "consequent": "AND", "subconsequents": [
         { "consequent": "PLAYER_HISTORY", "key": "ai_tutorial25_progress", "method": "max", "value": 1 }
     ] },
-    "base_source_file": "gg/gg_ai_bases_tutorial25/gg_ai_tutorial25_967_base.json",
-#include_stripped "gg_ai_bases_tutorial25/gg_ai_tutorial25_967_base.json"
+    "base_source_file": "$GAME_ID/$GAME_ID_ai_bases_tutorial25/$GAME_ID_ai_tutorial25_967_base.json",
+#include_stripped "$GAME_ID_ai_bases_tutorial25/$GAME_ID_ai_tutorial25_967_base.json"
 },
 
 "968": {
@@ -33,8 +33,8 @@
     "completion": { "consequent": "AND", "subconsequents": [
         { "consequent": "PLAYER_HISTORY", "key": "ai_tutorial25_progress", "method": "max", "value": 2 }
     ] },
-    "base_source_file": "gg/gg_ai_bases_tutorial25/gg_ai_tutorial25_968_base.json",
-#include_stripped "gg_ai_bases_tutorial25/gg_ai_tutorial25_968_base.json"
+    "base_source_file": "$GAME_ID/$GAME_ID_ai_bases_tutorial25/$GAME_ID_ai_tutorial25_968_base.json",
+#include_stripped "$GAME_ID_ai_bases_tutorial25/$GAME_ID_ai_tutorial25_968_base.json"
 },
 
 "969": {
@@ -47,8 +47,8 @@
     "completion": { "consequent": "AND", "subconsequents": [
         { "consequent": "PLAYER_HISTORY", "key": "ai_tutorial25_progress", "method": "max", "value": 3 }
     ] },
-    "base_source_file": "gg/gg_ai_bases_tutorial25/gg_ai_tutorial25_969_base.json",
-#include_stripped "gg_ai_bases_tutorial25/gg_ai_tutorial25_969_base.json"
+    "base_source_file": "$GAME_ID/$GAME_ID_ai_bases_tutorial25/$GAME_ID_ai_tutorial25_969_base.json",
+#include_stripped "$GAME_ID_ai_bases_tutorial25/$GAME_ID_ai_tutorial25_969_base.json"
 },
 
 "970": {
@@ -61,8 +61,8 @@
     "completion": { "consequent": "AND", "subconsequents": [
         { "consequent": "PLAYER_HISTORY", "key": "ai_tutorial25_progress", "method": "max", "value": 4 }
     ] },
-    "base_source_file": "gg/gg_ai_bases_tutorial25/gg_ai_tutorial25_970_base.json",
-#include_stripped "gg_ai_bases_tutorial25/gg_ai_tutorial25_970_base.json"
+    "base_source_file": "$GAME_ID/$GAME_ID_ai_bases_tutorial25/$GAME_ID_ai_tutorial25_970_base.json",
+#include_stripped "$GAME_ID_ai_bases_tutorial25/$GAME_ID_ai_tutorial25_970_base.json"
 },
 
 "971": {
@@ -75,8 +75,8 @@
     "completion": { "consequent": "AND", "subconsequents": [
         { "consequent": "PLAYER_HISTORY", "key": "ai_tutorial25_progress", "method": "max", "value": 5 }
     ] },
-    "base_source_file": "gg/gg_ai_bases_tutorial25/gg_ai_tutorial25_971_base.json",
-#include_stripped "gg_ai_bases_tutorial25/gg_ai_tutorial25_971_base.json"
+    "base_source_file": "$GAME_ID/$GAME_ID_ai_bases_tutorial25/$GAME_ID_ai_tutorial25_971_base.json",
+#include_stripped "$GAME_ID_ai_bases_tutorial25/$GAME_ID_ai_tutorial25_971_base.json"
 },
 
 "972": {
@@ -89,8 +89,8 @@
     "completion": { "consequent": "AND", "subconsequents": [
         { "consequent": "PLAYER_HISTORY", "key": "ai_tutorial25_progress", "method": "max", "value": 6 }
     ] },
-    "base_source_file": "gg/gg_ai_bases_tutorial25/gg_ai_tutorial25_972_base.json",
-#include_stripped "gg_ai_bases_tutorial25/gg_ai_tutorial25_972_base.json"
+    "base_source_file": "$GAME_ID/$GAME_ID_ai_bases_tutorial25/$GAME_ID_ai_tutorial25_972_base.json",
+#include_stripped "$GAME_ID_ai_bases_tutorial25/$GAME_ID_ai_tutorial25_972_base.json"
 },
 
 "973": {
@@ -103,8 +103,8 @@
     "completion": { "consequent": "AND", "subconsequents": [
         { "consequent": "PLAYER_HISTORY", "key": "ai_tutorial25_progress", "method": "max", "value": 7 }
     ] },
-    "base_source_file": "gg/gg_ai_bases_tutorial25/gg_ai_tutorial25_973_base.json",
-#include_stripped "gg_ai_bases_tutorial25/gg_ai_tutorial25_973_base.json"
+    "base_source_file": "$GAME_ID/$GAME_ID_ai_bases_tutorial25/$GAME_ID_ai_tutorial25_973_base.json",
+#include_stripped "$GAME_ID_ai_bases_tutorial25/$GAME_ID_ai_tutorial25_973_base.json"
 },
 
 "974": {
@@ -117,8 +117,8 @@
     "completion": { "consequent": "AND", "subconsequents": [
         { "consequent": "PLAYER_HISTORY", "key": "ai_tutorial25_progress", "method": "max", "value": 8 }
     ] },
-    "base_source_file": "gg/gg_ai_bases_tutorial25/gg_ai_tutorial25_974_base.json",
-#include_stripped "gg_ai_bases_tutorial25/gg_ai_tutorial25_974_base.json"
+    "base_source_file": "$GAME_ID/$GAME_ID_ai_bases_tutorial25/$GAME_ID_ai_tutorial25_974_base.json",
+#include_stripped "$GAME_ID_ai_bases_tutorial25/$GAME_ID_ai_tutorial25_974_base.json"
 },
 
 "975": {
@@ -131,8 +131,8 @@
     "completion": { "consequent": "AND", "subconsequents": [
         { "consequent": "PLAYER_HISTORY", "key": "ai_tutorial25_progress", "method": "max", "value": 9 }
     ] },
-    "base_source_file": "gg/gg_ai_bases_tutorial25/gg_ai_tutorial25_975_base.json",
-#include_stripped "gg_ai_bases_tutorial25/gg_ai_tutorial25_975_base.json"
+    "base_source_file": "$GAME_ID/$GAME_ID_ai_bases_tutorial25/$GAME_ID_ai_tutorial25_975_base.json",
+#include_stripped "$GAME_ID_ai_bases_tutorial25/$GAME_ID_ai_tutorial25_975_base.json"
 },
 
 "976": {
@@ -145,8 +145,8 @@
     "completion": { "consequent": "AND", "subconsequents": [
         { "consequent": "PLAYER_HISTORY", "key": "ai_tutorial25_progress", "method": "max", "value": 10 }
     ] },
-    "base_source_file": "gg/gg_ai_bases_tutorial25/gg_ai_tutorial25_976_base.json",
-#include_stripped "gg_ai_bases_tutorial25/gg_ai_tutorial25_976_base.json"
+    "base_source_file": "$GAME_ID/$GAME_ID_ai_bases_tutorial25/$GAME_ID_ai_tutorial25_976_base.json",
+#include_stripped "$GAME_ID_ai_bases_tutorial25/$GAME_ID_ai_tutorial25_976_base.json"
 },
 
 "977": {
@@ -159,8 +159,8 @@
     "completion": { "consequent": "AND", "subconsequents": [
         { "consequent": "PLAYER_HISTORY", "key": "ai_tutorial25_progress", "method": "max", "value": 11 }
     ] },
-    "base_source_file": "gg/gg_ai_bases_tutorial25/gg_ai_tutorial25_977_base.json",
-#include_stripped "gg_ai_bases_tutorial25/gg_ai_tutorial25_977_base.json"
+    "base_source_file": "$GAME_ID/$GAME_ID_ai_bases_tutorial25/$GAME_ID_ai_tutorial25_977_base.json",
+#include_stripped "$GAME_ID_ai_bases_tutorial25/$GAME_ID_ai_tutorial25_977_base.json"
 },
 
 "978": {
@@ -173,8 +173,8 @@
     "completion": { "consequent": "AND", "subconsequents": [
         { "consequent": "PLAYER_HISTORY", "key": "ai_tutorial25_progress", "method": "max", "value": 12 }
     ] },
-    "base_source_file": "gg/gg_ai_bases_tutorial25/gg_ai_tutorial25_978_base.json",
-#include_stripped "gg_ai_bases_tutorial25/gg_ai_tutorial25_978_base.json"
+    "base_source_file": "$GAME_ID/$GAME_ID_ai_bases_tutorial25/$GAME_ID_ai_tutorial25_978_base.json",
+#include_stripped "$GAME_ID_ai_bases_tutorial25/$GAME_ID_ai_tutorial25_978_base.json"
 },
 
 "979": {
@@ -187,8 +187,8 @@
     "completion": { "consequent": "AND", "subconsequents": [
         { "consequent": "PLAYER_HISTORY", "key": "ai_tutorial25_progress", "method": "max", "value": 13 }
     ] },
-    "base_source_file": "gg/gg_ai_bases_tutorial25/gg_ai_tutorial25_979_base.json",
-#include_stripped "gg_ai_bases_tutorial25/gg_ai_tutorial25_979_base.json"
+    "base_source_file": "$GAME_ID/$GAME_ID_ai_bases_tutorial25/$GAME_ID_ai_tutorial25_979_base.json",
+#include_stripped "$GAME_ID_ai_bases_tutorial25/$GAME_ID_ai_tutorial25_979_base.json"
 },
 
 "980": {
@@ -201,8 +201,8 @@
     "completion": { "consequent": "AND", "subconsequents": [
         { "consequent": "PLAYER_HISTORY", "key": "ai_tutorial25_progress", "method": "max", "value": 14 }
     ] },
-    "base_source_file": "gg/gg_ai_bases_tutorial25/gg_ai_tutorial25_980_base.json",
-#include_stripped "gg_ai_bases_tutorial25/gg_ai_tutorial25_980_base.json"
+    "base_source_file": "$GAME_ID/$GAME_ID_ai_bases_tutorial25/$GAME_ID_ai_tutorial25_980_base.json",
+#include_stripped "$GAME_ID_ai_bases_tutorial25/$GAME_ID_ai_tutorial25_980_base.json"
 },
 
 "981": {
@@ -215,8 +215,8 @@
     "completion": { "consequent": "AND", "subconsequents": [
         { "consequent": "PLAYER_HISTORY", "key": "ai_tutorial25_progress", "method": "max", "value": 15 }
     ] },
-    "base_source_file": "gg/gg_ai_bases_tutorial25/gg_ai_tutorial25_981_base.json",
-#include_stripped "gg_ai_bases_tutorial25/gg_ai_tutorial25_981_base.json"
+    "base_source_file": "$GAME_ID/$GAME_ID_ai_bases_tutorial25/$GAME_ID_ai_tutorial25_981_base.json",
+#include_stripped "$GAME_ID_ai_bases_tutorial25/$GAME_ID_ai_tutorial25_981_base.json"
 },
 
 "982": {
@@ -229,8 +229,8 @@
     "completion": { "consequent": "AND", "subconsequents": [
         { "consequent": "PLAYER_HISTORY", "key": "ai_tutorial25_progress", "method": "max", "value": 16 }
     ] },
-    "base_source_file": "gg/gg_ai_bases_tutorial25/gg_ai_tutorial25_982_base.json",
-#include_stripped "gg_ai_bases_tutorial25/gg_ai_tutorial25_982_base.json"
+    "base_source_file": "$GAME_ID/$GAME_ID_ai_bases_tutorial25/$GAME_ID_ai_tutorial25_982_base.json",
+#include_stripped "$GAME_ID_ai_bases_tutorial25/$GAME_ID_ai_tutorial25_982_base.json"
 },
 
 "983": {
@@ -243,8 +243,8 @@
     "completion": { "consequent": "AND", "subconsequents": [
         { "consequent": "PLAYER_HISTORY", "key": "ai_tutorial25_progress", "method": "max", "value": 17 }
     ] },
-    "base_source_file": "gg/gg_ai_bases_tutorial25/gg_ai_tutorial25_983_base.json",
-#include_stripped "gg_ai_bases_tutorial25/gg_ai_tutorial25_983_base.json"
+    "base_source_file": "$GAME_ID/$GAME_ID_ai_bases_tutorial25/$GAME_ID_ai_tutorial25_983_base.json",
+#include_stripped "$GAME_ID_ai_bases_tutorial25/$GAME_ID_ai_tutorial25_983_base.json"
 },
 
 "984": {
@@ -257,8 +257,8 @@
     "completion": { "consequent": "AND", "subconsequents": [
         { "consequent": "PLAYER_HISTORY", "key": "ai_tutorial25_progress", "method": "max", "value": 18 }
     ] },
-    "base_source_file": "gg/gg_ai_bases_tutorial25/gg_ai_tutorial25_984_base.json",
-#include_stripped "gg_ai_bases_tutorial25/gg_ai_tutorial25_984_base.json"
+    "base_source_file": "$GAME_ID/$GAME_ID_ai_bases_tutorial25/$GAME_ID_ai_tutorial25_984_base.json",
+#include_stripped "$GAME_ID_ai_bases_tutorial25/$GAME_ID_ai_tutorial25_984_base.json"
 },
 
 "985": {
@@ -271,8 +271,8 @@
     "completion": { "consequent": "AND", "subconsequents": [
         { "consequent": "PLAYER_HISTORY", "key": "ai_tutorial25_progress", "method": "max", "value": 19 }
     ] },
-    "base_source_file": "gg/gg_ai_bases_tutorial25/gg_ai_tutorial25_985_base.json",
-#include_stripped "gg_ai_bases_tutorial25/gg_ai_tutorial25_985_base.json"
+    "base_source_file": "$GAME_ID/$GAME_ID_ai_bases_tutorial25/$GAME_ID_ai_tutorial25_985_base.json",
+#include_stripped "$GAME_ID_ai_bases_tutorial25/$GAME_ID_ai_tutorial25_985_base.json"
 },
 
 "986": {
@@ -285,8 +285,8 @@
     "completion": { "consequent": "AND", "subconsequents": [
         { "consequent": "PLAYER_HISTORY", "key": "ai_tutorial25_progress", "method": "max", "value": 20 }
     ] },
-    "base_source_file": "gg/gg_ai_bases_tutorial25/gg_ai_tutorial25_986_base.json",
-#include_stripped "gg_ai_bases_tutorial25/gg_ai_tutorial25_986_base.json"
+    "base_source_file": "$GAME_ID/$GAME_ID_ai_bases_tutorial25/$GAME_ID_ai_tutorial25_986_base.json",
+#include_stripped "$GAME_ID_ai_bases_tutorial25/$GAME_ID_ai_tutorial25_986_base.json"
 },
 
 "987": {
@@ -299,8 +299,8 @@
     "completion": { "consequent": "AND", "subconsequents": [
         { "consequent": "PLAYER_HISTORY", "key": "ai_tutorial25_progress", "method": "max", "value": 21 }
     ] },
-    "base_source_file": "gg/gg_ai_bases_tutorial25/gg_ai_tutorial25_987_base.json",
-#include_stripped "gg_ai_bases_tutorial25/gg_ai_tutorial25_987_base.json"
+    "base_source_file": "$GAME_ID/$GAME_ID_ai_bases_tutorial25/$GAME_ID_ai_tutorial25_987_base.json",
+#include_stripped "$GAME_ID_ai_bases_tutorial25/$GAME_ID_ai_tutorial25_987_base.json"
 },
 
 "988": {
@@ -313,8 +313,8 @@
     "completion": { "consequent": "AND", "subconsequents": [
         { "consequent": "PLAYER_HISTORY", "key": "ai_tutorial25_progress", "method": "max", "value": 22 }
     ] },
-    "base_source_file": "gg/gg_ai_bases_tutorial25/gg_ai_tutorial25_988_base.json",
-#include_stripped "gg_ai_bases_tutorial25/gg_ai_tutorial25_988_base.json"
+    "base_source_file": "$GAME_ID/$GAME_ID_ai_bases_tutorial25/$GAME_ID_ai_tutorial25_988_base.json",
+#include_stripped "$GAME_ID_ai_bases_tutorial25/$GAME_ID_ai_tutorial25_988_base.json"
 },
 
 "989": {
@@ -327,8 +327,8 @@
     "completion": { "consequent": "AND", "subconsequents": [
         { "consequent": "PLAYER_HISTORY", "key": "ai_tutorial25_progress", "method": "max", "value": 23 }
     ] },
-    "base_source_file": "gg/gg_ai_bases_tutorial25/gg_ai_tutorial25_989_base.json",
-#include_stripped "gg_ai_bases_tutorial25/gg_ai_tutorial25_989_base.json"
+    "base_source_file": "$GAME_ID/$GAME_ID_ai_bases_tutorial25/$GAME_ID_ai_tutorial25_989_base.json",
+#include_stripped "$GAME_ID_ai_bases_tutorial25/$GAME_ID_ai_tutorial25_989_base.json"
 },
 
 "990": {
@@ -341,8 +341,8 @@
     "completion": { "consequent": "AND", "subconsequents": [
         { "consequent": "PLAYER_HISTORY", "key": "ai_tutorial25_progress", "method": "max", "value": 24 }
     ] },
-    "base_source_file": "gg/gg_ai_bases_tutorial25/gg_ai_tutorial25_990_base.json",
-#include_stripped "gg_ai_bases_tutorial25/gg_ai_tutorial25_990_base.json"
+    "base_source_file": "$GAME_ID/$GAME_ID_ai_bases_tutorial25/$GAME_ID_ai_tutorial25_990_base.json",
+#include_stripped "$GAME_ID_ai_bases_tutorial25/$GAME_ID_ai_tutorial25_990_base.json"
 },
 
 "991": {
@@ -355,6 +355,6 @@
     "completion": { "consequent": "AND", "subconsequents": [
         { "consequent": "PLAYER_HISTORY", "key": "ai_tutorial25_progress", "method": "max", "value": 25 }
     ] },
-    "base_source_file": "gg/gg_ai_bases_tutorial25/gg_ai_tutorial25_991_base.json",
-#include_stripped "gg_ai_bases_tutorial25/gg_ai_tutorial25_991_base.json"
+    "base_source_file": "$GAME_ID/$GAME_ID_ai_bases_tutorial25/$GAME_ID_ai_tutorial25_991_base.json",
+#include_stripped "$GAME_ID_ai_bases_tutorial25/$GAME_ID_ai_tutorial25_991_base.json"
 }

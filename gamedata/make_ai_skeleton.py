@@ -1389,6 +1389,7 @@ if __name__ == '__main__':
                         else:
                             print >> fd, ''
                     pass
+                # note: this should probably use $GAME_ID instead of hard-coding it into the output
                 relative_path = '%s_ai_bases_%s/%s' % (game_id, event_dirname, base_file)
                 base_json = [("base_source_file", game_id+'/'+relative_path),
                              '#include_stripped "%s"' % relative_path]

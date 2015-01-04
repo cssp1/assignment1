@@ -15,6 +15,6 @@
     "base_richness": 0.1,
     "resources": { "player_level": 1, "water": 2000, "iron": 2000 },
     "activation": { "predicate": "NOT", "subpredicates": [{"predicate": "TUTORIAL_COMPLETE"}] },
-    "base_source_file": "gg/gg_ai_bases_tutorial01/gg_ai_tutorial01_1002_base.json",
+    "base_source_file": "$GAME_ID/$GAME_ID_ai_bases_tutorial01/$GAME_ID_ai_tutorial01_1002_base.json",
 #include_stripped "$GAME_ID_ai_bases_tutorial01/$GAME_ID_ai_tutorial01_1002_base.json"
 }

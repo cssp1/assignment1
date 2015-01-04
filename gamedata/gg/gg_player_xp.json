@@ -37,7 +37,7 @@
     "research": 0,
 
     // XP gain when finished constructing or upgrading a building, as fraction of resources spent
-    "buildings": { // XXXXXX check that all buildings are present (and enable the check in verify.py)
+    "buildings": {
         "level_1": 0.03, // used for L1 of any building listed here
         "toc": 0.010,
         "barracks": 0.011,
@@ -49,7 +49,14 @@
         "supply_yard": 0.007,
         "supply_depot": 0.007,
         "fuel_yard": 0.007,
-        "fuel_depot": 0.007
+        "fuel_depot": 0.007,
+        "airfield": 0.011,
+        "transmitter": 0.0085,
+        "squad_bay": 0.007,
+        "barrier": 0,
+        "flight_center": 0.011,
+        "warehouse": 0.011,
+        "motor_pool": 0.011
     },
 
     // this can become an array with one entry per level

@@ -81,9 +81,9 @@ if __name__ == '__main__':
                                             } } }
 
     # create icons for DPS/environ/armor boost/armor equip/range/speed mods for units
-    if game_id in ('mf','tr','mf2','dv','gg','bfm'):
+    if game_id in ('mf','tr','mf2','dv','bfm'):
         buff_kinds = ['damage', 'armor', 'range', 'speed']
-        if game_id in ('tr','dv','sg','gg','bfm','mf2'):
+        if game_id in ('tr','dv','sg','bfm','mf2'):
             buff_kinds += ['damage_resist_equip','damage_boost_equip','range_boost_equip']
         if game_id != 'bfm':
             buff_kinds += ['radcold']
@@ -104,7 +104,7 @@ if __name__ == '__main__':
                                                                                      "inventory_%s" % kind] } } }
 
     # create icons for DPS/armor/range/speed mods for manufacture categories
-    if game_id in ('mf','tr','mf2','dv','sg','gg','bfm'):
+    if game_id in ('mf','tr','mf2','dv','sg','bfm'):
         buff_kinds = ['damage', 'armor', 'range', 'speed']
         if game_id != 'bfm':
             buff_kinds += ['radcold']
@@ -118,7 +118,7 @@ if __name__ == '__main__':
                                                                        "inventory_%s" % unit_type_plural,
                                                                        "inventory_%s" % kind] } } }
 
-    if game_id in ('tr','dv','sg','gg','bfm'):
+    if game_id in ('tr','dv','sg','bfm'):
         # TR only - create icons for damage_vs mods for tr unit categories (infantry, armor, aircraft)
         for kind in ('damage_vs_rover', 'damage_vs_transport'):
             for unit_name, unit_data in units.iteritems():

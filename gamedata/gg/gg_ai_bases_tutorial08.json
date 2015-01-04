@@ -15,8 +15,8 @@
     "completion": { "consequent": "AND", "subconsequents": [
         { "consequent": "PLAYER_HISTORY", "key": "ai_tutorial08_progress", "method": "max", "value": 8 }
     ] },
-    "base_source_file": "gg/gg_ai_bases_tutorial08/gg_ai_tutorial08_999_base.json",
-#include_stripped "gg_ai_bases_tutorial08/gg_ai_tutorial08_999_base.json"
+    "base_source_file": "$GAME_ID/$GAME_ID_ai_bases_tutorial08/$GAME_ID_ai_tutorial08_999_base.json",
+#include_stripped "$GAME_ID_ai_bases_tutorial08/$GAME_ID_ai_tutorial08_999_base.json"
 },
 
 "998": {
@@ -32,8 +32,8 @@
     "completion": { "consequent": "AND", "subconsequents": [
         { "consequent": "PLAYER_HISTORY", "key": "ai_tutorial08_progress", "method": "max", "value": 7 }
     ] },
-    "base_source_file": "gg/gg_ai_bases_tutorial08/gg_ai_tutorial08_998_base.json",
-#include_stripped "gg_ai_bases_tutorial08/gg_ai_tutorial08_998_base.json"
+    "base_source_file": "$GAME_ID/$GAME_ID_ai_bases_tutorial08/$GAME_ID_ai_tutorial08_998_base.json",
+#include_stripped "$GAME_ID_ai_bases_tutorial08/$GAME_ID_ai_tutorial08_998_base.json"
 },
 
 "997": {
@@ -49,8 +49,8 @@
     "completion": { "consequent": "AND", "subconsequents": [
         { "consequent": "PLAYER_HISTORY", "key": "ai_tutorial08_progress", "method": "max", "value": 6 }
     ] },
-    "base_source_file": "gg/gg_ai_bases_tutorial08/gg_ai_tutorial08_997_base.json",
-#include_stripped "gg_ai_bases_tutorial08/gg_ai_tutorial08_997_base.json"
+    "base_source_file": "$GAME_ID/$GAME_ID_ai_bases_tutorial08/$GAME_ID_ai_tutorial08_997_base.json",
+#include_stripped "$GAME_ID_ai_bases_tutorial08/$GAME_ID_ai_tutorial08_997_base.json"
 },
 
 "996": {
@@ -66,8 +66,8 @@
     "completion": { "consequent": "AND", "subconsequents": [
         { "consequent": "PLAYER_HISTORY", "key": "ai_tutorial08_progress", "method": "max", "value": 5 }
     ] },
-    "base_source_file": "gg/gg_ai_bases_tutorial08/gg_ai_tutorial08_996_base.json",
-#include_stripped "gg_ai_bases_tutorial08/gg_ai_tutorial08_996_base.json"
+    "base_source_file": "$GAME_ID/$GAME_ID_ai_bases_tutorial08/$GAME_ID_ai_tutorial08_996_base.json",
+#include_stripped "$GAME_ID_ai_bases_tutorial08/$GAME_ID_ai_tutorial08_996_base.json"
 },
 
 "995": {
@@ -83,8 +83,8 @@
     "completion": { "consequent": "AND", "subconsequents": [
         { "consequent": "PLAYER_HISTORY", "key": "ai_tutorial08_progress", "method": "max", "value": 4 }
     ] },
-    "base_source_file": "gg/gg_ai_bases_tutorial08/gg_ai_tutorial08_995_base.json",
-#include_stripped "gg_ai_bases_tutorial08/gg_ai_tutorial08_995_base.json"
+    "base_source_file": "$GAME_ID/$GAME_ID_ai_bases_tutorial08/$GAME_ID_ai_tutorial08_995_base.json",
+#include_stripped "$GAME_ID_ai_bases_tutorial08/$GAME_ID_ai_tutorial08_995_base.json"
 },
 
 "994": {
@@ -100,8 +100,8 @@
     "completion": { "consequent": "AND", "subconsequents": [
         { "consequent": "PLAYER_HISTORY", "key": "ai_tutorial08_progress", "method": "max", "value": 3 }
     ] },
-    "base_source_file": "gg/gg_ai_bases_tutorial08/gg_ai_tutorial08_994_base.json",
-#include_stripped "gg_ai_bases_tutorial08/gg_ai_tutorial08_994_base.json"
+    "base_source_file": "$GAME_ID/$GAME_ID_ai_bases_tutorial08/$GAME_ID_ai_tutorial08_994_base.json",
+#include_stripped "$GAME_ID_ai_bases_tutorial08/$GAME_ID_ai_tutorial08_994_base.json"
 },
 
 "993": {
@@ -117,8 +117,8 @@
     "completion": { "consequent": "AND", "subconsequents": [
         { "consequent": "PLAYER_HISTORY", "key": "ai_tutorial08_progress", "method": "max", "value": 2 }
     ] },
-    "base_source_file": "gg/gg_ai_bases_tutorial08/gg_ai_tutorial08_993_base.json",
-#include_stripped "gg_ai_bases_tutorial08/gg_ai_tutorial08_993_base.json"
+    "base_source_file": "$GAME_ID/$GAME_ID_ai_bases_tutorial08/$GAME_ID_ai_tutorial08_993_base.json",
+#include_stripped "$GAME_ID_ai_bases_tutorial08/$GAME_ID_ai_tutorial08_993_base.json"
 },
 
 
@@ -136,11 +136,11 @@
         {"predicate": "AI_BASE_SHOWN", "user_id": 992},
         {"predicate": "PLAYER_HISTORY", "key": "ai_tutorial02A_progress", "method": ">=", "value": 1,
          "ui_name": "Spy on Mr. Skilling Level 1 and destroy his Tactical Ops Center"},
-        { "predicate": "BUILDING_LEVEL", "building_type": "toc", "trigger_level": 2 }
+        { "predicate": "BUILDING_LEVEL", "building_type": "toc", "tri$GAME_IDer_level": 2 }
     ] },
     "completion": { "consequent": "AND", "subconsequents": [
         { "consequent": "PLAYER_HISTORY", "key": "ai_tutorial08_progress", "method": "max", "value": 1 }
     ] },
-    "base_source_file": "gg/gg_ai_bases_tutorial08/gg_ai_tutorial08_992_base.json",
-#include_stripped "gg_ai_bases_tutorial08/gg_ai_tutorial08_992_base.json"
+    "base_source_file": "$GAME_ID/$GAME_ID_ai_bases_tutorial08/$GAME_ID_ai_tutorial08_992_base.json",
+#include_stripped "$GAME_ID_ai_bases_tutorial08/$GAME_ID_ai_tutorial08_992_base.json"
 }

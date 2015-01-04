@@ -33,6 +33,11 @@ sobol_gen = None
 
 
 # libraries need to be set to read in CCW order
+MODERN_SPRITE_ROTATIONS = { 'curve':['roadway_curve4','roadway_curve3','roadway_curve2','roadway_curve1'],
+                            'straight_road': ['roadway_ns','roadway_ew','roadway_ns','roadway_ew'],
+                            'faded':['roadway_ns_ll','roadway_ew_lr','roadway_ns_ur','roadway_ew_ul'],
+                            '3way':['roadway_t1','roadway_t3','roadway_t2','roadway_t4'],
+                            'dirt':['dirt_road_ns1','dirt_road_ew1','dirt_road_ns1','dirt_road_ew1'] }
 SPRITE_ROTATIONS = {
     "mf": {},
     "mf2": { "curve": ["city_ruins_roadway_curve1","city_ruins_roadway_curve4","city_ruins_roadway_curve2","city_ruins_roadway_curve3"],
@@ -40,31 +45,9 @@ SPRITE_ROTATIONS = {
              "bump": ['city_ruins_roadway_speed_bump1','city_ruins_roadway_speed_bump2',
                       'city_ruins_roadway_speed_bump1','city_ruins_roadway_speed_bump2'],
              "dirt":['dirt_road_ns1','dirt_road_ew1','dirt_road_ns1','dirt_road_ew1'] },
-    "tr": { 'curve':['roadway_curve4','roadway_curve3','roadway_curve2','roadway_curve1'],
-            'straight_road': ['roadway_ns','roadway_ew','roadway_ns','roadway_ew'],
-            'faded':['roadway_ns_ll','roadway_ew_lr','roadway_ns_ur','roadway_ew_ul'],
-            '3way':['roadway_t1','roadway_t3','roadway_t2','roadway_t4'],
-            'dirt':['dirt_road_ns1','dirt_road_ew1','dirt_road_ns1','dirt_road_ew1'] },
-    "dv": { 'curve':['roadway_curve4','roadway_curve3','roadway_curve2','roadway_curve1'],
-            'straight_road': ['roadway_ns','roadway_ew','roadway_ns','roadway_ew'],
-            'faded':['roadway_ns_ll','roadway_ew_lr','roadway_ns_ur','roadway_ew_ul'],
-            '3way':['roadway_t1','roadway_t3','roadway_t2','roadway_t4'],
-            'dirt':['dirt_road_ns1','dirt_road_ew1','dirt_road_ns1','dirt_road_ew1'] },
-    "sg": { 'curve':['roadway_curve4','roadway_curve3','roadway_curve2','roadway_curve1'],
-            'straight_road': ['roadway_ns','roadway_ew','roadway_ns','roadway_ew'],
-            'faded':['roadway_ns_ll','roadway_ew_lr','roadway_ns_ur','roadway_ew_ul'],
-            '3way':['roadway_t1','roadway_t3','roadway_t2','roadway_t4'],
-            'dirt':['dirt_road_ns1','dirt_road_ew1','dirt_road_ns1','dirt_road_ew1'] },
-    "bfm": { 'curve':['roadway_curve4','roadway_curve3','roadway_curve2','roadway_curve1'],
-            'straight_road': ['roadway_ns','roadway_ew','roadway_ns','roadway_ew'],
-            'faded':['roadway_ns_ll','roadway_ew_lr','roadway_ns_ur','roadway_ew_ul'],
-            '3way':['roadway_t1','roadway_t3','roadway_t2','roadway_t4'],
-            'dirt':['dirt_road_ns1','dirt_road_ew1','dirt_road_ns1','dirt_road_ew1'] },
-    "gg": { 'curve':['roadway_curve4','roadway_curve3','roadway_curve2','roadway_curve1'],
-            'straight_road': ['roadway_ns','roadway_ew','roadway_ns','roadway_ew'],
-            'faded':['roadway_ns_ll','roadway_ew_lr','roadway_ns_ur','roadway_ew_ul'],
-            '3way':['roadway_t1','roadway_t3','roadway_t2','roadway_t4'],
-            'dirt':['dirt_road_ns1','dirt_road_ew1','dirt_road_ns1','dirt_road_ew1'] },
+    "tr": MODERN_SPRITE_ROTATIONS,
+    "dv": MODERN_SPRITE_ROTATIONS,
+    "bfm": MODERN_SPRITE_ROTATIONS,
 }
 
 # mapping from the first two elements of the rotation matrix to the amount by which indices shift in above table
@@ -72,7 +55,7 @@ SPRITE_ROTATION_SHIFT = { (0,1): 1, (0,-1): 3, (1,0): 0, (-1,0): 2 }
 
 # return proper rotated version of a sprite according to the xform
 def rotate_scenery_sprite(xform, scene):
-    table = SPRITE_ROTATIONS[SpinConfig.game()]
+    table = SPRITE_ROTATIONS.get(SpinConfig.game(), MODERN_SPRITE_ROTATIONS)
     for name, sprites in table.iteritems():
         if scene in sprites:
             rotshift = SPRITE_ROTATION_SHIFT[(xform[0],xform[1])]

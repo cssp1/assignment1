@@ -19,8 +19,8 @@
     "completion": { "consequent": "AND", "subconsequents": [
         { "consequent": "PLAYER_HISTORY", "key": "ai_tutorial02A_progress", "method": "max", "value": 1 }
     ] },
-    "base_source_file": "gg/gg_ai_bases_tutorial02/gg_ai_tutorial02_1001_base.json",
-#include_stripped "gg_ai_bases_tutorial02/gg_ai_tutorial02_1001_base.json"
+    "base_source_file": "$GAME_ID/$GAME_ID_ai_bases_tutorial02/$GAME_ID_ai_tutorial02_1001_base.json",
+#include_stripped "$GAME_ID_ai_bases_tutorial02/$GAME_ID_ai_tutorial02_1001_base.json"
 },
 
 // after first unit unlock
@@ -38,6 +38,6 @@
     "completion": { "consequent": "AND", "subconsequents": [
         { "consequent": "PLAYER_HISTORY", "key": "ai_tutorial02B_progress", "method": "max", "value": 1 }
     ] },
-    "base_source_file": "gg/gg_ai_bases_tutorial02/gg_ai_tutorial02_1000_base.json",
-#include_stripped "gg_ai_bases_tutorial02/gg_ai_tutorial02_1000_base.json"
+    "base_source_file": "$GAME_ID/$GAME_ID_ai_bases_tutorial02/$GAME_ID_ai_tutorial02_1000_base.json",
+#include_stripped "$GAME_ID_ai_bases_tutorial02/$GAME_ID_ai_tutorial02_1000_base.json"
 }

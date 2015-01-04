@@ -14,6 +14,7 @@ import SpinConfig
 import time
 import tempfile
 import subprocess
+import hashlib
 
 MAX_SESSION_LENGTH = 43200 # maximum conceivable session length, used to limit queries that are updated on logout
 
@@ -36,6 +37,12 @@ def iterate_from_mongodb(game_id, table_name, start_time, end_time, query = None
 def iterate_from_s3(game_id, bucket, logname, start_time, end_time, verbose = True):
     assert start_time > 0
 
+    # to protect against same-time collisions, create a unique fake "PID" for MongoDB row _ids
+    sha = hashlib.sha1()
+    sha.update(game_id)
+    dig = sha.digest()
+    fake_pid = (ord(dig[1]) << 8) | ord(dig[0])
+
     s3 = SpinS3.S3(SpinConfig.aws_key_file())
     last_id_time = -1
     id_serial = 0
@@ -49,12 +56,12 @@ def iterate_from_s3(game_id, bucket, logname, start_time, end_time, verbose = Tr
             if verbose: print 'reading', filename
 
             if entry['name'].endswith('.zip'):
-                tf = tempfile.NamedTemporaryFile(prefix='credits-'+filename, suffix='.zip')
+                tf = tempfile.NamedTemporaryFile(prefix=logname+'-'+filename, suffix='.zip')
                 s3.get_file(bucket, entry['name'], tf.name)
                 unzipper = subprocess.Popen(['unzip', '-q', '-p', tf.name],
                                             stdout = subprocess.PIPE)
             elif entry['name'].endswith('.gz'):
-                tf = tempfile.NamedTemporaryFile(prefix='credits-'+filename, suffix='.gz')
+                tf = tempfile.NamedTemporaryFile(prefix=logname+'-'+filename, suffix='.gz')
                 s3.get_file(bucket, entry['name'], tf.name)
                 unzipper = subprocess.Popen(['gunzip', '-c', tf.name],
                                             stdout = subprocess.PIPE)
@@ -71,7 +78,6 @@ def iterate_from_s3(game_id, bucket, logname, start_time, end_time, verbose = Tr
                     if row['time'] != last_id_time:
                         last_id_time = row['time']
                         id_serial = 0
-                    fake_pid = {'mf':0, 'tr':1, 'mf2':2, 'dv':3, 'gg':4, 'bfm':5, 'sg':6}[game_id] # to protect against same-time collisions
                     row['_id'] = SpinNoSQLId.creation_time_id(row['time'], pid = fake_pid, serial = id_serial)
                     assert SpinNoSQLId.is_valid(row['_id'])
                     id_serial += 1

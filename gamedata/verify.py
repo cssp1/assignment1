@@ -2913,7 +2913,7 @@ def main(args):
 
     # check that all existing buildings give XP
     # note: exclude legacy game titles from this check because many of them skipped some buildings in player_xp.buildings and it's too late to fix!
-    if gamedata['game_id'] not in ('mf','tr','bfm','mf2','dv','gg'):
+    if gamedata['game_id'] not in ('mf','tr','bfm','mf2','dv'):
         for building_name, building_data in gamedata['buildings'].iteritems():
             if not building_data.get('developer_only',False) and (building_name not in gamedata['player_xp']['buildings']):
                 error |= 1; print 'player_xp.buildings is missing an entry for building "%s"' % building_name
