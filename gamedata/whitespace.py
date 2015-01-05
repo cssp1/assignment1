@@ -243,8 +243,7 @@ def do_process(fullpath, do_fix, processors):
         for proc in processors:
             newline = proc.fix(line)
             if newline != line:
-                print proc.ui_name, fullpath+':'+str(linenum+1)+': ', line,
-                print '    -> ', newline,
+                print proc.ui_name, fullpath+':'+str(linenum+1)+': ', repr(line), ' -> ', repr(newline)
                 need_fix = True
                 line = newline
         linenum += 1
