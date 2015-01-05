@@ -1,159 +1,159 @@
 {
-  "riflemen_cluster" :{
+    "riflemen_cluster" :{
         {
-    "xy": [x,y],
-    "patrol": 1,
-    "force_level": 8, "spec":  "rifleman",
-    "orders": [{
-       "dest": [x-23,y+1],
-       "state": 6,
-       "aggressive": false
-     },{
-       "dest": [x+12,y-2],
-       "state": 6,
-       "patrol_origin": 1
-     },{
-       "dest": [x+23,y-1],
-       "state": 6,
-       "aggressive": false
-     }]
-  },{
-    "xy": [x+4,y-9],
-    "patrol": 1,
-    "force_level": 8, "spec":  "rifleman",
-    "orders": [{
-       "dest": [x+4-23,y-9+1],
-       "state": 6,
-       "aggressive": false
-     },{
-       "dest": [x+4+12,y-9-2],
-       "state": 6,
-       "patrol_origin": 1
-     },{
-       "dest": [x+4+23,y-9-1],
-       "state": 6,
-       "aggressive": false
-     }]
-  },{
-    "xy": [x+4,y-5],
-    "patrol": 1,
-    "force_level": 8, "spec":  "rifleman",
-    "orders": [{
-       "dest": [x+4-23,y-5+1],
-       "state": 6,
-       "aggressive": false
-     },{
-       "dest": [x+4+12,y-5-2],
-       "state": 6,
-       "patrol_origin": 1
-     },{
-       "dest": [x+4+23,y-5-1],
-       "state": 6,
-       "aggressive": false
-     }]
-  },{
-    "xy": [x+8,y-4],
-    "patrol": 1,
-    "force_level": 8, "spec":  "rifleman",
-    "orders": [{
-       "dest": [x+8-23,y-3],
-       "state": 6,
-       "aggressive": false
-     },{
-       "dest": [x+20,y-6],
-       "state": 6,
-       "patrol_origin": 1
-     },{
-       "dest": [x+31,y-5],
-       "state": 6,
-       "aggressive": false
-     }]
-  },{
-    "xy": [x+8,y-9],
-    "patrol": 1,
-    "force_level": 8, "spec":  "rifleman",
-    "orders": [{
-       "dest": [x+8-23,y-9+1],
-       "state": 6,
-       "aggressive": false
-     },{
-       "dest": [x+8+12,y-9-2],
-       "state": 6,
-       "patrol_origin": 1
-     },{
-       "dest": [x+8+23,y-9-1],
-       "state": 6,
-       "aggressive": false
-     }]
-  },{
-    "xy": [x,y-5],
-    "patrol": 1,
-    "force_level": 8, "spec":  "rifleman",
-    "orders": [{
-       "dest": [x-23,y-4],
-       "state": 6,
-       "aggressive": false
-     },{
-       "dest": [x+12,y-7],
-       "state": 6,
-       "patrol_origin": 1
-     },{
-       "dest": [x+23,y-6],
-       "state": 6,
-       "aggressive": false
-     }]
-  },{
-    "xy": [x+12,y-4],
-    "patrol": 1,
-    "force_level": 8, "spec":  "rifleman",
-    "orders": [{
-       "dest": [x-11,y+1-4],
-       "state": 6,
-       "aggressive": false
-     },{
-       "dest": [x+24,y-2-4],
-       "state": 6,
-       "patrol_origin": 1
-     },{
-       "dest": [x+35,y-1-4],
-       "state": 6,
-       "aggressive": false
-     }]
-  },{
-    "xy": [x-1,y-9],
-    "patrol": 1,
-    "force_level": 8, "spec":  "rifleman",
-    "orders": [{
-       "dest": [x-1-23,y-8],
-       "state": 6,
-       "aggressive": false
-     },{
-       "dest": [x-1+12,y-11],
-       "state": 6,
-       "patrol_origin": 1
-     },{
-       "dest": [x-1+23,y-10],
-       "state": 6,
-       "aggressive": false
-     }]
-  },{
-    "xy": [x+8,y],
-    "patrol": 1,
-    "force_level": 8, "spec":  "rifleman",
-    "orders": [{
-       "dest": [x+8-23,y+1],
-       "state": 6,
-       "aggressive": false
-     },{
-       "dest": [x+20,y-2],
-       "state": 6,
-       "patrol_origin": 1
-     },{
-       "dest": [x+31,y-1],
-       "state": 6,
-       "aggressive": false
-     }]
-  }
+            "xy": [x,y],
+            "patrol": 1,
+            "force_level": 8, "spec":  "rifleman",
+            "orders": [{
+                "dest": [x-23,y+1],
+                "state": 6,
+                "aggressive": false
+            },{
+                    "dest": [x+12,y-2],
+                    "state": 6,
+                    "patrol_origin": 1
+              },{
+                        "dest": [x+23,y-1],
+                        "state": 6,
+                        "aggressive": false
+                }]
+        },{
+                "xy": [x+4,y-9],
+                "patrol": 1,
+                "force_level": 8, "spec":  "rifleman",
+                "orders": [{
+                    "dest": [x+4-23,y-9+1],
+                    "state": 6,
+                    "aggressive": false
+                },{
+                        "dest": [x+4+12,y-9-2],
+                        "state": 6,
+                        "patrol_origin": 1
+                  },{
+                            "dest": [x+4+23,y-9-1],
+                            "state": 6,
+                            "aggressive": false
+                    }]
+          },{
+                    "xy": [x+4,y-5],
+                    "patrol": 1,
+                    "force_level": 8, "spec":  "rifleman",
+                    "orders": [{
+                        "dest": [x+4-23,y-5+1],
+                        "state": 6,
+                        "aggressive": false
+                    },{
+                            "dest": [x+4+12,y-5-2],
+                            "state": 6,
+                            "patrol_origin": 1
+                      },{
+                                "dest": [x+4+23,y-5-1],
+                                "state": 6,
+                                "aggressive": false
+                        }]
+            },{
+                        "xy": [x+8,y-4],
+                        "patrol": 1,
+                        "force_level": 8, "spec":  "rifleman",
+                        "orders": [{
+                            "dest": [x+8-23,y-3],
+                            "state": 6,
+                            "aggressive": false
+                        },{
+                                "dest": [x+20,y-6],
+                                "state": 6,
+                                "patrol_origin": 1
+                          },{
+                                    "dest": [x+31,y-5],
+                                    "state": 6,
+                                    "aggressive": false
+                            }]
+              },{
+                            "xy": [x+8,y-9],
+                            "patrol": 1,
+                            "force_level": 8, "spec":  "rifleman",
+                            "orders": [{
+                                "dest": [x+8-23,y-9+1],
+                                "state": 6,
+                                "aggressive": false
+                            },{
+                                    "dest": [x+8+12,y-9-2],
+                                    "state": 6,
+                                    "patrol_origin": 1
+                              },{
+                                        "dest": [x+8+23,y-9-1],
+                                        "state": 6,
+                                        "aggressive": false
+                                }]
+                },{
+                                "xy": [x,y-5],
+                                "patrol": 1,
+                                "force_level": 8, "spec":  "rifleman",
+                                "orders": [{
+                                    "dest": [x-23,y-4],
+                                    "state": 6,
+                                    "aggressive": false
+                                },{
+                                        "dest": [x+12,y-7],
+                                        "state": 6,
+                                        "patrol_origin": 1
+                                  },{
+                                            "dest": [x+23,y-6],
+                                            "state": 6,
+                                            "aggressive": false
+                                    }]
+                  },{
+                                    "xy": [x+12,y-4],
+                                    "patrol": 1,
+                                    "force_level": 8, "spec":  "rifleman",
+                                    "orders": [{
+                                        "dest": [x-11,y+1-4],
+                                        "state": 6,
+                                        "aggressive": false
+                                    },{
+                                            "dest": [x+24,y-2-4],
+                                            "state": 6,
+                                            "patrol_origin": 1
+                                      },{
+                                                "dest": [x+35,y-1-4],
+                                                "state": 6,
+                                                "aggressive": false
+                                        }]
+                    },{
+                                        "xy": [x-1,y-9],
+                                        "patrol": 1,
+                                        "force_level": 8, "spec":  "rifleman",
+                                        "orders": [{
+                                            "dest": [x-1-23,y-8],
+                                            "state": 6,
+                                            "aggressive": false
+                                        },{
+                                                "dest": [x-1+12,y-11],
+                                                "state": 6,
+                                                "patrol_origin": 1
+                                          },{
+                                                    "dest": [x-1+23,y-10],
+                                                    "state": 6,
+                                                    "aggressive": false
+                                            }]
+                      },{
+                                            "xy": [x+8,y],
+                                            "patrol": 1,
+                                            "force_level": 8, "spec":  "rifleman",
+                                            "orders": [{
+                                                "dest": [x+8-23,y+1],
+                                                "state": 6,
+                                                "aggressive": false
+                                            },{
+                                                    "dest": [x+20,y-2],
+                                                    "state": 6,
+                                                    "patrol_origin": 1
+                                              },{
+                                                        "dest": [x+31,y-1],
+                                                        "state": 6,
+                                                        "aggressive": false
+                                                }]
+                        }
 
-  }
+    }
 }
