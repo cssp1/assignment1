@@ -6,7 +6,7 @@
 
 # Enforce strict whitespace conventions
 
-import sys, os, re, getopt, cStringIO, traceback
+import sys, os, stat, re, getopt, cStringIO, traceback
 
 # FILTERS that control which files we operate on
 
@@ -256,8 +256,10 @@ def do_process(fullpath, do_fix, processors):
     if do_fix and need_fix:
         for proc in processors: proc.reset()
         fd = open(fullpath, 'r')
+        file_mode = stat.S_IMODE(os.fstat(fd.fileno()).st_mode)
         temp_filename = fullpath + '.inprogress'
         out = open(temp_filename, 'w')
+        os.fchmod(out.fileno(), file_mode)
         try:
             for line in fd:
                 for proc in processors:
