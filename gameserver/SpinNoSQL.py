@@ -217,7 +217,7 @@ class NoSQLClient (object):
     def _table(self, name): return self.slave_for_table(name).table(name)
     def _table_exists(self, name): return self.slave_for_table(name).table_exists(name)
 
-    def instrument(self, name, func, args):
+    def instrument(self, name, func, args, kwargs = {}):
         if self.latency_func: start_time = time.time()
         needs_ping = False
         attempt = 0
@@ -228,7 +228,7 @@ class NoSQLClient (object):
                 if needs_ping:
                     self.ping_connections()
                     needs_ping = False
-                ret = func(*args)
+                ret = func(*args, **kwargs)
                 if attempt > 0 and (not self.in_log_exception_func): self.log_exception('recovered from exception.')
                 break
             except pymongo.errors.AutoReconnect as e: # on line 95
@@ -869,6 +869,7 @@ class NoSQLClient (object):
                     ret[index] = entry
         return ret
 
+    # "player_cache_search" is for the player-accessible search-by-name/search-by-ID feature
     def player_cache_search(self, name, limit = -1, match_mode = 'prefix', name_field = 'ui_name_searchable', case_sensitive = False, reason=''): return self.instrument('player_cache_search(%s)'%reason, self._player_cache_search, (name, limit, name_field, match_mode, case_sensitive))
     def _player_cache_search(self, name, limit, name_field, match_mode, case_sensitive):
         assert len(name) >= 1
@@ -895,38 +896,46 @@ class NoSQLClient (object):
             cur = cur.limit(limit)
         return [x['_id'] for x in cur]
 
-    def _player_cache_query(self, qs, maxret, randomize, return_as_list, force_player_level_index):
+    # this is for internal use only
+    # it is allowed to return an iterator
+    def _player_cache_query_randomized(self, qs, maxret = -1, randomize_quality = 1, force_player_level_index = False):
         result = self.player_cache().find(qs, {'_id':1})
-
-        # for randomized big iterations, go in natural order to provide some randomness
-        if randomize and (not return_as_list):
-            result = result.sort([('$natural',-1)]) # XXX is this enough randomization?
 
         if force_player_level_index:
             result = result.hint([('player_level',pymongo.ASCENDING)])
-        if maxret > 0:
-            result = result.limit(maxret)
 
-        if return_as_list:
-            ret = map(lambda x: x['_id'], result)
-            if randomize: # shuffle out here, since doing sort({'$natural':1}) forces a full table scan as of MongoDB 2.4.6!
-                random.shuffle(ret)
-            return ret
+        if randomize_quality > 0:
+            # accurate randomization - do full query (ignore maxret), then shuffle, then truncate
+            result = list(result)
+            random.shuffle(result)
+            if maxret > 0:
+                result = result[:maxret]
         else:
-            return itertools.imap(lambda x: x['_id'], result)
+            # bad quick randomization - obey maxret
+            result = result.sort([('$natural',-1)])
+            if maxret > 0:
+                result = result.limit(maxret)
+
+            # shuffle out here, since doing sort({'$natural':1}) forces a full table scan as of MongoDB 2.4.6!
+            result = list(result)
+            random.shuffle(result)
+
+        return map(lambda x: x['_id'], result)
 
     # special case for use by notification checker
     def player_cache_query_tutorial_complete_and_mtime_between_or_ctime_between(self, mtime_ranges, ctime_ranges, reason = None):
         qs = {'$or': [{'tutorial_complete':1,'last_mtime':{'$gte':r[0], '$lt':r[1]}} for r in mtime_ranges] + \
                      [{'tutorial_complete':1,'account_creation_time':{'$gte':r[0], '$lt':r[1]}} for r in ctime_ranges]}
-        return self.instrument('player_cache_query_tutorial_complete_and_mtime_between_or_ctime_between(%s)'%reason, self._player_cache_query,
-                               (qs,-1,False,True,False))
+        return self.instrument('player_cache_query_tutorial_complete_and_mtime_between_or_ctime_between(%s)'%reason,
+                               lambda qs: map(lambda x: x['_id'], self.player_cache().find(qs, {'_id':1})), (qs,))
 
-    def player_cache_query_ladder_rival(self, query, maxret, reason = None):
-        return self.instrument('player_cache_query_ladder_rival(%s)'%reason, self._player_cache_query_ladder_rival, (query,maxret))
-    def _player_cache_query_ladder_rival(self, query, maxret):
+    def player_cache_query_ladder_rival(self, query, maxret, randomize_quality = 1, reason = None):
+        return self.instrument('player_cache_query_ladder_rival(%s)'%reason, self._player_cache_query_ladder_rival, (query,maxret,randomize_quality))
+    def _player_cache_query_ladder_rival(self, query, maxret, randomize_quality):
         qand = []
         # translate legacy query syntax to MongoDB
+
+        references_player_level = False
 
         # need to emulate a join on player_scores for the score range
         score_api = None
@@ -940,6 +949,8 @@ class NoSQLClient (object):
 
         for item in query:
             key = '_id' if (item[0] == 'user_id') else item[0]
+
+            if item[0] == 'player_level': references_player_level = True
 
             if type(key) is tuple:
                 assert key[0] in ('scores1', 'scores2')
@@ -978,6 +989,9 @@ class NoSQLClient (object):
             else:
                 raise Exception('cannot parse query item %s' % repr(item))
 
+        # note: when it comes to handling maxret, the limit must be applied only to the FINAL
+        # query, in order to guarantee that we will not miss any valid possible users to return.
+
         if score_first:
             # return list of candidates who have scores within the specified range
             if score_api == 'scores1':
@@ -988,28 +1002,26 @@ class NoSQLClient (object):
                                                                                                                 {'_id':0,'user_id':1})]
             qand.append({'_id':{'$in':candidate_ids}})
             cache_qs = {'$and':qand}
-            return self._player_cache_query(cache_qs,maxret,True,True,False)
+            return self._player_cache_query_randomized(cache_qs, maxret = maxret, randomize_quality = randomize_quality)
 
         else:
             cache_qs = {'$and':qand}
             ret = []
-            for candidate_id in self._player_cache_query(cache_qs, -1, True, False, True):
-
+            for candidate_id in self._player_cache_query_randomized(cache_qs, maxret = -1, randomize_quality = randomize_quality,
+                                                                    force_player_level_index = references_player_level):
                 # check if candidate's score is within the specified range
                 if score_api == 'scores1':
                     score_qs['user_id'] = candidate_id
-                    if self.player_scores().find_one(score_qs, {'_id':0,'user_id':1}):
-                        ret.append(candidate_id)
+                    if self.player_scores().find_one(score_qs, {'_id':0,'user_id':1}) is None:
+                        continue
                 elif score_api == 'scores2':
                     if s2._scores2_table('player', score_stat, score_axes).find_one({'key': s2._scores2_key(score_stat, score_axes),
                                                                                      'val': score_range_qs,
-                                                                                     'user_id': candidate_id},{'_id':0}) is not None:
-                        ret.append(candidate_id)
-
-                else:
-                    ret.append(candidate_id)
-
+                                                                                     'user_id': candidate_id},{'_id':0}) is None:
+                        continue
+                ret.append(candidate_id)
                 if len(ret) >= maxret: break
+
             return ret
 
     ###### PLAYER LOCKING (embedded in player_cache) ######

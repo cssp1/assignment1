@@ -8161,7 +8161,9 @@ class Player(AbstractPlayer):
             gamesite.exception_log.event(server_time, 'find_suitable_ladder_match: %d query %s pool %d' %
                                          (self.user_id, repr(query), gamedata['matchmaking']['ladder_match_pool_size']))
 
-        candidate_list = gamesite.db_client.player_cache_query_ladder_rival(query, gamedata['matchmaking']['ladder_match_pool_size'], reason = 'ladder')
+        candidate_list = gamesite.db_client.player_cache_query_ladder_rival(query, gamedata['matchmaking']['ladder_match_pool_size'],
+                                                                            randomize_quality = gamedata['matchmaking'].get('ladder_match_randomize_quality', 1),
+                                                                            reason = 'ladder')
 
         # note: request more than 1 match, and shuffle, to get rid of repeats for non-evenly-distributed user_ids
         if len(candidate_list) > 1:
