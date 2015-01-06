@@ -875,7 +875,9 @@ class NoSQLClient (object):
         qs = {}
 
         if name.isdigit():
-            qs['_id'] = long(name)
+            value = long(name)
+            if value >= sys.maxint - 1: return [] # can't exceed 64 bits
+            qs['_id'] = value
         else:
             if match_mode == 'prefix':
                 qs[name_field] = {'$regex': '^'+name, '$options':'i' if (not case_sensitive) else ''}
