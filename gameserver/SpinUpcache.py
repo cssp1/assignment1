@@ -1352,6 +1352,7 @@ def update_upcache_entry(user_id, driver, entry, time_now, gamedata, user_mtime 
                              'attacks_launched', 'attacks_launched_vs_ai', 'attacks_launched_vs_human', 'revenge_attacks_launched_vs_human',
                              'attacks_victory',
                              'attacks_suffered', 'ai_attacks_suffered', 'daily_attacks_suffered', 'revenge_attacks_suffered',
+                             'peak_trophies_pvp',
                              'units_manufactured',
                              'money_spent', 'largest_purchase', 'time_in_game', 'logged_in_times',
                              'alliances_joined', 'units_donated', 'donated_units_received', 'alliance_gift_items_sent',
@@ -1608,6 +1609,7 @@ def update_upcache_entry(user_id, driver, entry, time_now, gamedata, user_mtime 
                               "gift_orders_refunded", "gift_orders_received_then_refunded", "gamebucks_refunded_from_received_gift_orders",
                               'gamebucks_spent_on_gift_orders',
                               'items_activated', 'items_looted',
+                              'friendstones_redeemed',
                               'gifts_received', 'gifts_sent',
                               'birthday_gifts_received',
                               'fish_completed',
@@ -1649,12 +1651,17 @@ def update_upcache_entry(user_id, driver, entry, time_now, gamedata, user_mtime 
             obj['inventory_slots_used'] = len(data.get('inventory',[]))
 
             buildings = set(get_building_names(gamedata))
+            building_counts = {}
 
             obj['research_concurrency'] = 0
             obj['manuf_concurrency'] = 0
 
             for p in my_base:
                 if p['spec'] in buildings:
+                    building_counts[p['spec']] = building_counts.get(p['spec'],0) + 1
+                    if building_counts[p['spec']] > 1:
+                        # only bother recording this if >1, to save space in the trivial case
+                        obj[p['spec']+'_num'] = max(obj.get(p['spec']+'_num',0), building_counts[p['spec']])
                     obj[p['spec']+'_level'] = max(obj.get(p['spec']+'_level',0), p.get('level',1))
                     spec = gamedata['buildings'][p['spec']]
                     if 'provides_inventory' in spec:

@@ -40,7 +40,7 @@ abtest_filter = re.compile('^T[0-9]+')
 # always accept these keys
 accept_filter = re.compile('^item:instant_.*repair|feature_used:playfield_speed|ai_tutorial.*_progress$')
 # then, always reject these keys
-reject_filter = re.compile('^T[0-9]+_|acquisition_game_version|account_creation_hour|account_creation_wday|^fb_notification:|^feature_used:|^achievement:|^quest:|_conquests$|_progress$|_attempted$|days_since_joined|days_since_last_login|lock_state|^visits_[0-9]+d$|^retained_[0-9]+d$|oauth_token|facebook_permissions_str|acquisition_type|^link$|_context$|^item:|^unit:.+:(killed|lost|manufactured)|_times_(started|completed)$')
+reject_filter = re.compile('^T[0-9]+_|acquisition_game_version|account_creation_hour|account_creation_wday|^fb_notification:|^feature_used:|^achievement:|^quest:|_conquests$|_progress$|_attempted$|days_since_joined|days_since_last_login|lock_state|^visits_[0-9]+d$|^retained_[0-9]+d$|oauth_token|facebook_permissions_str|acquisition_type|^link$|_context$|^item:|^unit:.+:(killed|lost)|_times_(started|completed)$')
 
 # "lite" mode
 lite_accept_filter = re.compile('|'.join('^'+x+'$' for x in \
@@ -97,6 +97,8 @@ def setup_field(gamedata, key, val, field_mode = None):
             return 'TINYINT(1)' # booleans
         elif key.endswith('_level') or key.endswith('_level_started'):
             return 'INT1' # level numbers
+        elif key.endswith('_num') and key[:-4] in gamedata['buildings']:
+            return 'INT2' if key[:-4] == 'barrier' else 'INT1' # building quantities
         else:
             return 'INT4'
 
