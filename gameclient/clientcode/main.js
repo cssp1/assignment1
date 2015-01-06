@@ -12621,7 +12621,7 @@ function invoke_cheat_menu() {
         save_ai_base(filename);
     }));
 
-    //layout.add(new SPUI.Button("Clear", function() { change_selection_ui(null); destroy_all_enemies(); }));
+    layout.add(new SPUI.Button("Clear", function() { change_selection_ui(null); destroy_all_enemies(); }));
 
     if(player.is_cheater) {
         layout.add(new SPUI.Button("Remove All Barriers", function() { remove_all_barriers(); change_selection(null); }));
