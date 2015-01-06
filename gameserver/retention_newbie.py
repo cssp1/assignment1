@@ -5,7 +5,7 @@
 # found in the LICENSE file.
 
 # load some standard Python libraries
-import sys, time, urllib, urllib2, getopt, traceback, random, re
+import sys, time, urllib, urllib2, getopt, traceback, random, re, functools
 import SpinConfig, SpinUserDB, SpinJSON, SpinParallel, SpinLog
 import SpinNoSQL, SpinNoSQLLog, SpinETL
 import SpinFacebook
@@ -64,9 +64,11 @@ def check_harv_full(player):
 
     return 'harv_full', '', None
 
-def check_upgrade_complete(player):
+def check_upgrade_complete(building_type, specific_level, player):
     for obj in player['my_base']:
         if obj['spec'] not in gamedata['buildings']: continue
+        if building_type != 'ALL' and obj['spec'] != building_type: continue
+        if specific_level > 0 and obj.get('level',1) + 1 != specific_level: continue
         if ('upgrade_start_time' in obj) and ('upgrade_total_time' in obj) and (obj['upgrade_start_time'] > 0):
             if obj.get('upgrade_done_time',0) + (time_now - obj['upgrade_start_time']) >= obj['upgrade_total_time']:
                 ui_name = gamedata['buildings'][obj['spec']]['ui_name']
@@ -146,13 +148,15 @@ def finish_fishing_complete(player, bus):
 # functions to check if a notification applies
 CHECKERS = {
     'harv_full': check_harv_full,
-    'upgrade_complete': check_upgrade_complete,
+    'townhall_L3_upgrade_complete': functools.partial(check_upgrade_complete, gamedata['townhall'], 3),
+    'upgrade_complete': functools.partial(check_upgrade_complete, 'ALL', -1),
     'research_complete': check_research_complete,
     'production_complete': check_production_complete,
     'army_repaired': check_army_repaired,
     'fishing_complete': check_fishing_complete
     }
-CHECKERS_BY_PRIORITY = sorted(CHECKERS.items(), key = lambda k_v: -gamedata['fb_notifications']['notifications'][k_v[0]]['priority'])
+CHECKERS_BY_PRIORITY = sorted(filter(lambda k_v: k_v[0] in gamedata['fb_notifications']['notifications'], CHECKERS.items()),
+                              key = lambda k_v: -gamedata['fb_notifications']['notifications'][k_v[0]]['priority'])
 
 # functions to mutate player after sending a notification
 FINISHERS = {'fishing_complete': finish_fishing_complete }
@@ -261,7 +265,10 @@ class Sender(object):
         checker_state = None
 
         for key, func in CHECKERS_BY_PRIORITY:
-            config = gamedata['fb_notifications']['notifications'][key]
+            config = gamedata['fb_notifications']['notifications'].get(key, None)
+            if not config: continue
+            if player.get('creation_time',-1) < config.get('min_account_creation_time',-1): continue
+
             min_interval = config.get('min_interval', -1)
             if (min_interval > 0) and (time_now - player.get('last_fb_notification_time', -1) < min_interval):
                 #print >> self.msg_fd, 'too early to check for %s'
