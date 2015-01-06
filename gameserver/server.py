@@ -2136,6 +2136,7 @@ class PlayerTable:
               ('creation_time', None, None),
               ('lottery_seed', None, None),
               ('ladder_match', None, None),
+              ('ladder_match_history', None, None),
 
               ('last_gift_prompt', None, None),
               ('last_friend_invite_prompt', None, None),
@@ -6683,6 +6684,9 @@ class Player(AbstractPlayer):
         # PvP ladder rival, must not be alterable unless 1) attack is made or 2) time passes or 3) player pays (and waits) to switch
         self.ladder_match = None
 
+        # last N rivals matched (including the current one) - used to prevent repeats
+        self.ladder_match_history = []
+
         self.last_motd = 0 # time of last MOTD notice
         self.last_rank_update = 0 # time of last social network leaderboard rank update
         self.last_fb_score_update = 0 # time of last facebook Scores API call
@@ -6821,6 +6825,11 @@ class Player(AbstractPlayer):
     def prune_cooldowns(self):
         for cd_name in self.cooldowns.keys():
             self.cooldown_active(cd_name)
+
+    def prune_ladder_match_history(self, session):
+        max_exclude = Predicates.eval_cond_or_literal(gamedata['matchmaking'].get('ladder_match_history_exclude',1), session, self)
+        while len(self.ladder_match_history) > max_exclude:
+            self.ladder_match_history.remove(self.ladder_match_history[0])
 
     def prune_player_auras(self, is_session_change = False, is_login = False, is_recalc_stattab = False):
         to_remove = []
@@ -8071,7 +8080,7 @@ class Player(AbstractPlayer):
     def get_lootable_buildings(self):
         return sum([1 for obj in self.home_base_iter() if (obj.is_building() and (obj.is_storage() or obj.is_producer()) and (not obj.is_destroyed()))], 0)
 
-    def query_suitable_ladder_match(self, exclude_user_id = None, exclude_alliance_ids = [], trophy_range = None, townhall_range = None):
+    def query_suitable_ladder_match(self, exclude_user_ids = [], exclude_alliance_ids = [], trophy_range = None, townhall_range = None):
         # note: order of fields here is important for query speed
         if trophy_range:
             mycount = self.ladder_points()
@@ -8141,9 +8150,9 @@ class Player(AbstractPlayer):
         for aid in exclude_alliance_ids:
             # don't fight your own alliancemates
             query.append(['alliance_id', aid, aid, '!in'])
-        if exclude_user_id:
-            # don't fight the previously-matched user
-            query.append(['user_id', exclude_user_id, exclude_user_id, '!in'])
+        for excl in exclude_user_ids:
+            # don't fight previously-matched user(s)
+            query.append(['user_id', excl, excl, '!in'])
 
         # don't fight people we have fatigue for
         for cdname, cdata in self.cooldowns.iteritems():
@@ -8177,17 +8186,17 @@ class Player(AbstractPlayer):
         id = candidate_list[0] if candidate_list else None
         return id
 
-    def find_suitable_ladder_match(self, exclude_user_id = None, exclude_alliance_ids = []):
+    def find_suitable_ladder_match(self, exclude_user_ids = [], exclude_alliance_ids = []):
         start_time = time.time()
         id = None
         if gamedata['matchmaking']['ladder_match_by'] == 'trophies':
             for passnum in xrange(len(gamedata['matchmaking']['ladder_match_trophy_range'])):
-                id = self.query_suitable_ladder_match(exclude_user_id = exclude_user_id, exclude_alliance_ids = exclude_alliance_ids,
+                id = self.query_suitable_ladder_match(exclude_user_ids = exclude_user_ids, exclude_alliance_ids = exclude_alliance_ids,
                                                       trophy_range = gamedata['matchmaking']['ladder_match_trophy_range'][passnum]) # note: may be None/null
                 if id: break
         elif gamedata['matchmaking']['ladder_match_by'] == 'townhall':
             for passnum in xrange(len(gamedata['matchmaking']['ladder_match_townhall_range'])):
-                id = self.query_suitable_ladder_match(exclude_user_id = exclude_user_id, exclude_alliance_ids = exclude_alliance_ids,
+                id = self.query_suitable_ladder_match(exclude_user_ids = exclude_user_ids, exclude_alliance_ids = exclude_alliance_ids,
                                                       townhall_range = gamedata['matchmaking']['ladder_match_townhall_range'][passnum]) # note: may be None/null
                 if id: break
         else:
@@ -20709,7 +20718,7 @@ class GAMEAPI(resource.Resource):
                     return
             elif arg[0] == "VISIT_LADDER_RIVAL":
                 force_switch = bool(arg[1]) or gamedata['matchmaking']['ladder_match_life'] <= 0
-                exclude_user_id = None
+                exclude_user_ids = set()
 
                 if (not session.player.is_ladder_player()):
                     retmsg.append(["ERROR", "DISALLOWED_IN_SECURE_MODE"])
@@ -20732,7 +20741,10 @@ class GAMEAPI(resource.Resource):
 
                 if force_switch:
                     session.player.cooldown_reset('ladder_match')
-                    exclude_user_id = session.player.ladder_match
+                    exclude_user_ids.add(session.player.ladder_match) # exclude previous ID, always
+                    session.player.prune_ladder_match_history(session)
+                    exclude_user_ids.update(filter(lambda x: x > 0, session.player.ladder_match_history)) # exclude previous non-generic opponents
+
                     # force a delay to make alt-shopping inconvenient
                     delay += gamedata['matchmaking']['ladder_match_switch_cooldown']
                     if gamedata['server']['log_ladder_pvp'] >= 2:
@@ -20778,7 +20790,7 @@ class GAMEAPI(resource.Resource):
                             if aid >= 0 or gamedata['matchmaking'].get('ladder_match_non_alliance_bug',False):
                                 exclude_alliance_ids.append(aid)
                             exclude_alliance_ids += session.player.get_sticky_alliances()
-                            session.player.ladder_match = session.player.find_suitable_ladder_match(exclude_user_id = exclude_user_id, exclude_alliance_ids = exclude_alliance_ids)
+                            session.player.ladder_match = session.player.find_suitable_ladder_match(exclude_user_ids = exclude_user_ids, exclude_alliance_ids = exclude_alliance_ids)
                         if force_ai or ((not session.player.ladder_match) and gamedata['matchmaking']['ladder_match_ai_fallback']):
                             # assign AI opponent
                             candidates = []
@@ -20788,7 +20800,7 @@ class GAMEAPI(resource.Resource):
                                    ('activation' in entry and not Predicates.read_predicate(entry['activation']).is_satisfied(session.player, None)): continue # out of level range
 
                                 id = entry['base_id']
-                                if id == exclude_user_id: continue
+                                if id in exclude_user_ids: continue
 
                                 base = gamedata['ai_bases']['bases'].get(str(id),None)
                                 if not base:
@@ -20802,7 +20814,7 @@ class GAMEAPI(resource.Resource):
 
                             if gamedata['server']['log_ladder_pvp'] >= 3:
                                 gamesite.exception_log.event(server_time, 'VISIT_LADDER_RIVAL (AI): %d candidates %s (exclude %s) -> %s' % \
-                                                             (session.player.user_id, repr(candidates), repr(exclude_user_id), repr(session.player.ladder_match)))
+                                                             (session.player.user_id, repr(candidates), repr(exclude_user_ids), repr(session.player.ladder_match)))
 
 
                     event_props = {'attacker_pts': session.player.ladder_points(),
@@ -20815,6 +20827,13 @@ class GAMEAPI(resource.Resource):
                         event_props.update({'defender_id': session.player.ladder_match})
                         session.player.record_ladder_pvp_event('3301_ladder_search_success', copy.copy(event_props))
                         session.player.cooldown_trigger('ladder_match', gamedata['matchmaking']['ladder_match_life'])
+
+                        # append to history and truncate
+                        # (option: for AIs, only append a generic -1, and thus allow max_exclude to be greater than the number of AIs available?)
+                        # (session.player.ladder_match if str(session.player.ladder_match) not in gamedata['ai_bases']['bases'] else -1)
+                        session.player.ladder_match_history.append(session.player.ladder_match)
+                        session.player.prune_ladder_match_history(session)
+
                         if gamedata['server']['log_ladder_pvp'] >= 2:
                             gamesite.exception_log.event(server_time, 'VISIT_LADDER_RIVAL: %d found match %d' % (session.player.user_id, session.player.ladder_match))
                     else:
