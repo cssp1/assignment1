@@ -23207,7 +23207,7 @@ class GAMEAPI(resource.Resource):
                                 props = {'spec': obj.spec.name, 'xy': [obj.x, obj.y] }
                                 out['scenery'].append(props)
 
-                        atom = AtomicFileWrite.AtomicFileWrite(filename, 'w')
+                        atom = AtomicFileWrite.AtomicFileWrite(filename, 'w') # DANGEROUS - can overwrite any file!
                         atom.fd.write(SpinJSON.dumps(out, pretty = True)[1:-1]+'\n') # note: get rid of surrounding {}
                         atom.complete()
                     except:

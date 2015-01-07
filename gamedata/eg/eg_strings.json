@@ -900,9 +900,9 @@
                             "ui_button": "Reset" },
 
     "load_ai_base_success": { "ui_title": "AI base loaded",
-                              "ui_description": "AI base %s loaded." },
+                              "ui_description": "AI base loaded: %s" },
     "save_ai_base_success": { "ui_title": "AI base saved",
-                              "ui_description": "AI base %s saved.\n\nRemember to publish it!" },
+                              "ui_description": "AI base saved: %s" },
     "publish_ai_base_success": { "ui_title": "AI base published",
                                  "ui_description": "AI base %s was published and can now be visited." },
 

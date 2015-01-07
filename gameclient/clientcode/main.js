@@ -12614,10 +12614,10 @@ function invoke_cheat_menu() {
         send_to_server.func(["CAST_SPELL", 0, "CHEAT_REMOVE_LIMITS", player.is_cheater]);
     }));
 
-    layout.add(new SPUI.Button("Save AI base to gamedata/"+gamedata['game_id'], function() {
+    layout.add(new SPUI.Button("Save AI base to /var/tmp", function() {
         change_selection_ui(null);
         var timestamp = server_time.toFixed(0);
-        var filename = '../gamedata/'+gamedata['game_id']+'/'+'zzz_ai_base_'+timestamp+'.json';
+        var filename = '/var/tmp/'+gamedata['game_id']+'_saved_ai_base_'+timestamp+'.json';
         save_ai_base(filename);
     }));
 
