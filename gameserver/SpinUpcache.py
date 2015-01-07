@@ -1346,9 +1346,11 @@ def update_upcache_entry(user_id, driver, entry, time_now, gamedata, user_mtime 
                         obj[name] = history[name]
 
                 for name in ['harvested_'+resname+'_total' for resname in gamedata['resources']] + \
-                            ['peak_'+resname for resname in gamedata['resources']] + ['peak_gamebucks',] + \
+                            ['peak_'+resname for resname in gamedata['resources']] + \
+                            ['peak_'+resname+'_at_townhall_L'+str(lev) for resname in gamedata['resources'] for lev in range(2,10)] + \
                             [catname+'_unlocked' for catname in gamedata['strings']['manufacture_categories']] + \
                             ['history_version',
+                             'peak_gamebucks',
                              'attacks_launched', 'attacks_launched_vs_ai', 'attacks_launched_vs_human', 'revenge_attacks_launched_vs_human',
                              'attacks_victory',
                              'attacks_suffered', 'ai_attacks_suffered', 'daily_attacks_suffered', 'revenge_attacks_suffered',

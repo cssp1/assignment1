@@ -95,7 +95,7 @@ def setup_field(gamedata, key, val, field_mode = None):
             return 'INT8' # times / big resource amounts
         elif key.startswith('likes_') or key.startswith('returned_'):
             return 'TINYINT(1)' # booleans
-        elif key.endswith('_level') or key.endswith('_level_started'):
+        elif key.endswith('_level') or key.endswith('_level_started') or ('_townhall_L' in key):
             return 'INT1' # level numbers
         elif key.endswith('_num') and key[:-4] in gamedata['buildings']:
             return 'INT2' if key[:-4] == 'barrier' else 'INT1' # building quantities

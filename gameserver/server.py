@@ -5712,6 +5712,7 @@ class ResourceState:
         for resname in given:
             setattr(self, resname, getattr(self, resname) + given[resname])
             dict_setmax(self.player.history, 'peak_'+resname, getattr(self, resname))
+            dict_setmax(self.player.history, 'peak_'+resname+'_at_townhall_L'+str(self.player.get_townhall_level_fast()), getattr(self, resname))
 
         return given
 
