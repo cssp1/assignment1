@@ -3031,7 +3031,7 @@ def main(args):
         if name in matchmaking:
             error |= check_predicate(matchmaking[name], reason='matchmaking:'+name)
     for name in ('ladder_match_switch_cost','ladder_match_history_exclude'):
-        if type(matchmaking[name]) is list:
+        if name in matchmaking and (type(matchmaking[name]) is list):
             error |= check_cond_chain(matchmaking[name], reason='matchmaking:'+name)
 
     for name in ('loot_attacker_gains', 'loot_defender_loses'):
