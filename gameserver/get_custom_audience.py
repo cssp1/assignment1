@@ -105,12 +105,15 @@ if __name__ == '__main__':
             ret = [{'game_id':gid, 'aud':'p10-c10', 'min_spend':10, 'churned_for_days':10},
                    {'game_id':gid, 'aud':'p10-c30', 'min_spend':10, 'churned_for_days':30},
                    {'game_id':gid, 'aud':'p10', 'min_spend':10, 'churned_for_days':-1},
-                   {'game_id':gid, 'aud':'ALL', 'min_spend':-1, 'churned_for_days':-1}]
-            for country in ('us','ca','gb','au','nz','dk','nl','no','se'):
-                ret.append({'game_id':gid, 'aud':'p10-n%s' % country, 'min_spend':10, 'churned_for_days':-1, 'country':country})
+                   ]
+            if gid in ('tr','sg'):
+                ret.append({'game_id':gid, 'aud':'ALL', 'min_spend':-1, 'churned_for_days':-1})
+            if 0:
+                for country in ('us','ca','gb','au','nz','dk','nl','no','se'):
+                    ret.append({'game_id':gid, 'aud':'p10-n%s' % country, 'min_spend':10, 'churned_for_days':-1, 'country':country})
             return ret
         auds = []
-        for gid in ('bfm','mf2','mf','tr'):
+        for gid in ('mf','tr','mf2','bfm','sg'):
             auds += auds_for_game(gid)
 
     else:
