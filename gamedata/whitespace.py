@@ -11,10 +11,10 @@ import sys, os, stat, re, getopt, cStringIO, traceback
 # FILTERS that control which files we operate on
 
 # do not descend into directories with these names
-IGNORE_DIRS = {'.svn','.git', # SCM data
-               'userdb','playerdb','basedb','aistate','db','art','built', # server state
-               'logs','ujson','pysvg','dowser','google', # third-party
-               }
+IGNORE_DIRS = set(['.svn','.git', # SCM data
+                   'userdb','playerdb','basedb','aistate','db','art','built', # server state
+                   'logs','ujson','pysvg','dowser','google', # third-party
+                   ])
 
 def dir_filter(name):
     return (name not in IGNORE_DIRS) and \
@@ -26,8 +26,8 @@ def is_ai_base_dir(name):
            or name == 'ai_base_generator'
 
 # only process files named with these endings
-FILE_EXTENSIONS = {'html','js','json','php','pl','po','pot','py','sh','skel','sql','txt'}
-IGNORE_FILES = {'config.json', 'ses-send-email.pl'}
+FILE_EXTENSIONS = set(['html','js','json','php','pl','po','pot','py','sh','skel','sql','txt'])
+IGNORE_FILES = set(['config.json', 'ses-send-email.pl'])
 
 def file_filter(name):
     return ('.' in name) and \
