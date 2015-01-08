@@ -64,7 +64,7 @@ def check_harv_full(player):
 
     return 'harv_full', '', None
 
-def check_upgrade_complete(building_type, specific_level, player):
+def check_upgrade_complete(ref, building_type, specific_level, player):
     for obj in player['my_base']:
         if obj['spec'] not in gamedata['buildings']: continue
         if building_type != 'ALL' and obj['spec'] != building_type: continue
@@ -72,7 +72,7 @@ def check_upgrade_complete(building_type, specific_level, player):
         if ('upgrade_start_time' in obj) and ('upgrade_total_time' in obj) and (obj['upgrade_start_time'] > 0):
             if obj.get('upgrade_done_time',0) + (time_now - obj['upgrade_start_time']) >= obj['upgrade_total_time']:
                 ui_name = gamedata['buildings'][obj['spec']]['ui_name']
-                return 'upgrade_complete', ui_name, None
+                return ref, ui_name, None
     return None, None, None
 def check_research_complete(player):
     for obj in player['my_base']:
@@ -148,8 +148,8 @@ def finish_fishing_complete(player, bus):
 # functions to check if a notification applies
 CHECKERS = {
     'harv_full': check_harv_full,
-    'townhall_L3_upgrade_complete': functools.partial(check_upgrade_complete, gamedata['townhall'], 3),
-    'upgrade_complete': functools.partial(check_upgrade_complete, 'ALL', -1),
+    'townhall_L3_upgrade_complete': functools.partial(check_upgrade_complete, 'townhall_L3_upgrade_complete', gamedata['townhall'], 3),
+    'upgrade_complete': functools.partial(check_upgrade_complete, 'upgrade_complete', 'ALL', -1),
     'research_complete': check_research_complete,
     'production_complete': check_production_complete,
     'army_repaired': check_army_repaired,
