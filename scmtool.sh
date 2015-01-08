@@ -73,13 +73,27 @@ function do_commit_svn {
 
 function do_up_git {
     for dir in $GIT_DIRS; do
-        echo "pulling game-${dir}..."
-        (cd $dir && git pull)
+        if (cd $dir && git diff --exit-code --quiet); then
+            # tree is clean - plain pull
+            echo "pulling game-${dir}..."
+            (cd $dir && git pull)
+        else
+            # local changes - try to reapply on top
+            echo "fetching, stashing, merging, unstashing game-${dir}..."
+            (cd $dir && git fetch && git stash && git merge origin/master --ff-only && git stash pop)
+        fi
     done
 }
 function do_force_up_git {
+    # same code as do_up_git, but tries to be silent
     for dir in $GIT_DIRS; do
-        (cd $dir && git pull -q) # --ff-only ?
+        if (cd $dir && git diff --exit-code --quiet); then
+            # tree is clean - plain pull
+            (cd $dir && git pull -q)
+        else
+            # local changes - try to reapply on top
+            (cd $dir && git fetch -q && git stash -q && git merge origin/master --ff-only -q && git stash pop -q)
+        fi
     done
 }
 function do_revert_git {
