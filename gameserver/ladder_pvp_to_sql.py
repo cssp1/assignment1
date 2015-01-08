@@ -58,7 +58,8 @@ def ladder_pvp_summary_schema(sql_util, interval):
                       [('event_name', 'VARCHAR(255) NOT NULL'),
                        ('is_revenge', 'INT1'),
                        ('battle_streak_ladder', 'INT4'),
-                       ('is_victory', 'INT1'),
+                       ('n_victories', 'INT8'),
+                       ('victory_ratio', 'FLOAT4'),
                        ('n_events', 'INT8'),
                        ('most_active_n_events', 'INT8'),
                        ('most_active_total_duration', 'INT8'),
@@ -182,12 +183,15 @@ if __name__ == '__main__':
             sql_util.ensure_table(cur, temp_table, {'fields':[('user_id', 'INT4 NOT NULL')] + \
                                                              sql_util.summary_out_dimensions() + \
                                                              [('event_name', 'VARCHAR(255) NOT NULL'),
+                                                              ('is_revenge', 'INT1'),
+                                                              ('battle_streak_ladder', 'INT4'),
                                                               ('n_events', 'INT8'),
                                                               ('total_duration', 'INT8')],
-                                                    'indices':{'master':{'keys':[('frame_platform','ASC'),('country_tier','ASC'),('townhall_level','ASC'),('spend_bracket','ASC'),('event_name','ASC')]}}
+                                                    'indices':{'master':{'keys':[('frame_platform','ASC'),('country_tier','ASC'),('townhall_level','ASC'),('spend_bracket','ASC'),('event_name','ASC'),('is_revenge','ASC'),('battle_streak_ladder','ASC')]}}
                                                     }, temporary = False)
 
-            # get the max number of events of each type per player (chiefly to determine the max number and duration of battles
+            # get the max number of events of each type per player (chiefly to determine the max number and duration of battles)
+            # note: is_revenge not used
             cur.execute("INSERT INTO "+sql_util.sym(temp_table) + \
                         "SELECT a.user_id AS user_id," + \
                         "       a.frame_platform AS frame_platform," + \
@@ -195,14 +199,34 @@ if __name__ == '__main__':
                         "       MAX(a.townhall_level) AS townhall_level," + \
                         "       "+sql_util.encode_spend_bracket("MAX(a.prev_receipts)")+" AS spend_bracket," + \
                         "       a.event_name AS event_name," + \
+                        "       NULL AS is_revenge," + \
+                        "       a.battle_streak_ladder AS battle_streak_ladder," + \
+                        "       COUNT(1) AS n_events," + \
+                        "       SUM(a.duration) AS total_duration " + \
+                        "FROM " + sql_util.sym(ladder_pvp_table) + " a " + \
+                        "WHERE a.time >= %s AND a.time < %s AND a.battle_streak_ladder IS NOT NULL " + \
+                        "GROUP BY user_id, event_name, a.battle_streak_ladder ORDER BY NULL",
+                        [day_start, day_start+dt])
+
+            # second pass with battle_streak_ladder = NULL
+            cur.execute("INSERT INTO "+sql_util.sym(temp_table) + \
+                        "SELECT a.user_id AS user_id," + \
+                        "       a.frame_platform AS frame_platform," + \
+                        "       a.country_tier AS country_tier," + \
+                        "       MAX(a.townhall_level) AS townhall_level," + \
+                        "       "+sql_util.encode_spend_bracket("MAX(a.prev_receipts)")+" AS spend_bracket," + \
+                        "       a.event_name AS event_name," + \
+                        "       NULL AS is_revenge," + \
+                        "       NULL AS battle_streak_ladder," + \
                         "       COUNT(1) AS n_events," + \
                         "       SUM(a.duration) AS total_duration " + \
                         "FROM " + sql_util.sym(ladder_pvp_table) + " a " + \
                         "WHERE a.time >= %s AND a.time < %s " + \
-                        "GROUP BY a.user_id, a.event_name ORDER BY NULL",
+                        "GROUP BY user_id, event_name ORDER BY NULL",
                         [day_start, day_start+dt])
             con.commit()
 
+            # note: is_revenge not used for the per-streak rows
             cur.execute("INSERT INTO "+sql_util.sym(ladder_pvp_daily_summary_table) + \
                         "SELECT %s AS "+interval+"," + \
                         "       a.frame_platform AS frame_platform," + \
@@ -210,12 +234,13 @@ if __name__ == '__main__':
                         "       a.townhall_level AS townhall_level," + \
                         "       "+sql_util.encode_spend_bracket("a.prev_receipts")+" AS spend_bracket," + \
                         "       a.event_name AS event_name," + \
-                        "       a.is_revenge AS is_revenge," + \
+                        "       NULL AS is_revenge," + \
                         "       a.battle_streak_ladder AS battle_streak_ladder," + \
-                        "       a.is_victory AS is_victory," + \
+                        "       SUM(IF(a.is_victory,1,0)) AS n_victories," + \
+                        "       SUM(IF(a.is_victory,1,0))/SUM(1) AS victory_ratio," + \
                         "       COUNT(1) AS n_events," + \
-                        "       (SELECT MAX(b.n_events) FROM "+sql_util.sym(temp_table)+" b WHERE b.frame_platform = a.frame_platform AND b.country_tier = a.country_tier AND b.townhall_level = a.townhall_level AND b.spend_bracket = "+sql_util.encode_spend_bracket("a.prev_receipts")+" AND b.event_name = event_name) AS most_active_n_events, " + \
-                        "       (SELECT MAX(b.total_duration) FROM "+sql_util.sym(temp_table)+" b WHERE b.frame_platform = a.frame_platform AND b.country_tier = a.country_tier AND b.townhall_level = a.townhall_level AND b.spend_bracket = "+sql_util.encode_spend_bracket("a.prev_receipts")+" AND b.event_name = event_name) AS most_active_total_duration, " + \
+                        "       (SELECT MAX(b.n_events) FROM "+sql_util.sym(temp_table)+" b WHERE b.frame_platform = a.frame_platform AND b.country_tier = a.country_tier AND b.townhall_level = a.townhall_level AND b.spend_bracket = "+sql_util.encode_spend_bracket("a.prev_receipts")+" AND b.event_name = event_name AND b.battle_streak_ladder = a.battle_streak_ladder) AS most_active_n_events, " + \
+                        "       (SELECT MAX(b.total_duration) FROM "+sql_util.sym(temp_table)+" b WHERE b.frame_platform = a.frame_platform AND b.country_tier = a.country_tier AND b.townhall_level = a.townhall_level AND b.spend_bracket = "+sql_util.encode_spend_bracket("a.prev_receipts")+" AND b.event_name = event_name AND b.battle_streak_ladder = a.battle_streak_ladder) AS most_active_total_duration, " + \
                         "       COUNT(DISTINCT(a.user_id)) AS unique_players " + \
                         "".join((",       SUM(IFNULL(a."+s+",0)) AS "+s+"_total," + \
                                  "       MIN(a."+s+") AS "+s+"_min," + \
@@ -223,11 +248,11 @@ if __name__ == '__main__':
                                  "       AVG(a."+s+") AS "+s+"_avg ") for s in SUMFIELDS) + \
                         "FROM " + sql_util.sym(ladder_pvp_table) + " a " + \
                         "WHERE a.time >= %s AND a.time < %s AND a.battle_streak_ladder IS NOT NULL " + \
-                        "GROUP BY frame_platform, country_tier, townhall_level, spend_bracket, event_name, is_revenge, battle_streak_ladder, is_victory ORDER BY NULL",
+                        "GROUP BY frame_platform, country_tier, townhall_level, spend_bracket, event_name, battle_streak_ladder ORDER BY NULL",
                         [day_start, day_start, day_start+dt])
 
             # add extra rows with battle_streak_ladder = NULL meaning "any battle_streak_ladder" and is_revenge = NULL meaning "either revenge or non-revenge battle"
-            # note: this means that summary reports have to explicitly include or exclude based on battle_streak_ladder and is_revenge being NULL or non-NULL
+            # note: this means that summary reports have to explicitly include or exclude based on battle_streak_ladder being NULL or non-NULL
             cur.execute("INSERT INTO "+sql_util.sym(ladder_pvp_daily_summary_table) + \
                         "SELECT %s AS "+interval+"," + \
                         "       a.frame_platform AS frame_platform," + \
@@ -237,10 +262,11 @@ if __name__ == '__main__':
                         "       a.event_name AS event_name," + \
                         "       NULL AS is_revenge," + \
                         "       NULL AS battle_streak_ladder," + \
-                        "       a.is_victory AS is_victory," + \
+                        "       SUM(IF(a.is_victory,1,0)) AS n_victories," + \
+                        "       SUM(IF(a.is_victory,1,0))/SUM(1) AS victory_ratio," + \
                         "       COUNT(1) AS n_events," + \
-                        "       (SELECT MAX(b.n_events) FROM "+sql_util.sym(temp_table)+" b WHERE b.frame_platform = a.frame_platform AND b.country_tier = a.country_tier AND b.townhall_level = a.townhall_level AND b.spend_bracket = "+sql_util.encode_spend_bracket("a.prev_receipts")+" AND b.event_name = event_name) AS most_active_n_events, " + \
-                        "       (SELECT MAX(b.total_duration) FROM "+sql_util.sym(temp_table)+" b WHERE b.frame_platform = a.frame_platform AND b.country_tier = a.country_tier AND b.townhall_level = a.townhall_level AND b.spend_bracket = "+sql_util.encode_spend_bracket("a.prev_receipts")+" AND b.event_name = event_name) AS most_active_total_duration, " + \
+                        "       (SELECT MAX(b.n_events) FROM "+sql_util.sym(temp_table)+" b WHERE b.frame_platform = a.frame_platform AND b.country_tier = a.country_tier AND b.townhall_level = a.townhall_level AND b.spend_bracket = "+sql_util.encode_spend_bracket("a.prev_receipts")+" AND b.event_name = a.event_name AND b.battle_streak_ladder IS NULL) AS most_active_n_events, " + \
+                        "       (SELECT MAX(b.total_duration) FROM "+sql_util.sym(temp_table)+" b WHERE b.frame_platform = a.frame_platform AND b.country_tier = a.country_tier AND b.townhall_level = a.townhall_level AND b.spend_bracket = "+sql_util.encode_spend_bracket("a.prev_receipts")+" AND b.event_name = a.event_name AND b.battle_streak_ladder IS NULL) AS most_active_total_duration, " + \
                         "       COUNT(DISTINCT(a.user_id)) AS unique_players " + \
                         "".join((",       SUM(IFNULL(a."+s+",0)) AS "+s+"_total," + \
                                  "       MIN(a."+s+") AS "+s+"_min," + \
@@ -248,7 +274,7 @@ if __name__ == '__main__':
                                  "       AVG(a."+s+") AS "+s+"_avg ") for s in SUMFIELDS) + \
                         "FROM " + sql_util.sym(ladder_pvp_table) + " a " + \
                         "WHERE a.time >= %s AND a.time < %s " + \
-                        "GROUP BY frame_platform, country_tier, townhall_level, spend_bracket, event_name, is_victory ORDER BY NULL",
+                        "GROUP BY frame_platform, country_tier, townhall_level, spend_bracket, event_name ORDER BY NULL",
                         [day_start, day_start, day_start+dt])
 
         finally:
