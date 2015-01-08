@@ -335,7 +335,7 @@ def _generate_showcase_consequent(game_id, event_dirname, data, atom):
             showcase['corner_token_mode'] = 'token_progress'
             showcase['conquest_key'] = 'ai_'+data['event_name']+extra_suffix+'_conquests'
             showcase['achievement_keys'] += ["ai_"+data['event_name']+suffix+"_conquests"] + (["ai_"+data['event_name']+extra_suffix+"_conquests"] if extra_suffix else [])
-            showcase['ui_final_reward_label'] = '%TOKEN STORE REWARDS:'
+            showcase['ui_final_reward_label'] = 'NEW:'
             showcase['plus_store_category'] = 'event_prizes'
         else:
             showcase['show_progress_bar'] = 'small'
