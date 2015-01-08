@@ -1794,6 +1794,7 @@ EVENT_STAGES = {
            #{'ui_name': 'Murderous (wk94 murderous)', 'key': 'murderous1', 'difficulties': ['normal'], 'check_levels': range(0,-1)}, # range(1,12+1), 'attempts':True},
            #{'ui_name': 'Vendetta (wk106 murderous2)', 'key': 'murderous2', 'difficulties': ['normal'], 'check_levels': range(1,12+1), 'attempts':True}, # range(1,12+1), 'attempts':True},
            {'ui_name': 'Murderous (wk125 murderous3)', 'key': 'murderous3', 'difficulties': ['normal'], 'check_levels': range(1,12+1), 'attempts':True}, # range(1,12+1), 'attempts':True},
+           {'ui_name': 'Murderous (wk143,161,179 murderous4)', 'key': 'murderous4', 'difficulties': ['normal'], 'check_levels': range(1,12+1), 'attempts':True}, # range(1,12+1), 'attempts':True},
            #{'ui_name': 'Fanatic (wk111 fanatic)', 'key': 'fanatic', 'difficulties': ['normal'], 'check_levels': range(1,32+1), 'attempts':True}, # range(1,32+1), 'attempts':True},
            {'ui_name': 'Fanatic (wk129 fanatic2)', 'key': 'fanatic2', 'difficulties': ['normal'], 'check_levels': range(1,32+1), 'attempts':True}, # range(1,32+1), 'attempts':True},
            {'ui_name': 'Nomad (wk113 nomad2)', 'key': 'nomad2', 'difficulties': ['normal'], 'check_levels': range(1,32+1), 'attempts':True}, # range(1,32+1), 'attempts':True},
@@ -2011,6 +2012,10 @@ CUSTOM_STAGES = {
     {'name': 'E178B Cutthroat (wk139,157,177): Conquered 2+ hives', 'func': lambda user: user.get('ai_piper4_conquests',0) >= 2 },
     {'name': 'E178C Cutthroat (wk139,157,177): Conquered 5+ hives', 'func': lambda user: user.get('ai_piper4_conquests',0) >= 5 },
     {'name': 'E178D Cutthroat (wk139,157,177): Conquered 10+ hives', 'func': lambda user: user.get('ai_piper4_conquests',0) >= 10 },
+    {'name': 'E179A Murderous (wk143,161,179): Conquered 1+ hive', 'func': lambda user: user.get('ai_murderous4_conquests',0) >= 1 },
+    {'name': 'E179B Murderous (wk143,161,179): Conquered 2+ hives', 'func': lambda user: user.get('ai_murderous4_conquests',0) >= 2 },
+    {'name': 'E179C Murderous (wk143,161,179): Conquered 5+ hives', 'func': lambda user: user.get('ai_murderous4_conquests',0) >= 5 },
+    {'name': 'E179D Murderous (wk143,161,179): Conquered 10+ hives', 'func': lambda user: user.get('ai_murderous4_conquests',0) >= 10 },
     ],
     'bfm': [
     {'name': 'E200A Red Pole (Murdock wk117): Conquered 1+ hive', 'func': lambda user: user.get('ai_redpole1_conquests',0) >= 1 },
