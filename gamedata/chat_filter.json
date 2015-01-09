@@ -5,7 +5,7 @@
     // other characters that are considered the same as a letter,
     // e.g. "o":"0" means that "c0ck" will match with "cock"
     "leet_speak": {
-        "word_space": "\\._\\|-", // can be inserted between any letters, e.g. "_sh.it_"
+        "word_space": "\\._!\\'\\|-", // can be inserted between any letters, e.g. "_sh.it_"
         "a": "4@",
         "i": "1y\\|!",
         "l": "1\\|!",
@@ -28,7 +28,7 @@
         "cunt","cunts",
         "dafaq","dick","dicks","dickhead","dickheads",
         "dong","dongs",
-        "fag","faggot","fuck","fucking","fucked","fucker","fucks","fuc","fck","fuk","fux","firefux",
+        "fag","faggot","fuck","fucking","fucked","fucker","fukker","fuckers","fukkers","fucks","fuc","fck","fuk","fuker","fukers","fux","firefux",
         "gook",
         "kike",
         "mongoloid","motherfucker","motherfuckers",

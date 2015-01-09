@@ -67,6 +67,7 @@ import Scores2
 import CustomerSupport
 import ActivityClassifier
 import ChatChannels
+import ChatFilter
 import ResLoot
 import ResPrice
 from Region import Region
@@ -154,6 +155,7 @@ def is_valid_alliance_descr(name):
     if len(name) > 256: return False
     for c in name:
         if c in descr_disallowed_chars: return False
+    if chat_filter.is_bad(name): return False
     return True
 
 def is_valid_alliance_name(name):
@@ -162,6 +164,7 @@ def is_valid_alliance_name(name):
     for i in xrange(len(name)):
         if (i < 3) and (name[i] not in name_chars_simple): return False
         elif name[i] not in name_chars_ext: return False
+    if chat_filter.is_bad(name): return False
     for word in name.split(' '):
         if word.lower() in gamedata['client']['chat_filter']['bad_words']: return False
     return True
@@ -171,6 +174,7 @@ def is_valid_alliance_tag(tag):
         for i in xrange(len(tag)):
             if tag[i] not in tag_chars_ext:
                 return False
+        if chat_filter.is_bad(tag): return False
         if tag.lower() in gamedata['client']['chat_filter']['bad_words']: return False
     return True
 
@@ -366,8 +370,11 @@ class SQUAD_IDS(object):
 gamedata = None
 gameclient_build_date = None
 
+# cached ChatFilter instance - note: used for alliance name checking, not actually applied to chat (that's client side)
+chat_filter = None
+
 def reload_gamedata():
-    global gamedata, gameclient_build_date
+    global gamedata, gameclient_build_date, chat_filter
     try:
         newdata = SpinJSON.load(open(SpinConfig.gamedata_filename()))
 
@@ -382,8 +389,9 @@ def reload_gamedata():
         newdata['promo_codes'] = SpinConfig.load(SpinConfig.gamedata_component_filename("promo_codes_compiled.json"))
 
         gamedata = newdata
-
         gameclient_build_date = str(open("../gameclient/compiled-client.js.date").read().strip())
+
+        chat_filter = ChatFilter.ChatFilter(gamedata['client']['chat_filter'])
 
     except:
         writefunc = (lambda x: gamesite.exception_log.event(server_time, x)) if gamesite else (lambda x: sys.stderr.write(x+'\n'))
