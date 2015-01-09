@@ -188,6 +188,7 @@
     "INVALID_CHAT_CHANNEL": { "ui_name": "You do not have access to this chat channel" },
     "CHAT_THROTTLED": { "ui_name": "Chat spam detected, please wait %d seconds before sending another message." },
 
+    "NO_GIFTABLE_FRIENDS": { "ui_title": "Send more gifts", "ui_name": "You may send a gift to each friend once per day.\n\nInvite new friends to send more gifts.", "ui_button": "Invite" },
     "CANNOT_REQUEST_UNIT_DONATION_NO_SPACE": { "ui_name": "No space for more reinforcements. Use your existing reinforcements first." },
     "CANNOT_DONATE_UNITS_NO_SPACE": { "ui_name": "Recipient has no space for more reinforcements.\n\nAnother player may have donated units ahead of you, or this request may be too old.\n\nYou have not donated any units." },
     "CANNOT_CREATE_SQUAD_LIMIT_REACHED": { "ui_name": "Maximum number of battalions already created." },
@@ -230,7 +231,7 @@
     "CANNOT_JOIN_ALLIANCE": { "ui_title": "Alliance error", "ui_name": "You cannot join this alliance" },
     "CANNOT_CREATE_ALLIANCE_NAME_BAD": { "ui_title": "Alliance name error", "ui_name": "Names must be between 3 and 24 characters, and may contain only the following letters:\n\nA-Z 0-9 '\n\nThe first three characters of the name must be letters A-Z.\n\nOffensive language is not tolerated." },
     "CANNOT_CREATE_ALLIANCE_TAG_BAD": { "ui_title": "Chat tag error", "ui_name": "Chat tags must be 3 characters, and may contain only the following letters:\n\nA-Z 0-9\n\nOffensive language is not tolerated." },
-    "CANNOT_CREATE_ALLIANCE_DESCR_BAD": { "ui_title": "Alliance description error", "ui_name": "Descriptions must be less than 256 characters, and contain no linebreaks or tabs." },
+    "CANNOT_CREATE_ALLIANCE_DESCR_BAD": { "ui_title": "Alliance description error", "ui_name": "Descriptions must be less than 256 characters, and contain no linebreaks or tabs.\n\nOffensive language is not tolerated." },
     "CANNOT_CREATE_ALLIANCE_CHAT_MOTD_BAD": { "ui_title": "Alliance chat messsage", "ui_name": "Chat welcome messages must be less than 256 characters, and contain no linebreaks or tabs." },
     "CANNOT_CREATE_ALLIANCE_NAME_IN_USE": { "ui_title": "Alliance error", "ui_name": "This name is already taken.\nPlease choose a different name." },
     "CANNOT_CREATE_ALLIANCE_TAG_IN_USE": { "ui_title": "Alliance error", "ui_name": "This chat tag is already taken.\nPlease choose a different chat tag." },

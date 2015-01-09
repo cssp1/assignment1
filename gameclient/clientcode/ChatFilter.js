@@ -4,6 +4,8 @@ goog.provide('ChatFilter');
 // Use of this source code is governed by an MIT-style license that can be
 // found in the LICENSE file.
 
+// crude bad-language filter. Same as ChatFilter.py on the server.
+
 ChatFilter = {
     bad_regex: null,
     init: function(config) {
@@ -19,8 +21,7 @@ ChatFilter = {
 
         for(var i = 0; i < config['bad_words'].length; i++) {
             var word = config['bad_words'][i];
-            var pat = '';
-            pat += word_space;
+            var pat = word_space;
             for(var j = 0; j < word.length; j++) {
                 var c = word.charAt(j);
                 if(c in config['leet_speak']) {

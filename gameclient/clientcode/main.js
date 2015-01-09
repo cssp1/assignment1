@@ -9325,13 +9325,37 @@ function scroll_friend_bar(dialog, page) {
 
             dialog.widgets['gift_button'].show = (!!fbid && player.resource_gifts_enabled());
             if(dialog.widgets['gift_button'].show) {
-                dialog.widgets['gift_button'].onclick = function(w) {
-                    var fbid = w.parent.user_data['fbid'];
-                    change_selection_ui(null);
-                    FBSendRequests.invoke_send_gifts_dialog(fbid);
-                };
-                dialog.widgets['gift_button'].state = dialog.user_data['is_giftable'] ? 'normal' : 'disabled';
-                dialog.widgets['gift_button'].tooltip.str = dialog.user_data['is_giftable'] ? null : dialog.data['widgets']['gift_button']['ui_tooltip_already_sent'];
+                if(dialog.user_data['is_giftable']) {
+                    dialog.widgets['gift_button'].state = 'normal';
+                    dialog.widgets['gift_button'].tooltip.str = null;
+                    dialog.widgets['gift_button'].onclick = function(w) {
+                        var fbid = w.parent.user_data['fbid'];
+                        change_selection_ui(null);
+                        FBSendRequests.invoke_send_gifts_dialog(fbid);
+                    };
+                } else if(player.get_any_abtest_value('ungiftable_fallback_to_invite', gamedata['client']['ungiftable_fallback_to_invite'])) {
+                    dialog.widgets['gift_button'].state = 'normal';
+                    dialog.widgets['gift_button'].tooltip.str = null;
+                    dialog.widgets['gift_button'].onclick = function(w) {
+                        change_selection_ui(null);
+                        // ANY giftable friends?
+                        if(player.get_giftable_friend_info_list().length > 0) {
+                            FBSendRequests.invoke_send_gifts_dialog(null);
+                        } else {
+                            var s = gamedata['errors']['NO_GIFTABLE_FRIENDS'];
+                            invoke_child_message_dialog(s['ui_title'], s['ui_name'],
+                                                        {'dialog': 'message_dialog_big',
+                                                         'ok_button_ui_name': s['ui_button'],
+                                                         'cancel_button': false,
+                                                         'on_ok': function() {
+                                                             invoke_invite_friends_dialog('ungiftable_fallback');
+                                                         }});
+                        }
+                    };
+                } else {
+                    dialog.widgets['gift_button'].state = 'disabled';
+                    dialog.widgets['gift_button'].tooltip.str = dialog.data['widgets']['gift_button']['ui_tooltip_already_sent'];
+                }
             }
 
             dialog.widgets['message_button'].show = (!!fbid && (spin_frame_platform == 'fb'));

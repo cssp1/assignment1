@@ -54,7 +54,7 @@ FBInviteFriends.invoke_fb_invite_friends_dialog_v1 = function(reason) {
              'filters':['app_non_users'],
              'data':'friend_invite',
              'title': viral['ui_title'],
-                 'show_error': !spin_secure_mode
+             'show_error': !spin_secure_mode
             }, cb);
 };
 
