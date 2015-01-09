@@ -2184,6 +2184,8 @@ def check_quests(quests):
         for ART in ('icon',):
             if ART in data:
                 error |= require_art_asset(data[ART], 'quest:'+key+':'+ART)
+        if ('enable_desktop_quest_bar' in gamedata['client']) and ('icon' not in data):
+            error |= 1; print 'quest %s is missing an "icon"' % key
 
         for PRED in ('goal','activation'):
             if check_predicate(data[PRED], reason = 'quest:'+key+':'+PRED):
