@@ -68,7 +68,7 @@ function do_diff_svn {
     (cd "$ROOT" && diff)
 }
 function do_commit_svn {
-    (cd "$ROOT" && svn ci -m $@)
+    (cd "$ROOT" && svn ci -m "$1")
 }
 
 function do_up_git {
@@ -120,7 +120,7 @@ function do_diff_git {
 function do_commit_git {
     for dir in $GIT_DIRS; do
         echo "committing game-${dir}..."
-        (cd $dir && git commit -a -m $@)
+        (cd $dir && git commit -am "$1")
     done
 }
 function do_push_git {
@@ -160,7 +160,7 @@ else
                 do_diff_git $@
                 ;;
             commit)
-                do_commit_git $@
+                do_commit_git "$2"
                 ;;
             push)
                 do_push_git $@
@@ -196,7 +196,7 @@ else
                 do_diff_svn $@
                 ;;
             commit)
-                do_commit_svn $@
+                do_commit_svn "$2"
                 ;;
             *)
                 usage

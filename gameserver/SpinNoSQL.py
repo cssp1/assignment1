@@ -911,12 +911,13 @@ class NoSQLClient (object):
             if maxret > 0:
                 result = result[:maxret]
         else:
+            # XXX do not use this anymore, becausesort({'$natural':1}) forces a full table scan as of MongoDB 2.4.6!
+
             # bad quick randomization - obey maxret
             result = result.sort([('$natural',-1)])
             if maxret > 0:
                 result = result.limit(maxret)
 
-            # shuffle out here, since doing sort({'$natural':1}) forces a full table scan as of MongoDB 2.4.6!
             result = list(result)
             random.shuffle(result)
 
