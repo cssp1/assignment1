@@ -214,6 +214,8 @@ def MetricsLogFilter(child):
                                   #'5120_buy_item', # obsolete - use gamebucks log
 
                                   # thsese can be turned on temporarily for analytics
+                                  '4010_quest_complete',
+                                  '4011_quest_complete_again',
                                   #'5130_item_activated',
                                   #'5131_item_trashed',
                                   #'5140_mail_attachment_collected'

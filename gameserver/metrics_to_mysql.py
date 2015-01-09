@@ -103,7 +103,11 @@ if __name__ == '__main__':
         elif row['event_name'] in ('7530_cross_promo_banner_seen',
                                    '7531_cross_promo_banner_clicked'):
             keyvals.append(('spec',row.get('campaign',None)))
-
+        elif row['event_name'] in ('4010_quest_complete',
+                                   '4011_quest_complete_again'):
+            keyvals.append(('spec',row['quest']))
+            if 'count' in row:
+                keyvals.append(('stack',row['count']))
         elif row['event_name'] == '4701_change_region_success':
             if row.get('reason',None) == 'player_request': # only include player-initiated changes
                 keyvals.append(('spec',row.get('new_region',None))) # stick the new region name in the 'spec' column
