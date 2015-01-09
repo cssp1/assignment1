@@ -2477,6 +2477,7 @@
             "sunken_right2": { "kind": "StaticImage", "xy": [292,80], "dimensions": [76,76], "asset": "dialog_sunken_resizable", "bg_image_resizable": 1 },
             "valentina": { "kind": "StaticImage", "xy": [294,82], "dimensions": [72,72], "asset": "valentina_72x72" },
             "mission_icon": { "show": 0, "kind": "StaticImage", "xy": [305,93], "dimensions": [50,50] },
+            "mission_icon_frame": { "show": 0, "kind": "StaticImage", "xy": [305,93], "dimensions": [50,50], "asset": "inventory_frame" },
 
             "sunken_right3": { "kind": "StaticImage", "xy": [417,256], "dimensions": [264,101], "asset": "dialog_sunken_resizable", "bg_image_resizable": 1 },
 
@@ -5103,10 +5104,10 @@
 
     "chat_frame2": {
         "bg_image": "",
-        "dimensions": [356,350],
+        "dimensions": [340,350],
         "transparent_to_mouse": 0,
         "xy": [0,0], "xy_minimized": [-306,0], "transition_time": 0.33,
-        "console_shift_minimized": 0, "console_shift": 300,
+        "console_shift_minimized": 0, "console_shift": 305,
         "widgets": {
             "bg_frame": { "kind": "StaticImage", "xy": [0,0], "xy_minimized": [-300,0],
                           "dimensions": [336,350],
@@ -7524,6 +7525,33 @@
                        "tooltip_delay": 0 },
             "clock": { "kind": "CooldownClock", "xy": [5,5], "dimensions": [50,50],
                        "array": [1,7], "array_offset": [60,60] }
+        }
+    },
+
+    "quest_bar": {
+        "dimensions": [60,240],
+        "xy": [45,-50], // offset relative to center of left-hand edge of screen
+        "clip_children": 0, "transparent_to_mouse": 1,
+        "widgets": {
+            "bgrect": { "kind":"SolidRect", "xy":[0,0], "dimensions": [60,240], "color":[0.066,0.066,0.066,0.86], "bevel":4 },
+
+            "title": { "kind": "TextField", "xy": [0,4], "dimensions": [60,20], "text_size": 13, "text_style": "normal", "drop_shadow": 1,
+                       "text_hjustify": "center", "ui_name": "Missions", "text_color": [0.8,0.8,0.8,1] },
+
+            "slot": { "kind": "StaticImage", "xy": [5,27], "dimensions": [50,50], "asset": "inventory_slot",
+                      "array": [1,15], "array_offset": [60,60] },
+            "icon": { "kind": "StaticImage", "xy": [5,27], "dimensions": [50,50],
+                      "array": [1,15], "array_offset": [60,60] },
+            "checkmark": { "kind": "StaticImage", "xy": [5,27], "dimensions": [50,50], "asset": "inventory_checkmark",
+                           "pulse_period": 2.0, "pulse_amplitude": 0.7, "pulse_offset": 4,
+                           "array": [1,15], "array_offset": [60,60] },
+            "frame": { "kind": "ActionButton", "xy": [5,27], "dimensions": [50,50], "bg_image": "inventory_frame",
+                       "pulse_period": 4.0, "pulse_amplitude": 0.66, "pulse_offset": 1.5, "state": "normal",
+                       "ui_tooltip": "", "tooltip_delay": 0,
+                       "tooltip_width_ui_instructions": 113, // keep in sync with missions_dialog.widgets.tips width
+                       "tooltip_width_ui_description": 313, // keep in sync with missions_dialog.widgets.description width
+                       "ui_tooltip_available": "Click to accept mission:\n%s", "ui_tooltip_complete": "Click to claim reward for:\n%s",
+                       "array": [1,15], "array_offset": [60,60] }
         }
     },
 

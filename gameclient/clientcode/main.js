@@ -36,6 +36,7 @@ goog.require('SPVideoWidget');
 goog.require('ItemDisplay');
 goog.require('Dripper');
 goog.require('Showcase');
+goog.require('QuestBar');
 goog.require('RegionMap');
 goog.require('RegionMapIndex');
 goog.require('TeamMapAccelerator');
@@ -8973,21 +8974,9 @@ function init_desktop_dialogs() {
             dialog.widgets['resource_bar_fbcredits_icon'].onclick = Store.get_balance_plus_cb();
 
         dialog.widgets['quest_tracker_title'].onclick =
-//      dialog.widgets['quest_tracker_name'].onclick =
             dialog.widgets['quest_tracker_descr'].onclick = function() {
-                invoke_missions_dialog(true);
-                if(player.quest_tracked) {
-                    var dialog = selection.ui;
-                    if(dialog.user_data && dialog.user_data['quest_list']) {
-                        for(var i = 0; i < dialog.user_data['quest_list'].length; i++) {
-                            if(dialog.user_data['quest_list'][i] === player.quest_tracked) {
-                                missions_dialog_select_mission(dialog, i);
-                                break;
-                            }
-                        }
-                    }
-                }
-        };
+                invoke_missions_dialog(true, player.quest_tracked);
+            };
 
     } else { // NOT at home base
 
@@ -9201,6 +9190,10 @@ function init_desktop_dialogs() {
     if(session.home_base && !session.has_attacked) {
         SPUI.root.add(global_chat_frame);
         global_chat_frame.show = (player.tutorial_state === "COMPLETE");
+
+        if(player.tutorial_state === "COMPLETE" && player.get_any_abtest_value('enable_desktop_quest_bar', gamedata['client']['enable_desktop_quest_bar'])) {
+            QuestBar.init();
+        }
     }
 
 }
@@ -10718,9 +10711,11 @@ function get_event_evil_valentina() {
     return props;
 }
 
+function get_console_shift() { return ((global_chat_frame && global_chat_frame.is_visible()) ? global_chat_frame.user_data['console_shift'] : 0); };
+
 // return the current x,y coordinates for the top-left corner of the desktop_top dialog (shifted when chat is maximized)
 function get_shifted_console_position() {
-    var console_shift = ((global_chat_frame && global_chat_frame.is_visible()) ? global_chat_frame.user_data['console_shift'] : 0);
+    var console_shift = get_console_shift();
 
     // center in game window (region to right of console_shift)
     var xy = [0,0];
@@ -10778,9 +10773,7 @@ function update_desktop_dialogs() {
     // process top dialog
     var dialog = desktop_dialogs['desktop_top'];
 
-    // shift console horizontally to make room for chat
-    var console_shift = ((global_chat_frame && global_chat_frame.is_visible()) ? global_chat_frame.user_data['console_shift'] : 0);
-
+    // shift console horizontally to make room for chat and
     // center in game window (region to right of console_shift)
     dialog.xy = get_shifted_console_position();
 
@@ -12497,6 +12490,7 @@ function do_deploy(ji, ids_to_deploy) {
         session.set_attack_finish_time(Math.min(session.attack_finish_time, server_time + gamedata['tutorial_post_deploy_attack_time']));
         advance_tutorial();
     }
+    player.quest_tracked_dirty = true;
 };
 
 /**
@@ -18097,7 +18091,7 @@ function update_region_map(dialog) {
     region_map_finder_update(dialog, 'attacker_finder', dialog.user_data['attacker_finder_state']);
 
     // dynamic resizing, making room for chat
-    var console_shift = ((global_chat_frame && global_chat_frame.is_visible()) ? global_chat_frame.user_data['console_shift'] : 0);
+    var console_shift = get_console_shift();
     dialog.wh = vec_max(vec_floor(vec_scale(0.9, [canvas_width-console_shift, canvas_height])), dialog.data['min_dimensions']);
     dialog.widgets['bg'].wh = dialog.wh;
     dialog.apply_layout();
@@ -28066,6 +28060,8 @@ function update_manufacture_dialog(dialog) {
                                                    true,
                                                    { '%OBJECT_SPRITE': get_leveled_quantity(spec['art_asset'], level)});
                         }
+                        player.quest_tracked_dirty = true;
+
                     }; })(dialog, spec_name);
 
                     // check requirements
@@ -30649,12 +30645,10 @@ function update_research_dialog(dialog) {
     }
 };
 
-function invoke_missions_dialog(do_animation) {
+function invoke_missions_dialog(do_animation, preselect_quest) {
     change_selection(null);
 
     player.update_quest_cache(true);
-
-    //metric_event('4020_open_menu', {'menu_name':'missions_dialog'});
 
     var dialog_data = gamedata['dialogs']['missions_dialog'];
 
@@ -30671,6 +30665,7 @@ function invoke_missions_dialog(do_animation) {
     dialog.user_data['quest_list'] = [];
     dialog.user_data['fb_likes_time'] = -1; // time the Facebook likes_cache was last invalidated
     dialog.user_data['selected_row'] = -1; // index of selected row in UI
+    dialog.user_data['just_completed_row'] = -1; // index of row for previous completed quest in UI
     dialog.user_data['visible_rows'] = dialog.data['widgets']['row']['array'][1]; // # visible rows in UI
     dialog.user_data['first_row'] = 0; // index of top row that appears in UI
     dialog.user_data['context'] = null; // reward inventory item tooltip
@@ -30694,6 +30689,14 @@ function invoke_missions_dialog(do_animation) {
         // start arrow
         player.quest_tracked = gamedata['quests']['reclaim_base'];
         player.quest_tracked_dirty = true;
+    }
+
+    if(preselect_quest) {
+        var idx = goog.array.indexOf(dialog.user_data['quest_list'], preselect_quest);
+        if(idx >= 0) {
+            missions_dialog_scroll(dialog, idx);
+            missions_dialog_select_mission(dialog, idx);
+        }
     }
     return dialog;
 }
@@ -30735,7 +30738,15 @@ function animate_valentina_dialog(dialog) {
         dialog.widgets['scroll_left'].text_color = SPUI.make_colorv(dialog.data['widgets']['scroll_left']['text_color_normal'+(flash?'_flash':'')]);
     }
 
-    // zoom out of valentina
+    // zoom out of quest bar, or valentina
+    if('quest_bar' in desktop_dialogs && dialog.user_data['selected_row'] >= 0 && dialog.user_data['selected_row'] < player.active_quests.length) {
+        // note: coupled to ordering of QuestBar widgets matching player.active_quests
+        var wname = SPUI.get_array_widget_name('icon', desktop_dialogs['quest_bar'].data['widgets']['icon']['array'], [0,dialog.user_data['selected_row']]);
+        if(wname in desktop_dialogs['quest_bar'].widgets) {
+            animate_dialog_zoom_effect(dialog, desktop_dialogs['quest_bar'].widgets[wname]);
+            return;
+        }
+    }
     var bottom = desktop_dialogs['desktop_bottom'];
     var valentina = (bottom ? bottom.widgets['missions_button'] : null);
     animate_dialog_zoom_effect(dialog, valentina);
@@ -30829,7 +30840,11 @@ function update_missions_dialog(dialog) {
         dialog.user_data['quest_list'].push(quest);
 
         // select tracked mission
-        if(pre_select === -1 && quest === player.quest_tracked) {
+        if(pre_select === -1 &&
+           (quest === player.quest_tracked ||
+            (player.get_any_abtest_value('enable_desktop_quest_bar', gamedata['client']['enable_desktop_quest_bar']) &&
+             i === dialog.user_data['just_completed_row'] // same as previous XXXXXX this change is probably safe for all games
+            ))) {
             pre_select = i;
         }
     }
@@ -30912,6 +30927,7 @@ function missions_dialog_select_mission(dialog, row) {
         dialog.widgets['claim_button'].show =
         dialog.widgets['tips_label'].show =
         dialog.widgets['mission_icon'].show =
+        dialog.widgets['mission_icon_frame'].show =
         dialog.widgets['mission_accomplished_bar'].show =
         dialog.widgets['mission_accomplished'].show =
         dialog.widgets['mission_incomplete_bar'].show =
@@ -30974,6 +30990,7 @@ function missions_dialog_select_mission(dialog, row) {
     } else {
         dialog.widgets['mission_icon'].show = false;
     }
+    dialog.widgets['mission_icon_frame'].show = dialog.widgets['mission_icon'].show;
     dialog.widgets['valentina'].show = !dialog.widgets['mission_icon'].show;
 
     dialog.widgets['flavor_title'].text_color = (quest['ui_important'] ? important_color : SPUI.default_text_color);
@@ -40390,6 +40407,7 @@ function handle_server_message(data) {
         var cb = (function (_quest) { return function() {
             var _missions_dialog = find_dialog('missions_dialog');
             if(_missions_dialog) {
+                _missions_dialog.user_data['just_completed_row'] = _missions_dialog.user_data['quest_list'].indexOf(quest);
                 _missions_dialog.user_data['selected_row'] = -1;
                 update_missions_dialog(_missions_dialog);
             }
