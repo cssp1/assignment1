@@ -15756,10 +15756,10 @@ class GAMEAPI(resource.Resource):
 
         new_objects = session.player.give_quest_rewards(quest, session, retmsg)
         if hasattr(quest, 'repeat_interval'):
-            session.increment_player_metric('repeatable_quests_completed', 1)
+            session.increment_player_metric('repeatable_quests_completed', 1, time_series = False)
         else:
-            session.increment_player_metric('quests_completed', 1)
-            session.increment_player_metric('quest:'+questname+':completed', 1)
+            session.increment_player_metric('quests_completed', 1, time_series = False)
+            session.increment_player_metric('quest:'+questname+':completed', 1, time_series = False)
 
         for obj in new_objects:
             session.add_object(obj)
@@ -15781,14 +15781,13 @@ class GAMEAPI(resource.Resource):
         session.user.repopulate_ai_list(retmsg)
 
 
-        if LOTS_OF_METRICS:
-            props = {'mission_id':questname}
+        if gamedata['server'].get('log_quest_completion', False):
+            props = {'quest':quest.name}
             if hasattr(quest, 'repeat_interval'):
-                evname = '4011_mission_complete_repeatable'
-                props['mission_count'] = session.player.completed_quests[quest.name]['count']
+                evname = '4011_quest_complete_again'
+                props['count'] = session.player.completed_quests[quest.name]['count']
             else:
-                evname = '4010_mission_complete'
-
+                evname = '4010_quest_complete'
             metric_event_coded(session.user.user_id, evname, props)
 
     def do_claim_achievement(self, session, retmsg, name):
@@ -16053,7 +16052,16 @@ class GAMEAPI(resource.Resource):
                                                                          'target_chat_name': pcache_get_chat_name(pcache_data),
                                                                          'item_name': ', '.join([format_item(x) for x in loot])
                                                                          })
-                session.increment_player_metric('alliance_gift_items_sent', len(loot), time_series = False)
+            if 'history_key' in spellarg[0]:
+                history_key = spellarg[0]['history_key']
+            elif is_alliance:
+                history_key = 'alliance_gift_items_sent'
+            else:
+                history_key = 'friend_gift_items_sent'
+
+            if history_key:
+                session.increment_player_metric(history_key, len(loot), time_series = False)
+                session.player.send_history_update(retmsg)
 
             if 'event_name' in spellarg[0]:
                 event_name = spellarg[0]['event_name']

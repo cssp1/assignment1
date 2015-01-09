@@ -134,7 +134,7 @@ def get_csv_fields(gamedata):
           "home_region", "quarries_conquered", "hives_destroyed", "hive_kill_points", "hitlist_victories",
           "attacks_launched_vs_human", "revenge_attacks_launched_vs_human",
 
-          "alliances_joined", "units_donated", "donated_units_received", "alliance_gift_items_sent",
+          "alliances_joined", "units_donated", "donated_units_received", "alliance_gift_items_sent", "friend_gift_items_sent",
           "thunder_dome_entered",
           "iron_deposits_collected",
           "chat_messages_sent",
@@ -1613,7 +1613,7 @@ def update_upcache_entry(user_id, driver, entry, time_now, gamedata, user_mtime 
                               "gift_orders_refunded", "gift_orders_received_then_refunded", "gamebucks_refunded_from_received_gift_orders",
                               'gamebucks_spent_on_gift_orders',
                               'items_activated', 'items_looted',
-                              'friendstones_redeemed',
+                              'friendstones_sent', 'friendstones_redeemed',
                               'gifts_received', 'gifts_sent',
                               'birthday_gifts_received',
                               'fish_completed',
