@@ -71,6 +71,37 @@ function do_commit_svn {
     (cd "$ROOT" && svn ci -m "$1")
 }
 
+# synchronize SVN repository with Git repository by pulling in deltas since last sync
+# current sync status is recorded by saving the current Git commit checksum for each sub-repo in git-sync.txt
+function do_git_sync_svn {
+    GITREPO="$2" # path to the root of the git repository we are syncing to
+    COMMITMSG=""
+    for SYNCFILE in `(cd "$ROOT" && find . -name "git-sync.txt" | sort)`; do
+        SUBPATH=`dirname $SYNCFILE`
+        OLDREV=`cat $SYNCFILE`
+        NEWREV=`(cd "$GITREPO/$SUBPATH" && git rev-parse master)`
+        echo -n "Old $OLDREV latest $NEWREV $SUBPATH ..."
+        if [ "$NEWREV" != "$OLDREV" ]; then
+            ((cd "$GITREPO/$SUBPATH" && git diff "$OLDREV..$NEWREV") | (cd "$ROOT/$SUBPATH" && patch -p1)) && \
+                echo $NEWREV > "$SYNCFILE" && \
+                echo " patched!"
+
+        else
+            echo " no changes."
+        fi
+            COMMITMSG+="$SUBPATH: "
+            COMMITMSG+=`(cd "$GITREPO/$SUBPATH" && git log master -n 1 --oneline)` # --no-abbrev-commit
+            COMMITMSG+=$'\n'
+    done
+    if [ "$COMMITMSG" != "" ]; then
+        echo "Commits:"
+        echo "$COMMITMSG"
+    fi
+    if [[ -n `(cd "$ROOT" && svn stat gameclient/clientcode)` ]]; then
+        echo "Client code changed, recompile client!"
+    fi
+}
+
 function do_up_git {
     for dir in $GIT_DIRS; do
         if (cd $dir && git diff --exit-code --quiet); then
@@ -197,6 +228,9 @@ else
                 ;;
             commit)
                 do_commit_svn "$2"
+                ;;
+            git-sync)
+                do_git_sync_svn $@
                 ;;
             *)
                 usage
