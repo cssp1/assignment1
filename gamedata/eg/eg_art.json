@@ -1090,7 +1090,7 @@
         "pushed": { "images": ["art/ui/tr_inventory_elements34.png"],
                     "audio": "art/soundfx/menu_click.$AUDIO_CODEC", "volume": 0.25,
                     "origins": [0,100], "dimensions": [50,50] },
-        "buff": { "images": ["art/ui/tr_inventory_elements34.png"],
+        "buff": { "images": ["art/ui/tr_inventory_elements34.png"], "on_mouseover": "highlight",
                   "audio": "art/soundfx/menu_click.$AUDIO_CODEC", "volume": 0.25,
                   "origins": [0,250], "dimensions": [50,50] },
         "debuff": { "images": ["art/ui/tr_inventory_elements34.png"],
