@@ -3,6 +3,8 @@
 // found in the LICENSE file.
 
 {
+    "tutorial_state": "COMPLETE", // disable the rails tutorial
+
     "iron": 9780,
     "water": 9780,
 
@@ -17,34 +19,25 @@
     // PvP attack protection given to players after completing tutorial
     "protection_time": [[{"predicate": "ALWAYS_TRUE"}, 604800]], // 7 days
 
-    "player_auras": [{"name":"hold_unit_space", "stack":120}], // hold enough space for 4x 30-space machine_gunners (3x from the unlock_machine_gunner mission and 1x from the item activation tutorial)
+    "player_auras": [],
 
     // names of quests already considered to be complete (for A/B testing)
     "completed_quests": ["build_storage", "upgrade_storage_level_2"],
 
-    "buildings": [{"spec":"toc", "xy":[88,90], "hp_ratio": 0.75},
-                  {"spec":"transmitter", "xy":[95,60], "hp_ratio": 0.5},
-                  {"spec":"fuel_yard", "level":1, "xy":[72,90], "hp_ratio": 1},
-                  {"spec":"supply_yard",  "level":1, "xy":[110,75], "hp_ratio": 0.75},
-                  {"spec":"generator", "xy": [123,73], "hp_ratio": 0.75},
-                  {"spec":"barracks", "xy": [96,73], "hp_ratio": 0.75},
-                  {"spec":"supply_depot", "level":2, "xy": [110,64], "hp_ratio": 0.75},
-                  {"spec":"fuel_depot", "level":2, "xy":[72,79], "hp_ratio": 0.75},
-                  {"spec":"warehouse", "level":1, "xy":[82,68], "hp_ratio": 0.75}
+    "buildings": [{"spec":"toc", "xy":[88,90]},
+                  {"spec":"transmitter", "xy":[95,60]},
+                  {"spec":"fuel_yard", "level":1, "xy":[72,90]},
+                  {"spec":"supply_yard",  "level":1, "xy":[110,75]},
+                  {"spec":"generator", "xy": [123,73]},
+                  {"spec":"barracks", "xy": [96,73]},
+                  {"spec":"supply_depot", "level":2, "xy": [110,64]},
+                  {"spec":"fuel_depot", "level":2, "xy":[72,79]},
+                  {"spec":"warehouse", "level":1, "xy":[82,68]}
                  ],
 
-    // NOTE!!! the unit you must click on first during the
-    // tutorial must be defined in tutorial.json under "click_on_rover_action"!!!
-    "units": [{"spec": "stryker", "level": 1, "xy": [90, 106]},
-              {"spec": "rifleman", "level": 1, "xy": [90,117]},
-              {"spec": "rifleman", "level": 1, "xy": [93,117]},
-              {"spec": "rifleman", "level": 1, "xy": [96,117]}
-             ],
-    "barriers": [[66,74],[66,88],[66,72],[76,72],[66,84],[66,82],[66,78],[130,64],[128,64],[68,72],[126,64],[80,56],[82,56],[84,56],[86,56],[132,66],[66,80],[132,68],[132,64],[132,70],[78,56],[76,58],[122,64],[76,60],[76,56],[132,72],[124,64],[66,86],[70,72],[76,66],[66,76],[74,72],[72,72],[76,68]],
+    "units": [], // starting units are now given in the on_visit on the first tutorial AI base attack
 
+    "barriers": [],
 
-    "attacking_units": [{"spec":"rifleman", "xy": [99,87], "hp_ratio": 0.1},
-                        {"spec":"rifleman", "xy": [103,89], "hp_ratio": 0.1},
-                        {"spec":"rifleman", "xy": [107,87], "hp_ratio": 0.1}
-                       ]
+    "attacking_units": []
 }

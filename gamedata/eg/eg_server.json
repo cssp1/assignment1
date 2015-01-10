@@ -295,7 +295,7 @@
 
     "iron_deposits": {
         "interval": 43200, // one iron deposit is added each time this many seconds passes (9.5 hours)
-        "max": 8, // max number of iron deposits that can be present in a base
+        "max": 0, // max number of iron deposits that can be present in a base
         "worth_range": [0.0015, 0.005], // how much iron a deposit contains, as fraction of player's storage capacity [min,max] range
         "gamebucks_chance": 0.20, // chance that a deposit will contain alloys
         "gamebucks_range": [2,3] // number of alloys contained

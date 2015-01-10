@@ -3,14 +3,12 @@
 // found in the LICENSE file.
 
 {
-    // HAND-HOLDING TUTORIAL FOR NEW PLAYERS
+    // THE "RAILS" TUTORIAL DESCRIBED HERE IS NOT USED!
+    // BUT PLEASE KEEP THIS FILE INTACT BECAUSE main.js MAY HAVE HARDCODED REFERENCES TO IT.
 
-    // each "step" is one message or user action
-    // due to the specific and intrusive nature of these steps, most are hard-coded inside the client
-
-    "START": { "kind": "slideshow",
+     "START": { "kind": "slideshow",
                "asset": "tutorial_slideshow0",
-               "ui_description": "XXXXXX skip tutorial.",
+               "ui_description": "Unused tutorial.",
                "bg_fill_color": [1,1,1,1],
                "disable_landscape_clicks": 1,
                "disable_combat": 1,
