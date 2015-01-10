@@ -3,6 +3,5 @@
 // found in the LICENSE file.
 
 {
-    "fb": { "id": "fb", "ui_name": "Facebook" },
-    "kg": { "id": "kg", "ui_name": "Kongregate" }
+    "main": { "id": "main", "ui_name": "Main World" }
 }

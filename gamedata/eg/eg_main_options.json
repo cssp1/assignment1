@@ -1,4 +1,9 @@
+// Copyright (c) 2014 SpinPunch. All rights reserved.
+// Use of this source code is governed by an MIT-style license that can be
+// found in the LICENSE file.
+
 // misc options that are set at the toplevel of gamedata
+
 "game_id": "eg",
 
 "public_s3_bucket": "XXXXXX", // Amazon S3 bucket used for some external assets like anon_portrait.jpg
@@ -82,7 +87,7 @@
 
 "reward_units_by_mail": 1, // send reward units via in-game message rather than just spawning them immediately (can be overridden in A/B test
 
-"enable_unit_donation": 1,
+"enable_unit_donation": 0,
 "donated_units_take_space": 0, // whether donated units eat into your normal attack space limit
 
 "enable_harvest_all": 1, // whether to enable "Collect All" feature on Harvesters (NOTE: harvesting from quarries requires this to be ON!)
@@ -104,9 +109,6 @@
 
 "unit_repair_refund_on_cancel": false, // whether or not to refund iron/water when a unit repair is cancelled
 "unit_repair_refund_on_paid_repair": true, // whether or not to refund iron/water on queued repairs when a paid repair is made
-// Copyright (c) 2014 SpinPunch. All rights reserved.
-// Use of this source code is governed by an MIT-style license that can be
-// found in the LICENSE file.
 
 // default AI state for units when you put them on patrol
 // AI_ATTACK_MOVE = don't go outside of weapon range to pursue targets, AI_ATTACK_MOVE_AGGRO = do go outside weapon range
@@ -124,8 +126,7 @@
 "show_armor_in_ui": false, // whether or not to show unit Armor values in UI
 
 // always prefer PvE for the moment
-"map_dialog_default_page": [[{"predicate":"PLAYER_HISTORY", "key": "toc_level", "method": ">=", "value": 5},"computers"],
-                            [{"predicate":"ALWAYS_TRUE"},"computers"]],
+"map_dialog_default_page": "computers",
 
 "enable_power": 1,
 "enable_quarries": 1,
@@ -134,10 +135,7 @@
 "enable_region_map": 1,
 "enable_transmitter": 1,
 
-"continent_assignment": [
-    [{"predicate": "FRAME_PLATFORM", "platform": "kg"}, "kg"],
-    [{"predicate": "ALWAYS_TRUE"}, "fb"]
-],
+"continent_assignment": "main",
 
 // fraction of contained resources that the attacker takes when looting a building
 "loot_attacker_gains": 0.40,

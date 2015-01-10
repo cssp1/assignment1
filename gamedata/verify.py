@@ -1192,6 +1192,10 @@ def check_loot_table(table, reason = '', expire_time = -1, duration = -1, max_sl
             print '%s: bad loot table entry - missing "spec", "multi", "cond", "table", or "nothing": %s' % (reason, repr(entry))
     return error
 
+def check_cond_or_literal(chain, reason = ''):
+    if type(chain) is list:
+        return check_cond_chain(chain, reason=reason)
+    return 0
 def check_cond_chain(chain, reason = ''):
     error = 0
     for pred, val in chain:
@@ -2875,17 +2879,21 @@ def main(args):
     for name, data in gamedata['continents'].iteritems():
         error |= check_continent(name, data)
 
-    error |= check_cond_chain(gamedata['global_chat_channel_assignment'], reason = 'global_chat_channel_assignment')
+    error |= check_cond_or_literal(gamedata['global_chat_channel_assignment'], reason = 'global_chat_channel_assignment')
     if type(gamedata['strings']['footer_linkbar_content']) is list:
         error |= check_cond_chain(gamedata['strings']['footer_linkbar_content'], reason = 'strings.footer_linkbar_content')
-    error |= check_cond_chain(gamedata['continent_assignment'], reason = 'continent_assignment')
+    error |= check_cond_or_literal(gamedata['continent_assignment'], reason = 'continent_assignment')
     if type(gamedata['store']['payments_api']) is list:
         error |= check_cond_chain(gamedata['store']['payments_api'], reason = 'store.payments_api')
 
     for name, data in gamedata['strings']['idle_buildings'].iteritems():
         error |= require_art_asset(data['icon'], 'strings:idle_buildings:'+name+':icon')
 
-    for pred, val in gamedata['continent_assignment']:
+    if type(gamedata['continent_assignment']) is list:
+        continent_list = [val for pred, val in gamedata['continent_assignment']]
+    else:
+        continent_list = [gamedata['continent_assignment']]
+    for val in continent_list:
         if val not in gamedata['continents']:
             error |= 1; print 'continent_assignment value %s is not a valid continent_id' % val
 
