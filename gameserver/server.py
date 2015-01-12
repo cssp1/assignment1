@@ -3763,7 +3763,7 @@ class Session(object):
                 if self.has_object(obj.obj_id):
                     retmsg.append(["OBJECT_STATE_UPDATE2", obj.serialize_state()])
 
-        gamesite.gameapi.power_changed(self, retmsg)
+        gamesite.gameapi.power_changed(self, self.viewing_base, None, retmsg)
 
     # send any one-time ad network events whose predicates have become true
     def adnetworks(self):
@@ -5334,7 +5334,7 @@ class Building(GameObject):
     def update_repair(self):
         # ONLY update hitpoints for client battle purposes
         # do NOT actually set repair_finish_time=-1, let the client trigger that with PING_OBJECT
-        # because it needs to go through the power_changed() path etc.
+        # because it needs to go through the power_changed path etc.
         if self.repair_finish_time > 0:
             # bump hp up to what it should be after the elapsed time
             percent_unrepaired = float(self.repair_finish_time - server_time) / self.get_leveled_quantity(self.spec.repair_time)
@@ -16213,7 +16213,7 @@ class GAMEAPI(resource.Resource):
                 if do_buildings and object.is_building() and object.is_damaged():
                     object.repair_finish_time = server_time - 1
                     self.ping_object(session, retmsg, object.obj_id, session.viewing_base)
-                    if (object.spec.provides_power and object.get_leveled_quantity(object.spec.provides_power) > 0):
+                    if object.spec.provides_power or object.spec.consumes_power:
                         recalc_power = True
                 elif do_units and object.is_mobile() and session.player.can_repair_unit(object): # and object.is_damaged():
                     # do this unconditionally, because object combat upates showing damage might be in-flight
@@ -16244,7 +16244,7 @@ class GAMEAPI(resource.Resource):
 
             session.player.unit_repair_send(retmsg)
             if recalc_power:
-                self.power_changed(session, retmsg)
+                self.power_changed(session, session.viewing_base, None, retmsg)
         else:
             raise Exception('unknown spell '+spellname)
 
@@ -16508,7 +16508,7 @@ class GAMEAPI(resource.Resource):
 
             # if the action had any possible impact on power generation, then re-initialize harvesters
             if did_a_repair or did_finish_construction or did_an_upgrade:
-                self.power_changed(session, retmsg)
+                self.power_changed(session, session.viewing_base, object, retmsg)
                 session.deferred_ladder_point_decay_check = True
 
             if did_finish_construction or did_an_upgrade:
@@ -16571,10 +16571,11 @@ class GAMEAPI(resource.Resource):
         refund = session.player.resources.gain_res(refund, reason='canceled_upgrade')
         admin_stats.econ_flow_res(session.player, 'investment', 'buildings', refund)
 
-        # note: this also handles re-starting resource production for harvesters
-        self.power_changed(session, retmsg)
+        power_factor = self.power_changed(session, session.viewing_base, object, retmsg)
 
-        # (may be unnecessary if power_change sends the update)
+        if object.is_producer(): # re-start harvester
+            object.update_production(object.owner, session.viewing_base.base_type, session.viewing_base.base_region, power_factor)
+
         retmsg.append(["OBJECT_STATE_UPDATE", object.serialize_state(), session.player.resources.calc_snapshot().serialize()])
 
     def do_upgrade(self, session, retmsg, object):
@@ -16635,8 +16636,7 @@ class GAMEAPI(resource.Resource):
         retmsg.append(["OBJECT_STATE_UPDATE", object.serialize_state(), session.player.resources.calc_snapshot().serialize()])
 
         # re-evaluate power situation
-        if GameObjectSpec.get_leveled_quantity(object.spec.provides_power, 0):
-            self.power_changed(session, retmsg)
+        self.power_changed(session, session.viewing_base, object, retmsg)
 
         if build_time < 1:
             self.ping_object(session, retmsg, object.obj_id, session.viewing_base)
@@ -16676,7 +16676,7 @@ class GAMEAPI(resource.Resource):
 
         object.change_level(object.level+1)
 
-        self.power_changed(session, retmsg)
+        self.power_changed(session, session.viewing_base, object, retmsg)
 
         if object.spec.provides_inventory:
             session.player.send_inventory_update(retmsg)
@@ -17295,8 +17295,7 @@ class GAMEAPI(resource.Resource):
         retmsg.append(["PLAYER_STATE_UPDATE", session.player.resources.calc_snapshot().serialize()])
 
         # re-evaluate power situation
-        if (consumes_power > 0) or (GameObjectSpec.get_leveled_quantity(spec.provides_power, 1)):
-            self.power_changed(session, retmsg)
+        self.power_changed(session, session.viewing_base, newobj, retmsg)
 
         if build_time < 1 and spec.kind != 'inert':
             self.ping_object(session, retmsg, newobj.obj_id, session.viewing_base)
@@ -18710,16 +18709,24 @@ class GAMEAPI(resource.Resource):
 
     # call this after any action that may change the player's power production or consumption
     # it re-initializes harvesters with the correct harvesting rate
-    def power_changed(self, session, retmsg):
-        power_state = session.viewing_base.get_power_state()
+    def power_changed(self, session, base, changed_object, retmsg):
+        if not gamedata['enable_power']: return 1
+        if changed_object and (not (changed_object.spec.consumes_power or changed_object.spec.provides_power)): return 1
+
+        power_state = base.get_power_state()
         power_factor = compute_power_factor(power_state)
 
-        for obj in session.viewing_base.iter_objects():
+        for obj in base.iter_objects():
             if obj.is_building() and obj.is_producer():
-                obj.update_production(obj.owner, session.viewing_base.base_type, session.viewing_base.base_region, power_factor)
-                retmsg.append(["OBJECT_STATE_UPDATE2", obj.serialize_state(update_hp = False)])
+                obj.update_production(obj.owner, base.base_type, base.base_region, power_factor)
+                base.nosql_write_one(obj, 'power_changed')
+                if session.has_object(obj.obj_id):
+                    retmsg.append(["OBJECT_STATE_UPDATE2", obj.serialize_state(update_hp = False)])
 
-        retmsg.append(["BASE_POWER_UPDATE", power_state])
+        if base is session.viewing_base:
+            retmsg.append(["BASE_POWER_UPDATE", power_state])
+
+        return power_factor
 
     def object_combat_updates(self, session, retmsg, arg):
         # update hitpoints and (for mobile units only) XY position and movement orders
@@ -18953,8 +18960,7 @@ class GAMEAPI(resource.Resource):
 
                 obj.hp = newhp
 
-                if (obj.spec.consumes_power and obj.get_leveled_quantity(obj.spec.consumes_power) > 0) or \
-                   (obj.spec.provides_power and obj.get_leveled_quantity(obj.spec.provides_power) > 0):
+                if obj.spec.consumes_power or obj.spec.provides_power:
                     recalc_power = True
 
                 # client initiated the damage - do not send OBJECT_STATE_UPDATE
@@ -18998,7 +19004,7 @@ class GAMEAPI(resource.Resource):
         # record state changes to affected players
         if recalc_power:
             # note: this sends OBJECT_STATE_UPDATE for harvesters as well as BASE_POWER_UPDATE
-            self.power_changed(session, retmsg)
+            self.power_changed(session, session.viewing_base, None, retmsg)
 
         if recalc_resources:
             start_time = time.time()
@@ -21162,10 +21168,8 @@ class GAMEAPI(resource.Resource):
                     obj.owner.unit_repair_cancel(obj)
                 if obj in session.player.home_base_iter():
                     session.player.home_base_remove(obj)
-                if obj.is_building() and \
-                   ((obj.spec.provides_power and obj.get_leveled_quantity(obj.spec.provides_power) > 0) or \
-                    (obj.spec.consumes_power and obj.get_leveled_quantity(obj.spec.consumes_power) > 0)):
-                    self.power_changed(session, retmsg)
+                if obj.is_building() and (obj.spec.provides_power or obj.spec.consumes_power):
+                    self.power_changed(session, session.viewing_base, obj, retmsg)
                 retmsg.append(["PLAYER_STATE_UPDATE", session.player.resources.calc_snapshot().serialize()])
 
         elif arg[0] == "RECYCLE_UNIT":
