@@ -1158,7 +1158,7 @@
             "resource_foreman_icon": { "kind": "StaticImage", "xy": [648,255], "dimensions": [21,21], "asset": "resource_icon_foreman" },
             "resource_foreman_amount": { "kind": "TextField", "xy": [668,255], "dimensions": [84,21],
                                          "text_size": 11, "text_style": "thick",
-                                         "ui_tooltip": "Builders (Available/Total)", "tooltip_delay": 0,
+                                         "ui_tooltip": "Builders (Busy/Total)", "tooltip_delay": 0,
                                          "fixed_tooltip_offset": [570, 210] },
 
             "robots_button": { "kind": "ActionButton", "xy": [522,218], "dimensions": [74,27], "bg_image": "menu_button_74x27px",

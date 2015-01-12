@@ -11172,11 +11172,11 @@ function update_desktop_dialogs() {
 
             dialog.widgets['resource_foreman_amount'].show = dialog.widgets['resource_foreman_icon'].show = gamedata['enable_multiple_foremen'];
             if(gamedata['enable_multiple_foremen']) {
-                var available_foremen = player.stattab['total_foremen'] - player.foremen_in_use();
+                var in_use = player.foremen_in_use();
 
-                dialog.widgets['resource_foreman_amount'].str = pretty_print_number(available_foremen) + ' / ' + pretty_print_number(player.stattab['total_foremen']);
+                dialog.widgets['resource_foreman_amount'].str = pretty_print_number(in_use) + ' / ' + pretty_print_number(player.stattab['total_foremen']);
 
-                if(available_foremen <= 0) {
+                if(in_use >= player.stattab['total_foremen']) {
                     dialog.widgets['resource_foreman_amount'].text_color = SPUI.error_text_color;
                 } else {
                     dialog.widgets['resource_foreman_amount'].text_color = SPUI.default_text_color;
