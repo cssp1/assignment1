@@ -295,6 +295,16 @@ class QuestCompletedPredicate(Predicate):
         else:
             return (self.quest_name in player.completed_quests)
 
+    def is_satisfied(self, player, qdata): # XXXXXX remove when safe
+        target_quest = player.get_abtest_quest(self.quest_name)
+        # new skip_quest_claim behavior - don't require quest to have been claimed
+        # (if this becomes a performance problem, may need to cache the player's satisfied quests)
+        if (not self.must_claim) and (not target_quest.force_claim):
+            if target_quest.activation and (not target_quest.activation.is_satisfied(player, qdata)): return False
+            return target_quest.goal.is_satisfied(player, qdata)
+        else:
+            return (self.quest_name in player.completed_quests)
+
 class AuraActivePredicate(Predicate):
     def __init__(self, data):
         Predicate.__init__(self, data)
@@ -523,7 +533,9 @@ class LibraryPredicate(Predicate):
     def __init__(self, data):
         Predicate.__init__(self, data)
         self.name = data['name']
-    def is_satisfied(self, player, qdata):
+    def is_satisfied2(self, session, player, qdata):
+        return read_predicate(player.get_abtest_predicate(self.name)).is_satisfied2(session, player, qdata)
+    def is_satisfied(self, player, qdata): # XXXXXX remove when safe
         return read_predicate(player.get_abtest_predicate(self.name)).is_satisfied(player, qdata)
 
 class AIBaseActivePredicate(Predicate):

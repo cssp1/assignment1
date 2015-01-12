@@ -10706,7 +10706,7 @@ class LivePlayer(Player):
                 for mail in to_remove:
                     self.mailbox.remove(mail)
 
-        self.send_inventory_intro_mail(None)
+        self.send_inventory_intro_mail(session, None)
         self.reseed_lottery(force = False)
 
         # publish any modified scores
@@ -10769,14 +10769,14 @@ class LivePlayer(Player):
         randgen = random.Random(self.lottery_seed)
         return [session.get_loot_items(self, tab, -1, -1, rand_func = randgen.random) for tab in slot_tables]
 
-    def send_inventory_intro_mail(self, retmsg):
+    def send_inventory_intro_mail(self, session, retmsg):
         # retmsg will be None if called from migrate() on load
 
         sent = False
 
         if self.tutorial_state == "COMPLETE" and \
            self.get_any_abtest_value('enable_inventory', gamedata['enable_inventory']) and \
-           Predicates.read_predicate({'predicate':'LIBRARY', 'name': 'send_inventory_intro_mail_when'}).is_satisfied(self, None):
+           Predicates.read_predicate({'predicate':'LIBRARY', 'name': 'send_inventory_intro_mail_when'}).is_satisfied2(session, self, None):
 
             if (self.history.get('inventory_intro_mail_sent', 0) < 2):
                 self.history['inventory_intro_mail_sent'] = 2
@@ -10786,7 +10786,7 @@ class LivePlayer(Player):
 
             if (not self.history.get('free_transmitter_given', False)) and self.get_any_abtest_value('give_free_transmitter', False):
                 transmitter_spec = self.get_abtest_spec(GameObjectSpec, 'transmitter')
-                if GameObjectSpec.get_leveled_quantity(transmitter_spec.requires,1).is_satisfied(self, None):
+                if GameObjectSpec.get_leveled_quantity(transmitter_spec.requires,1).is_satisfied2(session, self, None):
                     self.history['free_transmitter_given'] = 1
                     self.mailbox_append(self.make_system_mail(gamedata['strings']['free_transmitter_mail']))
                     sent = True
@@ -15795,7 +15795,7 @@ class GAMEAPI(resource.Resource):
 
         # special case - if it's the quest that finishes the extended tutorial, send mail
         # must come BEFORE COMPLETED_QUEST, because otherwise the new mail/history state will not be set up before player.update_quest_cache()
-        session.player.send_inventory_intro_mail(retmsg)
+        session.player.send_inventory_intro_mail(session, retmsg)
 
         retmsg.append(["COMPLETED_QUEST", quest.name, qdata])
 
@@ -16499,7 +16499,7 @@ class GAMEAPI(resource.Resource):
 
                 if object.spec.name in (gamedata['townhall'], gamedata['inventory_building']):
                     # check if this triggered the inventory intro mail
-                    session.player.send_inventory_intro_mail(retmsg)
+                    session.player.send_inventory_intro_mail(session, retmsg)
 
                 if object.spec.name == gamedata['townhall']:
                     # may have triggered adnetwork events
@@ -16804,7 +16804,7 @@ class GAMEAPI(resource.Resource):
 
         if object.spec.name == gamedata['townhall']:
             # check if this triggered the inventory intro mail
-            session.player.send_inventory_intro_mail(retmsg)
+            session.player.send_inventory_intro_mail(session, retmsg)
             # check for new ad network events
             session.send_adnetwork_events(retmsg)
 
