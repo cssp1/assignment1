@@ -17459,40 +17459,52 @@ class GAMEAPI(resource.Resource):
         else:
             raise Exception('base not in session: '+base_id)
 
-        affected = False
         squad_to_repair = session.player.which_squad_is_under_repair() or SQUAD_IDS.BASE_DEFENDERS
         units_to_repair = [] # list units separately so we can sort them by time
         unit_repair_cost = dict([(res,0) for res in gamedata['resources']])
 
-        for object in base.iter_objects():
-            if object.owner is not session.player: continue
-            if object.is_building() and object.is_damaged():
-                if (not object.is_repairing()):
-                    health = float(object.hp) / float(object.max_hp)
-                    health = max(0.0, min(health, 1.0))
-                    repair_time = max(1, int((1.0-health)*object.get_leveled_quantity(object.spec.repair_time)))
-                    object.repair_finish_time = server_time + repair_time
-                    object.disarmed = True
-                    if session.has_object(object.obj_id) and (retmsg is not None):
-                        retmsg.append(["OBJECT_STATE_UPDATE2", object.serialize_state()])
-                    affected = True
-                else: # check for completed repairs
-                    if retmsg is not None: # but not on logout/non-interactive paths
-                        if server_time >= object.repair_finish_time:
-                            self.do_ping_object(session, retmsg, object, base)
-                            affected = True
-            if do_units and object.is_mobile():
-                if object.is_damaged() and session.player.can_repair_unit(object) and \
-                   ((object.squad_id or 0) == squad_to_repair) and \
-                   (not session.player.unit_repair_queued(object)):
-                    units_to_repair.append(object)
-                    my_cost = object.cost_to_repair(session.player)
-                    for res in gamedata['resources']:
-                        unit_repair_cost[res] += my_cost.get(res,0)
+        if write_base and session.viewing_base_lock != base.lock_id():
+            # not going to hold it for an extended period of time, so no need to broadcast
+            if gamesite.nosql_client.map_feature_lock_acquire(base.base_region, base.base_id, session.player.user_id,
+                                                                  generation=base.base_generation, do_hook=False, reason='do_start_repairs') \
+                                                                  != Player.LockState.being_attacked: # generation=-1?
+                retmsg.append(["ERROR", "CANNOT_LOCK_QUARRY", base.base_ui_name])
+                return False
+
+        try:
+            for object in base.iter_objects():
+                if object.owner is not session.player: continue
+                if object.is_building() and object.is_damaged():
+                    if (not object.is_repairing()):
+                        health = float(object.hp) / float(object.max_hp)
+                        health = max(0.0, min(health, 1.0))
+                        repair_time = max(1, int((1.0-health)*object.get_leveled_quantity(object.spec.repair_time)))
+                        object.repair_finish_time = server_time + repair_time
+                        object.disarmed = True
+                        if session.has_object(object.obj_id) and (retmsg is not None):
+                            retmsg.append(["OBJECT_STATE_UPDATE2", object.serialize_state()])
+                        if write_base:
+                            base.nosql_write_one(object, 'do_start_repairs')
+                    else: # check for completed repairs
+                        if retmsg is not None: # but not on logout/non-interactive paths
+                            if server_time >= object.repair_finish_time:
+                                self.do_ping_object(session, retmsg, object, base)
+                                if write_base:
+                                    base.nosql_write_one(object, 'do_start_repairs')
+                if do_units and object.is_mobile():
+                    if object.is_damaged() and session.player.can_repair_unit(object) and \
+                       ((object.squad_id or 0) == squad_to_repair) and \
+                       (not session.player.unit_repair_queued(object)):
+                        units_to_repair.append(object)
+                        my_cost = object.cost_to_repair(session.player)
+                        for res in gamedata['resources']:
+                            unit_repair_cost[res] += my_cost.get(res,0)
+        finally:
+            if write_base and session.viewing_base_lock != base.lock_id():
+                gamesite.nosql_client.map_feature_lock_release(base.base_region, base.base_id, session.player.user_id, generation=base.base_generation, reason='do_start_repairs')
 
         if units_to_repair:
             assert retmsg is not None # units must be repaired interactively because they cost resources
-            affected = True
             units_to_repair.sort(key = lambda obj: obj.time_to_repair(session.player))
             error = None
 
@@ -17523,9 +17535,6 @@ class GAMEAPI(resource.Resource):
             session.player.unit_repair_integrity_check()
             session.player.unit_repair_send(retmsg)
             retmsg.append(["PLAYER_STATE_UPDATE", session.player.resources.calc_snapshot().serialize()])
-
-        if affected and write_base:
-            self.mutate_quarry(session, retmsg, lambda x: None, base, 'start_repair')
 
         return False
 
