@@ -285,13 +285,13 @@ class QuestCompletedPredicate(Predicate):
         Predicate.__init__(self, data)
         self.quest_name = data['quest_name']
         self.must_claim = bool(data.get('must_claim', False))
-    def is_satisfied(self, player, qdata):
+    def is_satisfied2(self, session, player, qdata):
         target_quest = player.get_abtest_quest(self.quest_name)
         # new skip_quest_claim behavior - don't require quest to have been claimed
         # (if this becomes a performance problem, may need to cache the player's satisfied quests)
         if (not self.must_claim) and (not target_quest.force_claim):
-            if target_quest.activation and (not target_quest.activation.is_satisfied(player, None)): return False
-            return target_quest.goal.is_satisfied(player, None)
+            if target_quest.activation and (not target_quest.activation.is_satisfied2(session, player, qdata)): return False
+            return target_quest.goal.is_satisfied2(session, player, qdata)
         else:
             return (self.quest_name in player.completed_quests)
 
