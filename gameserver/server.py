@@ -16638,7 +16638,7 @@ class GAMEAPI(resource.Resource):
         object.upgrade_done_time = -1
 
         refund = session.player.resources.gain_res(refund, reason='canceled_upgrade')
-        admin_stats.econ_flow_res(session.player, 'investment', 'buildings', refund)
+        admin_stats.econ_flow_res(session.player, 'investment', 'buildings', refund, spec = object.spec.name, level = object.level+1)
 
         power_factor = self.power_changed(session, session.viewing_base, object, retmsg)
 
@@ -16899,7 +16899,7 @@ class GAMEAPI(resource.Resource):
         object.research_done_time = -1
 
         refund = session.player.resources.gain_res(refund, reason='canceled_research')
-        admin_stats.econ_flow_res(session.player, 'investment', 'research', refund)
+        admin_stats.econ_flow_res(session.player, 'investment', 'research', refund, spec = tech_name, level = current+1)
 
         retmsg.append(["OBJECT_STATE_UPDATE", object.serialize_state(), session.player.resources.calc_snapshot().serialize()])
 
