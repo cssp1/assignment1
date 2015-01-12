@@ -2591,7 +2591,7 @@ class BaseTable:
         # ideally, if all server code correctly updates objects as they mutate, no I/O should be necessary here
         base.nosql_pluck('BaseTable:unparse(XXXunnecessary:%s)' % str(reason))
         base.nosql_plant('BaseTable:unparse(XXXunnecessary:%s)' % str(reason))
-        reactor.callLater(0.01, cb)
+        if cb: reactor.callLater(0.01, cb)
 
     def unparse(self, base):
         start_time = time.time()
@@ -13145,14 +13145,7 @@ class Store:
             if not session.player.unit_speedups_enabled():
                 do_units = False
 
-            for object in base.iter_objects():
-                if object.is_building() and object.is_damaged():
-                    object.repair_finish_time = server_time - 1
-                    if session.has_object(object.obj_id):
-                        gameapi.ping_object(session, retmsg, object.obj_id, base)
-
             if do_units:
-
                 detail_props['unit_cost'] = cls.get_unit_cost_detail(session, session.player, damaged_obj_list = [object for object in session.player.home_base_iter() if object.is_mobile() and object.is_damaged() and session.player.can_repair_unit(object)])
 
                 # kill the entire repair queue (refunding resources for repairs already queued, because client may have sent REPAIR first)
@@ -13171,16 +13164,31 @@ class Store:
 
                 retmsg.append(["PLAYER_STATE_UPDATE", session.player.resources.calc_snapshot().serialize()])
 
+            # now handle base buildings
+
+            if write_base and session.viewing_base_lock != base.lock_id():
+                # not going to hold it for an extended period of time, so no need to broadcast
+                assert gamesite.nosql_client.map_feature_lock_acquire(base.base_region, base.base_id, session.player.user_id,
+                                                                      generation=base.base_generation, do_hook=False, reason=spellname) \
+                                                                      == Player.LockState.being_attacked # generation=-1?
+            try:
+                for object in base.iter_objects():
+                    if object.is_building() and object.is_damaged():
+                        object.repair_finish_time = server_time - 1
+                        if session.has_object(object.obj_id):
+                            gameapi.ping_object(session, retmsg, object.obj_id, base)
+                        if write_base:
+                            base.nosql_write_one(object, spellname)
+
+            finally:
+                if write_base and session.viewing_base_lock != base.lock_id():
+                    gamesite.nosql_client.map_feature_lock_release(base.base_region, base.base_id, session.player.user_id, generation=base.base_generation, reason=spellname)
+
             metric_event_coded(session.user.user_id, '5060_purchase_base_repair', {'currency': currency,
                                                                                    'base_id': spellarg,
                                                                                    record_price_type: amount_willing_to_pay})
             session.increment_player_metric('base_repairs_purchased', 1)
             session.increment_player_metric(record_spend_type+'_spent_on_base_repairs', record_amount)
-
-            if write_base:
-                # NOTE: this fires an asynchronous store, but does not hold up the credit transaction, because the 'request'
-                # here might be a CREDITAPI request, not a GAMEAPI request!
-                gameapi.mutate_quarry(None, session, retmsg, lambda x: None, base, 'repair_all_for_money', None)
 
         elif spellname == "UPGRADE_FOR_MONEY":
             object = session.get_object(unit_id)
@@ -17517,7 +17525,7 @@ class GAMEAPI(resource.Resource):
             retmsg.append(["PLAYER_STATE_UPDATE", session.player.resources.calc_snapshot().serialize()])
 
         if affected and write_base:
-            return self.mutate_quarry(request, session, retmsg, lambda x: None, base, 'start_repair', None)
+            self.mutate_quarry(session, retmsg, lambda x: None, base, 'start_repair')
 
         return False
 
@@ -19293,34 +19301,24 @@ class GAMEAPI(resource.Resource):
             session.viewing_base.drop_object(object)
 
     # grab lock, mutate quarry state, async write, release lock.
-    def mutate_quarry(self, request, session, retmsg, func, base, reason, chain_cb, deferred = False):
+    # returns False on lock failure, True on success
+    def mutate_quarry(self, session, retmsg, func, base, reason):
         if session.viewing_base_lock != base.lock_id():
             # not going to hold it for an extended period of time, so no need to broadcast
-            if gamesite.nosql_client.map_feature_lock_acquire(base.base_region, base.base_id, session.player.user_id, generation=base.base_generation, do_hook = False, reason='mutate_quarry') != Player.LockState.being_attacked: # generation=-1?
+            if gamesite.nosql_client.map_feature_lock_acquire(base.base_region, base.base_id, session.player.user_id,
+                                                              generation=base.base_generation, do_hook=False, reason='mutate_quarry') != Player.LockState.being_attacked: # generation=-1?
                 retmsg.append(["ERROR", "CANNOT_LOCK_QUARRY", base.base_ui_name])
-                if chain_cb:
-                    return chain_cb(False)
-                elif deferred and request:
-                    self.complete_deferred_request(request, session, retmsg)
                 return False
 
         try:
             func(base)
-        except:
+            base_table.store_async(base, None, True, reason) # note: actually synchronous
+            return True
+        finally:
             if session.viewing_base_lock != base.lock_id():
-                gamesite.nosql_client.map_feature_lock_release(base.base_region, base.base_id, session.player.user_id, generation=base.base_generation)
-            raise
+                gamesite.nosql_client.map_feature_lock_release(base.base_region, base.base_id, session.player.user_id, generation=base.base_generation, reason='mutate_quarry')
 
-        # asynchronous write
-        def finish_cb(self, request, session, retmsg, base, chain_cb):
-            if session.viewing_base_lock != base.lock_id():
-                gamesite.nosql_client.map_feature_lock_release(base.base_region, base.base_id, session.player.user_id, generation=base.base_generation)
-            if chain_cb:
-                chain_cb(True)
-            elif request:
-                self.complete_deferred_request(request, session, retmsg)
-        base_table.store_async(base, functools.partial(finish_cb, self, request, session, retmsg, base, chain_cb), True, reason)
-        return True
+        return False # shouldn't get here
 
     # outermost wrapper - perform HTTP request processing
     def render_POST(self, request):
@@ -21280,8 +21278,8 @@ class GAMEAPI(resource.Resource):
                     self.complete_deferred_request(request, session, retmsg)
                 return async
 
-            return self.mutate_quarry(request, session, retmsg, functools.partial(func, session.player.user_id), session.viewing_base, 'quarry_abandon',
-                                      functools.partial(chain_cb, self, request, session, retmsg))
+            success = self.mutate_quarry(session, retmsg, functools.partial(func, session.player.user_id), session.viewing_base, 'quarry_abandon')
+            chain_cb(self, request, session, retmsg, success)
 
         elif arg[0] == "QUARRY_QUERY":
             tag = arg[1]
