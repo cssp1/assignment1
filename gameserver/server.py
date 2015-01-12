@@ -19292,23 +19292,6 @@ class GAMEAPI(resource.Resource):
         else:
             session.viewing_base.drop_object(object)
 
-    def load_and_mutate_quarry(self, request, session, retmsg, target_base_id, func, reason, chain_cb):
-        def finish_cb(self, request, session, retmsg, target_base_id, func, reason, chain_cb, success, base_pre, landlord_id):
-            if not base_pre or landlord_id != session.player.user_id:
-                ui_name = base_pre.get('base_ui_name', 'Unknown') if base_pre else str(target_base_id)
-                retmsg.append(["ERROR", "CANNOT_COLLECT_QUARRY_LOST" if (landlord_id != session.player.user_id) else "QUARRY_LOAD_ERROR", ui_name])
-                if chain_cb:
-                    chain_cb(True)
-                elif request:
-                    self.complete_deferred_request(request, session, retmsg)
-                return
-            base = base_table.parse(session.player.home_region, target_base_id, base_pre, session.player, session.player, reason='load_and_mutate_quarry:'+reason)
-            assert base.base_landlord_id == session.player.user_id
-            assert base.base_type == 'quarry'
-            return self.mutate_quarry(request, session, retmsg, func, base, 'load_and_mutate_quarry:'+reason, chain_cb, deferred = True)
-        base_table.lookup_async(session.player.home_region, target_base_id, None, functools.partial(finish_cb, self, request, session, retmsg, target_base_id, func, reason, chain_cb), 'load_and_mutate_quarry')
-        return True
-
     # grab lock, mutate quarry state, async write, release lock.
     def mutate_quarry(self, request, session, retmsg, func, base, reason, chain_cb, deferred = False):
         if session.viewing_base_lock != base.lock_id():
