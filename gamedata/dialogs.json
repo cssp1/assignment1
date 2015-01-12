@@ -7550,7 +7550,9 @@
                        "ui_tooltip": "", "tooltip_delay": 0,
                        "tooltip_width_ui_instructions": 113, // keep in sync with missions_dialog.widgets.tips width
                        "tooltip_width_ui_description": 313, // keep in sync with missions_dialog.widgets.description width
-                       "ui_tooltip_available": "Click to accept mission:\n%s", "ui_tooltip_complete": "Click to claim reward for:\n%s",
+                       "ui_tooltip_available": "Click to view mission:\n%s",
+                       "ui_tooltip_complete": "Click to view completed mission:\n%s",
+                       //"ui_tooltip_complete": "Click to claim reward for:\n%s",
                        "array": [1,15], "array_offset": [60,60] }
         }
     },
