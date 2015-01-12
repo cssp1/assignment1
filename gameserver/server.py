@@ -20857,7 +20857,7 @@ class GAMEAPI(resource.Resource):
 
                     negative_cost = dict((res,-cost[res]) for res in cost)
                     session.player.resources.gain_res(negative_cost, reason='ladder_switch')
-                    admin_stats.econ_flow_res(self, 'consumption', 'ladder_switch', negative_cost)
+                    admin_stats.econ_flow_res(session.player, 'consumption', 'ladder_switch', negative_cost)
                     session.player.record_ladder_pvp_event('3304_ladder_skip', {'defender_id': session.viewing_player.user_id,
                                                                                 'battle_streak_ladder': session.player.cooldown_active('battle_streak_ladder'),
                                                                                 'cost': cost})
