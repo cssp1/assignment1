@@ -19309,26 +19309,6 @@ class GAMEAPI(resource.Resource):
         else:
             session.viewing_base.drop_object(object)
 
-    # grab lock, mutate quarry state, async write, release lock.
-    # returns False on lock failure, True on success
-    def mutate_quarry(self, session, retmsg, func, base, reason):
-        if session.viewing_base_lock != base.lock_id():
-            # not going to hold it for an extended period of time, so no need to broadcast
-            if gamesite.nosql_client.map_feature_lock_acquire(base.base_region, base.base_id, session.player.user_id,
-                                                              generation=base.base_generation, do_hook=False, reason='mutate_quarry') != Player.LockState.being_attacked: # generation=-1?
-                retmsg.append(["ERROR", "CANNOT_LOCK_QUARRY", base.base_ui_name])
-                return False
-
-        try:
-            func(base)
-            base_table.store_async(base, None, True, reason) # note: actually synchronous
-            return True
-        finally:
-            if session.viewing_base_lock != base.lock_id():
-                gamesite.nosql_client.map_feature_lock_release(base.base_region, base.base_id, session.player.user_id, generation=base.base_generation, reason='mutate_quarry')
-
-        return False # shouldn't get here
-
     # outermost wrapper - perform HTTP request processing
     def render_POST(self, request):
         update_server_time()
@@ -21261,34 +21241,32 @@ class GAMEAPI(resource.Resource):
                                              (session.player.user_id, base_id, session.viewing_base.base_type, session.viewing_base.base_landlord_id, repr(session.viewing_base.base_id), repr(session.defending_squads)))
                 retmsg.append(["ERROR", "HARMLESS_RACE_CONDITION"])
                 return
+            base = session.viewing_base
 
-            def func(player_id, base):
-                if gamedata['server']['log_quarries']: gamesite.exception_log.event(server_time, 'quarry_abandon START %d %s' % (player_id, base.base_id))
-                success = False
-                if base.base_landlord_id == player_id:
-                    base.quarry_abandon()
-                    base.send_map_feature_update(reason='quarry_abandon')
-                    success = True
-                    metric_event_coded(player_id, '4711_quarry_abandoned', {'region': base.base_region,
-                                                                            'base_id': base.base_id,
-                                                                            'new_landlord_id': base.base_landlord_id })
+            if session.viewing_base_lock != base.lock_id():
+                if gamesite.nosql_client.map_feature_lock_acquire(base.base_region, base.base_id, session.player.user_id,
+                                                                  generation=base.base_generation, do_hook=False, reason='QUARRY_ABANDON') != Player.LockState.being_attacked: # generation=-1?
+                    retmsg.append(["ERROR", "CANNOT_LOCK_QUARRY", base.base_ui_name])
+                    return False
 
-                if gamedata['server']['log_quarries']: gamesite.exception_log.event(server_time, 'quarry_abandon END %d %s success %d' % (player_id, base.base_id, int(success)))
+            success = False
+            try:
+                base.quarry_abandon()
+                base.send_map_feature_update(reason='quarry_abandon')
+                success = True
+                metric_event_coded(session.player.user_id, '4711_quarry_abandoned', {'region': base.base_region,
+                                                                                     'base_id': base.base_id,
+                                                                                     'new_landlord_id': base.base_landlord_id })
+            finally:
+                if session.viewing_base_lock != base.lock_id():
+                    gamesite.nosql_client.map_feature_lock_release(base.base_region, base.base_id, session.player.user_id, generation=base.base_generation, reason='QUARRY_ABANDON')
 
-            def chain_cb(self, request, session, retmsg, success):
-                if gamedata['server']['log_quarries']: gamesite.exception_log.event(server_time, 'quarry_abandon CHAIN_CB START %d %d' % (session.player.user_id, int(success)))
-                if (not success):
-                    return
-                session.visit_base_in_progress = True
-                # go back home
-                async = self.change_session(request, session, retmsg, dest_user_id = session.player.user_id, force = True)
-                if gamedata['server']['log_quarries']: gamesite.exception_log.event(server_time, 'quarry_abandon CHAIN_CB END %d %s' % (session.player.user_id, repr(async)))
-                if not async:
-                    self.complete_deferred_request(request, session, retmsg)
-                return async
+            if not success:
+                return
 
-            success = self.mutate_quarry(session, retmsg, functools.partial(func, session.player.user_id), session.viewing_base, 'quarry_abandon')
-            chain_cb(self, request, session, retmsg, success)
+            # go back home
+            session.visit_base_in_progress = True
+            return self.change_session(request, session, retmsg, dest_user_id = session.player.user_id, force = True)
 
         elif arg[0] == "QUARRY_QUERY":
             tag = arg[1]
