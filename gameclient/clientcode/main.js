@@ -37,6 +37,7 @@ goog.require('ItemDisplay');
 goog.require('Dripper');
 goog.require('Showcase');
 goog.require('QuestBar');
+goog.require('UpgradeBar');
 goog.require('RegionMap');
 goog.require('RegionMapIndex');
 goog.require('TeamMapAccelerator');
