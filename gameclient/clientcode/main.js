@@ -30867,9 +30867,7 @@ function update_missions_dialog(dialog) {
         // select tracked mission
         if(pre_select === -1 &&
            (quest === player.quest_tracked ||
-            (player.get_any_abtest_value('enable_desktop_quest_bar', gamedata['client']['enable_desktop_quest_bar']) &&
-             i === dialog.user_data['just_completed_row'] // same as previous XXXXXX this change is probably safe for all games
-            ))) {
+            i === dialog.user_data['just_completed_row'])) { // same row as previously-claimed quest
             pre_select = i;
         }
     }
