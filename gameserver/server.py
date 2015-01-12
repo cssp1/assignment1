@@ -3194,7 +3194,7 @@ class Session(object):
         else:
             self.do_chat_send('DEVELOPER', '(%s) REPORTED user %d' % (self.user.country, target_uid))
 
-    def do_chat_send(self, channel, text, bypass_gag = False, props = None):
+    def do_chat_send(self, channel, text, retmsg = None, bypass_gag = False, props = None):
         assert channel
 
         gagged = False
@@ -3245,7 +3245,8 @@ class Session(object):
             # gamesite.chat_mgr.send('DEVELOPER', sender_info, '(MUTED) '+text)
 
         else:
-            gamesite.chat_mgr.send(channel, sender_info, text)
+            gamesite.chat_mgr.send(channel, sender_info, text, exclude_listener = self)
+            self.chat_recv(channel, sender_info, text, retmsg = retmsg)
 
         if (not props) or (props.get('type','default') in ('default','turf_winner',)):
             # only increment chat_messages_sent for genuine player-input messages
@@ -3294,7 +3295,7 @@ class Session(object):
         if retmsg is not None:
             retmsg.append(msg)
         else:
-            self.send_deferred_message([msg])
+            self.send_deferred_message([msg], flush_now = False) # coalesce to avoid ping storms
 
     # "pending" means the client has been notified and the clock is already ticking
     def incoming_attack_pending(self): return (self.incoming_attack_time > 0)
@@ -22178,7 +22179,7 @@ class GAMEAPI(resource.Resource):
                 else:
                     props = None
 
-                session.do_chat_send(channel, text, bypass_gag = bypass_gag, props = props)
+                session.do_chat_send(channel, text, bypass_gag = bypass_gag, props = props, retmsg = retmsg)
 
         elif arg[0] == "CHAT_REPORT":
             target_uid = arg[1]

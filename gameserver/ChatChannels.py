@@ -14,8 +14,9 @@ class ChatChannel(object):
     def leave(self, member):
         if member in self.listeners:
             self.listeners.remove(member)
-    def send(self, sender_info, text):
+    def send(self, sender_info, text, exclude_listener = None):
         for member in self.listeners:
+            if member is exclude_listener: continue
             member.chat_recv(self.name, sender_info, text)
 
 # note: "relay" is optionally an instance of SpinChatClient.Client,
@@ -38,9 +39,9 @@ class ChatChannelMgr(object):
         if channame in self.channels:
             self.channels[channame].leave(session)
 
-    def send(self, channame, sender, text, log = True):
+    def send(self, channame, sender, text, log = True, exclude_listener = None):
         if channame in self.channels:
-            self.channels[channame].send(sender, text)
+            self.channels[channame].send(sender, text, exclude_listener = exclude_listener)
         if self.relay:
             self.relay.chat_send({'channel':channame, 'sender':sender, 'text': text}, log = log)
 
