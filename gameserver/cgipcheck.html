@@ -972,6 +972,14 @@ var refresh_clock = function() {
     window.setTimeout(refresh_clock, 10*1000);
 };
 
+// see http://stackoverflow.com/questions/14859281/select-tab-by-name-in-jquery-ui-1-10-0
+$.fn.tabIndex = function () {
+    return $(this).parent().find(this).index();
+};
+$.fn.selectTabByID = function (tabID) {
+    $(this).tabs("option", "active", $('#' + tabID).tabIndex());
+};
+
 $(function() {
     // hide server controls if ADMIN role is missing
     if(spin_token_data['roles'].indexOf('ADMIN') == -1) {
@@ -1060,6 +1068,11 @@ $(function() {
     });
     $('#skynet_query').bind('enterKey', method_skynet_query);
     $('#skynet_query').keyup(function(e) { if(e.keyCode == 13) { $(this).trigger('enterKey'); } });
+
+    // with ADMIN permission, default to server status page
+    if(spin_token_data['roles'].indexOf('ADMIN') != -1) {
+        $('#modes').selectTabByID('mode_server_tab');
+    }
 
     refresh_clock();
 });
