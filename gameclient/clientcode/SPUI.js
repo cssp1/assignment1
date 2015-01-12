@@ -1464,7 +1464,9 @@ SPUI.TextWidget.prototype.draw_text = function(offset) {
     SPUI.ctx.restore();
 };
 
-SPUI.break_lines = function(str, font, wh) {
+SPUI.break_lines = function(str, font, wh, options) {
+    var bbcode = (options && options.bbcode);
+
     if(!str) { return ['', 1]; }
 
     var ret = '';
@@ -1491,8 +1493,11 @@ SPUI.break_lines = function(str, font, wh) {
             // sanity check to prevent infinite loop
             if(i > 999 || words.length > 999) { break; }
 
+            var measure_word = words[i];
+            if(bbcode) { measure_word = SPText.bbcode_strip(measure_word); }
+
             //console.log('B '+b+' I '+i+' LEN '+words.length);
-            var word_width = font.measure_string(words[i])[0];
+            var word_width = font.measure_string(measure_word)[0];
 
             //console.log('HERE x '+x+' w '+word_width+' wh '+wh[0]+' '+words[i]);
 
@@ -1503,7 +1508,7 @@ SPUI.break_lines = function(str, font, wh) {
                 x += space_width;
             }
 
-            if(x == 0 && word_width >= wh[0] && words[i].length > max_chars) {
+            if(x == 0 && word_width >= wh[0] && measure_word.length > max_chars && !bbcode) {
                 // one word so long it doesn't fit on the line even by itself!
                 // break it at a non-whitespace location
                 var first = words[i].slice(0,max_chars);
@@ -3081,6 +3086,7 @@ SPUI.ScrollingTextField = function(data) {
     this.text_hjustify = data['text_hjustify'] || "center";
     this.text_vjustify = data['text_vjustify'] || "center";
     this.text_offset = data['text_offset'] || [0,0];
+    this.alpha = ('alpha' in data ? data['alpha'] : 1);
 
     // sentinel element that represents the bottom of the scroll area
     // new lines are added before this
@@ -3227,6 +3233,9 @@ SPUI.ScrollingTextField.prototype.do_draw = function(offset) {
         return false;
     }
     SPUI.ctx.save();
+    if(this.alpha != 1) {
+        SPUI.ctx.globalAlpha = this.alpha;
+    }
     SPUI.ctx.font = this.font.str();
     if(this.drop_shadow) {
         SPUI.ctx.fillStyle = '#000000';
