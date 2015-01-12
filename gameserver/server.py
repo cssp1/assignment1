@@ -4553,6 +4553,7 @@ class GameObjectSpec(Spec):
         ["provides_inventory", 0],
         ["provides_quarry_control", 0],
         ["quarry_movable", False],
+        ["quarry_buildable", False],
         ["build_time", 0],
         ["repair_time", 0],
         ] + resource_fields("build_cost") + [
@@ -6311,12 +6312,13 @@ class Base(object):
         return ret
     def nosql_drop_one(self, object, reason):
         if (not gamesite.nosql_client) or (not self.is_nosql_base()): return
-        assert object.is_mobile()
         state = object.persist_state(nosql = True)
         if gamedata['server'].get('log_nosql',0) >= 3:
             gamesite.exception_log.event(server_time, 'nosql_drop_one %s: %s reason %s' % (self.base_id, repr(state), reason))
-        gamesite.nosql_client.drop_mobile_object_by_id(self.base_region, state['obj_id'], reason=reason)
-
+        if object.is_mobile():
+            gamesite.nosql_client.drop_mobile_object_by_id(self.base_region, state['obj_id'], reason=reason)
+        else:
+            gamesite.nosql_client.drop_fixed_object_by_id(self.base_region, state['obj_id'], reason=reason)
 
     def spawn_scenery(self, observer, seed, overwrite = False):
         to_remove = []
@@ -12329,8 +12331,8 @@ class Store:
             if unit.owner is not session.player:
                 error_reason.append('player does not own this object')
                 return -1, p_currency
-            if unit not in session.player.home_base_iter():
-                error_reason.append('this object is not in the player\'s home base')
+            if (not unit.spec.quarry_buildable) and (unit not in session.player.home_base_iter()):
+                error_reason.append('this object is not in the player\'s home base, and is not quarry_buildable')
                 return -1, p_currency
 
             if unit.is_damaged() and (not unit.is_repairing()):
@@ -12517,8 +12519,8 @@ class Store:
                 if unit.owner is not session.player:
                     error_reason.append('player does not own this object')
                     return -1, p_currency
-                if unit not in session.player.home_base_iter():
-                    error_reason.append('this object is not in the player\'s home base')
+                if (not (formula == 'upgrade' and unit.spec.quarry_buildable)) and (unit not in session.player.home_base_iter()):
+                    error_reason.append('this object is not in the player\'s home base, and is not quarry_buildable')
                     return -1, p_currency
 
                 if (not unit.is_building()):
@@ -16275,7 +16277,7 @@ class GAMEAPI(resource.Resource):
             object = session.get_object(id)
             return self.do_ping_object(session, retmsg, object, base)
 
-    def do_ping_object(self, session, retmsg, object, base):
+    def do_ping_object(self, session, retmsg, object, base, force_write = False):
             if not object.is_building():
                 # no need to ping objects that aren't buildings
                 return
@@ -16293,9 +16295,20 @@ class GAMEAPI(resource.Resource):
             did_an_upgrade = False
             did_a_research = False
             did_a_manufacture = False
+            need_history_update = False
 
             xp = 0
             xp_why = []
+
+            if object.is_repairing():
+                if server_time >= object.repair_finish_time:
+                    # object fully repaired
+                    did_a_repair = True
+                    object.heal_to_full()
+                    undamaged_time = object.repair_finish_time
+                    object.repair_finish_time = -1
+                    object.update_production(object.owner, base.base_type, base.base_region, compute_power_factor(base.get_power_state()))
+                    object.update_all(undamaged_time)
 
             if object.is_under_construction() and (object.owner is session.player):
                 prog = object.build_done_time
@@ -16307,22 +16320,23 @@ class GAMEAPI(resource.Resource):
                     object.build_total_time = -1
                     object.build_start_time = -1
                     object.build_done_time = -1
-                    object.update_production(object.owner, session.viewing_base.base_type, session.viewing_base.base_region, compute_power_factor(base.get_power_state()))
+                    object.update_production(object.owner, base.base_type, base.base_region, compute_power_factor(base.get_power_state()))
                     if object.spec.upgrade_completion:
                         cons = object.get_leveled_quantity(object.spec.upgrade_completion)
                         if cons:
                             session.execute_consequent_safe(cons, session.player, retmsg, reason='building:upgrade_completion(%d)' % object.level)
 
+                    # run metrics for home-base buildings
+                    if base is object.owner.my_home:
+                        need_history_update = True
+                        num_built = sum([1 for p in object.owner.home_base_iter() if p.spec.name == object.spec.name])
+                        session.setmax_player_metric('building:'+object.spec.name+':num_built', num_built, bucket = bool(object.spec.worth_less_xp))
+                        if object.spec.history_category:
+                            num_cat = sum([1 for p in object.owner.home_base_iter() if p.spec.history_category == object.spec.history_category])
+                            session.setmax_player_metric(object.spec.history_category+'_built', num_cat, bucket = bool(object.spec.worth_less_xp))
+                        if object.spec.track_level_in_player_history:
+                            session.setmax_player_metric(object.spec.name+'_level', object.level, bucket = bool(object.spec.worth_less_xp))
 
-            if object.is_repairing():
-                if server_time >= object.repair_finish_time:
-                    # object fully repaired
-                    did_a_repair = True
-                    object.heal_to_full()
-                    undamaged_time = object.repair_finish_time
-                    object.repair_finish_time = -1
-                    object.update_production(object.owner, session.viewing_base.base_type, session.viewing_base.base_region, compute_power_factor(base.get_power_state()))
-                    object.update_all(undamaged_time)
             if object.is_upgrading() and (object.owner is session.player):
                 prog = object.upgrade_done_time
                 if object.upgrade_start_time >= 0:
@@ -16336,11 +16350,23 @@ class GAMEAPI(resource.Resource):
                     object.upgrade_total_time = -1
                     object.upgrade_start_time = -1
                     object.upgrade_done_time = -1
-                    object.update_production(object.owner, session.viewing_base.base_type, session.viewing_base.base_region, compute_power_factor(base.get_power_state()))
+                    object.update_production(object.owner, base.base_type, base.base_region, compute_power_factor(base.get_power_state()))
                     if object.spec.upgrade_completion:
                         cons = object.get_leveled_quantity(object.spec.upgrade_completion)
                         if cons:
                             session.execute_consequent_safe(cons, session.player, retmsg, reason='building:upgrade_completion(%d)' % object.level)
+
+                    # run metrics for home-base buildings
+                    if base is object.owner.my_home:
+                        need_history_update = True
+                        max_level = max([p.level for p in object.owner.home_base_iter() if p.spec.name == object.spec.name])
+                        session.setmax_player_metric('building:'+object.spec.name+':max_level', max_level, bucket = bool(object.spec.worth_less_xp))
+                        if object.spec.history_category:
+                            max_level = max([p.level for p in object.owner.home_base_iter() if p.spec.history_category == object.spec.history_category])
+                            session.setmax_player_metric(object.spec.history_category+'_max_level', max_level, bucket = bool(object.spec.worth_less_xp))
+                        if object.spec.track_level_in_player_history:
+                            session.setmax_player_metric(object.spec.name+'_level', object.level, bucket = bool(object.spec.worth_less_xp))
+                    session.user.create_fb_open_graph_action_building_upgrade(object)
 
             if object.is_researching() and (object.owner is session.player):
                 prog = object.research_done_time
@@ -16416,6 +16442,7 @@ class GAMEAPI(resource.Resource):
                                         gamesite.exception_log.event(server_time, 'player %d (CC%d) produced into oversize base defenders! (new %d limit %d army %s)' % (session.player.user_id, session.player.get_townhall_level(), space, session.player.stattab.main_squad_space, repr(space_usage)))
 
                         if object.owner is session.player:
+                            need_history_update = True
                             session.increment_player_metric('units_manufactured', 1, bucket = True, time_series = False)
                             session.increment_player_metric('unit:'+spec.name+':manufactured', 1, bucket = True, time_series = False)
                             if spec.manufacture_category:
@@ -16441,9 +16468,6 @@ class GAMEAPI(resource.Resource):
                         if destination_squad == SQUAD_IDS.RESERVES and object.owner is session.player:
                             retmsg.append(["MANUFACTURE_OVERFLOW_TO_RESERVES", newobj.obj_id])
 
-                        if LOTS_OF_METRICS:
-                            metric_event_coded(object.owner.user_id, '3800_produce_unit', {'unit_type':spec.name})
-
                     retmsg.append(["UNIT_MANUFACTURED", object.obj_id, new_object_ids])
 
                     # stop at end of production line
@@ -16451,68 +16475,18 @@ class GAMEAPI(resource.Resource):
                         object.manuf_start_time = -1
                         object.manuf_done_time = -1
 
-            # clean up, record metrics, etc
-            if object.owner is session.player:
-                setmax = session.setmax_player_metric
-            else:
-                setmax = None
-
-            if did_a_repair:
-                pass
-            if did_finish_construction:
-                if LOTS_OF_METRICS:
-                    metric_event_coded(object.owner.user_id, '4025_construct_building', {'building_type':object.spec.name})
-                mevent = object.get_leveled_quantity(object.spec.metric_events)
-                if mevent:
-                    metric_event_coded(object.owner.user_id, mevent, {})
-
-                # count how many are built
-                if setmax is not None:
-                    num_built = sum([1 for p in object.owner.home_base_iter() if p.spec.name == object.spec.name])
-                    setmax('building:'+object.spec.name+':num_built', num_built, bucket = bool(object.spec.worth_less_xp))
-
-                    if object.spec.history_category:
-                        num_cat = sum([1 for p in object.owner.home_base_iter() if p.spec.history_category == object.spec.history_category])
-                        setmax(object.spec.history_category+'_built', num_cat, bucket = bool(object.spec.worth_less_xp))
-
-                    if object.spec.track_level_in_player_history:
-                        setmax(object.spec.name+'_level', object.level, bucket = bool(object.spec.worth_less_xp))
-
-            if did_an_upgrade:
-                if LOTS_OF_METRICS:
-                    metric_event_coded(object.owner.user_id, '4030_upgrade_building', {'building_type':object.spec.name, 'level':object.level, 'method':'use_resources'})
-                mevent = object.get_leveled_quantity(object.spec.metric_events)
-                if mevent:
-                    metric_event_coded(object.owner.user_id, mevent, {})
-                max_level = max([p.level for p in object.owner.home_base_iter() if p.spec.name == object.spec.name])
-                if setmax is not None:
-                    setmax('building:'+object.spec.name+':max_level', max_level, bucket = bool(object.spec.worth_less_xp))
-                    if object.spec.history_category:
-                        max_level = max([p.level for p in object.owner.home_base_iter() if p.spec.history_category == object.spec.history_category])
-                        setmax(object.spec.history_category+'_max_level', max_level, bucket = bool(object.spec.worth_less_xp))
-                    if object.spec.track_level_in_player_history:
-                        setmax(object.spec.name+'_level', object.level, bucket = bool(object.spec.worth_less_xp))
-
-                session.user.create_fb_open_graph_action_building_upgrade(object)
 
             if did_finish_construction or did_an_upgrade:
-                # take account of updated global stats
-                if object.spec.manufacture_category or object.spec.provides_space or object.spec.provides_total_space or object.is_producer() or object.spec.provides_foremen:
+                # handle any updates to stattab
+                if object.spec.manufacture_category or object.spec.provides_space or object.spec.provides_total_space or \
+                   object.is_producer() or object.spec.provides_foremen:
                     object.owner.recalc_stattab(session.player)
                     if object.owner is session.player:
                         object.owner.stattab.send_update(session, retmsg)
-                    if object.is_producer():
-                        object.update_production(object.owner, object.owner.my_home.base_type, object.owner.my_home.base_region, compute_power_factor(object.owner.my_home.get_power_state()))
-
-            if did_a_research:
-                pass
-
-            if did_a_manufacture:
-                pass
 
             # if the action had any possible impact on power generation, then re-initialize harvesters
             if did_a_repair or did_finish_construction or did_an_upgrade:
-                self.power_changed(session, session.viewing_base, object, retmsg)
+                self.power_changed(session, base, object, retmsg)
                 session.deferred_ladder_point_decay_check = True
 
             if did_finish_construction or did_an_upgrade:
@@ -16552,18 +16526,109 @@ class GAMEAPI(resource.Resource):
             if did_a_repair or did_finish_construction or did_an_upgrade or did_a_research or did_a_manufacture:
                 self.give_xp_to(session, object.owner, retmsg, xp, ','.join(xp_why), [object.x,object.y], obj_session_id = object.obj_id)
 
-                # for safety, to make sure player state is updated
                 retmsg.append(["PLAYER_STATE_UPDATE", session.player.resources.calc_snapshot().serialize()])
+                base.nosql_write_one(object, 'do_ping_object')
+            elif force_write:
+                base.nosql_write_one(object, 'do_ping_object')
 
             retmsg.append(["OBJECT_STATE_UPDATE2", object.serialize_state()])
 
-            if did_a_manufacture or did_finish_construction or did_an_upgrade:
-                if object.owner is session.player:
-                    session.player.send_history_update(retmsg)
+            if need_history_update:
+                session.player.send_history_update(retmsg)
+
+    def do_speedup_for_free(self, session, retmsg, object):
+        assert object.is_building()
+        if session.viewing_base is not session.player.my_home:
+            if session.viewing_base.is_nosql_base() and object.spec.quarry_buildable and session.viewing_base.base_landlord_id == session.player.user_id:
+                pass # OK to access remotely
+            else:
+                retmsg.append(["ERROR", "CANNOT_CAST_SPELL_OUTSIDE_HOME_BASE"])
+                return
+
+        # max amount of time for which we allow free speed-ups
+        free_time = Store.get_free_speedup_time(session, session.player)
+
+        # just set the finish time to a time in the past, then
+        # let ping_object handle the rest of the work
+
+        if object.is_repairing():
+            time_left = object.repair_finish_time - server_time
+            if time_left <= free_time:
+                object.repair_finish_time = server_time - 1
+        elif object.is_upgrading():
+            prog = object.upgrade_done_time
+            if object.upgrade_start_time < 0:
+                return
+            else:
+                prog += server_time - object.upgrade_start_time
+            time_left = object.upgrade_total_time - prog
+            if time_left <= free_time:
+                object.upgrade_done_time = object.upgrade_total_time
+        elif object.is_under_construction():
+            prog = object.build_done_time
+            if object.build_start_time < 0:
+                return
+            else:
+                prog += server_time - object.build_start_time
+            time_left = object.build_total_time - prog
+            if time_left <= free_time:
+                object.build_done_time = object.build_total_time
+        elif object.is_researching():
+            prog = object.research_done_time
+            if object.research_start_time < 0:
+                return
+            else:
+                prog += server_time - object.research_start_time
+            time_left = object.research_total_time - prog
+            if time_left <= free_time:
+                object.research_done_time = object.research_total_time
+        elif object.is_crafting():
+            finish_time = object.crafting.finish_time()
+            if finish_time < 0:
+                return
+            if (finish_time - server_time) <= free_time:
+                object.crafting.speedup()
+        elif object.is_manufacturing():
+            # note: this only speeds up if ALL queued units fit in free_time
+            # and there is no unit queued which has the no_free_speedup flag
+            allow_free_speedup = True
+            always_free_speedup = True
+            for item in object.manuf_queue:
+                item_spec = session.player.get_abtest_spec(GameObjectSpec, item['spec_name'])
+                if item_spec.get_leveled_quantity(item_spec.always_free_speedup, item['level']):
+                    continue
+                else:
+                    always_free_speedup = False
+
+                if item_spec.get_leveled_quantity(item_spec.no_free_speedup, item['level']):
+                    allow_free_speedup = False
+
+            if always_free_speedup:
+                free_time = 999999999
+            elif not allow_free_speedup:
+                free_time = 0
+
+            prog = object.manuf_done_time
+            if object.manuf_start_time < 0:
+                return
+            else:
+                prog += server_time - object.manuf_start_time
+            time_left = sum([item['total_time'] for item in object.manuf_queue]) - prog
+            if time_left <= free_time:
+                object.manuf_done_time = sum([item['total_time'] for item in object.manuf_queue])
+
+        self.do_ping_object(session, retmsg, object, session.viewing_base, force_write = True)
 
     def do_cancel_upgrade(self, session, retmsg, object):
         if not object.is_upgrading():
             return # ignore invalid request
+
+        if session.viewing_base is not session.player.my_home:
+            if session.viewing_base.is_nosql_base() and object.spec.quarry_buildable and session.viewing_base.base_landlord_id == session.player.user_id:
+                pass # OK to access remotely
+            else:
+                retmsg.append(["ERROR", "CANNOT_CAST_SPELL_OUTSIDE_HOME_BASE"])
+                return
 
         # figure out how many resources to return to player
         refund = dict((res,int(gamedata['upgrade_cancel_refund']*GameObjectSpec.get_leveled_quantity(getattr(object.spec, 'build_cost_'+res), object.level+1))) for res in gamedata['resources'])
@@ -16580,6 +16645,7 @@ class GAMEAPI(resource.Resource):
         if object.is_producer(): # re-start harvester
             object.update_production(object.owner, session.viewing_base.base_type, session.viewing_base.base_region, power_factor)
 
+        session.viewing_base.nosql_write_one(object, 'do_cancel_upgrade')
         retmsg.append(["OBJECT_STATE_UPDATE", object.serialize_state(), session.player.resources.calc_snapshot().serialize()])
 
     def do_upgrade(self, session, retmsg, object):
@@ -16593,6 +16659,13 @@ class GAMEAPI(resource.Resource):
         if object.level >= object.spec.maxlevel:
             retmsg.append(["ERROR", "MAX_LEVEL_REACHED", object.spec.maxlevel])
             return
+
+        if session.viewing_base is not session.player.my_home:
+            if session.viewing_base.is_nosql_base() and object.spec.quarry_buildable and session.viewing_base.base_landlord_id == session.player.user_id:
+                pass # OK to access remotely
+            else:
+                retmsg.append(["ERROR", "CANNOT_CAST_SPELL_OUTSIDE_HOME_BASE"])
+                return
 
         fail = False
 
@@ -16637,15 +16710,16 @@ class GAMEAPI(resource.Resource):
             object.upgrade_total_time = 1
             object.upgrade_done_time = 999
 
-        retmsg.append(["OBJECT_STATE_UPDATE", object.serialize_state(), session.player.resources.calc_snapshot().serialize()])
-
         # re-evaluate power situation
         self.power_changed(session, session.viewing_base, object, retmsg)
+
+        retmsg.append(["OBJECT_STATE_UPDATE", object.serialize_state(), session.player.resources.calc_snapshot().serialize()])
+        session.viewing_base.nosql_write_one(object, 'do_upgrade')
 
         if build_time < 1:
             self.ping_object(session, retmsg, object.obj_id, session.viewing_base)
         else:
-            if object.spec.track_level_in_player_history:
+            if (session.viewing_base is session.player.my_home) and object.spec.track_level_in_player_history:
                 session.setmax_player_metric(object.spec.name+'_level_started', object.level+1, time_series = False) # bucket = bool(object.spec.worth_less_xp))
 
         session.activity_classifier.built_or_upgraded_building()
@@ -16654,6 +16728,12 @@ class GAMEAPI(resource.Resource):
         if object.owner is not session.player:
             retmsg.append(["ERROR", "CANNOT_CAST_SPELL_OUTSIDE_HOME_BASE"])
             return False
+        if session.viewing_base is not session.player.my_home:
+            if session.viewing_base.is_nosql_base() and object.spec.quarry_buildable and session.viewing_base.base_landlord_id == session.player.user_id:
+                pass # OK to access remotely
+            else:
+                retmsg.append(["ERROR", "CANNOT_CAST_SPELL_OUTSIDE_HOME_BASE"])
+                return
         if object.is_damaged() or object.is_repairing():
             retmsg.append(["ERROR", "CANNOT_UPGRADE_BUILDING_WHILE_DAMAGED"])
             return False
@@ -16693,6 +16773,7 @@ class GAMEAPI(resource.Resource):
             object.update_production(session.player, session.player.my_home.base_type, session.player.my_home.base_region, compute_power_factor(session.player.my_home.get_power_state()))
 
         retmsg.append(["OBJECT_STATE_UPDATE2", object.serialize_state()])
+        session.viewing_base.nosql_write_one(object, 'do_upgrade_instant')
 
         if object.spec.name in gamedata['player_xp']['buildings']:
             override = object.spec.get_leveled_quantity(object.spec.upgrade_xp, object.level)
@@ -16706,18 +16787,16 @@ class GAMEAPI(resource.Resource):
                 retmsg.append(["PLAYER_STATE_UPDATE", session.player.resources.calc_snapshot().serialize()])
 
         metric_event_coded(session.user.user_id, '4030_upgrade_building', {'building_type':object.spec.name, 'level':object.level, 'method':'instant'})
-        mevent = object.get_leveled_quantity(object.spec.metric_events)
-        if mevent:
-            metric_event_coded(session.user.user_id, mevent, {})
 
-        max_level = max([p.level for p in session.player.home_base_iter() if p.spec.name == object.spec.name])
-        session.setmax_player_metric('building:'+object.spec.name+':max_level', max_level, bucket = bool(object.spec.worth_less_xp))
+        if session.viewing_base is session.player.my_home:
+            max_level = max([p.level for p in session.player.home_base_iter() if p.spec.name == object.spec.name])
+            session.setmax_player_metric('building:'+object.spec.name+':max_level', max_level, bucket = bool(object.spec.worth_less_xp))
 
-        if object.spec.history_category:
-            max_level = max([p.level for p in session.player.home_base_iter() if p.spec.history_category == object.spec.history_category])
-            session.setmax_player_metric(object.spec.history_category+'_max_level', max_level, bucket = bool(object.spec.worth_less_xp))
-        if object.spec.track_level_in_player_history:
-            session.setmax_player_metric(object.spec.name+'_level', object.level, bucket = bool(object.spec.worth_less_xp))
+            if object.spec.history_category:
+                max_level = max([p.level for p in session.player.home_base_iter() if p.spec.history_category == object.spec.history_category])
+                session.setmax_player_metric(object.spec.history_category+'_max_level', max_level, bucket = bool(object.spec.worth_less_xp))
+            if object.spec.track_level_in_player_history:
+                session.setmax_player_metric(object.spec.name+'_level', object.level, bucket = bool(object.spec.worth_less_xp))
 
         if object.spec.name in (gamedata['townhall'],gamedata['region_map_building']):
             # these buildings can enable regional map features, place player on map if not already there
@@ -17191,25 +17270,32 @@ class GAMEAPI(resource.Resource):
 
         if (not is_instant) and session.player.foreman_is_busy():
             retmsg.append(["ERROR", "FOREMAN_IS_BUSY"])
-            return False
+            return
 
         spec = session.player.get_abtest_spec(GameObjectSpec, building_type)
         if spec.kind == 'inert':
             if (not session.player.is_cheater):
                 retmsg.append(["ERROR", "DISALLOWED_IN_SECURE_MODE"])
-                return False
+                return
             is_instant = True # all inert builds are instant
         else:
             assert spec.kind == 'building'
 
         if secure_mode and spec.developer_only:
             retmsg.append(["ERROR", "DISALLOWED_IN_SECURE_MODE"])
-            return False
+            return
+
+        if session.viewing_base is not session.player.my_home:
+            if session.viewing_base.is_nosql_base() and spec.quarry_buildable and session.viewing_base.base_landlord_id == session.player.user_id:
+                pass # OK to build remotely
+            else:
+                retmsg.append(["ERROR", "CANNOT_CAST_SPELL_OUTSIDE_HOME_BASE"])
+                return
 
         if not session.viewing_base.is_building_location_valid([j,i], spec, None, ignore_collision = session.player.is_cheater,
                                                                ignore_perimeter = spec.ignore_perimeter or session.player.is_cheater):
             retmsg.append(["ERROR", "INVALID_BUILDING_LOCATION"])
-            return False
+            return
 
         fail = False
 
@@ -17232,20 +17318,20 @@ class GAMEAPI(resource.Resource):
 
         # check power constraint, unless building requires zero power (e.g. it's a power plant)
         consumes_power = GameObjectSpec.get_leveled_quantity(spec.consumes_power_while_building, 1)
-        power_state = session.player.my_home.get_power_state()
+        power_state = session.viewing_base.get_power_state()
         if gamedata['enable_power'] and (not is_instant) and (GameObjectSpec.get_leveled_quantity(spec.consumes_power, 1) > 0) and \
            (power_state[1] + consumes_power) > power_state[0]:
             fail = True
             retmsg.append(["ERROR", "POWER_LIMIT"])
 
         if fail:
-            return False
+            return
 
         # check quantity constraint
         if (not session.player.is_cheater):
             # how many does the player already have?
             current = 0
-            for obj in session.player.home_base_iter():
+            for obj in session.viewing_base.iter_objects():
                 if obj.spec.name == spec.name:
                     current += 1
 
@@ -17256,14 +17342,14 @@ class GAMEAPI(resource.Resource):
 
             if (limit >= 0) and (current >= limit):
                 retmsg.append(["ERROR", "BUILDING_LIMIT_EXCEEDED", limit])
-                return False
+                return
 
             # check predicate quantity constraint
             if spec.limit_requires:
                 pred = spec.limit_requires[current]
                 if not Predicates.read_predicate(pred).is_satisfied(session.player, None):
                     retmsg.append(["ERROR", "REQUIREMENTS_NOT_SATISFIED", pred])
-                    return False
+                    return
 
         if (not is_instant):
             if (not session.player.is_cheater):
@@ -17289,7 +17375,7 @@ class GAMEAPI(resource.Resource):
         if build_time < 1 and spec.kind != 'inert':
             newobj.build_done_time = 999 # special case for instant finish, necessary to make ping_object() do the right thing
 
-        session.player.home_base_add(newobj)
+        session.viewing_base.adopt_object(newobj) # this does the nosql write
         session.add_object(newobj)
 
         if spec.kind != 'inert':
@@ -17306,7 +17392,47 @@ class GAMEAPI(resource.Resource):
 
         session.activity_classifier.built_or_upgraded_building()
 
-        return True
+    def do_move_building(self, session, retmsg, object, spellargs):
+        j, i = spellargs[0]
+
+        if (not object.is_building()) and (not session.player.is_cheater):
+            retmsg.append(["ERROR", "HARMLESS_RACE_CONDITION"])
+            retmsg.append(["OBJECT_STATE_UPDATE2", object.serialize_state()])
+            return
+
+        if object.is_building() and (object.is_repairing() or object.is_under_construction() or object.is_upgrading()):
+            retmsg.append(["ERROR", "CANNOT_MOVE_BUILDING_WHILE_BUSY"])
+            return
+
+        if not session.viewing_base.is_building_location_valid([j,i], object.spec, object, ignore_collision = session.player.is_cheater,
+                                                               ignore_perimeter = object.spec.ignore_perimeter or session.player.is_cheater):
+            retmsg.append(["ERROR", "INVALID_BUILDING_LOCATION"])
+            retmsg.append(["OBJECT_STATE_UPDATE2", object.serialize_state()])
+            return
+
+        # in quarry, object can be moved in quarry, object is player's, and player owns the quarry?
+        if session.viewing_base.is_nosql_base() and object.spec.quarry_movable and (object.owner is session.player) and session.viewing_base.base_landlord_id == session.player.user_id:
+            # do not allow quarry turrets to be moved in airborne quarries
+            if (not session.player.is_cheater) and session.viewing_base.base_climate:
+                data = gamedata['climates'][session.viewing_base.base_climate]
+                if data.get('exclude_ground_units',False):
+                    retmsg.append(["ERROR", "INVALID_BUILDING_LOCATION"])
+                    return
+            pass # OK
+        elif session.has_attacked:
+            retmsg.append(["ERROR", "CANNOT_CAST_SPELL_IN_COMBAT"])
+            return
+        elif (object in session.player.home_base_iter()):
+            pass # OK
+        else:
+            retmsg.append(["ERROR", "CANNOT_CAST_SPELL_OUTSIDE_HOME_BASE"])
+            return
+
+        object.x = j
+        object.y = i
+
+        retmsg.append(["OBJECT_STATE_UPDATE2", object.serialize_state()])
+        session.viewing_base.nosql_write_one(object, 'MOVE_BUILDING', fields = ['xy'])
 
     def do_make_droids(self, session, retmsg, object, spellargs):
         spec_name = spellargs[0]
@@ -21170,8 +21296,8 @@ class GAMEAPI(resource.Resource):
                 session.rem_object(id)
                 if obj.is_mobile():
                     obj.owner.unit_repair_cancel(obj)
-                if obj in session.player.home_base_iter():
-                    session.player.home_base_remove(obj)
+                if obj in session.viewing_base.iter_objects():
+                    session.viewing_base.drop_object(obj)
                 if obj.is_building() and (obj.spec.provides_power or obj.spec.consumes_power):
                     self.power_changed(session, session.viewing_base, obj, retmsg)
                 retmsg.append(["PLAYER_STATE_UPDATE", session.player.resources.calc_snapshot().serialize()])
@@ -22704,98 +22830,14 @@ class GAMEAPI(resource.Resource):
                 object = None
 
             if spellname == "SPEEDUP_FOR_FREE":
-                assert (object != None) and object.is_building()
-
-                if object not in session.player.home_base_iter():
-                    retmsg.append(["ERROR", "CANNOT_CAST_SPELL_OUTSIDE_HOME_BASE"])
-                    return
-
-                # max amount of time for which we allow free speed-ups
-                free_time = Store.get_free_speedup_time(session, session.player)
-
-                # just set the finish time to a time in the past, then
-                # let self.ping_object() handle the rest of the work
-
-                if object.is_repairing():
-                    time_left = object.repair_finish_time - server_time
-                    if time_left <= free_time:
-                        object.repair_finish_time = server_time - 1
-                elif object.is_upgrading():
-                    prog = object.upgrade_done_time
-                    if object.upgrade_start_time < 0:
-                        return
-                    else:
-                        prog += server_time - object.upgrade_start_time
-                    time_left = object.upgrade_total_time - prog
-                    if time_left <= free_time:
-                        object.upgrade_done_time = object.upgrade_total_time
-                elif object.is_under_construction():
-                    prog = object.build_done_time
-                    if object.build_start_time < 0:
-                        return
-                    else:
-                        prog += server_time - object.build_start_time
-                    time_left = object.build_total_time - prog
-                    if time_left <= free_time:
-                        object.build_done_time = object.build_total_time
-                elif object.is_researching():
-                    prog = object.research_done_time
-                    if object.research_start_time < 0:
-                        return
-                    else:
-                        prog += server_time - object.research_start_time
-                    time_left = object.research_total_time - prog
-                    if time_left <= free_time:
-                        object.research_done_time = object.research_total_time
-                elif object.is_crafting():
-                    finish_time = object.crafting.finish_time()
-                    if finish_time < 0:
-                        return
-                    if (finish_time - server_time) <= free_time:
-                        object.crafting.speedup()
-                elif object.is_manufacturing():
-                    # note: this only speeds up if ALL queued units fit in free_time
-                    # and there is no unit queued which has the no_free_speedup flag
-                    allow_free_speedup = True
-                    always_free_speedup = True
-                    for item in object.manuf_queue:
-                        item_spec = session.player.get_abtest_spec(GameObjectSpec, item['spec_name'])
-                        if item_spec.get_leveled_quantity(item_spec.always_free_speedup, item['level']):
-                            continue
-                        else:
-                            always_free_speedup = False
-
-                        if item_spec.get_leveled_quantity(item_spec.no_free_speedup, item['level']):
-                            allow_free_speedup = False
-
-                    if always_free_speedup:
-                        free_time = 999999999
-                    elif not allow_free_speedup:
-                        free_time = 0
-
-                    prog = object.manuf_done_time
-                    if object.manuf_start_time < 0:
-                        return
-                    else:
-                        prog += server_time - object.manuf_start_time
-                    time_left = sum([item['total_time'] for item in object.manuf_queue]) - prog
-                    if time_left <= free_time:
-                        object.manuf_done_time = sum([item['total_time'] for item in object.manuf_queue])
-
-                self.ping_object(session, retmsg, id, session.viewing_base)
+                self.do_speedup_for_free(session, retmsg, object)
 
             elif spellname == "REPAIR":
                 return self.do_start_repairs(request, session, retmsg, spellargs[0])
 
             elif spellname == "UPGRADE_FOR_FREE":
-                if object not in session.player.home_base_iter():
-                    retmsg.append(["ERROR", "CANNOT_CAST_SPELL_OUTSIDE_HOME_BASE"])
-                    return
                 self.do_upgrade(session, retmsg, object)
             elif spellname == "CANCEL_UPGRADE":
-                if object not in session.player.home_base_iter():
-                    retmsg.append(["ERROR", "CANNOT_CAST_SPELL_OUTSIDE_HOME_BASE"])
-                    return
                 self.do_cancel_upgrade(session, retmsg, object)
 
             elif spellname == "RESEARCH_FOR_FREE":
@@ -22862,10 +22904,7 @@ class GAMEAPI(resource.Resource):
                 self.do_cancel_make_droids(session, retmsg, object, spellargs)
 
             elif spellname == "BUILD":
-                if session.viewing_base is not session.player.my_home:
-                    retmsg.append(["ERROR", "CANNOT_CAST_SPELL_OUTSIDE_HOME_BASE"])
-                    return
-                self.do_build(session, retmsg, spellargs, False)
+                return self.do_build(session, retmsg, spellargs, False)
 
             elif spellname == "DEPLOY_UNITS":
                 self.do_attack(session, retmsg, spellargs)
@@ -22896,46 +22935,7 @@ class GAMEAPI(resource.Resource):
                 session.viewing_base.nosql_write_one(object, 'CONFIG_SET', fields = ['config'])
 
             elif spellname == "MOVE_BUILDING":
-                j, i = spellargs[0]
-
-                if (not object.is_building()) and (not session.player.is_cheater):
-                    retmsg.append(["ERROR", "HARMLESS_RACE_CONDITION"])
-                    retmsg.append(["OBJECT_STATE_UPDATE2", object.serialize_state()])
-                    return
-
-                if object.is_building() and (object.is_repairing() or object.is_under_construction() or object.is_upgrading()):
-                    retmsg.append(["ERROR", "CANNOT_MOVE_BUILDING_WHILE_BUSY"])
-                    return
-
-                if not session.viewing_base.is_building_location_valid([j,i], object.spec, object, ignore_collision = session.player.is_cheater,
-                                                                       ignore_perimeter = object.spec.ignore_perimeter or session.player.is_cheater):
-                    retmsg.append(["ERROR", "INVALID_BUILDING_LOCATION"])
-                    retmsg.append(["OBJECT_STATE_UPDATE2", object.serialize_state()])
-                    return
-
-                # in quarry, object can be moved in quarry, object is player's, and player owns the quarry?
-                if session.viewing_base.is_nosql_base() and object.spec.quarry_movable and (object.owner is session.player) and session.viewing_base.base_landlord_id == session.player.user_id:
-                    # do not allow quarry turrets to be moved in airborne quarries
-                    if (not session.player.is_cheater) and session.viewing_base.base_climate:
-                        data = gamedata['climates'][session.viewing_base.base_climate]
-                        if data.get('exclude_ground_units',False):
-                            retmsg.append(["ERROR", "INVALID_BUILDING_LOCATION"])
-                            return
-                    pass # OK
-                elif session.has_attacked:
-                    retmsg.append(["ERROR", "CANNOT_CAST_SPELL_IN_COMBAT"])
-                    return
-                elif (object in session.player.home_base_iter()):
-                    pass # OK
-                else:
-                    retmsg.append(["ERROR", "CANNOT_CAST_SPELL_OUTSIDE_HOME_BASE"])
-                    return
-
-                object.x = j
-                object.y = i
-
-                retmsg.append(["OBJECT_STATE_UPDATE2", object.serialize_state()])
-                session.viewing_base.nosql_write_one(object, 'MOVE_BUILDING', fields = ['xy'])
+                return self.do_move_building(session, retmsg, object, spellargs)
 
             elif spellname == "LOTTERY_GET_SLATE":
                 result = session.player.get_lottery_slate(session)

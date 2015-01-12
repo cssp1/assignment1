@@ -16858,224 +16858,223 @@ function invoke_building_context_menu(mouse_xy) {
         throw Error('context menu invoked without a building or player-owned inert object selected');
     }
 
+    var quarry_movable = (session.is_quarry() && obj.spec['quarry_movable'] && session.viewing_base.base_landlord_id == session.user_id && session.region.data && session.region.data['storage'] == 'nosql');
+    var quarry_buildable = (session.is_quarry() && obj.spec['quarry_buildable'] && session.viewing_base.base_landlord_id == session.user_id && session.region.data && session.region.data['storage'] == 'nosql');
+
     // need to figure out how many and what buttons to display first,
     // because there are different dialog templates depending on the
     // number of buttons.
 
     var buttons = []; // list of [name,callback] pairs
 
-    // special case for quarries
-    if(!session.home_base) {
-        if(obj.is_building()) {
-            if(obj.is_damaged()) {
-                buttons.push([gamedata['spells']['REPAIR']['ui_name'], invoke_repair_dialog]);
-            } else if(gamedata['client']['quarry_collect_poll_interval'] < 0 && obj.is_producer()) {
-                buttons.push([gamedata['spells']['HARVEST']['ui_name'], null, 'disabled', gamedata['spells']['HARVEST']['ui_name_quarry']]);
+    if(obj.is_building()) {
+
+        if(session.home_base && obj.is_warehouse() && !obj.is_under_construction()) {
+            if(player.warehouse_is_busy()) {
+                buttons.push([gamedata['spells']['SHOW_INVENTORY']['ui_name'], null, 'disabled', gamedata['spells']['SHOW_INVENTORY']['ui_name_busy']]);
+            } else {
+                buttons.push([gamedata['spells']['SHOW_INVENTORY']['ui_name'], invoke_inventory_dialog]);
             }
         }
 
-    } else if(obj.is_building()) {
-
-    if(obj.is_warehouse() && !obj.is_under_construction()) {
-        if(player.warehouse_is_busy()) {
-            buttons.push([gamedata['spells']['SHOW_INVENTORY']['ui_name'], null, 'disabled', gamedata['spells']['SHOW_INVENTORY']['ui_name_busy']]);
-        } else {
-            buttons.push([gamedata['spells']['SHOW_INVENTORY']['ui_name'], invoke_inventory_dialog]);
+        if(session.home_base && obj.spec['name'] == gamedata['squad_building'] && !obj.is_under_construction()) {
+            if(0 && player.squad_bay_is_busy()) {
+                buttons.push([gamedata['spells']['MANAGE_SQUADS']['ui_name'], null, 'disabled', gamedata['spells']['MANAGE_SQUADS']['ui_name_busy']]);
+            } else if(player.squads_enabled()) {
+                // MANAGE SQUADS button
+                buttons.push([gamedata['spells']['MANAGE_SQUADS']['ui_name'], function() { change_selection_ui(null); invoke_squad_control(); }]);
+                add_deploy_squads_button(buttons);
+            }
         }
-    }
 
-    if(obj.spec['name'] == gamedata['squad_building'] && !obj.is_under_construction()) {
-        if(0 && player.squad_bay_is_busy()) {
-            buttons.push([gamedata['spells']['MANAGE_SQUADS']['ui_name'], null, 'disabled', gamedata['spells']['MANAGE_SQUADS']['ui_name_busy']]);
-        } else if(player.squads_enabled()) {
-            // MANAGE SQUADS button
-            buttons.push([gamedata['spells']['MANAGE_SQUADS']['ui_name'], function() { change_selection_ui(null); invoke_squad_control(); }]);
-            add_deploy_squads_button(buttons);
-        }
-    }
+        if(session.home_base && obj.spec['name'] === gamedata['alliance_building'] && !obj.is_under_construction()) {
+            // TRANSMITTER
 
-    if(obj.spec['name'] === gamedata['alliance_building'] && !obj.is_under_construction()) {
-        // TRANSMITTER
+            // REINFORCEMENTS button
+            if(player.unit_donation_enabled()) {
+                var spell = gamedata['spells']['REQUEST_UNIT_DONATION'];
+                var togo = player.cooldown_togo(spell['cooldown_name']);
+                if(!session.is_in_alliance()) {
+                    buttons.push([spell['ui_name'], null, 'disabled', spell['ui_tooltip_no_alliance']]);
+                } else if(player.alliance_building_is_busy()) {
+                    buttons.push([spell['ui_name'], null, 'disabled', spell['ui_tooltip_busy']]);
+                } else if(player.donated_units_space() >= player.donated_units_max_space()) {
+                    buttons.push([spell['ui_name'], null, 'disabled', spell['ui_tooltip_no_space']]);
+                } else if(togo > 0) {
+                    buttons.push([spell['ui_name'], null, 'disabled', spell['ui_tooltip_cooldown'].replace('%s',pretty_print_time(togo))]);
+                } else {
+                    buttons.push([spell['ui_name'], (function(_obj) { return function() {
+                        request_unit_donation(_obj);
+                        GameArt.assets["request_unit_donation_sound"].states['normal'].audio.play(client_time);
+                        change_selection_ui(null);
 
-        // REINFORCEMENTS button
-        if(player.unit_donation_enabled()) {
-            var spell = gamedata['spells']['REQUEST_UNIT_DONATION'];
-            var togo = player.cooldown_togo(spell['cooldown_name']);
-            if(!session.is_in_alliance()) {
-                buttons.push([spell['ui_name'], null, 'disabled', spell['ui_tooltip_no_alliance']]);
-            } else if(player.alliance_building_is_busy()) {
-                buttons.push([spell['ui_name'], null, 'disabled', spell['ui_tooltip_busy']]);
-            } else if(player.donated_units_space() >= player.donated_units_max_space()) {
-                buttons.push([spell['ui_name'], null, 'disabled', spell['ui_tooltip_no_space']]);
-            } else if(togo > 0) {
-                buttons.push([spell['ui_name'], null, 'disabled', spell['ui_tooltip_cooldown'].replace('%s',pretty_print_time(togo))]);
-            } else {
-                buttons.push([spell['ui_name'], (function(_obj) { return function() {
-                    request_unit_donation(_obj);
-                    GameArt.assets["request_unit_donation_sound"].states['normal'].audio.play(client_time);
-                    change_selection_ui(null);
-
-                    if(gamedata['client']['unit_donation_request_maximize_chat']) {
-                        // pop up Alliance chat
-                        if(global_chat_frame) {
-                            change_chat_tab(global_chat_frame, 'ALLIANCE');
-                            chat_frame_size(global_chat_frame, true, true);
+                        if(gamedata['client']['unit_donation_request_maximize_chat']) {
+                            // pop up Alliance chat
+                            if(global_chat_frame) {
+                                change_chat_tab(global_chat_frame, 'ALLIANCE');
+                                chat_frame_size(global_chat_frame, true, true);
+                            }
                         }
-                    }
-                    if(1) {
-                        // show rising "Reinforcements Requested" text message
-                        SPFX.add(new SPFX.CombatText([_obj.x,_obj.y], 0,
-                                                     gamedata['strings']['combat_messages']['reinforcement_request_sent'],
-                                                     [1,1,0.3],
-                                                     client_time, client_time + 3.0,
-                                                     { drop_shadow: true, font_size: 20, text_style: 'thick' }));
-                    }
-                }; })(obj)]);
+                        if(1) {
+                            // show rising "Reinforcements Requested" text message
+                            SPFX.add(new SPFX.CombatText([_obj.x,_obj.y], 0,
+                                                         gamedata['strings']['combat_messages']['reinforcement_request_sent'],
+                                                         [1,1,0.3],
+                                                         client_time, client_time + 3.0,
+                                                         { drop_shadow: true, font_size: 20, text_style: 'thick' }));
+                        }
+                    }; })(obj)]);
+                }
+            }
+
+            // ALLIANCES button
+            if(1) {
+                var pred = read_predicate({'predicate':'LIBRARY','name':'alliance_join_requirement'});
+                if(!pred.is_satisfied(player, null)) {
+                    buttons.push([gamedata['spells']['SHOW_ALLIANCES']['ui_name'], get_requirements_help(pred,null), 'disabled_clickable', gamedata['spells']['SHOW_ALLIANCES']['ui_name_unmet'].replace('%s',pred.ui_describe(player))]);
+                } else {
+                    buttons.push([gamedata['spells']['SHOW_ALLIANCES']['ui_name'], invoke_alliance_dialog]);
+                }
             }
         }
 
-        // ALLIANCES button
-        if(1) {
-            var pred = read_predicate({'predicate':'LIBRARY','name':'alliance_join_requirement'});
-            if(!pred.is_satisfied(player, null)) {
-                buttons.push([gamedata['spells']['SHOW_ALLIANCES']['ui_name'], get_requirements_help(pred,null), 'disabled_clickable', gamedata['spells']['SHOW_ALLIANCES']['ui_name_unmet'].replace('%s',pred.ui_describe(player))]);
+        if(session.home_base && obj.spec['name'] === gamedata['region_map_building'] && !obj.is_under_construction()) {
+            // SHOW MAP button
+            //add_regional_map_button(buttons);
+
+            // CHANGE REGION button
+            add_change_region_button(buttons);
+        }
+
+        if(session.home_base && obj.is_lottery_building() && !obj.is_under_construction()) {
+            if(player.lottery_is_busy()) {
+                buttons.push([gamedata['spells']['LOTTERY_SCAN']['ui_name'], null, 'disabled', gamedata['spells']['LOTTERY_SCAN']['ui_tooltip_busy']]);
             } else {
-                buttons.push([gamedata['spells']['SHOW_ALLIANCES']['ui_name'], invoke_alliance_dialog]);
+                buttons.push([gamedata['spells']['LOTTERY_SCAN']['ui_name'], invoke_lottery_dialog]);
             }
         }
-    }
 
-    if(obj.spec['name'] === gamedata['region_map_building'] && !obj.is_under_construction()) {
-        // SHOW MAP button
-        //add_regional_map_button(buttons);
-
-        // CHANGE REGION button
-        add_change_region_button(buttons);
-    }
-
-    if(obj.is_lottery_building() && !obj.is_under_construction()) {
-        if(player.lottery_is_busy()) {
-            buttons.push([gamedata['spells']['LOTTERY_SCAN']['ui_name'], null, 'disabled', gamedata['spells']['LOTTERY_SCAN']['ui_tooltip_busy']]);
+        if(obj.is_damaged() && (!session.home_base || !obj.is_repairing())) {
+            buttons.push([gamedata['spells']['REPAIR']['ui_name'], invoke_repair_dialog]);
+        } else if((session.home_base || quarry_buildable) && (obj.is_repairing() || obj.is_under_construction())) {
+            // offer to speed up repairs or construction
+            buttons.push([gamedata['spells']['SPEEDUP_FOR_MONEY']['ui_name'],
+                          function() {invoke_speedup_dialog('speedup');}]);
+        } else if((session.home_base || quarry_buildable) && obj.is_upgrading()) {
+            // if upgrading, then just show speedup and cancel
+            buttons.push([gamedata['spells']['SPEEDUP_FOR_MONEY']['ui_name'],
+                          function() {invoke_speedup_dialog('speedup');}]);
+            buttons.push([gamedata['spells']['CANCEL_UPGRADE']['ui_name'],
+                          (function (_id) { return function() {
+                              change_selection_ui(null);
+                              invoke_confirm_cancel_message('upgrade', (function (__id) { return function() { send_to_server.func(["CAST_SPELL", __id, "CANCEL_UPGRADE"]); }; })(_id));
+                          }; })(selection.unit.id)]);
         } else {
-            buttons.push([gamedata['spells']['LOTTERY_SCAN']['ui_name'], invoke_lottery_dialog]);
-        }
-    }
+            // not damaged and not upgrading
 
-    if(obj.is_damaged() && (!obj.is_repairing())) {
-        buttons.push([gamedata['spells']['REPAIR']['ui_name'], invoke_repair_dialog]);
-    } else if(obj.is_repairing() || obj.is_under_construction()) {
-        // offer to speed up repairs or construction
-        buttons.push([gamedata['spells']['SPEEDUP_FOR_MONEY']['ui_name'],
-                      function() {invoke_speedup_dialog('speedup');}]);
-    } else if(obj.is_upgrading()) {
-        // if upgrading, then just show speedup and cancel
-        buttons.push([gamedata['spells']['SPEEDUP_FOR_MONEY']['ui_name'],
-                      function() {invoke_speedup_dialog('speedup');}]);
-        buttons.push([gamedata['spells']['CANCEL_UPGRADE']['ui_name'],
-                      (function (_id) { return function() {
-                          change_selection_ui(null);
-                          invoke_confirm_cancel_message('upgrade', (function (__id) { return function() { send_to_server.func(["CAST_SPELL", __id, "CANCEL_UPGRADE"]); }; })(_id));
-                      }; })(selection.unit.id)]);
-    } else {
-        // not damaged and not upgrading
-
-        if(obj.is_producer()) {
-            buttons.push([gamedata['spells']['HARVEST']['ui_name'],
-                          function() { do_harvest(false); }]);
-            if(player.get_any_abtest_value('enable_harvest_all', gamedata['enable_harvest_all'])) {
-                buttons.push([gamedata['spells']['HARVEST_ALL2']['ui_name'],
-                              function() { do_harvest(true); }]);
+            if(obj.is_producer()) {
+                if(!session.home_base && gamedata['client']['quarry_collect_poll_interval'] < 0) {
+                    // placeholder that tells you to go back home and collect all
+                    buttons.push([gamedata['spells']['HARVEST']['ui_name'], null, 'disabled', gamedata['spells']['HARVEST']['ui_name_quarry']]);
+                } else if(session.home_base) {
+                    buttons.push([gamedata['spells']['HARVEST']['ui_name'],
+                                  function() { do_harvest(false); }]);
+                    if(player.get_any_abtest_value('enable_harvest_all', gamedata['enable_harvest_all'])) {
+                        buttons.push([gamedata['spells']['HARVEST_ALL2']['ui_name'],
+                                      function() { do_harvest(true); }]);
+                    }
+                }
             }
-        }
 
-        if(obj.is_factory()) {
-            if(obj.is_manufacturing() && player.unit_speedups_enabled()) {
-                buttons.push([gamedata['spells']['SPEEDUP_FOR_MONEY']['ui_name'],
-                              function() {invoke_speedup_dialog('speedup'); }]);
-            }
-            buttons.push([gamedata['spells']['MAKE_DROIDS']['ui_name'],
-                          (function (_obj) { return function() {
-                              invoke_manufacture_dialog('building_context', _obj.spec['manufacture_category'], null, _obj);
-                          }; })(obj)]);
-        }
-
-        if(obj.is_researcher()) {
-            if(obj.is_researching()) {
-                buttons.push([gamedata['spells']['SPEEDUP_FOR_MONEY']['ui_name'],
-                              function() {invoke_speedup_dialog('speedup'); }]);
-                buttons.push([gamedata['spells']['CANCEL_RESEARCH']['ui_name'],
-                              (function (_id) { return function() {
-                                  change_selection_ui(null);
-                                  invoke_confirm_cancel_message('research', (function (__id) { return function() { send_to_server.func(["CAST_SPELL", __id, "CANCEL_RESEARCH"]); }; })(_id));
-                              }; })(selection.unit.id)]);
-            } else {
-                buttons.push([gamedata['spells']['RESEARCH_FOR_FREE']['ui_name'],
+            if(session.home_base && obj.is_factory()) {
+                if(obj.is_manufacturing() && player.unit_speedups_enabled()) {
+                    buttons.push([gamedata['spells']['SPEEDUP_FOR_MONEY']['ui_name'],
+                                  function() {invoke_speedup_dialog('speedup'); }]);
+                }
+                buttons.push([gamedata['spells']['MAKE_DROIDS']['ui_name'],
                               (function (_obj) { return function() {
-                                  var category = _obj.spec['research_categories'][0];
-                                  invoke_research_dialog(null, category);
+                                  invoke_manufacture_dialog('building_context', _obj.spec['manufacture_category'], null, _obj);
                               }; })(obj)]);
             }
-        }
 
-        if(obj.is_crafter()) {
-            var cat = gamedata['crafting']['categories'][obj.spec['crafting_categories'][0]];
-            buttons.push([cat['ui_verb'] || gamedata['spells']['CRAFT_FOR_FREE']['ui_name'],
-                          (function (_cat) { return function() {
-                              if(_cat['dialog'] == 'fishing_dialog') {
-                                  invoke_fishing_dialog();
-                              } else if(_cat['table_of_contents']) {
-                                  invoke_crafting_table_of_contents_dialog(_cat['name']);
-                              } else {
-                                  invoke_crafting_dialog(_cat['name']);
-                              }
-                          }; })(cat)]);
-            if(obj.is_crafting()) {
-                cat = gamedata['crafting']['categories'][gamedata['crafting']['recipes'][obj.is_crafting()]['crafting_category']];
-                if(player.crafting_speedups_enabled() && obj.crafting_progress_one() >= 0) {
-                    if(('speedupable' in cat) && !cat['speedupable']) {
-                        // cannot be sped up
-                    } else {
-                        buttons.push([gamedata['spells']['SPEEDUP_FOR_MONEY']['ui_name'],
-                                      function() {invoke_speedup_dialog('speedup'); }]);
+            if(session.home_base && obj.is_researcher()) {
+                if(obj.is_researching()) {
+                    buttons.push([gamedata['spells']['SPEEDUP_FOR_MONEY']['ui_name'],
+                                  function() {invoke_speedup_dialog('speedup'); }]);
+                    buttons.push([gamedata['spells']['CANCEL_RESEARCH']['ui_name'],
+                                  (function (_id) { return function() {
+                                      change_selection_ui(null);
+                                      invoke_confirm_cancel_message('research', (function (__id) { return function() { send_to_server.func(["CAST_SPELL", __id, "CANCEL_RESEARCH"]); }; })(_id));
+                                  }; })(selection.unit.id)]);
+                } else {
+                    buttons.push([gamedata['spells']['RESEARCH_FOR_FREE']['ui_name'],
+                                  (function (_obj) { return function() {
+                                      var category = _obj.spec['research_categories'][0];
+                                      invoke_research_dialog(null, category);
+                                  }; })(obj)]);
+                }
+            }
+
+            if(session.home_base && obj.is_crafter()) {
+                var cat = gamedata['crafting']['categories'][obj.spec['crafting_categories'][0]];
+                buttons.push([cat['ui_verb'] || gamedata['spells']['CRAFT_FOR_FREE']['ui_name'],
+                              (function (_cat) { return function() {
+                                  if(_cat['dialog'] == 'fishing_dialog') {
+                                      invoke_fishing_dialog();
+                                  } else if(_cat['table_of_contents']) {
+                                      invoke_crafting_table_of_contents_dialog(_cat['name']);
+                                  } else {
+                                      invoke_crafting_dialog(_cat['name']);
+                                  }
+                              }; })(cat)]);
+                if(obj.is_crafting()) {
+                    cat = gamedata['crafting']['categories'][gamedata['crafting']['recipes'][obj.is_crafting()]['crafting_category']];
+                    if(player.crafting_speedups_enabled() && obj.crafting_progress_one() >= 0) {
+                        if(('speedupable' in cat) && !cat['speedupable']) {
+                            // cannot be sped up
+                        } else {
+                            buttons.push([gamedata['spells']['SPEEDUP_FOR_MONEY']['ui_name'],
+                                          function() {invoke_speedup_dialog('speedup'); }]);
+                        }
+                    }
+                    if(('cancelable' in cat) && !cat['cancelable']) {
+                        // not cancelable
+                    } else if(obj.crafting_progress_one() >= 0) {
+                        buttons.push([cat['ui_cancel_verb'] || gamedata['spells']['CANCEL_CRAFT']['ui_name'],
+                                      (function (_unit, _cat) { return function() {
+                                          change_selection_ui(null);
+                                          invoke_confirm_cancel_message(cat['confirm_cancel_kind'] || 'crafting', (function (__unit) {
+                                              return function() {
+                                                  cancel_unfinished_crafting(__unit);
+                                              }; })(_unit));
+                                      }; })(selection.unit, cat)]);
                     }
                 }
-                if(('cancelable' in cat) && !cat['cancelable']) {
-                    // not cancelable
-                } else if(obj.crafting_progress_one() >= 0) {
-                    buttons.push([cat['ui_cancel_verb'] || gamedata['spells']['CANCEL_CRAFT']['ui_name'],
-                                  (function (_unit, _cat) { return function() {
-                                      change_selection_ui(null);
-                                      invoke_confirm_cancel_message(cat['confirm_cancel_kind'] || 'crafting', (function (__unit) {
-                                          return function() {
-                                              cancel_unfinished_crafting(__unit);
-                                          }; })(_unit));
-                                  }; })(selection.unit, cat)]);
+            }
+
+            if(session.home_base && obj.is_minefield()) {
+                buttons.push([gamedata['spells']['CRAFT_FOR_FREE']['ui_name_building_context_minefield'],
+                              (function (_obj) { return function() {
+                                  invoke_crafting_dialog('mines');
+                              }; })(obj)]);
+
+                var mine_item_name = obj.minefield_item();
+                if(mine_item_name) {
+                    var mine_item = gamedata['items'][mine_item_name];
+                    if(mine_item && mine_item['associated_tech']) {
+                        buttons.push([gamedata['spells']['UPGRADE_FOR_FREE']['ui_name'],
+                                      (function (_techname) { return function() {
+                                          invoke_upgrade_tech_dialog(_techname, null);
+                                      }; })(mine_item['associated_tech'])]);
+                    }
                 }
             }
-        }
-        if(obj.is_minefield()) {
-            buttons.push([gamedata['spells']['CRAFT_FOR_FREE']['ui_name_building_context_minefield'],
-                          (function (_obj) { return function() {
-                              invoke_crafting_dialog('mines');
-                          }; })(obj)]);
 
-            var mine_item_name = obj.minefield_item();
-            if(mine_item_name) {
-                var mine_item = gamedata['items'][mine_item_name];
-                if(mine_item && mine_item['associated_tech']) {
-                    buttons.push([gamedata['spells']['UPGRADE_FOR_FREE']['ui_name'],
-                                  (function (_techname) { return function() {
-                                      invoke_upgrade_tech_dialog(_techname, null);
-                                  }; })(mine_item['associated_tech'])]);
-                }
-            }
-        }
-
-        // can building be upgraded further?
+            // can building be upgraded further?
 
             if(obj.time_until_finish() > 0) {
                 // object is busy with something, cannot upgrade
-            } else if(obj.get_max_ui_level() > 1 || (('equip_slots' in obj.spec) && !obj.is_minefield())) {
+            } else if((session.home_base || quarry_buildable) && (obj.get_max_ui_level() > 1 || (('equip_slots' in obj.spec) && !obj.is_minefield()))) {
                 var spell = gamedata['spells']['SHOW_UPGRADE'];
                 if(obj.level < obj.get_max_ui_level()) {
                     if(gamedata['store']['enable_upgrade_all_barriers'] && (obj.spec['name'] === 'barrier')) {
@@ -17090,11 +17089,13 @@ function invoke_building_context_menu(mouse_xy) {
                 buttons.push([spell['ui_name'+ (obj.level < obj.get_max_ui_level() ? '' : '_maxlevel')], invoke_upgrade_building_dialog]);
             }
 
-        if(obj.spec['name'] == gamedata['townhall']) {
-            add_change_region_button(buttons);
-        }
-    }
-        // END is_building()
+            if(session.home_base && obj.spec['name'] == gamedata['townhall']) {
+                add_change_region_button(buttons);
+            }
+
+        } // END not damaged and not upgrading
+
+    // END is_building()
     } else if(obj.is_inert() && session.home_base && ('spells' in obj.spec)) {
         for(var i = 0; i < obj.spec['spells'].length; i++) {
             // COLLECT_DEPOSIT etc.
@@ -17122,7 +17123,7 @@ function invoke_building_context_menu(mouse_xy) {
     if((obj.is_building() ||
         (obj.is_inert() && player.is_cheater)) &&
        (session.home_base ||
-        (session.is_quarry() && obj.spec['quarry_movable'] && session.viewing_base.base_landlord_id == session.user_id && session.region.data && session.region.data['storage'] == 'nosql' &&
+        (quarry_movable &&
          (!(session.viewing_base.base_climate in gamedata['climates']) || !gamedata['climates'][session.viewing_base.base_climate]['exclude_ground_units']))
        )) {
         // "Move" is always the last button

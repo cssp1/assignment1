@@ -1608,6 +1608,7 @@ class NoSQLClient (object):
     def drop_mobile_objects_by_owner(self, region, user_id, reason=''): return self.instrument('drop_mobile_objects_by_owner(%s)'%reason, self._drop_objects, (region,'mobile',{'owner_id':user_id}))
     def drop_all_objects_by_base(self, *args, **kwargs):
         return self.drop_fixed_objects_by_base(*args, **kwargs) + self.drop_mobile_objects_by_base(*args, **kwargs)
+    def drop_fixed_object_by_id(self, region, obj_id, reason=''):  return self.instrument('drop_fixed_object_by_id(%s)'%reason, self._drop_objects, (region,'fixed',{'_id':self.encode_object_id(obj_id)}))
     def drop_mobile_object_by_id(self, region, obj_id, reason=''):  return self.instrument('drop_mobile_object_by_id(%s)'%reason, self._drop_objects, (region,'mobile',{'_id':self.encode_object_id(obj_id)}))
     def _drop_objects(self, region, table_name, query):
         return self.region_table(region, table_name).remove(query)['n']
