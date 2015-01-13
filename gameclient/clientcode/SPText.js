@@ -62,6 +62,34 @@ SPText.bbcode_quote = function(str) {
     return r;
 };
 
+// strip out all BBCode from the string to get its raw content
+SPText.bbcode_strip = function(str) {
+    var r = '';
+    var state = SPText.BBCODE_STATES.LITERAL;
+    for(var i = 0; i < str.length; i++) {
+        var c = str.charAt(i);
+        if(c === '[' && state != SPText.BBCODE_STATES.ESCAPED) {
+            if(state != SPText.BBCODE_STATES.LITERAL) {
+                console.log("parse error: double [");
+                break;
+            }
+            state = SPText.BBCODE_STATES.CODE;
+        } else if(c === ']' && state != SPText.BBCODE_STATES.ESCAPED) {
+            state = SPText.BBCODE_STATES.LITERAL;
+        } else if(c === '\\' && state == SPText.BBCODE_STATES.LITERAL) {
+            state = SPText.BBCODE_STATES.ESCAPED;
+        } else {
+          if(state == SPText.BBCODE_STATES.LITERAL) {
+              r += c;
+          } else if(state == SPText.BBCODE_STATES.ESCAPED) {
+              r += c;
+              state = SPText.BBCODE_STATES.LITERAL;
+          }
+        }
+    }
+    return r;
+};
+
 SPText.BBCODE_STATES = { LITERAL: 0, CODE: 1, CODE_OPEN: 2, CODE_CLOSE: 3, ESCAPED: 4 };
 
 SPText.cstring_to_ablocks_bbcode = function(str, props, plugins) {

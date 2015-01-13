@@ -756,6 +756,10 @@
 #include "$GAME_ID/$GAME_ID_tech.json"
     ,
 
+    "inverse_requirements":
+#include "$GAME_ID/built/$GAME_ID_inverse_requirements.json"
+    ,
+
     "items": {
 #include_stripped "$GAME_ID/$GAME_ID_items.json"
         ,

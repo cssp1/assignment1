@@ -7,14 +7,13 @@
 # gamedata checker
 
 import SpinJSON
+import GameDataUtil
 import sys, traceback, os, copy, time
 import getopt
 
 time_now = int(time.time())
 gamedata = None
 verbose = False
-
-def get_leveled_quantity(qty, level): return qty[level-1] if type(qty) is list else qty
 
 # track all entries in art.json referenced by code and data
 # note, this is separate from the tracking of whether the art pack actually contains what's needed by art.json
@@ -150,8 +149,6 @@ def check_inert(specname, spec):
         error |= 1; print specname, 'continuous_cast spell "%s" not found' % (spec['continuous_cast'])
     return error
 
-MAX_LEVEL_FIELD = {'units': 'max_hp', 'buildings': 'build_time', 'tech': 'research_time'}
-
 def check_mandatory_fields(specname, spec, kind):
     fields = ['name', 'kind', 'gridsize', 'defense_types', 'art_asset']
     if kind == 'buildings':
@@ -198,8 +195,8 @@ def check_mandatory_fields(specname, spec, kind):
                 error |= 1; print 'building %s has invalid exclusion_zone setting. In SG, all buildings (except barriers) must have "exclusion_zone": [4,4]' % specname
     max_level = -1
 
-    if kind in MAX_LEVEL_FIELD:
-        field = MAX_LEVEL_FIELD[kind]
+    if kind in GameDataUtil.MAX_LEVEL_FIELD:
+        field = GameDataUtil.MAX_LEVEL_FIELD[kind]
         if (field not in spec):
             error |= 1; print '%s missing mandatory field %s' % (specname, field)
         elif not isinstance(spec[field], list):
@@ -217,7 +214,7 @@ def check_mandatory_fields(specname, spec, kind):
     ['storage_'+res for res in gamedata['resources']]:
         if (check_field in spec) and (type(spec[check_field]) is list) and (len(spec[check_field]) != max_level):
             error |= 1
-            print '%s %s "%s" array length (%d) does not match max level (%d - as determined by length of %s array)' % (kind, specname, check_field, len(spec[check_field]), max_level, MAX_LEVEL_FIELD[kind])
+            print '%s %s "%s" array length (%d) does not match max level (%d - as determined by length of %s array)' % (kind, specname, check_field, len(spec[check_field]), max_level, GameDataUtil.MAX_LEVEL_FIELD[kind])
 
     for lev in xrange(1,max_level+1):
         cc_requirement = get_cc_requirement(spec['requires'], lev) if ('requires' in spec) else 0
@@ -1056,7 +1053,7 @@ def check_item(itemname, spec):
                 elif (not equip.get('dev_only',False)) and (equip['slot_type'] not in host_spec.get('equip_slots',{})):
                     error |= 1; print '%s: equips to %s but %s.json is missing a "%s" slot for it' % (itemname, equip['name'], source, equip['slot_type'])
                 elif ('min_level' in equip):
-                    if len(host_spec[MAX_LEVEL_FIELD[source]]) < equip['min_level']:
+                    if len(host_spec[GameDataUtil.MAX_LEVEL_FIELD[source]]) < equip['min_level']:
                         error |= 1; print '%s: equips to %s L%d+ but the unit/building does not actually upgrade that high' % (itemname, equip['name'], equip['min_level'])
 
         if equip.get('min_level',1) > 1:
@@ -1495,7 +1492,7 @@ def check_consequent(cons, reason = '', context = None, context_data = None):
             error |= 1; print '%s: %s consequent refers to nonexistent tech "%s"' % (reason, cons['consequent'], cons['tech_name'])
         else:
             level = cons.get('tech_level',1)
-            if level < 1 or level > len(gamedata['tech'][cons['tech_name']][MAX_LEVEL_FIELD['tech']]):
+            if level < 1 or level > len(gamedata['tech'][cons['tech_name']][GameDataUtil.MAX_LEVEL_FIELD['tech']]):
                 error |= 1; print '%s: %s consequent gives "%s" L%d which is greater than its max level' % (reason, cons['consequent'], cons['tech_name'], cons['tech_level'])
     elif cons['consequent'] == 'OPEN_URL':
         error |= check_url(cons['url'], reason = reason)
@@ -1521,7 +1518,7 @@ def check_consequent(cons, reason = '', context = None, context_data = None):
             if type(data) is dict:
                 qty = data['qty']
                 min_level = data.get('min_level', 1)
-                if min_level > len(gamedata['units'][name][MAX_LEVEL_FIELD['units']]):
+                if min_level > len(gamedata['units'][name][GameDataUtil.MAX_LEVEL_FIELD['units']]):
                     error |= 1; print '%s: GIVE_UNITS min_level is higher than max unit level' % reason
             else:
                 qty = data
@@ -1951,9 +1948,9 @@ def check_ai_base_contents_power(building_list, strid):
         level = obj.get('force_level', obj.get('level', 1))
         if spec:
             if 'consumes_power' in spec:
-                consumed += get_leveled_quantity(spec['consumes_power'], level)
+                consumed += GameDataUtil.get_leveled_quantity(spec['consumes_power'], level)
             if 'provides_power' in spec:
-                produced += get_leveled_quantity(spec['provides_power'], level)
+                produced += GameDataUtil.get_leveled_quantity(spec['provides_power'], level)
 
     if produced <= 0:
         return 0 # tutorial or dummy base

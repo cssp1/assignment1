@@ -7557,6 +7557,29 @@
         }
     },
 
+    "upgrade_bar": {
+        "dimensions": [736,60], // note: width is dynamic
+        "xy": [6,0], // offset relative to bottom-left corner of parent dialog
+        "clip_children": 0, "transparent_to_mouse": 1,
+        "widgets": {
+            "bgrect": { "kind":"SolidRect", "xy":[0,0], "dimensions": [736,60], "color":[0,0,0,0.5], "bevel":3 },
+            "upgrade_button": { "kind": "ActionButton", "xy": [14,14], "dimensions": [134,28], "text_size": 13, "text_style": "bold",
+                                "bg_image": "menu_button_134px", "text_color": [0,0,0,1], "ui_name": "Upgrade", "alpha_nonhover": 0.8 },
+            "output": { "kind": "ScrollingTextField", "xy": [174,9], "dimensions": [512,44], "text_size": 15, "text_leading": 20, "text_style": "normal",
+                        "text_hjustify": "left", "text_vjustify": "top", "drop_shadow": 1, "text_color":[1,1,1,1], "alpha_nonhover": 0.8,
+                        "ui_name": "[b]Next: %THING Level %LEVEL[/b]\nUnlocks: %GOODIES",
+                        "ui_goody_leveled": "[color=#00b0f0]%THING[/color] Level %LEVEL",
+                        "ui_goody_unleveled": "[color=#00b0f0]%THING[/color]",
+                        "ui_goody_with": " (with %PRED_LIST)",
+                        "ui_goody_with_pred": "[color=#f0f000]%PRED[/color]"
+                      },
+            "scroll_up": { "kind": "ActionButton", "xy": [700,-5], "dimensions": [27,46], "bg_image": "chat_scroll_up", "push_bg_image": 1,
+                           "layout": { "hjustify": "right"} },
+            "scroll_down": { "kind": "ActionButton", "xy": [700,20], "dimensions": [27,46], "bg_image": "chat_scroll_down", "push_bg_image": 1,
+                           "layout": { "hjustify": "right"} }
+        }
+    },
+
     "loot_dialog": {
         "bg_image": "",
         "dimensions": [736,423],
