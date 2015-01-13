@@ -15,6 +15,7 @@ import SpinUpcacheIO
 import SkynetLTV # for outboard LTV estimate table
 import SpinSQLUtil
 import SpinParallel
+import SpinSingletonProcess
 import MySQLdb
 
 time_now = int(time.time())
@@ -366,154 +367,16 @@ if __name__ == '__main__':
     sql_util = SpinSQLUtil.MySQLUtil()
     if not verbose: sql_util.disable_warnings()
 
-    cache = open_cache(game_id)
+    with SpinSingletonProcess.SingletonProcess('upcache_to_mysql-%s' % game_id):
+        cache = open_cache(game_id)
 
-    # mapping of upcache fields to MySQL
-    fields = {}
+        # mapping of upcache fields to MySQL
+        fields = {}
 
-    # PASS 1 - get field names
-    if 1:
-        tasks = [{'game_id':game_id, 'cache_info':cache.info,
-                  'mode':'get_fields', 'field_mode': field_mode, 'segnum':segnum,
-                  'commit_interval':commit_interval, 'verbose':verbose} for segnum in range(0, cache.num_segments())]
-
-        if parallel <= 1:
-            output = [do_slave(task) for task in tasks]
-        else:
-            output = SpinParallel.go(tasks, [sys.argv[0], '--slave'], on_error='continue', nprocs=parallel, verbose=False)
-
-        # reduce
-        for slave_fields in output:
-            for key, val in slave_fields.iteritems():
-                if val is not None:
-                    fields[key] = val
-
-        # filter field names
-        for key, val in fields.items():
-            if val is None: del fields[key]
-        if 'user_id' in fields: del fields['user_id'] # handled specially
-
-        if verbose: print 'fields =', fields
-
-    # PASS 2 - dump the rows
-    if 1:
-        cfg = SpinConfig.get_mysql_config(game_id+'_upcache')
-        con = MySQLdb.connect(*cfg['connect_args'], **cfg['connect_kwargs'])
-        cur = con.cursor()
-
-        upcache_table = cfg['table_prefix']+game_id+'_upcache'
-        if field_mode != 'ALL':
-            upcache_table += '_'+field_mode
-        sessions_table = cfg['table_prefix']+game_id+'_sessions'
-        townhall_table = cfg['table_prefix']+game_id+'_townhall_at_time'
-        tech_table = cfg['table_prefix']+game_id+'_tech_at_time'
-        upgrade_achievement_table = cfg['table_prefix']+game_id+'_upgrade_achievement'
-        buildings_table = cfg['table_prefix']+game_id+'_building_levels_at_time'
-        activity_table = cfg['table_prefix']+game_id+'_activity_5min'
-        facebook_campaign_map_table = cfg['table_prefix']+game_id+'_facebook_campaign_map'
-        ltv_table = cfg['table_prefix']+game_id+'_user_ltv'
-
-        # these are the tables that are replaced entirely each run
-        atomic_tables = [upcache_table,facebook_campaign_map_table] + \
-                        ([sessions_table] if do_sessions else []) + \
-                        ([activity_table] if do_activity else []) + \
-                        ([townhall_table] if do_townhall else []) + \
-                        ([upgrade_achievement_table] if (do_tech or do_buildings) else []) + \
-                        ([buildings_table] if do_buildings else []) + \
-                        ([tech_table] if do_tech else []) + \
-                        ([ltv_table] if do_ltv else [])
-
-        for TABLE in atomic_tables:
-            # get rid of temp tables
-            cur.execute("DROP TABLE IF EXISTS "+sql_util.sym(TABLE+'_temp'))
-            # ensure that non-temp version actually exists, so that the RENAME operation below will work
-            sql_util.ensure_table(cur, TABLE, {'fields': [('unused','INT4')]})
-        con.commit()
-
-        # set up FACEBOOK_CAMPAIGN_MAP table
-        for t in (facebook_campaign_map_table, facebook_campaign_map_table+'_temp'):
-            sql_util.ensure_table(cur, t,
-                                  {'fields': [('from', 'VARCHAR(64) NOT NULL PRIMARY KEY'),
-                                              ('to', 'VARCHAR(64)')]})
-        sql_util.do_insert_batch(cur, facebook_campaign_map_table+'_temp',
-                                 [[('from',k),('to',v)] for k,v in SpinUpcache.FACEBOOK_CAMPAIGN_MAP.iteritems()])
-
-        sorted_field_names = sorted(fields.keys())
-
-        sql_util.ensure_table(cur, upcache_table+'_temp', {'fields': [('user_id', 'INT4 NOT NULL PRIMARY KEY')] +
-                                                                     [(key, fields[key]) for key in sorted_field_names],
-                                                           'indices': {'by_account_creation_time': {'keys': [('account_creation_time','ASC')]},
-                                                                       'by_last_login_time': {'keys': [('last_login_time','ASC')]}}
-                                                           })
-
-        if do_sessions: # keep in sync with sessions_to_sql.py
-            sql_util.ensure_table(cur, sessions_table+'_temp',
-                                  {'fields': [('user_id', 'INT4 NOT NULL'),
-                                              ('start', 'INT8 NOT NULL'),
-                                              ('end', 'INT8 NOT NULL')] + sql_util.summary_in_dimensions()}) # make index after load
-
-        if do_activity: # keep in sync with activity_to_sql.py
-            sql_util.ensure_table(cur, activity_table+'_temp',
-                                  {'fields': [('user_id','INT4 NOT NULL'),
-                                              ('time','INT8 NOT NULL'),
-                                              ('gamebucks_spent','INT4'),
-                                              ('receipts','FLOAT4')] + \
-                                             sql_util.summary_in_dimensions() + \
-                                             [('state','VARCHAR(32) NOT NULL'),
-                                              ('ai_ui_name','VARCHAR(32)')]
-                                   }) # make index after load
-
-        if do_townhall:
-            sql_util.ensure_table(cur, townhall_table+'_temp',
-                                  {'fields': [('user_id','INT4 NOT NULL'),
-                                              ('time','INT8 NOT NULL'),
-                                              ('townhall_level','INT4 NOT NULL')]}) # make index after load
-
-        if do_tech:
-            sql_util.ensure_table(cur, tech_table+'_temp',
-                                  {'fields': [('user_id','INT4 NOT NULL'),
-                                              ('level','INT4 NOT NULL'),
-                                              ('time','INT8 NOT NULL'),
-                                              ('tech_name','VARCHAR(200) NOT NULL')],
-                                   # note: make index incrementally rather than all at once at the end, to avoid long lockup of the database
-                                   'indices': {'lev_then_time': {'unique': False, # technically unique, but don't waste time enforcing it
-                                                                 'keys': [('user_id','ASC'),('tech_name','ASC'),('level','ASC'),('time','ASC')]}}
-                                   })
-
-        if do_buildings:
-            sql_util.ensure_table(cur, buildings_table+'_temp',
-                                  {'fields': [('user_id','INT4 NOT NULL'),
-                                              ('max_level','INT4 NOT NULL'),
-                                              ('time','INT8 NOT NULL'),
-                                              ('building','VARCHAR(64) NOT NULL')],
-                                   # note: make index incrementally rather than all at once at the end, to avoid long lockup of the database
-                                   'indices': {'lev_then_time': {'unique': False, # technically unique, but don't waste time enforcing it
-                                                                 'keys': [('user_id','ASC'),('building','ASC'),('max_level','ASC'),('time','ASC')]}}
-                                   })
-
-        if do_tech or do_buildings:
-            sql_util.ensure_table(cur, upgrade_achievement_table+'_temp', achievement_table_schema(sql_util))
-
-        if do_ltv:
-            sql_util.ensure_table(cur, ltv_table+'_temp',
-                                  {'fields': [('user_id','INT4 NOT NULL PRIMARY KEY'),
-                                              ('est_90d','FLOAT4 NOT NULL')]})
-
-        con.commit()
-
-        try:
-            tasks = [{'game_id':game_id, 'cache_info':cache.info, 'dbconfig':cfg,
-                      'do_townhall': do_townhall, 'do_sessions': do_sessions, 'do_tech': do_tech, 'do_buildings': do_buildings, 'do_activity': do_activity,
-                      'do_ltv': do_ltv, 'ltv_table': ltv_table+'_temp',
-                      'upcache_table': upcache_table+'_temp',
-                      'sessions_table': sessions_table+'_temp',
-                      'townhall_table': townhall_table+'_temp',
-                      'tech_table': tech_table+'_temp',
-                      'upgrade_achievement_table': upgrade_achievement_table+'_temp',
-                      'buildings_table': buildings_table+'_temp',
-                      'activity_table': activity_table+'_temp',
-                      'mode':'get_rows', 'sorted_field_names':sorted_field_names,
-                      'segnum':segnum,
+        # PASS 1 - get field names
+        if 1:
+            tasks = [{'game_id':game_id, 'cache_info':cache.info,
+                      'mode':'get_fields', 'field_mode': field_mode, 'segnum':segnum,
                       'commit_interval':commit_interval, 'verbose':verbose} for segnum in range(0, cache.num_segments())]
 
             if parallel <= 1:
@@ -521,49 +384,188 @@ if __name__ == '__main__':
             else:
                 output = SpinParallel.go(tasks, [sys.argv[0], '--slave'], on_error='continue', nprocs=parallel, verbose=False)
 
-        except:
+            # reduce
+            for slave_fields in output:
+                for key, val in slave_fields.iteritems():
+                    if val is not None:
+                        fields[key] = val
+
+            # filter field names
+            for key, val in fields.items():
+                if val is None: del fields[key]
+            if 'user_id' in fields: del fields['user_id'] # handled specially
+
+            if verbose: print 'fields =', fields
+
+        # PASS 2 - dump the rows
+        if 1:
+            cfg = SpinConfig.get_mysql_config(game_id+'_upcache')
+            con = MySQLdb.connect(*cfg['connect_args'], **cfg['connect_kwargs'])
+            cur = con.cursor()
+
+            upcache_table = cfg['table_prefix']+game_id+'_upcache'
+            if field_mode != 'ALL':
+                upcache_table += '_'+field_mode
+            sessions_table = cfg['table_prefix']+game_id+'_sessions'
+            townhall_table = cfg['table_prefix']+game_id+'_townhall_at_time'
+            tech_table = cfg['table_prefix']+game_id+'_tech_at_time'
+            upgrade_achievement_table = cfg['table_prefix']+game_id+'_upgrade_achievement'
+            buildings_table = cfg['table_prefix']+game_id+'_building_levels_at_time'
+            activity_table = cfg['table_prefix']+game_id+'_activity_5min'
+            facebook_campaign_map_table = cfg['table_prefix']+game_id+'_facebook_campaign_map'
+            ltv_table = cfg['table_prefix']+game_id+'_user_ltv'
+
+            # these are the tables that are replaced entirely each run
+            atomic_tables = [upcache_table,facebook_campaign_map_table] + \
+                            ([sessions_table] if do_sessions else []) + \
+                            ([activity_table] if do_activity else []) + \
+                            ([townhall_table] if do_townhall else []) + \
+                            ([upgrade_achievement_table] if (do_tech or do_buildings) else []) + \
+                            ([buildings_table] if do_buildings else []) + \
+                            ([tech_table] if do_tech else []) + \
+                            ([ltv_table] if do_ltv else [])
+
             for TABLE in atomic_tables:
+                # get rid of temp tables
                 cur.execute("DROP TABLE IF EXISTS "+sql_util.sym(TABLE+'_temp'))
-            con.commit()
-            raise
-
-        if verbose: print 'inserts done'
-
-        if verbose: print 'replacing old tables'
-        for TABLE in atomic_tables:
-            # t -> t_old, t_temp -> t
-            cur.execute("RENAME TABLE "+\
-                        sql_util.sym(TABLE)+" TO "+sql_util.sym(TABLE+'_old')+","+\
-                        sql_util.sym(TABLE+'_temp')+" TO "+sql_util.sym(TABLE))
+                # ensure that non-temp version actually exists, so that the RENAME operation below will work
+                sql_util.ensure_table(cur, TABLE, {'fields': [('unused','INT4')]})
             con.commit()
 
-            # kill t_old
-            cur.execute("DROP TABLE "+sql_util.sym(TABLE+'_old'))
+            # set up FACEBOOK_CAMPAIGN_MAP table
+            for t in (facebook_campaign_map_table, facebook_campaign_map_table+'_temp'):
+                sql_util.ensure_table(cur, t,
+                                      {'fields': [('from', 'VARCHAR(64) NOT NULL PRIMARY KEY'),
+                                                  ('to', 'VARCHAR(64)')]})
+            sql_util.do_insert_batch(cur, facebook_campaign_map_table+'_temp',
+                                     [[('from',k),('to',v)] for k,v in SpinUpcache.FACEBOOK_CAMPAIGN_MAP.iteritems()])
+
+            sorted_field_names = sorted(fields.keys())
+
+            sql_util.ensure_table(cur, upcache_table+'_temp', {'fields': [('user_id', 'INT4 NOT NULL PRIMARY KEY')] +
+                                                                         [(key, fields[key]) for key in sorted_field_names],
+                                                               'indices': {'by_account_creation_time': {'keys': [('account_creation_time','ASC')]},
+                                                                           'by_last_login_time': {'keys': [('last_login_time','ASC')]}}
+                                                               })
+
+            if do_sessions: # keep in sync with sessions_to_sql.py
+                sql_util.ensure_table(cur, sessions_table+'_temp',
+                                      {'fields': [('user_id', 'INT4 NOT NULL'),
+                                                  ('start', 'INT8 NOT NULL'),
+                                                  ('end', 'INT8 NOT NULL')] + sql_util.summary_in_dimensions()}) # make index after load
+
+            if do_activity: # keep in sync with activity_to_sql.py
+                sql_util.ensure_table(cur, activity_table+'_temp',
+                                      {'fields': [('user_id','INT4 NOT NULL'),
+                                                  ('time','INT8 NOT NULL'),
+                                                  ('gamebucks_spent','INT4'),
+                                                  ('receipts','FLOAT4')] + \
+                                                 sql_util.summary_in_dimensions() + \
+                                                 [('state','VARCHAR(32) NOT NULL'),
+                                                  ('ai_ui_name','VARCHAR(32)')]
+                                       }) # make index after load
+
+            if do_townhall:
+                sql_util.ensure_table(cur, townhall_table+'_temp',
+                                      {'fields': [('user_id','INT4 NOT NULL'),
+                                                  ('time','INT8 NOT NULL'),
+                                                  ('townhall_level','INT4 NOT NULL')]}) # make index after load
+
+            if do_tech:
+                sql_util.ensure_table(cur, tech_table+'_temp',
+                                      {'fields': [('user_id','INT4 NOT NULL'),
+                                                  ('level','INT4 NOT NULL'),
+                                                  ('time','INT8 NOT NULL'),
+                                                  ('tech_name','VARCHAR(200) NOT NULL')],
+                                       # note: make index incrementally rather than all at once at the end, to avoid long lockup of the database
+                                       'indices': {'lev_then_time': {'unique': False, # technically unique, but don't waste time enforcing it
+                                                                     'keys': [('user_id','ASC'),('tech_name','ASC'),('level','ASC'),('time','ASC')]}}
+                                       })
+
+            if do_buildings:
+                sql_util.ensure_table(cur, buildings_table+'_temp',
+                                      {'fields': [('user_id','INT4 NOT NULL'),
+                                                  ('max_level','INT4 NOT NULL'),
+                                                  ('time','INT8 NOT NULL'),
+                                                  ('building','VARCHAR(64) NOT NULL')],
+                                       # note: make index incrementally rather than all at once at the end, to avoid long lockup of the database
+                                       'indices': {'lev_then_time': {'unique': False, # technically unique, but don't waste time enforcing it
+                                                                     'keys': [('user_id','ASC'),('building','ASC'),('max_level','ASC'),('time','ASC')]}}
+                                       })
+
+            if do_tech or do_buildings:
+                sql_util.ensure_table(cur, upgrade_achievement_table+'_temp', achievement_table_schema(sql_util))
+
+            if do_ltv:
+                sql_util.ensure_table(cur, ltv_table+'_temp',
+                                      {'fields': [('user_id','INT4 NOT NULL PRIMARY KEY'),
+                                                  ('est_90d','FLOAT4 NOT NULL')]})
+
             con.commit()
 
-        # created incrementally now
-        #if verbose: print 'building indices for', upcache_table
-        #cur.execute("ALTER TABLE "+sql_util.sym(upcache_table)+" ADD INDEX by_account_creation_time (account_creation_time), ADD INDEX by_last_login_time (last_login_time)")
+            try:
+                tasks = [{'game_id':game_id, 'cache_info':cache.info, 'dbconfig':cfg,
+                          'do_townhall': do_townhall, 'do_sessions': do_sessions, 'do_tech': do_tech, 'do_buildings': do_buildings, 'do_activity': do_activity,
+                          'do_ltv': do_ltv, 'ltv_table': ltv_table+'_temp',
+                          'upcache_table': upcache_table+'_temp',
+                          'sessions_table': sessions_table+'_temp',
+                          'townhall_table': townhall_table+'_temp',
+                          'tech_table': tech_table+'_temp',
+                          'upgrade_achievement_table': upgrade_achievement_table+'_temp',
+                          'buildings_table': buildings_table+'_temp',
+                          'activity_table': activity_table+'_temp',
+                          'mode':'get_rows', 'sorted_field_names':sorted_field_names,
+                          'segnum':segnum,
+                          'commit_interval':commit_interval, 'verbose':verbose} for segnum in range(0, cache.num_segments())]
 
-        if do_sessions:
-            if verbose: print 'building indices for', sessions_table
-            cur.execute("ALTER TABLE "+sql_util.sym(sessions_table)+" ADD INDEX by_start (start), ADD INDEX by_user_start (user_id, start)")
-        if do_activity:
-            if verbose: print 'building indices for', activity_table
-            cur.execute("ALTER TABLE "+sql_util.sym(activity_table)+" ADD INDEX by_time (time)")
-        if do_townhall:
-            if verbose: print 'building indices for', townhall_table
-            cur.execute("ALTER TABLE "+sql_util.sym(townhall_table)+" ADD INDEX ts (user_id, townhall_level, time), ADD INDEX ts2 (user_id, time, townhall_level)")
+                if parallel <= 1:
+                    output = [do_slave(task) for task in tasks]
+                else:
+                    output = SpinParallel.go(tasks, [sys.argv[0], '--slave'], on_error='continue', nprocs=parallel, verbose=False)
 
-        if do_tech:
-            pass # note: index is created incrementally now, to avoid long lockup of database
-            #if verbose: print 'building indices for', tech_table
-            #cur.execute("ALTER TABLE "+sql_util.sym(tech_table)+" ADD INDEX lev_then_time (user_id, tech_name, level, time)")
-        if do_buildings:
-            pass # note: index is created incrementally now, to avoid long lockup of database
-            #if verbose: print 'building indices for', buildings_table
-            #cur.execute("ALTER TABLE "+sql_util.sym(buildings_table)+" ADD INDEX lev_then_time (user_id, building, max_level, time)")
+            except:
+                for TABLE in atomic_tables:
+                    cur.execute("DROP TABLE IF EXISTS "+sql_util.sym(TABLE+'_temp'))
+                con.commit()
+                raise
 
-        con.commit()
+            if verbose: print 'inserts done'
 
-        if verbose: print 'all done.'
+            if verbose: print 'replacing old tables'
+            for TABLE in atomic_tables:
+                # t -> t_old, t_temp -> t
+                cur.execute("RENAME TABLE "+\
+                            sql_util.sym(TABLE)+" TO "+sql_util.sym(TABLE+'_old')+","+\
+                            sql_util.sym(TABLE+'_temp')+" TO "+sql_util.sym(TABLE))
+                con.commit()
+
+                # kill t_old
+                cur.execute("DROP TABLE "+sql_util.sym(TABLE+'_old'))
+                con.commit()
+
+            # created incrementally now
+            #if verbose: print 'building indices for', upcache_table
+            #cur.execute("ALTER TABLE "+sql_util.sym(upcache_table)+" ADD INDEX by_account_creation_time (account_creation_time), ADD INDEX by_last_login_time (last_login_time)")
+
+            if do_sessions:
+                if verbose: print 'building indices for', sessions_table
+                cur.execute("ALTER TABLE "+sql_util.sym(sessions_table)+" ADD INDEX by_start (start), ADD INDEX by_user_start (user_id, start)")
+            if do_activity:
+                if verbose: print 'building indices for', activity_table
+                cur.execute("ALTER TABLE "+sql_util.sym(activity_table)+" ADD INDEX by_time (time)")
+            if do_townhall:
+                if verbose: print 'building indices for', townhall_table
+                cur.execute("ALTER TABLE "+sql_util.sym(townhall_table)+" ADD INDEX ts (user_id, townhall_level, time), ADD INDEX ts2 (user_id, time, townhall_level)")
+
+            if do_tech:
+                pass # note: index is created incrementally now, to avoid long lockup of database
+                #if verbose: print 'building indices for', tech_table
+                #cur.execute("ALTER TABLE "+sql_util.sym(tech_table)+" ADD INDEX lev_then_time (user_id, tech_name, level, time)")
+            if do_buildings:
+                pass # note: index is created incrementally now, to avoid long lockup of database
+                #if verbose: print 'building indices for', buildings_table
+                #cur.execute("ALTER TABLE "+sql_util.sym(buildings_table)+" ADD INDEX lev_then_time (user_id, building, max_level, time)")
+
+            con.commit()
+
+            if verbose: print 'all done.'
