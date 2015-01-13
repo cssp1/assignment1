@@ -76,7 +76,7 @@ ${BUILT}/${GAME_ID}_loot_tables.json: ${GAME_ID}/${GAME_ID}_make_loot_tables.py
 	@echo "    ${GAME_ID}_loot_tables.json..." && ${GAME_ID}/${GAME_ID}_make_loot_tables.py $@
 ${BUILT}/${GAME_ID}_loot_tables_compiled.json: ${BUILT}/${GAME_ID}_loot_tables.json
 	@echo "    ${GAME_ID}_loot_tables_compiled.json..." && ${PROCESSOR} ${PROCESSOR_ARGS} $< -o $@
-≈ma${BUILT}/${GAME_ID}_promo_codes_compiled.json: ${GAME_ID}/${GAME_ID}_promo_codes.json
+${BUILT}/${GAME_ID}_promo_codes_compiled.json: ${GAME_ID}/${GAME_ID}_promo_codes.json
 	@echo "    ${GAME_ID}_promo_codes_compiled.json..." && ${PROCESSOR} ${PROCESSOR_ARGS} $< -o $@
 ${BUILT}/${GAME_ID}_tech_mods.json: ${GAMEDATA}/make_tech_mods.py ${GAME_ID}/${GAME_ID}_tech_units.json
 	@echo "    ${GAME_ID}_tech_mods.json..." && ${GAMEDATA}/make_tech_mods.py -g ${GAME_ID} ${GAME_ID}/${GAME_ID}_tech_units.json $@
