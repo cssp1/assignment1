@@ -118,8 +118,8 @@ if __name__ == '__main__':
                     'tech': prune_dict(dict((name, get_requirements(gamedata, gamedata['tech'][name])) for name in gamedata['tech'])),
                     'crafting_recipe': prune_dict(dict((name, get_requirements(gamedata, gamedata['crafting']['recipes'][name])) for name in gamedata['crafting']['recipes'])),
                     }
-    # note different pluralization of the keys - this parallels toplevel gamedata specs
-    out = {'buildings': prune_dict(dict((name, invert_requirements(gamedata, requirements, gamedata['buildings'][name])) for name in gamedata['buildings'])),
+    # note pluralization of the keys - this matches what UpgradeBar expects
+    out = {'building': prune_dict(dict((name, invert_requirements(gamedata, requirements, gamedata['buildings'][name])) for name in gamedata['buildings'])),
            'tech': prune_dict(dict((name, invert_requirements(gamedata, requirements, gamedata['tech'][name])) for name in gamedata['tech'])),
            #'zzz-requirements': requirements
            }

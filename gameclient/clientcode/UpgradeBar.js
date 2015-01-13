@@ -79,11 +79,16 @@ UpgradeBar.update_contents = function(dialog, kind, specname, new_level, obj_id)
     s = s.replace('%THING', spec['ui_name']);
     s = s.replace('%LEVEL', pretty_print_number(new_level));
 
-    // XXXXXX
     var ui_goodies_list = [];
-    var goodies_list = [{'tech':'archer_production','level':1},{'tech':'orc_production','level':2},{'building':'barracks','level':2},{'crafting_recipe':'make_dragons_breath_magic_L1'}];
+    var goodies_list = null;
+    if(specname in gamedata['inverse_requirements'][kind]) {
+        goodies_list = get_leveled_quantity(gamedata['inverse_requirements'][kind][specname], new_level);
+    }
+    if(goodies_list === null) { goodies_list = []; }
+
     goog.array.forEach(goodies_list, function(goody) {
-        var temp = dialog.data['widgets']['output'][('level' in goody && goody['level'] > 1 ? 'ui_goody_leveled' : 'ui_goody_unleveled')];
+        var level = ('level' in goody ? goody['level'] : 1);
+        var temp = dialog.data['widgets']['output'][(level > 1 ? 'ui_goody_leveled' : 'ui_goody_unleveled')];
         if('tech' in goody) {
             temp = temp.replace('%THING', gamedata['tech'][goody['tech']]['ui_name']);
         } else if('building' in goody) {
@@ -100,8 +105,20 @@ UpgradeBar.update_contents = function(dialog, kind, specname, new_level, obj_id)
         } else {
             throw Error('unknown goody '+JSON.stringify(goody));
         }
-        if('level' in goody) {
-            temp = temp.replace('%LEVEL', pretty_print_number(goody['level']));
+        if(level > 1) {
+            temp = temp.replace('%LEVEL', pretty_print_number(level));
+        }
+
+        // parse additional required predicates
+        if('with' in goody) {
+            var with_list = [];
+            goog.array.forEach(goody['with'], function(other_pred) {
+                var ui_pred = read_predicate(other_pred).ui_describe(player);
+                if(ui_pred) { with_list.push(dialog.data['widgets']['output']['ui_goody_with_pred'].replace('%PRED', ui_pred)); }
+            });
+            if(with_list.length > 0) {
+                temp += dialog.data['widgets']['output']['ui_goody_with'].replace('%PRED_LIST', with_list.join(', '));
+            }
         }
         ui_goodies_list.push(temp);
     });
