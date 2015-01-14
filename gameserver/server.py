@@ -14405,7 +14405,7 @@ class GAMEAPI(resource.Resource):
                 metric_event_coded(session.user.user_id, '3830_battle_end', event_props.copy())
             session.attack_event(session.user.user_id, '3830_battle_end', event_props.copy())
 
-            if session.is_ladder_battle():
+            if session.is_ladder_battle() and ((not session.using_squad_deployment()) or gamedata['server'].get('log_ladder_pvp_on_map',False)):
                 session.player.record_ladder_pvp_event('3306_ladder_attack_end', {'defender_id': session.viewing_player.user_id,
                                                                                   'outcome': outcome,
                                                                                   'base_damage': base_damage,
@@ -15213,7 +15213,7 @@ class GAMEAPI(resource.Resource):
                                 break
 
             props['pvp_balance'] = (session.pvp_balance if session.pvp_balance else 'equal')
-            if session.is_ladder_battle():
+            if session.is_ladder_battle() and ((not session.using_squad_deployment()) or gamedata['server'].get('log_ladder_pvp_on_map',False)):
                 session.player.record_ladder_pvp_event('3303_ladder_spy', {'defender_id': session.viewing_player.user_id,
                                                                            'attacker_pts': session.player.ladder_points(),
                                                                            'defender_pts': session.viewing_player.ladder_points(),
@@ -18142,7 +18142,7 @@ class GAMEAPI(resource.Resource):
             else:
                 session.open_attack_log(session.user.user_id, session.viewing_user.user_id, base_id = session.viewing_base.base_id if (session.viewing_base is not session.viewing_player.my_home) else None)
                 session.attack_event(session.user.user_id, '3820_battle_start', event_props.copy())
-                if session.is_ladder_battle():
+                if session.is_ladder_battle() and ((not session.using_squad_deployment()) or gamedata['server'].get('log_ladder_pvp_on_map',False)):
                     session.player.record_ladder_pvp_event('3305_ladder_attack_start', {'defender_id': session.viewing_player.user_id,
                                                                                         'attacker_pts': session.player.ladder_points(),
                                                                                         'defender_pts': session.viewing_player.ladder_points(),
