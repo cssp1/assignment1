@@ -1485,8 +1485,15 @@ SPUI.break_lines = function(str, font, wh, options) {
         if(b != 0) {
             ret += '\n'; x = 0; nlines += 1;
         }
+        var block = blocks[b];
 
-        var words = blocks[b].split(' ');
+        // split line into words
+        var words;
+        if(bbcode) {
+            words = SPText.bbcode_split_words(block);
+        } else {
+            words = block.split(' ');
+        }
 
         for(var i = 0; i < words.length; i++) {
 

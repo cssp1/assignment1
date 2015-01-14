@@ -62,6 +62,8 @@ SPText.bbcode_quote = function(str) {
     return r;
 };
 
+SPText.BBCODE_STATES = { LITERAL: 0, CODE: 1, CODE_OPEN: 2, CODE_CLOSE: 3, ESCAPED: 4 };
+
 // strip out all BBCode from the string to get its raw content
 SPText.bbcode_strip = function(str) {
     var r = '';
@@ -90,7 +92,50 @@ SPText.bbcode_strip = function(str) {
     return r;
 };
 
-SPText.BBCODE_STATES = { LITERAL: 0, CODE: 1, CODE_OPEN: 2, CODE_CLOSE: 3, ESCAPED: 4 };
+// return a list of space-separated words in a string, but don't split when below toplevel
+SPText.bbcode_split_words = function(str) {
+    var r = [];
+    var word = '';
+    var depth = 0;
+    var state = SPText.BBCODE_STATES.LITERAL;
+    for(var i = 0; i < str.length; i++) {
+        var c = str.charAt(i);
+        if(c === '[' && state != SPText.BBCODE_STATES.ESCAPED) {
+            if(state != SPText.BBCODE_STATES.LITERAL) {
+                console.log("parse error: double [");
+                break;
+            }
+            state = SPText.BBCODE_STATES.CODE;
+        } else if(c === '/' && state == SPText.BBCODE_STATES.CODE) {
+            state = SPText.BBCODE_STATES.CODE_CLOSE;
+        } else if(c === ']' && state != SPText.BBCODE_STATES.ESCAPED) {
+            if(state == SPText.BBCODE_STATES.CODE_CLOSE) {
+                depth -= 1;
+            } else {
+                depth += 1;
+            }
+            state = SPText.BBCODE_STATES.LITERAL;
+        } else if(c === '\\' && state == SPText.BBCODE_STATES.LITERAL) {
+            state = SPText.BBCODE_STATES.ESCAPED;
+        } else {
+            if(state == SPText.BBCODE_STATES.LITERAL) {
+                if(c === ' ' && depth == 0) {
+                    if(word) { r.push(word); }
+                    word = '';
+                    continue; // do not append
+                } else {
+                    // do append
+                }
+            } else if(state == SPText.BBCODE_STATES.ESCAPED) {
+                word += c;
+                state = SPText.BBCODE_STATES.LITERAL;
+            }
+        }
+        word += c;
+    }
+    if(word) { r.push(word); }
+    return r;
+};
 
 SPText.cstring_to_ablocks_bbcode = function(str, props, plugins) {
     var ret = [];
