@@ -3328,6 +3328,16 @@ SPUI.ScrollingTextField.prototype.can_scroll_up = function() {
     return (this.bot.prev !== this.head && this.top != this.head);
 };
 
+SPUI.ScrollingTextField.prototype.get_scroll_pos = function() {
+    var pos = 0;
+    var p = this.top;
+    while(p != this.head) {
+        pos += 1;
+        p = p.next;
+    }
+    return pos;
+};
+
 SPUI.ScrollingTextField.prototype.scroll_down = function() {
     if(this.can_scroll_down()) {
         this.bot = this.bot.next;
