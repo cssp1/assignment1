@@ -17087,7 +17087,7 @@ function invoke_building_context_menu(mouse_xy) {
                     }
                 }
 
-                buttons.push([spell['ui_name'+ (obj.level < obj.get_max_ui_level() ? '' : '_maxlevel')], invoke_upgrade_building_dialog]);
+                buttons.push([spell['ui_name'+ (obj.level < obj.get_max_ui_level() ? '' : '_maxlevel')], function() { invoke_upgrade_building_dialog(); }]);
             }
 
             if(session.home_base && obj.spec['name'] == gamedata['townhall']) {
@@ -36188,13 +36188,13 @@ function get_requirements_help(kind, arg, options) {
     }; })(title, descr, button, cancel_button, help_function, unit_icon, options, open_function);
 }
 
-// upgrade a specific building (must be selected in selection.unit before calling)
-function invoke_upgrade_building_dialog() { return invoke_upgrade_dialog_generic('BUILDING', null); }
+// upgrade a specific building (if preselect_building is null, use selection.unit)
+function invoke_upgrade_building_dialog(preselect_building) { return invoke_upgrade_dialog_generic('BUILDING', null, preselect_building); }
 
 // upgrade a technology
-function invoke_upgrade_tech_dialog(techname, prev_dialog) { return invoke_upgrade_dialog_generic(techname, prev_dialog); }
+function invoke_upgrade_tech_dialog(techname, prev_dialog) { return invoke_upgrade_dialog_generic(techname, prev_dialog, null); }
 
-function invoke_upgrade_dialog_generic(techname, prev_dialog) {
+function invoke_upgrade_dialog_generic(techname, prev_dialog, preselect) {
     if(techname == 'BUILDING' &&
        selection.unit.time_until_finish() > 0) {
         return invoke_child_speedup_dialog('speedup');
@@ -36208,7 +36208,7 @@ function invoke_upgrade_dialog_generic(techname, prev_dialog) {
     dialog.auto_center();
     dialog.modal = true;
     dialog.user_data['dialog'] = 'upgrade_dialog';
-    dialog.user_data['unit'] = selection.unit; // buildings only
+    dialog.user_data['unit'] = (preselect || selection.unit); // buildings only
     dialog.user_data['techname'] = techname;
     dialog.user_data['tech'] = (techname !== 'BUILDING' ? gamedata['tech'][techname] : null);
     dialog.user_data['prev_dialog'] = prev_dialog;
