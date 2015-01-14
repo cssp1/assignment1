@@ -62,8 +62,7 @@ UpgradeBar.update_contents = function(dialog, kind, specname, new_level, obj_id)
     if(kind == 'building') {
         spec = gamedata['buildings'][specname];
         dialog.widgets['upgrade_button'].onclick = (function (_obj_id) { return function(w) {
-            change_selection_unit(session.cur_objects.get_object(_obj_id));
-            invoke_upgrade_building_dialog();
+            invoke_upgrade_building_dialog(session.cur_objects.get_object(_obj_id));
         }; })(obj_id);
     } else if(kind == 'tech') {
         spec = gamedata['tech'][specname];
@@ -76,8 +75,12 @@ UpgradeBar.update_contents = function(dialog, kind, specname, new_level, obj_id)
     if(new_level > get_max_level(spec)) { dialog.show = false; return; } // maxed out
 
     var s = dialog.data['widgets']['output']['ui_name'];
-    s = s.replace('%THING', spec['ui_name']);
-    s = s.replace('%LEVEL', pretty_print_number(new_level));
+
+    var self = dialog.data['widgets']['output']['ui_self'].replace('%THING', spec['ui_name']).replace('%LEVEL', pretty_print_number(new_level));
+
+    // add hyperlink to "Next..."
+    self = '['+kind+'='+specname+']'+self+'[/'+kind+']';
+    s = s.replace('%SELF', self);
 
     var ui_goodies_list = [];
     var goodies_list = null;
@@ -86,13 +89,22 @@ UpgradeBar.update_contents = function(dialog, kind, specname, new_level, obj_id)
     }
     if(goodies_list === null) { goodies_list = []; }
 
+    // XXX eventualy, we want to be able to inject predicates into BBCode, e.g. [predicate="{\"predicate\":\"BUILDING_LEVEL\",...
+    // but this will require careful updating of the SPText BBCode parser/quoter. For now, just track predicates by giving
+    // them a number and referring to them via this map attached to the onclick handler
+    var predicate_map = {}; // map from integer index -> raw predicate dict
+    var predicate_index = 0;
+
     goog.array.forEach(goodies_list, function(goody) {
         var level = ('level' in goody ? goody['level'] : 1);
+        var linkcode = null;
         var temp = dialog.data['widgets']['output'][(level > 1 ? 'ui_goody_leveled' : 'ui_goody_unleveled')];
         if('tech' in goody) {
             temp = temp.replace('%THING', gamedata['tech'][goody['tech']]['ui_name']);
+            linkcode = 'tech='+goody['tech'];
         } else if('building' in goody) {
             temp = temp.replace('%THING', gamedata['buildings'][goody['building']]['ui_name']);
+            linkcode = 'building='+goody['building'];
         } else if('crafting_recipe' in goody) {
             var recipe = gamedata['crafting']['recipes'][goody['crafting_recipe']];
             var n;
@@ -102,6 +114,7 @@ UpgradeBar.update_contents = function(dialog, kind, specname, new_level, obj_id)
                 n = ItemDisplay.get_inventory_item_ui_name(recipe['products'][0]['spec']);
             }
             temp = temp.replace('%THING', n);
+            linkcode = 'crafting_recipe='+goody['crafting_recipe'];
         } else {
             throw Error('unknown goody '+JSON.stringify(goody));
         }
@@ -109,12 +122,20 @@ UpgradeBar.update_contents = function(dialog, kind, specname, new_level, obj_id)
             temp = temp.replace('%LEVEL', pretty_print_number(level));
         }
 
+        if(linkcode) {
+            temp = '['+linkcode+']'+temp+'[/'+linkcode.split('=')[0]+']';
+        }
         // parse additional required predicates
         if('with' in goody) {
             var with_list = [];
             goog.array.forEach(goody['with'], function(other_pred) {
-                var ui_pred = read_predicate(other_pred).ui_describe(player);
-                if(ui_pred) { with_list.push(dialog.data['widgets']['output']['ui_goody_with_pred'].replace('%PRED', ui_pred)); }
+                var p = read_predicate(other_pred);
+                var ui_pred = p.ui_describe(player);
+                if(ui_pred) {
+                    predicate_map[predicate_index] = other_pred;
+                    with_list.push('[predicate='+predicate_index.toString()+']'+dialog.data['widgets']['output']['ui_goody_with_pred'].replace('%PRED', ui_pred)+'[/predicate]');
+                    predicate_index += 1;
+                }
             });
             if(with_list.length > 0) {
                 temp += dialog.data['widgets']['output']['ui_goody_with'].replace('%PRED_LIST', with_list.join(', '));
@@ -122,18 +143,52 @@ UpgradeBar.update_contents = function(dialog, kind, specname, new_level, obj_id)
         }
         ui_goodies_list.push(temp);
     });
+
     if(ui_goodies_list.length < 1) { // nothing to talk about!
         dialog.show = false; return;
     }
+
     s = s.replace('%GOODIES', ui_goodies_list.join(', '));
+
+    // hyperlink handlers for goodies and also "with ..." unsatisfied predicates
+    var click_handlers = {
+        'building': {'onclick': (function (_obj_id) { return function(specname) { return function(w, mloc) {
+            // if it's the same type as the object upon which the upgrade bar was invoked, prefer selecting that one
+            var sel_obj = session.cur_objects.get_object(_obj_id);
+            if(!sel_obj || sel_obj.spec['name'] != specname) {
+                sel_obj = find_object_by_type(specname);
+            }
+            if(sel_obj) {
+                invoke_upgrade_building_dialog(sel_obj);
+            } else {
+                invoke_build_dialog(gamedata['buildings'][specname]['build_category']);
+            }
+        }; }; })(obj_id) },
+        'tech': {'onclick': function(specname) { return function(w, mloc) {
+            invoke_upgrade_tech_dialog(specname);
+        }; } },
+        'crafting_recipe': {'onclick': function(specname) { return function(w, mloc) {
+            var recipe = gamedata['crafting']['recipes'][specname];
+            var dialog = invoke_crafting_dialog(recipe['crafting_category']);
+            if(dialog) { crafting_dialog_select_recipe(dialog, specname); }
+        }; } },
+        'predicate': {'onclick': (function (_predicate_map) { return function(sindex) { return function(w, mloc) {
+            var pred = _predicate_map[parseInt(sindex)];
+            var helper = get_requirements_help(read_predicate(pred), null, {short_circuit:true});
+            if(helper) { helper(); }
+        }; }; })(predicate_map) }
+    };
+
+    // console.log(s);
     if(0) {
-        dialog.widgets['output'].append_text(SPText.cstring_to_ablocks_bbcode(broken_s));
+        // safe version, but not scrollable line-by-line
+        dialog.widgets['output'].append_text(SPText.cstring_to_ablocks_bbcode(s, {}, click_handlers));
     } else {
-        // probably unsafe, because it can break inside BBCode
+        // break lines, protecting BBCode
         var broken_s = SPUI.break_lines(s, dialog.widgets['output'].font, dialog.widgets['output'].wh, {bbcode:true})[0];
-        console.log(broken_s);
+        //console.log(broken_s);
         goog.array.forEach(broken_s.split('\n'), function(line) {
-            dialog.widgets['output'].append_text(SPText.cstring_to_ablocks_bbcode(line));
+            dialog.widgets['output'].append_text(SPText.cstring_to_ablocks_bbcode(line, {}, click_handlers));
         });
     }
 
