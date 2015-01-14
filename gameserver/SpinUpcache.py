@@ -1188,7 +1188,9 @@ def update_upcache_entry(user_id, driver, entry, time_now, gamedata, user_mtime 
         obj = {'user_id': user_id, 'EMPTY': 1, 'upcache_time': time_now}
     else:
         # clean out old bloated fields
-        for FIELD in ('money_purchase_history', 'gamebucks_purchase_history', 'activity'):
+        for FIELD in ('money_purchase_history', 'gamebucks_purchase_history', 'activity',
+                      'attacks_launched_vs_human_at_time', 'attacks_launched_vs_ai_at_time', 'attacks_suffered_at_time',
+                      'revenge_attacks_launched_vs_human_at_time', 'revenge_attacks_suffered_at_time'):
             if FIELD in obj:
                 del obj[FIELD]
 
@@ -1624,8 +1626,9 @@ def update_upcache_entry(user_id, driver, entry, time_now, gamedata, user_mtime 
                               # TIME SERIES needed by ANALYTICS2:
                               'money_spent_at_time', 'gamebucks_spent_at_time',
                               'money_refunded_at_time', 'gamebucks_refunded_at_time',
-                              'attacks_launched_at_time', 'attacks_launched_vs_human_at_time', 'attacks_suffered_at_time',
-                              'revenge_attacks_launched_vs_human_at_time', 'revenge_attacks_suffered_at_time',
+                              'attacks_launched_at_time',
+                              # 'attacks_launched_vs_human_at_time', 'attacks_suffered_at_time', # removed for bloating
+                              # 'revenge_attacks_launched_vs_human_at_time', 'revenge_attacks_suffered_at_time', # removed for bloating
                               'player_level_at_time',
 
                               # redundant with building:x:max_level_at_time - for legacy code

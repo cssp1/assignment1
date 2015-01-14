@@ -10688,7 +10688,8 @@ class LivePlayer(Player):
         # get rid of bloated obsolete history fields
         BLOAT = ['purchase_ui_log', 'resources_harvested_at_time', 'resources_looted_at_time', 'stored_iron_at_time', 'stored_water_at_time',
                  'units_manufactured_at_time', 'units_killed_at_time', 'units_lost_at_time', 'items_looted_at_time',
-                 'resources_stolen_at_time']
+                 'resources_stolen_at_time', 'attacks_launched_vs_human_at_time', 'attacks_launched_vs_ai_at_time', 'attacks_suffered_at_time',
+                 'revenge_attacks_launched_vs_human_at_time', 'revenge_attacks_suffered_at_time']
         for field in BLOAT:
             if field in self.history: del self.history[field]
 
@@ -18161,11 +18162,11 @@ class GAMEAPI(resource.Resource):
                 if session.player.player_auras: session.attack_event(session.user.user_id, '3901_player_auras', {'player_auras':copy.copy(session.player.player_auras)})
 
                 session.increment_player_metric('attacks_launched', 1)
-                session.increment_player_metric('attacks_launched_vs_'+session.viewing_player.ai_or_human(), 1)
+                session.increment_player_metric('attacks_launched_vs_'+session.viewing_player.ai_or_human(), 1, time_series = False)
 
                 if session.viewing_player.is_human() and session.player.cooldown_active('revenge_defender:%d' % session.viewing_player.user_id):
-                    session.increment_player_metric('revenge_attacks_launched_vs_'+session.viewing_player.ai_or_human(), 1)
-                    record_player_metric(session.viewing_player, dict_increment, 'revenge_attacks_suffered', 1)
+                    session.increment_player_metric('revenge_attacks_launched_vs_'+session.viewing_player.ai_or_human(), 1, time_series = False)
+                    record_player_metric(session.viewing_player, dict_increment, 'revenge_attacks_suffered', 1, time_series = False)
 
                 if session.viewing_player.is_human() and \
                    ((session.viewing_base is session.viewing_player.my_home) or \
