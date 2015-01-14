@@ -39,7 +39,9 @@ def sessions_summary_schema(sql_util, interval, dau_name):
                       sql_util.summary_out_dimensions() + \
                       [(dau_name, 'INT4 NOT NULL'),
                        ('num_logins', 'INT4 NOT NULL'),
-                       ('playtime', 'INT8 NOT NULL')],
+                       ('playtime', 'INT8 NOT NULL'),
+                       ('most_active_playtime', 'INT8 NOT NULL'),
+                       ],
             'indices': {'master': {'unique':True, 'keys': [(interval,'ASC')] + [(dim,'ASC') for dim, kind in sql_util.summary_out_dimensions()]}},
             }
 
@@ -231,7 +233,8 @@ if __name__ == '__main__':
                             "       "+sql_util.encode_spend_bracket("prev_receipts")+" AS spend_bracket," + \
                             "       COUNT(*) AS "+dau_name+"," + \
                             "       SUM(num_logins) AS num_logins," + \
-                            "       SUM(playtime) AS playtime " + \
+                            "       SUM(playtime) AS playtime, " + \
+                            "       MAX(playtime) AS most_active_playtime " + \
                             "FROM "+sql_util.sym(temp_table)+ " temp " + \
                             "GROUP BY "+interval+", frame_platform, country_tier, townhall_level, spend_bracket ORDER BY NULL")
 
