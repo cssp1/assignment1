@@ -92,7 +92,7 @@ def setup_field(gamedata, key, val, field_mode = None):
     elif type(val) is int:
         if key.endswith(':completed') or key.startswith('achievement:'):
             return 'INT4' # counters
-        elif key.endswith('_time') or key == 'time_in_game' or ('time_reacquired' in key) or ('stolen' in key) or ('harvested' in key) or ('looted' in key):
+        elif key.endswith('_time') or key == 'time_in_game' or ('time_reacquired' in key) or ('stolen' in key) or ('harvested' in key) or ('looted' in key) or key.startswith('peak_'):
             return 'INT8' # times / big resource amounts
         elif key.startswith('likes_') or key.startswith('returned_'):
             return 'TINYINT(1)' # booleans
