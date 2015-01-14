@@ -1188,7 +1188,7 @@ def update_upcache_entry(user_id, driver, entry, time_now, gamedata, user_mtime 
         obj = {'user_id': user_id, 'EMPTY': 1, 'upcache_time': time_now}
     else:
         # clean out old bloated fields
-        for FIELD in ('money_purchase_history', 'gamebucks_purchase_history'):
+        for FIELD in ('money_purchase_history', 'gamebucks_purchase_history', 'activity'):
             if FIELD in obj:
                 del obj[FIELD]
 
@@ -1603,7 +1603,8 @@ def update_upcache_entry(user_id, driver, entry, time_now, gamedata, user_mtime 
 
                 # copy these fields directly, omitting if absent in playerdb file
                 for field in ['money_spent_by_day',
-                              'logins_by_day', 'sessions', 'activity', # 'purchase_ui_log',
+                              'logins_by_day', 'sessions',
+                              # 'activity', 'purchase_ui_log', # removed for bloating
                               'friends_in_game', 'initial_friends_in_game',
                               'time_of_first_purchase', 'last_purchase_time',
                               'money_refunded', 'gamebucks_refunded',

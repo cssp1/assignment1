@@ -2916,7 +2916,7 @@ class Session(object):
             self.activity_classifier = ActivityClassifier.ActivityClassifier(gamedata)
             self.last_activity_sample_time = t
             if sample['state'] not in ('idle','harvest'): # don't bother recording idle or harvest time
-                if gamedata['server'].get('log_activity_in_player_history', True):
+                if gamedata['server'].get('log_activity_in_player_history', False):
                     hist = self.player.history
                     if 'activity' not in hist: hist['activity'] = {}
                     # note: record at t=(t-interval) because that is the *start* of the sampling period
@@ -10067,9 +10067,13 @@ class LivePlayer(Player):
     def prune_activity(self):
         activity = self.history.get('activity', None)
         if not activity: return
-        for stime, data in activity.items():
-            if data['state'] in ('idle','harvest'):
-                del activity[stime]
+        if gamedata['server'].get('log_activity_in_player_history', False):
+            for stime, data in activity.items():
+                if data['state'] in ('idle','harvest'):
+                    del activity[stime]
+        else:
+            # delete it completely
+            del self.history['activity']
 
     # delete oldest entries in the battle history to avoid explosive growth of playerdb files
     def prune_battle_history(self):
