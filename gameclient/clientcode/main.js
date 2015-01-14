@@ -37184,6 +37184,12 @@ function update_upgrade_dialog(dialog) {
 
     update_upgrade_dialog_equipment(dialog);
 
+    if(player.get_any_abtest_value('enable_upgrade_bar', gamedata['client']['enable_upgrade_bar'])) {
+        UpgradeBar.invoke(dialog, (tech ? 'tech' : 'building'),
+                          (tech ? techname : (unit ? unit.spec['name'] : null)),
+                          new_level, (unit ? unit.id : null));
+    }
+
     // update tutorial UI
     player.quest_tracked_dirty = true;
 

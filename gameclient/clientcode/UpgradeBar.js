@@ -26,8 +26,13 @@ UpgradeBar.invoke = function(parent, kind, specname, new_level, obj_id) {
     var dialog_data = gamedata['dialogs']['upgrade_bar'];
     dialog = new SPUI.Dialog(dialog_data);
     dialog.user_data['dialog'] = 'upgrade_bar';
+    // special case hack - if parented to the main "Upgrade" dialog, do not show a redundant upgrade button
+    dialog.user_data['show_button'] = !(parent.user_data['dialog'] == 'upgrade_dialog');
+    dialog.user_data['scroll_pos'] = 0;
     dialog.widgets['scroll_up'].onclick = function (w) { UpgradeBar.scroll(w.parent, -1); };
     dialog.widgets['scroll_down'].onclick = function (w) { UpgradeBar.scroll(w.parent, 1); };
+    dialog.widgets['output'].scroll_up_button = dialog.widgets['scroll_up'];
+    dialog.widgets['output'].scroll_down_button = dialog.widgets['scroll_down'];
     dialog.ondraw = UpgradeBar.ondraw;
     parent.widgets['upgrade_bar'] = dialog;
     parent.add(dialog);
@@ -44,18 +49,23 @@ UpgradeBar.scroll = function(dialog, incr) {
     } else if(incr > 0) {
         dialog.widgets['output'].scroll_down();
     }
-    // set clickability of scroll arrows
-    dialog.widgets['scroll_up'].state = (dialog.widgets['output'].can_scroll_up() ? 'normal' : 'disabled');
-    dialog.widgets['scroll_down'].state = (dialog.widgets['output'].can_scroll_down() ? 'normal' : 'disabled');
+    dialog.user_data['scroll_pos'] = dialog.widgets['output'].get_scroll_pos();
 };
 UpgradeBar.ondraw = function(dialog) {
     var border = dialog.data['xy'];
+    var show_button = dialog.user_data['show_button'];
     dialog.xy = [border[0], dialog.parent.wh[1]];
     dialog.wh = [dialog.parent.wh[0] - 2*border[0], dialog.data['dimensions'][1]];
     dialog.widgets['bgrect'].wh = dialog.wh;
+
+    // resize output widget
+    // note: might interfere with "layout" directives, so output widget does not use layout
+    var output_dims = (show_button ? 'dimensions' : 'dimensions_nobutton');
     dialog.widgets['output'].wh = [
-        dialog.data['widgets']['output']['dimensions'][0] + (dialog.wh[0] - dialog.data['dimensions'][0]),
-        dialog.data['widgets']['output']['dimensions'][1]];
+        dialog.data['widgets']['output'][output_dims][0] + (dialog.wh[0] - dialog.data['dimensions'][0]),
+        dialog.data['widgets']['output'][output_dims][1]];
+    dialog.widgets['output'].xy = dialog.data['widgets']['output'][show_button ? 'xy' : 'xy_nobutton'];
+
     dialog.apply_layout();
     var is_hover = (dialog.mouse_enter_time > 0);
     goog.array.forEach(['upgrade_button', 'output'], function(wname) {
@@ -63,7 +73,12 @@ UpgradeBar.ondraw = function(dialog) {
     });
 };
 UpgradeBar.update_contents = function(dialog, kind, specname, new_level, obj_id) {
-    dialog.widgets['output'].clear_text();
+    var prev_kind = dialog.user_data['kind'] || null; dialog.user_data['kind'] = kind;
+    var prev_specname = dialog.user_data['specname'] || null; dialog.user_data['specname'] = specname;
+    var prev_new_level = dialog.user_data['new_level'] || null; dialog.user_data['new_level'] = new_level;
+    var prev_obj_id = dialog.user_data['obj_id'] || null; dialog.user_data['obj_id'] = obj_id;
+    var prev_scroll_pos = dialog.user_data['scroll_pos'];
+
     if(kind === null || specname === null) { dialog.show = false; return; }
     dialog.show = true;
 
@@ -83,13 +98,16 @@ UpgradeBar.update_contents = function(dialog, kind, specname, new_level, obj_id)
     }
     if(new_level > get_max_level(spec)) { dialog.show = false; return; } // maxed out
 
-    var s = dialog.data['widgets']['output']['ui_name'];
+    dialog.widgets['upgrade_button'].show = dialog.user_data['show_button'];
+
+    var s = dialog.data['widgets']['output'][(dialog.user_data['show_button'] ? 'ui_name' : 'ui_name_nobutton')];
 
     var self = dialog.data['widgets']['output']['ui_self'].replace('%THING', spec['ui_name']).replace('%LEVEL', pretty_print_number(new_level));
 
     // add hyperlink to "Next..."
     self = '['+kind+'='+specname+']'+self+'[/'+kind+']';
-    s = s.replace('%SELF', self);
+    // note: second replacement of THING/LEVEL because they may occur either inside or outside the SELF replacement
+    s = s.replace('%SELF', self).replace('%THING', spec['ui_name']).replace('%LEVEL', pretty_print_number(new_level));
 
     var ui_goodies_list = [];
     var goodies_list = null;
@@ -188,6 +206,8 @@ UpgradeBar.update_contents = function(dialog, kind, specname, new_level, obj_id)
         }; }; })(predicate_map) }
     };
 
+    dialog.widgets['output'].clear_text();
+
     // console.log(s);
     if(0) {
         // safe version, but not scrollable line-by-line
@@ -201,5 +221,14 @@ UpgradeBar.update_contents = function(dialog, kind, specname, new_level, obj_id)
         });
     }
 
-    UpgradeBar.scroll(dialog, -2);
+    // if contents changed, then reset scroll
+    if(kind != prev_kind || specname != prev_specname || new_level != prev_new_level || obj_id != prev_obj_id) {
+        UpgradeBar.scroll(dialog, -2);
+    } else {
+        // otherwise, return to previous scroll position
+        UpgradeBar.scroll(dialog, -2);
+        for(var i = 0; i < prev_scroll_pos; i++) {
+            UpgradeBar.scroll(dialog, 1);
+        }
+    }
 };
