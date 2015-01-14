@@ -27828,6 +27828,10 @@ function manufacture_dialog_change_category(dialog, catname) {
         dialog.user_data['units'].push(name);
     }
 
+    if(player.get_any_abtest_value('enable_upgrade_bar', gamedata['client']['enable_upgrade_bar'])) {
+        UpgradeBar.invoke(dialog, 'building', (builder ? builder.spec['name'] : null), (builder ? builder.level+1 : -1), (builder ? builder.id : null));
+    }
+
     manufacture_dialog_scroll(dialog, 0);
     manufacture_dialog_select_unit(dialog, null);
 }
@@ -30360,6 +30364,10 @@ function research_dialog_change_category(dialog, category, num)
 
             dialog.user_data['techs'].push(name);
         }
+    }
+
+    if(player.get_any_abtest_value('enable_upgrade_bar', gamedata['client']['enable_upgrade_bar'])) {
+        UpgradeBar.invoke(dialog, 'building', (builder ? builder.spec['name'] : null), (builder ? builder.level+1 : -1), (builder ? builder.id : null));
     }
 
     research_dialog_scroll(dialog, num || 0);

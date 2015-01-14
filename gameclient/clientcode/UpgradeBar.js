@@ -14,8 +14,17 @@ goog.require('SPText');
 /** @param {SPUI.Dialog} parent */
 UpgradeBar.invoke = function(parent, kind, specname, new_level, obj_id) {
     if(parent.clip_children) { throw Error('parent must not clip children'); }
+
+    var dialog;
+
+    if('upgrade_bar' in parent.widgets) { // re-use existing instance
+        dialog = parent.widgets['upgrade_bar'];
+        UpgradeBar.update_contents(dialog, kind, specname, new_level, obj_id);
+        return dialog;
+    }
+
     var dialog_data = gamedata['dialogs']['upgrade_bar'];
-    var dialog = new SPUI.Dialog(dialog_data);
+    dialog = new SPUI.Dialog(dialog_data);
     dialog.user_data['dialog'] = 'upgrade_bar';
     dialog.widgets['scroll_up'].onclick = function (w) { UpgradeBar.scroll(w.parent, -1); };
     dialog.widgets['scroll_down'].onclick = function (w) { UpgradeBar.scroll(w.parent, 1); };
@@ -55,7 +64,7 @@ UpgradeBar.ondraw = function(dialog) {
 };
 UpgradeBar.update_contents = function(dialog, kind, specname, new_level, obj_id) {
     dialog.widgets['output'].clear_text();
-    if(kind === null) { dialog.show = false; return; }
+    if(kind === null || specname === null) { dialog.show = false; return; }
     dialog.show = true;
 
     var spec;

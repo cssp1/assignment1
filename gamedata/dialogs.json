@@ -1408,6 +1408,7 @@
 
     "research_dialog": {
         "dimensions": [736,423],
+        "clip_children": 0,
         "widgets": {
             "bg": { "kind":"StaticImage", "xy":[0,0], "dimensions": [736,423], "transparent_to_mouse":0, "asset": "dialog_resizable", "bg_image_resizable": 1},
             "sunken": {"kind": "StaticImage", "xy":[36,70], "dimensions":[664,344], "bg_image_resizable": 1, "asset": "dialog_sunken_resizable" },
@@ -2033,6 +2034,7 @@
         "bg_image": "dialog_736x423_bg",
         "dimensions": [736,423],
         "default_button": "finish_button",
+        "clip_children": 0,
         "widgets": {
             "sunken_left": {"kind": "StaticImage", "xy":[10,64], "dimensions":[256,347], "bg_image_resizable": 1, "asset": "dialog_sunken_resizable" },
             "sunken_right": {"kind": "StaticImage", "xy":[272,64], "dimensions":[454,347], "bg_image_resizable": 1, "asset": "dialog_sunken_resizable" },
