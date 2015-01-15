@@ -286,6 +286,12 @@
                         "stroke_alpha": 0.8,
                         "altitude_alpha": 0.3,
                         "fill_alpha": 0.18,
+                        "ring_size": 1 },
+            // used for on-over on friendly buildings
+            "hover": { "basecol": "rgba(0,255,0,",
+                        "stroke_alpha": 0.5,
+                        "altitude_alpha": 0.3,
+                        "fill_alpha": 0.12,
                         "ring_size": 1 }
         },
 

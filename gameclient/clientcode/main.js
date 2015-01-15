@@ -43962,6 +43962,10 @@ function do_draw() {
                     }
                 }
 
+                if(!selection.ui && !session.has_attacked && mouse_state.hovering_over && mouse_state.hovering_over.is_building() && mouse_state.hovering_over.team == 'player') {
+                    draw_selection_highlight(mouse_state.hovering_over, 'hover');
+                }
+
                 // if mouse is hovering over a turret and there is no other UI up, draw all turret ranges
                 /*
                   if(!selection.ui &&
@@ -45868,12 +45872,14 @@ function draw_drag_selection() {
     ctx.restore();
 };
 
-function draw_selection_highlight(unit) {
+function draw_selection_highlight(unit, config_override) {
     var curpos = unit.interpolate_pos();
     ctx.save();
 
     var config_name;
-    if(unit.team !== 'player') {
+    if(config_override) {
+        config_name = config_override;
+    } else if(unit.team !== 'player') {
         config_name = 'enemy';
     } else if(unit.ai_state === ai_states.AI_ATTACK_STATIONARY) {
         config_name = 'hold_position';
