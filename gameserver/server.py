@@ -9650,10 +9650,12 @@ class LivePlayer(Player):
                     break
                 iter += 1
 
+            metadata = {}
             max_pct = config['worth_range'][0]
             min_pct = config['worth_range'][1]
-            amount = max(1, int(max_res * (min_pct + random.random() * (max_pct-min_pct))))
-            metadata = {'iron': amount}
+            amount = max(0, int(max_res * (min_pct + random.random() * (max_pct-min_pct))))
+            if amount > 0:
+                metadata['iron'] = amount
 
             if self.get_any_abtest_value('currency', gamedata['currency']) == 'gamebucks':
                 contains_gamebucks = (random.random() < config['gamebucks_chance'])
@@ -11228,8 +11230,9 @@ def init_game(player, add_extras):
     for u in units:
         player.home_base_add(instantiate_object_for_player(player, player, u['spec'], x=u['xy'][0], y=u['xy'][1]))
 
-    if player.get_any_abtest_value('iron_deposits', gamedata['server']['iron_deposits'])['max'] > 0:
-        deposit = instantiate_object_for_player(player, player, 'iron_deposit', x=72, y=63, metadata = {'iron': 150})
+    deposit_config = player.get_any_abtest_value('iron_deposits', gamedata['server']['iron_deposits'])
+    if deposit_config['max'] > 0:
+        deposit = instantiate_object_for_player(player, player, 'iron_deposit', x=72, y=63, metadata = deposit_config.get('starting_contents', {'iron': 150}))
         player.home_base_add(deposit)
 
     player.my_home.init_production(player)
@@ -19422,7 +19425,7 @@ class GAMEAPI(resource.Resource):
         if "COLLECT_DEPOSIT" not in object.spec.spells: return
         snap = session.player.resources.calc_snapshot()
         resource = 'iron'
-        harvested = object.metadata[resource]
+        harvested = object.metadata.get(resource,0)
         descr = 'home' if (object in session.player.home_base_iter()) else 'quarry'
         loot = session.player.resources.gain_res({resource:harvested}, reason='collect_deposit', snap = snap)
 
