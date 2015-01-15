@@ -12360,8 +12360,8 @@ function do_build(ji) {
             }
 
             // trigger visual effect
-            var fx_data = ('upgrade_start_effect' in this.spec ?
-                           this.spec['upgrade_start_effect'] :
+            var fx_data = ('upgrade_start_effect' in spec ?
+                           spec['upgrade_start_effect'] :
                            gamedata['client']['vfx']['building_upgrade_start']);
             if(fx_data) {
                 SPFX.add_visual_effect(ji, 0, [0,1,0], client_time, fx_data,
@@ -36989,8 +36989,8 @@ function update_upgrade_dialog(dialog) {
                 send_to_server.func(["CAST_SPELL", __unit.id, "UPGRADE_FOR_FREE"]);
 
                 // trigger effect
-                var fx_data = ('upgrade_start_effect' in this.spec ?
-                               this.spec['upgrade_start_effect'] :
+                var fx_data = ('upgrade_start_effect' in __unit.spec ?
+                               __unit.spec['upgrade_start_effect'] :
                                gamedata['client']['vfx']['building_upgrade_start']);
                 if(fx_data) {
                     SPFX.add_visual_effect([__unit.x,__unit.y], 0, [0,1,0], client_time, fx_data,
