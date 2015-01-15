@@ -1547,7 +1547,10 @@ SPFX.add_visual_effect = function(pos, altitude, orient, time, data, allow_sound
         var ret = new SPFX.CombineEffect();
         var effects = data['effects'] || [];
         for(var i = 0; i < effects.length; i++) {
-            ret.effects.push(SPFX.add_visual_effect(pos, altitude, orient, time, effects[i], allow_sound, instance_data));
+            var child = SPFX.add_visual_effect(pos, altitude, orient, time, effects[i], allow_sound, instance_data);
+            if(child) {
+                ret.effects.push(child);
+            }
         }
         return ret;
     } else if(data['type'] === 'random') {
