@@ -272,7 +272,7 @@ def check_mandatory_fields(specname, spec, kind):
                 error |= 1
                 print '%s:permanent_auras refers to an aura that does not exist (%s)' % (specname, a['aura_name'])
 
-    for EFFECT in ('pre_deploy_effect','post_deploy_effect','explosion_effect','damaged_effect','movement_effect','permanent_effect'):
+    for EFFECT in ('pre_deploy_effect','post_deploy_effect','explosion_effect','damaged_effect','movement_effect','permanent_effect','upgrade_finish_effect'):
         if EFFECT in spec:
             error |= check_visual_effect(specname+':'+EFFECT, spec[EFFECT])
 

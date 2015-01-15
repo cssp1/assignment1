@@ -3769,7 +3769,9 @@ Building.prototype.receive_state = function(data, init, is_deploying) {
 
         if(!player.is_cheater) {
             // trigger visual effect
-            var fx_data = gamedata['client']['vfx']['building_upgrade_finish'];
+            var fx_data = ('upgrade_finish_effect' in this.spec ?
+                           this.spec['upgrade_finish_effect'] :
+                           gamedata['client']['vfx']['building_upgrade_finish']);
             if(fx_data) {
                 SPFX.add_visual_effect([this.x,this.y], 0, [0,1,0], client_time, fx_data,
                                        !this.spec['worth_less_xp'], // no sound for barrier upgrades
@@ -12358,7 +12360,9 @@ function do_build(ji) {
             }
 
             // trigger visual effect
-            var fx_data = gamedata['client']['vfx']['building_upgrade_start'];
+            var fx_data = ('upgrade_start_effect' in this.spec ?
+                           this.spec['upgrade_start_effect'] :
+                           gamedata['client']['vfx']['building_upgrade_start']);
             if(fx_data) {
                 SPFX.add_visual_effect(ji, 0, [0,1,0], client_time, fx_data,
                                        true, // !spec['worth_less_xp'], // no sound for barrier upgrades?
@@ -36985,7 +36989,9 @@ function update_upgrade_dialog(dialog) {
                 send_to_server.func(["CAST_SPELL", __unit.id, "UPGRADE_FOR_FREE"]);
 
                 // trigger effect
-                var fx_data = gamedata['client']['vfx']['building_upgrade_start'];
+                var fx_data = ('upgrade_start_effect' in this.spec ?
+                               this.spec['upgrade_start_effect'] :
+                               gamedata['client']['vfx']['building_upgrade_start']);
                 if(fx_data) {
                     SPFX.add_visual_effect([__unit.x,__unit.y], 0, [0,1,0], client_time, fx_data,
                                            true, // !spec['worth_less_xp'], // no sound for barrier upgrades?
