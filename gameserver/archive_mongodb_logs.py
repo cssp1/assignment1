@@ -71,7 +71,7 @@ TABLES = {
     'inventory': { 's3_name': 'inventory', 'table_name': 'log_inventory', 'compression': 'zip', 'retain_for': 60*86400 },
 
     # ladder PvP log
-    'ladder_pvp': { 's3_name': 'ladder_pvp', 'table_name': 'ladder_pvp', 'compression': 'zip', 'retain_for': 10*86400 },
+    'ladder_pvp': { 's3_name': 'ladder_pvp', 'table_name': 'log_ladder_pvp', 'compression': 'zip', 'retain_for': 10*86400 },
 
     # damage protection log
     'damage_protection': { 's3_name': 'damage_protection', 'table_name': 'log_damage_protection', 'compression': 'zip', 'retain_for': 30*86400 },
