@@ -51,14 +51,20 @@ if __name__ == '__main__':
     if (not response):
         raise Exception('Facebook API failure on payment '+payment_id)
 
+    user_id = None
+
+    # first try getting user_id via facebook_id
     if response.get('user',None):
         facebook_id = response['user']['id']
         user_id = social_id_table.social_id_to_spinpunch('fb'+facebook_id, False)
         if not user_id:
-            raise Exception('unknown facebook_id %s' % facebook_id)
-    elif len(response.get('request_id','').split('_'))==4:
+            print 'strange: unknown facebook_id %s' % facebook_id
+
+    # fallback - pull user_id from new request_id format
+    if (not user_id) and len(response.get('request_id','').split('_'))==4:
         user_id = int(response['request_id'].split('_')[1])
-    else:
+
+    if not user_id:
         if verbose:
             print "HERE", response
         user_id = None

@@ -1872,12 +1872,16 @@ class GameProxy(proxy.ReverseProxyResource):
                         def _on_response(self, str_response):
                             response = SpinJSON.loads(str_response)
                             user_id = None
+
+                            # first try getting user_id via facebook_id
                             if response.get('user',None):
                                 facebook_id = str(response['user']['id'])
                                 user_id = social_id_table.social_id_to_spinpunch('fb'+facebook_id, False)
-                            elif len(response.get('request_id','').split('_'))==4:
-                                # pull user_id from new request_id format
+
+                            # fallback - pull user_id from new request_id format
+                            if (not user_id) and len(response.get('request_id','').split('_'))==4:
                                 user_id = int(response['request_id'].split('_')[1])
+
                             if not user_id:
                                 raise Exception('cannot determine user_id')
 
