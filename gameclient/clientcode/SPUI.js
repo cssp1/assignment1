@@ -3330,8 +3330,8 @@ SPUI.ScrollingTextField.prototype.can_scroll_up = function() {
 
 SPUI.ScrollingTextField.prototype.get_scroll_pos = function() {
     var pos = 0;
-    var p = this.top;
-    while(p != this.head) {
+    var p = this.head;
+    while(p != this.top) {
         pos += 1;
         p = p.next;
     }
