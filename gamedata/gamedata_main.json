@@ -367,6 +367,7 @@
         // wait until account is at least 2 hours old before showing any of the below popups
         "motd_filter": { "predicate": "RETAINED", "duration": 7200 },
 
+        "ungiftable_fallback_to_invite": 1, // when friend is not giftable, still show "Send Gifts" option, leading to Invite
         "gift_prompt_interval": 86400, // minimum number of seconds between times the user will be prompted to give gifts upon login
         "friend_invite_prompt_interval": 1814400, // same for interval between prompts to invite Facebook friends
         "motd_interval": 36000, // minimum number of seconds between times the user will be shown the "Message of the Day" upon login
