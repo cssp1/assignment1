@@ -17232,6 +17232,10 @@ class GAMEAPI(resource.Resource):
             session.player.send_history_update(retmsg)
 
     def do_create_inert(self, session, retmsg, spellargs):
+        # XXX to make inerts work in remote bases, need to prune them
+        if session.viewing_base is not session.viewing_player.my_home: return
+
+        base = session.viewing_base
         inert_type = spellargs[0]
         j = int(spellargs[1][0]); i = int(spellargs[1][1])
         metadata = spellargs[2]
@@ -17241,20 +17245,16 @@ class GAMEAPI(resource.Resource):
         if metadata is not None:
             assert type(metadata) == dict
 
-        if session.home_base:
-            player = session.player
-        else:
-            if not session.has_attacked:
-                if gamedata['server'].get('log_combat_race_conditions', False):
-                    gamesite.exception_log.event(server_time, 'player %d vs %d: race condition in do_create_inert()' % (session.player.user_id,
-                                                                                                                        session.viewing_player.user_id))
-                return
-            player = session.viewing_player
+        if not session.has_attacked:
+            if gamedata['server'].get('log_combat_race_conditions', False):
+                gamesite.exception_log.event(server_time, 'player %d at %s: race condition in do_create_inert()' % (session.player.user_id,
+                                                                                                                    session.viewing_base.base_id))
+            return
 
         # limit # of client-creatable inert objects in base
         oldest = None
         current = 0
-        for obj in player.home_base_iter():
+        for obj in base.iter_objects():
             if obj.is_inert() and obj.spec.client_can_create:
                 current += 1
                 if not oldest:
@@ -17262,11 +17262,14 @@ class GAMEAPI(resource.Resource):
 
         # remove oldest inert object
         if current >= gamedata['inert_limit'] and oldest:
-            player.home_base_remove(oldest)
+            if session.has_object(oldest):
+                retmsg.append(["OBJECT_REMOVED2", oldest.obj_id])
+                session.rem_object(oldest)
+            base.drop_object(oldest)
 
-        newobj = instantiate_object_for_player(player, EnvironmentOwner, inert_type, x=j, y=i, metadata = metadata)
+        newobj = instantiate_object_for_player(session.player, EnvironmentOwner, inert_type, x=j, y=i, metadata = metadata)
 
-        player.home_base_add(newobj)
+        base.adopt_object(newobj)
         session.add_object(newobj)
 
         retmsg.append(["OBJECT_CREATED2", newobj.serialize_state()])
