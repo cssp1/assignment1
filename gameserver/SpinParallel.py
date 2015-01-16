@@ -4,7 +4,7 @@
 # Use of this source code is governed by an MIT-style license that can be
 # found in the LICENSE file.
 
-import sys, os, fcntl, select, traceback, signal
+import sys, os, fcntl, select, traceback, signal, cStringIO, errno, struct
 from multiprocessing import cpu_count
 
 import SpinJSON
@@ -17,12 +17,20 @@ def set_non_blocking(fd):
     oldflags = f.fcntl(fd, f.F_GETFL)
     f.fcntl(fd, f.F_SETFL, oldflags | nb)
 
+# To determine message boundaries when reading continuous input from a slave's output pipe,
+# the slave writes a 64-bit message length as the first 8 bytes of its output.
+def slave_send(fd, msg):
+    fd.write(struct.pack('>Q',len(msg)))
+    fd.write(msg)
+    fd.flush()
+
 def go(tasks, argv, nprocs = -1, on_error = 'break', verbose = False):
     if nprocs < 0: nprocs = cpu_count()
     pids = []
     pid_fds = {}
     read_fds = {}
     write_fds = {}
+    read_buffers = {}
 
     results = {}
     task_num = 0
@@ -48,6 +56,8 @@ def go(tasks, argv, nprocs = -1, on_error = 'break', verbose = False):
             os.close(down_rd)
             os.close(up_wr)
             read_fds[up_rd] = i
+            set_non_blocking(up_rd)
+            read_buffers[up_rd] = cStringIO.StringIO()
             write_fds[down_wr] = i
             pid_fds[pid] = [up_rd,down_wr]
 
@@ -58,20 +68,54 @@ def go(tasks, argv, nprocs = -1, on_error = 'break', verbose = False):
         try:
             readable, writable, errors = select.select(read_fds.keys(), [], read_fds.keys() + write_fds.keys())
 
-            #print 'SELECT:', readable, writable, errors
             for fd in errors:
                 child_num = read_fds[fd] if (fd in read_fds) else write_fds[i]
                 raise Exception("FD error on child %d" % child_num)
             for fd in readable:
                 child_num = read_fds[fd]
-                buf = ''
+                complete = False
+
                 while True:
-                    r = os.read(fd, PIPE_BUF)
-                    if not r: break
-                    buf += r
-                    if len(r) < PIPE_BUF: break
+                    try:
+                        r = os.read(fd, PIPE_BUF)
+                    except OSError as e:
+                        if e.errno == errno.EAGAIN: # incomplete input
+                            break
+                        else:
+                            raise
+                    if not r: # no more to read, or a closed socket
+                        complete = True
+                        break
+
+                    # accumulate read buffer
+                    read_buffers[fd].write(r)
+
+                    # check for complete 8-byte length prefix
+                    cur_len = read_buffers[fd].tell()
+                    if cur_len >= 8:
+                        read_buffers[fd].seek(0,0) # seek to beginning
+                        val = read_buffers[fd].read(8)
+                        read_buffers[fd].seek(cur_len,0) # return to where we were
+                        client_len = struct.unpack('>Q', val)[0]
+                        if cur_len-8 >= client_len:
+                            # complete input (note: assumes client hasn't gone ahead and written anything else
+                            complete = True
+                            break
+                    if len(r) < PIPE_BUF: # incomplete read
+                        break
+
+                if not complete:
+                    continue
+
+                read_buffers[fd].seek(8,0) # skip length prefix
+                buf = read_buffers[fd].read() # get actual data
+                read_buffers[fd] = cStringIO.StringIO() # reset the read buffer
 
                 if verbose: print 'CHILD', child_num, 'SAYS', buf
+
+                if not buf:
+                    sys.stderr.write('child process closed the pipe unexpectedly')
+                    continue
 
                 try:
                     ret = SpinJSON.loads(buf)
@@ -132,8 +176,7 @@ def go(tasks, argv, nprocs = -1, on_error = 'break', verbose = False):
 def slave(func, verbose = False):
     signal.signal(signal.SIGINT, signal.SIG_IGN)
     if verbose: sys.stderr.write('I AM SLAVE %d\n' % os.getpid())
-    SpinJSON.dump({'response':'ready'}, sys.stdout, newline = True)
-    sys.stdout.flush()
+    slave_send(sys.stdout, SpinJSON.dumps({'response':'ready'}, newline = True))
 
     stop = False
     while (not stop):
@@ -168,13 +211,14 @@ def slave(func, verbose = False):
                 errors.append(None)
                 results.append(ret)
 
-        SpinJSON.dump({'response':'compute',
-                       'status': status,
-                       'errors': errors,
-                       'result_nums': result_nums,
-                       'results':results},
-                      sys.stdout, newline = True)
-        sys.stdout.flush()
+        msg = SpinJSON.dumps({'response':'compute',
+                              'status': status,
+                              'errors': errors,
+                              'result_nums': result_nums,
+                              'results':results},
+                             newline = True)
+        slave_send(sys.stdout, msg)
+        if verbose: sys.stderr.write('SLAVE '+repr(command)+' WROTE\n')
 
 def my_slave(input):
     if 0:
