@@ -789,7 +789,6 @@
 #include "$GAME_ID/$GAME_ID_buildings.json"
     ,
 
-    "inert_limit": 25, // limit on # of client-creatable inert objects in base to prevent DoS attack
     "inert":
 #include "$GAME_ID/$GAME_ID_inert.json"
     ,

@@ -30,6 +30,8 @@
 // default inert asset to use for destroyed unit debris
 "default_debris_inert": "droid_debris",
 
+"inert_limit": 25, // limit on # of client-creatable inert objects in base to prevent DoS attack
+
 "unit_deploy_spread": 12, // radius of area to scatter deployed units around, in map units
 "guard_deploy_spread": 2.4, // multiple of building collision gridsize within which spawned security guard units will be scattered
 
