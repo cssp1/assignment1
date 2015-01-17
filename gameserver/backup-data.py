@@ -12,6 +12,7 @@ import SpinS3
 import SpinUserDB
 import SpinConfig
 import SpinParallel
+import SpinSingletonProcess
 import subprocess
 
 time_now = int(time.time())
@@ -192,11 +193,12 @@ if __name__ == '__main__':
         for part in xrange(s3_driver.nbuckets):
             task_list.append({'kind': 'user', 'part': part, 'verbose': verbose})
 
-    if parallel <= 1:
-        for task in task_list:
-            my_slave(task)
-    else:
-        SpinParallel.go(task_list, [sys.argv[0], '--slave'], on_error = 'continue', nprocs=parallel, verbose = False)
+    with SpinSingletonProcess.SingletonProcess('backup-data-%s' % game_id):
+        if parallel <= 1:
+            for task in task_list:
+                my_slave(task)
+        else:
+            SpinParallel.go(task_list, [sys.argv[0], '--slave'], on_error = 'continue', nprocs=parallel, verbose = False)
 
     print 'DONE'
 
