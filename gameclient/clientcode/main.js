@@ -40697,13 +40697,16 @@ function handle_server_message(data) {
             }
         }
 
-        // gamebucks discovery message
-        if(res['gamebucks'] > 0) {
-            GameArt.assets['minor_level_up_sound'].states['normal'].audio.play(client_time);
+        // "ding" sound for gamebucks
+        if(res['gamebucks'] > 0) {  GameArt.assets['minor_level_up_sound'].states['normal'].audio.play(client_time); }
 
+        // GUI message
+        if(res['gamebucks'] > 0) {
             var s = gamedata['strings']['gamebucks_discovered_in_deposit'];
-            invoke_child_message_dialog(s['ui_title'].replace('%s',Store.gamebucks_ui_name()),
-                                        s['ui_description'].replace('%s', Store.display_user_currency_amount(res['gamebucks'], 'full')));
+            if(s) {
+                invoke_child_message_dialog(s['ui_title'].replace('%s',Store.gamebucks_ui_name()),
+                                            s['ui_description'].replace('%s', Store.display_user_currency_amount(res['gamebucks'], 'full')));
+            }
         } else if((obj_id in session.cur_objects.objects) &&
                   session.cur_objects.objects[obj_id].spec['name'] == 'iron_deposit') {
             // see if this was the last deposit, and if so show consolation message
@@ -40718,10 +40721,10 @@ function handle_server_message(data) {
             if(!more_deposits &&
                player.get_any_abtest_value('currency', gamedata['currency']) == 'gamebucks' &&
                player.get_any_abtest_value('gamebucks_in_deposits', gamedata['gamebucks_in_deposits'])) {
-
                 var s = gamedata['strings']['deposits_mined_out'];
-                invoke_child_message_dialog(s['ui_title'],
-                                            s['ui_description'].replace('%s', Store.gamebucks_ui_name()));
+                if(s) {
+                    invoke_child_message_dialog(s['ui_title'], s['ui_description'].replace('%s', Store.gamebucks_ui_name()));
+                }
             }
         }
 
