@@ -1,10 +1,10 @@
 #!/usr/bin/python
 
-# Copyright (c) 2014 SpinPunch. All rights reserved.
+# Copyright (c) 2015 SpinPunch. All rights reserved.
 # Use of this source code is governed by an MIT-style license that can be
 # found in the LICENSE file.
 
-# this is a raw standalone script that does not depend on a game SVN checkout
+# this is a raw standalone script that does not depend on a game checkout
 
 import sys, os, time, calendar, getopt
 import boto.ec2, boto.rds2
@@ -47,6 +47,14 @@ def rds_res_match(res, inst, rds_offerings):
            (product == 'postgresql' and engine == 'postgres') and \
            res['MultiAZ'] == inst['MultiAZ']
 
+def pretty_print_ec2_res_price(res):
+    yearly = float(res.fixed_price) * (365*86400)/float(res.duration)
+    for charge in res.recurring_charges:
+        assert charge.frequency == 'Hourly'
+        yearly += float(charge.amount) * (365*24)
+    yearly += float(res.usage_price) * (365*24) # ???
+    return '$%.0f/yr' % yearly
+
 def pretty_print_ec2_res(res, override_count = None, my_index = None):
     assert res.state == 'active'
     lifetime = decode_time(res.start) + res.duration - time_now
@@ -56,7 +64,21 @@ def pretty_print_ec2_res(res, override_count = None, my_index = None):
     else:
         instance_count = override_count if override_count is not None else res.instance_count
         count = ' (x%d)' % instance_count if (instance_count!=1 or override_count is not None) else ''
-    return '%-10s %-22s %-3d days left' % (res.availability_zone, res.instance_type+count, days)
+    return '%-10s %-22s %10s  %3d days left' % (res.availability_zone, res.instance_type+count, pretty_print_ec2_res_price(res), days)
+
+def pretty_print_ec2_instance(inst):
+    return '%-16s %-10s %-16s' % (inst.tags['Name'], inst.placement, inst.instance_type)
+
+def pretty_print_rds_offering_price(offer):
+    yearly = float(offer['FixedPrice']) * (365*86400)/float(offer['Duration'])
+    for charge in offer['RecurringCharges']:
+        assert charge['RecurringChargeFrequency'] == 'Hourly'
+        yearly += float(charge['RecurringChargeAmount']) * (365*24)
+    yearly += float(offer['UsagePrice']) * (365*24) # ???
+    return '$%.0f/yr' % yearly
+
+def pretty_print_multiaz(flag):
+    return 'MultiAZ' if flag else 'NoMulti'
 
 def pretty_print_rds_res(res, rds_offerings, override_count = None, my_index = None):
     lifetime = res['StartTime'] + res['Duration'] - time_now
@@ -66,13 +88,11 @@ def pretty_print_rds_res(res, rds_offerings, override_count = None, my_index = N
     else:
         instance_count = override_count if override_count is not None else res['DBInstanceCount']
         count = ' (x%d)' % instance_count if (instance_count!=1 or override_count is not None) else ''
-    return 'multi %-1d %-22s %-12s %-3d days left' % (int(res['MultiAZ']), res['DBInstanceClass']+count, rds_offerings[res['ReservedDBInstancesOfferingId']]['ProductDescription'], days)
-
-def pretty_print_ec2_instance(inst):
-    return '%-16s %-10s %-16s' % (inst.tags['Name'], inst.placement, inst.instance_type)
+    offer = rds_offerings[res['ReservedDBInstancesOfferingId']]
+    return '%s %-22s %-12s %10s  %3d days left' % (pretty_print_multiaz(res['MultiAZ']), res['DBInstanceClass']+count, offer['ProductDescription'], pretty_print_rds_offering_price(offer), days)
 
 def pretty_print_rds_instance(inst):
-    return '%-16s %-10s multi %-1d %-16s %-12s' % (inst['DBInstanceIdentifier'], inst['AvailabilityZone'], int(inst['MultiAZ']), inst['DBInstanceClass'], inst['Engine'])
+    return '%-16s %-10s %s %-16s %-12s' % (inst['DBInstanceIdentifier'], inst['AvailabilityZone'], pretty_print_multiaz(inst['MultiAZ']), inst['DBInstanceClass'], inst['Engine'])
 
 def get_rds_res_offerings(rds):
     ret = {}
@@ -104,10 +124,6 @@ if __name__ == '__main__':
     rds_res_list = rds.describe_reserved_db_instances()['DescribeReservedDBInstancesResponse']['DescribeReservedDBInstancesResult']['ReservedDBInstances']
 
     rds_res_offerings = get_rds_res_offerings(rds)
-
-    #print rds_instance_list
-    #print rds_res_list
-    #print rds_res_offerings['d6a5b4d4-6488-404b-a405-33f01f6a54aa']
 
     # only show running instances, and sort by name
     ec2_instance_list = sorted(filter(lambda x: x.state=='running' and not x.spot_instance_request_id,
@@ -172,11 +188,17 @@ if __name__ == '__main__':
             print ANSIColor.yellow('EVENTS! '+','.join(ec2_instance_status[inst.id])),
         print
 
-    print 'EC2 UNUSED RESERVATIONS:'
+    ec2_any_unused = False
+    print 'EC2 UNUSED RESERVATIONS:',
     for res in ec2_res_list:
         use_count = len(ec2_res_usage[res.id])
         if use_count >= res.instance_count: continue
+        if not ec2_any_unused:
+            print
+            ec2_any_unused = True
         print ANSIColor.red(pretty_print_ec2_res(res, override_count = res.instance_count - use_count)), res.id
+    if not ec2_any_unused:
+        print '(none)'
 
     print 'RDS INSTANCES:'
     for inst in rds_instance_list:
@@ -187,8 +209,15 @@ if __name__ == '__main__':
         else:
             print ANSIColor.red(pretty_print_rds_instance(inst)+' NOT COVERED'),
         print
-    print 'RDS UNUSED RESERVATIONS:'
+
+    rds_any_unused = False
+    print 'RDS UNUSED RESERVATIONS:',
     for res in rds_res_list:
         use_count = len(rds_res_usage[res['ReservedDBInstanceId']])
         if use_count >= res['DBInstanceCount']: continue
+        if not rds_any_unused:
+            print
+            rds_any_unused = True
         print ANSIColor.red(pretty_print_rds_res(res, rds_res_offerings, override_count = res['DBInstanceCount'] - use_count)), res['ReservedDBInstanceId']
+    if not rds_any_unused:
+        print '(none)'
