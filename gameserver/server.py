@@ -9463,6 +9463,17 @@ class Player(AbstractPlayer):
         props['sum'] = self.get_denormalized_summary_props('brief')
         metric_event_coded(self.user_id, event_name, props)
 
+    # log items entering or leaving player inventory
+    # item_stack can be positive (item entering inventory) or negative (item exiting inventory)
+    def inventory_log_event(self, event_name, item_specname, item_stack, expire_time, reason=None):
+        if not event_name: return
+        if not gamedata['server'].get('log_inventory', True): return
+        props = {'spec': item_specname, 'stack': item_stack}
+        if expire_time and expire_time > 0: props['expire_time'] = expire_time
+        if reason: props['reason'] = reason
+        props['sum'] = self.get_denormalized_summary_props('brief')
+        metric_event_coded(self.user_id, event_name, props)
+
     def send_fb_notification(self, user, text, config, force = False):
 
         if (not self.has_write_lock):
@@ -9802,17 +9813,6 @@ class LivePlayer(Player):
         self.inventory.remove(item)
         self.inventory_log_event(event_name, item['spec'], -item.get('stack',1), item.get('expire_time',-1), reason=reason)
         return True
-
-    # log items entering or leaving player inventory
-    # item_stack can be positive (item entering inventory) or negative (item exiting inventory)
-    def inventory_log_event(self, event_name, item_specname, item_stack, expire_time, reason=None):
-        if not event_name: return
-        if not gamedata['server'].get('log_inventory', True): return
-        props = {'spec': item_specname, 'stack': item_stack}
-        if expire_time and expire_time > 0: props['expire_time'] = expire_time
-        if reason: props['reason'] = reason
-        props['sum'] = self.get_denormalized_summary_props('brief') # do we intend to summarize this?
-        metric_event_coded(self.user_id, event_name, props)
 
     def inventory_has_space_for(self, item, max_slots):
         spec = gamedata['items'][item['spec']]
