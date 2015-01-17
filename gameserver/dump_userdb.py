@@ -24,6 +24,7 @@ import SpinUserDB
 import SpinNoSQL
 import AtomicFileWrite
 import SpinParallel
+import SpinSingletonProcess
 
 gamedata = SpinJSON.load(open(SpinConfig.gamedata_filename()))
 
@@ -219,81 +220,83 @@ if __name__ == "__main__":
     else:
         ignore_users = SpinConfig.config.get('developer_user_id_list', [])
 
-    cache = open_cache(cache_read, cache_segments, from_s3_bucket, from_s3_keyfile, progress)
+    with SpinSingletonProcess.SingletonProcess('dump_userdb-%s' % SpinConfig.config['game_id']):
 
-    if cache and cache_update_time < 0:
-        cache_update_time = cache.update_time()
+        cache = open_cache(cache_read, cache_segments, from_s3_bucket, from_s3_keyfile, progress)
 
-    if cache:
-        if progress:
-            sys.stderr.write('will read cache %s (%d segs, updated %d)\n' % (cache_read, cache_segments, cache_update_time))
+        if cache and cache_update_time < 0:
+            cache_update_time = cache.update_time()
 
-    # connect to dbserver to ask it for the ID range and list of recent logins
-    nosql_client = None
-    if use_dbserver:
-        db_client = SpinNoSQL.NoSQLClient(SpinConfig.get_mongodb_config(SpinConfig.config['game_id']))
+        if cache:
+            if progress:
+                sys.stderr.write('will read cache %s (%d segs, updated %d)\n' % (cache_read, cache_segments, cache_update_time))
 
-    if db_client:
-        if progress: sys.stderr.write('successfully connected to database...\n')
+        # connect to dbserver to ask it for the ID range and list of recent logins
+        nosql_client = None
+        if use_dbserver:
+            db_client = SpinNoSQL.NoSQLClient(SpinConfig.get_mongodb_config(SpinConfig.config['game_id']))
 
-    # master set of all user_ids that need updating
-    if db_client:
-        if progress: sys.stderr.write('getting all user_ids from live database...\n')
-        user_id_range = db_client.get_user_id_range()
-    else:
-        if progress: sys.stderr.write('getting all user_ids using local file read...\n')
-        user_id_range = SpinUserDB.driver.get_user_id_range()
-
-    if progress:
-        sys.stderr.write('user_id range %s...\n' % repr(user_id_range))
-
-    # try to get the minimal set of user_ids that were updated since last upcache run
-    mod_users = None
-    if cache and cache_update_time > 0:
         if db_client:
-            if progress: sys.stderr.write('getting recent login list using database...\n')
-            mod_users = db_client.get_users_modified_since(cache_update_time)
+            if progress: sys.stderr.write('successfully connected to database...\n')
+
+        # master set of all user_ids that need updating
+        if db_client:
+            if progress: sys.stderr.write('getting all user_ids from live database...\n')
+            user_id_range = db_client.get_user_id_range()
         else:
-            if progress: sys.stderr.write('getting recent login list using sessions.json...\n')
-            mod_users = SpinUserDB.get_users_modified_since(cache_update_time, time_now)
+            if progress: sys.stderr.write('getting all user_ids using local file read...\n')
+            user_id_range = SpinUserDB.driver.get_user_id_range()
 
-    if mod_users is not None:
         if progress:
-            sys.stderr.write('got accurate modification list! Will only update %d users!\n' % len(mod_users))
+            sys.stderr.write('user_id range %s...\n' % repr(user_id_range))
 
-    task_list = [{'seg':seg,
-                  'ignore_users': ignore_users,
-                  'mod_users': mod_users,
-                  's3_userdb': s3_userdb,
-                  'from_s3_keyfile': from_s3_keyfile,
-                  'from_s3_bucket': from_s3_bucket,
-                  'to_s3_keyfile': to_s3_keyfile,
-                  'to_s3_bucket': to_s3_bucket,
-                  'to_mongodb_config': to_mongodb_config,
-                  'nosql_deltas_only': nosql_deltas_only,
-                  'user_id_range': user_id_range,
-                  'progress': progress,
-                  'time_now': time_now,
-                  'cache_segments': cache_segments,
-                  'cache_read': cache_read,
-                  'filename': (cache_write+SpinUpcache.segment_name(seg, cache_segments)+'.sjson.gz') if cache_write else None,
-                  } for seg in xrange(cache_segments)]
+        # try to get the minimal set of user_ids that were updated since last upcache run
+        mod_users = None
+        if cache and cache_update_time > 0:
+            if db_client:
+                if progress: sys.stderr.write('getting recent login list using database...\n')
+                mod_users = db_client.get_users_modified_since(cache_update_time)
+            else:
+                if progress: sys.stderr.write('getting recent login list using sessions.json...\n')
+                mod_users = SpinUserDB.get_users_modified_since(cache_update_time, time_now)
 
-    # dump all segments
-    if parallel <= 1:
-        for task in task_list:
-            do_slave(task)
-    else:
-        SpinParallel.go(task_list, [sys.argv[0], '--slave'], on_error = 'break', nprocs=parallel, verbose = False)
+        if mod_users is not None:
+            if progress:
+                sys.stderr.write('got accurate modification list! Will only update %d users!\n' % len(mod_users))
 
-    # write info file
-    if cache_write:
-        info_filename = cache_write + '-info.json'
-        props = {'update_time':time_now,
-                 'segments': [task['filename'] for task in task_list]}
-        fd = open(info_filename, 'w')
-        SpinJSON.dump(props, fd, pretty = True, newline = True)
-        fd.close()
+        task_list = [{'seg':seg,
+                      'ignore_users': ignore_users,
+                      'mod_users': mod_users,
+                      's3_userdb': s3_userdb,
+                      'from_s3_keyfile': from_s3_keyfile,
+                      'from_s3_bucket': from_s3_bucket,
+                      'to_s3_keyfile': to_s3_keyfile,
+                      'to_s3_bucket': to_s3_bucket,
+                      'to_mongodb_config': to_mongodb_config,
+                      'nosql_deltas_only': nosql_deltas_only,
+                      'user_id_range': user_id_range,
+                      'progress': progress,
+                      'time_now': time_now,
+                      'cache_segments': cache_segments,
+                      'cache_read': cache_read,
+                      'filename': (cache_write+SpinUpcache.segment_name(seg, cache_segments)+'.sjson.gz') if cache_write else None,
+                      } for seg in xrange(cache_segments)]
 
-        if to_s3_bucket:
-            SpinS3.S3(to_s3_keyfile, verbose = progress).put_file(to_s3_bucket, os.path.basename(info_filename), info_filename)
+        # dump all segments
+        if parallel <= 1:
+            for task in task_list:
+                do_slave(task)
+        else:
+            SpinParallel.go(task_list, [sys.argv[0], '--slave'], on_error = 'break', nprocs=parallel, verbose = False)
+
+        # write info file
+        if cache_write:
+            info_filename = cache_write + '-info.json'
+            props = {'update_time':time_now,
+                     'segments': [task['filename'] for task in task_list]}
+            fd = open(info_filename, 'w')
+            SpinJSON.dump(props, fd, pretty = True, newline = True)
+            fd.close()
+
+            if to_s3_bucket:
+                SpinS3.S3(to_s3_keyfile, verbose = progress).put_file(to_s3_bucket, os.path.basename(info_filename), info_filename)
