@@ -44,12 +44,10 @@ if [ -e ../gamedata/linebreak/Makefile ]; then
 fi
 
 echo "Calculating client JavaScript include dependencies..."
-(cd ../gameclient && google/closure/bin/build/depswriter.py --root_with_prefix='clientcode ../../../clientcode' > generated-deps.js)
-(cd ../gameclient && echo "goog.require('SPINPUNCHGAME');" >> generated-deps.js)
+(cd ../gameclient && make -f Makefile dep)
 
-# Google Closure compilation is disabled by default, since it takes a long time. Will only be used for obfuscated releases.
-# echo "compiling client JavaScript code..."
-# (cd ../gameclient && ./make-compiled-client.sh)
+echo "Compiling client JavaScript code..."
+(cd ../gameclient && make -f Makefile all)
 
 ./make-gamedata.sh -u
 if [[ $? != 0 ]]; then
