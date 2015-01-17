@@ -17154,13 +17154,14 @@ class GAMEAPI(resource.Resource):
                 session.increment_player_metric('item:'+item['spec']+':crafted', item.get('stack',1), time_series = False)
 
             if delivery_method == 'building_slot':
+                assert len(loot) == 1
+                item = loot[0]
                 try:
                     delivery_address = bus.craft_state['delivery']
-                    assert self.do_equip_building(session, retmsg, [None, delivery_address['obj_id'], (delivery_address['slot_type'],delivery_address.get('slot_index',0)), -1, loot[0]['spec'], None, None],
+                    assert self.do_equip_building(session, retmsg, [None, delivery_address['obj_id'], (delivery_address['slot_type'],delivery_address.get('slot_index',0)), -1, item['spec'], None, None],
                                                   force = True)
                     looted += loot
-                   #if session.has_object(delivery_address['obj_id']):
-                   #     retmsg.append(["CRAFT_COMPLETE", delivery_address['obj_id'], loot])
+                    session.player.inventory_log_event('5125_item_obtained', item['spec'], item.get('stack',1), item.get('expire_time',-1), reason='crafted')
                 except:
                     gamesite.exception_log.event(server_time, 'player %d crafting delivery %s target not found, discarding.\n%s' % \
                                                  (object.owner.user_id, repr(bus.craft_state), traceback.format_exc()))
@@ -17901,7 +17902,8 @@ class GAMEAPI(resource.Resource):
         if remove_specname:
             assert Equipment.equip_remove(equipment, dest_addr, remove_specname)
             if remove_spec and remove_spec.get('remove_fragility',0) >= 1:
-                pass # item destroyed
+                # item destroyed
+                session.player.inventory_log_event('5131_item_trashed', remove_specname, -1, -1, reason='removed')
             else:
                 # note: pass inflated max_usable_inventory here as "buffer" space, since we checked for space above
                 assert session.player.inventory_add_item({'spec':remove_specname}, max_usable_inventory + inventory_buffer) == 1
@@ -19085,8 +19087,9 @@ class GAMEAPI(resource.Resource):
                         for slot_type, slot_num, specname in items_destroyed:
                             Equipment.equip_remove(obj.equipment, (slot_type, slot_num), specname)
                             # record expenditure of the item (e.g. landmines)
-                            if owning_user:
-                                session.attack_item_expended(owning_user.user_id, specname, 1)
+                            if owning_player:
+                                session.attack_item_expended(owning_player.user_id, specname, 1)
+                                owning_player.inventory_log_event('5131_item_trashed', specname, -1, -1, reason='destroyed')
 
                     if items_destroyed:
                         event_props['items_destroyed'] = [x[2] for x in items_destroyed]
