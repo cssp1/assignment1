@@ -97,9 +97,9 @@ function do_git_sync_svn {
         echo "Commits:"
         echo "$COMMITMSG"
     fi
-    if [[ -n `(cd "$ROOT" && svn stat gameclient/clientcode)` ]]; then
-        echo "Client code changed, recompile client!"
-    fi
+#    if [[ -n `(cd "$ROOT" && svn stat gameclient/clientcode)` ]]; then
+#        echo "Client code changed, recompile client!"
+#    fi
 }
 
 function do_up_git {
