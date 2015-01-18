@@ -1,11 +1,13 @@
 #!/usr/bin/env python
 
-# Copyright (c) 2014 SpinPunch. All rights reserved.
+# Copyright (c) 2015 SpinPunch. All rights reserved.
 # Use of this source code is governed by an MIT-style license that can be
 # found in the LICENSE file.
 
-# backup all game server state, including local databases and S3 userdb/playerdb/aistate,
-# to another S3 bucket
+# backup S3 userdb/playerdb to compressed files in another S3 bucket
+
+# note: requires a large amount of space (1GB+) for gathering temporary files
+# set TMPDIR environment variable to a suitable location
 
 import sys, os, getopt, time, tempfile, shutil
 import SpinS3
@@ -15,8 +17,7 @@ import SpinParallel
 import SpinSingletonProcess
 import subprocess
 
-time_now = int(time.time())
-date_str = time.strftime('%Y%m%d', time.gmtime(time_now))
+date_str = time.strftime('%Y%m%d', time.gmtime())
 
 # autoconfigure based on config.json
 game_id = SpinConfig.config['game_id']
@@ -24,56 +25,9 @@ backup_bucket = 'spinpunch-backups'
 backup_obj_prefix = '%s-player-data-%s/' % (SpinConfig.game_id_long(), date_str)
 s3_key_file_for_db = SpinConfig.aws_key_file()
 s3_key_file_for_backups = SpinConfig.aws_key_file()
-s3_driver = None
-userdb_bucket = SpinConfig.config['userdb_s3_bucket']
-playerdb_bucket = SpinConfig.config['playerdb_s3_bucket']
-aistate_bucket = SpinConfig.config['aistate_s3_bucket']
 
 class NullFD(object):
     def write(self, stuff): pass
-
-def do_local_backup(verbose):
-    msg_fd = sys.stderr if verbose else NullFD()
-    backup_con = SpinS3.S3(s3_key_file_for_backups)
-
-    # back up config.json and all local database files
-    objname = backup_obj_prefix + 'config.json'
-    print >> msg_fd, 'local: uploading config.json', '->', objname, '...'
-    backup_con.put_file(backup_bucket, objname, 'config.json')
-
-    if ('sqlserver' in SpinConfig.config) and SpinConfig.config['sqlserver'].get('enable', True) and False:
-        # OBSOLETE - we don't use MySQL anymore, and if we re-introduce it we'd do the backups on the MySQL server itself
-        sqlfile = tempfile.NamedTemporaryFile(prefix='prodbackup-local', suffix='.sql.gz')
-        sqlfilename = sqlfile.name
-        cfg = SpinConfig.config['sqlserver']
-        print >> msg_fd, 'local: dumping SQL data...'
-        subprocess.check_call('mysqldump -u%s -p%s %s | gzip -c > %s' % (cfg['username'], cfg['password'], cfg['database'], sqlfilename), shell = True)
-        objname = backup_obj_prefix + 'mysql.gz'
-        print >> msg_fd, 'local: uploading', os.path.basename(sqlfilename), '->', objname, '...'
-        backup_con.put_file(backup_bucket, objname, sqlfilename)
-
-    if ('mongodb_servers' in SpinConfig.config) and False:
-        # OBSOLETE - we now have the MongoDB servers take care of their own backups
-        for key, cfg in SpinConfig.config['mongodb_servers'].iteritems():
-            if not cfg.get('backup',False): continue
-            #if cfg['host'] != 'localhost': continue
-
-            config = SpinConfig.get_mongodb_config(key)
-            mydir = tempfile.mkdtemp(prefix='prodbackup-local-'+key, suffix='-mongodb')
-            try:
-                print >> msg_fd, 'local: dumping NoSQL data for %s...' % key
-                subprocess.check_call('/usr/local/mongodb/bin/mongodump --host %s --port %d -u %s -p %s -d %s -o %s > /dev/null' % (config['host'], config['port'], config['username'], config['password'], config['dbname'], mydir), shell = True)
-                myarch = os.path.join(mydir, 'mongodb-%s.cpio.gz' % config['dbname'])
-                print >> msg_fd, 'local: compressing %s...' % os.path.basename(myarch)
-                subprocess.check_call('(cd %s && find %s | cpio -oL --quiet | gzip -c > %s)' % (mydir, config['dbname'], myarch), shell = True)
-                objname = backup_obj_prefix + 'mongodb-%s.cpio.gz' % config['dbname']
-                print >> msg_fd, 'local: uploading', os.path.basename(myarch), '->', objname, '...'
-                backup_con.put_file(backup_bucket, objname, myarch)
-            finally:
-                subprocess.check_call('rm -rf %s' % mydir, shell = True)
-
-    print >> msg_fd, 'local: done'
-
 
 def backup_s3_dir(title, bucket_name, prefix = '', ignore_errors = False, verbose = False):
     # back up from S3 (either an entire bucket or one subdirectory) to one cpio.gz archive
@@ -132,29 +86,23 @@ def backup_s3_dir(title, bucket_name, prefix = '', ignore_errors = False, verbos
         shutil.rmtree(td, True)
 
 def get_s3_driver():
-    return SpinUserDB.S3Driver(game_id = game_id,
-                               key_file = s3_key_file_for_db,
-                               userdb_bucket = userdb_bucket,
-                               playerdb_bucket = playerdb_bucket)
+    return SpinUserDB.S3Driver()
 
 def do_user_backup(part, verbose):
     s3_driver = get_s3_driver()
     backup_s3_dir('userdb-part%02dof%02d' % (part, s3_driver.nbuckets-1),
-                  userdb_bucket,
+                  s3_driver.userdb_bucket,
                   prefix = s3_driver.get_user_prefix_for_bucket(part),
                   verbose = verbose)
 def do_player_backup(part, verbose):
     s3_driver = get_s3_driver()
     backup_s3_dir('playerdb-part%02dof%02d' % (part, s3_driver.nbuckets-1),
-                  playerdb_bucket,
+                  s3_driver.playerdb_bucket,
                   prefix = s3_driver.get_player_prefix_for_bucket(part),
                   verbose = verbose)
 
-
 def my_slave(input):
-    if input['kind'] == 'local':
-        do_local_backup(input['verbose'])
-    elif input['kind'] == 'player':
+    if input['kind'] == 'player':
         do_player_backup(input['part'], input['verbose'])
     elif input['kind'] == 'user':
         do_user_backup(input['part'], input['verbose'])
@@ -182,9 +130,6 @@ if __name__ == '__main__':
             do_local = bool(int(val))
 
     task_list = []
-
-    if do_local:
-        task_list.append({'kind':'local', 'verbose':verbose})
 
     if do_s3:
         s3_driver = get_s3_driver()

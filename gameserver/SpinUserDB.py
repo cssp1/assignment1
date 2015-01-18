@@ -169,14 +169,14 @@ class S3Driver (Driver):
     # There are only three S3 buckets, one for userdb, one for playerdb, and one for aistate
     # S3 objects are subdivided further into 100 folders, to spread the S3 key space more efficiently.
 
-    def __init__(self, game_id = None, key_file = None, userdb_bucket = None, playerdb_bucket = None, basedb_bucket = None, verbose = False):
+    def __init__(self, game_id = None, key_file = None, userdb_bucket = None, playerdb_bucket = None, aistate_bucket = None, basedb_bucket = None, verbose = False):
         self.nbuckets = 100
         if game_id is None: game_id = SpinConfig.config['game_id']
         self.game_id = game_id
-        self.userdb_bucket = userdb_bucket if userdb_bucket else SpinConfig.config.get('userdb_s3_bucket', 'spinpunch-prod-userdb')
-        self.playerdb_bucket = playerdb_bucket if playerdb_bucket else SpinConfig.config.get('playerdb_s3_bucket', 'spinpunch-mfprod-playerdb')
-        self.aistate_bucket = SpinConfig.config.get('aistate_s3_bucket', 'spinpunch-mfprod-aistate')
-        self.basedb_bucket = basedb_bucket if basedb_bucket else SpinConfig.config.get('basedb_s3_bucket', 'spinpunch-mfprod-basedb')
+        self.userdb_bucket = userdb_bucket if userdb_bucket else SpinConfig.config.get('userdb_s3_bucket', None)
+        self.playerdb_bucket = playerdb_bucket if playerdb_bucket else SpinConfig.config.get('playerdb_s3_bucket', None)
+        self.aistate_bucket = aistate_bucket if aistate_bucket else SpinConfig.config.get('aistate_s3_bucket', None)
+        self.basedb_bucket = basedb_bucket if basedb_bucket else SpinConfig.config.get('basedb_s3_bucket', None)
         self.s3con = SpinS3.S3(key_file if key_file else SpinConfig.aws_key_file(), verbose=verbose)
 
     def user_id_bucket(self, id):
