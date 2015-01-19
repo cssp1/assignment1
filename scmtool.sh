@@ -53,7 +53,7 @@ function do_force_revert_svn {
     (cd "$ROOT" && svn revert -R . && (svn stat | grep '^\?' | awk '{print $2}' | xargs rm -f) )
 }
 function do_site_patch {
-    (cd "$ROOT" && for p in *private/??*.patch; do patch -p0 < $p; done)
+    (cd "$ROOT" && for p in *private/??*.patch; do patch -p1 < $p; done)
 }
 function do_force_up_svn {
     (cd "$ROOT" && svn up --force --accept theirs-full)
