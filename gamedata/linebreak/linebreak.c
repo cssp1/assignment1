@@ -1,7 +1,7 @@
 /* Break long lines in a JavaScript file, without changing its meaning at all. */
 /* This should work identically to linebreak.py, just a lot faster. */
 
-/* Copyright (c) 2014 SpinPunch. All rights reserved.
+/* Copyright (c) 2015 SpinPunch. All rights reserved.
    Use of this source code is governed by an MIT-style license that can be
    found in the LICENSE file. */
 
