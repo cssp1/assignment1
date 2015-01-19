@@ -22779,7 +22779,7 @@ function player_info_statistics_tab_receive(dialog, data, status_code, query_gen
             goog.object.forEach({
                 'resources_looted_from_human': player.history['resources_looted_from_human'] || 0,
                 'resources_stolen_by_human': player.history['resources_stolen_by_human'] || 0,
-                'attacks_launched_vs_human': player.history['attacks_lauched_vs_human'] || 0,
+                'attacks_launched_vs_human': player.history['attacks_launched_vs_human'] || 0,
                 // time_in_game is updated on logout, so add current session time
                 'time_in_game': player.history['time_in_game'] + (client_time - session.connect_time),
                 'account_age': server_time - player.creation_time},
