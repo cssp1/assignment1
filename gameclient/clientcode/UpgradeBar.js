@@ -50,6 +50,9 @@ UpgradeBar.scroll = function(dialog, incr) {
         dialog.widgets['output'].scroll_down();
     }
     dialog.user_data['scroll_pos'] = dialog.widgets['output'].get_scroll_pos();
+    var has_scrolling = dialog.widgets['output'].can_scroll_up() || dialog.widgets['output'].can_scroll_down();
+    dialog.widgets['output'].scroll_up_button.show =
+        dialog.widgets['output'].scroll_down_button.show = has_scrolling;
 };
 UpgradeBar.ondraw = function(dialog) {
     var border = dialog.data['xy'];
