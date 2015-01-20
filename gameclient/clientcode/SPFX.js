@@ -1433,6 +1433,7 @@ SPFX.PhantomUnit = function(pos, altitude, orient, time, data, instance_data) {
 
     this.start_time = time;
     this.end_time = (!('duration' in data) || data['duration'] >= 0) ? (time + data['duration'] || 3.0) : -1;
+    this.end_at_dest = (('end_at_dest' in data) ? data['end_at_dest'] : true);
 
     this.obj = new Mobile();
     this.obj.id = -1;
@@ -1480,6 +1481,23 @@ SPFX.PhantomUnit.prototype.dispose = function() {
         SPFX.remove(this.obj.permanent_effect);
     }
 };
+
+/** set new motion path directly - totally bypasses A*
+ * @param {Array.<Array.<number>>} new_path */
+SPFX.PhantomUnit.prototype.set_path = function(new_path) {
+    this.obj.pos = this.obj.next_pos = vec_copy(new_path[0]);
+    this.obj.dest = this.obj.ai_dest = vec_copy(new_path[new_path.length-1]);
+    this.obj.control_state = control_states.CONTROL_MOVING;
+    this.obj.path = new_path;
+    this.obj.path_valid = true;
+};
+
+/** set new destination - will call A* for pathfinding
+ * @param {Array.<number>} new_dest */
+SPFX.PhantomUnit.prototype.set_dest = function(new_dest) {
+    this.obj.ai_move_towards(new_dest, null, 'SPFX.PhantomUnit.set_dest');
+};
+
 SPFX.PhantomUnit.prototype.draw = function() { throw Error('should not be called'); };
 SPFX.PhantomUnit.prototype.get_phantom_object = function() {
     if(this.end_time >= 0 && SPFX.time >= this.end_time) { return null; } // timed out
@@ -1497,7 +1515,7 @@ SPFX.PhantomUnit.prototype.get_phantom_object = function() {
             this.obj.cur_opacity = 0;
             this.obj.last_opacity = 1;
             this.obj.last_opacity_time = this.end_time - gamedata['client']['unit_fade_time'];
-        } else if(vec_equals(this.obj.pos, this.obj.dest)) {
+        } else if(this.end_at_dest && vec_equals(this.obj.pos, this.obj.dest)) {
             if(this.obj.cur_opacity != 0) {
                 this.obj.cur_opacity = 0;
                 this.obj.last_opacity = 1;
