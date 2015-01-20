@@ -1167,9 +1167,10 @@ def check_loot_table(table, reason = '', expire_time = -1, duration = -1, max_sl
                         error |= 1
                         print '%s: loot table entry (%s) gives more than the max stack size (%d) of item "%s"\n -> reduce loot amount or break this into multiple stacks of <= %d each' % (reason, repr(entry), spec.get('stack_max',1), entry['spec'], spec.get('stack_max',1))
 
-                if ('use' in spec) and ('spellname' in spec['use']) and spec['use']['spellname'] == 'GIVE_UNITS' and ('sexy_unlocked' not in reason) and ('resurrection_ok' not in entry):
+                if ('use' in spec) and ('spellname' in spec['use']) and spec['use']['spellname'] == 'GIVE_UNITS' and ('sexy_unlocked' not in reason) and \
+                   (not entry.get('resurrection_ok',False)) and any(gamedata['units'][u].get('resurrectable',False) for u in spec['use']['spellarg'].iterkeys()):
                     error |= 1
-                    print '%s: loot table gives packaged units (%s), this is not compatible with permanent resurrection. Please replace this loot entry with something other than a packaged unit.' % (reason, entry['spec'])
+                    print '%s: loot table gives resurrectable packaged units (%s), this is not compatible with permanent resurrection. Please replace this loot entry with something other than a packaged unit.' % (reason, entry['spec'])
         elif 'multi' in entry:
             if max_slots >= 0 and len(entry['multi']) > max_slots:
                 error |= 1; print '%s: loot table entry (%s) can yield %d slots worth of items but limit here is %d' % (reason, repr(entry), len(entry['multi']), max_slots)
