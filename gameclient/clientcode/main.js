@@ -44,6 +44,7 @@ goog.require('TeamMapAccelerator');
 goog.require('VoxelMapAccelerator');
 goog.require('buzz');
 goog.require('Traceback');
+goog.require('Citizens');
 
 // detect whether browser has touch-screen events
 var touch_modes = {
@@ -4548,13 +4549,35 @@ session.loot = {}; // exact copy of server's session.loot
 session.last_loot = {}; // previous value of session.loot, for graphical ticker effect only
 session.last_looted_uncapped = {}; // previous value of session.res_looter['looted_uncapped'], for graphical ticker effect only
 
-session.res_looter = null; // supports client GUI displaying server's ResLooter state
+session.res_looter = null; // raw JSON ResLooter state sent from server; drives client GUI display
 
 session.pvp_balance = null; // which party is favored in PvP
 session.ladder_state = null; // identical to session.ladder_state in server
 session.home_warehouse_busy = false; // business state of warehouse upon session change
 session.home_equip_items = []; // list of equipped items from home that we can use during combat
 session.last_map_dialog_state = null; // stash state of map dialog when leaving home base, so we can come back to it
+
+/** @type Citizens.Context */
+session.citizens = null; // army units walking around the base
+session.citizens_dirty = false;
+session.lazy_update_citizens = function() { session.citizens_dirty = true; };
+session.do_update_citizens = function() {
+    if(session.citizens) {
+        var data_list;
+        if(session.citizens_dirty) { // need to tell Citizens about changes to army contents
+            session.citizens_dirty = false;
+            data_list = [];
+            goog.object.forEach(player.my_army, function(obj) {
+                if((obj['squad_id']||0) == SQUAD_IDS.BASE_DEFENDERS) {
+                    data_list.push(new Citizens.UnitData(obj['obj_id'], obj['spec'], obj['level']||1, ('hp_ratio' in obj ? obj['hp_ratio'] : 1)));
+                }
+            });
+        } else {
+            data_list = null; // no update to army contents
+        }
+        session.citizens.update(data_list);
+    }
+};
 
 session.viewing_lock_state = 0; // lock state of (foreign) base being viewed
 session.viewing_isolate_pvp = 0; // isolate_pvp flag of base being viewed
@@ -13542,7 +13565,11 @@ function invoke_recycle_dialog(obj) {
         if(dialog.user_data['is_army']) {
             if(_obj['obj_id'] in player.my_army) {
                 send_to_server.func(["RECYCLE_UNIT", _obj['obj_id']]);
-                if(_obj['obj_id'] in player.my_army) { delete player.my_army[_obj['obj_id']]; }
+                // snoop update into my_army
+                if(_obj['obj_id'] in player.my_army) {
+                    delete player.my_army[_obj['obj_id']];
+                    session.lazy_update_citizens();
+                }
                 if(_obj['obj_id'] in session.cur_objects.objects) {
                     remove_object(session.cur_objects.objects[_obj['obj_id']]);
                 }
@@ -13551,7 +13578,11 @@ function invoke_recycle_dialog(obj) {
             if(_obj.id && _obj.id !== -1) { // check obj.id rather than is_destroyed() because you CAN recycle destroyed units
                 send_to_server.func(["RECYCLE_UNIT", _obj.id]);
                 unit_repair_sync_marker = synchronizer.request_sync();
-                if(_obj.id in player.my_army) { delete player.my_army[_obj.id]; }
+                // snoop update into my_army
+                if(_obj.id in player.my_army) {
+                    delete player.my_army[_obj.id];
+                    session.lazy_update_citizens();
+                }
                 remove_object(_obj);
             }
         }
@@ -39453,9 +39484,11 @@ function handle_server_message(data) {
         goog.array.forEach(data[1], function(state) {
             player.my_army[state['obj_id']] = state;
         });
+        session.lazy_update_citizens();
     } else if(msg == "PLAYER_ARMY_UPDATE_DESTROYED") {
         var obj_id = data[1];
         if(obj_id in player.my_army) { delete player.my_army[obj_id]; }
+        session.lazy_update_citizens();
     } else if(msg == "REGION_CHANGE") {
         change_region_pending = null;
         var new_region_id = data[1];
@@ -39669,6 +39702,10 @@ function handle_server_message(data) {
 
         // blow away the old session
         change_selection(null);
+        if(session.citizens) {
+            session.citizens.dispose();
+            session.citizens = null;
+        }
         SPFX.clear();
         offscreen_unit_arrow = null;
         visit_base_pending = false;
@@ -39838,6 +39875,11 @@ function handle_server_message(data) {
         enemy.instance_expiration_time = data[8];
         enemy.stattab = {'player':{},'units':{},'buildings':{},'INIT':'enemy'};
         enemy.player_auras = [];
+
+        if(session.home_base && player.get_any_abtest_value('enable_citizens', gamedata['client']['enable_citizens'])) {
+            session.citizens = new Citizens.Context(session.viewing_base, astar_context);
+            session.lazy_update_citizens();
+        }
 
         init_desktop_dialogs();
         set_view_zoom(get_preference_setting(player.preferences, 'playfield_zoom'));
@@ -43716,6 +43758,9 @@ function do_draw() {
         SPUI.dripper.activate(client_time);
 
         mouse_state.dripper.activate(client_time, [mouse_state.last_x, mouse_state.last_y]);
+
+        // run deferred citizens update
+        session.do_update_citizens();
 
         // run game simulation tick, if enough time has elapsed since last tick
         run_unit_ticks();
