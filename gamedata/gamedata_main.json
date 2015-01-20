@@ -289,10 +289,10 @@
                         "ring_size": 1 },
             // used for on-over on friendly buildings
             "hover": { "basecol": "rgba(0,255,0,",
-                        "stroke_alpha": 0.5,
-                        "altitude_alpha": 0.3,
-                        "fill_alpha": 0.12,
-                        "ring_size": 1 }
+                       "stroke_alpha": 0.5,
+                       "altitude_alpha": 0.3,
+                       "fill_alpha": 0.12,
+                       "ring_size": 1 }
         },
 
         // if true, always draw weapon range of selected units

@@ -6,7 +6,7 @@
     // THE "RAILS" TUTORIAL DESCRIBED HERE IS NOT USED!
     // BUT PLEASE KEEP THIS FILE INTACT BECAUSE main.js MAY HAVE HARDCODED REFERENCES TO IT.
 
-     "START": { "kind": "slideshow",
+    "START": { "kind": "slideshow",
                "asset": "tutorial_slideshow0",
                "ui_description": "Unused tutorial.",
                "bg_fill_color": [1,1,1,1],
