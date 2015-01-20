@@ -7545,6 +7545,12 @@
                       "array": [1,15], "array_offset": [60,60] },
             "icon": { "kind": "StaticImage", "xy": [5,27], "dimensions": [50,50],
                       "array": [1,15], "array_offset": [60,60] },
+            "icon_gamebucks": { "kind": "StaticImage", "xy": [8,57], "dimensions": [21,21],
+                                "transform": [0.75,0,0,0.75,0,0], // scale to 75% for better spacing
+                                "array": [1,15], "array_offset": [60,60] },
+            "icon_gamebucks_amount": { "kind": "TextField", "xy": [28,55], "dimensions": [21,21],
+                                       "text_size": 12, "text_style": "normal", "drop_shadow": 1,
+                                       "array": [1,15], "array_offset": [60,60] },
             "checkmark": { "kind": "StaticImage", "xy": [5,27], "dimensions": [50,50], "asset": "inventory_checkmark",
                            "pulse_period": 2.0, "pulse_amplitude": 0.7, "pulse_offset": 4,
                            "array": [1,15], "array_offset": [60,60] },

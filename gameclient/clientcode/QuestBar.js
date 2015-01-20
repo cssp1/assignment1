@@ -50,6 +50,8 @@ QuestBar.update = function(dialog) {
 
             dialog.widgets['slot'+wname].show =
                 dialog.widgets['icon'+wname].show =
+                dialog.widgets['icon_gamebucks'+wname].show =
+                dialog.widgets['icon_gamebucks_amount'+wname].show =
                 dialog.widgets['checkmark'+wname].show =
                 dialog.widgets['frame'+wname].show = (i < n_shown);
             if(i >= n_shown) { continue; } // after final quest
@@ -69,6 +71,13 @@ QuestBar.update = function(dialog) {
             dialog.widgets['frame'+wname].tooltip.str = tip;
             dialog.widgets['frame'+wname].state = (player.quest_tracked == quest ? 'highlight' : dialog.data['widgets']['frame']['state']);
             dialog.widgets['icon'+wname].asset = quest['icon'] || 'inventory_unknown';
+
+            dialog.widgets['icon_gamebucks'+wname].show = dialog.widgets['icon_gamebucks_amount'+wname].show = ('reward_gamebucks' in quest);
+            if('reward_gamebucks' in quest) {
+                dialog.widgets['icon_gamebucks'+wname].asset = player.get_any_abtest_value('gamebucks_resource_icon', gamedata['store']['gamebucks_resource_icon']);
+                dialog.widgets['icon_gamebucks_amount'+wname].str = Store.display_user_currency_amount(quest['reward_gamebucks'], 'compact');
+            }
+
             dialog.widgets['checkmark'+wname].show = can_complete;
             if(can_complete) {
                 var amp = dialog.data['widgets']['checkmark']['pulse_amplitude'];
