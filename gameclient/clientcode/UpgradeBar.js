@@ -200,7 +200,7 @@ UpgradeBar.update_contents = function(dialog, kind, specname, new_level, obj_id)
         'crafting_recipe': {'onclick': function(specname) { return function(w, mloc) {
             var recipe = gamedata['crafting']['recipes'][specname];
             var dialog = invoke_crafting_dialog(recipe['crafting_category']);
-            if(dialog) { crafting_dialog_select_recipe(dialog, specname); }
+            if(dialog) { crafting_dialog_select_recipe(dialog.widgets['recipe'], specname); }
         }; } },
         'predicate': {'onclick': (function (_predicate_map) { return function(sindex) { return function(w, mloc) {
             var pred = _predicate_map[parseInt(sindex)];

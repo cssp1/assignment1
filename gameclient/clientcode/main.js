@@ -28663,6 +28663,7 @@ function invoke_crafting_dialog(newcategory, newsubcategory, newpage) {
 
     dialog.ondraw = update_crafting_dialog;
     crafting_dialog_change_category(dialog, newcategory, newpage || 0);
+    return dialog;
 }
 
 function crafting_dialog_change_category(dialog, category, page) {
@@ -28766,6 +28767,10 @@ function crafting_dialog_change_category(dialog, category, page) {
         crafting_dialog_init_status_missiles(dialog.widgets['status']);
     } else {
         throw Error('unhandled category '+category);
+    }
+
+    if(player.get_any_abtest_value('enable_upgrade_bar', gamedata['client']['enable_upgrade_bar'])) {
+        UpgradeBar.invoke(dialog, 'building', (builder ? builder.spec['name'] : null), (builder ? builder.level+1 : -1), (builder ? builder.id : null));
     }
 
     crafting_dialog_scroll(dialog, page || 0);

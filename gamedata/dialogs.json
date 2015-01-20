@@ -1774,6 +1774,7 @@
     },
     "crafting_dialog": {
         "dimensions": [736,423],
+        "clip_children": 0,
         "widgets": {
             "bg": { "kind":"StaticImage", "xy":[0,0], "dimensions": [736,423], "transparent_to_mouse":0, "asset": "dialog_resizable", "bg_image_resizable": 1},
             "sunken": {"kind": "StaticImage", "xy":[9,70], "dimensions":[718,344], "bg_image_resizable": 1, "asset": "dialog_sunken_resizable" },
