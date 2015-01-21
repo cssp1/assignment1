@@ -63,19 +63,22 @@ AStar.heuristic_euclidean = function(start_pos, cur_pos, end_pos) {
 };
 
 // MAP CELL
-// in order to avoid having to re-initialize the entire grid before each query,
-// we use a "mailbox" technique to do just-in-time initialization
+
+/** @typedef {function(AStar.AStarCell): boolean | null} */
+AStar.BlockChecker;
 
 /** @constructor
  * @param {Array.<number>} pos
  */
 AStar.AStarCell = function(pos) {
-    this.serial = 0;
     this.pos = pos;
-    this.blocked = 0; // count of obstacles overlapping this point
+    this.block_count = 0; // count of obstacles overlapping this point
     this.heapscore = 0; // for insertion into BinaryHeap
 
-    // following fields are specific to one query and will be reset if serial mismatches
+    // The following fields are specific to one query.
+    // In order to avoid having to re-initialize the entire grid before each query,
+    // we use a "mailbox" technique to do just-in-time initialization if serial mismatches.
+    this.serial = 0;
     this.f = 0;
     this.g = 0;
     this.h = 0;
@@ -84,18 +87,32 @@ AStar.AStarCell = function(pos) {
     this.parent = null;
 };
 
-AStar.AStarCell.prototype.init = function() {
-    this.f = 0;
-    this.g = 0;
-    this.h = 0;
-    this.visited = false;
-    this.closed = false;
-    this.parent = null;
-};
+// return true only if there is no data at all for this cell, meaning it can be deallocated
+AStar.AStarCell.prototype.is_empty = function() { return this.block_count <= 0; }
 
+AStar.AStarCell.prototype.block = function() { this.block_count += 1; }
+AStar.AStarCell.prototype.unblock = function() { this.block_count -= 1; }
+
+/** Test map cell for blockage. Optionally supply a "checker" function that can perform
+ * arbitrary logic. Otherwise just uses block_count to determine blockage.
+ * @param {AStar.BlockChecker=} checker
+ * @return {boolean} */
+AStar.AStarCell.prototype.is_blocked = function(checker) {
+    if(checker) { return checker(this); }
+    return this.block_count > 0;
+}
+
+/** Initialize fields needed by the A* search, lazily, and return reference to this.
+ * @param {number} serial
+ * @return {AStar.AStarCell} */
 AStar.AStarCell.prototype.get = function(serial) {
     if(this.serial != serial) {
-        this.init();
+        this.f = 0;
+        this.g = 0;
+        this.h = 0;
+        this.visited = false;
+        this.closed = false;
+        this.parent = null;
         this.serial = serial;
     }
     return this;
@@ -135,7 +152,7 @@ AStar.AStarMap.prototype.cleanup = function() {
             for(var x = 0; x < this.size[0]; x++) {
                 var c = this.map[y][x];
                 if(c) {
-                    if(!c.blocked) {
+                    if(c.is_empty()) {
                         this.map[y][x] = null;
                         this.n_alloc -= 1;
                     } else {
@@ -174,35 +191,40 @@ AStar.AStarMap.prototype.free_cell = function(xy) {
 };
 
 /** Return a cell that can potentially be used for pathing
-  * @param {Array.<number>} xy */
-AStar.AStarMap.prototype.cell_if_unblocked = function(xy) {
+ * @param {Array.<number>} xy
+ * @param {AStar.BlockChecker} checker
+ * @return {?AStar.AStarCell} */
+AStar.AStarMap.prototype.cell_if_unblocked = function(xy, checker) {
     if(xy[0] >= 0 && xy[0] < this.size[0] &&
        xy[1] >= 0 && xy[1] < this.size[1]) {
         if(this.terrain_func && this.terrain_func(xy)) { return null; }
         var c = this.cell(xy); // potentially create cell here if it is within the map area but not blocked
-        if(c.blocked) { return null; }
+        if(c.is_blocked(checker)) { return null; }
         return c;
     }
     return null;
 };
 
-/** @param {Array.<number>} xy */
-AStar.AStarMap.prototype.is_blocked = function(xy) {
+/** @param {Array.<number>} xy
+ * @param {AStar.BlockChecker=} checker
+ * @return {boolean} */
+AStar.AStarMap.prototype.is_blocked = function(xy, checker) {
     if(xy[0] >= 0 && xy[0] < this.size[0] &&
        xy[1] >= 0 && xy[1] < this.size[1]) {
         if(this.terrain_func && this.terrain_func(xy)) { return true; }
         if(!this.map[xy[1]]) { return false; }
         var c = this.map[xy[1]][xy[0]];
-        return c && c.blocked;
+        return c && c.is_blocked(checker);
     }
     return true;
 };
 
-AStar.AStarMap.prototype.num_neighbors = function() { return 0; };
+AStar.AStarMap.prototype.num_neighbors = goog.abstractMethod;
 
 /** @param {AStar.AStarCell} node
-    @param {Array.<AStar.AStarCell>} ret */
-AStar.AStarMap.prototype.get_unblocked_neighbors = function(node, ret) {};
+ * @param {AStar.BlockChecker} checker
+ * @param {Array.<AStar.AStarCell>} ret */
+AStar.AStarMap.prototype.get_unblocked_neighbors = goog.abstractMethod;
 
 
 // RECTANGULAR MAP
@@ -219,15 +241,17 @@ AStar.AStarRectMap = function (size, terrain_func, allow_diagonal_passage) {
 };
 goog.inherits(AStar.AStarRectMap, AStar.AStarMap);
 
+/** @override */
 AStar.AStarRectMap.prototype.num_neighbors = function() { return 4; };
 
-AStar.AStarRectMap.prototype.get_unblocked_neighbors = function(node, ret) {
+/** @override */
+AStar.AStarRectMap.prototype.get_unblocked_neighbors = function(node, checker, ret) {
     var x = node.pos[0];
     var y = node.pos[1];
-    ret[0] = this.cell_if_unblocked([x-1,y]);
-    ret[1] = this.cell_if_unblocked([x+1,y]);
-    ret[2] = this.cell_if_unblocked([x,y-1]);
-    ret[3] = this.cell_if_unblocked([x,y+1]);
+    ret[0] = this.cell_if_unblocked([x-1,y], checker);
+    ret[1] = this.cell_if_unblocked([x+1,y], checker);
+    ret[2] = this.cell_if_unblocked([x,y-1], checker);
+    ret[3] = this.cell_if_unblocked([x,y+1], checker);
 };
 
 /** update collision-detection data structure
@@ -242,8 +266,12 @@ AStar.AStarRectMap.prototype.block_map = function(xy, wh, value) {
             if(m >= 0 && m < this.size[1] && n >= 0 && n < this.size[0]) {
                 var cell = this.cell([n,m]);
                 if(cell) {
-                    cell.blocked += value;
-                    if(!cell.blocked) {
+                    if(value > 0) {
+                        cell.block();
+                    } else if(value < 0) {
+                        cell.unblock();
+                    }
+                    if(cell.is_empty()) {
                         this.free_cell([n,m]);
                     }
                 }
@@ -493,18 +521,20 @@ AStar.AStarHexMap = function (size, terrain_func) {
 };
 goog.inherits(AStar.AStarHexMap, AStar.AStarMap);
 
+/** @override */
 AStar.AStarHexMap.prototype.num_neighbors = function() { return 6; };
 
-AStar.AStarHexMap.prototype.get_unblocked_neighbors = function(node, ret) {
+/** @override */
+AStar.AStarHexMap.prototype.get_unblocked_neighbors = function(node, checker, ret) {
     var x = node.pos[0], y = node.pos[1];
     var odd = (y%2) > 0;
 
-    ret[0] = this.cell_if_unblocked([x-1,y]); // left
-    ret[1] = this.cell_if_unblocked([x+1,y]); // right
-    ret[2] = this.cell_if_unblocked([x+odd-1,y-1]); // upper-left
-    ret[3] = this.cell_if_unblocked([x+odd,y-1]); // upper-right
-    ret[4] = this.cell_if_unblocked([x+odd-1,y+1]); // lower-left
-    ret[5] = this.cell_if_unblocked([x+odd,y+1]); // lower-right
+    ret[0] = this.cell_if_unblocked([x-1,y], checker); // left
+    ret[1] = this.cell_if_unblocked([x+1,y], checker); // right
+    ret[2] = this.cell_if_unblocked([x+odd-1,y-1], checker); // upper-left
+    ret[3] = this.cell_if_unblocked([x+odd,y-1], checker); // upper-right
+    ret[4] = this.cell_if_unblocked([x+odd-1,y+1], checker); // lower-left
+    ret[5] = this.cell_if_unblocked([x+odd,y+1], checker); // lower-right
 };
 
 /** block/unblock individual hexes
@@ -514,8 +544,12 @@ AStar.AStarHexMap.prototype.block_hex = function(xy, value) {
     if(xy[0] >= 0 && xy[0] < this.size[0] && xy[1] >= 0 && xy[1] < this.size[1]) {
         var cell = this.cell(xy);
         if(cell) {
-            cell.blocked += value;
-            if(!cell.blocked) {
+            if(value > 0) {
+                cell.block();
+            } else if(value < 0) {
+                cell.unblock();
+            }
+            if(cell.is_empty()) {
                 this.free_cell(xy);
             }
         }
@@ -656,9 +690,11 @@ AStar.AStarContext.prototype.debug_draw = function(ctx) {
 /** Main A* search function
   * @param {Array.<number>} start_pos
   * @param {Array.<number>} end_pos
+  * @param {AStar.BlockChecker=} checker
   * @return {Array.<Array.<number>>}
   */
-AStar.AStarContext.prototype.search = function(start_pos, end_pos) {
+AStar.AStarContext.prototype.search = function(start_pos, end_pos, checker) {
+    checker = checker || null;
     this.serial += 1;
     if(PLAYFIELD_DEBUG) { this.debug_clear(); }
 
@@ -730,12 +766,12 @@ AStar.AStarContext.prototype.search = function(start_pos, end_pos) {
         currentNode.get(this.serial).closed = true;
 
         // get references to neighbor cells
-        this.map.get_unblocked_neighbors(currentNode, neighbors);
+        this.map.get_unblocked_neighbors(currentNode, checker, neighbors);
 
         for(var i = 0, il = neighbors.length; i < il; i++) {
             var neighbor = neighbors[i];
 
-            if(!neighbor || neighbor.blocked || neighbor.get(this.serial).closed) {
+            if(!neighbor || neighbor.is_blocked(checker) || neighbor.get(this.serial).closed) {
                 // not a valid node to process, skip to next neighbor
                 continue;
             }
@@ -840,8 +876,15 @@ AStar.CachedAStarContext.prototype.cache_key = function(start_pos, end_pos, ring
     return (start_pos[0].toFixed(0)+','+start_pos[1].toFixed(0)+':'+end_pos[0].toFixed(0)+','+end_pos[1].toFixed(0)+','+ring_size.toFixed(0));
 };
 
-// cached wrapper
-AStar.CachedAStarContext.prototype.search = function(start_pos, end_pos) {
+/** Cached wrapper around A* search function
+ * @override
+ * @param {Array.<number>} start_pos
+ * @param {Array.<number>} end_pos
+ * @param {AStar.BlockChecker=} checker
+ * @return {Array.<Array.<number>>}
+ */
+AStar.CachedAStarContext.prototype.search = function(start_pos, end_pos, checker) {
+    if(checker) { throw Error('checkers not supported in CachedAStarContext'); }
     this.check_dirty();
 
     var key = this.cache_key(start_pos, end_pos, 0);
@@ -862,7 +905,7 @@ AStar.CachedAStarContext.prototype.search = function(start_pos, end_pos) {
         ret = []; // early out - no connection
         // XXX eventually want to check end_region < 0 here, but callers are still looking for paths into blocked cells
     } else {
-        ret = goog.base(this, 'search', start_pos, end_pos);
+        ret = goog.base(this, 'search', start_pos, end_pos, checker);
     }
 
     // must make a copy, because the caller may mutate the path
