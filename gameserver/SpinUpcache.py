@@ -1662,6 +1662,7 @@ def update_upcache_entry(user_id, driver, entry, time_now, gamedata, user_mtime 
             buildings = set(get_building_names(gamedata))
             building_counts = {}
 
+            obj['foreman_concurrency'] = 0
             obj['research_concurrency'] = 0
             obj['manuf_concurrency'] = 0
 
@@ -1679,6 +1680,8 @@ def update_upcache_entry(user_id, driver, entry, time_now, gamedata, user_mtime 
                         obj['research_concurrency'] += 1
                     if 'manuf_start_time' in p:
                         obj['manuf_concurrency'] += 1
+                    if ('build_start_time' in p) or ('upgrade_start_time' in p):
+                        obj['foreman_concurrency'] += 1
 
             # get A/B test cohort membership
             if 'abtests' in data:
