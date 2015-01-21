@@ -1351,6 +1351,8 @@ class NoSQLClient (object):
         props['last_mtime'] = self.time
         if 'base_id' in props: del props['base_id']
         if 'base_map_loc' in props: props['base_map_loc_flat'] = self.flatten_map_loc(props['base_map_loc'])
+        # arrival time at final waypoint - needed for dynamic occupancy query
+        if 'base_map_path' in props: props['base_map_path_eta'] = props['base_map_path'][-1]['eta']
         self.region_table(region, 'map').update({'_id':base_id}, {'$set': props}, upsert = False)
 
     def create_map_feature(self, region, base_id, props, exclusive = -1, originator=None, do_hook = True, reason=''):
@@ -1373,7 +1375,9 @@ class NoSQLClient (object):
             props['_id'] = base_id
             # do not store base_id since it is redundant with _id
             if 'base_id' in props: del props['base_id']
+
             props['base_map_loc_flat'] = self.flatten_map_loc(props['base_map_loc'])
+            if 'base_map_path' in props: props['base_map_path_eta'] = props['base_map_path'][-1]['eta']
 
             # when creating a new feature, create it in the "locked" state
             props['LOCK_STATE'] = self.LOCK_BEING_ATTACKED
@@ -1390,8 +1394,9 @@ class NoSQLClient (object):
                                     }}
             if caller_props.get('base_map_path',None):
                 move_update['$set']['base_map_path'] = caller_props['base_map_path']
+                move_update['$set']['base_map_path_eta'] = caller_props['base_map_path'][-1]['eta']
             else:
-                move_update['$unset'] = {'base_map_path':1}
+                move_update['$unset'] = {'base_map_path':1,'base_map_path_eta':1}
 
         if exclusive < 0:
             # easy case
@@ -1447,9 +1452,10 @@ class NoSQLClient (object):
                         rb_set = {'$set': {'base_map_loc':old_loc,
                                            'base_map_loc_flat':self.flatten_map_loc(old_loc)}}
                         if old_path is None:
-                            rb_set['$unset'] = {'base_map_path':1}
+                            rb_set['$unset'] = {'base_map_path':1,'base_map_path_eta':1}
                         else:
                             rb_set['$set']['base_map_path'] = old_path
+                            rb_set['$set']['base_map_path_eta'] = old_path[-1]['eta']
                         self.region_table(region, 'map').update({'_id':base_id}, rb_set, upsert = False)
                 else:
                     success = True
@@ -1465,7 +1471,23 @@ class NoSQLClient (object):
         #qs = {'$or': [{'base_map_loc':coord} for coord in coord_list]} # works, but slow
         #NOT_EXPIRED = {'$or':[{'base_expire_time':{'$exists':False}},{'base_expire_time':{'$lte':0}},{'base_expire_time':{'$gt':self.time}}]}
         qs = {'base_map_loc_flat': {'$in': [self.flatten_map_loc(c) for c in coord_list]}} # ,NOT_EXPIRED}
-        return self.region_table(region, 'map').find(qs).count()>0
+        return self.region_table(region, 'map').find_one(qs) is not None
+
+    # waypoint_list is [{'xy':[x,y], 'eta':time}, ...]
+    def map_feature_occupancy_check_dynamic(self, region, waypoint_list, reason=''):
+        return self.instrument('map_feature_occupancy_check_dynamic(%s)'%(reason), self._map_feature_occupancy_check_dynamic, (region,waypoint_list))
+    def _map_feature_occupancy_check_dynamic(self, region, waypoint_list):
+        qs = {'$or': [ # at any waypoint
+               {'$and': [ # is a feature present here before we'd pass it?
+                 {'base_map_loc_flat': self.flatten_map_loc(w['xy'])},
+                 {'$or':[{'base_map_path':{'$exists':False}},
+                         {'base_map_path_eta':{'$exists':False}},
+                         {'base_map_path_eta':{'$lte':w['eta']}}]}
+               ] } \
+               for w in waypoint_list
+             ] }
+        return self.region_table(region, 'map').find_one(qs) is not None
+
 
     def map_feature_lock_acquire(self, region, base_id, owner_id, generation = -1, do_hook = True, reason=''):
         state = self.instrument('map_feature_lock_acquire(%s)'%(reason), self._map_feature_lock_acquire, (region,base_id,owner_id,generation))

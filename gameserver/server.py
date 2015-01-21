@@ -7716,9 +7716,12 @@ class Player(AbstractPlayer):
             new_entry = copy.copy(entry)
 
             if check_path and coords and (len(coords) > 1) and (not gamedata['server'].get('trust_client_map_path', False)):
-                # This is a race-prone check on intermediate waypoints
+                # This is a race-prone check on intermediate waypoints (not including the final waypoint)
                 # We don't really care about squads crossing each other. The final waypoint is checked atomically below.
-                blocked = gamesite.nosql_client.map_feature_occupancy_check(self.home_region, coords[:-1], reason = 'squad_step')
+                if gamedata['territory'].get('pass_moving_squads', False):
+                    blocked = gamesite.nosql_client.map_feature_occupancy_check_dynamic(self.home_region, new_path[1:-1], reason = 'squad_step')
+                else:
+                    blocked = gamesite.nosql_client.map_feature_occupancy_check(self.home_region, coords[:-1], reason = 'squad_step')
                 if blocked:
                     return False, [], [entry], ["INVALID_MAP_LOCATION", squad_id, 'path', coords[:-1]] # map location already occupied
 
