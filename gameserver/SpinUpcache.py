@@ -119,7 +119,7 @@ def get_csv_fields(gamedata):
           "last_login_time", "logged_in_times", "last_purchase_time",
           "facebook_id", "country", "country_tier", "currency", "facebook_permissions_str",
           "gender", "locale", "birth_year", "birthday", "facebook_name", "email", "link",
-          "tutorial_state", "player_level", "gamebucks_cur_balance", "completed_quests", "lock_state",
+          "tutorial_state", "player_level", "completed_quests", "lock_state",
           'payer_promo_offered', 'promo_gamebucks_earned', 'payer_promo_gamebucks_earned', 'fb_gift_cards_redeemed',
           "money_spent", "money_refunded", "gamebucks_refunded", "largest_purchase", "time_in_game"] + \
           [resname for resname in gamedata['resources']] + \
@@ -1314,7 +1314,7 @@ def update_upcache_entry(user_id, driver, entry, time_now, gamedata, user_mtime 
             for resname in gamedata['resources']:
                 obj[resname] = resources.get(resname, 0)
             obj['player_xp'] = resources.get('xp', 0)
-            obj['gamebucks_cur_balance'] = resources.get('gamebucks', 0)
+            obj['gamebucks_balance'] = resources.get('gamebucks', 0) # note: this is redundant with a player history field of the same name filled in by TIME_CURRENT_FIELDS. Added just to be sure it's here even if we don't have that player history field.
             obj['lock_state'] = data.get('lock_state', 0)
 
             # note: override userdb facebook_permissions with playerdb facebook_permissions
