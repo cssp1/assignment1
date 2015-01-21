@@ -1256,9 +1256,18 @@ class NoSQLClient (object):
     def _decode_map_feature(self, props):
         props['base_id'] = props['_id']
         del props['_id']
+
         # mongo sometimes turns these into floats :(
         if 'base_map_loc' in props: props['base_map_loc'] = [int(props['base_map_loc'][0]), int(props['base_map_loc'][1])]
-        if 'base_map_loc_flat' in props: del props['base_map_loc_flat']
+
+        # omit path data for moving features that have already arrived at their destination by now
+        if props.get('base_map_path') and props['base_map_path'][-1]['eta'] < self.time:
+            del props['base_map_path']
+
+        # omit unwanted fields
+        for UNWANTED in ('base_map_loc_flat','base_map_path_eta'):
+            if UNWANTED in props: del props[UNWANTED]
+
         return props
 
     def flatten_map_loc(self, loc):
@@ -1538,6 +1547,10 @@ class NoSQLClient (object):
         LOCK_IS_STALE = {'LOCK_TIME':{'$lte':self.time - self.LOCK_TIMEOUT}}
         self.region_table(region, 'map').update({'$and':[LOCK_IS_TAKEN, LOCK_IS_STALE]},
                                                 {'$unset':{'LOCK_STATE':1,'LOCK_OWNER':1,'LOCK_TIME':1,'LOCK_GENERATION':1}},
+                                                multi=True)
+        # get rid of path data for moving features that have already arrived at their destination by now
+        self.region_table(region, 'map').update({'base_map_path_eta':{'$exists':True, '$lt': self.time}},
+                                                {'$unset':{'base_map_path':1,'base_map_path_eta':1}},
                                                 multi=True)
 
     ###### MAP OBJECTS (FIXED/MOBILE) TABLES ######
