@@ -18,7 +18,7 @@ ART_DIR = SCRIPT_DIR+'/../gameclient/art'
 aws_bucket = 'spinpunch-art/mf1art'
 
 aws_script = SCRIPT_DIR + '/aws'
-aws_script_args = '--secrets-file="'+os.getenv('HOME')+'/.ssh/artmaster-awssecret"'
+aws_script_args = '--secrets-file="'+os.getenv('HOME')+'/.ssh/'+os.getenv('USER')+'-awssecret"'
 
 # set up HTTP cache control headers
 
