@@ -8409,7 +8409,22 @@ var notification_queue = new NotificationQueue();
 
 // main code
 
-var loading_screen_image = null;
+// spin_loading_screen_mode meanings:
+// "canvas" = old method, hide startup_div immediately and paint loading_screen_image on white canvas
+// "div" = new method, keep startup_div visible until canvas is ready to paint game
+var loading_screen_image = null; // reference to HTML5 Image element for OLD loading screen
+var startup_div_shown = true;
+
+var kill_startup_div = function() {
+    if(!startup_div_shown) { return; }
+    startup_div_shown = false;
+    document.getElementById('startup_div').style.display = "none";
+};
+var kill_loading_screen = function() {
+    kill_startup_div();
+    loading_screen_image = null; // don't need this any more, let GC have it
+};
+
 var blacklist_audio = false;
 
 SPINPUNCHGAME.watchdog_timer = null;
@@ -8900,9 +8915,9 @@ SPINPUNCHGAME.init = function() {
 
     flush_message_queue(true, ajax_config['message_timeout_hello']);
 
-    // get rid of "Starting Up..." text
-    var startup_div = document.getElementById('startup_div');
-    startup_div.style.display = "none";
+    if(spin_loading_screen_mode == 'canvas') {
+        kill_startup_div();
+    }
 
     draw();
     //}, 3000);
@@ -43691,8 +43706,37 @@ function do_draw() {
     ctx.strokeStyle = "#ffffff";
     ctx.lineWidth = 1;
 
-    if(client_state == client_states.LOADING ||
-       client_art_state == client_art_states.DOWNLOADING_ESSENTIAL) {
+    if(client_state == client_states.UNABLE_TO_LOGIN || SPINPUNCHGAME.client_death_sent) { // TIMED_OUT gets handled below
+        kill_loading_screen();
+
+        // clear background
+        ctx.fillRect(0,0,canvas_width,canvas_height);
+
+        // this will display the error message dialog
+        SPUI.draw_all();
+    } else if(client_state == client_states.LOADING ||
+              client_art_state == client_art_states.DOWNLOADING_ESSENTIAL) {
+
+        /** @type {string} to display loading progress in the GUI */
+        var msg;
+
+        if(client_state == client_states.LOADING) {
+            var data = gamedata['strings']['connecting_to_server'];
+            var index = Math.floor((client_time/data['interval']) % data['frames'].length);
+            msg = data['frames'][index];
+        } else {
+            var progress;
+            if(gamedata['client']['delay_load_art']) {
+                progress = GameArt.get_dl_progress_essential();
+            } else {
+                progress = GameArt.get_dl_progress_all();
+            }
+            msg = gamedata['strings']['loading_screen_loading'].replace('%pct',(100*progress).toFixed(0));
+        }
+
+        if(startup_div_shown) {
+            document.getElementById('startup_msg').innerHTML = msg;
+        } else {
 
         ctx.save();
 
@@ -43725,38 +43769,12 @@ function do_draw() {
 
         // because we're a Web 2.0 app, yo!
         ctx.fillText(gamedata['strings']['loading_screen_beta'], x+215, y+398);
-
-        if(client_state == client_states.LOADING) {
-            var data = gamedata['strings']['connecting_to_server'];
-            var index = Math.floor((client_time/data['interval']) % data['frames'].length);
-            ctx.fillText(data['frames'][index], x+450, y+398);
-        } else {
-            var progress;
-            if(gamedata['client']['delay_load_art']) {
-                progress = GameArt.get_dl_progress_essential();
-            } else {
-                progress = GameArt.get_dl_progress_all();
-            }
-            ctx.fillText(gamedata['strings']['loading_screen_loading'].replace('%pct',(100*progress).toFixed(0)), x+450, y+398);
-        }
+        ctx.fillText(msg, x+450, y+398);
         ctx.restore();
-
-        // display connection error messages
-        if(SPINPUNCHGAME.client_death_sent) {
-            SPUI.draw_all();
         }
-
-    } else if(client_state == client_states.UNABLE_TO_LOGIN) {
-        loading_screen_image = null; // don't need this any more, let GC have it
-
-        // clear background
-        ctx.fillRect(0,0,canvas_width,canvas_height);
-
-        // this will display the message dialog from on_ajax()
-        SPUI.draw_all();
 
     } else if(client_state == client_states.RUNNING || client_state == client_states.TIMED_OUT) {
-        loading_screen_image = null; // don't need this any more, let GC have it
+        kill_loading_screen();
 
         if(client_state == client_states.RUNNING && !visit_base_pending) {
 
