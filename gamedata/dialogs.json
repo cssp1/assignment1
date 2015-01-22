@@ -3962,6 +3962,7 @@
             "trophy_amount": { "type": "same_as", "ref": "trophy_label", "delay": 0 },
 
             "splash_image": { "type": "fadein", "start_time": 1.5, "end_time": 1.7 },
+            "splash_image_frame": { "type": "same_as", "ref": "splash_image", "delay": 0 },
 
 
             //////////////////////////////////////////////////////////////////////////////////////////////
@@ -4154,6 +4155,7 @@
                                 "text_color": [1,0,0,1],
                                 "text_hjustify": "center", "ui_name": "%expiry:\n%s" },
 
+            "splash_image_frame": { "kind": "SolidRect", "xy": [527,154], "dimensions": [212,196], "outline_color": [1,1,1,0.5], "outline_width": 1.5 },
             "splash_image": { "kind": "StaticImage", "xy": [528,155], "dimensions": [210,194], "asset": "battle_win_splash" },
             "items_found": { "show": 0, "kind": "TextField", "xy": [518,148], "dimensions": [231,36], "text_size": 15, "text_style": "thick",
                              "text_hjustify": "center", "text_vjustify": "center", "ui_name": "Special Items Found!" },

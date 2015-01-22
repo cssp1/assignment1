@@ -16357,7 +16357,7 @@ function invoke_fancy_victory_dialog(battle_type, battle_base, battle_opponent_u
 
     if('items' in loot && loot['items'].length > 0) {
 
-        dialog.widgets['splash_image'].show = false;
+        dialog.widgets['splash_image'].show = dialog.widgets['splash_image_frame'].show = false;
         dialog.widgets['items_found'].show = true;
 
         for(var i = 0; i < dialog.data['widgets']['itemrow_bg']['array'][1]; i++) {
