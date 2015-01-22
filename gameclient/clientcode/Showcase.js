@@ -138,7 +138,10 @@ Showcase.apply_showcase_hacks = function(dialog, hack) {
         dialog.widgets['final_reward_label'].str = hack['ui_final_reward_label'].replace('%TOKEN', token_item_name);
         goog.array.forEach(['title', 'subtitle'], function(n) {
             if(hack['ui_final_reward_'+n+'_bbcode']) {
-                dialog.widgets['final_reward_'+n].append_text(SPText.cstring_to_ablocks_bbcode(eval_cond_or_literal(hack['ui_final_reward_'+n+'_bbcode'],player,null)));
+                var s = eval_cond_or_literal(hack['ui_final_reward_'+n+'_bbcode'],player,null);
+                if(s) {
+                    dialog.widgets['final_reward_'+n].append_text(SPText.cstring_to_ablocks_bbcode(s));
+                }
             }
         });
 
