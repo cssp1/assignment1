@@ -125,7 +125,8 @@ if __name__ == '__main__':
            (not ('fb_source' in row)) and \
            ('fb_source=' in row['query_string']):
             q = urlparse.parse_qs(row['query_string'])
-            row['fb_source'] = q['fb_source'][-1]
+            if 'fb_source' in q:
+                row['fb_source'] = q['fb_source'][-1]
 
         for FIELD in ('user_id','social_id','frame_platform','country','country_tier','ip',
                       'browser_name','browser_os','browser_version','browser_hardware','query_string','referer',
