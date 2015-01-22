@@ -8418,7 +8418,20 @@ var startup_div_shown = true;
 var kill_startup_div = function() {
     if(!startup_div_shown) { return; }
     startup_div_shown = false;
-    document.getElementById('startup_div').style.display = "none";
+    var startup_div = document.getElementById('startup_div');
+    var fade_time = (spin_loading_screen_mode == 'div' ? (gamedata['client']['startup_div_fade_time'] || 0.5) : -1);
+    if(fade_time > 0) {
+        var set_startup_div_fade = (function (_start_time, _end_time, _div) { return function() {
+            if(client_time >= _end_time) {
+                _div.style.display = 'none'; return;
+            }
+            _div.style.opacity = 1.0 - (client_time - _start_time)/(_end_time - _start_time);
+            window.setTimeout(set_startup_div_fade, 1000*gamedata['client']['startup_div_fade_tick']);
+        }; })(client_time, client_time + fade_time, startup_div);
+        set_startup_div_fade();
+    } else {
+        startup_div.style.display = 'none';
+    }
 };
 var kill_loading_screen = function() {
     kill_startup_div();

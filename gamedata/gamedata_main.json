@@ -39,6 +39,9 @@
         // true if friend bar should be shown at bottom of screen
         "friend_bar_enabled": {"predicate": "FRAME_PLATFORM", "platform":"fb"},
 
+        "startup_div_fade_time": 0.5, // when using "div" spin_loading_screen_mode, fade away the startup div over this many seconds
+        "startup_div_fade_tick": 0.025, // interval between fade animation steps
+
         "canvas_div_offset_snoop_time": 1, // refresh cached offsetLeft/offsetTop properties every so often to handle browser reflows
 
         "enable_perfect_audience": false,
