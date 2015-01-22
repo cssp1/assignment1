@@ -54,6 +54,7 @@ var spin_facebook_api_versions;
 var spin_art_protocol;
 var spin_art_path;
 var spin_unsupported_browser_landing;
+var spin_loading_screen_mode;
 var spin_init_messages;
 var add_demographics;
 var gamedata; // from gamedata.js
