@@ -41,7 +41,7 @@
     for(var i = 0; i < layers.length; i++) {
         var layer = layers[i];
         var img = new Image();
-        handles.push(img);
+        handles.push({'img':img,'start_time':-1});
         img.src = art_url(layer['image']);
 
         // set up so that transforms will apply from center of image
@@ -52,6 +52,7 @@
         img.style.webkitTransformOrigin =
             img.style.msTransformOrigin =
             img.style.transformOrigin = '50% 50%';
+        img.style.opacity = 0; // start faded out
 
         startup_div.insertBefore(img, startup_msg_div);
         if('anchor_msg_at' in layer) { msg_anchor = layer; }
@@ -95,11 +96,24 @@
         var layers = _data['layers'];
         for(var i = 0; i < layers.length; i++) {
             var d = layers[i];
-            var h = _handles[i];
+            var h = _handles[i]['img'];
             if(stop) {
                 h.parentElement.removeChild(h);
                 continue;
             }
+            // see if download is complete
+            if(!h.complete || h.width <= 0) {
+                continue;
+            }
+
+            // fade in gradually once downloaded
+            if(_handles[i]['start_time'] < 0) {
+                _handles[i]['start_time'] = entire_t;
+            }
+            var fadeup = ('fadeup' in d ? d['fadeup'] : ('fadeup' in _data ? _data['fadeup'] : 0.5));
+            var opacity = Math.min(1, (entire_t - _handles[i]['start_time'])/fadeup);
+            h.style.opacity = opacity;
+
             var duration = ('duration' in d ? d['duration'] : _data['duration']);
             var animation_style = ('animation_style' in d ? d['animation_style'] : _data['animation_style']);
             var t;
