@@ -7897,6 +7897,13 @@ function on_resize_iframe(e) {
             //canvas.style.height = canvas_div.style.height;
         }
 
+        // resize startup_div to match, if it is still visible
+        var startup_div = document.getElementById('startup_div');
+        if(startup_div.offsetWidth > 0 && startup_div.offsetHeight > 0) {
+            startup_div.style.height = canvas_div.style.height;
+            startup_div.style.width = canvas_div.style.width;
+        }
+
         if(typeof FB != 'undefined') {
             var iframe_width = canvas_width;
             var iframe_height = newheight + parseInt(document.getElementById('spin_footer').style.height);
