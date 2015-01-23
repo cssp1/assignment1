@@ -92,7 +92,7 @@ if [[ $DO_VERIFY == 1 ]]; then
     fi
 fi
 
-(cd $SPIN_GAMEDATA && mv "${GAME_ID}/built/gamedata-${GAME_ID}.json.unverified" "${GAME_ID}/built/gamedata-${GAME_ID}.json")
+(cd $SPIN_GAMEDATA && cp "${GAME_ID}/built/gamedata-${GAME_ID}.json.unverified" "${GAME_ID}/built/gamedata-${GAME_ID}.json")
 
 # NOTE! gamedata.js is no longer exposed to players, instead one of the -locale.js files must be used!
 # we generate gamedata.js from gamedata.json ONLY for debugging with ?locale_override=null
