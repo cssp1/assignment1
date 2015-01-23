@@ -48,3 +48,27 @@ SPLWMetrics.on_ajax = function (msg) {
         console.log('metrics AJAX unexpected response: '+msg);
     }
 };
+
+// similar to the logger in main.js, but usable before it loads
+SPLWMetrics.early_exception_sent = false;
+SPLWMetrics.log_early_exception = function(e, where) {
+    if(SPLWMetrics.early_exception_sent) { return; }
+    SPLWMetrics.early_exception_sent = true;
+    console.log('Exception thrown in '+where);
+    var msg;
+    if(e) {
+        msg = e.toString();
+        if(e.stack) {
+            msg += '\nstack: '+e.stack.toString();
+        }
+        if(e.message) {
+            msg += '\nmessage: '+e.message.toString();
+        }
+    } else {
+        msg = 'none';
+    }
+    console.log(msg);
+    var MAX_LEN = 1500;
+    if(msg.length > MAX_LEN) { msg = msg.slice(0,MAX_LEN); }
+    SPLWMetrics.send_event(spin_user_id, '0970_client_exception', add_demographics({'method':msg, 'location':where}));
+};
