@@ -40727,22 +40727,23 @@ function handle_server_message(data) {
         }
 
         var flash_delay, ticker_delay;
+        var need_glow_effect = false;
+
         if(msg == "HARVESTED_RESOURCES") {
             // peaceful harvesting
-            if(client_time - last_loot_text_time > 1.0) { // don't overlap multiple sounds
-                var need_default_sound = false;
-                for(var resname in gamedata['resources']) {
-                    if((res[resname]||0) > 0) {
-                        if(gamedata['resources'][resname]['harvest_effect']) {
-                            SPFX.add_visual_effect(pos, 0, [0,1,0], client_time, gamedata['resources'][resname]['harvest_effect'], true);
-                        } else {
-                            need_default_sound = true;
-                        }
+            var has_sound = false;
+            for(var resname in gamedata['resources']) {
+                if((res[resname]||0) > 0) {
+                    if(gamedata['resources'][resname]['harvest_effect']) {
+                        SPFX.add_visual_effect(pos, 0, [0,1,0], client_time, gamedata['resources'][resname]['harvest_effect'], !has_sound);
+                        has_sound = true;
+                    } else {
+                        need_glow_effect = true;
                     }
                 }
-                if(need_default_sound) {
-                    GameArt.assets['harvest_sound'].states['normal'].audio.play(client_time);
-                }
+            }
+            if(!has_sound && client_time - last_loot_text_time > 1.0) { // play a default sound effect
+                GameArt.assets['harvest_sound'].states['normal'].audio.play(client_time);
             }
             flash_delay = gamedata['client']['harvest_flash_delay'];
             ticker_delay = gamedata['client']['harvest_flash_delay'] + gamedata['client']['resource_ticker_delay'];
@@ -40769,16 +40770,23 @@ function handle_server_message(data) {
             player.last_resource_time = client_time + ticker_delay;
         }
 
-        // trigger glow effect
-        if(obj_id in session.cur_objects.objects) {
-            var obj = session.cur_objects.objects[obj_id];
-            if(obj.is_building() && obj.is_producer()) {
-                obj.harvest_glow_time = client_time;
+        if(need_glow_effect) { // trigger glow effect
+            if(obj_id in session.cur_objects.objects) {
+                var obj = session.cur_objects.objects[obj_id];
+                if(obj.is_building() && obj.is_producer()) {
+                    obj.harvest_glow_time = client_time;
+                }
             }
         }
 
         // "ding" sound for gamebucks
-        if(res['gamebucks'] > 0) {  GameArt.assets['minor_level_up_sound'].states['normal'].audio.play(client_time); }
+        if(res['gamebucks'] > 0) {
+            if(gamedata['client']['vfx']['gamebucks_harvest_effect']) {
+                SPFX.add_visual_effect(pos, 0, [0,1,0], client_time, gamedata['client']['vfx']['gamebucks_harvest_effect'], true);
+            } else {
+                GameArt.assets['minor_level_up_sound'].states['normal'].audio.play(client_time);
+            }
+        }
 
         // GUI message
         if(res['gamebucks'] > 0) {
