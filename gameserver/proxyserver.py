@@ -1607,7 +1607,7 @@ class GameProxy(proxy.ReverseProxyResource):
 
             '$FACEBOOK_SDK$': get_static_include('FacebookSDK.js') if (visitor.frame_platform == 'fb' and SpinConfig.config.get('enable_facebook',0)) else '',
             '$KONGREGATE_SDK$': get_static_include('KongregateSDK.js') if (visitor.frame_platform == 'kg' and SpinConfig.config.get('enable_kongregate',0)) else '',
-            '$LOADING_SCREEN_NAME$': SpinJSON.dumps(screen_name),
+            '$LOADING_SCREEN_NAME$': screen_name,
             '$LOADING_SCREEN_DATA$': SpinJSON.dumps(screen_data),
             '$INDEX_BODY$': get_static_include('index_body_%s.html' % visitor.frame_platform),
             })
