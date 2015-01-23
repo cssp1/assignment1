@@ -8,10 +8,6 @@
 
 "public_s3_bucket": "XXXXXX", // Amazon S3 bucket used for some external assets like anon_portrait.jpg
 
-// path to loading screen artwork (relative to art assets), outside of asset system because it has to load first
-// if given as a list, then game randomly chooses one
-"loading_screen_image_url": ["art/ui/tr_loading_screenA8.jpg"],
-
 // name of the main "town hall" building
 "townhall": "toc",
 

@@ -1,0 +1,10 @@
+{
+    // Note: this is not shipped into client gamedata, it is just used raw by proxyserver.
+    // Mapping of "name": data for available loading screens.
+    // Loading screen data can be one of:
+    // 1. raw HTML color like "#ffffff" (only for fb_guest)
+    // 2. path to loading screen artwork (relative to art assets), outside of asset system because it has to load first
+    // 3. JSON description of layered div parallax scene
+    "fb_guest": { "#ffffff": "#ffffff" },
+    "game": { "tr_loading_screenA8.jpg": "art/ui/tr_loading_screenA8.jpg" }
+}

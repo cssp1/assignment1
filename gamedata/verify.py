@@ -28,6 +28,11 @@ def require_art_asset(name, reason):
         required_art_assets.add(name)
     return error
 
+# track raw art files referenced in places OTHER than art.json (e.g. loading screens)
+required_art_files = set()
+def require_art_file(name):
+    required_art_files.add(name)
+
 # never allow upgrades to cost more than this much resources, since the player cannot hold as much even with max storage!
 # CC L6 = 4*L10 storage = 24400000
 # CC L7 = 5*L10 storage = 30500000
@@ -2643,6 +2648,30 @@ def check_starting_conditions(starting_conditions):
 
     return error
 
+def check_loading_screens(loading_screens):
+    error = 0
+    for kind in loading_screens:
+        for name, data in loading_screens[kind].iteritems():
+            if type(data) in (str,unicode):
+                if data[0] == '#': continue # HTML color
+                require_art_file(data)
+            else:
+                for FIELD in ('background_color', 'parallax_strength', 'animation_style', 'duration'):
+                    if FIELD not in data:
+                        error |= 1; print 'loading screen "%s" missing mandatory field "%s"' % (name, FIELD)
+                for layer in data['layers']:
+                    # this is not a complete check - needs more thoroughness!
+                    for FIELD in ('image', 'dimensions'):
+                        if FIELD not in layer:
+                            error |= 1; print 'loading screen "%s" layer missing mandatory field "%s"' % (name, FIELD)
+                    if 'image' in layer:
+                        require_art_file(layer['image'])
+
+    if 'loading_screen_image_url' in gamedata:
+        error |= 1; print 'obsolete loading_screen_image_url, convert to new format'
+
+    return error
+
 # art source file checking - make sure that JSON format is sane
 # ref_list is a set to which to add any files needed for this asset
 def get_art_source_files(name, asset, ref_list):
@@ -2685,7 +2714,6 @@ def inventory_art(dir, root):
         else:
             yield relpath
 
-
 def check_art(art, report_unreferenced_art_files = True, report_unreferenced_art_assets = True):
     # optionally also warn about extra files found in art/ that aren't referenced or assets in gamedata.art that aren't referenced
 
@@ -2702,12 +2730,9 @@ def check_art(art, report_unreferenced_art_files = True, report_unreferenced_art
     ref_list = set() # list of files required by art JSON
 
     # make sure hard-coded art files are present
-    loading_screens = gamedata['loading_screen_image_url']
-    if type(loading_screens) is not list:
-        loading_screens = [loading_screens,]
+    ref_list |= required_art_files
 
-    ref_list |= set(loading_screens + \
-                    [gamedata['store']['fb_order_dialog_gamebucks_icon'],
+    ref_list |= set([gamedata['store']['fb_order_dialog_gamebucks_icon'],
                      gamedata['store']['fb_order_dialog_generic_icon']] + \
                     ['art/ui/spin_footer_warbird.jpg',
                      'art/mars_frontier_icon_50x50.png',
@@ -2824,6 +2849,7 @@ def main(args):
     gamedata['loot_tables'] = SpinJSON.load(open(args[5]))
     gamedata['promo_codes'] = SpinJSON.load(open(args[6]))
     gamedata['server'] = SpinJSON.load(open(args[7]))
+    gamedata['loading_screens'] = SpinJSON.load(open(args[8]))
 
     global MAX_STORAGE
     MAX_STORAGE = calc_max_storage(gamedata)
@@ -3061,6 +3087,8 @@ def main(args):
 
     for name, data in gamedata['adnetworks'].iteritems():
         error |= check_adnetwork(name, data)
+
+    error |= check_loading_screens(gamedata['loading_screens'])
 
     # this must come last, because it depends on required_art_assets being filled out by previous code
     error |= check_art(gamedata['art'],

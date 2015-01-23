@@ -84,7 +84,9 @@ if [[ $DO_VERIFY == 1 ]]; then
         "$GAME_ID/built/${GAME_ID}_hives_compiled.json" \
         "$GAME_ID/built/${GAME_ID}_loot_tables_compiled.json" \
         "$GAME_ID/built/${GAME_ID}_promo_codes_compiled.json" \
-        "$GAME_ID/built/${GAME_ID}_server_compiled.json")
+        "$GAME_ID/built/${GAME_ID}_server_compiled.json" \
+    "$GAME_ID/built/${GAME_ID}_loading_screens_compiled.json"
+    )
     if [[ $? != 0 ]]; then
         echo "Error in gamedata!"
         (cd $SPIN_GAMEDATA && rm -f "${GAME_ID}/built/gamedata-${GAME_ID}.json.unverified")

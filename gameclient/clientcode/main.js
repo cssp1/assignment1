@@ -8809,10 +8809,7 @@ SPINPUNCHGAME.init = function() {
     if(spin_loading_screen_mode == 'canvas') {
         // start downloading the splash screen before GameArt init
         loading_screen_image = new Image();
-        var loading_screen_list = gamedata['loading_screen_image_url'];
-        if(typeof(loading_screen_list) == 'string') { loading_screen_list = [loading_screen_list]; }
-        var loading_screen_url = loading_screen_list[Math.floor(loading_screen_list.length * Math.random())];
-        loading_screen_image.src = GameArt.art_url(loading_screen_url, false);
+        loading_screen_image.src = GameArt.art_url(spin_loading_screen_data, false);
     }
 
     // old Chrome on Windows crashes with audio
@@ -8920,7 +8917,7 @@ SPINPUNCHGAME.init = function() {
                                    spin_login_country,
                                    spin_user_id];
 
-    SPLWMetrics.send_event(spin_metrics_anon_id, '0105_client_start', add_demographics({}));
+    SPLWMetrics.send_event(spin_metrics_anon_id, '0105_client_start', add_demographics({'splash_image':spin_loading_screen_name}));
 
     // uncomment these brackets to test proxyserver race conditions
     //window.setTimeout(function() {
@@ -40069,7 +40066,6 @@ function handle_server_message(data) {
         }
 
         longpoll_send();
-        SPLWMetrics.send_event(spin_metrics_anon_id, '0120_client_ingame', add_demographics({}));
 
         // URL parameter processing
 
@@ -40099,6 +40095,8 @@ function handle_server_message(data) {
                                                                }; })(request));
             }
         }
+
+        SPLWMetrics.send_event(spin_metrics_anon_id, '0120_client_ingame', add_demographics({'splash_image':spin_loading_screen_name}));
 
     } else if(msg == "OBJECT_REMOVED" || msg == "OBJECT_REMOVED2") {
         var id = data[1];

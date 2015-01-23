@@ -1,8 +1,159 @@
 <div id="spin_header" style="width:100%;position:static;top:0px;min-width:770px;clear:both;border:0;background:#4b4444;"></div>
 
 <div id="startup_div" style="width:100%;height:100%;position:fixed;top:0px;min-width:770px;min-height:425px;overflow:hidden;border:0;">
-<div style="left:40%;top:40%;position:relative;font-size:20px;"><b><span id="startup_msg">Starting up, please wait...</span></b></div>
+<div id="startup_msg_div" style="left:40%;top:40%;position:relative;font-size:20px;">
+<b><span id="startup_msg">Starting up, please wait...</span></b>
 </div>
+</div>
+
+<script type="text/javascript">
+(function() { // set up splash animation
+  try {
+    if(spin_loading_screen_mode != 'div') { return; }
+    var art_url = function(path) {
+        return (spin_art_protocol||spin_server_protocol)+(spin_art_path||(spin_server_host+':'+spin_server_port+'/'))+path;
+    };
+    var startup_div = document.getElementById('startup_div');
+    var startup_msg_div = document.getElementById('startup_msg_div');
+    var mouse_state = {'xy':[0,0]};
+    startup_div.addEventListener("mousemove", (function(_startup_div, _mouse_state) { return function(e) {
+        var x, y;
+        if(e.pageX || e.pageY) {
+            x = e.pageX;
+            y = e.pageY;
+        } else {
+            x = e.clientX;
+            y = e.clientY;
+        }
+        x -= _startup_div.offsetLeft;
+        y -= _startup_div.offsetTop;
+        _mouse_state['xy'] = [x,y];
+    }; })(startup_div, mouse_state), false);
+
+    var data = spin_loading_screen_data;
+
+    startup_div.style.background = data['background_color'];
+    //startup_div.style.transform = 'translateZ(0)'; // force acceleration?
+
+    var handles = [];
+    var layers = data['layers'];
+    var msg_anchor = null;
+    for(var i = 0; i < layers.length; i++) {
+        var layer = layers[i];
+        var img = new Image();
+        handles.push(img);
+        img.src = art_url(layer['image']);
+
+        // set up so that transforms will apply from center of image
+        img.style.position = 'absolute';
+        img.style.left = (-layer['dimensions'][0]/2).toString()+'px';
+        img.style.top = (-layer['dimensions'][1]/2).toString()+'px';
+        img.style.display = 'block';
+        img.style.webkitTransformOrigin =
+            img.style.msTransformOrigin =
+            img.style.transformOrigin = '50% 50%';
+
+        startup_div.insertBefore(img, startup_msg_div);
+        if('anchor_msg_at' in layer) { msg_anchor = layer; }
+    }
+
+    if(msg_anchor) { // prep for animation
+        startup_msg_div.style.display = 'inline-block';
+        startup_msg_div.style.position = 'absolute';
+        startup_msg_div.style.color = msg_anchor['msg_color'];
+        startup_msg_div.style.fontSize = msg_anchor['msg_size'].toString()+'px';
+        var horigin, vorigin;
+        if(msg_anchor['msg_hjustify'] == 'left') {
+            startup_msg_div.style.left = 0;
+            horigin = '0%';
+        } else {
+            horigin = '50%';
+        }
+        if(msg_anchor['msg_vjustify'] == 'top') {
+            startup_msg_div.style.top = 0;
+            vorigin = '0%';
+        } else {
+            vorigin = '50%';
+        }
+        startup_msg_div.style.webkitTransformOrigin =
+            startup_msg_div.style.msTransformOrigin =
+            startup_msg_div.style.transformOrigin = horigin + ' ' +vorigin;
+    }
+
+    var animate = (function (_startup_div, _startup_msg_div, _msg_anchor, _mouse_state, _start_time, _data, _handles) { return function() {
+      try {
+        var canvas_width = _startup_div.offsetWidth, canvas_height = _startup_div.offsetHeight;
+        if(!(canvas_width > 0 || canvas_height > 0)) { stop = true; } // hidden
+
+        var entire_t = (new Date()).getTime()/1000 - _start_time;
+        var stop = false;
+        //if(entire_t > 2) { return; }
+
+        // parallax viewpoint
+        var par_view = [(mouse_state['xy'][0] - canvas_width/2)/canvas_width, (mouse_state['xy'][1] - canvas_height/2)/canvas_height];
+
+        var layers = _data['layers'];
+        for(var i = 0; i < layers.length; i++) {
+            var d = layers[i];
+            var h = _handles[i];
+            if(stop) {
+                h.parentElement.removeChild(h);
+                continue;
+            }
+            var duration = ('duration' in d ? d['duration'] : _data['duration']);
+            var animation_style = ('animation_style' in d ? d['animation_style'] : _data['animation_style']);
+            var t;
+            if(animation_style == 'pingpong') {
+                t = duration*Math.abs(Math.sin((entire_t/duration)*Math.PI));
+            } else if(animation_style == 'halt') {
+                t = duration*Math.abs(Math.sin(Math.min(Math.PI/2, (entire_t/duration)*Math.PI)));
+            } else {
+                t = entire_t;
+            }
+
+            var xy = d['xy'] || [0,0];
+            var dims = d['dimensions'];
+            var vel = d['vel'] || [0,0];
+            var base_scale = d['scale'] || 1;
+            var zoom = d['zoom'] || 0;
+            var pos = [canvas_width/2 + xy[0] + vel[0] * t,
+                       canvas_height/2 + xy[1] + vel[1] * t];
+            // parallax
+            pos[0] += _data['parallax_strength'] * par_view[0] * ('parallax' in d ? d['parallax'] : zoom);
+            pos[1] += _data['parallax_strength'] * par_view[1] * ('parallax' in d ? d['parallax'] : zoom);
+
+            var scl = base_scale * (1 + zoom * t);
+            var spin = d['spin'] || 0;
+            var rotz = (d['rotate']||0) + spin*t;
+            var xform = 'translate('+pos[0].toString()+'px, '+pos[1].toString()+'px) rotateZ('+rotz.toString()+'deg) scale('+scl.toString()+')'
+
+            h.style.webkitTransform =
+                h.style.msTransform =
+                h.style.transform = xform;
+            if(d === _msg_anchor) {
+                var off = [d['anchor_msg_at'][0] - dims[0]/2,
+                           d['anchor_msg_at'][1] - dims[1]/2];
+                if(d['msg_hjustify'] == 'center') {
+                    _startup_msg_div.style.left = -_startup_msg_div.offsetWidth/2;
+                }
+                if(d['msg_vjustify'] == 'center') {
+                    _startup_msg_div.style.top = -_startup_msg_div.offsetHeight/2;
+                }
+                _startup_msg_div.style.webkitTransform =
+                    _startup_msg_div.style.msTransform =
+                    _startup_msg_div.style.transform = xform + ' translate('+off[0].toString()+'px, '+off[1].toString()+'px)';
+            }
+        }
+        if(!stop) {
+            window.setTimeout(animate, 10);
+        }
+      } catch (e) { SPLWMetrics.log_early_exception(e, 'startup_div(animate)'); }
+    }; })(startup_div, startup_msg_div, msg_anchor, mouse_state, (new Date()).getTime()/1000, data, handles);
+    animate();
+  } catch(e) { SPLWMetrics.log_early_exception(e, 'startup_div'); }
+})();
+</script>
+
 <div id="canvas_div" style="width:100%;height:100%;position:static;min-width:770px;min-height:425px;overflow:hidden;border:0;-ms-touch-action:none;">
 <canvas id="canvas"></canvas>
 </div>

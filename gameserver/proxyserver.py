@@ -1156,13 +1156,9 @@ class GameProxy(proxy.ReverseProxyResource):
         elif method == 'fb_guest_page':
             # use fb_guest.html - NOTE! probably requires Login API v2.0+
             replacements = self.get_fb_global_variables(request, visitor)
-            if 'fb_guest_splash_images' in SpinConfig.config['proxyserver']:
-                # can be either a path in 'art/facebook_assets/nnn.jpg' or a literal HTML color like '#ffffff'
-                splash_image = random.choice(SpinConfig.config['proxyserver']['fb_guest_splash_images'])
-            else:
-                splash_image = '#ffffff'
-            replacements['$FACEBOOK_GUEST_SPLASH_IMAGE$'] = splash_image
-            metric_props['splash_image'] = splash_image
+            screen_name, screen_data = get_loading_screen('fb_guest')
+            replacements['$FACEBOOK_GUEST_SPLASH_IMAGE$'] = SpinJSON.dumps(screen_data)
+            metric_props['splash_image'] = screen_name
             expr = re.compile('|'.join([key.replace('$','\$') for key in replacements.iterkeys()]))
             ret = str(expr.sub(lambda match: replacements[match.group(0)], get_static_include('fb_guest.html')))
 
@@ -1378,8 +1374,6 @@ class GameProxy(proxy.ReverseProxyResource):
         user_id = social_id_table.social_id_to_spinpunch(visitor.social_id, True)
         visitor.demographics['user_id'] = user_id
 
-        metric_event_coded(visitor, '0100_authenticated_visit', visitor.add_demographics({}))
-
         # note: we're remembering the gameserver's HTTP port no matter what protocol the client is using,
         # since this is for proxy forwarding
         session = ProxySession(generate_session_id(), user_id, visitor.social_id, visitor.demographics['ip'],
@@ -1575,6 +1569,8 @@ class GameProxy(proxy.ReverseProxyResource):
         else:
             extra_data = ''
 
+        screen_name, screen_data = get_loading_screen('game')
+
         replacements = self.get_fb_global_variables(request, visitor)
         replacements.update({
             '$SERVER_HTTP_PORT$': str(SpinConfig.config['proxyserver']['external_http_port']),
@@ -1611,12 +1607,16 @@ class GameProxy(proxy.ReverseProxyResource):
 
             '$FACEBOOK_SDK$': get_static_include('FacebookSDK.js') if (visitor.frame_platform == 'fb' and SpinConfig.config.get('enable_facebook',0)) else '',
             '$KONGREGATE_SDK$': get_static_include('KongregateSDK.js') if (visitor.frame_platform == 'kg' and SpinConfig.config.get('enable_kongregate',0)) else '',
+            '$LOADING_SCREEN_NAME$': SpinJSON.dumps(screen_name),
+            '$LOADING_SCREEN_DATA$': SpinJSON.dumps(screen_data),
             '$INDEX_BODY$': get_static_include('index_body_%s.html' % visitor.frame_platform),
             })
 
         expr = re.compile('|'.join([key.replace('$','\$') for key in replacements.iterkeys()]))
 
         template = get_static_include('proxy_index.html')
+
+        metric_event_coded(visitor, '0100_authenticated_visit', visitor.add_demographics({'splash_image':screen_name}))
 
         if 0:
             ret = []
@@ -2294,17 +2294,36 @@ proxysite = None
 def log_exception_func(x):
     exception_log.event(proxy_time, x)
 
+# can be either a path in 'art/facebook_assets/nnn.jpg', or a literal HTML color like '#ffffff', or a JSON layer object (see loading_screens.json)
+loading_screens = {'fb_guest': {'#ffffff':'#ffffff'}, 'game': {'canvas':'canvas'}}
+def reconfig_loading_screens():
+    global loading_screens
+    temp = SpinJSON.load(open(SpinConfig.gamedata_component_filename('loading_screens_compiled.json')))
+    # sanity check
+    for kind in temp:
+        for name, data in temp[kind].iteritems():
+            if type(data) in (str,unicode):
+                if data[0] == '#': continue
+                if not os.path.exists('../gameclient/'+data):
+                    exception_log.event(proxy_time, 'proxyserver: loading_screen image not found: "%s"' % data)
+            else:
+                for layer in data['layers']:
+                    if 'image' in layer and not os.path.exists('../gameclient/'+layer['image']):
+                        exception_log.event(proxy_time, 'proxyserver: loading_screen image not found: "%s"' % layer['image'])
+    loading_screens = temp
+
+def get_loading_screen(kind):
+    data = loading_screens[kind]
+    name = random.choice(data.keys())
+    return name, data[name]
+
 def reconfig():
     update_time()
     try:
         reload(SpinConfig) # reload SpinConfig module
         SpinConfig.reload() # reload config.json file
 
-        if 'fb_guest_splash_images' in SpinConfig.config['proxyserver']:
-            for img in SpinConfig.config['proxyserver']['fb_guest_splash_images']:
-                if img.startswith('#'): continue
-                if not os.path.exists('../gameclient/'+img):
-                    exception_log.event(proxy_time, 'proxyserver: fb_guest_splash_image not found: "%s"' % img)
+        reconfig_loading_screens()
 
         if db_client:
             db_client.update_dbconfig(SpinConfig.get_mongodb_config(SpinConfig.config['game_id']))
@@ -2337,6 +2356,7 @@ def do_main():
 
     # init server list
     reload_static_includes()
+    reconfig_loading_screens()
 
     myport_http = SpinConfig.config['proxyserver']['external_http_port']
     myport_ssl  = SpinConfig.config['proxyserver'].get('external_ssl_port',-1)

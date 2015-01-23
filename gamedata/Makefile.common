@@ -22,6 +22,7 @@ clean:
 # this is done for gamedata_main.json as well as the individual JSON files that are built but not linked into it
 dep:
 	rm -f ${BUILT}/deps
+	${PROCESSOR} -g ${GAME_ID} --get-deps ${GAME_ID}/${GAME_ID}_loading_screens.json --get-deps-as ${BUILT}/${GAME_ID}_loading_screens_compiled.json >> ${BUILT}/deps
 	${PROCESSOR} -g ${GAME_ID} --get-deps ${GAME_ID}/${GAME_ID}_server.json --get-deps-as ${BUILT}/${GAME_ID}_server_compiled.json >> ${BUILT}/deps
 	${PROCESSOR} -g ${GAME_ID} --get-deps ${GAME_ID}/${GAME_ID}_ai_bases.json --get-deps-as ${BUILT}/${GAME_ID}_ai_bases_compiled.json >> ${BUILT}/deps
 	${PROCESSOR} -g ${GAME_ID} --get-deps ${GAME_ID}/${GAME_ID}_ai_attacks.json --get-deps-as ${BUILT}/${GAME_ID}_ai_attacks_compiled.json >> ${BUILT}/deps
@@ -34,6 +35,8 @@ dep:
 -include ${BUILT}/deps
 
 # non-shipped compiled JSON
+${BUILT}/${GAME_ID}_loading_screens_compiled.json: ${GAME_ID}/${GAME_ID}_loading_screens.json
+	@echo "    ${GAME_ID}_loading_screens_compiled.json..." && ${PROCESSOR} ${PROCESSOR_ARGS} $< -o $@
 ${BUILT}/${GAME_ID}_server_compiled.json: ${GAME_ID}/${GAME_ID}_server.json
 	@echo "    ${GAME_ID}_server_compiled.json..." && ${PROCESSOR} ${PROCESSOR_ARGS} $< -o $@
 ${BUILT}/${GAME_ID}_ai_bases_compiled.json: ${GAME_ID}/${GAME_ID}_ai_bases.json
@@ -89,6 +92,7 @@ ${BUILT}/gamedata-${GAME_ID}.json.unverified: gamedata_main.json
 	@echo "    gamedata-${GAME_ID}.json..." && ${PROCESSOR} ${PROCESSOR_ARGS} $< -o $@
 
 all: ${BUILT}/gamedata-${GAME_ID}.json.unverified \
+	${BUILT}/${GAME_ID}_loading_screens_compiled.json \
 	${BUILT}/${GAME_ID}_server_compiled.json \
 	${BUILT}/${GAME_ID}_loot_tables.json \
 	${BUILT}/${GAME_ID}_loot_tables_compiled.json \
