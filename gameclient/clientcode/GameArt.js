@@ -534,7 +534,7 @@ GameArt.Sprite = function(name, data) {
             throw Error('invalid framerate');
         }
         this.loop = data['loop'] || 1;
-        n_images = data['images'].length;
+        n_images = Math.max(('origins' in data ? data['origins'].length >> 1 : 1), data['images'].length);
     } else if(this.style === 'corners') {
         n_images = 1;
         this.corner_width = data['corner_width'];
@@ -598,10 +598,11 @@ GameArt.Sprite = function(name, data) {
 
         var imgname = data['images'][0];
         for(var i = 0; i < n_images; i++) {
-            if(data['images'][i] === '*') {
+            var img_i = Math.min(data['images'].length-1, i);
+            if(data['images'][img_i] === '*') {
                 // compressed duplicate
             } else {
-                imgname = data['images'][i];
+                imgname = data['images'][img_i];
             }
 
             var instance;
