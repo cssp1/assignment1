@@ -8806,14 +8806,14 @@ SPINPUNCHGAME.init = function() {
                                      };
     }
 
-    // start downloading the splash screen before GameArt init
-    loading_screen_image = new Image();
-    var loading_screen_list = gamedata['loading_screen_image_url'];
-    if(typeof(loading_screen_list) == 'string') { loading_screen_list = [loading_screen_list]; }
-    var loading_screen_url = loading_screen_list[Math.floor(loading_screen_list.length * Math.random())];
-    loading_screen_image.src = GameArt.art_url(loading_screen_url, false);
-
-
+    if(spin_loading_screen_mode == 'canvas') {
+        // start downloading the splash screen before GameArt init
+        loading_screen_image = new Image();
+        var loading_screen_list = gamedata['loading_screen_image_url'];
+        if(typeof(loading_screen_list) == 'string') { loading_screen_list = [loading_screen_list]; }
+        var loading_screen_url = loading_screen_list[Math.floor(loading_screen_list.length * Math.random())];
+        loading_screen_image.src = GameArt.art_url(loading_screen_url, false);
+    }
 
     // old Chrome on Windows crashes with audio
     if(spin_demographics['browser_name'] === 'Chrome' &&
