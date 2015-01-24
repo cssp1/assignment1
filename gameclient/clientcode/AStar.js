@@ -64,8 +64,19 @@ AStar.heuristic_euclidean = function(start_pos, cur_pos, end_pos) {
 
 // MAP CELL
 
-/** @typedef {function(AStar.AStarCell): boolean | null} */
+// by default, we track whether a cell is blocked by a single "block_count" counter.
+// for more complex situations, you can use the blockers list to associate state with
+// blockage, and then use a "checker" function to test against that state.
+
+/** Function to evaluate the blockage of a cell. Return true if blocked, false otherwise.
+ * @typedef {function(AStar.AStarCell): boolean | null} */
 AStar.BlockChecker;
+
+/** Function to evaluate the blockage of a cell when reached via a specific path.
+ *  Note that path dependence may invalidate the A* algorithm.
+ *  The second parameter is the array of coordinates along the path, excluding starting point, including ending point.
+ * @typedef {function(AStar.AStarCell, Array.<Array.<number>>): boolean | null} */
+AStar.PathChecker;
 
 /** @constructor
  * @param {Array.<number>} pos
@@ -73,6 +84,10 @@ AStar.BlockChecker;
 AStar.AStarCell = function(pos) {
     this.pos = pos;
     this.block_count = 0; // count of obstacles overlapping this point
+
+    /** @type {Array|null} list of references to obstacles that are blocking here */
+    this.blockers = null; // optional - only used by hex map right now
+
     this.heapscore = 0; // for insertion into BinaryHeap
 
     // The following fields are specific to one query.
@@ -539,15 +554,29 @@ AStar.AStarHexMap.prototype.get_unblocked_neighbors = function(node, checker, re
 
 /** block/unblock individual hexes
     @param {Array.<number>} xy
-    @param {number} value */
-AStar.AStarHexMap.prototype.block_hex = function(xy, value) {
+    @param {number} value +1 to block, -1 to unblock
+    @param {!Object} blocker reference to thing that is blocking here
+*/
+AStar.AStarHexMap.prototype.block_hex = function(xy, value, blocker) {
+    if(!blocker) { throw Error('must provide blocker'); } // Closure doesn't flag this
     if(xy[0] >= 0 && xy[0] < this.size[0] && xy[1] >= 0 && xy[1] < this.size[1]) {
         var cell = this.cell(xy);
         if(cell) {
             if(value > 0) {
                 cell.block();
+                if(cell.blockers === null) {
+                    cell.blockers = [blocker];
+                } else {
+                    cell.blockers.push(blocker);
+                }
             } else if(value < 0) {
                 cell.unblock();
+                if(!cell.blockers || !goog.array.remove(cell.blockers, blocker)) {
+                    throw Error('unblock hex but blocker not found: '+JSON.stringify(blocker)+' in '+JSON.stringify(cell.blockers));
+                }
+                if(cell.blockers.length == 0) {
+                    cell.blockers = null;
+                }
             }
             if(cell.is_empty()) {
                 this.free_cell(xy);
@@ -690,11 +719,11 @@ AStar.AStarContext.prototype.debug_draw = function(ctx) {
 /** Main A* search function
   * @param {Array.<number>} start_pos
   * @param {Array.<number>} end_pos
-  * @param {AStar.BlockChecker=} checker
+  * @param {AStar.PathChecker=} path_checker
   * @return {Array.<Array.<number>>}
   */
-AStar.AStarContext.prototype.search = function(start_pos, end_pos, checker) {
-    checker = checker || null;
+AStar.AStarContext.prototype.search = function(start_pos, end_pos, path_checker) {
+    path_checker = path_checker || null;
     this.serial += 1;
     if(PLAYFIELD_DEBUG) { this.debug_clear(); }
 
@@ -765,13 +794,25 @@ AStar.AStarContext.prototype.search = function(start_pos, end_pos, checker) {
         // Normal case -- move currentNode from open to closed, process each of its neighbors
         currentNode.get(this.serial).closed = true;
 
+        /** wrap path_checker into a version that is_blocked() can call with only the current cell as the argument
+         * @type {AStar.BlockChecker | null} */
+        var cell_checker = null;
+        if(path_checker) {
+            var cur_path = [];
+            for(var c = currentNode; c.parent != null; c = c.parent) {
+                cur_path.push(c.pos);
+            }
+            cur_path = cur_path.reverse();
+            cell_checker = (function (_path_checker, _cur_path) { return function(cell) { return _path_checker(cell, _cur_path.concat(cell.pos)); }; })(path_checker, cur_path);
+        }
+
         // get references to neighbor cells
-        this.map.get_unblocked_neighbors(currentNode, checker, neighbors);
+        this.map.get_unblocked_neighbors(currentNode, cell_checker, neighbors);
 
         for(var i = 0, il = neighbors.length; i < il; i++) {
             var neighbor = neighbors[i];
 
-            if(!neighbor || neighbor.is_blocked(checker) || neighbor.get(this.serial).closed) {
+            if(!neighbor || neighbor.is_blocked(cell_checker) || neighbor.get(this.serial).closed) {
                 // not a valid node to process, skip to next neighbor
                 continue;
             }
@@ -880,11 +921,11 @@ AStar.CachedAStarContext.prototype.cache_key = function(start_pos, end_pos, ring
  * @override
  * @param {Array.<number>} start_pos
  * @param {Array.<number>} end_pos
- * @param {AStar.BlockChecker=} checker
+ * @param {AStar.PathChecker=} path_checker
  * @return {Array.<Array.<number>>}
  */
-AStar.CachedAStarContext.prototype.search = function(start_pos, end_pos, checker) {
-    if(checker) { throw Error('checkers not supported in CachedAStarContext'); }
+AStar.CachedAStarContext.prototype.search = function(start_pos, end_pos, path_checker) {
+    if(path_checker) { throw Error('checkers not supported in CachedAStarContext'); }
     this.check_dirty();
 
     var key = this.cache_key(start_pos, end_pos, 0);
@@ -905,7 +946,7 @@ AStar.CachedAStarContext.prototype.search = function(start_pos, end_pos, checker
         ret = []; // early out - no connection
         // XXX eventually want to check end_region < 0 here, but callers are still looking for paths into blocked cells
     } else {
-        ret = goog.base(this, 'search', start_pos, end_pos, checker);
+        ret = goog.base(this, 'search', start_pos, end_pos, path_checker);
     }
 
     // must make a copy, because the caller may mutate the path
