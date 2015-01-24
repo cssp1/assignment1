@@ -17670,7 +17670,8 @@ Region.prototype.receive_feature_update = function(res) {
 
             var cur_loc = feature['base_map_loc'] || null, new_loc = res['base_map_loc'] || cur_loc;
             if(cur_loc && (cur_loc[0] != new_loc[0] || cur_loc[1] != new_loc[1])) {
-                this.occupancy.block_hex(cur_loc, -1, feature);
+                this.occupancy.unblock_hex_maybe(cur_loc, feature);
+                //this.occupancy.block_hex(cur_loc, -1, feature);
                 this.map_index.remove(feature['base_id'], cur_loc, feature);
                 this.occupancy.block_hex(new_loc, 1, feature);
                 this.map_index.insert(feature['base_id'], new_loc, feature);
