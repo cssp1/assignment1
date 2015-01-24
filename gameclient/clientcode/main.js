@@ -17649,19 +17649,76 @@ Region.prototype.squads_nearby = function(cell) {
     return ok;
 };
 
+/** Make sure all features are blocking map properly
+ * @param {string} where this was called from */
+Region.prototype.check_map_integrity = function(where) {
+    var error_count = 0;
+    var report_err = function(s, cell, feature) {
+        error_count += 1;
+        console.log('Map integrity problem ('+where+'): '+s+' : '+
+                    ' cell '+(cell ? cell.pos[0].toString()+','+cell.pos[1].toString() : 'null')+
+                    ' feature '+(feature ? feature['base_id']+':'+(feature['base_map_loc'] ? feature['base_map_loc'][0].toString()+','+feature['base_map_loc'][1].toString() : 'null') : 'null'));
+    };
+
+    this.for_each_feature((function (_this) { return function(feature) {
+        if(feature['base_map_loc']) {
+            var cell = _this.occupancy.cell(feature['base_map_loc']);
+            if(cell.block_count < 1) {
+                report_err('feature present but cell.block_count < 1', cell, feature);
+            }
+            if(!cell.blockers || !goog.array.contains(cell.blockers, feature)) {
+                report_err('feature present but cell.blockers does not contain it', cell, feature);
+            }
+        }
+    }; })(this));
+    var seen = {};
+
+    this.occupancy.for_each_cell((function (_this) { return function(cell) {
+        if(cell.block_count != (cell.blockers ? cell.blockers.length : 0)) {
+            report_err('cell block_count '+cell.block_count.toString()+' does not match blockers.length '+cell.blockers.length.toString(), cell, feature);
+        }
+        if(cell.blockers) {
+            for(var b = 0; b < cell.blockers.length; b++) {
+                var feature = cell.blockers[b];
+                if(feature['base_id'] in seen) {
+                    var other = seen[feature['base_id']];
+                    report_err('feature appears twice in occupancy (also cell '+other.pos[0].toString()+','+other.pos[1].toString()+')', cell, feature);
+                    continue;
+                }
+                seen[feature['base_id']] = cell;
+                if(feature != _this.map_index.get_by_base_id(feature['base_id'])) {
+                    report_err('feature listed as blocker but not found in index!', cell, feature);
+                }
+                if(!goog.array.contains(_this.features, feature)) {
+                    report_err('feature listed as blocker but not found in this.features!', cell, feature);
+                }
+            }
+        }
+    }; })(this));
+
+    if(!error_count) { console.log('integrity check OK! ('+where+')'); }
+};
+
 Region.prototype.receive_feature_update = function(res) {
     var feature = this.map_index.get_by_base_id(res['base_id']);
 
     if(feature) {
         // update or delete
         if(res['DELETED']) {
+            if(gamedata['territory']['check_map_integrity'] >= 2) { this.check_map_integrity('receive_feature_update, existing, DELETED, enter'); }
+
             if(feature['base_map_loc']) {
                 // unblock, but do so carefully, because it may never have been blocked in the first place
                 this.occupancy.unblock_hex_maybe(feature['base_map_loc'], feature);
             }
             this.map_index.remove(feature['base_id'], feature['base_map_loc']||null, feature);
             goog.array.remove(this.features, feature);
+
+            if(gamedata['territory']['check_map_integrity'] >= 2) { this.check_map_integrity('receive_feature_update, existing, DELETED, exit'); }
+
         } else {
+            if(gamedata['territory']['check_map_integrity'] >= 2) { this.check_map_integrity('receive_feature_update, existing, update, enter'); }
+
             // for incremental updates, a missing
             // LOCK_STATE or protection timer means that it was dropped
             if('LOCK_STATE' in feature) { delete feature['LOCK_STATE']; }
@@ -17670,8 +17727,10 @@ Region.prototype.receive_feature_update = function(res) {
 
             var cur_loc = feature['base_map_loc'] || null, new_loc = res['base_map_loc'] || cur_loc;
             if(cur_loc && (cur_loc[0] != new_loc[0] || cur_loc[1] != new_loc[1])) {
+                // XXXXXX this is really scary that feature isn't blocked sometimes - check invariant violations!
                 this.occupancy.unblock_hex_maybe(cur_loc, feature);
                 //this.occupancy.block_hex(cur_loc, -1, feature);
+
                 this.map_index.remove(feature['base_id'], cur_loc, feature);
                 this.occupancy.block_hex(new_loc, 1, feature);
                 this.map_index.insert(feature['base_id'], new_loc, feature);
@@ -17680,11 +17739,15 @@ Region.prototype.receive_feature_update = function(res) {
             for(var propname in res) {
                 feature[propname] = res[propname];
             }
+
+            if(gamedata['territory']['check_map_integrity'] >= 2) { this.check_map_integrity('receive_feature_update, existing, update, exit'); }
         }
     } else {
         if(res['DELETED']) {
             // could be due to a base that is added and removed before we see it the first time
+            if(gamedata['territory']['check_map_integrity'] >= 2) { this.check_map_integrity('receive_feature_update, new, DELETED'); }
         } else {
+            if(gamedata['territory']['check_map_integrity'] >= 2) { this.check_map_integrity('receive_feature_update, new, enter'); }
             this.features.push(res);
             if(res['base_map_loc']) {
                 this.occupancy.block_hex(res['base_map_loc'],1,res);
@@ -17692,6 +17755,7 @@ Region.prototype.receive_feature_update = function(res) {
                 //throw Error('received a feature update without base_map_loc! region '+(this.data ? this.data['id'] : 'NULL!')+' base_id '+res['base_id'].toString());
             }
             this.map_index.insert(res['base_id'], res['base_map_loc']||null,res);
+            if(gamedata['territory']['check_map_integrity'] >= 2) { this.check_map_integrity('receive_feature_update, new, exit'); }
         }
     }
 };
@@ -17706,6 +17770,7 @@ Region.prototype.receive_update = function(db_time, result, last_db_time) {
         for(var i = 0; i < result.length; i++) {
             this.receive_feature_update(result[i]);
         }
+        if(gamedata['territory']['check_map_integrity'] >= 1) { this.check_map_integrity('receive_update incremental'); }
     } else {
         this.features = result;
         this.occupancy.clear();
@@ -17719,6 +17784,7 @@ Region.prototype.receive_update = function(db_time, result, last_db_time) {
             }
             _this.map_index.insert(feature['base_id'], feature['base_map_loc']||null, feature);
         }; })(this));
+        if(gamedata['territory']['check_map_integrity'] >= 1) { this.check_map_integrity('receive_update full'); }
     }
 
     var cblist = this.fresh_cbs;

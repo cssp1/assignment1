@@ -241,6 +241,20 @@ AStar.AStarMap.prototype.num_neighbors = goog.abstractMethod;
  * @param {Array.<AStar.AStarCell>} ret */
 AStar.AStarMap.prototype.get_unblocked_neighbors = goog.abstractMethod;
 
+/** Iterate through all allocated cells, whether blocked or not. Used for integrity checking/debugging only.
+ * @param {function(AStar.AStarCell)} func */
+AStar.AStarMap.prototype.for_each_cell = function(func) {
+   for(var y = 0; y < this.size[1]; y++) {
+        if(this.map[y]) {
+            for(var x = 0; x < this.size[0]; x++) {
+                var cell = this.map[y][x];
+                if(cell) {
+                    func(cell);
+                }
+            }
+        }
+   }
+};
 
 // RECTANGULAR MAP
 
