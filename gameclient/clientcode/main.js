@@ -17656,7 +17656,7 @@ Region.prototype.receive_feature_update = function(res) {
         // update or delete
         if(res['DELETED']) {
             if(feature['base_map_loc']) {
-                this.occupancy.block_hex(feature['base_map_loc'], -1);
+                this.occupancy.block_hex(feature['base_map_loc'], -1, feature);
             }
             this.map_index.remove(feature['base_id'], feature['base_map_loc']||null, feature);
             goog.array.remove(this.features, feature);
@@ -17669,9 +17669,9 @@ Region.prototype.receive_feature_update = function(res) {
 
             var cur_loc = feature['base_map_loc'] || null, new_loc = res['base_map_loc'] || cur_loc;
             if(cur_loc && (cur_loc[0] != new_loc[0] || cur_loc[1] != new_loc[1])) {
-                this.occupancy.block_hex(cur_loc, -1);
+                this.occupancy.block_hex(cur_loc, -1, feature);
                 this.map_index.remove(feature['base_id'], cur_loc, feature);
-                this.occupancy.block_hex(new_loc, 1);
+                this.occupancy.block_hex(new_loc, 1, feature);
                 this.map_index.insert(feature['base_id'], new_loc, feature);
             }
 
@@ -17685,7 +17685,7 @@ Region.prototype.receive_feature_update = function(res) {
         } else {
             this.features.push(res);
             if(res['base_map_loc']) {
-                this.occupancy.block_hex(res['base_map_loc'],1);
+                this.occupancy.block_hex(res['base_map_loc'],1,res);
             } else {
                 //throw Error('received a feature update without base_map_loc! region '+(this.data ? this.data['id'] : 'NULL!')+' base_id '+res['base_id'].toString());
             }
@@ -17710,7 +17710,7 @@ Region.prototype.receive_update = function(db_time, result, last_db_time) {
         this.map_index.clear();
         this.for_each_feature((function (_this) { return function(feature) {
             if(feature['base_map_loc']) {
-                _this.occupancy.block_hex(feature['base_map_loc'],1);
+                _this.occupancy.block_hex(feature['base_map_loc'],1,feature);
 
             } else {
                 throw Error('received a feature without base_map_loc! region '+(_this.data ? _this.data['id'] : 'NULL')+' base_id '+feature['base_id'].toString());
@@ -26330,9 +26330,39 @@ player.squad_find_path_adjacent_to = function(squad_id, dest) {
 
     // note! A* code tends to blow up memory/CPU if you ask it to go into a blocked destination
 
+    // When pass_moving_squads is enabled, allow travel through hexes that are reserved as the destination
+    // of another squad before its arrival time. This requires a path-dependent blockage check, since the
+    // arrival time to check against depends on how long it takes us to get ther.
+
+    /** @type AStar.PathChecker */
+    var path_checker = null;
+    if(gamedata['territory']['pass_moving_squads']) {
+        path_checker = function (_squad_id, _dest) { return function(cell, path) {
+            if(cell.block_count > 0) {
+                for(var i = 0; i < cell.blockers.length; i++) {
+                    var feature = cell.blockers[i];
+                    if(feature['base_map_path']) {
+                        var last_waypoint = feature['base_map_path'][feature['base_map_path'].length-1];
+                        var their_arrival_time = last_waypoint['eta'];
+                        var fudge_time = gamedata['territory']['pass_moving_squads_fudge_time'] || 0; // give some conservative leeway for network latency, otherwise players could get frustrated
+
+                        if(!vec_equals(last_waypoint['xy'], cell.pos)) { throw Error('last_waypoint does not match cell.pos'); }
+
+                        if(!vec_equals(_dest, cell.pos) && // this exception does not apply to our final destination cell
+                           their_arrival_time > server_time + player.squad_travel_time(_squad_id, path) + fudge_time) {
+                            continue; // not necessarily blocked! (there might be another feature here though)
+                        }
+                    }
+                    return true; // blocked by this feature
+                }
+            }
+            return false; // not blocked
+        }; };
+    }
+
     // if dest is not blocked, try going directly there
     if(!session.region.occupancy.is_blocked(dest)) {
-        var path = session.region.hstar_context.search(squad_data['map_loc'], dest);
+        var path = session.region.hstar_context.search(squad_data['map_loc'], dest, path_checker(squad_id, dest));
         if(path && path.length >= 1 && hex_distance(path[path.length-1], dest) == 0) {
             return path; // good path
         }
@@ -26343,7 +26373,7 @@ player.squad_find_path_adjacent_to = function(squad_id, dest) {
     for(var i = 0; i < neighbors.length; i++) {
         var n = neighbors[i];
         if(!session.region.occupancy.is_blocked(n)) {
-            var path = session.region.hstar_context.search(squad_data['map_loc'], n);
+            var path = session.region.hstar_context.search(squad_data['map_loc'], n, path_checker(squad_id, n));
             // path must lead ON TOP OF n
             if(path && path.length >= 1 && hex_distance(path[path.length-1], n) == 0) {
                 return path; // good path
