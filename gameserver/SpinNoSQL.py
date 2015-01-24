@@ -1575,6 +1575,14 @@ class NoSQLClient (object):
                                                 {'$unset':{'base_map_path':1,'base_map_path_eta':1}},
                                                 multi=True)
 
+        if 1: # clean up legacy features with no base_map_path_eta
+            self.region_table(region, 'map').update({'$and':[{'base_map_path':{'$exists':True}},
+                                                             {'base_map_path_eta':{'$exists':False}},
+                                                             {'base_map_path':{'$all':[{'$elemMatch': {'eta': {'$lt': self.time}}}]}}
+                                                             ]},
+                                                    {'$unset':{'base_map_path':1}},
+                                                    multi=True)
+
     ###### MAP OBJECTS (FIXED/MOBILE) TABLES ######
 
     def get_mobile_object_by_id(self, region, obj_id, reason=''):
