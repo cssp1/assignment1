@@ -586,6 +586,18 @@ AStar.AStarHexMap.prototype.block_hex = function(xy, value, blocker) {
     this.generation += 1;
 };
 
+/** unblock a hex, but only if "blocker" is currently blocking it
+    @param {Array.<number>} xy
+    @param {Object} blocker reference to thing that is blocking here
+*/
+AStar.AStarHexMap.prototype.unblock_hex_maybe = function(xy, blocker) {
+    if(this.is_blocked(xy)) {
+        var cell = this.cell(xy);
+        if(cell.blockers && goog.array.contains(cell.blockers, blocker)) {
+            this.block_hex(xy, -1, blocker);
+        }
+    }
+};
 
 // Connectivity stores a "region number" for each cell in the map,
 // based on the map's blockage at instantiation time. (it does NOT update itself).

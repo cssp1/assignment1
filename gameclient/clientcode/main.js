@@ -17656,7 +17656,8 @@ Region.prototype.receive_feature_update = function(res) {
         // update or delete
         if(res['DELETED']) {
             if(feature['base_map_loc']) {
-                this.occupancy.block_hex(feature['base_map_loc'], -1, feature);
+                // unblock, but do so carefully, because it may never have been blocked in the first place
+                this.occupancy.unblock_hex_maybe(feature['base_map_loc'], feature);
             }
             this.map_index.remove(feature['base_id'], feature['base_map_loc']||null, feature);
             goog.array.remove(this.features, feature);
