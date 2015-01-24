@@ -113,8 +113,14 @@ SPUI.on_resize = function(new_width, new_height) {
 };
 
 // range is 0-1, linear light
-/** @constructor */
+/** @constructor
+ * @param {number} r
+ * @param {number} g
+ * @param {number} b
+ * @param {number=} a
+ */
 SPUI.Color = function(r,g,b,a) {
+    if(typeof(a) == 'undefined') { a = 1; }
     this.r = r; this.g = g; this.b = b; this.a = a;
 };
 
@@ -577,8 +583,9 @@ SPUI.Window.prototype.draw = function(offset) {
 
 /** @constructor
   * @extends SPUI.Element
+  * @param {null|string|function(): string} str can be either literal or a function
+  * @param {Object=} props
   */
-// 'str' can be either a literal string or a function
 SPUI.Text = function(str, props) {
     goog.base(this);
     this.str = str;
@@ -590,7 +597,9 @@ SPUI.Text = function(str, props) {
 goog.inherits(SPUI.Text, SPUI.Element);
 
 SPUI.Text.prototype.render_str = function () {
-    if(typeof this.str == 'string') {
+    if(!this.str) {
+        return null;
+    } else if(typeof this.str == 'string') {
         return this.str;
     } else {
         // assume this.str is a function
@@ -633,6 +642,9 @@ SPUI.Text.prototype.reflow = function() {
 
 /** @constructor
   * @extends SPUI.Element
+  * @param {string} str
+  * @param {function()} onclick
+  * @param {Object=} props
   */
 SPUI.Button = function(str, onclick, props) {
     goog.base(this);
@@ -854,6 +866,8 @@ SPUI.get_array_widget_name = function(array_name, array_dims, xy) {
 
 /** @constructor
   * @extends SPUI.Container
+  * @param {Object} data reference to gamedata['dialogs']
+  * @param {Object=} instance_props override data with per-instance key/vals
   */
 SPUI.Dialog = function(data, instance_props) {
     if(!instance_props) { instance_props = {}; }
@@ -968,7 +982,7 @@ goog.inherits(SPUI.Dialog, SPUI.Container);
  * and we count left-to-right then top-to-bottom).
  *
  * @param {string} array_name name prefix for the widget array
- * @param {(number|undefined)} element_count (optional) number of widgets to display.
+ * @param {number=} element_count (optional) number of widgets to display.
  */
 SPUI.Dialog.prototype.update_array_widget_positions = function(array_name, element_count) {
     var wdata = this.data['widgets'][array_name];
@@ -1151,6 +1165,7 @@ SPUI.Dialog.prototype.on_mousemove = function(uv, offset) {
     return ret;
 };
 
+/** @param {string=} centering_mode */
 SPUI.Dialog.prototype.auto_center = function(centering_mode) {
     centering_mode = 'root'; // XXXXXX hack - might need to force this always (region_map_dialog being off-center etc.)
     this.centered = centering_mode;
@@ -1464,6 +1479,10 @@ SPUI.TextWidget.prototype.draw_text = function(offset) {
     SPUI.ctx.restore();
 };
 
+/** @param {string} str
+    @param {SPUI.Font} font
+    @param {Array.<number>} wh
+    @param {Object=} options */
 SPUI.break_lines = function(str, font, wh, options) {
     var bbcode = (options && options.bbcode);
 
@@ -1949,7 +1968,7 @@ SPUI.ActionButton = function(data) {
     }
 
     // note: it is expected that the caller will over-ride the onclick() handler
-    this.onclick = function(widget) { console.log('BUTTON PRESS ' + widget.str); };
+    this.onclick = function(widget, buttons) { console.log('BUTTON PRESS ' + widget.str); };
 
     // mouse-enter handler
     this.onenter = null;
@@ -3097,7 +3116,7 @@ SPUI.ScrollingTextField = function(data) {
 
     // sentinel element that represents the bottom of the scroll area
     // new lines are added before this
-    this.head = new SPUI.TextNode('BOT');
+    this.head = new SPUI.TextNode();
     this.head.next = this.head;
     this.head.prev = this.head;
 

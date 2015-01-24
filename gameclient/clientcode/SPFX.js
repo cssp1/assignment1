@@ -246,9 +246,10 @@ SPFX.CoverScreen.prototype.draw = function() {
 };
 
 /** @constructor
-  * @extends SPFX.Effect */
+  * @extends SPFX.Effect
+  * @param {Array.<SPFX.Effect>=} effects */
 SPFX.CombineEffect = function(effects) {
-    goog.base(this);
+    goog.base(this, null);
     this.effects = effects || [];
 };
 goog.inherits(SPFX.CombineEffect, SPFX.Effect);
@@ -277,7 +278,7 @@ SPFX.CombineEffect.prototype.dispose = function() {
   * @extends SPFX.Effect
   */
 SPFX.Tesla = function(from, to, cur_time) {
-    goog.base(this);
+    goog.base(this, null);
     this.from = from;
     this.to = to;
     this.end_time = cur_time + 0.001;
@@ -305,6 +306,11 @@ SPFX.Tesla.prototype.draw = function() {
 
 /** @constructor
   * @extends SPFX.Effect
+  * @param {Array.<number>} spawn_pos
+  * @param {number} start_time
+  * @param {number} end_time
+  * @param {Object} data
+  * @param {Object=} instance_data
   */
 SPFX.Particles = function(spawn_pos, start_time, end_time, data, instance_data) {
     goog.base(this, data);
@@ -651,7 +657,7 @@ SPFX.Particles.prototype.run_physics = function(dt) {
   * @extends SPFX.Effect
   */
 SPFX.Projectile = function(from, from_height, to, to_height, launch_time, impact_time, max_height, color, exhaust, line_width, min_length, fade_time, comp_mode, glow, asset) {
-    goog.base(this);
+    goog.base(this, null);
     this.from = from;
     this.to = to;
     this.launch_time = launch_time;
@@ -1103,7 +1109,7 @@ SPFX.Explosion.prototype.draw = function() {
   * @extends SPFX.Effect
   */
 SPFX.Debris = function(where, assetname, facing) {
-    goog.base(this);
+    goog.base(this, null);
     this.show = true;
     this.where = where;
     var asset = GameArt.assets[assetname];
@@ -1128,7 +1134,7 @@ SPFX.Debris.prototype.draw = function() {
   * @extends SPFX.Effect
   */
 SPFX.OffscreenArrow = function() {
-    goog.base(this);
+    goog.base(this, null);
     this.where = null;
     this.sprite = null;
 };
@@ -1220,7 +1226,7 @@ SPFX.OffscreenArrow.prototype.draw = function() {
              is_ui: (boolean|undefined)}=} props
   */
 SPFX.CombatText = function(where, altitude, str, col, start_time, end_time, props) {
-    goog.base(this);
+    goog.base(this, null);
     this.where = where;
     this.altitude = altitude;
     this.str = str;
@@ -1285,7 +1291,7 @@ SPFX.CombatText.prototype.draw = function() {
   * @extends SPFX.Effect
   */
 SPFX.FeedbackEffect = function(col, start_time, end_time) {
-    goog.base(this);
+    goog.base(this, null);
     this.base_col = col;
     this.color = new SPUI.Color(col[0], col[1], col[2], col[3]);
     this.start_time = start_time;

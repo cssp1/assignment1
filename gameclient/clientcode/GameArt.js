@@ -1070,6 +1070,12 @@ GameArt.sRGB_encode = function(f) {
 GameArt.float_to_sRGB = function(f) { return Math.min(Math.max(Math.floor(255.0*GameArt.sRGB_encode(f) + 0.5), 0), 255); };
 
 // use an offscreen canvas to derive a tinted version from an HTML Image element
+/** @param {Image} img
+    @param {Array.<number>} origin
+    @param {Array.<number>} wh
+    @param {Array.<number>} tint
+    @param {number=} saturation
+    @param {Image=} mask_img */
 GameArt.make_tinted_image = function(img, origin, wh, tint, saturation, mask_img) {
     var ret = new Image();
     var osc = null, con = null, data = null, pixels = null, data_url = null;

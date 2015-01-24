@@ -90,7 +90,7 @@ function chrome_version_atleast(min_big, min_major, min_minor, min_release) {
     var ua = navigator.userAgent;
     var m = ua.match(new RegExp('Chrome/([0-9]+).([0-9]+).([0-9]+).([0-9]+)'));
     if(m) {
-        var big = parseInt(m[1]), major = parseInt(m[2]), minor = parseInt(m[3]), release = parseInt(m[4]);
+        var big = parseInt(m[1],10), major = parseInt(m[2],10), minor = parseInt(m[3],10), release = parseInt(m[4],10);
         if(big < min_big) {
             return false;
         } else if(big > min_big) {
@@ -683,7 +683,15 @@ function force_scroll_eval() {
 
 // Auras
 
-/** @constructor */
+/** @constructor
+    @param {GameObject|null} source object
+    @param {Object} spec
+    @param {?} strength
+    @param {number} range
+    @param {number} start_tick
+    @param {number} expire_tick
+    @param {Object|null=} vs_table
+*/
 function Aura(source, spec, strength, range, start_tick, expire_tick, vs_table) {
     this.source = source;
     this.spec = spec;
@@ -1621,6 +1629,12 @@ GameObject.prototype.cast_client_spell = function(spell_name, spell, target, loc
     return true;
 };
 
+/** @param {GameObject|null} creator
+    @param {string} aura_name
+    @param {?} strength
+    @param {number} duration
+    @param {number} range
+    @param {Object=} vs_table */
 GameObject.prototype.create_aura = function(creator, aura_name, strength, duration, range, vs_table) {
     var aura_spec = gamedata['auras'][aura_name];
     var end_tick;
@@ -4636,6 +4650,7 @@ session.foreach_deployable_unit = function(func) {
 };
 
 // return number of deployable units (optionally, that satisfy filter_func)
+/** @param {function(Object): boolean=} filter_func */
 session.count_deployable_units = function(filter_func) {
     var count = 0;
     session.foreach_deployable_unit(function(obj) {
@@ -5015,6 +5030,9 @@ player.cooldown_togo = function(cd_name) {
     }
     return -1;
 };
+
+/** @param {string} cd_name
+    @param {Object=} match_data */
 player.cooldown_active = function(cd_name, match_data) {
     if(player.cooldown_togo(cd_name) > 0) {
         var cd = player.cooldowns[cd_name];
@@ -5072,6 +5090,8 @@ function tutorial_opt_out() {
     player.quest_tracked = null;
     player.quest_tracked_dirty = true;
 }
+
+/** @param {Object=} quest */
 function tutorial_opt_in(quest) {
     if('skip_tutorial' in player.preferences) {
         player.record_feature_use('resume_tutorial');
@@ -5172,6 +5192,7 @@ player.refresh_quest_cache_entry = function(quest) {
     player.can_complete_quest(quest); // force re-evaluation
 };
 
+/** @param {boolean=} force */
 player.update_quest_cache = function(force) {
     if(!force && !player.quest_cache_dirty) { return; }
     if(QUEST_CACHE_DEBUG) { console.log("UPDATE QUEST CACHE"); }
@@ -6608,7 +6629,7 @@ var MAX_UNIT_SPRITE_SIZE = 64; // max pixel dimensions of all unit sprites (for 
 var FRAME_RATE_CAP = 60; // maximum screen update rate, in Hz
 if(1) {
     var x = get_query_string('frame_rate_cap');
-    if(x) { FRAME_RATE_CAP = parseInt(x); }
+    if(x) { FRAME_RATE_CAP = parseInt(x,10); }
 }
 var USING_REQUESTANIMATIONFRAME = false;
 var LAST_ANIM_FRAME_TIMEOUT = 0;
@@ -7632,9 +7653,9 @@ function send_and_destroy_object(victim, killer) {
 
 // URL to game server GAMEAPI, preferring direct connection if possible
 function gameapi_url() {
-    if(spin_game_use_websocket && parseInt(spin_game_server_wss_port) > 0) {
+    if(spin_game_use_websocket && parseInt(spin_game_server_wss_port,10) > 0) {
         return 'wss://'+spin_game_server_host+':'+spin_game_server_wss_port+'/WS_GAMEAPI';
-    } else if(spin_game_use_websocket && parseInt(spin_game_server_ws_port) > 0) {
+    } else if(spin_game_use_websocket && parseInt(spin_game_server_ws_port,10) > 0) {
         return 'ws://'+spin_game_server_host+':'+spin_game_server_ws_port+'/WS_GAMEAPI';
     } else if(spin_game_direct_connect) {
         // IE's default security settings do not allow AJAX connections via http from an https frame
@@ -7829,7 +7850,7 @@ function on_resize_browser(e) {
     fb_iframe_dims = null;
 
     var force_width_s = get_query_string('force_width'), force_height_s = get_query_string('force_height');
-    var force_width = (force_width_s ? parseInt(force_width_s) : -1), force_height = (force_height_s ? parseInt(force_height_s) : -1);
+    var force_width = (force_width_s ? parseInt(force_width_s,10) : -1), force_height = (force_height_s ? parseInt(force_height_s,10) : -1);
 
     if(force_width > 0 && force_height > 0) {
         fb_iframe_dims = [force_width, force_height];
@@ -7906,7 +7927,7 @@ function on_resize_iframe(e) {
 
         if(typeof FB != 'undefined') {
             var iframe_width = canvas_width;
-            var iframe_height = newheight + parseInt(document.getElementById('spin_footer').style.height);
+            var iframe_height = newheight + parseInt(document.getElementById('spin_footer').style.height,10);
             console.log('FB.Canvas.setSize: '+iframe_width+'x'+iframe_height);
             FB.Canvas.setSize({'width':iframe_width, 'height': iframe_height});
         }
@@ -8144,6 +8165,8 @@ var last_websocket_xmit_len = -1;
 var last_websocket_queue = null; // last AJAXMessageQueue queued for transmission on the websocket
 var last_websocket_serial = -1; // serial number of last_websocket_queue
 
+/** @param {boolean=} force
+    @param {number=} my_timeout */
 function flush_message_queue(force, my_timeout) {
     if(message_queue.length() < 1) {
         return;
@@ -8864,7 +8887,7 @@ SPINPUNCHGAME.init = function() {
 
     // try websockets by default, if able and gamedata.client.enable_websockets is true
     if(spin_game_direct_connect && gamedata['client']['enable_websockets'] && SPWebsocket.is_supported() &&
-       (parseInt(spin_game_server_ws_port) > 0 || parseInt(spin_game_server_wss_port) > 0)) {
+       (parseInt(spin_game_server_ws_port,10) > 0 || parseInt(spin_game_server_wss_port,10) > 0)) {
         spin_game_use_websocket = true;
     }
 
@@ -12810,7 +12833,7 @@ var user_chat_bbcode_click_handlers = {
         return function(w, mloc) {
             if(!_srxy) { return; }
             var params = _srxy.split(',');
-            var region = params[0], x = parseInt(params[1]), y = parseInt(params[2]);
+            var region = params[0], x = parseInt(params[1],10), y = parseInt(params[2],10);
             invoke_find_on_map(region, [x,y]);
         }; } }
 };
@@ -12836,8 +12859,8 @@ function display_user_chat_body(body, base_props, home_region) {
             // transfer the part of the string before the match
             disp_body_final += disp_body_safe.slice(0, result.index);
             disp_body_safe = disp_body_safe.slice(result.index + result[0].length, disp_body_safe.length);
-            var x = parseInt(result[1]).toString();
-            var y = parseInt(result[2]).toString();
+            var x = parseInt(result[1],10).toString();
+            var y = parseInt(result[2],10).toString();
             // sanity check - do not send bad coordinates
             if(!(home_region in gamedata['regions']) ||
                x < 0 || x >= gamedata['regions'][home_region]['dimensions'][0] ||
@@ -13140,7 +13163,7 @@ function invoke_damage_protection_notice() {
 
 /** Base damage calculator. Follows the base_damage_skip_partial setting unless count_partial option overrides it.
  * @param {{detail:(boolean|undefined),
- *          count_partial:(boolean|undefined)}} options
+ *          count_partial:(boolean|undefined)}=} options
  */
 function do_calc_base_damage(options) {
     var damaged_objects = {};
@@ -13185,6 +13208,8 @@ function do_calc_base_damage(options) {
     return [base_damage, damaged_objects];
 };
 
+/** @param {{detail:(boolean|undefined),
+             count_partial:(boolean|undefined)}=} options */
 function calc_base_damage(options) { return do_calc_base_damage(options)[0]; }
 
 function invoke_you_were_attacked_dialog(recent_attacks) {
@@ -15568,6 +15593,9 @@ function tutorial_step_invite_friends(data) {
     }
 }
 
+/** @param {string} title_text
+    @param {string} body_text
+    @param {Object=} props */
 function invoke_message_dialog(title_text, body_text, props) {
     if(typeof props == 'undefined') { props = {}; }
 
@@ -15603,6 +15631,9 @@ function invoke_message_dialog(title_text, body_text, props) {
 }
 
 // same as above but presents message as a child of the current selection.ui
+/** @param {string} title_text
+    @param {string} body_text
+    @param {Object=} props */
 function invoke_child_message_dialog(title_text, body_text, props) {
     if(typeof props == 'undefined') { props = {}; }
 
@@ -15683,6 +15714,9 @@ function invoke_insufficient_alloy_message(reason, amount, order) {
     return dialog;
 }
 
+/** @param {Object.<string,number>} cost
+    @param {string} headline
+    @param {string=} extra */
 function invoke_insufficient_resources_message(cost, headline, extra) {
     if(!extra) { extra = ''; }
     var ls = [];
@@ -15696,6 +15730,8 @@ function invoke_insufficient_resources_message(cost, headline, extra) {
     invoke_child_message_dialog(headline, gamedata['strings']['more_resources_needed'].replace('%res',resname) + ' '+extra);
 }
 
+/** @param {Object.<string,number>} cost
+    @param {number=} squad_id */
 function invoke_insufficient_resources_for_repair_message(cost, squad_id) {
     var helper;
     var options = {};
@@ -15946,6 +15982,8 @@ function invoke_attack_level_range_message(mode) {
 }
 
 
+/** @param {Object} data
+    @param {Object=} context */
 function create_splash_message(data, context) {
     var dialog = new SPUI.Dialog(gamedata['dialogs'][data['dialog']]);
     if(data['ui_title']) {
@@ -17415,7 +17453,10 @@ Region.prototype.display_turf_standings = function(ui_data) {
     if(!has_all_alliances) {
         return ui_data['ui_name_loading'];
     }
-    var alliance_id_list = goog.object.getKeys(points_by_alliance);
+
+    // Google Closure is too smart for its own good, and assumes the return value from getKeys() is always an array of strings
+    var alliance_id_list = /** @type {Array.<number>} */ (goog.object.getKeys(points_by_alliance));
+
     alliance_id_list.sort(function(a,b) {
         var a_rank = points_by_alliance[a], b_rank = points_by_alliance[b];
         if(a_rank > b_rank) {
@@ -17431,7 +17472,8 @@ Region.prototype.display_turf_standings = function(ui_data) {
     var display_list = [];
     var cur_rank = -1, last_points = -1;
     for(var i = 0; i < Math.min(3, alliance_id_list.length); i++) {
-        var alliance_id = alliance_id_list[i], points = points_by_alliance[alliance_id];
+        var alliance_id = alliance_id_list[i];
+        var points = points_by_alliance[alliance_id];
         var tied = false;
         if(points != last_points) {
             cur_rank += 1;
@@ -17506,6 +17548,9 @@ Region.prototype.get_neighbors = function(xy) {
                        }, this);
     return ret;
 };
+
+/** @param {function(Object)} cb
+    @param {?=} cb_this */
 Region.prototype.for_each_feature = function(cb, cb_this) {
     if(!this.features) { return; }
     goog.array.forEach(this.features, cb, cb_this);
@@ -17890,7 +17935,7 @@ function update_region_map_feature_list_element(dialog, i, feature) {
     dialog.widgets['bgrect'].onclick = onclick;
 
     if(feature['base_type'] == 'squad') {
-        var squad_id = parseInt(feature['base_id'].split('_')[1]);
+        var squad_id = parseInt(feature['base_id'].split('_')[1],10);
         var squad_data = player.squads[squad_id.toString()] || {};
         var stats = player.get_squad_hp_and_space(squad_id);
         dialog.widgets['name'].str = (squad_data['ui_name'] ? squad_data['ui_name'] : gamedata['strings']['regional_map']['unknown_name']);
@@ -17925,6 +17970,7 @@ function update_region_map_feature_list_element(dialog, i, feature) {
     }
 }
 
+/** @param {Array.<number>=} target_loc */
 function invoke_region_map(target_loc) {
     change_selection_ui(null);
     if(!player.get_any_abtest_value('enable_region_map', gamedata['enable_region_map'])) { return null; }
@@ -18053,6 +18099,8 @@ function update_region_map_scroll_help(dialog) {
 }
 
 // if a home_base_relocator_anywhere item is availble, return a function that will open the Store to it, otherwise null
+/** @param {Array.<Object>=} skulist
+    @param {Array.<Object>=} path */
 function continent_bridge_available(skulist, path) {
     if(!skulist) { skulist = gamedata['store']['catalog']; }
     if(!path) { path = []; }
@@ -19509,6 +19557,7 @@ function update_mail_dialog_context(dialog) {
     }
 }
 
+/** @param {string=} msg */
 function invoke_loot_dialog(msg) {
     if(player.loot_buffer.length < 1) { return null; }
     /*
@@ -19836,6 +19885,7 @@ function update_loot_dialog(dialog) {
     }
 }
 
+/** @param {boolean=} force it to open even away from home */
 function invoke_inventory_dialog(force) {
     if(!player.get_any_abtest_value('enable_inventory', gamedata['enable_inventory'])) { return null; }
     if(!session.home_base && !force) { return null; }
@@ -20096,6 +20146,12 @@ function update_inventory_dialog(dialog) {
     }
 };
 
+/** @param {SPUI.Dialog} inv_dialog
+    @param {SPUI.DialogWidget} parent_widget
+    @param {?} slot
+    @param {Object} item
+    @param {boolean} show_dropdown
+    @param {Object=} props */
 function invoke_inventory_context(inv_dialog, parent_widget, slot, item, show_dropdown, props) {
 
     if(inv_dialog.user_data['context']) {
@@ -21538,6 +21594,11 @@ function update_abtest_dialog(dialog) {
     }
 };
 
+/** @param {number} from_id
+    @param {number} user_id
+    @param {string} name
+    @param {number} level
+    @param {boolean=} zoom_from_widget */
 function invoke_battle_history_dialog(from_id, user_id, name, level, zoom_from_widget) {
     player.record_feature_use('battle_history');
     var dialog = new SPUI.Dialog(gamedata['dialogs']['battle_history_dialog']);
@@ -22165,6 +22226,10 @@ function query_score_leaders(field, period, callback) {
     score_leaders_receivers[tag] = callback;
     send_to_server.func(["QUERY_SCORE_LEADERS", field, period, tag]);
 }
+/** @param {Array.<number>} id_list
+    @param {Array.<string>} fields
+    @param {function(Array)} callback
+    @param {Object=} props */
 function query_player_scores(id_list, fields, callback, props) {
     var get_rank = !!(props && props.get_rank);
     last_query_tag += 1;
@@ -22203,6 +22268,9 @@ function query_region_pop(callback) {
     send_to_server.func(["REGION_POP_QUERY", tag]);
 }
 
+/** @param {string=} force_period
+    @param {string=} force_mode
+    @param {string=} force_chapter */
 function invoke_leaderboard(force_period, force_mode, force_chapter) {
     player.record_feature_use('leaderboard');
 
@@ -22677,6 +22745,8 @@ function invoke_player_info(user_id, knowledge) {
     return dialog;
 }
 
+/** @param {SPUI.Dialog} parent
+    @param {Object|null=} preselect */
 function invoke_statistics_tab(parent, preselect) {
     var user_id = parent.user_data['user_id'];
     var knowledge = parent.user_data['knowledge'];
@@ -23327,6 +23397,8 @@ function notify_achievements() {
     return dialog;
 }
 
+/** @param {string} _scope to request (comma-separated list)
+    @param {function()=} _cb callback to call after permissions granted */
 function invoke_facebook_permissions_dialog(_scope, _cb) {
     var display_mode = gamedata['permissions_request_display']; // 'popup' or 'iframe' FB.ui mode - note that 'popup' must be triggered by a click to avoid popup blockers
     metric_event('0036_request_permission_add_scope_ingame', {'scope': _scope, 'method':'ingame', 'display':display_mode});
@@ -23667,6 +23739,9 @@ var tag_chars_ext =
      '0','1','2','3','4','5','6','7','8','9'];
 var name_chars_ext = tag_chars_ext.concat([' ',"'"]);
 
+/** @param {SPUI.Dialog} dialog
+    @param {string} newtab
+    @param {number=} info_id alliance we want to look at */
 function alliance_list_change_tab(dialog, newtab, info_id) {
     if(newtab != dialog.user_data['tab']) {
         if(dialog.user_data['tab'] !== 'modify') {
@@ -25778,6 +25853,10 @@ function invoke_player_info_dialog_rival(friend) {
                               });
 }
 
+/** @param {number} uid
+    @param {string|null=} fbid
+    @param {string|null=} name
+    @param {number|null=} level */
 function invoke_player_info_dialog_stranger(uid, fbid, name, level) {
     var relationship;
     if(uid == session.user_id) {
@@ -25811,9 +25890,14 @@ function find_friend_by_user_id(uid) {
 }
 
 // call this if you have no freaking idea who the user is (e.g. from chat hyperlink)
+/** @param {number} uid
+    @param {(string|null)=} fbid
+    @param {(string|null)=} name
+    @param {(number|null)=} level
+    @param {(function(SPUI.Dialog)|null)=} cb */
 function invoke_player_info_dialog_unknown(uid, fbid, name, level, cb) {
     if(!cb) { cb = function(x) { return x; } }
-    if(fbid === -1 || fbid === '-1') { /* AI user*/ return null; };
+    if(fbid === '-1') { /* AI user*/ return null; };
 
     if(uid == session.user_id) { return cb(invoke_player_info_dialog_self()); }
 
@@ -25851,10 +25935,13 @@ function invoke_player_info_dialog_unknown(uid, fbid, name, level, cb) {
 }
 
 // fill in a unit_icon dialog widget
-// @specname: spec name (may be null)
-// @qty: stack count (-1 if irrelevant)
-// @obj_id: ID for tracking a specific army object (may be null)
-// @onlick: click handler
+/** @param {SPUI.Dialog} dialog
+    @param {string|null} specname
+    @param {number=} qty, -1 if irrelevant
+    @param {string|null=} obj
+    @param {function(SPUI.DialogWidget)|null=} onclick
+    @param {string|null=} frame_state_override
+    @param {string|null=} tooltip_override */
 function unit_icon_set(dialog, specname, qty, obj, onclick, frame_state_override, tooltip_override) {
     var spec = (specname ? gamedata['units'][specname] : null);
     dialog.user_data['spec'] = spec;
@@ -25997,7 +26084,7 @@ function squad_control_refresh(dialog) {
     var need_tiles = cur_squads + (show_add_button ? 1 : 0);
     dialog.user_data['columns'] = (need_tiles <= (dialog.data['widgets']['squad']['array_max'][0]*dialog.data['widgets']['squad']['array_max'][1]) ? Math.min(dialog.data['widgets']['squad']['array_max'][0], need_tiles) : Math.floor((need_tiles+1)/2));
     // sort squads by ID
-    var squad_ids = goog.array.map(goog.object.getKeys(player.squads), function(x) { return parseInt(x); }).sort();
+    var squad_ids = goog.array.map(goog.object.getKeys(player.squads), function(x) { return parseInt(x,10); }).sort();
     var grid_x = 0, grid_y = 0;
     goog.array.forEach(squad_ids, function (id) {
         make_squad_tile(dialog, player.squads[id.toString()], [grid_x,grid_y], dialog.user_data['dlg_mode']);
@@ -26005,7 +26092,7 @@ function squad_control_refresh(dialog) {
     });
     // add-squad button
     if(show_add_button) {
-        make_squad_tile(dialog, null, [grid_x, grid_y]);
+        make_squad_tile(dialog, null, [grid_x, grid_y], dialog.user_data['dlg_mode']);
     }
 
     dialog.user_data['scroll_limits'] = [0, Math.max(0, (dialog.user_data['columns']-1) * dialog.data['widgets']['squad']['array_offset'][0] - dialog.widgets['sunken'].wh[0] - dialog.widgets['sunken'].xy[0] + dialog.data['widgets']['squad']['xy'][0] + dialog.data['widgets']['squad']['dimensions'][0] + 1)];
@@ -26493,6 +26580,8 @@ player.squad_interpolate_pos_and_heading = function(squad_id) {
 
 // it is optional to provide the path home
 
+/** @param {number} squad_id
+    @param {Array.<Array.<number>>|null=} path */
 player.squad_recall = function(squad_id, path) {
     if(player.squad_is_moving(squad_id)) {
         if(!player.squad_get_client_data(squad_id, 'halt_pending')) {
@@ -27872,6 +27961,10 @@ function hide_army_dialog_buttons(dialog, mode) {
 
 var last_manufacture_dialog_category = null;
 
+/** @param {string} reason
+    @param {string=} category
+    @param {GameObject|null=} unit
+    @param {boolean=} want_builder */
 function invoke_manufacture_dialog(reason, category, unit, want_builder) {
     if(last_manufacture_dialog_category === null) {
         last_manufacture_dialog_category = goog.object.getKeys(gamedata['strings']['manufacture_categories'])[0];
@@ -28755,6 +28848,9 @@ function crafting_subcategory_setup_row(dialog, row_col, rowdata) {
     }; })(rowdata);
 }
 
+/** @param {string} newcategory
+    @param {string|null=} newsubcategory
+    @param {number=} newpage */
 function invoke_crafting_dialog(newcategory, newsubcategory, newpage) {
     if(!newcategory) { // pick a reasonable default
         goog.object.forEach(gamedata['crafting']['categories'], function(entry, name) {
@@ -28810,6 +28906,9 @@ function invoke_crafting_dialog(newcategory, newsubcategory, newpage) {
     return dialog;
 }
 
+/** @param {SPUI.Dialog} dialog
+    @param {string} category
+    @param {number=} page */
 function crafting_dialog_change_category(dialog, category, page) {
     dialog.user_data['category'] = category;
     dialog.user_data['recipes'] = null;
@@ -30405,6 +30504,9 @@ function update_fishing_dialog_row(parent_dialog, row, rowdata) {
 
 var last_research_dialog_category = null;
 
+/** @param {(string|null)=} parent_category
+    @param {string=} newcategory
+    @param {number=} newpage */
 function invoke_research_dialog(parent_category, newcategory, newpage) {
     // note: assumes the research lab is already selected
 
@@ -30484,6 +30586,9 @@ function invoke_research_dialog(parent_category, newcategory, newpage) {
     research_dialog_change_category(dialog, newcategory, newpage || 0);
 }
 
+/** @param {SPUI.Dialog} dialog
+    @param {string} category
+    @param {number=} num page to scroll to */
 function research_dialog_change_category(dialog, category, num)
 {
     dialog.user_data['category'] = category;
@@ -30863,6 +30968,8 @@ function update_research_dialog(dialog) {
     }
 };
 
+/** @param {boolean=} do_animation
+    @param {Object=} preselect_quest */
 function invoke_missions_dialog(do_animation, preselect_quest) {
     change_selection(null);
 
@@ -31933,7 +32040,7 @@ function map_dialog_change_page(dialog, chapter, page) {
                 if(('show_if' in ai_base) && !read_predicate(ai_base['show_if']).is_satisfied(player, null)) { return; }
                 // create a fake Friend entry for the AI
                 var info = {'social_id': 'ai', 'ui_name': ai_base['ui_name'], 'player_level': ai_base['resources']['player_level']};
-                item_list.push(new Friend(parseInt(sid), 0, -1, false, info));
+                item_list.push(new Friend(parseInt(sid,10), 0, -1, false, info));
             });
         } else {
             // first filter the list of friends down to those who should appear on this page
@@ -32458,6 +32565,8 @@ function update_daily_tip_pageable(dialog) {
     }
 }
 
+/** @param {string} tipname
+    @param {boolean=} skip_notification_queue */
 function invoke_daily_tip(tipname, skip_notification_queue) {
     var tip = null;
     for(var i = 0; i < gamedata['daily_tips'].length; i++) {
@@ -32495,7 +32604,7 @@ function invoke_daily_tip(tipname, skip_notification_queue) {
                 read_consequent(_cons).execute();
             }
         }; };
-        dialog.widgets['close_button'].onclick = go_away(_tip['name'], false, null);
+        dialog.widgets['close_button'].onclick = go_away(_tip['name'], false, null, null);
         dialog.widgets['ok_button'].onclick = go_away(_tip['name'], true,
                                                       ('understood_button_url' in _tip ?
                                                        url_put_info(_tip['understood_button_url'], session.user_id, player.history['money_spent'] || 0) : null),
@@ -32545,6 +32654,9 @@ function invoke_daily_tip(tipname, skip_notification_queue) {
 
 // common function used by daily tips and AI base completion Consequents (DISPLAY_MESSAGE)
 // to apply widget hacks to the dialog
+/** @param {SPUI.Dialog} dialog
+    @param {Object} _tip
+    @param {Object=} consequent_context */
 function apply_dialog_hacks(dialog, _tip, consequent_context) {
     dialog.user_data['consequent_context'] = consequent_context || null;
     if('sunken_asset' in _tip) {
@@ -32673,6 +32785,8 @@ function apply_dialog_hacks(dialog, _tip, consequent_context) {
 }
 
 // these are not daily tips, but small one-time GUI messages that pop up for certain actions
+/** @param {string} name
+    @param {Object=} options */
 function invoke_ingame_tip(name, options) {
     if(!options) { options = {}; }
     if(!player.check_feature_use(name) || options.force) {
@@ -32707,13 +32821,18 @@ player.get_absolute_time = function() {
     var cur_time;
     var time_override = get_query_string('event_time_override');
     if(time_override) {
-        cur_time = parseInt(time_override);
+        cur_time = parseInt(time_override,10);
     } else {
         cur_time = server_time;
     }
     return cur_time;
 };
 
+
+/** @param {string} event_kind
+    @param {string|null} event_name
+    @param {number} ref_time
+    @param {boolean=} ignore_activation */
 player.get_event = function(event_kind, event_name, ref_time, ignore_activation) {
     if(!goog.array.contains(['current_event','current_event_store','facebook_sale',
                              'current_stat_tournament',
@@ -32749,6 +32868,11 @@ player.get_event = function(event_kind, event_name, ref_time, ignore_activation)
     return null;
 };
 
+/** @param {string} event_kind
+    @param {string|null} event_name
+    @param {string} method
+    @param {boolean=} ignore_activation
+    @param {number=} t_offset */
 player.get_event_time = function(event_kind, event_name, method, ignore_activation, t_offset) {
     if(typeof t_offset == 'undefined') { t_offset = 0; }
     var cur_time = player.get_absolute_time() + t_offset;
@@ -33410,7 +33534,7 @@ function invoke_buy_gamebucks_dialog(reason, amount, order) {
     // because it often causes support tickets like "I bought 1000
     // Gold but only recevied 490!" (because 510 was spent on
     // auto-completing the original order).
-    if(!eval_cond_or_literal(player.get_any_abtest_value('reattempt_order_after_buy_gamebucks', gamedata['store']['reattempt_order_after_buy_gamebucks']||false))) {
+    if(!eval_cond_or_literal(player.get_any_abtest_value('reattempt_order_after_buy_gamebucks', gamedata['store']['reattempt_order_after_buy_gamebucks']||false), player, null)) {
         order = null;
     }
 
@@ -33502,9 +33626,7 @@ function invoke_buy_gamebucks_dialog1(reason, amount, order) {
     }
 
     if(spell_list.length < 1 || spell_list.length > 6) {
-        log_exception(null,
-                      'weird number of gamebucks SKUs ('+spell_list.length.toString()+')! region '+player.price_region+' country '+player.country+' SKUs: ['+spell_list.join(',')+']',
-                      'invoke_buy_gamebucks_dialog');
+        log_exception(null, 'weird number of gamebucks SKUs ('+spell_list.length.toString()+')! region '+player.price_region+' country '+player.country+' SKUs: ['+spell_list.join(',')+'] in invoke_buy_gamebucks_dialog');
     }
 
     if(spell_list.length > dialog.data['widgets']['radio']['array'][1]) {
@@ -33917,7 +34039,7 @@ function invoke_buy_gamebucks_dialog23(ver, reason, amount, order) {
     }
 
     if(spell_list.length < 1) {
-        log_exception(null, 'no gamebucks SKUs ('+spell_list.length.toString()+')! region '+player.price_region+' country '+player.country, 'invoke_buy_gamebucks_dialog2');
+        log_exception(null, 'no gamebucks SKUs ('+spell_list.length.toString()+')! region '+player.price_region+' country '+player.country + 'in invoke_buy_gamebucks_dialog2');
     }
 
     dialog.user_data['spell_list'] = spell_list;
@@ -34292,6 +34414,8 @@ function update_buy_gamebucks_sku2(dialog) {
 
 
 // utility to completely lock up the UI until server catches up, with optional cb to call after we close
+/** @param {number|null=} sync_marker
+    @param {function()=} cb */
 function invoke_ui_locker(sync_marker, cb) {
     if(!sync_marker && (sync_marker !== 0)) { sync_marker = synchronizer.request_sync(); }
     var dialog_data = gamedata['dialogs']['ui_locker'];
@@ -34542,6 +34666,9 @@ function new_store_allow_sku(skudata) {
     return true;
 }
 
+/** @param {Object} catdata
+    @param {(Array.<Object>|null)=} parent_catdata
+    @param {string=} scroll_to_sku_name */
 function invoke_new_store_category(catdata, parent_catdata, scroll_to_sku_name) {
     // parent_catdata (optional, can be null) is a list of the catdatas on the hierarchical path to this category
     // scroll_to_sku_name (optional, can be null) is the "name" string of a spell, item, or subcategory to scroll to upon opening the category
@@ -34986,7 +35113,7 @@ function update_new_store_sku(d) {
 
         } else if(formula.indexOf('grow_base_perimeter') === 0) {
             info_col = (price >= 0 ? 'ok' : 'error');
-            var to_level = parseInt(formula[formula.length-1]);
+            var to_level = parseInt(formula[formula.length-1],10);
             if(session.viewing_base.base_size >= to_level) {
                 info_str = d.data['widgets']['info']['ui_name_already_upgraded'];
                 info_high = info_small = false;
@@ -35311,6 +35438,8 @@ function update_new_store_sku(d) {
     }
 }
 
+/** @param {string=} purpose
+    @param {string=} path */
 function invoke_store(purpose, path) {
     // purpose: null, or (a resource name like 'iron'), 'special_items', 'barriers', 'defenses', 'exact_path'
     // path (required when purpose='exact_path', otherwise null): a string specifying the SKU or category to scroll to, in the form of a /-delimited hierarchical path
@@ -35384,6 +35513,7 @@ function invoke_store(purpose, path) {
 
 var last_build_dialog_category = 'resources';
 
+/** @param {string=} newcategory */
 function invoke_build_dialog(newcategory) {
     //metric_event('4020_open_menu', {'menu_name':'build_dialog'});
 
@@ -35834,7 +35964,7 @@ function build_dialog_scroll(dialog, page) {
                         // hack - need to update helper on a per-frame basis - this closes the build dialog as a work-around
                         widget.onclick = (function (_helper) { return function(w) {
                             close_parent_dialog(w);
-                            _helper(w);
+                            _helper();
                         }; })(helper);
                     } else {
                         widget.onclick = null;
@@ -35911,8 +36041,11 @@ function classify_unit_space_shortage() {
     }
 }
 
-// try to help the player overcome a lack of resources or unfulfilled predicate
-// returns a function that will cause the helper UI to appear (null if we can't help)
+/** Try to help the player overcome a lack of resources or unfulfilled predicate
+    @returns {function()|null} a function that will cause the helper UI to appear (null if we can't help)
+    @param {string|Predicate} kind
+    @param {?=} arg
+    @param {Object=} options */
 function get_requirements_help(kind, arg, options) {
     if(!options) { options = {}; }
 
@@ -36338,7 +36471,7 @@ function get_requirements_help(kind, arg, options) {
         return help_function;
     }
 
-    return (function (_title, _descr, _button, _cancel_button, _help, _unit_icon, _options, _open_function) { return function(w) {
+    return (function (_title, _descr, _button, _cancel_button, _help, _unit_icon, _options, _open_function) { return function() {
         var dialog = new SPUI.Dialog(gamedata['dialogs']['requirements_help_dialog']);
         dialog.user_data['dialog'] = 'requirements_help_dialog';
         install_child_dialog(dialog);
@@ -36363,7 +36496,7 @@ function get_requirements_help(kind, arg, options) {
             dialog.widgets['ok_button'].show = true;
             if(_button) { dialog.widgets['ok_button'].str = _button; }
             dialog.widgets['ok_button'].onclick = (function (_help_func) { return function(w) {
-                    close_parent_dialog(w); _help_func();
+                close_parent_dialog(w); _help_func();
             }; })(_help);
         }
 
@@ -36381,11 +36514,17 @@ function get_requirements_help(kind, arg, options) {
 }
 
 // upgrade a specific building (if preselect_building is null, use selection.unit)
-function invoke_upgrade_building_dialog(preselect_building) { return invoke_upgrade_dialog_generic('BUILDING', null, preselect_building); }
+/** @param {(GameObject|null)=} preselect_building */
+function invoke_upgrade_building_dialog(preselect_building) { return invoke_upgrade_dialog_generic('BUILDING', null, preselect_building || null); }
 
 // upgrade a technology
-function invoke_upgrade_tech_dialog(techname, prev_dialog) { return invoke_upgrade_dialog_generic(techname, prev_dialog, null); }
+/** @param {string} techname
+    @param {SPUI.Dialog|null=} prev_dialog */
+function invoke_upgrade_tech_dialog(techname, prev_dialog) { return invoke_upgrade_dialog_generic(techname, prev_dialog || null, null); }
 
+/** @param {string} techname
+    @param {SPUI.Dialog|null} prev_dialog
+    @param {GameObject|null} preselect */
 function invoke_upgrade_dialog_generic(techname, prev_dialog, preselect) {
     if(techname == 'BUILDING' &&
        selection.unit.time_until_finish() > 0) {
@@ -37562,6 +37701,8 @@ Store.get_balance_plus_cb = function() {
 
 // display an amount of in-game currency
 // format = 'compact' for raw number, 'normal' for 'N Alloy'/'N', or 'full' for 'N Alloy'/'N Facebook Credits'
+/** @param {number} price
+    @param {string=} format */
 Store.display_user_currency_amount = function(price, format) {
     if(Store.get_user_currency() == 'gamebucks') {
         var divisor = player.get_any_abtest_value('gamebucks_display_divisor', gamedata['store']['gamebucks_display_divisor']);
@@ -37591,6 +37732,8 @@ Store.display_user_currency_amount = function(price, format) {
 };
 
 // display an in-game currency price. Same as display_user_currency_amount except returns "-" for things that are free
+/** @param {number} price
+    @param {string=} format */
 Store.display_user_currency_price = function(price, format) {
     if(price < 0) {
         return "-"; // unfulfilled requirements or other error
@@ -37678,6 +37821,11 @@ Store.get_user_currency_price = function(unit_id, spell, spellarg) {
 
 // main pricing entry point
 // this MUST match Store.get_price in server.py, or else there will be trouble!!!
+/** @param {string} sale_currency
+    @param {number} unit_id
+    @param {Object} spell
+    @param {?} spellarg
+    @param {boolean=} ignore_error */
 Store.get_price = function(sale_currency, unit_id, spell, spellarg, ignore_error) {
     var p_p_currency = Store.get_base_price(unit_id, spell, spellarg, ignore_error);
     var p = p_p_currency[0], p_currency = p_p_currency[1];
@@ -37890,7 +38038,7 @@ function can_cast_spell_detailed(unit_id, spellname, spellarg) {
             }
         }
         var formula = spell['price_formula'];
-        var up_level = parseInt(formula[formula.length-1]);
+        var up_level = parseInt(formula[formula.length-1],10);
         if(min_level >= up_level) {
             return [false, null, null];
         } else {
@@ -37898,7 +38046,7 @@ function can_cast_spell_detailed(unit_id, spellname, spellarg) {
         }
     } else if(spellname.indexOf("GROW_BASE_PERIMETER") == 0) {
         var formula = spell['price_formula'];
-        var to_level = parseInt(formula[formula.length-1]);
+        var to_level = parseInt(formula[formula.length-1],10);
         if(session.viewing_base.base_size >= to_level) {
             return [false, null, null];
         }
@@ -38159,14 +38307,14 @@ Store.get_base_price = function(unit_id, spell, spellarg, ignore_error) {
                 min_level = Math.min(min_level, obj.level);
             }
         }
-        var up_level = parseInt(formula[formula.length-1]);
+        var up_level = parseInt(formula[formula.length-1],10);
         if(min_level >= up_level && !ignore_error) {
             return [-1, p_currency];
         } else {
             return [spell['price'], p_currency];
         }
     } else if(formula.indexOf('grow_base_perimeter') === 0) {
-        var to_level = parseInt(formula[formula.length-1]);
+        var to_level = parseInt(formula[formula.length-1],10);
         if(session.viewing_base.base_size >= to_level && !ignore_error) {
             return [-1, p_currency];
         }
@@ -38589,9 +38737,21 @@ Store.force_order_cleanup = function() {
 // NOTE: cb is a UI cleanup callback that will be called ONLY for gamebucks purchases, not for FB credits purchases!
 // FB credits purchases always have to kill the entire UI because the FB script callback is unreliable
 
+/** @param {number} unit_id
+    @param {string} spellname
+    @param {?} spellarg
+    @param {function()|null=} cb
+    @param {Object|null=} props */
 Store.place_user_currency_order = function(unit_id, spellname, spellarg, cb, props) {
     return Store.place_order(Store.get_user_currency(), unit_id, spellname, spellarg, cb, props);
 };
+
+/** @param {string} currency
+    @param {number} unit_id
+    @param {string} spellname
+    @param {?} spellarg
+    @param {function()|null=} cb
+    @param {Object|null=} props */
 Store.place_order = function(currency, unit_id, spellname, spellarg, cb, props) {
     var no_clear = props && props['no_clear'];
 
@@ -38916,7 +39076,7 @@ Store.place_fbpayments_order = function(fbpayments_currency, price, unit_id, spe
         descr += ','+object.spec['name'];
     }
 
-    var product_url = 'http://'+spin_server_host+(parseInt(spin_server_http_port)!=80 ? ":"+spin_server_http_port : "")+"/OGPAPI?spellname="+spellname+"&type="+gamedata['game_id']+"_sku";
+    var product_url = 'http://'+spin_server_host+(parseInt(spin_server_http_port,10)!=80 ? ":"+spin_server_http_port : "")+"/OGPAPI?spellname="+spellname+"&type="+gamedata['game_id']+"_sku";
     var quantity = 1;
 
     Store.fbpayments_order_serial += 1;
@@ -39499,7 +39659,7 @@ function handle_server_message(data) {
 
         // optionally switch on websockets (which may already be on from init() if gamedata.client.enable_websockets is true)
         // but note: don't do this if spin_game_direct_connect has been turned off by error 0631 happening from an earlier connection attempt
-        if(!spin_game_use_websocket && spin_game_direct_connect && (parseInt(spin_game_server_ws_port) > 0 || parseInt(spin_game_server_wss_port) > 0)) {
+        if(!spin_game_use_websocket && spin_game_direct_connect && (parseInt(spin_game_server_ws_port,10) > 0 || parseInt(spin_game_server_wss_port,10) > 0)) {
             if(player.get_any_abtest_value('enable_websockets', false) && SPWebsocket.is_supported()) {
                 spin_game_use_websocket = true;
             }
@@ -40200,7 +40360,7 @@ function handle_server_message(data) {
         // allow developers to link directly to someone's base
         var immediate_visit = get_query_string('visit_base');
         if(player.is_developer && immediate_visit) {
-            visit_base(parseInt(immediate_visit));
+            visit_base(parseInt(immediate_visit,10));
         }
 
         // deep link to player info statistics
@@ -41204,20 +41364,20 @@ function handle_server_message(data) {
                 'player': { 'onclick': function (_suser_id) {
                     return function(w, mloc) {
                         if(!_suser_id) { return; }
-                        var _user_id = parseInt(_suser_id);
+                        var _user_id = parseInt(_suser_id,10);
                         if(!_user_id || is_ai_user_id_range(_user_id)) { return; }
                         change_selection_ui(null);
                         invoke_player_info_dialog_unknown(_user_id);
                     }; } },
                 'alliance': { 'onclick': function(salliance_id) { return function(w, mloc) {
-                    var alliance_id = parseInt(salliance_id);
+                    var alliance_id = parseInt(salliance_id,10);
                     if(alliance_id >= 0) {
                         change_selection_ui(null); invoke_alliance_info(alliance_id);
                     }
                 }; } },
                 'achievement': {'onclick': function(player_and_name) { return function(w, mloc) {
                     var fields = player_and_name.split(':');
-                    var player_id = parseInt(fields[0]), name = fields[1];
+                    var player_id = parseInt(fields[0],10), name = fields[1];
                     if(name in gamedata['achievements']) {
                         var cheeve = gamedata['achievements'][name];
                         change_selection_ui(null);
@@ -41489,7 +41649,7 @@ function handle_server_message(data) {
                     var str = null, name = null;
 
                     if(feature['base_type'] == 'squad') {
-                        var squad_id = parseInt(base_id.split('_')[1]);
+                        var squad_id = parseInt(base_id.split('_')[1],10);
                         if(squad_id.toString() in player.squads) {
                             name = player.squads[squad_id.toString()]['ui_name'];
                             str = gamedata['strings']['regional_map']['your_squad_'+what_happened];
@@ -44263,7 +44423,7 @@ function do_draw() {
         }
 
         if(!offscreen_unit_arrow) {
-            offscreen_unit_arrow = new SPFX.OffscreenArrow(arrow_pos);
+            offscreen_unit_arrow = new SPFX.OffscreenArrow();
             SPFX.add(offscreen_unit_arrow);
         }
         offscreen_unit_arrow.reset(arrow_pos);
@@ -46081,6 +46241,8 @@ function draw_drag_selection() {
     ctx.restore();
 };
 
+/** @param {GameObject} unit
+    @param {string=} config_override */
 function draw_selection_highlight(unit, config_override) {
     var curpos = unit.interpolate_pos();
     ctx.save();

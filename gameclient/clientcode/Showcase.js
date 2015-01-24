@@ -523,8 +523,11 @@ Showcase.collect_child_sku_counts = function(sku, ignore_list) { // note: sku mu
     });
     return ret;
 };
+
 // returns list of [{'path':'event_prizes/etc', 'ui_name':''}] of any SKU sales that are currently on
-Showcase.collect_active_sales_data = function(sku, path) { // note: sku can be an individual sku or a folder with a 'skus' member
+/** @param {Object} sku - can be an individual sku or a folder with a 'skus' member
+    @param {string=} path */
+Showcase.collect_active_sales_data = function(sku, path) {
     if(!path) { path = ''; }
     if(('show_if' in sku) && !(read_predicate(sku['show_if']).is_satisfied(player, null))) { return []; }
 

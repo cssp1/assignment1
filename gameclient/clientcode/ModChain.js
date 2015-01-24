@@ -94,6 +94,8 @@ ModChain.get_stat = function(modchain, default_value) {
     return default_value;
 };
 
+/** @param {?} base_val
+    @param {Object=} props */
 ModChain.make_chain = function(base_val, props) {
     var mod = {'kind': 'base', 'val':base_val};
     if(props) { for(var k in props) { mod[k] = props[k]; } }

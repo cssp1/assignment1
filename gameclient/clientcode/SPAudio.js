@@ -147,7 +147,7 @@ SPAudio.SM2Sample.prototype.fade_step = function(t) {
         this.last_volume = this.fade_vol;
         this.fade_start = -1;
         this.fade_end = -1;
-        if(this.fade_vol <= 0) { this.stop(); console.log('stop at end of fade'); }
+        if(this.fade_vol <= 0) { this.stop(t); console.log('stop at end of fade'); }
     }
     if(this.loaded) {
         var vol = this.last_volume + progress * (this.fade_vol - this.last_volume);
@@ -214,7 +214,7 @@ SPAudio.BuzzSample.prototype.play = function(time, volume) {
     this.buzz_sound.setVolume(volume);
     if(0) {
         // potential multishot solution for FireFox?
-        this.buzz_sound.sound.cloneNode().play();
+        // this.buzz_sound.sound.cloneNode().play();
     } else {
         this.end_time = time + this.duration;
         this.buzz_sound.play();

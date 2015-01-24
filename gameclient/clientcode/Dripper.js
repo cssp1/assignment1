@@ -31,6 +31,8 @@ Dripper.Dripper.prototype.reset = function(cb, rate, origin_time) {
     this.origin_time = origin_time;
 };
 
+/** @param {boolean=} call_cb whether to call the callback
+    @param {?=} param parameter to pass the callback */
 Dripper.Dripper.prototype.stop = function(call_cb, param) {
     if(!this.is_active()) return;
 
@@ -45,6 +47,8 @@ Dripper.Dripper.prototype.stop = function(call_cb, param) {
     this.resid = 0;
 };
 
+/** @param {number} t
+    @param {?=} param to call the function with */
 Dripper.Dripper.prototype.activate = function(t, param) {
     if(!this.is_active() || t < this.origin_time) { return 0; } // not begun yet
 

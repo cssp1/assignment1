@@ -203,7 +203,7 @@ UpgradeBar.update_contents = function(dialog, kind, specname, new_level, obj_id)
             if(dialog) { crafting_dialog_select_recipe(dialog.widgets['recipe'], specname); }
         }; } },
         'predicate': {'onclick': (function (_predicate_map) { return function(sindex) { return function(w, mloc) {
-            var pred = _predicate_map[parseInt(sindex)];
+            var pred = _predicate_map[parseInt(sindex,10)];
             var helper = get_requirements_help(read_predicate(pred), null, {short_circuit:true});
             if(helper) { helper(); }
         }; }; })(predicate_map) }

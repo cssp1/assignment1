@@ -17,6 +17,12 @@ RegionMap.Cursor = function(map) {
 RegionMap.Cursor.prototype.on_mousemove = function(cell) { return false; };
 RegionMap.Cursor.prototype.allow_drag = function() { return true; };
 RegionMap.Cursor.prototype.allow_label = function(cell) { return true; };
+
+/** @param {Array.<number>} cell
+    @param {string} text_str
+    @param {string} text_color
+    @param {number} text_size
+    @param {Array.<number>=} extra_offset */
 RegionMap.Cursor.prototype.draw_text_at_cell = function(cell, text_str, text_color, text_size, extra_offset) {
     if(!extra_offset) { extra_offset = [0,0]; }
     var cell_xy = this.map.cell_to_field(cell);
@@ -193,7 +199,7 @@ RegionMap.MoveCursor.prototype.do_get_path = function(cell) {
                 is_my_home = true;
             } else if(f['base_type'] == 'quarry' && f['base_landlord_id'] == session.user_id) {
                 is_my_quarry = true;
-            } else if(f['base_type'] == 'squad' && (f['base_landlord_id'] != session.user_id) || parseInt(f['base_id'].split('_')[1]) != this.squad_id) {
+            } else if(f['base_type'] == 'squad' && (f['base_landlord_id'] != session.user_id) || parseInt(f['base_id'].split('_')[1],10) != this.squad_id) {
                 // some squad other than this one
                 is_blocked = true;
             }
@@ -546,7 +552,7 @@ RegionMap.RegionMap.prototype.invoke_deploy_cursor = function(from_loc, squad_id
 /**
  *  @param {{do_select:(boolean|undefined),
  *           with_zoom:(boolean|undefined),
- *           slowly:(boolean|undefined)}} options
+ *           slowly:(boolean|undefined)}=} options
  */
 RegionMap.RegionMap.prototype.go_home = function(options) {
     var home_loc = player.home_base_loc;
@@ -566,7 +572,7 @@ RegionMap.RegionMap.prototype.go_home = function(options) {
 /**
  *  @param {Array.<number>} loc
  *           with_zoom:(boolean|undefined),
- *  @param {{slowly:(boolean|undefined)}} options
+ *  @param {{slowly:(boolean|undefined)}=} options
  */
 RegionMap.RegionMap.prototype.pan_to_cell = function(loc, options) {
     var fxy = this.cell_to_field(loc);
@@ -577,7 +583,7 @@ RegionMap.RegionMap.prototype.pan_to_cell = function(loc, options) {
 /**
  *  @param {Array.<number>} fxy
  *           with_zoom:(boolean|undefined),
- *  @param {{slowly:(boolean|undefined)}} options
+ *  @param {{slowly:(boolean|undefined)}=} options
  */
 RegionMap.RegionMap.prototype.pan_to_field = function(fxy, options) {
     if(options && options.slowly) {
@@ -908,7 +914,7 @@ RegionMap.RegionMap.update_feature_popup_menu = function(dialog) {
         // OWN SQUAD
         if(feature['base_type'] == 'squad') {
             var squad_sid = feature['base_id'].split('_')[1]
-            var squad_id = parseInt(squad_sid);
+            var squad_id = parseInt(squad_sid,10);
             var squad_data = player.squads[squad_sid];
             if(squad_data && player.squad_is_deployed(squad_id)) {
                 if(player.squad_is_moving(squad_id)) {
@@ -1379,7 +1385,7 @@ RegionMap.RegionMap.update_feature_popup = function(dialog) {
 
     // set squad health/space widgets
     if(feature['base_type'] == 'squad' && feature['base_landlord_id'] == session.user_id) {
-        var squad_id = parseInt(feature['base_id'].split('_')[1]);
+        var squad_id = parseInt(feature['base_id'].split('_')[1],10);
         var stats = player.get_squad_hp_and_space(squad_id);
         dialog.widgets['squad_space_bar'].show = dialog.widgets['squad_hp_bar'].show = true;
         dialog.widgets['squad_space_bar'].progress = stats['cur_space'] / Math.max(stats['max_space'],1);
@@ -1790,6 +1796,8 @@ RegionMap.RegionMap.prototype.sort_features_for_draw = function(roi, feature_lis
 };
 
 // convert PlayerCache entry to the most specific name we can
+/** @param {Object} info
+    @param {boolean=} abbreviate */
 RegionMap.RegionMap.prototype.pcache_to_name = function(info, abbreviate) {
     var name = PlayerCache._get_ui_name(info) || gamedata['strings']['regional_map']['unknown_name'];
     if(!abbreviate && ('player_level' in info)) {
@@ -1832,7 +1840,7 @@ RegionMap.RegionMap.prototype.draw_feature = function(feature) {
 
         if(feature['base_type'] == 'squad') {
             squad_sid = feature['base_id'].split('_')[1];
-            squad_id = parseInt(squad_sid);
+            squad_id = parseInt(squad_sid,10);
 
             // is this squad guarding a quarry?
             var f = this.region.find_feature_at_coords(loc);

@@ -311,7 +311,7 @@ ItemDisplay.get_inventory_item_refund_str = function(spec, count) {
             glow:(boolean|undefined),
             hide_stack:(boolean|undefined),
             hide_tooltip:(boolean|undefined),
-            context_parent:(SPUI.Element|undefined)
+            context_parent:(SPUI.Dialog|undefined)
             }=} opts
  */
 ItemDisplay.display_item_array = function(dialog, prefix, item_list, opts) {
@@ -355,12 +355,16 @@ ItemDisplay.display_item_array = function(dialog, prefix, item_list, opts) {
 };
 
 /** Attaches an item's tooltip to the provided widget so that it will appear on mouse over
-   @param {SPUI.Element} widget
+   @param {SPUI.DialogWidget} widget
    @param {Object} item
-   @param {(SPUI.Element|undefined)} context_parent
+   @param {SPUI.Dialog|null=} context_parent
  */
 ItemDisplay.attach_inventory_item_tooltip = function(widget, item, context_parent) {
-    context_parent = context_parent || widget.parent;
+    // we have to assume widget.parent is a dialog
+    context_parent = context_parent || /** @type {SPUI.Dialog} */ (widget.parent);
+    if(!context_parent.user_data) {
+        throw Error('context_parent must be a SPUI.Dialog');
+    }
 
     // show tooltip on enter
     widget.onenter = (function (_slot, _item, _context_parent) {
@@ -388,7 +392,7 @@ ItemDisplay.attach_inventory_item_tooltip = function(widget, item, context_paren
 };
 
 /** Undoes the above
-   @param {SPUI.Element} widget
+   @param {SPUI.DialogWidget} widget
  */
 ItemDisplay.remove_inventory_item_tooltip = function(widget) {
     widget.onenter = widget.onleave_cb = null;
@@ -400,12 +404,18 @@ ItemDisplay.remove_inventory_item_tooltip = function(widget) {
     @param {{glow:(boolean|undefined),
              hide_stack:(boolean|undefined),
              hide_tooltip:(boolean|undefined),
-             context_parent:(SPUI.Element|undefined)
+             context_parent:(SPUI.Dialog|undefined)
              }=} opts
  */
 ItemDisplay.display_item = function(item_display, item, opts) {
     var options = opts || {};
-    var context_parent = options.context_parent || item_display.parent;
+
+    // we have to assume item_display.parent is a dialog
+    var context_parent = options.context_parent || /** @type {SPUI.Dialog} */ (item_display.parent);
+
+    if(!context_parent.user_data) {
+        throw Error('context_parent must be a SPUI.Dialog');
+    }
 
     var spec = ItemDisplay.get_inventory_item_spec(item['spec']);
 

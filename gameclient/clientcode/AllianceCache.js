@@ -84,6 +84,9 @@ AllianceCache.query_info_sync = function(alliance_id) {
     return null;
 };
 
+/** @param {number} alliance_id
+    @param {function((Object|null)) | null=} callback
+    @param {Object=} props */
 AllianceCache.query_info = function (alliance_id, callback, props) {
     if(!props) { props = {}; }
     var get_private_fields = props.get_private_fields;

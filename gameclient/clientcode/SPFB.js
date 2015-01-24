@@ -12,6 +12,8 @@ goog.provide('SPFB');
 // global namespace
 SPFB = {};
 
+/** @param {Object} props
+    @param {function(Object)|null=} callback */
 SPFB.ui = function(props, callback) {
     if(typeof FB === 'undefined') {
         // note: calls back into main.js
@@ -28,6 +30,9 @@ SPFB.ui = function(props, callback) {
     return FB.ui(props, callback);
 };
 
+/** @param {string} url
+    @param {?} method
+    @param {Object=} props */
 SPFB.api = function(url, method, props) {
     if(typeof FB === 'undefined') {
         // note: calls back into main.js
@@ -53,6 +58,9 @@ SPFB.AppEvents.activateApp = function() {
     }
     return FB.AppEvents.activateApp();
 };
+/** @param {string} name
+    @param {number|null=} value
+    @param {Object=} params */
 SPFB.AppEvents.logEvent = function(name, value, params) {
     console.log('SPFB.AppEvents.logEvent("'+name+'", '+(value ? value.toString() : 'null')+', '+(params ? JSON.stringify(params) : 'null')+')');
     if(spin_frame_platform != 'fb' || !spin_facebook_enabled || !gamedata['enable_fb_app_events']) { return; }

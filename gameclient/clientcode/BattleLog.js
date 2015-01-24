@@ -54,7 +54,7 @@ BattleLog.unit = function(met, is_mine) {
             var count = met['multi_units'][key];
             var kind_level = key.split(':');
             var kind = kind_level[0];
-            var level = parseInt(kind_level[1]);
+            var level = parseInt(kind_level[1],10);
             var tx = BattleLog.one_unit(kind, level, is_mine);
             ret.push(count.toString()+'x '+tx);
         }

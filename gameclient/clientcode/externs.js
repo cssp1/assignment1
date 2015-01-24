@@ -565,8 +565,8 @@ var soundManager, SM2_DEFER, sm2Debugger;
 
 /**
  * @constructor
- * @param {string} smURL Optional: Path to SWF files
- * @param {string} smID Optional: The ID to use for the SWF container element
+ * @param {string=} smURL Optional: Path to SWF files
+ * @param {string=} smID Optional: The ID to use for the SWF container element
  * @this {SoundManager}
  * @return {SoundManager} The new SoundManager instance
  */

@@ -22,9 +22,10 @@ OPT_FLAGS :=
 
 ifneq (${TYPECHECK},)
     CHECK_FLAGS += --compiler_flags=--jscomp_warning=checkTypes
-#    CHECK_FLAGS += --compiler_flags=--jscomp_off=reportUnknownTypes
+    CHECK_FLAGS += --compiler_flags=--jscomp_off=reportUnknownTypes # Closure itself is not clean for this one
     # custom SpinPunch option that shuts up complaints about argument count mismatches
-    CHECK_FLAGS += --compiler_flags=--jscomp_off=checkTypesArgumentCount
+    # (no longer used, as our code is now clean for it)
+    #CHECK_FLAGS += --compiler_flags=--jscomp_off=checkTypesArgumentCount
 else
     CHECK_FLAGS += --compiler_flags=--jscomp_off=checkTypes
 endif

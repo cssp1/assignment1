@@ -16,6 +16,7 @@ Traceback = {};
 /**
  * Main function giving a function stack trace with a forced or passed in Error
  *
+ * @param {Object=} options
  * {Error} e The error to create a stacktrace from (optional)
  * {Boolean} guess If we should try to resolve the names of anonymous functions
  * @return {Array} of Strings with functions, lines, files, and arguments where possible
@@ -34,7 +35,7 @@ Traceback.printStackTrace.implementation = function() {
 Traceback.printStackTrace.implementation.prototype = {
     /**
      * @param {Error} ex The error to create a stacktrace from (optional)
-     * @param {?} mode Forced mode (optional, mostly for unit tests)
+     * @param {?=} mode Forced mode (optional, mostly for unit tests)
      */
     run: function(ex, mode) {
         ex = ex || this.createException();

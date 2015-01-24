@@ -16,6 +16,8 @@ goog.require('GameArt'); // for client graphics
 function Consequent(data) {
     this.kind = data['consequent'];
 }
+/** @param {Object=} state */
+Consequent.prototype.execute = goog.abstractMethod;
 
 /** @constructor
   * @extends Consequent */
@@ -670,6 +672,8 @@ function read_consequent(data) {
     else { throw Error('unknown consequent type '+kind); }
 }
 
+/** @param {Object} data
+    @param {Object=} state */
 function execute_logic(data, state) {
     if('if' in data && 'then' in data) {
         var pred_true = read_predicate(data['if']).is_satisfied(player, null);

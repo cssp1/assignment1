@@ -47,8 +47,8 @@ var soundManager = null;
  * The SoundManager constructor.
  *
  * @constructor
- * @param {string} smURL Optional: Path to SWF files
- * @param {string} smID Optional: The ID to use for the SWF container element
+ * @param {string=} smURL Optional: Path to SWF files
+ * @param {string=} smID Optional: The ID to use for the SWF container element
  * @this {SoundManager}
  * @return {SoundManager} The new SoundManager instance
  */
@@ -578,7 +578,7 @@ function SoundManager(smURL, smID) {
    * Calls the play() method of a SMSound object by ID.
    *
    * @param {string} sID The ID of the sound
-   * @param {?} oOptions Optional: Sound options
+   * @param {?=} oOptions Optional: Sound options
    * @return {SMSound} The SMSound object
    */
 
@@ -1022,7 +1022,7 @@ function SoundManager(smURL, smID) {
    * Queues a callback for execution when SoundManager has successfully initialized.
    *
    * @param {?} oMethod The callback method to fire
-   * @param {?} oScope Optional: The scope to apply to the callback
+   * @param {?=} oScope Optional: The scope to apply to the callback
    */
 
   this.onready = function(oMethod, oScope) {
@@ -1565,7 +1565,8 @@ function SoundManager(smURL, smID) {
     /**
      * Begins playing a sound.
      *
-     * @param {?} oOptions Optional: Sound options
+     * @param {?=} oOptions Optional: Sound options
+     * @param {?=} _updatePlayState
      * @return {SMSound} The SMSound object
      */
 
@@ -1763,7 +1764,7 @@ function SoundManager(smURL, smID) {
     /**
      * Stops playing a sound (and optionally, all sounds)
      *
-     * @param {boolean} bAll Optional: Whether to stop all sounds
+     * @param {boolean=} bAll Optional: Whether to stop all sounds
      * @return {SMSound} The SMSound object
      */
 

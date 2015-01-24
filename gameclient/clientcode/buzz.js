@@ -490,6 +490,9 @@ var buzz = {
             return this;
         };
 
+        /** @param {number} to
+            @param {function(?)|number} duration
+            @param {function(?)=} callback */
         this.fadeTo = function( to, duration, callback ) {
                         if ( !supported ) {
               return this;
@@ -794,7 +797,8 @@ var buzz = {
         };
 
         // privates
-        function fn() {
+        /** @param {...*} var_args */
+        function fn(var_args) {
             var args = argsToArray( null, arguments ),
                 func = args.shift();
 

@@ -22,6 +22,8 @@ SPText.ABlock = function(str, props) {
 
 // convert raw JavaScript string (possibly containing newlines) into
 // the array-of-arrays ABlock structure
+/** @param {string} str
+    @param {Object=} props */
 SPText.cstring_to_ablocks = function(str, props) {
     var ret = [];
     var line = [];
@@ -137,7 +139,11 @@ SPText.bbcode_split_words = function(str) {
     return r;
 };
 
+/** @param {string} str
+    @param {Object=} props
+    @param {Object.<string,function(string)>=} plugins */
 SPText.cstring_to_ablocks_bbcode = function(str, props, plugins) {
+    if(typeof(props) == 'undefined') { props = {}; }
     var ret = [];
     var line = [];
     var word = new SPText.ABlock('', props);
@@ -195,7 +201,7 @@ SPText.cstring_to_ablocks_bbcode = function(str, props, plugins) {
                     // do not descend since there is no closing code for this
                     prop_stack.pop();
                     code_stack.pop();
-                    insert_string = pretty_print_date(parseInt(arg)); // XXX imported from main.js
+                    insert_string = pretty_print_date(parseInt(arg,10)); // XXX imported from main.js
                 } else if(plugins && (root in plugins)) {
                     if('onclick' in plugins[root]) { word_props.onclick = plugins[root]['onclick'](arg); }
                 } else {
@@ -422,6 +428,10 @@ SPText.layout_text = function(sblocklines, wh, hjustify, vjustify, deffont, offs
     return ret;
 };
 
+/** @param {Array.<Array.<SPText.RBlock>>} rblocklines
+    @param {Array.<number>} offset coordinates
+    @param {SPUI.Font} default_font
+    @param {boolean=} no_color */
 SPText.render_text = function(rblocklines, offset, default_font, no_color) {
     var bold_font = null;
     for(var n = 0; n < rblocklines.length; n++) {

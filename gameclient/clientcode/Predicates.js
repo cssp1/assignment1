@@ -1499,6 +1499,9 @@ function read_predicate(data) {
 }
 
 // evaluate a "cond" expression in the form of [[pred1,val1], [pred2,val2], ...]
+/** @param {Array} chain
+    @param {Object} player
+    @param {Object=} qdata */
 function eval_cond(chain, player, qdata) {
     for(var i = 0; i < chain.length; i++) {
         var pred = chain[i][0], val = chain[i][1];
@@ -1510,6 +1513,9 @@ function eval_cond(chain, player, qdata) {
 }
 
 // evaluate a "cond" expression that might also be a literal value
+/** @param {?} qty
+    @param {Object} player
+    @param {Object=} qdata */
 function eval_cond_or_literal(qty, player, qdata) {
     if((typeof qty) == 'undefined') {
         throw Error('eval_cond_or_literal of undefined');
