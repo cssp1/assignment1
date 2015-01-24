@@ -26370,18 +26370,32 @@ player.squad_find_path_adjacent_to = function(squad_id, dest) {
 
     // try aiming for neighbor squares around "dest"
     var neighbors = session.region.get_neighbors(dest);
+    var best_path = null;
+    var best_travel_time = -1;
+
     for(var i = 0; i < neighbors.length; i++) {
         var n = neighbors[i];
         if(!session.region.occupancy.is_blocked(n)) {
             var path = session.region.hstar_context.search(squad_data['map_loc'], n, path_checker(squad_id, n));
-            // path must lead ON TOP OF n
+            // path must lead INTO n
             if(path && path.length >= 1 && hex_distance(path[path.length-1], n) == 0) {
-                return path; // good path
+                // good path
+
+                // trim off unnecessary extra moves at the end of the path that just circle around the destination hex
+                while(path.length >= 2 && hex_distance(path[path.length-2], dest) == 1) {
+                    goog.array.removeAt(path, path.length-1);
+                }
+                var travel_time = player.squad_travel_time(squad_id, path);
+                if(best_path === null || travel_time  < best_travel_time) {
+                    best_path = path;
+                    best_travel_time = travel_time;
+                }
+                //return path;
             }
         }
     }
 
-    return null;
+    return best_path;
 };
 
 
