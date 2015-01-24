@@ -588,7 +588,7 @@ AStar.AStarHexMap.prototype.block_hex = function(xy, value, blocker) {
 
 /** unblock a hex, but only if "blocker" is currently blocking it
     @param {Array.<number>} xy
-    @param {Object} blocker reference to thing that is blocking here
+    @param {!Object} blocker reference to thing that is blocking here
 */
 AStar.AStarHexMap.prototype.unblock_hex_maybe = function(xy, blocker) {
     if(this.is_blocked(xy)) {

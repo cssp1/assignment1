@@ -26363,7 +26363,7 @@ player.squad_find_path_adjacent_to = function(squad_id, dest) {
 
     // if dest is not blocked, try going directly there
     if(!session.region.occupancy.is_blocked(dest)) {
-        var path = session.region.hstar_context.search(squad_data['map_loc'], dest, path_checker(squad_id, dest));
+        var path = session.region.hstar_context.search(squad_data['map_loc'], dest, path_checker ? path_checker(squad_id, dest) : null);
         if(path && path.length >= 1 && hex_distance(path[path.length-1], dest) == 0) {
             return path; // good path
         }
@@ -26377,7 +26377,7 @@ player.squad_find_path_adjacent_to = function(squad_id, dest) {
     for(var i = 0; i < neighbors.length; i++) {
         var n = neighbors[i];
         if(!session.region.occupancy.is_blocked(n)) {
-            var path = session.region.hstar_context.search(squad_data['map_loc'], n, path_checker(squad_id, n));
+            var path = session.region.hstar_context.search(squad_data['map_loc'], n, path_checker ? path_checker(squad_id, n) : null);
             // path must lead INTO n
             if(path && path.length >= 1 && hex_distance(path[path.length-1], n) == 0) {
                 // good path
