@@ -13675,6 +13675,10 @@ function invoke_recycle_dialog(obj) {
  * @param {?} continuation - optional callback to call after the purchase
  */
 function invoke_buy_resources_dialog(amounts, continuation) {
+    if(!('BUY_RESOURCES_TOPUP' in gamedata['spells'])) {
+        throw Error('game has no BUY_RESOURCES_TOPUP spell');
+    }
+
     var dialog = new SPUI.Dialog(gamedata['dialogs']['buy_resources_dialog']);
     dialog.user_data['dialog'] = 'buy_resources_dialog';
     dialog.user_data['amounts'] = amounts;
@@ -36086,10 +36090,12 @@ function get_requirements_help(kind, arg, options) {
     if(kind == 'resources') {
         noun = kind;
         var can_topup = true;
+        var need_more = false;
 
         // legacy path: one at a time
         for(var res in arg) {
             if(arg[res] > 0) {
+                need_more = true;
                 if(!gamedata['resources'][res]['allow_topup']) {
                     can_topup = false;
                     verb = res; ui_arg_s = pretty_print_number(arg[res]);
@@ -36097,11 +36103,14 @@ function get_requirements_help(kind, arg, options) {
                 }
             }
         }
-        if(can_topup) {
+        if(need_more && can_topup) {
             // optional continuation callback
             var continuation = options.continuation || null;
             return (function (_arg, _continuation) { return function() { invoke_buy_resources_dialog(_arg, _continuation); }; })(arg, continuation);
         }
+
+        // otherwise fall through to standard helper
+
     } else if(kind == 'insufficient_resources_to_repair_units' || kind == 'insufficient_resources_to_repair_squad') {
         noun = kind;
         if(!arg) { return null; }
@@ -36121,7 +36130,7 @@ function get_requirements_help(kind, arg, options) {
                 }
             }
         }
-        if(can_topup) {
+        if(goog.object.getCount(missing_res) > 0 && can_topup) {
             // optional continuation callback
             var continuation = options.continuation || null;
             return (function (_missing_res, _continuation) { return function() { invoke_buy_resources_dialog(_missing_res, _continuation); }; })(missing_res, continuation);
