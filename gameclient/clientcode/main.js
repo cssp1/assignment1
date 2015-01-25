@@ -16498,8 +16498,13 @@ function invoke_fancy_victory_dialog(battle_type, battle_base, battle_opponent_u
         dialog.widgets['valentina_says'].data['ui_name'] = template.replace('%d', pretty_print_number(trophies));
     } else {
         var win_type = (gamedata['common_win_condition'] == 'battle_stars' ? battle_type+'_battle_stars' : battle_type);
-        dialog.widgets['valentina_says'].data['ui_name'] = dialog.widgets['valentina_says'].data['ui_name_'+win_type].replace('%LADDER_WIN_DAMAGE',
-                                                                                                                                 (100.0*gamedata['matchmaking']['ladder_win_damage']).toFixed(0)).replace('%TOWNHALL', gamedata['buildings'][gamedata['townhall']]['ui_name']);
+        if(!('ui_name_'+win_type in dialog.widgets['valentina_says'].data)) {
+            throw Error('no ui_name_'+win_type+' in valentina_says');
+        }
+        dialog.widgets['valentina_says'].data['ui_name'] =
+            dialog.widgets['valentina_says'].data['ui_name_'+win_type].replace('%LADDER_WIN_DAMAGE',
+                                                                               (100.0*gamedata['matchmaking']['ladder_win_damage']).toFixed(0)).replace('%TOWNHALL',
+                                                                                                                                                        gamedata['buildings'][gamedata['townhall']]['ui_name']);
     }
 
     if(battle_type == 'home') {
