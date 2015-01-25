@@ -118,6 +118,9 @@ BEGIN
         IF (x LIKE 'viral_%' OR x LIKE 'open_graph_%') THEN
            RETURN 'game_viral';
         END IF;
+        IF (x LIKE '%_bx_%') THEN
+           RETURN 'cross_promo';
+        END IF;
         IF (x LIKE '%/') THEN
            SET x = SUBSTRING(x, 1, CHAR_LENGTH(x)-1);
         END IF;
@@ -144,7 +147,7 @@ BEGIN
            -- if camp maps to facebook_free or game_viral, return those
            -- if camp maps to MISSING, then ignore (!) this user (this is what ANALYTICS2 does - maybe we should report it as 'FB MISSING' instead?)
            -- otherwise, map to 'paid'
-           RETURN (CASE (SELECT remap_facebook_campaigns(camp)) WHEN 'facebook_free' THEN 'FB Free (Facebook)' WHEN 'game_viral' THEN 'FB Free (Game Viral)' WHEN 'MISSING' THEN NULL ELSE 'FB Paid' END);
+           RETURN (CASE (SELECT remap_facebook_campaigns(camp)) WHEN 'facebook_free' THEN 'FB Free (Facebook)' WHEN 'game_viral' THEN 'FB Free (Game Viral)' WHEN 'cross_promo' THEN 'Cross Promo' WHEN 'MISSING' THEN NULL ELSE 'FB Paid' END);
         ELSE
            RETURN NULL;
         END IF;
