@@ -9,6 +9,7 @@ import sys, time, urllib, urllib2, getopt, traceback, random, re, functools
 import SpinConfig, SpinUserDB, SpinJSON, SpinParallel, SpinLog
 import SpinNoSQL, SpinNoSQLLog, SpinETL
 import SpinFacebook
+import SpinSingletonProcess
 
 # load gamedata
 gamedata = SpinJSON.load(open(SpinConfig.gamedata_filename()))
@@ -449,33 +450,35 @@ if __name__ == '__main__':
         elif key == '--quiet':
             verbose = False
 
-    db_client = connect_to_db()
+    with SpinSingletonProcess.SingletonProcess('retention-newbie-%s' % (SpinConfig.config['game_id'],)):
 
-    id_list = []
-    if test:
-        id_list += [1112, 1114, 1115]
+        db_client = connect_to_db()
 
-    if not test:
-        if verbose: print 'querying player_cache...'
-        id_list += db_client.player_cache_query_tutorial_complete_and_mtime_between_or_ctime_between([[time_now - MAX_MTIME_AGE, time_now - MIN_MTIME_AGE]],
-                                                                                                     [[time_now - r[1], time_now - r[0]] for r in CRITICALS.itervalues()])
+        id_list = []
+        if test:
+            id_list += [1112, 1114, 1115]
 
-    id_list.sort(reverse=True)
-    total_count = len(id_list)
+        if not test:
+            if verbose: print 'querying player_cache...'
+            id_list += db_client.player_cache_query_tutorial_complete_and_mtime_between_or_ctime_between([[time_now - MAX_MTIME_AGE, time_now - MIN_MTIME_AGE]],
+                                                                                                         [[time_now - r[1], time_now - r[0]] for r in CRITICALS.itervalues()])
 
-    batches = [id_list[i:i+BATCH_SIZE] for i in xrange(0, len(id_list), BATCH_SIZE)]
+        id_list.sort(reverse=True)
+        total_count = len(id_list)
 
-    if verbose: print 'player_cache_query returned %d users -> %d batches' % (total_count, len(batches))
+        batches = [id_list[i:i+BATCH_SIZE] for i in xrange(0, len(id_list), BATCH_SIZE)]
 
-    if parallel <= 1:
-        for batch_num in xrange(len(batches)):
-            run_batch(batch_num, batches[batch_num], total_count, limit, dry_run, verbose)
-    else:
-        SpinParallel.go([{'batch_num':batch_num,
-                          'batch':batches[batch_num],
-                          'total_count':total_count,
-                          'limit':limit, 'verbose':verbose,
-                          'dry_run':dry_run} for batch_num in xrange(len(batches))],
-                        [sys.argv[0], '--slave'],
-                        on_error = 'break', nprocs=parallel, verbose = False)
+        if verbose: print 'player_cache_query returned %d users -> %d batches' % (total_count, len(batches))
+
+        if parallel <= 1:
+            for batch_num in xrange(len(batches)):
+                run_batch(batch_num, batches[batch_num], total_count, limit, dry_run, verbose)
+        else:
+            SpinParallel.go([{'batch_num':batch_num,
+                              'batch':batches[batch_num],
+                              'total_count':total_count,
+                              'limit':limit, 'verbose':verbose,
+                              'dry_run':dry_run} for batch_num in xrange(len(batches))],
+                            [sys.argv[0], '--slave'],
+                            on_error = 'break', nprocs=parallel, verbose = False)
 

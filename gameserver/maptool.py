@@ -12,6 +12,7 @@ import SpinUserDB
 import SpinConfig
 import SpinJSON
 import SpinNoSQLId
+import SpinSingletonProcess
 from Region import Region
 import Sobol
 import sys, getopt, time, random, copy
@@ -1410,39 +1411,40 @@ if __name__ == '__main__':
 
         elif action == 'maint':
             # MASTER PER-REGION MAINTENANCE JOB
-            assert base_type == 'ALL'
-            print "====== %s ======" % region_id
+            with SpinSingletonProcess.SingletonProcess('maptool-region-maint-%s-%s' % (game_id, region_id)):
+                assert base_type == 'ALL'
+                print "====== %s ======" % region_id
 
-            # 1. run low-level database maintenance (bust stale locks)
-            print "%s: busting stale map feature locks..." % region_id
-            nosql_client.do_region_maint(region_id)
+                # 1. run low-level database maintenance (bust stale locks)
+                print "%s: busting stale map feature locks..." % region_id
+                nosql_client.do_region_maint(region_id)
 
-            # 2. weed expired bases
-            print "%s: weeding expired hives/quarries..." % region_id
-            weed_expired_bases(db, lock_manager, region_id, ['hive','quarry'], dry_run=dry_run)
+                # 2. weed expired bases
+                print "%s: weeding expired hives/quarries..." % region_id
+                weed_expired_bases(db, lock_manager, region_id, ['hive','quarry'], dry_run=dry_run)
 
-            # 3. weed churned players
-            print "%s: weeding players churned for more than %d days..." % (region_id, threshold_days)
-            weed_churned_players(db, lock_manager, region_id, threshold_days, skip_quarry_owners = skip_quarry_owners, dry_run=dry_run)
+                # 3. weed churned players
+                print "%s: weeding players churned for more than %d days..." % (region_id, threshold_days)
+                weed_churned_players(db, lock_manager, region_id, threshold_days, skip_quarry_owners = skip_quarry_owners, dry_run=dry_run)
 
-            # 4. weed orphaned squads
-            print "%s: weeding orphan squads..." % region_id
-            weed_orphan_squads(db, lock_manager, region_id, dry_run=dry_run)
+                # 4. weed orphaned squads
+                print "%s: weeding orphan squads..." % region_id
+                weed_orphan_squads(db, lock_manager, region_id, dry_run=dry_run)
 
-            # 5. weed orphaned units
-            print "%s: weeding orphan objects..." % region_id
-            weed_orphan_objects(db, lock_manager, region_id, dry_run=dry_run)
+                # 5. weed orphaned units
+                print "%s: weeding orphan objects..." % region_id
+                weed_orphan_objects(db, lock_manager, region_id, dry_run=dry_run)
 
-            # 6. update turf war
-            if 'alliance_turf' in gamedata['quarries_client'] and gamedata['regions'][region_id].get('enable_turf_control',False):
-                print "%s: turf update..." % region_id
-                update_turf(db, lock_manager, region_id, dry_run=dry_run)
+                # 6. update turf war
+                if 'alliance_turf' in gamedata['quarries_client'] and gamedata['regions'][region_id].get('enable_turf_control',False):
+                    print "%s: turf update..." % region_id
+                    update_turf(db, lock_manager, region_id, dry_run=dry_run)
 
-            # 7. respawn hives/quarries
-            print "%s: spawning hives..." % region_id
-            spawn_all_hives(db, lock_manager, region_id, force_rotation=force_rotation, dry_run=dry_run)
-            print "%s: spawning quarries..." % region_id
-            spawn_all_quarries(db, lock_manager, region_id, force_rotation=force_rotation, dry_run=dry_run)
+                # 7. respawn hives/quarries
+                print "%s: spawning hives..." % region_id
+                spawn_all_hives(db, lock_manager, region_id, force_rotation=force_rotation, dry_run=dry_run)
+                print "%s: spawning quarries..." % region_id
+                spawn_all_quarries(db, lock_manager, region_id, force_rotation=force_rotation, dry_run=dry_run)
 
         elif action == 'prune-stale-locks':
             nosql_client.do_region_maint(region_id)

@@ -2270,6 +2270,7 @@ class NoSQLClient (object):
 if __name__ == '__main__':
     import getopt
     import codecs
+    import SpinSingletonProcess
 
     sys.stdout = codecs.getwriter('utf8')(sys.stdout)
 
@@ -2352,9 +2353,11 @@ if __name__ == '__main__':
         cur_week = SpinConfig.get_pvp_week(gamedata['matchmaking']['week_origin'], time_now)
 
     if mode == 'region-maint':
-        client.do_region_maint(maint_region)
+        with SpinSingletonProcess.SingletonProcess('SpinNoSQL-region-maint-%s-%s' % (game_id, maint_region)):
+            client.do_region_maint(maint_region)
     elif mode == 'maint':
-        client.do_maint(time_now, cur_season, cur_week)
+        with SpinSingletonProcess.SingletonProcess('SpinNoSQL-global-maint-%s' % (game_id)):
+            client.do_maint(time_now, cur_season, cur_week)
 
     elif mode == 'clear-locks':
         ID_LIST = [1112,1113,1114,1115]
