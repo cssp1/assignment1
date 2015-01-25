@@ -37379,13 +37379,26 @@ function update_upgrade_dialog(dialog) {
                     break;
                 }
             }
+
+            var button_is_normal = false;
+
             if(!help_func && !resources_ok) {
                 // try a resource basket
                 // special case that leads to the "buy resources" dialog
                 help_func = get_requirements_help('resources', resources_needed, {continuation:upgrade_func});
+
+                // don't gray out the button if all resources can be topped-up
+                var can_topup = true;
+                for(var res in resources_needed) {
+                    if(!gamedata['resources'][res]['allow_topup']) {
+                        can_topup = false; break;
+                    }
+                }
+                if(can_topup) { button_is_normal = true; }
             }
+
             if(help_func) {
-                dialog.widgets['use_resources_button'].state = 'disabled_clickable';
+                dialog.widgets['use_resources_button'].state = (button_is_normal ? 'normal' : 'disabled_clickable');
                 dialog.widgets['use_resources_button'].onclick = help_func;
             }
         }
@@ -37401,6 +37414,8 @@ function update_upgrade_dialog(dialog) {
         if(dialog.widgets['use_resources_button'].state == 'normal') {
             // make use_resources_button yellow and default
             dialog.widgets['use_resources_button'].state = 'active';
+        } else if(dialog.widgets['use_resources_button'].state == 'disabled_clickable') {
+            // dialog.widgets['use_resources_button'].state = 'normal'; ?
         }
     } else {
         dialog.default_button = dialog.widgets['instant_button'];
