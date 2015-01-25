@@ -4187,7 +4187,8 @@
                                 "ui_name_away": "Congratulations, Commander!\nYou destroyed your opponent's\n%TOWNHALL.",
                                 "ui_name_away_battle_stars": "Congratulations, Commander!\nYou won the battle!",
                                 "ui_name_home": "Congratulations, Commander!\nYou survived your opponent's\nattack.",
-                                "ui_name_ladder": "Congratulations, Commander!\nYou won the battle!", // XXX needs to handle other ladder_win_conditions: "achieved over %LADDER_WIN_DAMAGE%\nBase Damage.",
+                                "ui_name_ladder": "Congratulations, Commander!\nYou won the battle!",
+                                "ui_name_ladder_battle_stars": "Congratulations, Commander!\nYou won the battle!",
                                 "ui_name_trophies": "Congratulations!\nYou won %d Points.",
                                 "ui_name_trophies_pvv": "Congratulations!\nYou won %d Valor."
                               },
