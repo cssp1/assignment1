@@ -5383,6 +5383,8 @@ player.squads_enabled = function() { return read_predicate({'predicate':'LIBRARY
 player.unit_speedups_enabled = function() { return player.is_cheater || !('enable_unit_speedups' in gamedata) || gamedata['enable_unit_speedups']; };
 player.crafting_speedups_enabled = function() { return player.is_cheater || !('enable_crafting_speedups' in gamedata) || gamedata['enable_crafting_speedups']; };
 player.resource_gifts_enabled = function() { return (player.get_any_abtest_value('enable_resource_gifts', gamedata['enable_resource_gifts']) && (spin_frame_platform == 'fb')); };
+player.upgrade_bar_enabled = function() { return player.get_any_abtest_value('enable_upgrade_bar', gamedata['client']['enable_upgrade_bar']) &&
+                                          read_predicate({'predicate':'LIBRARY', 'name': 'extended_tutorial_complete'}).is_satisfied(player,null); };
 
 player.num_mobile_squads = function() { return goog.object.getCount(player.squads)-1; };
 player.num_deployed_squads = function() {
@@ -28109,7 +28111,7 @@ function manufacture_dialog_change_category(dialog, catname) {
         dialog.user_data['units'].push(name);
     }
 
-    if(player.get_any_abtest_value('enable_upgrade_bar', gamedata['client']['enable_upgrade_bar'])) {
+    if(player.upgrade_bar_enabled()) {
         UpgradeBar.invoke(dialog, 'building', (builder ? builder.spec['name'] : null), (builder ? builder.level+1 : -1), (builder ? builder.id : null));
     }
 
@@ -29021,7 +29023,7 @@ function crafting_dialog_change_category(dialog, category, page) {
         throw Error('unhandled category '+category);
     }
 
-    if(player.get_any_abtest_value('enable_upgrade_bar', gamedata['client']['enable_upgrade_bar'])) {
+    if(player.upgrade_bar_enabled()) {
         UpgradeBar.invoke(dialog, 'building', (builder ? builder.spec['name'] : null), (builder ? builder.level+1 : -1), (builder ? builder.id : null));
     }
 
@@ -30664,7 +30666,7 @@ function research_dialog_change_category(dialog, category, num)
         }
     }
 
-    if(player.get_any_abtest_value('enable_upgrade_bar', gamedata['client']['enable_upgrade_bar'])) {
+    if(player.upgrade_bar_enabled()) {
         UpgradeBar.invoke(dialog, 'building', (builder ? builder.spec['name'] : null), (builder ? builder.level+1 : -1), (builder ? builder.id : null));
     }
 
@@ -37538,7 +37540,7 @@ function update_upgrade_dialog(dialog) {
 
     update_upgrade_dialog_equipment(dialog);
 
-    if(player.get_any_abtest_value('enable_upgrade_bar', gamedata['client']['enable_upgrade_bar'])) {
+    if(player.upgrade_bar_enabled()) {
         UpgradeBar.invoke(dialog, (tech ? 'tech' : 'building'),
                           (tech ? techname : (unit ? unit.spec['name'] : null)),
                           new_level, (unit ? unit.id : null));
