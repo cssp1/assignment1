@@ -32,6 +32,7 @@ var spin_token_cookie_name = '$SPIN_TOKEN_COOKIE_NAME$';
 var spin_token_domain = '$SPIN_TOKEN_DOMAIN$';
 var spin_giveable_items = $SPIN_GIVEABLE_ITEMS$;
 var spin_ai_base_ids = $SPIN_AI_BASE_IDS$;
+var spin_region_names = $SPIN_REGION_NAMES$;
 var spin_log_bookmark = $SPIN_LOG_BOOKMARK$;
 var spin_log_bookmark_dirty = true;
 var spin_ssl_available = $SPIN_SSL_AVAILABLE$;
@@ -830,7 +831,9 @@ var refresh_server_status = function() {
                             }
                         } else if(field['type'] == 'active_sessions') {
                             s = val.toFixed(0);
-                            if(('game_http_port' in item) && val >= 100) {
+                            var has_regions = Object.keys(spin_region_names).length > 0;
+                            var warn_if_over = (has_regions ? 100 : 300);
+                            if(('game_http_port' in item) && val >= warn_if_over) {
                                 s = '<font color="#ff0000">'+s+'</font>';
                             }
                         } else if(field['type'] == 'server_name') {
