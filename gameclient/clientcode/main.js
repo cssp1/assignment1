@@ -45413,7 +45413,7 @@ function draw_building_or_inert(obj, powerfac) {
                 if(obj.manuf_queue.length > 1) {
                     s += ' ... ';
                 }
-                status_text.push(s + ': ' + pretty_print_time(obj.manuf_time_left_one()));
+                status_text.push(s + ': ' + pretty_print_time(obj.manuf_time_left()));
             }
         }
 
