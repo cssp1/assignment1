@@ -1,6 +1,7 @@
 goog.provide('AStar');
 
 goog.require('goog.array');
+goog.require('goog.object');
 goog.require('BinaryHeap');
 
 /*
@@ -907,6 +908,10 @@ AStar.CachedAStarContext = function(map, options) {
     goog.base(this, map, options);
     this.cache_generation = -1;
     this.cache = {};
+    this.hits = 0;
+    this.misses = 0;
+    this.size = 0;
+    this.peak_size = 0;
 
     /** @type {AStar.Connectivity|null} */
     this.connectivity = null;
@@ -918,6 +923,7 @@ AStar.CachedAStarContext.prototype.check_dirty = function() {
     if(this.map.generation !== this.cache_generation) {
         this.cache_generation = this.map.generation;
         this.cache = {};
+        this.size = 0;
         if(this.connectivity) { this.connectivity = null; }
     }
 };
@@ -927,11 +933,14 @@ AStar.CachedAStarContext.prototype.ensure_connectivity = function() {
     }
 };
 AStar.CachedAStarContext.prototype.debug_draw = function(ctx) {
-    if(this.connectivity) {
+    if(0 && this.connectivity) {
         this.connectivity.debug_draw();
     } else {
         return goog.base(this, 'debug_draw', ctx);
     }
+};
+AStar.CachedAStarContext.prototype.debug_dump = function() {
+    console.log(this.hits.toString()+' hits '+this.misses.toString()+' misses ('+(100.0*this.hits/this.misses).toFixed(3)+'%) peak size: '+this.peak_size.toString());
 };
 
 /**
@@ -992,8 +1001,14 @@ AStar.CachedAStarContext.prototype.ring_search = function(start_pos, end_pos, ri
 
     var key = this.cache_key(start_pos, end_pos, ring_size);
     if(key in this.cache) {
+        this.hits++;
+
         // must make a copy, because the caller may mutate the path
         return goog.array.clone(this.cache[key]);
+    } else {
+        this.misses++;
+        this.size++;
+        this.peak_size = Math.max(this.peak_size, this.size);
     }
 
     this.ensure_connectivity();
@@ -1037,7 +1052,7 @@ AStar.CachedAStarContext.prototype.ring_search = function(start_pos, end_pos, ri
             });
             for(var i = 0; i < points.length; i++) {
                 var path = this.search(start_pos, points[i]); // note: this uses the cache as well
-                if(path) {
+                if(path.length > 0) {
                     ret = path;
                     break;
                 }
