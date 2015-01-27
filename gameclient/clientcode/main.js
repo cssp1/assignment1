@@ -17718,6 +17718,12 @@ Region.prototype.check_map_integrity = function(where) {
 
     this.for_each_feature((function (_this) { return function(feature) {
         if(feature['base_map_loc']) {
+            if(feature['base_map_path']) {
+                var last_waypoint = feature['base_map_path'][feature['base_map_path'].length-1];
+                if(!vec_equals(last_waypoint['xy'], feature['base_map_loc'])) {
+                    report_err('feature base_map_path endpoint '+last_waypoint['xy'][0].toString()+','+last_waypoint['xy'][1].toString()+' does not match location', null, feature);
+                }
+            }
             var cell = _this.occupancy.cell(feature['base_map_loc']);
             if(cell.block_count < 1) {
                 report_err('feature present but cell.block_count < 1', cell, feature);
@@ -26512,7 +26518,7 @@ player.squad_find_path_adjacent_to = function(squad_id, dest) {
                         var their_arrival_time = last_waypoint['eta'];
                         var fudge_time = gamedata['territory']['pass_moving_squads_fudge_time'] || 0; // give some conservative leeway for network latency, otherwise players could get frustrated
 
-                        if(!vec_equals(last_waypoint['xy'], cell.pos)) { throw Error('last_waypoint does not match cell.pos'); }
+                        if(!vec_equals(last_waypoint['xy'], cell.pos)) { throw Error('last_waypoint '+JSON.stringify(last_waypoint)+' does not match cell.pos '+JSON.stringify(cell.pos)); }
 
                         if(!vec_equals(_dest, cell.pos) && // this exception does not apply to our final destination cell
                            their_arrival_time > server_time + player.squad_travel_time(_squad_id, path) + fudge_time) {
