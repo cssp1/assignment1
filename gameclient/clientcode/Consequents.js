@@ -274,6 +274,13 @@ MessageBoxConsequent.prototype.execute = function(state) {
                 dialog.widgets[name].asset = val;
             } else if(key == 'show') {
                 dialog.widgets[name].show = val;
+            } else if(typeof(val) == 'object') {
+                // sometimes we have to reach into a child dialog
+                for(var k in val) {
+                    if(k == 'asset') {
+                        dialog.widgets[name].widgets[key].asset = val[k];
+                    }
+                }
             }
         }
     }
@@ -525,6 +532,17 @@ EnableCombatResourceBarsConsequent.prototype.execute = function(state) {
 
 /** @constructor
   * @extends Consequent */
+function EnableDialogCompletionConsequent(data) {
+    goog.base(this, data);
+    this.enabled = data['enable'];
+}
+goog.inherits(EnableDialogCompletionConsequent, Consequent);
+EnableDialogCompletionConsequent.prototype.execute = function(state) {
+    session.enable_dialog_completion_buttons = this.enabled;
+};
+
+/** @constructor
+  * @extends Consequent */
 function PreloadArtAssetConsequent(data) {
     goog.base(this, data);
     this.asset = data['asset'] || null;
@@ -662,6 +680,7 @@ function read_consequent(data) {
     else if(kind === 'DAILY_TIP_UNDERSTOOD') { return new DailyTipUnderstoodConsequent(data); }
     else if(kind === 'DISPLAY_DAILY_TIP') { return new DisplayDailyTipConsequent(data); }
     else if(kind === 'ENABLE_COMBAT_RESOURCE_BARS') { return new EnableCombatResourceBarsConsequent(data); }
+    else if(kind === 'ENABLE_DIALOG_COMPLETION') { return new EnableDialogCompletionConsequent(data); }
     else if(kind === 'PRELOAD_ART_ASSET') { return new PreloadArtAssetConsequent(data); }
     else if(kind === 'METRIC_EVENT') { return new MetricEventConsequent(data); }
     else if(kind === 'CLEAR_NOTIFICATIONS') { return new ClearNotificationsConsequent(data); }

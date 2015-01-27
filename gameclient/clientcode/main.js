@@ -4534,6 +4534,7 @@ session.has_attacked = false; // true if there has been an attack in the current
 session.has_deployed = false; // true if there has been an attack AND player has deployed at least one unit
 session.deploy_time = -1; // server_time at which has_deployed became 1
 session.enable_combat_resource_bars = true; // used by the tutorial to hide combat resource bars (via ENABLE_COMBAT_RESOURCE_BARS consequent)
+session.enable_dialog_completion_buttons = true; // used by the tutorial to disable completions button when player shouldn't press them (via ENABLE_DIALOG_COMPLETION consequent)
 session.surrender_pending = false; // true if player has pressed Surrender and we are waiting for the session change
 session.retreat_pending = -1; // client_time at which retreat will happen (between clicking "End Attack" and session change request)
 session.no_more_units = false; // true if all of the player's units have been destroyed and we need to check the battle outcome next time the damage effect queue empties
@@ -28590,7 +28591,7 @@ function update_manufacture_dialog(dialog) {
         dialog.widgets['finish_button'].state = 'disabled';
         dialog.widgets['finish_button'].str = dialog.data['widgets']['finish_button']['ui_name_pending'];
         dialog.widgets['price_display'].tooltip.str = dialog.widgets['finish_button'].tooltip.str = '';
-    } else if(!builder || manuf_queue.length < 1) {
+    } else if(!builder || manuf_queue.length < 1 || !session.enable_dialog_completion_buttons) {
         dialog.widgets['price_display'].str = '';
         closure = null;
         dialog.widgets['price_display'].onclick = null;
@@ -40069,6 +40070,7 @@ function handle_server_message(data) {
         session.has_deployed = false;
         session.deploy_time = -1;
         session.enable_combat_resource_bars = true;
+        session.enable_dialog_completion_buttons = true;
         session.surrender_pending = false;
         session.retreat_pending = -1;
         session.no_more_units = false;
