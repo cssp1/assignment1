@@ -12558,10 +12558,32 @@ DeployUICursor.prototype.draw = function(offset) {
 
         SPUI.ctx.stroke();
 
+        var text_pos = [mouse_state.last_x+10, mouse_state.last_y+25];
         if(player.is_cheater) {
-            var text_pos = [mouse_state.last_x+10, mouse_state.last_y+25];
             SPUI.ctx.fillStyle = 'rgba(255,255,255,1)';
             SPUI.ctx.fillText(ji[0].toString()+','+ji[1].toString(), text_pos[0], text_pos[1]);
+            text_pos[1] += 20;
+        }
+
+        var text = null;
+        if(location_valid && 'click_to_deploy' in gamedata['strings']['cursors']) {
+            // grab a unit spec
+            var spec = null;
+            for(var army_id in session.pre_deploy_units) {
+                spec = gamedata['units'][session.pre_deploy_units[army_id]['spec']];
+                if(spec) {
+                    text = gamedata['strings']['cursors']['click_to_deploy'].replace('%s', spec['ui_name_plural'] || spec['ui_name']);
+                }
+            }
+        } else if(!location_valid && 'location_blocked' in gamedata['strings']['cursors']) {
+            text = gamedata['strings']['cursors']['location_blocked'];
+        }
+
+        if(text) {
+            SPUI.ctx.fillStyle = 'rgba(0,0,0,1)';
+            SPUI.ctx.fillText(text, text_pos[0]+1, text_pos[1]+1);
+            SPUI.ctx.fillStyle = text_style = (location_valid ? SPUI.default_text_color : SPUI.error_text_color).str();
+            SPUI.ctx.fillText(text, text_pos[0], text_pos[1]);
         }
     }
 
