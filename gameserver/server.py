@@ -15046,7 +15046,6 @@ class GAMEAPI(resource.Resource):
         base_damage, base_repair_time = session.viewing_base.calc_base_damage_and_repair_time()
 
         session.starting_base_damage = base_damage
-        session.res_looter = ResLoot.ResLoot(gamedata, session, session.viewing_player, session.viewing_base)
 
         if session.viewing_player is not session.player and session.viewing_player.is_human():
             session.viewing_player.ladder_point_decay_check(session, None, base_damage = base_damage, base_repair_time = base_repair_time) # session change - viewing_player
@@ -15462,6 +15461,8 @@ class GAMEAPI(resource.Resource):
 
         retmsg.append(["LOOT_BUFFER_UPDATE", session.player.loot_buffer, False])
         retmsg.append(["DONATED_UNITS_UPDATE", session.player.donated_units])
+
+        session.res_looter = ResLoot.ResLoot(gamedata, session, session.viewing_player, session.viewing_base)
 
         # tell client about res looter state
         session.res_looter.send_update(retmsg)
