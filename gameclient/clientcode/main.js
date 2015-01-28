@@ -17600,6 +17600,9 @@ Region.prototype.feature_shown = function(feature) {
     return true;
 };
 
+// note: just checking for presence of base_map_path is not correct, because sometimes squads
+// get to where they're going, and the base_map_path on the server side disappears, but that
+// deletion does not make it out to the client, so we may see a stale value.
 Region.prototype.feature_is_moving = function(feature) {
     return (('base_map_path' in feature) && feature['base_map_path'] && (feature['base_map_path'][feature['base_map_path'].length-1]['eta'] > server_time));
 };
@@ -17741,7 +17744,7 @@ Region.prototype.check_map_integrity = function(where) {
 
     this.for_each_feature((function (_this) { return function(feature) {
         if(feature['base_map_loc']) {
-            if(feature['base_map_path']) {
+            if(_this.feature_is_moving(feature)) {
                 var last_waypoint = feature['base_map_path'][feature['base_map_path'].length-1];
                 if(!vec_equals(last_waypoint['xy'], feature['base_map_loc'])) {
                     report_err('feature base_map_path endpoint '+last_waypoint['xy'][0].toString()+','+last_waypoint['xy'][1].toString()+' does not match location', null, feature);
@@ -26536,7 +26539,7 @@ player.squad_find_path_adjacent_to = function(squad_id, dest) {
             if(cell.block_count > 0) {
                 for(var i = 0; i < cell.blockers.length; i++) {
                     var feature = cell.blockers[i];
-                    if(feature['base_map_path']) {
+                    if(session.region.feature_is_moving(feature)) {
                         var last_waypoint = feature['base_map_path'][feature['base_map_path'].length-1];
                         var their_arrival_time = last_waypoint['eta'];
                         var fudge_time = gamedata['territory']['pass_moving_squads_fudge_time'] || 0; // give some conservative leeway for network latency, otherwise players could get frustrated
