@@ -12520,6 +12520,7 @@ DeployUICursor.prototype.destroy = function() {
 };
 
 DeployUICursor.prototype.draw = function(offset) {
+    var has_state = true;
     SPUI.ctx.save();
     set_playfield_draw_transform(SPUI.ctx);
 
@@ -12558,6 +12559,10 @@ DeployUICursor.prototype.draw = function(offset) {
 
         SPUI.ctx.stroke();
 
+        // pop playfield transform
+        has_state = false;
+        SPUI.ctx.restore();
+
         var text_pos = [mouse_state.last_x+10, mouse_state.last_y+25];
         if(player.is_cheater) {
             SPUI.ctx.fillStyle = 'rgba(255,255,255,1)';
@@ -12586,8 +12591,9 @@ DeployUICursor.prototype.draw = function(offset) {
             SPUI.ctx.fillText(text, text_pos[0], text_pos[1]);
         }
     }
-
-    SPUI.ctx.restore();
+    if(has_state) {
+        SPUI.ctx.restore();
+    }
 };
 
 function add_unit_deployment_vfx(kind, ji, spec, level) {
