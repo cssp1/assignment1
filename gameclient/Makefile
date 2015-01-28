@@ -40,9 +40,10 @@ ifneq (${OPTIMIZE},)
     OPT_FLAGS += --compiler_flags=--use_types_for_optimization
 endif
 
-.PHONY: clean dep
+.PHONY: clean dep all
 
 all: dep compiled-client.js
+	@true
 
 clean:
 	rm -f compiled-client* *.out generated-deps.js
