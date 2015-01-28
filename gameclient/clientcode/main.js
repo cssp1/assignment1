@@ -12582,7 +12582,7 @@ DeployUICursor.prototype.draw = function(offset) {
         if(text) {
             SPUI.ctx.fillStyle = 'rgba(0,0,0,1)';
             SPUI.ctx.fillText(text, text_pos[0]+1, text_pos[1]+1);
-            SPUI.ctx.fillStyle = text_style = (location_valid ? SPUI.default_text_color : SPUI.error_text_color).str();
+            SPUI.ctx.fillStyle = (location_valid ? SPUI.default_text_color : SPUI.error_text_color).str();
             SPUI.ctx.fillText(text, text_pos[0], text_pos[1]);
         }
     }
