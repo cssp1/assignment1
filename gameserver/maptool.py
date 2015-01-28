@@ -1368,7 +1368,9 @@ if __name__ == '__main__':
         elif key == '-q' or key == '--quiet':
             verbose = False
 
-    assert region_id in gamedata['regions']
+    if region_id not in gamedata['regions']:
+        sys.stderr.write('region not found: %s\n' % region_id)
+        sys.exit(1)
 
     if gamedata['regions'][region_id].get('storage','basedb') != 'nosql':
         print "%s: basedb (non nosql) regions are not supported anymore" % region_id
