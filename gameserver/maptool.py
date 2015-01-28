@@ -1411,7 +1411,7 @@ if __name__ == '__main__':
 
         elif action == 'maint':
             # MASTER PER-REGION MAINTENANCE JOB
-            with SpinSingletonProcess.SingletonProcess('maptool-region-maint-%s-%s' % (game_id, region_id)):
+            with SpinSingletonProcess.SingletonProcess('maptool-region-maint-%s-%s' % (SpinConfig.config['game_id'], region_id)):
                 assert base_type == 'ALL'
                 print "====== %s ======" % region_id
 
