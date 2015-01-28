@@ -1,0 +1,13 @@
+diff --git a/gameclient/google/closure/bin/build/closurebuilder.py b/gameclient/google/closure/bin/build/closurebuilder.py
+index b66a3e3..4201b55 100755
+--- a/gameclient/google/closure/bin/build/closurebuilder.py
++++ b/gameclient/google/closure/bin/build/closurebuilder.py
+@@ -183,7 +183,7 @@ class _PathSource(source.Source):
+ 
+ def main():
+   logging.basicConfig(format=(sys.argv[0] + ': %(message)s'),
+-                      level=logging.INFO)
++                      level=logging.WARNING)
+   options, args = _GetOptionsParser().parse_args()
+ 
+   # Make our output pipe.
