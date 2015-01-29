@@ -9,6 +9,8 @@
 
 # This is meant to be run from the top-level "game" directory.
 
+set -e
+
 function usage {
     echo "Usage: $0 <command>"
     echo "Commands include:"
@@ -72,7 +74,7 @@ function do_commit_svn {
 }
 
 # synchronize SVN repository with Git repository by pulling in deltas since last sync
-# current sync status is recorded by saving the current Git commit checksum for each sub-repo in git-sync.txt
+# current sync status is recorded by saving the current Git commit checksum for each sub-repo in a file called "git-sync.txt"
 function do_git_sync_svn {
     GITREPO="$2" # path to the root of the git repository we are syncing to
     COMMITMSG=""
@@ -80,26 +82,29 @@ function do_git_sync_svn {
         SUBPATH=`dirname $SYNCFILE`
         OLDREV=`cat $SYNCFILE`
         NEWREV=`(cd "$GITREPO/$SUBPATH" && git rev-parse master)`
-        echo -n "Old $OLDREV latest $NEWREV $SUBPATH ..."
+
         if [ "$NEWREV" != "$OLDREV" ]; then
+            echo -n "Old $OLDREV latest $NEWREV $SUBPATH ..."
             ((cd "$GITREPO/$SUBPATH" && git diff "$OLDREV..$NEWREV") | (cd "$ROOT/$SUBPATH" && patch -p1)) && \
                 echo $NEWREV > "$SYNCFILE" && \
                 echo " patched!"
-
-        else
-            echo " no changes."
-        fi
-            COMMITMSG+="$SUBPATH: "
+            COMMITMSG+=`basename $SUBPATH`
+            COMMITMSG+=" "
             COMMITMSG+=`(cd "$GITREPO/$SUBPATH" && git log master -n 1 --oneline)` # --no-abbrev-commit
-            COMMITMSG+=$'\n'
+            #COMMITMSG+=$'\n'
+#        else
+#            echo " no changes."
+        fi
     done
     if [ "$COMMITMSG" != "" ]; then
         echo "Commits:"
         echo "$COMMITMSG"
     fi
-#    if [[ -n `(cd "$ROOT" && svn stat gameclient/clientcode)` ]]; then
-#        echo "Client code changed, recompile client!"
-#    fi
+    if [[ -n `(cd "$ROOT" && svn stat | egrep '^\?' )` ]]; then
+        echo "New files added, manual intervention required!"
+    else
+        svn ci -m "$COMMITMSG"
+    fi
 }
 
 function do_up_git {
