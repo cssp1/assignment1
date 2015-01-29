@@ -6,7 +6,7 @@
 
 # dump "log_credits" table from MongoDB to a MySQL database for analytics
 
-import sys, time, getopt, re
+import sys, time, getopt, re, functools
 import SpinConfig
 import SpinETL
 import SpinSQLUtil
@@ -103,12 +103,14 @@ if __name__ == '__main__':
     credits_hourly_summary_table = cfg['table_prefix']+game_id+'_credits_hourly_summary'
     credits_daily_summary_table = cfg['table_prefix']+game_id+'_credits_daily_summary'
     credits_top_spenders_28d_table = cfg['table_prefix']+game_id+'_credits_top_spenders_28d'
+    credits_top_spenders_alltime_table = cfg['table_prefix']+game_id+'_credits_top_spenders_alltime'
 
     cur = con.cursor(MySQLdb.cursors.DictCursor)
     for table, schema in ((credits_table, credits_schema(sql_util)),
                           (credits_hourly_summary_table, credits_summary_schema(sql_util,'hour')),
                           (credits_daily_summary_table, credits_summary_schema(sql_util,'day')),
                           (credits_top_spenders_28d_table, credits_top_spenders_schema(sql_util,'day')),
+                          (credits_top_spenders_alltime_table, credits_top_spenders_schema(sql_util,'day')),
                           ):
         sql_util.ensure_table(cur, table, schema)
     con.commit()
@@ -238,7 +240,7 @@ if __name__ == '__main__':
                        )
 
     # update the "top spenders within trailing 28 days" summary table
-    def update_top_spenders(cur, table, interval, day_start, dt):
+    def update_top_spenders(day_window, cur, table, interval, day_start, dt):
         temp_table = cfg['table_prefix']+game_id+'_credits_by_user_temp'
         cur.execute("DROP TABLE IF EXISTS "+sql_util.sym(temp_table))
         try:
@@ -257,7 +259,7 @@ if __name__ == '__main__':
                         "FROM " + sql_util.sym(credits_table) + " credits " + \
                         "WHERE credits.time >= %s AND credits.time < %s " + \
                         "GROUP BY credits.user_id",
-                        [day_start - 28*86400, day_start])
+                        [(day_start - day_window*86400) if day_window > 0 else 0, day_start])
 
             # only insert the max spender for each permutation of the summary dimensions
             cur.execute("INSERT INTO "+sql_util.sym(table) + \
@@ -275,10 +277,20 @@ if __name__ == '__main__':
         finally:
             cur.execute("DROP TABLE IF EXISTS "+sql_util.sym(temp_table))
 
-    SpinETL.update_summary(sql_util, con, cur, credits_top_spenders_28d_table,
-                           # every change to the credits table affects top_spenders_28d up to 28 days in the future
-                           set(sum([range(x, min(x+(28+1)*86400, 86400*(end_time//86400 + 1)), 86400) for x in affected_days],[])),
-                           # input data only starts mattering 28 days after the event
-                           [min(credits_range[0]+28*86400,end_time), min(credits_range[1]+28*86400,end_time)] if credits_range else None,
-                           'day', 86400, verbose=verbose, dry_run=dry_run, execute_func = update_top_spenders, resummarize_tail = 86400)
+    for table, day_window in ((credits_top_spenders_28d_table, 28),
+                              (credits_top_spenders_alltime_table, -1),):
+        if day_window > 0:
+            # every change to the credits table affects top_spenders_28d up to 28 days in the future
+            affect_set = set(sum([range(x, min(x+(day_window+1)*86400, 86400*(end_time//86400 + 1)), 86400) for x in affected_days],[]))
+            # input data only starts mattering 28 days after the event
+            input_set = [min(credits_range[0]+28*86400,end_time), min(credits_range[1]+28*86400,end_time)] if credits_range else None
+        else:
+            # every change to the credits table affects ALL following days
+            affect_set = set(sum([range(x, 86400*(end_time//86400 + 1), 86400) for x in affected_days],[]))
+            input_set = credits_range
+
+        SpinETL.update_summary(sql_util, con, cur, table, affect_set, input_set,
+                               'day', 86400, verbose=verbose, dry_run=dry_run,
+                               execute_func = functools.partial(update_top_spenders, day_window),
+                               resummarize_tail = 86400)
 
