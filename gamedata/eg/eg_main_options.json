@@ -143,4 +143,39 @@
 "loot_defender_loses": 0.60,
 
 // [min,max] number of seconds to store damage to AI bases before they reset to original state (currently 12-14 days)
-"ai_base_persistence_time": [1036800,1209600]
+"ai_base_persistence_time": [1036800,1209600],
+
+// global chat channel assignment
+"global_chat_channel_assignment": [
+    // Kongregate
+    [{"predicate": "FRAME_PLATFORM", "platform":"kg"}, "global_kong"],
+
+    // random Tier 4
+    [{"predicate": "COUNTRY", "countries": ["ph"]}, "global_ph"],
+    [{"predicate": "COUNTRY", "countries": ["id"]}, "global_id"],
+    [{"predicate": "COUNTRY", "countries": ["my"]}, "global_my"],
+    [{"predicate": "COUNTRY", "countries": ["eg"]}, "global_eg"],
+    [{"predicate": "COUNTRY", "countries": ["iq"]}, "global_iq"],
+    [{"predicate": "COUNTRY", "countries": ["tr"]}, "global_tr"],
+    [{"predicate": "COUNTRY", "countries": ["br"]}, "global_br"],
+    [{"predicate": "COUNTRY", "countries": ["th"]}, "global_th"],
+    [{"predicate": "COUNTRY", "countries": ["in"]}, "global_in"],
+    [{"predicate": "COUNTRY", "countries": ["ba"]}, "global_ba"],
+    [{"predicate": "COUNTRY", "countries": ["pe"]}, "global_pe"],
+    [{"predicate": "COUNTRY", "countries": ["ae"]}, "global_ae"],
+    [{"predicate": "COUNTRY", "countries": ["mx","es"]}, "global_spanish"],
+
+    // non-English continental Europe
+    [{"predicate": "COUNTRY", "countries": ["de","at","ch"]}, "global_de"],
+    [{"predicate": "COUNTRY", "countries": ["be"]}, "global_be"],
+    [{"predicate": "COUNTRY", "countries": ["fr"]}, "global_fr"],
+    [{"predicate": "COUNTRY", "countries": ["it"]}, "global_it"],
+    [{"predicate": "COUNTRY", "countries": ["ro"]}, "global_ro"],
+    [{"predicate": "COUNTRY", "countries": ["hu"]}, "global_hu"],
+
+    // English-speaking countries and Tier 1 countries with generally good English
+    [{"predicate": "COUNTRY", "countries": ["us","ca","gb","au","nz","za","ie","dk","fi","nl","no","se","is"]}, "global_english"],
+
+    [{"predicate": "COUNTRY", "countries": ["tw","cn"]}, "global_zh"],
+    [{"predicate": "ALWAYS_TRUE"}, "global_default"]
+]
