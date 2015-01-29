@@ -10,6 +10,7 @@ import sys, time, getopt, re, functools
 import SpinConfig
 import SpinETL
 import SpinSQLUtil
+import SpinSingletonProcess
 import MySQLdb
 
 time_now = int(time.time())
@@ -98,199 +99,201 @@ if __name__ == '__main__':
     if not verbose: sql_util.disable_warnings()
 
     cfg = SpinConfig.get_mysql_config(game_id+'_upcache')
-    con = MySQLdb.connect(*cfg['connect_args'], **cfg['connect_kwargs'])
     credits_table = cfg['table_prefix']+game_id+'_credits'
     credits_hourly_summary_table = cfg['table_prefix']+game_id+'_credits_hourly_summary'
     credits_daily_summary_table = cfg['table_prefix']+game_id+'_credits_daily_summary'
     credits_top_spenders_28d_table = cfg['table_prefix']+game_id+'_credits_top_spenders_28d'
     credits_top_spenders_alltime_table = cfg['table_prefix']+game_id+'_credits_top_spenders_alltime'
 
-    cur = con.cursor(MySQLdb.cursors.DictCursor)
-    for table, schema in ((credits_table, credits_schema(sql_util)),
-                          (credits_hourly_summary_table, credits_summary_schema(sql_util,'hour')),
-                          (credits_daily_summary_table, credits_summary_schema(sql_util,'day')),
-                          (credits_top_spenders_28d_table, credits_top_spenders_schema(sql_util,'day')),
-                          (credits_top_spenders_alltime_table, credits_top_spenders_schema(sql_util,'day')),
-                          ):
-        sql_util.ensure_table(cur, table, schema)
-    con.commit()
+    with SpinSingletonProcess.SingletonProcess('credits_to_mysql-%s' % game_id):
 
-    # find most recent already-converted action
-    start_time = -1
-    refund_start_time = -1
-    end_time = time_now - 60  # skip entries too close to "now" to ensure all events for a given second have all arrived
+        con = MySQLdb.connect(*cfg['connect_args'], **cfg['connect_kwargs'])
+        cur = con.cursor(MySQLdb.cursors.DictCursor)
+        for table, schema in ((credits_table, credits_schema(sql_util)),
+                              (credits_hourly_summary_table, credits_summary_schema(sql_util,'hour')),
+                              (credits_daily_summary_table, credits_summary_schema(sql_util,'day')),
+                              (credits_top_spenders_28d_table, credits_top_spenders_schema(sql_util,'day')),
+                              (credits_top_spenders_alltime_table, credits_top_spenders_schema(sql_util,'day')),
+                              ):
+            sql_util.ensure_table(cur, table, schema)
+        con.commit()
 
-    cur.execute("SELECT time FROM "+sql_util.sym(credits_table)+" ORDER BY time DESC LIMIT 1")
-    row = cur.fetchone()
-    if row:
-        start_time = row['time']
-    cur.execute("SELECT time FROM "+sql_util.sym(credits_table)+" WHERE currency_amount < 0 ORDER BY time DESC LIMIT 1")
-    row = cur.fetchone()
-    if row:
-        refund_start_time = row['time']
-    con.commit()
+        # find most recent already-converted action
+        start_time = -1
+        refund_start_time = -1
+        end_time = time_now - 60  # skip entries too close to "now" to ensure all events for a given second have all arrived
 
-    if verbose:  print 'start_time', start_time, 'refund_start_time', refund_start_time, 'end_time', end_time
+        cur.execute("SELECT time FROM "+sql_util.sym(credits_table)+" ORDER BY time DESC LIMIT 1")
+        row = cur.fetchone()
+        if row:
+            start_time = row['time']
+        cur.execute("SELECT time FROM "+sql_util.sym(credits_table)+" WHERE currency_amount < 0 ORDER BY time DESC LIMIT 1")
+        row = cur.fetchone()
+        if row:
+            refund_start_time = row['time']
+        con.commit()
 
-    batch = 0
-    total = 0
-    affected_hours = set()
-    affected_days = set()
+        if verbose:  print 'start_time', start_time, 'refund_start_time', refund_start_time, 'end_time', end_time
 
-    qs = {'$or':[{'event_name':'1000_billed',
-                  'time': {'$gt':start_time, '$lt': end_time}},
-                 {'event_name':'1310_order_refunded',
-                  'time': {'$gt':refund_start_time, '$lt': end_time}}]}
+        batch = 0
+        total = 0
+        affected_hours = set()
+        affected_days = set()
 
-#    for row in SpinETL.iterate_from_s3(game_id, 'spinpunch-logs', 'credits', 1388096233, 1389398506, verbose = verbose):
-    for row in SpinETL.iterate_from_mongodb(game_id, 'log_credits', min(start_time, refund_start_time), end_time, query = qs):
-        keyvals = [('_id',row['_id']),
-                   ('time',row['time']),
-                   ('user_id',row['user_id'])]
+        qs = {'$or':[{'event_name':'1000_billed',
+                      'time': {'$gt':start_time, '$lt': end_time}},
+                     {'event_name':'1310_order_refunded',
+                      'time': {'$gt':refund_start_time, '$lt': end_time}}]}
 
-        if 'summary' in row:
-            if row['summary'].get('developer',False): continue # skip events by developers
-            keyvals += sql_util.parse_brief_summary(row['summary'])
+    #    for row in SpinETL.iterate_from_s3(game_id, 'spinpunch-logs', 'credits', 1388096233, 1389398506, verbose = verbose):
+        for row in SpinETL.iterate_from_mongodb(game_id, 'log_credits', min(start_time, refund_start_time), end_time, query = qs):
+            keyvals = [('_id',row['_id']),
+                       ('time',row['time']),
+                       ('user_id',row['user_id'])]
 
-        if row['event_name'] in ('1000_billed', '1310_order_refunded'):
-            sign = -1 if row['event_name'] == '1310_order_refunded' else 1
-            keyvals.append(('is_gift_order', 1 if row.get('gift_order',False) else 0))
-            keyvals.append(('currency',row.get('currency','USD')))
+            if 'summary' in row:
+                if row['summary'].get('developer',False): continue # skip events by developers
+                keyvals += sql_util.parse_brief_summary(row['summary'])
 
-            if 'currency' not in row: # very old FB Payments data
-                row['currency'] = 'USD'
-                row['currency_amount'] = row['Billing Amount']/0.7
+            if row['event_name'] in ('1000_billed', '1310_order_refunded'):
+                sign = -1 if row['event_name'] == '1310_order_refunded' else 1
+                keyvals.append(('is_gift_order', 1 if row.get('gift_order',False) else 0))
+                keyvals.append(('currency',row.get('currency','USD')))
 
-            if ('currency_amount' not in row) and (row['currency'] == 'kgcredits'): # bad legacy data
-                keyvals.append(('currency_amount', sign * int(row['Billing Amount']/0.07 + 0.5)))
-            else:
-                keyvals.append(('currency_amount', sign * row['currency_amount']))
+                if 'currency' not in row: # very old FB Payments data
+                    row['currency'] = 'USD'
+                    row['currency_amount'] = row['Billing Amount']/0.7
 
-            keyvals.append(('usd_receipts_cents',sign * int(100*row['Billing Amount']+0.5)))
-
-            if 'Billing Description' in row:
-                descr = row['Billing Description']
-                keyvals.append(('description',descr))
-
-                if descr.startswith("BUY_GAMEBUCKS_"):
-                    keyvals.append(('gamebucks', sign * int(descr.split('_')[2])))
-                elif descr.startswith("FB_GAMEBUCKS_PAYMENT,"):
-                    keyvals.append(('gamebucks', sign * int(descr.split(',')[1])))
+                if ('currency_amount' not in row) and (row['currency'] == 'kgcredits'): # bad legacy data
+                    keyvals.append(('currency_amount', sign * int(row['Billing Amount']/0.07 + 0.5)))
                 else:
-                    pass # just go by the description for other spells
+                    keyvals.append(('currency_amount', sign * row['currency_amount']))
 
-            elif 'product' in row:
-                found = spellname_re.search(row['product'])
-                if found:
-                    keyvals.append(('description', found.groups()[0]))
-                found = gamebucks_re.search(row['product'])
-                if found:
-                    keyvals.append(('gamebucks', sign * int(found.groups()[0])))
+                keyvals.append(('usd_receipts_cents',sign * int(100*row['Billing Amount']+0.5)))
 
-            for FIELD in ('quantity', 'payout_foreign_exchange_rate', 'tax_amount', 'tax_country'):
-                if FIELD in row:
-                    keyvals.append((FIELD,row[FIELD]))
+                if 'Billing Description' in row:
+                    descr = row['Billing Description']
+                    keyvals.append(('description',descr))
 
+                    if descr.startswith("BUY_GAMEBUCKS_"):
+                        keyvals.append(('gamebucks', sign * int(descr.split('_')[2])))
+                    elif descr.startswith("FB_GAMEBUCKS_PAYMENT,"):
+                        keyvals.append(('gamebucks', sign * int(descr.split(',')[1])))
+                    else:
+                        pass # just go by the description for other spells
+
+                elif 'product' in row:
+                    found = spellname_re.search(row['product'])
+                    if found:
+                        keyvals.append(('description', found.groups()[0]))
+                    found = gamebucks_re.search(row['product'])
+                    if found:
+                        keyvals.append(('gamebucks', sign * int(found.groups()[0])))
+
+                for FIELD in ('quantity', 'payout_foreign_exchange_rate', 'tax_amount', 'tax_country'):
+                    if FIELD in row:
+                        keyvals.append((FIELD,row[FIELD]))
+
+            else:
+                if verbose: print 'unrecognized event', row
+                continue
+
+            sql_util.do_insert(cur, credits_table, keyvals)
+
+            batch += 1
+            total += 1
+            affected_hours.add(3600*(row['time']//3600))
+            affected_days.add(86400*(row['time']//86400))
+
+            if commit_interval > 0 and batch >= commit_interval:
+                batch = 0
+                con.commit()
+                if verbose: print total, 'inserted'
+
+        con.commit()
+        if verbose: print 'total', total, 'inserted', 'affecting', len(affected_hours), 'hour(s)', len(affected_days), 'day(s)'
+
+        # update summary
+
+        cur.execute("SELECT MIN(time) AS min_time, MAX(time) AS max_time FROM "+sql_util.sym(credits_table))
+        rows = cur.fetchall()
+        if rows and rows[0] and rows[0]['min_time'] and rows[0]['max_time']:
+            credits_range = (rows[0]['min_time'], rows[0]['max_time'])
         else:
-            if verbose: print 'unrecognized event', row
-            continue
+            credits_range = None
 
-        sql_util.do_insert(cur, credits_table, keyvals)
+        for table, affected, interval, dt in ((credits_hourly_summary_table, affected_hours, 'hour', 3600),
+                                              (credits_daily_summary_table, affected_days, 'day', 86400)):
+            SpinETL.update_summary(sql_util, con, cur, table, affected, credits_range, interval, dt, verbose=verbose, dry_run=dry_run,
+                                   resummarize_tail = dt,
+                                   execute_func = lambda cur, table, interval, day_start, dt:
+                        cur.execute("INSERT INTO "+sql_util.sym(table) + \
+                                    "SELECT %s*FLOOR(credits.time/%s) AS "+sql_util.sym(interval)+"," + \
+                                    "       credits.frame_platform AS frame_platform," + \
+                                    "       credits.country_tier AS country_tier," + \
+                                    "       credits.townhall_level AS townhall_level," + \
+                                    "       "+sql_util.encode_spend_bracket("credits.prev_receipts")+" AS spend_bracket," + \
+                                    "       credits.currency AS currency," + \
+                                    "       SUM(credits.currency_amount) AS currency_amount," + \
+                                    "       SUM(usd_receipts_cents) AS usd_receipts_cents," + \
+                                    "       SUM(gamebucks) AS gamebucks " + \
+                                    "FROM " + sql_util.sym(credits_table) + " credits " + \
+                                    "WHERE credits.time >= %s AND credits.time < %s+%s " + \
+                                    "GROUP BY "+sql_util.sym(interval)+", credits.frame_platform, credits.country_tier, credits.townhall_level, "+sql_util.encode_spend_bracket("credits.prev_receipts")+", credits.currency ORDER BY NULL", [dt,dt,day_start,day_start,dt])
+                           )
 
-        batch += 1
-        total += 1
-        affected_hours.add(3600*(row['time']//3600))
-        affected_days.add(86400*(row['time']//86400))
-
-        if commit_interval > 0 and batch >= commit_interval:
-            batch = 0
-            con.commit()
-            if verbose: print total, 'inserted'
-
-    con.commit()
-    if verbose: print 'total', total, 'inserted', 'affecting', len(affected_hours), 'hour(s)', len(affected_days), 'day(s)'
-
-    # update summary
-
-    cur.execute("SELECT MIN(time) AS min_time, MAX(time) AS max_time FROM "+sql_util.sym(credits_table))
-    rows = cur.fetchall()
-    if rows and rows[0] and rows[0]['min_time'] and rows[0]['max_time']:
-        credits_range = (rows[0]['min_time'], rows[0]['max_time'])
-    else:
-        credits_range = None
-
-    for table, affected, interval, dt in ((credits_hourly_summary_table, affected_hours, 'hour', 3600),
-                                          (credits_daily_summary_table, affected_days, 'day', 86400)):
-        SpinETL.update_summary(sql_util, con, cur, table, affected, credits_range, interval, dt, verbose=verbose, dry_run=dry_run,
-                               resummarize_tail = dt,
-                               execute_func = lambda cur, table, interval, day_start, dt:
-                    cur.execute("INSERT INTO "+sql_util.sym(table) + \
-                                "SELECT %s*FLOOR(credits.time/%s) AS "+sql_util.sym(interval)+"," + \
-                                "       credits.frame_platform AS frame_platform," + \
-                                "       credits.country_tier AS country_tier," + \
-                                "       credits.townhall_level AS townhall_level," + \
-                                "       "+sql_util.encode_spend_bracket("credits.prev_receipts")+" AS spend_bracket," + \
-                                "       credits.currency AS currency," + \
-                                "       SUM(credits.currency_amount) AS currency_amount," + \
-                                "       SUM(usd_receipts_cents) AS usd_receipts_cents," + \
-                                "       SUM(gamebucks) AS gamebucks " + \
-                                "FROM " + sql_util.sym(credits_table) + " credits " + \
-                                "WHERE credits.time >= %s AND credits.time < %s+%s " + \
-                                "GROUP BY "+sql_util.sym(interval)+", credits.frame_platform, credits.country_tier, credits.townhall_level, "+sql_util.encode_spend_bracket("credits.prev_receipts")+", credits.currency ORDER BY NULL", [dt,dt,day_start,day_start,dt])
-                       )
-
-    # update the "top spenders within trailing 28 days" summary table
-    def update_top_spenders(day_window, cur, table, interval, day_start, dt):
-        temp_table = cfg['table_prefix']+game_id+'_credits_by_user_temp'
-        cur.execute("DROP TABLE IF EXISTS "+sql_util.sym(temp_table))
-        try:
-            # note: this can't actually be a TEMPORARY table because we need to refer to it more than once in the following queries
-            sql_util.ensure_table(cur, temp_table, credits_by_user_temp_schema(sql_util), temporary = False)
-
-            # add up all spend by each user within the trailing time window
-            cur.execute("INSERT INTO "+sql_util.sym(temp_table) + \
-                        "SELECT credits.frame_platform AS frame_platform," + \
-                        "       credits.country_tier AS country_tier," + \
-                        "       MAX(credits.townhall_level) AS townhall_level," + \
-                        "       MAX("+sql_util.encode_spend_bracket("credits.prev_receipts")+") AS spend_bracket," + \
-                        "       credits.user_id AS user_id," + \
-                        "       SUM(IF(credits.usd_receipts_cents>0,1,0)) AS num_purchases," + \
-                        "       SUM(credits.usd_receipts_cents) AS total_usd_receipts_cents " + \
-                        "FROM " + sql_util.sym(credits_table) + " credits " + \
-                        "WHERE credits.time >= %s AND credits.time < %s " + \
-                        "GROUP BY credits.user_id",
-                        [(day_start - day_window*86400) if day_window > 0 else 0, day_start])
-
-            # only insert the max spender for each permutation of the summary dimensions
-            cur.execute("INSERT INTO "+sql_util.sym(table) + \
-                        "SELECT %s AS "+sql_util.sym(interval)+"," + \
-                        "       by_user.frame_platform AS frame_platform," + \
-                        "       by_user.country_tier AS country_tier," + \
-                        "       by_user.townhall_level AS townhall_level," + \
-                        "       by_user.spend_bracket AS spend_bracket," + \
-                        "       by_user.user_id AS user_id," + \
-                        "       by_user.num_purchases AS num_purchases," + \
-                        "       by_user.total_usd_receipts_cents AS total_usd_receipts_cents " + \
-                        "FROM "+sql_util.sym(temp_table)+ " by_user " + \
-                        "WHERE by_user.total_usd_receipts_cents = (SELECT MAX(b2.total_usd_receipts_cents) FROM "+sql_util.sym(temp_table)+" b2 WHERE b2.frame_platform = by_user.frame_platform AND b2.country_tier = by_user.country_tier AND b2.townhall_level = by_user.townhall_level AND b2.spend_bracket = by_user.spend_bracket)",
-                        [day_start,])
-        finally:
+        # update the "top spenders within trailing 28 days" summary table
+        def update_top_spenders(day_window, cur, table, interval, day_start, dt):
+            temp_table = cfg['table_prefix']+game_id+'_credits_by_user_temp'
             cur.execute("DROP TABLE IF EXISTS "+sql_util.sym(temp_table))
+            try:
+                # note: this can't actually be a TEMPORARY table because we need to refer to it more than once in the following queries
+                sql_util.ensure_table(cur, temp_table, credits_by_user_temp_schema(sql_util), temporary = False)
 
-    for table, day_window in ((credits_top_spenders_28d_table, 28),
-                              (credits_top_spenders_alltime_table, -1),):
-        if day_window > 0:
-            # every change to the credits table affects top_spenders_28d up to 28 days in the future
-            affect_set = set(sum([range(x, min(x+(day_window+1)*86400, 86400*(end_time//86400 + 1)), 86400) for x in affected_days],[]))
-            # input data only starts mattering 28 days after the event
-            input_set = [min(credits_range[0]+28*86400,end_time), min(credits_range[1]+28*86400,end_time)] if credits_range else None
-        else:
-            # every change to the credits table affects ALL following days
-            affect_set = set(sum([range(x, 86400*(end_time//86400 + 1), 86400) for x in affected_days],[]))
-            input_set = credits_range
+                # add up all spend by each user within the trailing time window
+                cur.execute("INSERT INTO "+sql_util.sym(temp_table) + \
+                            "SELECT credits.frame_platform AS frame_platform," + \
+                            "       credits.country_tier AS country_tier," + \
+                            "       MAX(credits.townhall_level) AS townhall_level," + \
+                            "       MAX("+sql_util.encode_spend_bracket("credits.prev_receipts")+") AS spend_bracket," + \
+                            "       credits.user_id AS user_id," + \
+                            "       SUM(IF(credits.usd_receipts_cents>0,1,0)) AS num_purchases," + \
+                            "       SUM(credits.usd_receipts_cents) AS total_usd_receipts_cents " + \
+                            "FROM " + sql_util.sym(credits_table) + " credits " + \
+                            "WHERE credits.time >= %s AND credits.time < %s " + \
+                            "GROUP BY credits.user_id",
+                            [(day_start - day_window*86400) if day_window > 0 else 0, day_start])
 
-        SpinETL.update_summary(sql_util, con, cur, table, affect_set, input_set,
-                               'day', 86400, verbose=verbose, dry_run=dry_run,
-                               execute_func = functools.partial(update_top_spenders, day_window),
-                               resummarize_tail = 86400)
+                # only insert the max spender for each permutation of the summary dimensions
+                cur.execute("INSERT INTO "+sql_util.sym(table) + \
+                            "SELECT %s AS "+sql_util.sym(interval)+"," + \
+                            "       by_user.frame_platform AS frame_platform," + \
+                            "       by_user.country_tier AS country_tier," + \
+                            "       by_user.townhall_level AS townhall_level," + \
+                            "       by_user.spend_bracket AS spend_bracket," + \
+                            "       by_user.user_id AS user_id," + \
+                            "       by_user.num_purchases AS num_purchases," + \
+                            "       by_user.total_usd_receipts_cents AS total_usd_receipts_cents " + \
+                            "FROM "+sql_util.sym(temp_table)+ " by_user " + \
+                            "WHERE by_user.total_usd_receipts_cents = (SELECT MAX(b2.total_usd_receipts_cents) FROM "+sql_util.sym(temp_table)+" b2 WHERE b2.frame_platform = by_user.frame_platform AND b2.country_tier = by_user.country_tier AND b2.townhall_level = by_user.townhall_level AND b2.spend_bracket = by_user.spend_bracket)",
+                            [day_start,])
+            finally:
+                cur.execute("DROP TABLE IF EXISTS "+sql_util.sym(temp_table))
+
+        for table, day_window in ((credits_top_spenders_28d_table, 28),
+                                  (credits_top_spenders_alltime_table, -1),):
+            if day_window > 0:
+                # every change to the credits table affects top_spenders_28d up to 28 days in the future
+                affect_set = set(sum([range(x, min(x+(day_window+1)*86400, 86400*(end_time//86400 + 1)), 86400) for x in affected_days],[]))
+                # input data only starts mattering 28 days after the event
+                input_set = [min(credits_range[0]+28*86400,end_time), min(credits_range[1]+28*86400,end_time)] if credits_range else None
+            else:
+                # every change to the credits table affects ALL following days
+                affect_set = set(sum([range(x, 86400*(end_time//86400 + 1), 86400) for x in affected_days],[]))
+                input_set = credits_range
+
+            SpinETL.update_summary(sql_util, con, cur, table, affect_set, input_set,
+                                   'day', 86400, verbose=verbose, dry_run=dry_run,
+                                   execute_func = functools.partial(update_top_spenders, day_window),
+                                   resummarize_tail = 86400)
 
