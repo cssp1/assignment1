@@ -19039,7 +19039,14 @@ class GAMEAPI(resource.Resource):
                             admin_stats.econ_flow_res(session.player, 'loot', 'ai_attack'+flow_suffix, dict((res, -lost[res]) for res in lost))
                         elif (owning_player and owning_player.is_human()) and attacker.is_human():
                             # human attacking human - log the frictional loss only, because the rest is a transfer
-                            admin_stats.econ_flow_res(session.player, 'loot', 'friction'+flow_suffix, dict((res,looted.get(res,0)-lost.get(res,0)) for res in gamedata['resources']))
+                            # EXCEPT for harvesters, which generate from "thin air" because the owner hadn't collected the resources yet
+                            if obj.is_producer():
+                                econ_delta = looted
+                                econ_reason = 'human'+flow_suffix
+                            else:
+                                econ_delta = dict((res,looted.get(res,0)-lost.get(res,0)) for res in gamedata['resources'])
+                                econ_reason = 'friction'+flow_suffix
+                            admin_stats.econ_flow_res(session.player, 'loot', econ_reason, econ_delta)
 
                     # give XP for destroying and looting the building
                     if attacker is session.player:
