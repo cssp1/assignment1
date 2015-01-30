@@ -9746,7 +9746,9 @@ class LivePlayer(Player):
                           type(v) != list and \
                           type(v) != dict and \
                           ((':' not in k) or (k.startswith('feature_used')) or (k.startswith('item')) or \
-                           (k.startswith('unit') and k.endswith('manufactured'))) and \
+                           (k.startswith('unit') and k.endswith('manufactured')) or \
+                           (k.startswith('building') and k.endswith('killed'))
+                           ) and \
                           (not k.startswith('score_')),
                           self.history.iteritems()))
         retmsg.append(["PLAYER_HISTORY_UPDATE", msg])
