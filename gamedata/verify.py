@@ -8,7 +8,7 @@
 
 import SpinJSON
 import GameDataUtil
-import sys, traceback, os, copy, time
+import sys, traceback, os, copy, time, re
 import getopt
 
 time_now = int(time.time())
@@ -929,11 +929,27 @@ def check_item_set(setname, spec):
 
     return error
 
+level_re = re.compile('.+_L([0-9]+)(_SHOOT)?$')
+
 def check_item(itemname, spec):
     error = 0
     if spec['name'] != itemname.split(':')[1]:
         error |= 1
         print '%s:name mismatch' % itemname
+
+    matches = level_re.match(itemname)
+    if matches:
+        level = int(matches.group(1))
+        if 'level' in spec and spec['level'] != level:
+            error |= 1; print '%s: probably a typo: "level" number %d does not match item name suffix "%s"' % (itemname, level, itemname)
+
+        for FIELD in ('ui_name', 'icon',):
+            ui_matches = level_re.match(spec[FIELD])
+            if ui_matches:
+                ui_level = int(ui_matches.group(1))
+                if ui_level != level:
+                    error |= 1; print '%s: probably a typo: "%s" Lxx number suffix does not match item name "%s"' % (itemname, FIELD, itemname)
+
     if 'unit_icon' in spec:
         error |= 1
         print '%s:unit_icon is obsolete, replace with "icon":"inventory_%s"' % (itemname, spec['unit_icon'])
@@ -1045,7 +1061,9 @@ def check_item(itemname, spec):
                     replacement = {'code':'modstat', 'stat':'on_destroy', 'method':'concat', 'strength':[effect['consequent']]}
                 print '%s: obsolete effect code "%s" - replace with: %s' % (itemname,effect['code'], SpinJSON.dumps(replacement))
             if effect['code'] == 'modstat':
-                error |= check_modstat(effect, reason = 'item %s: effects' % itemname, expect_item_sets = set((spec['item_set'],)) if 'item_set' in spec else None)
+                error |= check_modstat(effect, reason = 'item %s: effects' % itemname,
+                                       expect_level = spec.get('level', None),
+                                       expect_item_sets = set((spec['item_set'],)) if 'item_set' in spec else None)
                 if effect['stat'] == 'permanent_auras' and spec['equip']['kind'] != 'building':
                     error |= 1; print '%s: permanent_auras mods are not supported on mobile units (buildings only)' % itemname
             if 'consequent' in effect:
@@ -1103,7 +1121,7 @@ def check_item_name(specname, context):
         error |= 1; print '%s refers to missing item "%s"' % (context, specname)
     return error
 
-def check_modstat(effect, reason, affects = None, expect_item_sets = None):
+def check_modstat(effect, reason, affects = None, expect_level = None, expect_item_sets = None):
     error = 0
     if 'apply_if' in effect:
         error |= check_predicate(effect['apply_if'], reason = '%s:apply_if' % reason, expect_item_sets = expect_item_sets)
@@ -1129,7 +1147,13 @@ def check_modstat(effect, reason, affects = None, expect_item_sets = None):
     if effect['stat'] == 'weapon':
         if effect['strength'] not in gamedata['spells']:
             error |= 1; print '%s: weapon spell "%s" not found' % (reason, effect['strength'])
-
+        # if this is a per-level item, and references a per-level weapon spell, make sure the level numbers match
+        if expect_level is not None:
+            matches = level_re.match(effect['strength'])
+            if matches:
+                level = int(matches.group(1))
+                if level != expect_level:
+                    error |= 1; print '%s: leveled spell %s level number does not match item name' % (reason, effect['strength'])
     return error
 
 def check_loot_table(table, reason = '', expire_time = -1, duration = -1, max_slots = -1, is_toplevel = True):
