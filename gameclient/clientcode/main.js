@@ -37283,8 +37283,8 @@ function update_upgrade_dialog(dialog) {
         init_damage_vs_icons(dialog, gamedata['units'][tech['associated_unit']], get_auto_spell_for_unit(player, gamedata['units'][tech['associated_unit']]));
     } else if(tech['associated_item']) {
         var spell = get_auto_spell_for_item(ItemDisplay.get_inventory_item_spec(get_leveled_quantity(tech['associated_item'],Math.min(new_level, max_level))));
-        init_damage_vs_icons(dialog, {'kind':'building', 'ui_damage_vs':{}}, // fake building spec to fool init_damage_vs_icons()
-                             spell);
+        init_damage_vs_icons(dialog, {'name': tech['name'], 'kind':'building', 'ui_damage_vs':{}}, // fake building spec to fool init_damage_vs_icons()
+                             spell); // spell's ui_damage_vs will take precedence
     } else {
         init_damage_vs_icons(dialog, null, null);
     }
@@ -37739,7 +37739,7 @@ function update_upgrade_dialog_equipment(dialog) {
 }
 
 function init_damage_vs_icons(dialog, spec, weapon_spell) {
-    var show = (weapon_spell && ('ui_damage_vs' in spec));
+    var show = (weapon_spell && (('ui_damage_vs' in weapon_spell) || ('ui_damage_vs' in spec)));
 
     if('damage_vs_label' in dialog.widgets) { dialog.widgets['damage_vs_label'].show = show; }
 
@@ -37757,9 +37757,17 @@ function init_damage_vs_icons(dialog, spec, weapon_spell) {
                 widget.xy[0] = dialog.data['widgets']['damage_vs']['xy'][0] + i*dialog.data['widgets']['damage_vs']['array_offset'][0] + Math.ceil(dialog.data['widgets']['damage_vs']['array_offset'][0]/2);
             }
 
+            if(!(CATS[i][0] in ui_damage_vs)) {
+                throw Error('ui_damage_vs from '+('ui_damage_vs' in weapon_spell ? 'weapon_spell '+weapon_spell['name'] : 'spec '+spec['name'])+' missing entry '+CATS[i][0]);
+            }
+
             var q = ui_damage_vs[CATS[i][0]];
             widget.asset = 'damage_vs_'+CATS[i][0];
-            widget.state = gamedata['strings']['damage_vs_qualities'][q];
+            if(q in gamedata['strings']['damage_vs_qualities']) {
+                widget.state = gamedata['strings']['damage_vs_qualities'][q];
+            } else {
+                throw Error('not found: damage_vs_qualities: '+q);
+            }
             var ui_name;
             if(CATS[i][1] in gamedata['strings']['manufacture_categories']) {
                 ui_name = gamedata['strings']['manufacture_categories'][CATS[i][1]]['plural'];
