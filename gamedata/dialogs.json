@@ -376,7 +376,6 @@
         }
     },
 
-    // building context menu comes in several versions with different numbers of generic buttons
     "building_context_menu": {
         "dimensions": [152,48],
         "clip_children": 1,
@@ -389,7 +388,31 @@
             "title":  { "kind": "TextField", "xy": [0,8], "dimensions": [152, 17], "text_style": "bold", "text_size": 13, "ui_name": "Title" },
             "level":  { "kind": "TextField", "xy": [0,24], "dimensions": [152, 17], "text_style": "normal", "text_size": 13, "ui_name": "Level %d0 of %d1" },
             "button": { "kind": "ActionButton", "xy": [9,47], "dimensions": [134,28], "text_offset": [0,1], "ui_tooltip": "", "tooltip_delay": 0,
-                        "bg_image": "action_button_134px", "text_color": [0,0,0,1], "text_size": 13, "text_style": "bold", "ui_name": "Button 0",
+                        "bg_image": "action_button_134px", "text_color": [0,0,0,1], "text_size": 13, "text_style": "bold",
+                        "array": [1,6], "array_offset": [0,36] }
+        }
+    },
+
+    "emplacement_context_menu": {
+        "dimensions": [172,168],
+        "clip_children": 1,
+        "default_button": "head_button0",
+        "widgets": {
+            // virtual widget that catches clicks outside the area, acts like close button
+            "bg_close_button": { "kind": "ActionButton", "xy": [-1000,-1000], "dimensions": [2000,2000] },
+            "bg": { "kind": "StaticImage", "xy":[0,0], "dimensions":[172,168], "asset": "dialog_resizable", "bg_image_resizable": 1},
+
+            "head_title":  { "kind": "TextField", "xy": [0,8], "dimensions": [172, 17], "text_style": "bold", "text_size": 13, "ui_name_empty": "No Weapon" },
+            "head_level":  { "kind": "TextField", "xy": [0,24], "dimensions": [172, 17], "text_style": "normal", "text_size": 13, "ui_name": "Level %d0 of %d1" },
+            "head_button": { "kind": "ActionButton", "xy": [9,47], "dimensions": [154,28], "text_offset": [0,1], "ui_tooltip": "", "tooltip_delay": 0,
+                             "bg_image": "action_button_resizable", "bg_image_resizable": 1, "text_color": [0,0,0,1], "text_size": 13, "text_style": "bold",
+                             "array": [1,2], "array_offset": [0,36] },
+            "separator": {"kind": "Line", "xy": [29,121], "dimensions": [114,0], "color":  [1,1,1,0.5], "stroke_width": 2 },
+
+            "title":  { "kind": "TextField", "xy": [0,126], "dimensions": [172, 17], "text_style": "bold", "text_size": 13, "ui_name": "Title" },
+            "level":  { "kind": "TextField", "xy": [0,142], "dimensions": [172, 17], "text_style": "normal", "text_size": 13, "ui_name": "Level %d0 of %d1" },
+            "button": { "kind": "ActionButton", "xy": [9,165], "dimensions": [154,28], "text_offset": [0,1], "ui_tooltip": "", "tooltip_delay": 0,
+                        "bg_image": "action_button_resizable", "bg_image_resizable": 1, "text_color": [0,0,0,1], "text_size": 13, "text_style": "bold",
                         "array": [1,6], "array_offset": [0,36] }
         }
     },

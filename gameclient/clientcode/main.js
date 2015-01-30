@@ -3802,6 +3802,14 @@ Building.prototype.receive_state = function(data, init, is_deploying) {
     }
 };
 Building.prototype.is_turret = function() { return this.spec['history_category'] === 'turrets'; };
+Building.prototype.is_emplacement = function() { return this.spec['equip_slots'] && ('turret_head' in this.spec['equip_slots']); };
+// return the name of the turret head item equipped here, if any, otherwise null
+Building.prototype.turret_head_item = function() {
+    if(this.equipment && this.equipment['turret_head'] && this.equipment['turret_head'].length > 0) {
+        return this.equipment['turret_head'];
+    }
+    return null;
+};
 Building.prototype.is_minefield = function() { return this.spec['equip_slots'] && ('mine' in this.spec['equip_slots']); };
 Building.prototype.is_minefield_armed = function() { return (this.equipment && this.equipment['mine'] && this.equipment['mine'].length > 0); };
 // returns the name of mine item associated with this minefield, if any, otherwise null
@@ -17010,12 +17018,17 @@ function invoke_building_context_menu(mouse_xy) {
     var quarry_movable = (session.is_quarry() && obj.spec['quarry_movable'] && session.viewing_base.base_landlord_id == session.user_id && session.region.data && session.region.data['storage'] == 'nosql');
     var quarry_buildable = (session.is_quarry() && obj.spec['quarry_buildable'] && session.viewing_base.base_landlord_id == session.user_id && session.region.data && session.region.data['storage'] == 'nosql');
 
+    var dialog_name = 'building_context_menu';
+
     // need to figure out how many and what buttons to display first,
     // because there are different dialog templates depending on the
     // number of buttons.
 
     /** @type {Array.<ContextMenuButton>} */
     var buttons = [];
+
+    /** @type {Object.<string, Array.<ContextMenuButton> >} */
+    var special_buttons = {}; // for turret heads etc
 
     if(obj.is_building()) {
 
@@ -17205,12 +17218,31 @@ function invoke_building_context_menu(mouse_xy) {
 
                 var mine_item_name = obj.minefield_item();
                 if(mine_item_name) {
-                    var mine_item = gamedata['items'][mine_item_name];
+                    var mine_item = ItemDisplay.get_inventory_item_spec(mine_item_name);
                     if(mine_item && mine_item['associated_tech']) {
                         buttons.push(new ContextMenuButton(gamedata['spells']['UPGRADE_FOR_FREE']['ui_name'],
                                       (function (_techname) { return function() {
                                           invoke_upgrade_tech_dialog(_techname, null);
                                       }; })(mine_item['associated_tech'])));
+                    }
+                }
+            }
+
+            if(session.home_base && obj.is_emplacement()) { // special case for emplacements
+                dialog_name = 'emplacement_context_menu';
+                var spell = gamedata['spells']['CRAFT_FOR_FREE'];
+                special_buttons['head'] = [];
+                special_buttons['head'].push(new ContextMenuButton(spell['ui_name_building_context_emplacement'],
+                                                                   function() { console.log('XXXXXX invoke crafting dialog for turret head'); }));
+                var cur_item_name = obj.turret_head_item();
+                if(cur_item_name) {
+                    var item_spec = ItemDisplay.get_inventory_item_spec(cur_item_name);
+                    if(item_spec && item_spec['associated_tech']) {
+                        spell = gamedata['spells']['RESEARCH_FOR_FREE'];
+                        special_buttons['head'].push(new ContextMenuButton(spell['ui_name_building_context_emplacement'],
+                                                                           (function (_techname) { return function() {
+                                                                               invoke_upgrade_tech_dialog(_techname, null);
+                                                                           }; })(item_spec['associated_tech'])));
                     }
                 }
             }
@@ -17231,7 +17263,8 @@ function invoke_building_context_menu(mouse_xy) {
                     }
                 }
 
-                buttons.push(new ContextMenuButton(spell['ui_name'+ (obj.level < obj.get_max_ui_level() ? '' : '_maxlevel')], function() { invoke_upgrade_building_dialog(); }));
+                buttons.push(new ContextMenuButton(spell['ui_name'+ (obj.level < obj.get_max_ui_level() ? (obj.is_emplacement() ? '_emplacement' : '') : '_maxlevel')],
+                                                   function() { invoke_upgrade_building_dialog(); }));
             }
 
             if(session.home_base && obj.spec['name'] == gamedata['townhall']) {
@@ -17290,7 +17323,7 @@ function invoke_building_context_menu(mouse_xy) {
 
     if(buttons.length < 1) { return; }
 
-    var dialog = invoke_generic_context_menu(mouse_xy, buttons, 'building_context_menu');
+    var dialog = invoke_generic_context_menu(mouse_xy, buttons, dialog_name, special_buttons);
 
     dialog.widgets['bg_close_button'].show = false;
 
@@ -17314,6 +17347,24 @@ function invoke_building_context_menu(mouse_xy) {
         dialog.widgets['level'].str = spec['ui_description'].replace('%d', '??');
     } else {
         dialog.widgets['level'].str = '';
+    }
+
+    if(obj.is_building() && obj.is_emplacement()) {
+        var cur_item_name = obj.turret_head_item();
+        dialog.widgets['head_title'].str = dialog.data['widgets']['head_title']['ui_name_empty'];
+        dialog.widgets['head_level'].show = false;
+        if(cur_item_name) {
+            var item_spec = ItemDisplay.get_inventory_item_spec(cur_item_name);
+            if(item_spec) {
+                dialog.widgets['head_title'] = ItemDisplay.get_inventory_item_ui_name(item_spec);
+                if(item_spec['associated_tech']) {
+                    var item_cur_level = item_spec['level']; // note: level of item itself, NOT the tech
+                    var tech_max_level = get_max_level(gamedata['tech'][item_spec['associated_tech']]);
+                    dialog.widgets['head_level'].show = true;
+                    dialog.widgets['level'].str = dialog.data['widgets']['level']['ui_name'].replace('%d0', item_cur_level).replace('%d1', tech_max_level);
+                }
+            }
+        }
     }
 
     if(player.tutorial_state === 'speedup_open_context_menu') {
@@ -17346,8 +17397,9 @@ function ContextMenuButton(ui_name, onclick, state, ui_tooltip) {
 /** @param {Array.<number>} xy position at which to pop up (screen coordinates)
     @param {Array.<ContextMenuButton>} buttons
     @param {string=} dialog_name from gamedata['dialogs']
+    @param {Object.<string, Array.<ContextMenuButton> >=} special_buttons that go in a separately-named widget array, e.g. for turret heads
     @return {SPUI.Dialog} */
-function invoke_generic_context_menu(xy, buttons, dialog_name) {
+function invoke_generic_context_menu(xy, buttons, dialog_name, special_buttons) {
     dialog_name = dialog_name || 'generic_context_menu';
     if(buttons.length < 1 || buttons.length > gamedata['dialogs'][dialog_name]['widgets']['button']['array'][1]) {
         throw Error('bad number of buttons for '+dialog_name+': '+buttons.length.toString());
@@ -17359,7 +17411,8 @@ function invoke_generic_context_menu(xy, buttons, dialog_name) {
 
     // center the dialog horizontally on xy, and shift it upwards so
     // that the first button is directly underneath the cursor
-    var xy = vec_add(xy, [-Math.floor(dialog.wh[0]/2),Math.floor(-(dialog.data['widgets']['button']['xy'][1] + dialog.data['widgets']['button']['dimensions'][1]/2 + 7))]);
+    var default_button = ('default_button' in dialog.data ? dialog.widgets[dialog.data['default_button']] : dialog.widgets['button0']);
+    var xy = vec_add(xy, [-Math.floor(dialog.wh[0]/2),Math.floor(-(default_button.xy[1] + default_button.wh[1]/2 + 7))]);
     xy = vec_sub(xy, dialog.get_absolute_xy());
 
     // resize dialog to fit the proper number of buttons
@@ -17383,21 +17436,28 @@ function invoke_generic_context_menu(xy, buttons, dialog_name) {
     }
 
     // fill in buttons
-    var i;
-    for(i = 0; i < buttons.length; i++) {
-        var but = buttons[i];
-        var widget = dialog.widgets['button'+i.toString()];
-        widget.str = but.ui_name;
-        widget.onclick = (function (_cb) { return function(w) {
-            close_parent_dialog(w);
-            if(_cb) { _cb(w); }
-        }; })(but.onclick);
-        widget.state = but.state || 'normal';
-        widget.tooltip.str = but.ui_tooltip || null;
-    }
-    for(; i < dialog.data['widgets']['button']['array'][1]; i++) {
-        dialog.widgets['button'+i.toString()].show = false;
-    }
+    var button_dict = {'': buttons};
+    if(special_buttons) { for(var k in special_buttons) { button_dict[k] = special_buttons[k]; } };
+
+    goog.object.forEach(button_dict, function(buttons, prefix) {
+        var i;
+        for(i = 0; i < buttons.length; i++) {
+            var but = buttons[i];
+            var widget = dialog.widgets[(prefix ? prefix+'_' : '')+'button'+i.toString()];
+            if(!but.ui_name) { throw Error('blank ui_name for button on '+dialog_name); }
+            widget.str = but.ui_name;
+            widget.onclick = (function (_cb) { return function(w) {
+                close_parent_dialog(w);
+                if(_cb) { _cb(w); }
+            }; })(but.onclick);
+            widget.state = but.state || 'normal';
+            widget.tooltip.str = but.ui_tooltip || null;
+        }
+        for(; i < dialog.data['widgets'][(prefix ? prefix+'_' : '')+'button']['array'][1]; i++) {
+            dialog.widgets[(prefix ? prefix+'_' : '')+'button'+i.toString()].show = false;
+        }
+    });
+
     return dialog;
 }
 
