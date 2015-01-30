@@ -637,8 +637,8 @@ PlayerHistoryPredicate.prototype.ui_progress = function(player, qdata) {
 
     var old_value = (this.relative && qdata && this.key in qdata) ? qdata[this.key] : 0;
     var cur_value = (this.key in player.history) ? player.history[this.key] : 0;
-    ret = ret.replace('%d1', (cur_value - old_value).toString());
-    ret = ret.replace('%d2', this.minvalue.toString());
+    ret = ret.replace('%d1', pretty_print_number(cur_value - old_value));
+    ret = ret.replace('%d2', pretty_print_number(this.minvalue));
     return ret;
 };
 PlayerHistoryPredicate.prototype.ui_expire_time = function(player) { return -1; }
