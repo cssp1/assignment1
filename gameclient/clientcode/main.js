@@ -16938,7 +16938,7 @@ function do_harvest_quarries() {
     }
 }
 
-// for use with invoke_building_context_menu below
+/** @param {Array.<ContextMenuButton>} buttons */
 function add_change_region_button(buttons) {
     if(gamedata['enable_region_map'] && player.get_any_abtest_value('change_region_requirement', gamedata['territory']['change_region_requirement'])['predicate'] != 'ALWAYS_FALSE') {
         var pred = read_predicate(player.get_any_abtest_value('change_region_requirement', gamedata['territory']['change_region_requirement']));
@@ -16946,31 +16946,34 @@ function add_change_region_button(buttons) {
         var ui_name = spell['ui_name'];
         var togo = player.cooldown_togo(spell['cooldown_name']);
         if(!pred.is_satisfied(player, null)) {
-            buttons.push([ui_name, get_requirements_help(pred), 'disabled_clickable', spell['ui_tooltip_unmet'].replace('%s',pred.ui_describe(player))]);
+            buttons.push(new ContextMenuButton(ui_name, get_requirements_help(pred), 'disabled_clickable', spell['ui_tooltip_unmet'].replace('%s',pred.ui_describe(player))));
         } else if(0 && player.region_map_building_is_busy()) {
-            buttons.push([ui_name, null, 'disabled', spell['ui_tooltip_busy']]);
+            buttons.push(new ContextMenuButton(ui_name, null, 'disabled', spell['ui_tooltip_busy']));
         } else if(togo > 0) {
             if(player.squads_enabled() || player.get_any_abtest_value('show_base_relocation_in_store', gamedata['store']['show_base_relocation_in_store'])) {
-                buttons.push([ui_name, function() { change_selection_ui(null); invoke_change_region_offer_dialog(); }, 'normal', spell['ui_tooltip_cooldown'].replace('%s', pretty_print_time(togo))]);
+                buttons.push(new ContextMenuButton(ui_name, function() { change_selection_ui(null); invoke_change_region_offer_dialog(); }, 'normal', spell['ui_tooltip_cooldown'].replace('%s', pretty_print_time(togo))));
             } else {
-                buttons.push([ui_name, null, 'disabled', spell['ui_tooltip_cooldown'].replace('%s', pretty_print_time(togo))]);
+                buttons.push(new ContextMenuButton(ui_name, null, 'disabled', spell['ui_tooltip_cooldown'].replace('%s', pretty_print_time(togo))));
             }
         } else {
-            buttons.push([ui_name, function() { change_selection_ui(null); invoke_change_region_dialog(null, 'CHANGE_REGION'); }, 'normal', spell['ui_tooltip']]);
+            buttons.push(new ContextMenuButton(ui_name, function() { change_selection_ui(null); invoke_change_region_dialog(null, 'CHANGE_REGION'); }, 'normal', spell['ui_tooltip']));
         }
     }
 }
 
+/** @param {Array.<ContextMenuButton>} buttons */
 function add_regional_map_button(buttons) {
     var pred = read_predicate({'predicate':'LIBRARY', 'name':'quarry_play_requirement'});
     var can_view_quarries = pred.is_satisfied(player, null);
     if(can_view_quarries) {
-        buttons.push([gamedata['spells']['SHOW_REGIONAL_MAP']['ui_name'], function() { change_selection_ui(null); invoke_region_map(); }]);
+        buttons.push(new ContextMenuButton(gamedata['spells']['SHOW_REGIONAL_MAP']['ui_name'], function() { change_selection_ui(null); invoke_region_map(); }));
     } else {
-        buttons.push([gamedata['spells']['SHOW_REGIONAL_MAP']['ui_name'], get_requirements_help(pred), 'disabled_clickable',
-                      gamedata['spells']['SHOW_REGIONAL_MAP']['ui_tooltip_unmet'].replace('%s',pred.ui_describe(player))]);
+        buttons.push(new ContextMenuButton(gamedata['spells']['SHOW_REGIONAL_MAP']['ui_name'], get_requirements_help(pred), 'disabled_clickable',
+                                           gamedata['spells']['SHOW_REGIONAL_MAP']['ui_tooltip_unmet'].replace('%s',pred.ui_describe(player))));
     }
 }
+
+/** @param {Array.<ContextMenuButton>} buttons */
 function add_deploy_squads_button(buttons) {
     var pred = read_predicate({'predicate': 'AND', 'subpredicates':[
         {'predicate':'LIBRARY', 'name':'quarry_play_requirement'},
@@ -16979,17 +16982,17 @@ function add_deploy_squads_button(buttons) {
     ]});
     var can_view_quarries = pred.is_satisfied(player, null);
     if(can_view_quarries) {
-        buttons.push([gamedata['spells']['DEPLOY_SQUADS']['ui_name'],
-                      function() {
-                          change_selection_ui(null);
-                          var map = invoke_region_map();
-                          if(map) {
-                              var sq = do_invoke_squad_control('deploy', {'deploy_from':player.home_base_loc});
-                          }
-                      }]);
+        buttons.push(new ContextMenuButton(gamedata['spells']['DEPLOY_SQUADS']['ui_name'],
+                                           function() {
+                                               change_selection_ui(null);
+                                               var map = invoke_region_map();
+                                               if(map) {
+                                                   var sq = do_invoke_squad_control('deploy', {'deploy_from':player.home_base_loc});
+                                               }
+                                           }));
     } else {
-        buttons.push([gamedata['spells']['DEPLOY_SQUADS']['ui_name'], get_requirements_help(pred), 'disabled_clickable',
-                      gamedata['spells']['DEPLOY_SQUADS']['ui_tooltip_unmet'].replace('%s',pred.ui_describe(player))]);
+        buttons.push(new ContextMenuButton(gamedata['spells']['DEPLOY_SQUADS']['ui_name'], get_requirements_help(pred), 'disabled_clickable',
+                                           gamedata['spells']['DEPLOY_SQUADS']['ui_tooltip_unmet'].replace('%s',pred.ui_describe(player))));
     }
 }
 
@@ -17011,24 +17014,25 @@ function invoke_building_context_menu(mouse_xy) {
     // because there are different dialog templates depending on the
     // number of buttons.
 
-    var buttons = []; // list of [name,callback] pairs
+    /** @type {Array.<ContextMenuButton>} */
+    var buttons = [];
 
     if(obj.is_building()) {
 
         if(session.home_base && obj.is_warehouse() && !obj.is_under_construction()) {
             if(player.warehouse_is_busy()) {
-                buttons.push([gamedata['spells']['SHOW_INVENTORY']['ui_name'], null, 'disabled', gamedata['spells']['SHOW_INVENTORY']['ui_name_busy']]);
+                buttons.push(new ContextMenuButton(gamedata['spells']['SHOW_INVENTORY']['ui_name'], null, 'disabled', gamedata['spells']['SHOW_INVENTORY']['ui_name_busy']));
             } else {
-                buttons.push([gamedata['spells']['SHOW_INVENTORY']['ui_name'], invoke_inventory_dialog]);
+                buttons.push(new ContextMenuButton(gamedata['spells']['SHOW_INVENTORY']['ui_name'], function(w) { invoke_inventory_dialog(); }));
             }
         }
 
         if(session.home_base && obj.spec['name'] == gamedata['squad_building'] && !obj.is_under_construction()) {
             if(0 && player.squad_bay_is_busy()) {
-                buttons.push([gamedata['spells']['MANAGE_SQUADS']['ui_name'], null, 'disabled', gamedata['spells']['MANAGE_SQUADS']['ui_name_busy']]);
+                buttons.push(new ContextMenuButton(gamedata['spells']['MANAGE_SQUADS']['ui_name'], null, 'disabled', gamedata['spells']['MANAGE_SQUADS']['ui_name_busy']));
             } else if(player.squads_enabled()) {
                 // MANAGE SQUADS button
-                buttons.push([gamedata['spells']['MANAGE_SQUADS']['ui_name'], function() { change_selection_ui(null); invoke_squad_control(); }]);
+                buttons.push(new ContextMenuButton(gamedata['spells']['MANAGE_SQUADS']['ui_name'], function() { change_selection_ui(null); invoke_squad_control(); }));
                 add_deploy_squads_button(buttons);
             }
         }
@@ -17041,15 +17045,15 @@ function invoke_building_context_menu(mouse_xy) {
                 var spell = gamedata['spells']['REQUEST_UNIT_DONATION'];
                 var togo = player.cooldown_togo(spell['cooldown_name']);
                 if(!session.is_in_alliance()) {
-                    buttons.push([spell['ui_name'], null, 'disabled', spell['ui_tooltip_no_alliance']]);
+                    buttons.push(new ContextMenuButton(spell['ui_name'], null, 'disabled', spell['ui_tooltip_no_alliance']));
                 } else if(player.alliance_building_is_busy()) {
-                    buttons.push([spell['ui_name'], null, 'disabled', spell['ui_tooltip_busy']]);
+                    buttons.push(new ContextMenuButton(spell['ui_name'], null, 'disabled', spell['ui_tooltip_busy']));
                 } else if(player.donated_units_space() >= player.donated_units_max_space()) {
-                    buttons.push([spell['ui_name'], null, 'disabled', spell['ui_tooltip_no_space']]);
+                    buttons.push(new ContextMenuButton(spell['ui_name'], null, 'disabled', spell['ui_tooltip_no_space']));
                 } else if(togo > 0) {
-                    buttons.push([spell['ui_name'], null, 'disabled', spell['ui_tooltip_cooldown'].replace('%s',pretty_print_time(togo))]);
+                    buttons.push(new ContextMenuButton(spell['ui_name'], null, 'disabled', spell['ui_tooltip_cooldown'].replace('%s',pretty_print_time(togo))));
                 } else {
-                    buttons.push([spell['ui_name'], (function(_obj) { return function() {
+                    buttons.push(new ContextMenuButton(spell['ui_name'], (function(_obj) { return function() {
                         request_unit_donation(_obj);
                         GameArt.assets["request_unit_donation_sound"].states['normal'].audio.play(client_time);
                         change_selection_ui(null);
@@ -17069,7 +17073,7 @@ function invoke_building_context_menu(mouse_xy) {
                                                          client_time, client_time + 3.0,
                                                          { drop_shadow: true, font_size: 20, text_style: 'thick' }));
                         }
-                    }; })(obj)]);
+                    }; })(obj)));
                 }
             }
 
@@ -17077,9 +17081,9 @@ function invoke_building_context_menu(mouse_xy) {
             if(1) {
                 var pred = read_predicate({'predicate':'LIBRARY','name':'alliance_join_requirement'});
                 if(!pred.is_satisfied(player, null)) {
-                    buttons.push([gamedata['spells']['SHOW_ALLIANCES']['ui_name'], get_requirements_help(pred,null), 'disabled_clickable', gamedata['spells']['SHOW_ALLIANCES']['ui_name_unmet'].replace('%s',pred.ui_describe(player))]);
+                    buttons.push(new ContextMenuButton(gamedata['spells']['SHOW_ALLIANCES']['ui_name'], get_requirements_help(pred,null), 'disabled_clickable', gamedata['spells']['SHOW_ALLIANCES']['ui_name_unmet'].replace('%s',pred.ui_describe(player))));
                 } else {
-                    buttons.push([gamedata['spells']['SHOW_ALLIANCES']['ui_name'], invoke_alliance_dialog]);
+                    buttons.push(new ContextMenuButton(gamedata['spells']['SHOW_ALLIANCES']['ui_name'], invoke_alliance_dialog));
                 }
             }
         }
@@ -17094,76 +17098,72 @@ function invoke_building_context_menu(mouse_xy) {
 
         if(session.home_base && obj.is_lottery_building() && !obj.is_under_construction()) {
             if(player.lottery_is_busy()) {
-                buttons.push([gamedata['spells']['LOTTERY_SCAN']['ui_name'], null, 'disabled', gamedata['spells']['LOTTERY_SCAN']['ui_tooltip_busy']]);
+                buttons.push(new ContextMenuButton(gamedata['spells']['LOTTERY_SCAN']['ui_name'], null, 'disabled', gamedata['spells']['LOTTERY_SCAN']['ui_tooltip_busy']));
             } else {
-                buttons.push([gamedata['spells']['LOTTERY_SCAN']['ui_name'], invoke_lottery_dialog]);
+                buttons.push(new ContextMenuButton(gamedata['spells']['LOTTERY_SCAN']['ui_name'], invoke_lottery_dialog));
             }
         }
 
         if(obj.is_damaged() && (!session.home_base || !obj.is_repairing())) {
-            buttons.push([gamedata['spells']['REPAIR']['ui_name'], invoke_repair_dialog]);
+            buttons.push(new ContextMenuButton(gamedata['spells']['REPAIR']['ui_name'], invoke_repair_dialog));
         } else if((session.home_base || quarry_buildable) && (obj.is_repairing() || obj.is_under_construction())) {
             // offer to speed up repairs or construction
-            buttons.push([gamedata['spells']['SPEEDUP_FOR_MONEY']['ui_name'],
-                          function() {invoke_speedup_dialog('speedup');}]);
+            buttons.push(new ContextMenuButton(gamedata['spells']['SPEEDUP_FOR_MONEY']['ui_name'],
+                                               function() {invoke_speedup_dialog('speedup');}));
         } else if((session.home_base || quarry_buildable) && obj.is_upgrading()) {
             // if upgrading, then just show speedup and cancel
-            buttons.push([gamedata['spells']['SPEEDUP_FOR_MONEY']['ui_name'],
-                          function() {invoke_speedup_dialog('speedup');}]);
-            buttons.push([gamedata['spells']['CANCEL_UPGRADE']['ui_name'],
+            buttons.push(new ContextMenuButton(gamedata['spells']['SPEEDUP_FOR_MONEY']['ui_name'],
+                                               function() {invoke_speedup_dialog('speedup');}));
+            buttons.push(new ContextMenuButton(gamedata['spells']['CANCEL_UPGRADE']['ui_name'],
                           (function (_id) { return function() {
                               change_selection_ui(null);
                               invoke_confirm_cancel_message('upgrade', (function (__id) { return function() { send_to_server.func(["CAST_SPELL", __id, "CANCEL_UPGRADE"]); }; })(_id));
-                          }; })(selection.unit.id)]);
+                          }; })(selection.unit.id)));
         } else {
             // not damaged and not upgrading
 
             if(obj.is_producer()) {
                 if(!session.home_base && gamedata['client']['quarry_collect_poll_interval'] < 0) {
                     // placeholder that tells you to go back home and collect all
-                    buttons.push([gamedata['spells']['HARVEST']['ui_name'], null, 'disabled', gamedata['spells']['HARVEST']['ui_name_quarry']]);
+                    buttons.push(new ContextMenuButton(gamedata['spells']['HARVEST']['ui_name'], null, 'disabled', gamedata['spells']['HARVEST']['ui_name_quarry']));
                 } else if(session.home_base) {
-                    buttons.push([gamedata['spells']['HARVEST']['ui_name'],
-                                  function() { do_harvest(false); }]);
+                    buttons.push(new ContextMenuButton(gamedata['spells']['HARVEST']['ui_name'], function() { do_harvest(false); }));
                     if(player.get_any_abtest_value('enable_harvest_all', gamedata['enable_harvest_all'])) {
-                        buttons.push([gamedata['spells']['HARVEST_ALL2']['ui_name'],
-                                      function() { do_harvest(true); }]);
+                        buttons.push(new ContextMenuButton(gamedata['spells']['HARVEST_ALL2']['ui_name'], function() { do_harvest(true); }));
                     }
                 }
             }
 
             if(session.home_base && obj.is_factory()) {
                 if(obj.is_manufacturing() && player.unit_speedups_enabled()) {
-                    buttons.push([gamedata['spells']['SPEEDUP_FOR_MONEY']['ui_name'],
-                                  function() {invoke_speedup_dialog('speedup'); }]);
+                    buttons.push(new ContextMenuButton(gamedata['spells']['SPEEDUP_FOR_MONEY']['ui_name'], function() {invoke_speedup_dialog('speedup'); }));
                 }
-                buttons.push([gamedata['spells']['MAKE_DROIDS']['ui_name'],
-                              (function (_obj) { return function() {
-                                  invoke_manufacture_dialog('building_context', _obj.spec['manufacture_category'], null, _obj);
-                              }; })(obj)]);
+                buttons.push(new ContextMenuButton(gamedata['spells']['MAKE_DROIDS']['ui_name'],
+                                                   (function (_obj) { return function() {
+                                                       invoke_manufacture_dialog('building_context', _obj.spec['manufacture_category'], null, _obj);
+                                                   }; })(obj)));
             }
 
             if(session.home_base && obj.is_researcher()) {
                 if(obj.is_researching()) {
-                    buttons.push([gamedata['spells']['SPEEDUP_FOR_MONEY']['ui_name'],
-                                  function() {invoke_speedup_dialog('speedup'); }]);
-                    buttons.push([gamedata['spells']['CANCEL_RESEARCH']['ui_name'],
+                    buttons.push(new ContextMenuButton(gamedata['spells']['SPEEDUP_FOR_MONEY']['ui_name'], function() {invoke_speedup_dialog('speedup'); }));
+                    buttons.push(new ContextMenuButton(gamedata['spells']['CANCEL_RESEARCH']['ui_name'],
                                   (function (_id) { return function() {
                                       change_selection_ui(null);
                                       invoke_confirm_cancel_message('research', (function (__id) { return function() { send_to_server.func(["CAST_SPELL", __id, "CANCEL_RESEARCH"]); }; })(_id));
-                                  }; })(selection.unit.id)]);
+                                  }; })(selection.unit.id)));
                 } else {
-                    buttons.push([gamedata['spells']['RESEARCH_FOR_FREE']['ui_name'],
+                    buttons.push(new ContextMenuButton(gamedata['spells']['RESEARCH_FOR_FREE']['ui_name'],
                                   (function (_obj) { return function() {
                                       var category = _obj.spec['research_categories'][0];
                                       invoke_research_dialog(null, category);
-                                  }; })(obj)]);
+                                  }; })(obj)));
                 }
             }
 
             if(session.home_base && obj.is_crafter()) {
                 var cat = gamedata['crafting']['categories'][obj.spec['crafting_categories'][0]];
-                buttons.push([cat['ui_verb'] || gamedata['spells']['CRAFT_FOR_FREE']['ui_name'],
+                buttons.push(new ContextMenuButton(cat['ui_verb'] || gamedata['spells']['CRAFT_FOR_FREE']['ui_name'],
                               (function (_cat) { return function() {
                                   if(_cat['dialog'] == 'fishing_dialog') {
                                       invoke_fishing_dialog();
@@ -17172,46 +17172,45 @@ function invoke_building_context_menu(mouse_xy) {
                                   } else {
                                       invoke_crafting_dialog(_cat['name']);
                                   }
-                              }; })(cat)]);
+                              }; })(cat)));
                 if(obj.is_crafting()) {
                     cat = gamedata['crafting']['categories'][gamedata['crafting']['recipes'][obj.is_crafting()]['crafting_category']];
                     if(player.crafting_speedups_enabled() && obj.crafting_progress_one() >= 0) {
                         if(('speedupable' in cat) && !cat['speedupable']) {
                             // cannot be sped up
                         } else {
-                            buttons.push([gamedata['spells']['SPEEDUP_FOR_MONEY']['ui_name'],
-                                          function() {invoke_speedup_dialog('speedup'); }]);
+                            buttons.push(new ContextMenuButton(gamedata['spells']['SPEEDUP_FOR_MONEY']['ui_name'], function() {invoke_speedup_dialog('speedup'); }));
                         }
                     }
                     if(('cancelable' in cat) && !cat['cancelable']) {
                         // not cancelable
                     } else if(obj.crafting_progress_one() >= 0) {
-                        buttons.push([cat['ui_cancel_verb'] || gamedata['spells']['CANCEL_CRAFT']['ui_name'],
+                        buttons.push(new ContextMenuButton(cat['ui_cancel_verb'] || gamedata['spells']['CANCEL_CRAFT']['ui_name'],
                                       (function (_unit, _cat) { return function() {
                                           change_selection_ui(null);
                                           invoke_confirm_cancel_message(cat['confirm_cancel_kind'] || 'crafting', (function (__unit) {
                                               return function() {
                                                   cancel_unfinished_crafting(__unit);
                                               }; })(_unit));
-                                      }; })(selection.unit, cat)]);
+                                      }; })(selection.unit, cat)));
                     }
                 }
             }
 
             if(session.home_base && obj.is_minefield()) {
-                buttons.push([gamedata['spells']['CRAFT_FOR_FREE']['ui_name_building_context_minefield'],
+                buttons.push(new ContextMenuButton(gamedata['spells']['CRAFT_FOR_FREE']['ui_name_building_context_minefield'],
                               (function (_obj) { return function() {
                                   invoke_crafting_dialog('mines');
-                              }; })(obj)]);
+                              }; })(obj)));
 
                 var mine_item_name = obj.minefield_item();
                 if(mine_item_name) {
                     var mine_item = gamedata['items'][mine_item_name];
                     if(mine_item && mine_item['associated_tech']) {
-                        buttons.push([gamedata['spells']['UPGRADE_FOR_FREE']['ui_name'],
+                        buttons.push(new ContextMenuButton(gamedata['spells']['UPGRADE_FOR_FREE']['ui_name'],
                                       (function (_techname) { return function() {
                                           invoke_upgrade_tech_dialog(_techname, null);
-                                      }; })(mine_item['associated_tech'])]);
+                                      }; })(mine_item['associated_tech'])));
                     }
                 }
             }
@@ -17224,15 +17223,15 @@ function invoke_building_context_menu(mouse_xy) {
                 var spell = gamedata['spells']['SHOW_UPGRADE'];
                 if(obj.level < obj.get_max_ui_level()) {
                     if(gamedata['store']['enable_upgrade_all_barriers'] && (obj.spec['name'] === 'barrier')) {
-                        buttons.push([spell['ui_name_all'],
-                                      function() {
-                                          change_selection_ui(null);
-                                          invoke_store('barriers');
-                                      }]);
+                        buttons.push(new ContextMenuButton(spell['ui_name_all'],
+                                                           function() {
+                                                               change_selection_ui(null);
+                                                               invoke_store('barriers');
+                                                           }));
                     }
                 }
 
-                buttons.push([spell['ui_name'+ (obj.level < obj.get_max_ui_level() ? '' : '_maxlevel')], function() { invoke_upgrade_building_dialog(); }]);
+                buttons.push(new ContextMenuButton(spell['ui_name'+ (obj.level < obj.get_max_ui_level() ? '' : '_maxlevel')], function() { invoke_upgrade_building_dialog(); }));
             }
 
             if(session.home_base && obj.spec['name'] == gamedata['townhall']) {
@@ -17247,7 +17246,7 @@ function invoke_building_context_menu(mouse_xy) {
             // COLLECT_DEPOSIT etc.
             var spellname = obj.spec['spells'][i];
             var spell = gamedata['spells'][spellname];
-            buttons.push([spell['ui_name'],
+            buttons.push(new ContextMenuButton(spell['ui_name'],
                           function() {
                               if(spellname == "COLLECT_DEPOSIT") {
                                   for(var res in gamedata['resources']) {
@@ -17262,7 +17261,7 @@ function invoke_building_context_menu(mouse_xy) {
                               }
                               send_to_server.func(["CAST_SPELL", selection.unit.id, spellname]);
                               change_selection(null);
-                          }]);
+                          }));
         }
     }
 
@@ -17276,51 +17275,24 @@ function invoke_building_context_menu(mouse_xy) {
         if(obj.is_building() && (obj.is_repairing() || obj.is_under_construction() || obj.is_upgrading())) {
             // moves are not allowed while repairing, constructing, or upgrading
         } else {
-            buttons.push([gamedata['spells']['MOVE_BUILDING']['ui_name'],
+            buttons.push(new ContextMenuButton(gamedata['spells']['MOVE_BUILDING']['ui_name'],
                           function() {
                               selection.spellname = "MOVE_BUILDING";
                               change_selection_ui_under(new BuildUICursor(selection.unit, selection.unit.spec));
-                          }]);
+                          }));
         }
     }
 
     if(player.is_cheater) {
         // DEV Delete button
-        buttons.push([gamedata['spells']['REMOVE_OBJECT']['ui_name'],
-                      function() { send_and_remove_object(selection.unit);
-                          }]);
+        buttons.push(new ContextMenuButton(gamedata['spells']['REMOVE_OBJECT']['ui_name'], function() { send_and_remove_object(selection.unit); }));
     }
 
     if(buttons.length < 1) { return; }
 
-    if(buttons.length < 1 || buttons.length > 6) {
-        throw Error('need a context menu with '+buttons.length+' buttons: '+buttons.toString());
-    }
+    var dialog = invoke_generic_context_menu(mouse_xy, buttons, 'building_context_menu');
 
-    var dialog_data = gamedata['dialogs']['building_context_'+buttons.length.toString()+'buttons'];
-    var dialog = new SPUI.Dialog(dialog_data);
-
-    change_selection_ui(dialog);
-
-    var wh = dialog_data['dimensions'];
-    var xy = [mouse_xy[0] - Math.floor(wh[0]/2), mouse_xy[1]];
-
-    // shift the dialog upwards so that the first button is directly underneath the cursor
-    xy[1] -= 68;
-
-    // try to pop up near mouse location, but don't let it go off screen
-    if(xy[0] < 0) { xy[0] = 0; }
-    if(xy[0] + wh[0] >= canvas_width) { xy[0] = canvas_width - wh[0]; }
-    if(xy[1] < 0) { xy[1] = 0; }
-    if(xy[1] + wh[1] >= canvas_height) { xy[1] = canvas_height - wh[1]; }
-    dialog.xy = xy;
-    dialog.user_data['dialog'] = 'context_menu';
-
-    // play sound effect
-    if(1) {
-        var state = GameArt.assets['building_context_1buttons_bg'].states['normal'];
-        if(state.audio) { state.audio.play(client_time); }
-    }
+    dialog.widgets['bg_close_button'].show = false;
 
     // fill in building name and level text
     dialog.widgets['title'].str = spec['ui_name'] || spec['name'];
@@ -17333,7 +17305,7 @@ function invoke_building_context_menu(mouse_xy) {
             cur_level = cur_level.toString();
         }
         var max_level = obj.get_max_ui_level().toString();
-        dialog.widgets['level'].str = dialog_data['widgets']['level']['ui_name'].replace('%d0', cur_level).replace('%d1', max_level);
+        dialog.widgets['level'].str = dialog.data['widgets']['level']['ui_name'].replace('%d0', cur_level).replace('%d1', max_level);
     } else if(obj.is_building() && obj.is_minefield() && (obj.id in session.minefield_tags_by_obj_id)) {
         dialog.widgets['level'].str = session.minefield_tags_by_obj_id[obj.id];
 
@@ -17344,41 +17316,51 @@ function invoke_building_context_menu(mouse_xy) {
         dialog.widgets['level'].str = '';
     }
 
-    // fill in buttons
-    for(var i = 0; i < buttons.length; i++) {
-        var bname = (buttons.length == 1 ? '0' : i.toString());
-        dialog.widgets['button'+bname].str = buttons[i][0];
-        dialog.widgets['button'+bname].onclick = buttons[i][1];
-        dialog.widgets['button'+bname].state = (buttons[i].length > 2 ? buttons[i][2] : 'normal');
-        dialog.widgets['button'+bname].tooltip.str = (buttons[i].length > 3 ? buttons[i][3] : '');
-
-        if(player.tutorial_state === 'speedup_open_context_menu' && i != 0) {
-            dialog.widgets['button'+bname].state = 'disabled';
+    if(player.tutorial_state === 'speedup_open_context_menu') {
+        // hide all buttons except first
+        for(var i = 1; i < buttons.length; i++) {
+            dialog.widgets['button'+i.toString()].state = 'disabled';
+        }
+        if(obj.spec['name'] === gamedata['tutorial'][player.tutorial_state]['target']) {
+            advance_tutorial();
         }
     }
 
-    if(player.tutorial_state === 'speedup_open_context_menu' &&
-       obj.spec['name'] === gamedata['tutorial'][player.tutorial_state]['target']) {
-        advance_tutorial();
-    }
+    return dialog;
 }
 
-function invoke_generic_context_menu(xy, buttons) {
-    if(buttons.length < 1 || buttons.length > gamedata['dialogs']['generic_context_menu']['widgets']['button']['array'][1]) {
-        throw Error('bad number of buttons for generic_context_menu '+buttons.length.toString());
+/** button description for generic context menu
+    @constructor
+    @struct
+    @param {string} ui_name
+    @param {function(SPUI.DialogWidget)|null} onclick
+    @param {string|null=} state
+    @param {string|null=} ui_tooltip */
+function ContextMenuButton(ui_name, onclick, state, ui_tooltip) {
+    this.ui_name = ui_name;
+    this.onclick = onclick;
+    this.state = state || null;
+    this.ui_tooltip = ui_tooltip || null;
+};
+
+/** @param {Array.<number>} xy position at which to pop up (screen coordinates)
+    @param {Array.<ContextMenuButton>} buttons
+    @param {string=} dialog_name from gamedata['dialogs']
+    @return {SPUI.Dialog} */
+function invoke_generic_context_menu(xy, buttons, dialog_name) {
+    dialog_name = dialog_name || 'generic_context_menu';
+    if(buttons.length < 1 || buttons.length > gamedata['dialogs'][dialog_name]['widgets']['button']['array'][1]) {
+        throw Error('bad number of buttons for '+dialog_name+': '+buttons.length.toString());
     }
 
-    var dialog = new SPUI.Dialog(gamedata['dialogs']['generic_context_menu']);
+    var dialog = new SPUI.Dialog(gamedata['dialogs'][dialog_name]);
     dialog.user_data['dialog'] = 'context_menu';
     install_child_dialog(dialog);
 
-    if(!xy) {
-        xy = vec_sub([mouse_state.last_raw_x, mouse_state.last_raw_y], dialog.get_absolute_xy());
-    }
-
     // center the dialog horizontally on xy, and shift it upwards so
     // that the first button is directly underneath the cursor
-    var xy = vec_add(xy, [-Math.floor(dialog.wh[0]/2),-31]);
+    var xy = vec_add(xy, [-Math.floor(dialog.wh[0]/2),Math.floor(-(dialog.data['widgets']['button']['xy'][1] + dialog.data['widgets']['button']['dimensions'][1]/2 + 7))]);
+    xy = vec_sub(xy, dialog.get_absolute_xy());
 
     // resize dialog to fit the proper number of buttons
     var wh = [dialog.wh[0], dialog.data['dimensions'][1] + buttons.length * dialog.data['widgets']['button']['array_offset'][1]];
@@ -17403,14 +17385,15 @@ function invoke_generic_context_menu(xy, buttons) {
     // fill in buttons
     var i;
     for(i = 0; i < buttons.length; i++) {
+        var but = buttons[i];
         var widget = dialog.widgets['button'+i.toString()];
-        widget.str = buttons[i]['ui_name'];
+        widget.str = but.ui_name;
         widget.onclick = (function (_cb) { return function(w) {
             close_parent_dialog(w);
-            _cb();
-        }; })(buttons[i]['onclick']);
-        widget.state = buttons[i]['state'] || 'normal';
-        widget.tooltip.str = buttons[i]['ui_tooltip'] || null;
+            if(_cb) { _cb(w); }
+        }; })(but.onclick);
+        widget.state = but.state || 'normal';
+        widget.tooltip.str = but.ui_tooltip || null;
     }
     for(; i < dialog.data['widgets']['button']['array'][1]; i++) {
         dialog.widgets['button'+i.toString()].show = false;
@@ -25150,11 +25133,12 @@ function alliance_info_member_rowfunc(dialog, row, rowdata) {
                 d.widgets['manage_button'].show = true;
 
                 // INFO
-                var buttons = [{'ui_name': d.data['widgets']['manage_button']['ui_name_info'],
-                                'ui_tooltip': d.data['widgets']['manage_button']['ui_tooltip_info'],
-                                'onclick': (function (_user_id) { return function(w) {
-                                    invoke_player_info_dialog_unknown(_user_id);
-                                }; })(user_id)}];
+                var buttons = [new ContextMenuButton(d.data['widgets']['manage_button']['ui_name_info'],
+                                                     (function (_user_id) { return function(w) {
+                                                         invoke_player_info_dialog_unknown(_user_id);
+                                                     }; })(user_id),
+                                                     null,
+                                                     d.data['widgets']['manage_button']['ui_tooltip_info'])];
 
                 // PROMOTE/DEMOTE
                 if(user_id != session.user_id && player.get_any_abtest_value('enable_alliance_role_gui', gamedata['client']['enable_alliance_role_gui'])) {
@@ -25167,16 +25151,15 @@ function alliance_info_member_rowfunc(dialog, row, rowdata) {
                         var perm_ok = session.check_alliance_perm('leader') ||
                             (session.check_alliance_perm('promote') && ((session.alliance_membership['role']||0) > Math.max(cur_role,new_role)));
                         if(!perm_ok) {
-                            buttons.push({'ui_name': d.data['widgets']['manage_button']['ui_name_'+action['name']],
-                                          'ui_tooltip': d.data['widgets']['manage_button']['ui_tooltip_no_permission'],
-                                          'state':'disabled'});
+                            buttons.push(new ContextMenuButton(d.data['widgets']['manage_button']['ui_name_'+action['name']],
+                                                               null, 'disabled',
+                                                               d.data['widgets']['manage_button']['ui_tooltip_no_permission']));
                         } else {
-                            buttons.push({'ui_name': d.data['widgets']['manage_button']['ui_name_'+action['name']],
-                                          'ui_tooltip': d.data['widgets']['manage_button']['ui_tooltip_'+action['name']],
-                                          'onclick': (function (_d, _user_id, _cur_role, _new_role) { return function(w) {
-                                              invoke_alliance_promote_dialog(_d.parent, _user_id, _cur_role, _new_role);
-                                          }; })(d, user_id, cur_role, new_role)
-                                     });
+                            buttons.push(new ContextMenuButton(d.data['widgets']['manage_button']['ui_name_'+action['name']],
+                                                               (function (_d, _user_id, _cur_role, _new_role) { return function(w) {
+                                                                   invoke_alliance_promote_dialog(_d.parent, _user_id, _cur_role, _new_role);
+                                                               }; })(d, user_id, cur_role, new_role),
+                                                               null, d.data['widgets']['manage_button']['ui_tooltip_'+action['name']]));
                         }
                     });
                 }
@@ -25185,34 +25168,33 @@ function alliance_info_member_rowfunc(dialog, row, rowdata) {
                 if(user_id == session.user_id) {
                     // no kick button on yourself
                 } else if(session.check_alliance_perm('kick') && ((session.alliance_membership['role']||0) > (member['role']||0))) {
-                    buttons.push({'ui_name': d.data['widgets']['manage_button']['ui_name_kick'],
-                                   'ui_tooltip': d.data['widgets']['manage_button']['ui_tooltip_kick'],
-                                   'onclick': (function (_d, _user_id, _ui_name) { return function(w) {
-                                       var s = gamedata['strings']['alliance_kick_confirm'];
-                                       invoke_child_message_dialog(s['ui_title'], s['ui_description'].replace('%s', _ui_name),
-                                                                   {'cancel_button': true,
-                                                                    'ok_button_ui_name': s['ui_button'],
-                                                                    'on_ok': (function (__d, __user_id) { return function() {
-                                                                        __d.widgets['manage_button'].state = 'disabled';
-                                                                        invoke_ui_locker();
-                                                                        AllianceCache.send_kick(session.alliance_id, __user_id, (function (___d) { return function (success) {
-                                                                            ___d.widgets['manage_button'].state = 'normal';
-                                                                            if(!success) { return; }
-                                                                            // refresh the alliance info tab
-                                                                            if(___d.parent) { update_alliance_info_tab(___d.parent); }
-                                                                        }; })(__d));
-                                                                    }; })(_d, _user_id)
-                                                                   });
-                                   }; })(d, user_id, d.widgets['name'].str)
-                                  });
+                    buttons.push(new ContextMenuButton(d.data['widgets']['manage_button']['ui_name_kick'],
+                                                       (function (_d, _user_id, _ui_name) { return function(w) {
+                                                           var s = gamedata['strings']['alliance_kick_confirm'];
+                                                           invoke_child_message_dialog(s['ui_title'], s['ui_description'].replace('%s', _ui_name),
+                                                                                       {'cancel_button': true,
+                                                                                        'ok_button_ui_name': s['ui_button'],
+                                                                                        'on_ok': (function (__d, __user_id) { return function() {
+                                                                                            __d.widgets['manage_button'].state = 'disabled';
+                                                                                            invoke_ui_locker();
+                                                                                            AllianceCache.send_kick(session.alliance_id, __user_id, (function (___d) { return function (success) {
+                                                                                                ___d.widgets['manage_button'].state = 'normal';
+                                                                                                if(!success) { return; }
+                                                                                                // refresh the alliance info tab
+                                                                                                if(___d.parent) { update_alliance_info_tab(___d.parent); }
+                                                                                            }; })(__d));
+                                                                                        }; })(_d, _user_id)
+                                                                                       });
+                                                       }; })(d, user_id, d.widgets['name'].str),
+                                                       null, d.data['widgets']['manage_button']['ui_tooltip_kick']));
                 } else {
-                    buttons.push({'ui_name': d.data['widgets']['manage_button']['ui_name_kick'],
-                                  'state': 'disabled',
-                                  'ui_tooltip': d.data['widgets']['manage_button']['ui_tooltip_no_permission']});
+                    buttons.push(new ContextMenuButton(d.data['widgets']['manage_button']['ui_name_kick'],
+                                                       null, 'disabled',
+                                                       d.data['widgets']['manage_button']['ui_tooltip_no_permission']));
                 }
 
                 d.widgets['manage_button'].onclick = (function (_buttons) { return function(w) {
-                    invoke_generic_context_menu(null, _buttons);
+                    invoke_generic_context_menu([mouse_state.last_raw_x, mouse_state.last_raw_y], _buttons);
                 }; })(buttons);
 
             } else {
