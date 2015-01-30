@@ -84,13 +84,19 @@ def check_research_complete(player):
                 return 'research_complete', ui_name, None
     return None, None, None
 def check_production_complete(player):
+    any_manuf = False
+    all_complete = True
     for obj in player['my_base']:
         if obj['spec'] not in gamedata['buildings']: continue
         if ('manuf_queue' in obj) and len(obj['manuf_queue'])>0 and ('manuf_start_time' in obj) and (obj['manuf_start_time'] > 0):
+            any_manuf = True
             prog = obj.get('manuf_done_time',0) + (time_now - obj['manuf_start_time'])
             total = sum([item.get('total_time',0) for item in obj['manuf_queue']])
-            if prog >= total:
-                return 'production_complete', '', None
+            if prog < total:
+                all_complete = False
+                break
+    if any_manuf and all_complete:
+        return 'production_complete', '', None
     return None, None, None
 def check_army_repaired(player):
     if 'unit_repair_queue' in player and len(player['unit_repair_queue']) > 0:
