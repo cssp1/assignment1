@@ -30655,7 +30655,10 @@ function invoke_research_dialog(parent_category, newcategory, newpage) {
 
     // set up category buttons
     var i = 0;
-    var cat_list = goog.array.filter(gamedata['strings']['research_categories'][parent_category], function(entry) { return !!get_lab_for(entry['name']); });
+    var cat_list = goog.array.filter(gamedata['strings']['research_categories'][parent_category], function(entry) {
+        if('show_if' in entry && !read_predicate(entry['show_if']).is_satisfied(player, null)) { return false; }
+        return !!get_lab_for(entry['name']);
+    });
     var used = cat_list.length;
     goog.array.forEach(cat_list, function(entry) {
         // manually compute X coordinate to center all the visible buttons
@@ -30671,6 +30674,7 @@ function invoke_research_dialog(parent_category, newcategory, newpage) {
         dialog.widgets['category_button'+i.toString()].show = false;
         i++;
     }
+    dialog.user_data['category_list'] = cat_list;
 
     dialog.widgets['scroll_left'].onclick = function(w) { dialog.user_data['scrolled'] = true; research_dialog_scroll(w.parent, w.parent.user_data['page']-1); };
     dialog.widgets['scroll_right'].onclick = function(w) { dialog.user_data['scrolled'] = true; research_dialog_scroll(w.parent, w.parent.user_data['page']+1); };
@@ -30698,7 +30702,7 @@ function research_dialog_change_category(dialog, category, num)
     dialog.user_data['scrolled'] = false;
     dialog.user_data['open_time'] = client_time;
 
-    goog.array.forEach(gamedata['strings']['research_categories'][dialog.user_data['parent_category']], function(entry, i) {
+    goog.array.forEach(dialog.user_data['category_list'], function(entry, i) {
         var w = dialog.widgets['category_button'+i.toString()];
         w.text_color = (category === entry['name'] ? SPUI.default_text_color : SPUI.disabled_text_color);
         w.state = (category === entry['name'] ? 'active' : 'normal');

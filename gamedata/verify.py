@@ -840,6 +840,12 @@ def check_scores2_stat(stat, reason):
         error |= 1; print '%s: bad stat space_scope %s' % (reason, stat['space_scope'])
     return error
 
+def check_research_category(path, spec):
+    error = 0
+    if 'show_if' in spec:
+        error |= check_predicate(spec['show_if'], reason=path+':show_if')
+    return error
+
 def check_crafting_category(catname, spec):
     error = 0
     for cat in spec.get('category_group',[]):
@@ -2915,6 +2921,9 @@ def main(args):
     for name, data in gamedata['item_sets'].iteritems():
         error |= check_item_set('item_set:'+name, data)
 
+    for parent_name, parent_cat in gamedata['strings']['research_categories'].iteritems():
+        for entry in parent_cat:
+            error |= check_research_category('strings:research_categories:'+parent_name+':'+entry['name'], entry)
     if 'categories' in gamedata['crafting']:
         for name, data in gamedata['crafting']['categories'].iteritems():
             error |= check_crafting_category('crafting:categories:'+name, data)
