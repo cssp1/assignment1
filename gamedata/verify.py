@@ -289,7 +289,12 @@ def check_mandatory_fields(specname, spec, kind):
             if c is not None:
                 error |= check_consequent(c, reason = specname+':upgrade_completion', context='building')
 
-
+    if 'equip_slots' in spec:
+        slot_dict_list = spec['equip_slots'] if type(spec['equip_slots']) is list else [spec['equip_slots'],]
+        for slot_dict in slot_dict_list:
+            for slot_name, qty in slot_dict.iteritems():
+                if slot_name not in gamedata['strings']['equip_slots']:
+                    error |= 1; print '%s: equip_slot type %s not found in strings.json' % (specname, slot_name)
     return error
 
 def check_object_spells(specname, spec, maxlevel):
