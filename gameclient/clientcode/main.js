@@ -24644,7 +24644,17 @@ function invoke_alliance_dialog() {
 
 function invoke_alliance_list() {
     var dialog = _invoke_alliance_dialog();
-    alliance_list_change_tab(dialog, (session.is_in_alliance() ? 'your' : 'join'));
+    var default_tab;
+    if(session.is_in_alliance()) {
+        default_tab = 'your';
+    } else {
+        if(player.use_trophies() || player.current_alliance_stat_tournament_event()) {
+            default_tab = 'top';
+        } else {
+            default_tab = 'join';
+        }
+    }
+    alliance_list_change_tab(dialog, default_tab);
     return dialog;
 }
 
