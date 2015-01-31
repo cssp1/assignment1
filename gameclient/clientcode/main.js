@@ -36654,6 +36654,31 @@ function invoke_upgrade_dialog_generic(techname, prev_dialog, preselect) {
     return dialog;
 }
 
+/** Get list of features to show for a weapon on a unit or building
+    @param {Object} spec
+    @param {Object} spell
+    @return {Array.<string>} */
+function get_weapon_spell_features2(spec, spell) {
+    var ret = [];
+    ret.push('weapon_damage');
+    if('effective_range' in spell) {
+        ret.push('effective_weapon_range');
+    }
+    if(!is_melee_spell(spell)) {
+        ret.push('weapon_range');
+    }
+    if('splash_range' in spell) {
+        ret.push('splash_range');
+    }
+    if('accuracy' in spell) {
+        ret.push('accuracy');
+    }
+    if('ui_priority_vs' in spell || 'ui_priority_vs' in spec) {
+        ret.push('ui_priority_vs');
+    }
+    return ret;
+};
+
 function update_upgrade_dialog(dialog) {
     var techname = dialog.user_data['techname'];
     var unit = dialog.user_data['unit'];
@@ -36934,27 +36959,6 @@ function update_upgrade_dialog(dialog) {
     // FEATURES
 
     var feature_list = [];
-
-    function get_weapon_spell_features2(spec, spell) {
-        var ret = [];
-        ret.push('weapon_damage');
-        if('effective_range' in spell) {
-            ret.push('effective_weapon_range');
-        }
-        if(!is_melee_spell(spell)) {
-            ret.push('weapon_range');
-        }
-        if('splash_range' in spell) {
-            ret.push('splash_range');
-        }
-        if('accuracy' in spell) {
-            ret.push('accuracy');
-        }
-        if('ui_priority_vs' in spec) {
-            ret.push('ui_priority_vs');
-        }
-        return ret;
-    };
 
     if(tech) {
         // UNIT OR GENERIC TECH
@@ -37748,12 +37752,18 @@ function init_damage_vs_icons(dialog, spec, weapon_spell) {
     var ui_damage_vs = (show ? ('ui_damage_vs' in weapon_spell ? weapon_spell['ui_damage_vs'] : spec['ui_damage_vs']) : null);
 
     for(var i = 0; i < CATS.length; i++) {
-        var widget = dialog.widgets['damage_vs'+i.toString()];
+        var xy;
+        if(dialog.data['widgets']['damage_vs']['array'][1] <= 1) {
+            xy = [i,0]; // 2D array
+        } else {
+            xy = [i % dialog.data['widgets']['damage_vs']['array'][0], Math.floor(i / dialog.data['widgets']['damage_vs']['array'][0])];
+        }
+        var widget = dialog.widgets[SPUI.get_array_widget_name('damage_vs', dialog.data['widgets']['damage_vs']['array'], xy)];
         widget.show = show;
         if(show) {
             widget.show = (spec['kind'] !== 'building' || CATS[i][0] != 'building');
 
-            if(spec['kind'] === 'building') {
+            if(spec['kind'] === 'building' && dialog.data['widgets']['damage_vs']['array'][1] <= 1) {
                 // slide widgets to the right to re-center them with missing "vs building" icon
                 widget.xy[0] = dialog.data['widgets']['damage_vs']['xy'][0] + i*dialog.data['widgets']['damage_vs']['array_offset'][0] + Math.ceil(dialog.data['widgets']['damage_vs']['array_offset'][0]/2);
             }
