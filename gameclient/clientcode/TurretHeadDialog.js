@@ -18,7 +18,7 @@ TurretHeadDialog.invoke = function(emplacement_obj) {
     dialog.user_data['dialog'] = 'turret_head_dialog';
     dialog.user_data['emplacement'] = emplacement_obj;
     dialog.user_data['builder'] = emplacement_obj;
-    dialog.user_data['selected'] = null;
+    dialog.user_data['selected_recipe'] = null;
 
     dialog.widgets['title'].str = dialog.data['widgets']['title']['ui_name'].replace('%s', gamedata['spells']['CRAFT_FOR_FREE']['ui_name_building_context_emplacement']);
     dialog.widgets['flavor_text'].set_text_with_linebreaking(dialog.data['widgets']['flavor_text']['ui_name'].replace('%s', gamedata['buildings'][get_lab_for('turret_heads')]['ui_name']));
@@ -46,6 +46,8 @@ TurretHeadDialog.invoke = function(emplacement_obj) {
     dialog.modal = true;
     dialog.ondraw = TurretHeadDialog.ondraw;
     TurretHeadDialog.scroll(dialog, 0);
+    TurretHeadDialog.select_recipe(dialog, null);
+
     return dialog;
 };
 
@@ -62,10 +64,9 @@ TurretHeadDialog.scroll = function(dialog, page) {
 };
 
 /** @param {SPUI.Dialog} dialog
-    @param {string} name */
+    @param {string|null} name */
 TurretHeadDialog.select_recipe = function(dialog, name) {
-    dialog.user_data['selected'] = name;
-    // XXXXXX
+    dialog.user_data['selected_recipe'] = name;
 };
 
 /** @param {SPUI.Dialog} dialog */
@@ -125,7 +126,7 @@ TurretHeadDialog.ondraw = function(dialog) {
             }; })(name);
 
             dialog.widgets['recipe_gray_outer'+wname].show = !can_craft;
-            dialog.widgets['recipe_frame'+wname].state = (name == dialog.user_data['selected'] ? 'highlight' : 'normal');
+            dialog.widgets['recipe_frame'+wname].state = (name == dialog.user_data['selected_recipe'] ? 'highlight' : 'normal');
 
             if(can_craft) {
             } else {
@@ -194,19 +195,141 @@ TurretHeadDialog.ondraw = function(dialog) {
     dialog.widgets['current'].show = !!current_name;
 
     if(current_name) {
-        TurretHeadDialog.set_head_info(dialog.widgets['current'], current_name);
+        TurretHeadDialog.set_stats_display(dialog.widgets['current'], dialog.user_data['emplacement'], current_name);
     }
 
     // click-to-select
+    var selected_recipe_name = dialog.user_data['selected_recipe'];
     dialog.widgets['click_to_select_arrow'].show =
-        dialog.widgets['click_to_select'].show = !dialog.user_data['selected'];
+        dialog.widgets['click_to_select'].show = !selected_recipe_name;
+    dialog.widgets['selected'].show = !!selected_recipe_name;
+    if(dialog.widgets['selected'].show) {
+        TurretHeadDialog.set_recipe_display(dialog.widgets['selected'], dialog.user_data['emplacement'], selected_recipe_name);
+    }
 };
 
-// operates on turret_head_dialog_current
+// operates on turret_head_dialog_recipe
 /** @param {SPUI.Dialog} dialog
+    @param {GameObject} emplacement_obj it will go onto
+    @param {string} recipe_name of the recipe */
+TurretHeadDialog.set_recipe_display = function(dialog, emplacement_obj, recipe_name) {
+    var current_name = emplacement_obj.turret_head_item();
+    var current_spec = (current_name ? ItemDisplay.get_inventory_item_spec(current_name) : null);
+    var recipe_spec = gamedata['crafting']['recipes'][recipe_name];
+    var product_name = recipe_spec['product'][0]['spec'];
+    var product_spec = ItemDisplay.get_inventory_item_spec(product_name);
+    var product_level = product_spec['level'];
+
+    TurretHeadDialog.set_stats_display(dialog.widgets['stats'], emplacement_obj, product_name);
+
+    // XXX copy/pasted from update_upgrade_dialog()
+    var use_resources_offered = true;
+    var use_resources_requirements_ok = true, instant_requirements_ok = true, resources_ok = true;
+    var tooltip_req_instant = [], tooltip_req_use_resources = [];
+    var resources_needed = {}; // dictionary of resource amounts needed
+    var ui_resources_needed = [];
+    var req = [];
+
+    // RESOURCE requirement
+    for(var res in gamedata['resources']) {
+        var resdata = gamedata['resources'][res];
+        var cost = get_leveled_quantity(recipe_spec['cost'][res]||0, product_level);
+
+        if(!player.is_cheater && cost > 0 && ('allow_instant' in resdata) && !resdata['allow_instant']) {
+            instant_requirements_ok = false;
+            tooltip_req_instant.push(dialog.parent.data['widgets']['instant_button']['ui_tooltip_rare_res'].replace('%s', resdata['ui_name']));
+        }
+
+        if(cost < 0) {
+            use_resources_offered = false;
+        } else if(player.resource_state[res][1] < cost) {
+            resources_ok = false;
+            resources_needed[res] = cost - player.resource_state[res][1];
+            ui_resources_needed.push(dialog.parent.data['widgets']['use_resources_button']['ui_tooltip_more_res'].replace('%d',pretty_print_number(cost - player.resource_state[res][1])).replace('%s',resdata['ui_name']));
+        }
+
+        if('cost_'+res in dialog.widgets) {
+            var widget = dialog.widgets['cost_'+res];
+            widget.show = (cost > 0);
+            if('resource_'+res+'_icon' in dialog.widgets) {
+                dialog.widgets['resource_'+res+'_icon'].show = (cost > 0);
+            }
+            widget.str = pretty_print_qty_brief(cost);
+            widget.tooltip.str = widget.data['ui_tooltip'].replace('%RES', resdata['ui_name']).replace('%QTY', pretty_print_number(cost));
+            if(cost > 0 && player.resource_state[res][1] < cost) {
+                widget.text_color = SPUI.error_text_color;
+            } else {
+                widget.text_color = SPUI.good_text_color;
+            }
+        }
+    }
+
+    // POWER requirement
+    if(1) { // XXXXXX where to store power? on product_spec['equip']?
+        var old_power = 555;
+        var new_power = 666;
+        dialog.widgets['cost_power'].show =
+            dialog.widgets['resource_power_icon'].show = (new_power > 0 || old_power > 0);
+        if(dialog.widgets['cost_power'].show) {
+            dialog.widgets['cost_power'].tooltip.str = dialog.data['widgets']['cost_power']['ui_tooltip'].replace('%CUR', pretty_print_number(old_power)).replace('%AFTER', pretty_print_number(new_power));
+
+            dialog.widgets['cost_power'].str = pretty_print_number(new_power);
+
+            // do not display energy text in red for central computer upgrades, because they allow more plants to be built
+            if((session.viewing_base.power_state[1] + new_power - old_power) > session.viewing_base.power_state[0]) {
+                dialog.widgets['cost_power'].text_color = SPUI.error_text_color;
+                // cannot craft?
+            } else {
+                dialog.widgets['cost_power'].text_color = SPUI.good_text_color;
+            }
+        }
+    }
+
+    // PREDICATE requirement
+    if('requires' in recipe_spec) {
+        var pred = read_predicate(get_leveled_quantity(recipe_spec['requires'], product_level));
+        var text = pred.ui_describe(player);  // XXX make ui_describe return a list
+        if(text) {
+            req.push(text);
+            use_resources_requirements_ok = instant_requirements_ok = false;
+            //var helper = get_requirements_help(pred, null);
+        }
+    }
+
+    dialog.widgets['requirements_text'].set_text_with_linebreaking(req.join(', '));
+
+    for(var i = 0; i < req.length; i++) {
+        tooltip_req_instant.push(req[i]);
+        tooltip_req_use_resources.push(req[i]);
+    }
+    for(var i = 0; i < ui_resources_needed.length; i++) {
+        tooltip_req_use_resources.push(ui_resources_needed[i]);
+    }
+    if(tooltip_req_instant.length > 0) { tooltip_req_instant.splice(0, 0, dialog.parent.data['widgets']['use_resources_button']['ui_tooltip_unmet']); }
+    if(tooltip_req_use_resources.length > 0) { tooltip_req_use_resources.splice(0, 0, dialog.parent.data['widgets']['use_resources_button']['ui_tooltip_unmet']); }
+
+
+    // DESCRIPTION
+    if(1) {
+        var descr_nlines = SPUI.break_lines(product_spec['ui_description'], dialog.widgets['description'].font, dialog.widgets['description'].wh);
+
+        dialog.widgets['description'].tooltip.str = descr_nlines[0];
+        var descr_list = descr_nlines[0].split('\n');
+        var descr;
+        if(descr_list.length > dialog.data['widgets']['description']['max_lines']) {
+            descr = descr_list.slice(0, dialog.data['widgets']['description']['max_lines']).join('\n')+'...';
+        } else {
+            descr = descr_list.join('\n');
+        }
+        dialog.widgets['description'].str = descr;
+    }
+};
+
+// operates on turret_head_dialog_stats
+/** @param {SPUI.Dialog} dialog
+    @param {GameObject} emplacement_obj it will go onto
     @param {string} name of the turret head item */
-TurretHeadDialog.set_head_info = function(dialog, name) {
-    var emplacement_obj = dialog.parent.user_data['emplacement'];
+TurretHeadDialog.set_stats_display = function(dialog, emplacement_obj, name) {
     var spec = ItemDisplay.get_inventory_item_spec(name);
 
     dialog.widgets['name'].str = ItemDisplay.get_inventory_item_ui_name(spec);

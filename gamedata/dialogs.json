@@ -1914,8 +1914,10 @@
             // display for currently-equipped head item
             "no_current": { "kind": "TextField", "xy":[25,140], "dimensions": [160,17], "text_size": 13, "text_style": "thick",
                             "ui_name": "No weapon equipped", "text_color": [0.4,0.4,0.4,1] },
-            "current": { "show": 0, "kind": "Dialog", "dialog": "turret_head_dialog_current", "xy": [25,105], "dimensions":[160,205] },
+            "current": { "show": 0, "kind": "Dialog", "dialog": "turret_head_dialog_stats", "xy": [25,105], "dimensions":[160,205] },
 
+            // display for head item produced by selected recipe
+            "selected": { "show": 0, "kind": "Dialog", "dialog": "turret_head_dialog_recipe", "xy": [350,105], "dimensions":[360,205] },
 
             "flavor_text": { "kind": "TextField", "xy": [16,342], "dimensions": [378,60], "text_size": 13, "text_leading": 17, "text_hjustify": "left", "text_vjustify": "top",
                              "ui_name": "Change turret weapons to change defensive capabilities.\nUnlock higher turret weapon levels in the %s." },
@@ -1938,7 +1940,7 @@
         }
     },
 
-    "turret_head_dialog_current": {
+    "turret_head_dialog_stats": {
         "dimensions": [160,205],
         "widgets": {
             "name": { "kind": "TextField", "xy": [13,9], "dimensions": [176,30], "text_size": 15, "text_style": "thick", "text_hjustify": "left" },
@@ -1957,6 +1959,38 @@
             "descriptionR": { "kind": "TextField", "xy": [83,113], "dimensions": [64,50], "text_size": 13, "text_style": "normal",
                               "text_hjustify": "left", "text_vjustify": "top", "ui_tooltip": "", "tooltip_delay": 0, "fixed_tooltip_offset": [50,140],
                               "array": [1,3], "array_offset": [0,19] }
+        }
+    },
+
+    // stats on the left, requirements on the right
+    "turret_head_dialog_recipe": {
+        "dimensions": [360,205],
+        "widgets": {
+            "stats": {"kind": "Dialog", "dialog": "turret_head_dialog_stats", "xy":[2,0], "dimensions":[160,205]},
+
+            "requirements": { "kind": "TextField", "xy": [160,11], "dimensions": [135,26], "text_size": 13, "text_style": "thick", "text_hjustify": "left", "ui_name": "REQUIREMENTS" },
+
+            "resource_water_icon": { "kind": "StaticImage", "xy": [160,43], "dimensions": [21,21], "asset": "resource_icon_water", "show": 0 },
+            "cost_water": { "kind": "TextField", "xy": [160,43], "dimensions": [100,21], "text_offset": [31,0], "text_size": 13, "text_hjustify": "left",
+                            "ui_tooltip": "%QTY %RES needed to mount this weapon", "tooltip_delay": 0},
+
+            "resource_iron_icon": { "kind": "StaticImage", "xy": [160,72], "dimensions": [21,21], "asset": "resource_icon_iron", "show": 0 },
+            "cost_iron": { "kind": "TextField", "xy": [160,72], "dimensions": [100,21], "text_offset": [31,0], "text_size": 13, "text_hjustify": "left",
+                           "ui_tooltip": "%QTY %RES needed to mount this weapon", "tooltip_delay": 0},
+
+            "resource_res3_icon": { "kind": "StaticImage", "xy": [240,43], "dimensions": [21,21], "asset": "resource_icon_res3", "show": 0 },
+            "cost_res3": { "kind": "TextField", "xy": [240,43], "dimensions": [100,21], "text_offset": [31,0], "text_size": 13, "text_hjustify": "left",
+                            "ui_tooltip": "%QTY %RES needed to mount this weapon", "tooltip_delay": 0},
+
+            "resource_power_icon": { "kind": "StaticImage", "xy": [240,72], "dimensions": [21,21], "asset": "resource_icon_power" },
+            "cost_power": { "kind": "TextField", "xy": [240,72], "dimensions": [100,21], "text_offset": [31,0], "text_size": 13, "text_hjustify": "left",
+                            "ui_tooltip": "%AFTER power needed after mounting\n(Current power usage: %CUR)",
+                            "ui_tooltip_maxlevel": "Power needed", "tooltip_delay": 0},
+
+            "requirements_text":  { "kind": "TextField", "xy": [160,101], "dimensions": [180,74], "text_size": 13, "text_leading": 17, "text_hjustify": "left", "text_vjustify": "top",
+                                    "text_color": [1,0,0,1] },
+            "description": { "kind": "TextField", "xy": [160,103], "dimensions": [190,74], "text_size": 13, "text_leading": 17, "text_hjustify": "left", "text_vjustify": "bottom",
+                             "max_lines": 3, "ui_tooltip": "", "tooltip_delay": 0}
         }
     },
 
