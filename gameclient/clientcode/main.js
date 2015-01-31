@@ -28340,6 +28340,7 @@ function update_manufacture_dialog(dialog) {
 
     // count how many units of each kind the player has
     var unit_count = {};
+
     if(!('enable_defending_units' in gamedata) || gamedata['enable_defending_units']) {
         // in games with defending units, count units in session (i.e. base defenders)
         for(var id in session.cur_objects.objects) {
@@ -28367,17 +28368,22 @@ function update_manufacture_dialog(dialog) {
 
     // count queued units
     var queue_count = {};
-    if(builder) {
-        for(var i = 0; i < manuf_queue.length; i++) {
-            var data = manuf_queue[i];
-            var name = data['spec_name'];
-            if(name in queue_count) {
-                queue_count[name] += 1;
-            } else {
-                queue_count[name] = 1;
-            }
+    for(var id in session.cur_objects.objects) {
+        var obj = session.cur_objects.objects[id];
+        if(obj.is_building() && obj.is_manufacturer() && (obj.team === 'player')) {
+            var q = obj.get_client_prediction('manuf_queue', obj.manuf_queue);
+            goog.array.forEach(q, function(data) {
+                var name = data['spec_name'];
+                if(name in queue_count) {
+                    queue_count[name] += 1;
+                } else {
+                    queue_count[name] = 1;
+                }
+            });
         }
-    } else if(!player.is_cheater) {
+    }
+
+    if(!builder && !player.is_cheater) {
         // factory building does not exist, do not show queue
         dialog.user_data['replace_queue_with_unlock_helper'] = manufacture_dialog_unlock_helper(dialog.user_data['category'], dialog.user_data['current_unit']);
     }
@@ -28400,17 +28406,30 @@ function update_manufacture_dialog(dialog) {
 
         dialog.widgets['grid'+widget_name].show =
             dialog.widgets['grid_qty'+widget_name].show =
+            dialog.widgets['sunken_grid_bg'+widget_name].show =
             dialog.widgets['sunken_grid'+widget_name].show =
             dialog.widgets['sunken_grid_label'+widget_name].show = true;
 
-        widget.bg_image = get_leveled_quantity(spec['art_asset'], 1);
-        widget.alpha = spec['cloaked'] ? gamedata['client']['cloaked_opacity'] : 1;
+        dialog.widgets['sunken_grid_bg'+widget_name].color = SPUI.make_colorv(dialog.data['widgets']['sunken_grid_bg'][(dialog.user_data['current_unit'] == name ? 'color_highlight' : 'color')]);
 
-        var voffset;
-        if(spec['flying']) {
-            voffset = -1*spec['altitude'];
-        } else {
+        var asset_is_3d;
+        var voffset; // tweak vertical positioning of icon
+
+        if('icon' in spec) { // this doesn't necessarily look better - stay optional
+            // override auto-generated 3D asset icon
+            asset_is_3d = false;
+            widget.bg_image = get_leveled_quantity(spec['icon'], 1);
+            widget.alpha = 1;
             voffset = 0;
+        } else {
+            asset_is_3d = true;
+            widget.bg_image = get_leveled_quantity(spec['art_asset'], 1);
+            widget.alpha = spec['cloaked'] ? gamedata['client']['cloaked_opacity'] : 1;
+            if(spec['flying']) {
+                voffset = -1*spec['altitude'];
+            } else {
+                voffset = 0;
+            }
         }
 
         widget.bg_image_offset = [dialog.data['widgets']['grid']['bg_image_offset'][0],
@@ -28552,7 +28571,8 @@ function update_manufacture_dialog(dialog) {
         widget.state = ((builder &&
                          unit_unlock_level(name) > 0 &&
                          builder.level >= get_leveled_quantity(gamedata['units'][name]['requires_factory_level']||0, unit_unlock_level(name))) ||
-                        player.is_cheater) ? 'icon' : 'icon_disabled';
+                        player.is_cheater) ? (asset_is_3d ? 'icon' : 'normal') : (asset_is_3d ? 'icon_disabled' : 'disabled');
+
         if((builder && unit_unlock_level(name) > 0) || qty_current + qty_queued > 0 || player.is_cheater) {
             var str = qty_current.toString();
             if(qty_queued > 0) {
@@ -28575,6 +28595,7 @@ function update_manufacture_dialog(dialog) {
         var widget_name = grid_x.toString()+','+grid_y.toString();
         dialog.widgets['grid'+widget_name].show =
             dialog.widgets['grid_qty'+widget_name].show =
+            dialog.widgets['sunken_grid_bg'+widget_name].show =
             dialog.widgets['sunken_grid'+widget_name].show =
             dialog.widgets['sunken_grid_label'+widget_name].show = false;
         grid_x += 1;

@@ -31,54 +31,57 @@ if __name__ == '__main__':
     outkeys = []
 
     # create unit inventory icons
-    EXTRA_UNITS = [] # not included in units.json but icons are needed
-    if game_id == 'tr':
-        EXTRA_UNITS += [('ch47', {'art_asset': 'ch47'})]
-    for unit_name, unit_data in units.items() + EXTRA_UNITS:
-        key = 'inventory_%s' % unit_name
-        outkeys.append(key)
-        DEFAULT_OFFSET = [0,-5]
-        # special-case pixel offsets for units where the default offset does not look good
-        SPECIAL_OFFSETS = {'rifleman': [0,0],
-                           'mortarman': [0,0],
-                           'stinger_gunner': [0,0],
-                           'cyclone': [0,5],
-                           'saber': [-2,1],
-                           'ch47': [0,0],
+    if game_id not in ('sg',):
+        # (sg uses hand-painted images in art.json)
 
-                           # BFM
-                           'marine': [0,0],
-                           'grenadier': [0,0],
-                           'chaingunner': [0,3],
-                           'boomer': [0,0],
-                           'marksman': [0,-4],
-                           'rainmaker': [0,5], 'elite_rainmaker': [0,5],
-                           'wrecker': [0,0], 'elite_wrecker': [0,0],
-                           'centurion': [0,7],
-                           'mauler': [0,6],
-                           'outrider':[0,8],
-                           'tornado': [0,3],
-                           'voodoo': [0,8],
-                           'hellhound': [0,8],
+        EXTRA_UNITS = [] # units that are not included in units.json but whose icons are needed
+        if game_id == 'tr':
+            EXTRA_UNITS += [('ch47', {'art_asset': 'ch47'})]
+        for unit_name, unit_data in units.items() + EXTRA_UNITS:
+            key = 'inventory_%s' % unit_name
+            outkeys.append(key)
+            DEFAULT_OFFSET = [0,-5]
+            # special-case pixel offsets for units where the default offset does not look good
+            SPECIAL_OFFSETS = {'rifleman': [0,0],
+                               'mortarman': [0,0],
+                               'stinger_gunner': [0,0],
+                               'cyclone': [0,5],
+                               'saber': [-2,1],
+                               'ch47': [0,0],
 
-                           # SG
-                           'swordsman': [0,6],
-                           'thief': [0,6],
-                           'orc': [0,6],
-                           'archer': [0,6],
-                           'paladin': [0,6],
-                           'airship': [-2,-1],
-                           'sorceress': [0,6],
-                           'fire_phantom': [0,6],
-                           'golem': [0,4],
-                           'dragon': [5,-5],
-                           }
-        out[key] = {"states": { "normal": { "dimensions": [50,50], "subassets": [{"name": unit_data['art_asset'],
-                                                                                  "state": "icon",
-                                                                                  "centered": 1,
-                                                                                  "offset": SPECIAL_OFFSETS.get(unit_name, DEFAULT_OFFSET),
-                                                                                  "clip_to": [0,0,50,50]}]
-                                            } } }
+                               # BFM
+                               'marine': [0,0],
+                               'grenadier': [0,0],
+                               'chaingunner': [0,3],
+                               'boomer': [0,0],
+                               'marksman': [0,-4],
+                               'rainmaker': [0,5], 'elite_rainmaker': [0,5],
+                               'wrecker': [0,0], 'elite_wrecker': [0,0],
+                               'centurion': [0,7],
+                               'mauler': [0,6],
+                               'outrider':[0,8],
+                               'tornado': [0,3],
+                               'voodoo': [0,8],
+                               'hellhound': [0,8],
+
+                               # SG
+                               'swordsman': [0,6],
+                               'thief': [0,6],
+                               'orc': [0,6],
+                               'archer': [0,6],
+                               'paladin': [0,6],
+                               'airship': [-2,-1],
+                               'sorceress': [0,6],
+                               'fire_phantom': [0,6],
+                               'golem': [0,4],
+                               'dragon': [5,-5],
+                               }
+            out[key] = {"states": { "normal": { "dimensions": [50,50], "subassets": [{"name": unit_data['art_asset'],
+                                                                                      "state": "icon",
+                                                                                      "centered": 1,
+                                                                                      "offset": SPECIAL_OFFSETS.get(unit_name, DEFAULT_OFFSET),
+                                                                                      "clip_to": [0,0,50,50]}]
+                                                } } }
 
     # create icons for DPS/environ/armor boost/armor equip/range/speed mods for units
     if game_id in ('mf','tr','mf2','dv','bfm'):

@@ -2164,17 +2164,23 @@
             "unit_description": { "kind": "TextField", "xy": [283,107], "dimensions": [290,27], "text_size": 13, "text_style": "thick", "text_color": [0.6,0.6,0.6,1],
                                   "drop_shadow": 1, "text_hjustify": "left", "text_vjustify": "top" },
 
+            "sunken_grid_bg": {"kind": "SolidRect", "xy":[46,119], "dimensions":[59,65], "bevel":4,
+                               "color":[1,1,1,0.4], "color_highlight": [1,1,0,1],
+                               "fade_unless_hover": 0.5,
+                               "array": [3,4], "array_offset": [64,67] },
             "sunken_grid": {"kind": "StaticImage", "xy":[47,120], "dimensions":[57,63], "bg_image_resizable": 1, "asset": "dialog_sunken_resizable",
                             "array": [3,4], "array_offset": [64,67] },
-            "sunken_grid_label": {"kind": "SolidRect", "xy":[52,163], "dimensions":[47,15], "color": [0.0354,0.0517,0.0797,1],
-                                  "outline_color": [0.3,0.3,0.3,1], "outline_width": 0.5,
-                                  "array": [3,4], "array_offset": [64,67] },
 
             "grid": { "kind": "ActionButton", "xy": [47,120], "dimensions": [57,63], // [57,43] deliberately oversized for easy clickability
                       "bg_image_offset": [1,-2], // [0,6]
                       "bg_image_justify": "center", "state": "normal", "push_bg_image": 1, "mouseover_sound": 1,
                       "array": [3,4], "array_offset": [64,67], "dripper": {"rate": 4.0, "delay": 0}},
-            "grid_qty": { "kind": "TextField", "xy": [46,163], "dimensions": [58,15], "text_size": 12, "text_style": "normal",
+
+            "sunken_grid_label": {"kind": "SolidRect", "xy":[52,163], "dimensions":[47,15], "color": [0.0354,0.0517,0.0797,0.5],
+                                  "outline_color": [0.3,0.3,0.3,1], "outline_width": 0.5,
+                                  "array": [3,4], "array_offset": [64,67] },
+
+            "grid_qty": { "kind": "TextField", "xy": [46,164], "dimensions": [58,15], "text_size": 12, "text_style": "normal",
                           "ui_name": "X/Y", "ui_name_locked": "Locked",
                           "array": [3,4], "array_offset": [64,67] },
 
