@@ -11,26 +11,182 @@ goog.require('ItemDisplay');
 
 // tightly coupled to main.js, sorry!
 
-/** @param {SPUI.Dialog} parent */
+/** @param {GameObject} emplacement_obj */
 TurretHeadDialog.invoke = function(emplacement_obj) {
     var dialog_data = gamedata['dialogs']['turret_head_dialog'];
-    dialog = new SPUI.Dialog(dialog_data);
+    var dialog = new SPUI.Dialog(dialog_data);
     dialog.user_data['dialog'] = 'turret_head_dialog';
     dialog.user_data['emplacement'] = emplacement_obj;
     dialog.user_data['builder'] = emplacement_obj;
     dialog.user_data['selected'] = null;
+
     dialog.widgets['title'].str = dialog.data['widgets']['title']['ui_name'].replace('%s', gamedata['spells']['CRAFT_FOR_FREE']['ui_name_building_context_emplacement']);
     dialog.widgets['flavor_text'].set_text_with_linebreaking(dialog.data['widgets']['flavor_text']['ui_name'].replace('%s', gamedata['buildings'][get_lab_for('turret_heads')]['ui_name']));
     dialog.widgets['close_button'].onclick = close_parent_dialog;
+
+    // construct recipe list
+    dialog.user_data['recipes'] = [];
+
+    for(var name in gamedata['crafting']['recipes']) {
+        var spec = gamedata['crafting']['recipes'][name];
+        if(spec['crafting_category'] != 'turret_heads') { continue; }
+        if('show_if' in spec && !read_predicate(spec['show_if']).is_satisfied(player, null)) { continue; }
+        if('activation' in spec && !read_predicate(spec['activation']).is_satisfied(player, null)) { continue; }
+        dialog.user_data['recipes'].push(name);
+    }
+
+    // scrolling setup
+    dialog.user_data['scrolled'] = false;
+    dialog.user_data['open_time'] = client_time;
+    dialog.widgets['scroll_left'].widgets['scroll_left'].onclick = function(w) { var dialog = w.parent.parent; dialog.user_data['scrolled'] = true; TurretHeadDialog.scroll(dialog, dialog.user_data['page']-1); };
+    dialog.widgets['scroll_right'].widgets['scroll_right'].onclick = function(w) { var dialog = w.parent.parent; dialog.user_data['scrolled'] = true; TurretHeadDialog.scroll(dialog, dialog.user_data['page']+1); };
+
     install_child_dialog(dialog);
     dialog.auto_center();
     dialog.modal = true;
     dialog.ondraw = TurretHeadDialog.ondraw;
+    TurretHeadDialog.scroll(dialog, 0);
     return dialog;
 };
 
-/** @param {TurretHeadDialog} dialog */
+/** @param {SPUI.Dialog} dialog
+    @param {number} page */
+TurretHeadDialog.scroll = function(dialog, page) {
+    dialog.user_data['recipes_by_widget'] = null;
+    var chapter_recipes = (dialog.user_data['recipes'] ? dialog.user_data['recipes'].length : 0);
+    var recipes_per_page = dialog.data['widgets']['recipe_icon']['array'][0]*dialog.data['widgets']['recipe_icon']['array'][1];
+    var chapter_pages = dialog.user_data['chapter_pages'] = Math.floor((chapter_recipes+recipes_per_page-1)/recipes_per_page);
+    dialog.user_data['page'] = page = (chapter_recipes === 0 ? 0 : clamp(page, 0, chapter_pages-1));
+
+    player.quest_tracked_dirty = true;
+};
+
+/** @param {SPUI.Dialog} dialog
+    @param {string} name */
+TurretHeadDialog.select_recipe = function(dialog, name) {
+    dialog.user_data['selected'] = name;
+    // XXXXXX
+};
+
+/** @param {SPUI.Dialog} dialog */
 TurretHeadDialog.ondraw = function(dialog) {
+    // deal with the recipe selector in the middle
+    var flash_scroll = false;
+    if(!dialog.user_data['scrolled'] &&
+       ((client_time - dialog.user_data['open_time']) < gamedata['store']['store_scroll_flash_time']) &&
+       dialog.widgets['scroll_right'].state != 'disabled') {
+        flash_scroll = (((client_time/gamedata['store']['store_scroll_flash_period']) % 1) >= 0.5);
+    }
+    var page = dialog.user_data['page'], chapter_pages = dialog.user_data['chapter_pages'];
+    var chapter_recipes = (dialog.user_data['recipes'] ? dialog.user_data['recipes'].length : 0);
+    var recipes_per_page = dialog.data['widgets']['recipe_icon']['array'][0]*dialog.data['widgets']['recipe_icon']['array'][1];
+    var grid = [0,0];
+
+    // XXX copy/pasted from update_crafting_dialog()
+    if(chapter_pages > 0) {
+        dialog.user_data['recipes_by_widget'] = {};
+        var first_recipe_on_page = page * recipes_per_page;
+        var last_recipe_on_page = Math.max(0, Math.min((page+1)*recipes_per_page-1, chapter_recipes-1));
+        for(var i = first_recipe_on_page; i <= last_recipe_on_page; i++) {
+            var name = dialog.user_data['recipes'][i];
+            var spec = gamedata['crafting']['recipes'][name];
+            var wname = grid[0].toString() +',' + grid[1].toString();
+            dialog.user_data['recipes_by_widget'][wname] = name;
+            var tooltip_text = [], tooltip_text_color = SPUI.default_text_color;
+            dialog.widgets['recipe_slot'+wname].show =
+                dialog.widgets['recipe_icon'+wname].show =
+                dialog.widgets['recipe_frame'+wname].show = true;
+            var can_craft = true;
+
+            tooltip_text.push(get_crafting_recipe_ui_name(spec));
+            dialog.widgets['recipe_icon'+wname].asset = get_crafting_recipe_icon(spec);
+
+            // get list of any unsatisfied requirements
+            var pred = null, req = null;
+            if(('requires' in spec) && !player.is_cheater) {
+                pred = read_predicate(spec['requires']);
+                req = pred.ui_describe(player);
+                if(req) {
+                    tooltip_text.push('');
+                    tooltip_text.push(dialog.data['widgets']['recipe_frame']['ui_tooltip_requires'].replace('%s', req));
+                    can_craft = false;
+                }
+            }
+
+            dialog.widgets['recipe_frame'+wname].onclick = (function (_name) { return function(w) {
+                if(w.parent.user_data['selected_recipe'] == _name) {
+                    if(w.parent.user_data['on_use_recipe']) {
+                        // note: assumes on_use_recipe has been set up by an ondraw update
+                        w.parent.user_data['on_use_recipe'](w.parent);
+                    }
+                } else {
+                    TurretHeadDialog.select_recipe(w.parent, _name);
+                }
+            }; })(name);
+
+            dialog.widgets['recipe_gray_outer'+wname].show = !can_craft;
+            dialog.widgets['recipe_frame'+wname].state = (name == dialog.user_data['selected'] ? 'highlight' : 'normal');
+
+            if(can_craft) {
+            } else {
+                if(pred) {
+                    // still allow selecting the recipe so that players can see what its benefits and requirements are
+                    tooltip_text_color = SPUI.error_text_color;
+                } else {
+                    dialog.widgets['recipe_frame'+wname].state = 'disabled';
+                }
+            }
+
+            if(tooltip_text.length > 0) {
+                dialog.widgets['recipe_frame'+wname].tooltip.str = tooltip_text.join('\n');
+                dialog.widgets['recipe_frame'+wname].tooltip.text_color = tooltip_text_color;
+            } else {
+                dialog.widgets['recipe_frame'+wname].tooltip.str = null;
+            }
+            grid[0] += 1;
+            if(grid[0] >= dialog.user_data['recipe_columns']) {
+                // clear out unused columns to the right-hand side
+                while(grid[0] < dialog.data['widgets']['recipe_icon']['array'][0]) {
+                    var widget_name = grid[0].toString() + ',' + grid[1].toString();
+                    dialog.widgets['recipe_slot'+widget_name].show =
+                        dialog.widgets['recipe_icon'+widget_name].show =
+                        dialog.widgets['recipe_gray_outer'+widget_name].show =
+                        dialog.widgets['recipe_frame'+widget_name].show = false;
+                    grid[0] += 1;
+                }
+
+                grid[0] = 0; grid[1] += 1;
+            }
+        }
+
+        dialog.widgets['scroll_text'].show = !!dialog.data['widgets']['scroll_text']['show']; // allow hiding permanently
+        dialog.widgets['scroll_text'].str = dialog.data['widgets']['scroll_text']['ui_name'].replace('%d1',(first_recipe_on_page+1).toString()).replace('%d2',(last_recipe_on_page+1).toString()).replace('%d3',chapter_recipes.toString());
+    } else {
+        dialog.widgets['scroll_text'].show = false;
+    }
+
+    // clear out empty widgets
+    while(grid[1] < dialog.data['widgets']['recipe_icon']['array'][1]) {
+        while(grid[0] < dialog.data['widgets']['recipe_icon']['array'][0]) {
+            var widget_name = grid[0].toString() + ',' + grid[1].toString();
+            dialog.widgets['recipe_slot'+widget_name].show =
+                dialog.widgets['recipe_icon'+widget_name].show =
+                dialog.widgets['recipe_gray_outer'+widget_name].show =
+                dialog.widgets['recipe_frame'+widget_name].show = false;
+            grid[0] += 1;
+        }
+        grid[0] = 0; grid[1] += 1;
+    }
+
+    dialog.widgets['scroll_left'].widgets['scroll_left'].state = (page != 0 ? 'normal' : 'disabled');
+    dialog.widgets['scroll_left'].widgets['scroll_left_bg'].alpha = (page != 0 ? 0.86 : 0.25);
+    dialog.widgets['scroll_left'].widgets['scroll_left_bg'].fade_unless_hover = (page != 0 ? 0.5 : 1);
+    dialog.widgets['scroll_right'].widgets['scroll_right'].state = ((page < chapter_pages-1) ? 'normal' : 'disabled');
+    dialog.widgets['scroll_right'].widgets['scroll_right_bg'].alpha = ((page < chapter_pages-1) ? (flash_scroll ? 1 : 0.86) : 0.25);
+    dialog.widgets['scroll_right'].widgets['scroll_right_bg'].fade_unless_hover = ((page < chapter_pages-1) ? (flash_scroll ? 1 : 0.5) : 1);
+    dialog.widgets['scroll_left'].show = dialog.widgets['scroll_right'].show = (chapter_pages > 1);
+
+    // deal with the current item
     var emplacement_obj = dialog.user_data['emplacement'];
     var current_name = emplacement_obj.turret_head_item();
 
@@ -41,13 +197,14 @@ TurretHeadDialog.ondraw = function(dialog) {
         TurretHeadDialog.set_head_info(dialog.widgets['current'], current_name);
     }
 
+    // click-to-select
     dialog.widgets['click_to_select_arrow'].show =
         dialog.widgets['click_to_select'].show = !dialog.user_data['selected'];
-
 };
 
 // operates on turret_head_dialog_current
-/** @param {string} name of the turret head item */
+/** @param {SPUI.Dialog} dialog
+    @param {string} name of the turret head item */
 TurretHeadDialog.set_head_info = function(dialog, name) {
     var emplacement_obj = dialog.parent.user_data['emplacement'];
     var spec = ItemDisplay.get_inventory_item_spec(name);

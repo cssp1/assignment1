@@ -1888,18 +1888,18 @@
             "close_button": { "kind": "ActionButton", "xy": [706,1], "dimensions": [19,22], "bg_image": "close_button_small", "push_bg_image": 1 },
 
             "label_current": { "kind": "TextField", "xy": [35,74], "dimensions": [714,33], "text_size": 13, "text_hjustify": "left", "ui_name": "Current Weapon:" },
-            "label_new": { "kind": "TextField", "xy": [208,74], "dimensions": [714,33], "text_size": 13, "text_hjustify": "left", "ui_name": "New Weapon:" },
+            "label_new": { "kind": "TextField", "xy": [211,74], "dimensions": [714,33], "text_size": 13, "text_hjustify": "left", "ui_name": "New Weapon:" },
             "label_new_detail": { "kind": "TextField", "xy": [360,74], "dimensions": [714,33], "text_size": 13, "text_hjustify": "left", "ui_name": "New Weapon Detail:" },
 
-            "recipe_slot": { "kind": "ActionButton", "xy": [208,126], "dimensions": [50,50], "bg_image": "inventory_slot",
+            "recipe_slot": { "kind": "ActionButton", "xy": [213,126], "dimensions": [50,50], "bg_image": "inventory_slot",
                              "array": [2,3], "array_offset": [59,57] },
-            "recipe_icon": { "kind": "StaticImage", "xy": [208,126], "dimensions": [50,50],
+            "recipe_icon": { "kind": "StaticImage", "xy": [213,126], "dimensions": [50,50],
                              "array": [2,3], "array_offset": [59,57] },
             // we need a separate sprite to gray out uncraftable items, because we still want the frame to show a highlight
-            "recipe_gray_outer": { "kind": "StaticImage", "xy": [208,126], "dimensions": [50,50], "asset": "inventory_frame",
+            "recipe_gray_outer": { "kind": "StaticImage", "xy": [213,126], "dimensions": [50,50], "asset": "inventory_frame",
                                    "state": "disabled",
                                    "array": [2,3], "array_offset": [59,57] },
-            "recipe_frame": { "kind": "ActionButton", "xy": [208,126], "dimensions": [50,50], "bg_image": "inventory_frame",
+            "recipe_frame": { "kind": "ActionButton", "xy": [213,126], "dimensions": [50,50], "bg_image": "inventory_frame",
                               "ui_tooltip": "", "ui_tooltip_requires": "Requires: %s", "tooltip_delay":0,
                               "array": [2,3], "array_offset": [59,57] },
             "scroll_left": { "kind": "Dialog", "dialog": "crafting_dialog_scroll_left", "xy": [237,104], "dimensions": [50,16] },
@@ -1911,11 +1911,11 @@
             "click_to_select_arrow": { "show": 0, "kind": "StaticImage", "xy": [370,127], "dimensions": [69,46], "asset": "tutorial_arrow_left" },
             "click_to_select": { "show": 0, "kind": "TextField", "xy":[335,127], "dimensions": [410,46], "text_size": 15, "text_style": "bold", "ui_name": "Click to select a weapon" },
 
+            // display for currently-equipped head item
             "no_current": { "kind": "TextField", "xy":[25,140], "dimensions": [160,17], "text_size": 13, "text_style": "thick",
                             "ui_name": "No weapon equipped", "text_color": [0.4,0.4,0.4,1] },
             "current": { "show": 0, "kind": "Dialog", "dialog": "turret_head_dialog_current", "xy": [25,105], "dimensions":[160,205] },
-            //"mines": { "kind": "Dialog", "dialog": "crafting_dialog_status_mines", "xy": [0,0], "dimensions":[736,423] },
-            //"leaders": { "kind": "Dialog", "dialog": "crafting_dialog_status_leaders", "xy": [0,0], "dimensions":[736,423] },
+
 
             "flavor_text": { "kind": "TextField", "xy": [16,342], "dimensions": [378,60], "text_size": 13, "text_leading": 17, "text_hjustify": "left", "text_vjustify": "top",
                              "ui_name": "Change turret weapons to change defensive capabilities.\nUnlock higher turret weapon levels in the %s." },
