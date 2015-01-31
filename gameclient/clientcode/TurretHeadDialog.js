@@ -203,16 +203,27 @@ TurretHeadDialog.ondraw = function(dialog) {
     dialog.widgets['click_to_select_arrow'].show =
         dialog.widgets['click_to_select'].show = !selected_recipe_name;
     dialog.widgets['selected'].show = !!selected_recipe_name;
+
     if(dialog.widgets['selected'].show) {
-        TurretHeadDialog.set_recipe_display(dialog.widgets['selected'], dialog.user_data['emplacement'], selected_recipe_name);
+
+        TurretHeadDialog.set_recipe_display(dialog.widgets['selected'], dialog.user_data['emplacement'], selected_recipe_name, dialog);
+
+    } else {
+        dialog.widgets['instant_credits'].show =
+            dialog.widgets['instant_button'].show =
+            dialog.widgets['cost_time_bar'].show =
+            dialog.widgets['cost_time_clock'].show =
+            dialog.widgets['cost_time'].show =
+            dialog.widgets['use_resources_button'].show = false;
     }
 };
 
-// operates on turret_head_dialog_recipe
-/** @param {SPUI.Dialog} dialog
+/** operates on turret_head_dialog_recipe
+    @param {SPUI.Dialog} dialog
     @param {GameObject} emplacement_obj it will go onto
-    @param {string} recipe_name of the recipe */
-TurretHeadDialog.set_recipe_display = function(dialog, emplacement_obj, recipe_name) {
+    @param {string} recipe_name of the recipe
+    @param {SPUI.Dialog} parent dialog that contains the "Use Resource"/"Instant" buttons and price/time displays */
+TurretHeadDialog.set_recipe_display = function(dialog, emplacement_obj, recipe_name, parent) {
     var current_name = emplacement_obj.turret_head_item();
     var current_spec = (current_name ? ItemDisplay.get_inventory_item_spec(current_name) : null);
     var recipe_spec = gamedata['crafting']['recipes'][recipe_name];
@@ -222,13 +233,14 @@ TurretHeadDialog.set_recipe_display = function(dialog, emplacement_obj, recipe_n
 
     TurretHeadDialog.set_stats_display(dialog.widgets['stats'], emplacement_obj, product_name);
 
-    // XXX copy/pasted from update_upgrade_dialog()
+    // XXX most of this is copy/pasted from update_upgrade_dialog() - maybe unify into some kind of can_cast_spell variant
     var use_resources_offered = true;
     var use_resources_requirements_ok = true, instant_requirements_ok = true, resources_ok = true;
     var tooltip_req_instant = [], tooltip_req_use_resources = [];
     var resources_needed = {}; // dictionary of resource amounts needed
     var ui_resources_needed = [];
     var req = [];
+    var use_resources_helper = null, instant_helper = null;
 
     // RESOURCE requirement
     for(var res in gamedata['resources']) {
@@ -275,7 +287,6 @@ TurretHeadDialog.set_recipe_display = function(dialog, emplacement_obj, recipe_n
 
             dialog.widgets['cost_power'].str = pretty_print_number(new_power);
 
-            // do not display energy text in red for central computer upgrades, because they allow more plants to be built
             if((session.viewing_base.power_state[1] + new_power - old_power) > session.viewing_base.power_state[0]) {
                 dialog.widgets['cost_power'].text_color = SPUI.error_text_color;
                 // cannot craft?
@@ -285,29 +296,25 @@ TurretHeadDialog.set_recipe_display = function(dialog, emplacement_obj, recipe_n
         }
     }
 
+    // TIME requirement
+    parent.widgets['cost_time_bar'].show =
+        parent.widgets['cost_time_clock'].show =
+        parent.widgets['cost_time'].show = (current_name != product_name);
+    if(parent.widgets['cost_time'].show) {
+        parent.widgets['cost_time'].str = pretty_print_time(recipe_spec['craft_time']);
+    }
+
     // PREDICATE requirement
     if('requires' in recipe_spec) {
         var pred = read_predicate(get_leveled_quantity(recipe_spec['requires'], product_level));
-        var text = pred.ui_describe(player);  // XXX make ui_describe return a list
+        var text = pred.ui_describe(player);
         if(text) {
             req.push(text);
             use_resources_requirements_ok = instant_requirements_ok = false;
-            //var helper = get_requirements_help(pred, null);
+            use_resources_helper = instant_helper = get_requirements_help(pred, null);
         }
     }
-
     dialog.widgets['requirements_text'].set_text_with_linebreaking(req.join(', '));
-
-    for(var i = 0; i < req.length; i++) {
-        tooltip_req_instant.push(req[i]);
-        tooltip_req_use_resources.push(req[i]);
-    }
-    for(var i = 0; i < ui_resources_needed.length; i++) {
-        tooltip_req_use_resources.push(ui_resources_needed[i]);
-    }
-    if(tooltip_req_instant.length > 0) { tooltip_req_instant.splice(0, 0, dialog.parent.data['widgets']['use_resources_button']['ui_tooltip_unmet']); }
-    if(tooltip_req_use_resources.length > 0) { tooltip_req_use_resources.splice(0, 0, dialog.parent.data['widgets']['use_resources_button']['ui_tooltip_unmet']); }
-
 
     // DESCRIPTION
     if(1) {
@@ -322,6 +329,145 @@ TurretHeadDialog.set_recipe_display = function(dialog, emplacement_obj, recipe_n
             descr = descr_list.join('\n');
         }
         dialog.widgets['description'].str = descr;
+    }
+
+    // NOW THE ACTION BUTTONS
+
+    for(var i = 0; i < req.length; i++) {
+        tooltip_req_instant.push(req[i]);
+        tooltip_req_use_resources.push(req[i]);
+    }
+    for(var i = 0; i < ui_resources_needed.length; i++) {
+        tooltip_req_use_resources.push(ui_resources_needed[i]);
+    }
+    if(tooltip_req_instant.length > 0) { tooltip_req_instant.splice(0, 0, parent.data['widgets']['use_resources_button']['ui_tooltip_unmet']); }
+    if(tooltip_req_use_resources.length > 0) { tooltip_req_use_resources.splice(0, 0, parent.data['widgets']['use_resources_button']['ui_tooltip_unmet']); }
+
+    var craft_spellarg = {'recipe':recipe_name,
+                          'delivery':{'obj_id':emplacement_obj.id, 'slot_type':'turret_head', 'slot_index': 0, 'replace': 1}
+                         };
+
+    if(current_name != product_name) {
+        parent.widgets['use_resources_button'].show = use_resources_offered;
+        parent.widgets['use_resources_button'].tooltip.str = null;
+
+        var slow_func = (function (_parent, _obj, _recipe_spec, _product_name, _craft_spellarg) { return function() {
+
+            var new_config = (_obj.config ? goog.object.clone(_obj.config) : {});
+            new_config['turret_head'] = _product_name;
+            send_to_server.func(["CAST_SPELL", _obj.id, "CONFIG_SET", new_config]);
+
+            start_crafting(_obj, _recipe_spec, _craft_spellarg);
+            invoke_ui_locker(_obj.request_sync(), (function (__parent) { return function() { close_dialog(__parent); }; })(_parent));
+
+        }; })(parent, emplacement_obj, recipe_spec, product_name, craft_spellarg);
+
+        if(!emplacement_obj.is_in_sync()) {
+            parent.widgets['use_resources_button'].state = 'disabled';
+        } else if(use_resources_requirements_ok && resources_ok) {
+            parent.widgets['use_resources_button'].state = 'normal';
+            parent.widgets['use_resources_button'].onclick = slow_func;
+        } else {
+            parent.widgets['use_resources_button'].state = 'disabled';
+            if(tooltip_req_use_resources.length > 0) {
+                parent.widgets['use_resources_button'].tooltip.text_color = SPUI.error_text_color;
+                parent.widgets['use_resources_button'].tooltip.str = tooltip_req_use_resources.join('\n');
+            }
+
+            var button_is_normal = false;
+            if(!use_resources_helper && !resources_ok) {
+                // try a resource basket
+                // special case that leads to the "buy resources" dialog
+                use_resources_helper = get_requirements_help('resources', resources_needed, {continuation:slow_func});
+
+                // don't gray out the button if all resources can be topped-up
+                var can_topup = true;
+                for(var res in resources_needed) {
+                    if(!gamedata['resources'][res]['allow_topup']) {
+                        can_topup = false; break;
+                    }
+                }
+                if(can_topup) { button_is_normal = true; }
+            }
+
+            if(use_resources_helper) {
+                parent.widgets['use_resources_button'].state = (button_is_normal ? 'normal' : 'disabled_clickable');
+                parent.widgets['use_resources_button'].onclick = use_resources_helper;
+            }
+        }
+
+        // "Instant" button
+
+        if(get_leveled_quantity(recipe_spec['craft_gamebucks_cost']||-1, product_level) < 0) {
+            // instant upgrade not offered
+            parent.widgets['instant_button'].show = parent.widgets['instant_credits'].show = false;
+            parent.default_button = parent.widgets['use_resources_button'];
+
+            if(parent.widgets['use_resources_button'].state == 'normal') {
+                // make use_resources_button yellow and default
+                parent.widgets['use_resources_button'].state = 'active';
+            } else if(parent.widgets['use_resources_button'].state == 'disabled_clickable') {
+                // parent.widgets['use_resources_button'].state = 'normal'; ?
+            }
+        } else {
+            parent.widgets['instant_button'].show = parent.widgets['instant_credits'].show = true;
+            parent.default_button = parent.widgets['instant_button'];
+        }
+
+        var price = Store.get_user_currency_price(emplacement_obj.id, gamedata['spells']['CRAFT_FOR_MONEY'], craft_spellarg);
+
+        // just for diagnotics - price should always be -1 if requirements are not met
+        if(!instant_requirements_ok && price >= 0 && !player.is_cheater) {
+            throw Error('requirements/price mismatch for '+recipe_name);
+        }
+
+        widget = parent.widgets['instant_credits'];
+        widget.bg_image = player.get_any_abtest_value('price_display_asset', gamedata['store']['price_display_asset']);
+        widget.state = Store.get_user_currency();
+        widget.str = Store.display_user_currency_price(price); // PRICE
+        widget.tooltip.str = Store.display_user_currency_price_tooltip(price);
+
+        if(price < 0) {
+            // cannot make a purchase because tech requirements are not fulfilled
+            parent.widgets['instant_credits'].onclick = null;
+            parent.widgets['instant_button'].state = 'disabled';
+            if(tooltip_req_instant.length > 0) {
+                parent.widgets['instant_button'].tooltip.str = tooltip_req_instant.join('\n');
+                parent.widgets['instant_button'].tooltip.text_color = SPUI.error_text_color;
+            }
+            if(instant_helper) {
+                parent.widgets['instant_button'].state = 'disabled_clickable';
+                parent.widgets['instant_credits'].onclick = parent.widgets['instant_button'].onclick = instant_helper;
+            }
+        } else if(price == 0) {
+            throw Error('no code path for free instant craft');
+        } else {
+            if(!emplacement_obj.is_in_sync()) {
+                parent.widgets['instant_button'].state = 'disabled';
+                parent.widgets['instant_button'].str = parent.data['widgets']['instant_button']['ui_name_pending'];
+                parent.widgets['instant_credits'].parent = parent.widgets['instant_button'].onclick = null;
+            } else {
+                parent.widgets['instant_button'].state = 'normal';
+                parent.widgets['instant_button'].str = parent.data['widgets']['instant_button']['ui_name'];
+                parent.widgets['instant_credits'].onclick =
+                    parent.widgets['instant_button'].onclick = (function (_obj, _product_name, _craft_spellarg, _parent) { return function(w) {
+                        var dialog = w.parent;
+
+                        var new_config = (_obj.config ? goog.object.clone(_obj.config) : {});
+                        new_config['turret_head'] = _product_name;
+                        send_to_server.func(["CAST_SPELL", _obj.id, "CONFIG_SET", new_config]);
+
+                        if(Store.place_user_currency_order(_obj.id, "CRAFT_FOR_MONEY", _craft_spellarg,
+                                                           (function (__parent) { return function() { close_dialog(__parent); } })(_parent))) {
+                            invoke_ui_locker(_obj.request_sync());
+                        }
+                    }; })(emplacement_obj, product_name, craft_spellarg, parent);
+            }
+        }
+    } else { // this product is already equipped
+        parent.widgets['use_resources_button'].show =
+            parent.widgets['instant_credits'].show =
+            parent.widgets['instant_button'].show = false;
     }
 };
 

@@ -38672,7 +38672,7 @@ Store.get_base_price = function(unit_id, spell, spellarg, ignore_error) {
         }
         return [sum_price, p_currency];
 
-    } else if(formula === 'upgrade' || formula === 'research') {
+    } else if(formula === 'upgrade' || formula === 'research' || formula === 'craft_gamebucks') {
         var unit = null;
         if(unit_id == 0 && player.is_cheater && formula === 'research') {
 
@@ -38717,6 +38717,47 @@ Store.get_base_price = function(unit_id, spell, spellarg, ignore_error) {
             if(factor != 1) {
                 price = Math.round(factor*price);
             }
+        } else if(formula === 'craft_gamebucks') {
+            p_currency = 'gamebucks';
+            var delivery = spellarg['delivery'] || null;
+            var recipe = gamedata['crafting']['recipes'][spellarg['recipe']];
+            var recipe_level = spellarg['level'] || 1;
+            var category = gamedata['crafting']['categories'][recipe['crafting_category']];
+            if(category['foreman'] && player.foreman_is_busy()) {
+                return [-1, p_currency];
+            }
+            if(!player.is_cheater) {
+                for(var res in gamedata['resources']) {
+                    var resdata = gamedata['resources'][res];
+                    if(('allow_instant' in resdata) && !resdata['allow_instant']) {
+                        if(get_leveled_quantity(recipe['cost'][res] || 0, recipe_level) > 0) {
+                            return [-1, p_currency]; // requires rare resource
+                        }
+                    }
+                }
+                var pred_fail = false;
+                goog.array.forEach(['show_if','requires','activation'], function(predname) {
+                    if(predname in recipe && !read_predicate(recipe[predname]).is_satisfied(player, null)) { pred_fail = true; };
+                });
+                if(pred_fail) { return [-1, p_currency]; }
+            }
+            // check existing queue
+            // we don't bother with the more detailed checks the server does, since only a client bug would cause mal-formed requests here
+            var craft_queue = unit.get_client_prediction('crafting.queue', unit.crafting ? unit.crafting['queue'] : []);
+            if('queueable' in category && !category['queueable']) {
+                if(craft_queue.length > 0) { return [-1, p_currency]; } // note: doesn't handle uncollected finished jobs
+            }
+
+            // check destination slot
+            if(delivery && delivery['obj_id'] && !delivery['replace']) {
+                var other = session.cur_objects.objects[delivery['obj_id']];
+                if(other.equipment && delivery['slot_type'] in other.equipment && other.equipment[delivery['slot_type']][delivery['slot_index']||0]) {
+                    return [-1, p_currency];
+                }
+            }
+
+            price = get_leveled_quantity(recipe['craft_gamebucks_cost']||-1, recipe_level);
+
         } else {
             // tech research
             var spec = gamedata['tech'][spellarg];
