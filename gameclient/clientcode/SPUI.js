@@ -2025,7 +2025,7 @@ SPUI.ActionButton.prototype.do_draw = function(offset) {
         var art_asset = GameArt.assets[this.bg_image];
         var draw_state = this.state;
         if(!art_asset || !(draw_state in art_asset.states)) {
-            throw Error('undefined art asset "'+this.bg_image+'" state "'+draw_state+'"');
+            throw Error('undefined art asset "'+this.bg_image+'" state "'+draw_state+'" in '+this.get_address());
         }
 
         if(this.pushed && ('pushed' in art_asset.states || art_asset.states[draw_state].on_push)) {
