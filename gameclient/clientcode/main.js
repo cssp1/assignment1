@@ -18239,9 +18239,9 @@ function invoke_find_on_map(region_id, target_loc) {
                                         {'dialog': 'message_dialog_big',
                                          'cancel_button':true, 'close_button':true,
                                          'ok_button_ui_name': s['ui_button'],
-                                         'on_ok': btn[0][1],
-                                         'ok_button_state': btn[0][2],
-                                         'ok_button_tooltip':btn[0][3]});
+                                         'on_ok': btn[0].onclick,
+                                         'ok_button_state': btn[0].state || 'normal',
+                                         'ok_button_tooltip':btn[0].ui_tooltip});
         } else {
             // different continent
             var bridge = continent_bridge_available();
@@ -18659,9 +18659,9 @@ function update_map_ladder_pvp_dialog(dialog) {
         // TEMPORARY TR ladder->map transition version
         var btn = [];
         add_change_region_button(btn); // reuse the code from the building context menu
-        dialog.widgets['relocate_button'].onclick = btn[0][1];
-        dialog.widgets['relocate_button'].state = btn[0][2];
-        dialog.widgets['relocate_button'].tooltip.str = btn[0][3];
+        dialog.widgets['relocate_button'].onclick = btn[0].onclick;
+        dialog.widgets['relocate_button'].state = btn[0].state || 'normal';
+        dialog.widgets['relocate_button'].tooltip.str = btn[0].ui_tooltip;
     }
 
     // update fight button based on how many resources the user now has and their army size
