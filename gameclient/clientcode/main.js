@@ -36,6 +36,7 @@ goog.require('SPVideoWidget');
 goog.require('ItemDisplay');
 goog.require('Dripper');
 goog.require('Showcase');
+goog.require('TurretHeadDialog');
 goog.require('QuestBar');
 goog.require('UpgradeBar');
 goog.require('RegionMap');
@@ -17233,7 +17234,7 @@ function invoke_building_context_menu(mouse_xy) {
                 var spell = gamedata['spells']['CRAFT_FOR_FREE'];
                 special_buttons['head'] = [];
                 special_buttons['head'].push(new ContextMenuButton(spell['ui_name_building_context_emplacement'],
-                                                                   function() { console.log('XXXXXX invoke crafting dialog for turret head'); }));
+                                                                   (function (_obj) { return function(w) { TurretHeadDialog.invoke(_obj); }; })(obj)));
                 var cur_item_name = obj.turret_head_item();
                 if(cur_item_name) {
                     var item_spec = ItemDisplay.get_inventory_item_spec(cur_item_name);
