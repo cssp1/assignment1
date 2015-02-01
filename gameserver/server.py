@@ -16958,12 +16958,14 @@ class GAMEAPI(resource.Resource):
             retmsg.append(["ERROR", "OBJECT_IS_NOT_CAPABLE"])
             return
 
+        catdata = gamedata['crafting']['categories'][recipe['crafting_category']]
+
         # check delivery options
-        delivery = recipe.get('delivery', gamedata['crafting']['categories'][recipe['crafting_category']].get('delivery', None))
+        delivery = recipe.get('delivery', catdata.get('delivery', None))
         if delivery == 'building_slot':
             if (not delivery_address) or \
                ('obj_id' not in delivery_address) or ('slot_type' not in delivery_address) or \
-               (delivery_address['slot_type'] != gamedata['crafting']['categories'][recipe['crafting_category']]['delivery_slot_type']) or \
+               (delivery_address['slot_type'] != catdata['delivery_slot_type']) or \
                (not session.has_object(delivery_address['obj_id'])) or \
                (session.get_object(delivery_address['obj_id']) not in session.player.home_base_iter()):
                 retmsg.append(["ERROR", "OBJECT_IS_NOT_CAPABLE"])
@@ -16986,6 +16988,11 @@ class GAMEAPI(resource.Resource):
         if object.is_damaged() or object.is_upgrading() or object.is_under_construction() or object.is_researching() or object.is_manufacturing():
             retmsg.append(["ERROR", "WORKSHOP_IS_BUSY", object.obj_id])
             return
+
+        if catdata.get('foreman', False) and session.player.foreman_is_busy():
+            retmsg.append(["ERROR", "FOREMAN_IS_BUSY"])
+            return
+
         # check predicates
         for PRED in ('show_if', 'activation','requires'):
             if PRED in recipe:
@@ -17021,7 +17028,6 @@ class GAMEAPI(resource.Resource):
                     return
 
         # check for queue usage exclusivity and collection buffer
-        catdata = gamedata['crafting']['categories'][recipe['crafting_category']]
 
         if object.is_crafting():
             uncollected = 0
@@ -17035,7 +17041,7 @@ class GAMEAPI(resource.Resource):
 
                 # queueability constraint - if crafting is still in progress, and new recipe is not queuable, then we cannot start it
                 if not bus.is_complete(server_time):
-                    if not gamedata['crafting']['categories'][recipe['crafting_category']].get('queueable', True):
+                    if not catdata.get('queueable', True):
                         retmsg.append(["ERROR", "WORKSHOP_IS_BUSY", object.obj_id])
                         return
 

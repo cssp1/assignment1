@@ -38723,9 +38723,13 @@ Store.get_base_price = function(unit_id, spell, spellarg, ignore_error) {
             var recipe = gamedata['crafting']['recipes'][spellarg['recipe']];
             var recipe_level = spellarg['level'] || 1;
             var category = gamedata['crafting']['categories'][recipe['crafting_category']];
+
+            /* allow instant upgrades even if foreman is busy
             if(category['foreman'] && player.foreman_is_busy()) {
                 return [-1, p_currency];
             }
+            */
+
             if(!player.is_cheater) {
                 for(var res in gamedata['resources']) {
                     var resdata = gamedata['resources'][res];

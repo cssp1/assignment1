@@ -227,6 +227,7 @@ TurretHeadDialog.set_recipe_display = function(dialog, emplacement_obj, recipe_n
     var current_name = emplacement_obj.turret_head_item();
     var current_spec = (current_name ? ItemDisplay.get_inventory_item_spec(current_name) : null);
     var recipe_spec = gamedata['crafting']['recipes'][recipe_name];
+    var category = gamedata['crafting']['categories'][recipe_spec['crafting_category']];
     var product_name = recipe_spec['product'][0]['spec'];
     var product_spec = ItemDisplay.get_inventory_item_spec(product_name);
     var product_level = product_spec['level'];
@@ -367,7 +368,20 @@ TurretHeadDialog.set_recipe_display = function(dialog, emplacement_obj, recipe_n
             parent.widgets['use_resources_button'].state = 'disabled';
         } else if(use_resources_requirements_ok && resources_ok) {
             parent.widgets['use_resources_button'].state = 'normal';
-            parent.widgets['use_resources_button'].onclick = slow_func;
+            if(category['foreman'] && player.foreman_is_busy()) {
+                var helper = get_requirements_help('foreman', null);
+                if(helper) {
+                    parent.widgets['use_resources_button'].onclick = helper;
+                } else {
+                    parent.widgets['use_resources_button'].onclick = function(w) {
+                        var busy_obj = player.foreman_get_tasks()[0]; // this just prompts to speed up one possible building
+                        change_selection(busy_obj);
+                        invoke_speedup_dialog('busy');
+                    };
+                }
+            } else {
+                parent.widgets['use_resources_button'].onclick = slow_func;
+            }
         } else {
             parent.widgets['use_resources_button'].state = 'disabled';
             if(tooltip_req_use_resources.length > 0) {
