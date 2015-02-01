@@ -3807,7 +3807,15 @@ Building.prototype.is_emplacement = function() { return this.spec['equip_slots']
 // return the name of the turret head item equipped here, if any, otherwise null
 Building.prototype.turret_head_item = function() {
     if(this.equipment && this.equipment['turret_head'] && this.equipment['turret_head'].length > 0) {
-        return this.equipment['turret_head'];
+        return this.equipment['turret_head'][0];
+    }
+    return null;
+};
+// return name of turret head item currently being crafted (assumes is_crafting() is true)
+Building.prototype.turret_head_inprogress_item = function() {
+    var craft_queue = this.get_client_prediction('crafting.queue', this.crafting ? this.crafting['queue'] : []);
+    if(craft_queue.length > 0) {
+        return gamedata['crafting']['recipes'][craft_queue[0]['craft']['recipe']]['product'][0]['spec'];
     }
     return null;
 };
@@ -15861,7 +15869,12 @@ function do_invoke_speedup_dialog(kind) {
             description_finish = gamedata['strings']['speedup']['finish_tech_unlock'].replace('%s', gamedata['tech'][selection.unit.research_item]['ui_name']);
         }
     } else if(selection.unit.is_crafting()) {
-        description_finish = gamedata['strings']['speedup']['finish_crafting'].replace('%s', selection.unit.spec['ui_name']);
+        if(selection.unit.is_emplacement()) {
+            var ui_name = ItemDisplay.get_inventory_item_ui_name(ItemDisplay.get_inventory_item_spec(selection.unit.turret_head_inprogress_item()));
+            description_finish = gamedata['strings']['speedup']['finish_turret_head'].replace('%s', ui_name);
+        } else {
+            description_finish = gamedata['strings']['speedup']['finish_crafting'].replace('%s', selection.unit.spec['ui_name']);
+        }
     } else if(selection.unit.is_manufacturing()) {
         description_finish = gamedata['strings']['speedup']['finish_manufacturing'].replace('%s', selection.unit.spec['ui_name']);
     } else {
@@ -17177,36 +17190,49 @@ function invoke_building_context_menu(mouse_xy) {
 
             if(session.home_base && obj.is_crafter()) {
                 var cat = gamedata['crafting']['categories'][obj.spec['crafting_categories'][0]];
-                buttons.push(new ContextMenuButton(cat['ui_verb'] || gamedata['spells']['CRAFT_FOR_FREE']['ui_name'],
-                              (function (_cat) { return function() {
-                                  if(_cat['dialog'] == 'fishing_dialog') {
-                                      invoke_fishing_dialog();
-                                  } else if(_cat['table_of_contents']) {
-                                      invoke_crafting_table_of_contents_dialog(_cat['name']);
-                                  } else {
-                                      invoke_crafting_dialog(_cat['name']);
-                                  }
-                              }; })(cat)));
+
+                if(!obj.is_emplacement()) { // turret emplacements have special case, see below
+                    buttons.push(new ContextMenuButton(cat['ui_verb'] || gamedata['spells']['CRAFT_FOR_FREE']['ui_name'],
+                                                       (function (_cat) { return function() {
+                                                           if(_cat['dialog'] == 'fishing_dialog') {
+                                                               invoke_fishing_dialog();
+                                                           } else if(_cat['table_of_contents']) {
+                                                               invoke_crafting_table_of_contents_dialog(_cat['name']);
+                                                           } else {
+                                                               invoke_crafting_dialog(_cat['name']);
+                                                           }
+                                                       }; })(cat)));
+                }
+
                 if(obj.is_crafting()) {
+                    // for turret emplacements, add the speedup/cancel buttons above the divider
+                    var which_buttons;
+                    if(obj.is_emplacement()) {
+                        if(!('head' in special_buttons)) { special_buttons['head'] = []; }
+                        which_buttons = special_buttons['head'];
+                    } else {
+                        which_buttons = buttons;
+                    }
+
                     cat = gamedata['crafting']['categories'][gamedata['crafting']['recipes'][obj.is_crafting()]['crafting_category']];
                     if(player.crafting_speedups_enabled() && obj.crafting_progress_one() >= 0) {
                         if(('speedupable' in cat) && !cat['speedupable']) {
                             // cannot be sped up
                         } else {
-                            buttons.push(new ContextMenuButton(gamedata['spells']['SPEEDUP_FOR_MONEY']['ui_name'], function() {invoke_speedup_dialog('speedup'); }));
+                            which_buttons.push(new ContextMenuButton(gamedata['spells']['SPEEDUP_FOR_MONEY']['ui_name'], function() {invoke_speedup_dialog('speedup'); }));
                         }
                     }
                     if(('cancelable' in cat) && !cat['cancelable']) {
                         // not cancelable
                     } else if(obj.crafting_progress_one() >= 0) {
-                        buttons.push(new ContextMenuButton(cat['ui_cancel_verb'] || gamedata['spells']['CANCEL_CRAFT']['ui_name'],
-                                      (function (_unit, _cat) { return function() {
-                                          change_selection_ui(null);
-                                          invoke_confirm_cancel_message(cat['confirm_cancel_kind'] || 'crafting', (function (__unit) {
-                                              return function() {
-                                                  cancel_unfinished_crafting(__unit);
-                                              }; })(_unit));
-                                      }; })(selection.unit, cat)));
+                        which_buttons.push(new ContextMenuButton(cat['ui_cancel_verb'] || gamedata['spells']['CANCEL_CRAFT']['ui_name'],
+                                                                 (function (_unit, _cat) { return function() {
+                                                                     change_selection_ui(null);
+                                                                     invoke_confirm_cancel_message(cat['confirm_cancel_kind'] || 'crafting', (function (__unit) {
+                                                                         return function() {
+                                                                             cancel_unfinished_crafting(__unit);
+                                                                         }; })(_unit));
+                                                                 }; })(selection.unit, cat)));
                     }
                 }
             }
@@ -17231,16 +17257,19 @@ function invoke_building_context_menu(mouse_xy) {
 
             if(session.home_base && obj.is_emplacement()) { // special case for emplacements
                 dialog_name = 'emplacement_context_menu';
-                var spell = gamedata['spells']['CRAFT_FOR_FREE'];
-                special_buttons['head'] = [];
-                special_buttons['head'].push(new ContextMenuButton(spell['ui_name_building_context_emplacement'],
-                                                                   (function (_obj) { return function(w) { TurretHeadDialog.invoke(_obj); }; })(obj)));
+                if(obj.time_until_finish() <= 0) {
+                    var spell = gamedata['spells']['CRAFT_FOR_FREE'];
+                    special_buttons['head'] = [];
+                    special_buttons['head'].push(new ContextMenuButton(spell['ui_name_building_context_emplacement'],
+                                                                       (function (_obj) { return function(w) { TurretHeadDialog.invoke(_obj); }; })(obj)));
+                }
+
                 var cur_item_name = obj.turret_head_item();
                 if(cur_item_name) {
                     var item_spec = ItemDisplay.get_inventory_item_spec(cur_item_name);
                     if(item_spec && item_spec['associated_tech']) {
-                        spell = gamedata['spells']['RESEARCH_FOR_FREE'];
-                        special_buttons['head'].push(new ContextMenuButton(spell['ui_name_building_context_emplacement'],
+                        var upgr_spell = gamedata['spells']['RESEARCH_FOR_FREE'];
+                        special_buttons['head'].push(new ContextMenuButton(upgr_spell['ui_name_building_context_emplacement'],
                                                                            (function (_techname) { return function() {
                                                                                invoke_upgrade_tech_dialog(_techname, null);
                                                                            }; })(item_spec['associated_tech'])));
@@ -17351,20 +17380,22 @@ function invoke_building_context_menu(mouse_xy) {
     }
 
     if(obj.is_building() && obj.is_emplacement()) {
-        var cur_item_name = obj.turret_head_item();
-        dialog.widgets['head_title'].str = dialog.data['widgets']['head_title']['ui_name_empty'];
-        dialog.widgets['head_level'].show = false;
+        var cur_item_name = obj.turret_head_item() || obj.turret_head_inprogress_item();
+
         if(cur_item_name) {
             var item_spec = ItemDisplay.get_inventory_item_spec(cur_item_name);
             if(item_spec) {
-                dialog.widgets['head_title'] = ItemDisplay.get_inventory_item_ui_name(item_spec);
+                dialog.widgets['head_title'].str = ItemDisplay.get_inventory_item_ui_name(item_spec);
                 if(item_spec['associated_tech']) {
                     var item_cur_level = item_spec['level']; // note: level of item itself, NOT the tech
                     var tech_max_level = get_max_level(gamedata['tech'][item_spec['associated_tech']]);
                     dialog.widgets['head_level'].show = true;
-                    dialog.widgets['level'].str = dialog.data['widgets']['level']['ui_name'].replace('%d0', item_cur_level).replace('%d1', tech_max_level);
+                    dialog.widgets['head_level'].str = dialog.data['widgets']['level']['ui_name'].replace('%d0', item_cur_level).replace('%d1', tech_max_level);
                 }
             }
+        } else {
+            dialog.widgets['head_title'].str = dialog.data['widgets']['head_title']['ui_name_empty'];
+            dialog.widgets['head_level'].show = false;
         }
     }
 
@@ -17444,7 +17475,9 @@ function invoke_generic_context_menu(xy, buttons, dialog_name, special_buttons) 
         var i;
         for(i = 0; i < buttons.length; i++) {
             var but = buttons[i];
-            var widget = dialog.widgets[(prefix ? prefix+'_' : '')+'button'+i.toString()];
+            var wname = (prefix ? prefix+'_' : '')+'button'+i.toString();
+            if(!wname in dialog.widgets) { throw Error('bad wname '+wname); }
+            var widget = dialog.widgets[wname];
             if(!but.ui_name) { throw Error('blank ui_name for button on '+dialog_name); }
             widget.str = but.ui_name;
             widget.onclick = (function (_cb) { return function(w) {
@@ -45243,12 +45276,12 @@ Building.prototype.get_idle_state_legacy = function() {
     } else if(this.is_researcher()) {
         if(!this.is_researching()) { draw_idle_icon = 'research'; }
     } else if(this.is_crafter()) {
-        if(!this.is_crafting() || this.crafting_progress_one() < 0) {
+        if((!this.is_crafting() || this.crafting_progress_one() < 0) && !(this.is_emplacement() && this.turret_head_item())) {
             var cat = gamedata['crafting']['categories'][this.spec['crafting_categories'][0]];
             draw_idle_icon = cat['idle_state'] || 'craft';
             if(draw_idle_icon == 'fish') {
                 if(player.cooldown_active('fish_slate_assigned')) {
-                    // show now idle icon if all available fishing SKUs are exhausted
+                    // show no idle icon if all available fishing SKUs are exhausted
                     if(!goog.object.findKey(gamedata['crafting']['recipes'], function(recipe) {
                         return (recipe['crafting_category'] == 'fishing' && read_predicate(recipe['show_if']).is_satisfied(player, null));
                     })) {
@@ -45397,7 +45430,7 @@ Building.prototype.get_idle_state_advanced = function() {
                 }
             }
         }
-    } else if(this.is_crafter() && (!this.is_crafting() || this.crafting_progress_one() < 0)) {
+    } else if(this.is_crafter() && (!this.is_crafting() || this.crafting_progress_one() < 0) && !(this.is_emplacement() && this.turret_head_item())) {
         for(var i = 0; i < this.spec['crafting_categories'].length; i++) {
             var cat = this.spec['crafting_categories'][i];
             if(cat == 'mines') {

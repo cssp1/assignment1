@@ -303,7 +303,9 @@ TurretHeadDialog.set_recipe_display = function(dialog, emplacement_obj, recipe_n
         parent.widgets['cost_time_clock'].show =
         parent.widgets['cost_time'].show = (current_name != product_name);
     if(parent.widgets['cost_time'].show) {
-        parent.widgets['cost_time'].str = pretty_print_time(recipe_spec['craft_time']);
+        var speed = emplacement_obj.get_stat('crafting_speed', emplacement_obj.get_leveled_quantity(emplacement_obj.spec['crafting_speed'] || 1.0));
+        var cost_time = Math.max(1, Math.floor(get_leveled_quantity(recipe_spec['craft_time'], product_level) / speed));
+        parent.widgets['cost_time'].str = pretty_print_time(cost_time);
     }
 
     // PREDICATE requirement
