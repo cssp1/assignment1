@@ -4832,23 +4832,24 @@ class Equipment (object):
 
     # check that there actually exists an item of the right spec at this address
     @staticmethod
-    def equip_has(equipment, addr, specname):
+    def equip_has(equipment, addr, specname = None):
         assert type(equipment) is dict
         slot_type, slot_num = addr
         if not equipment: return False
         if slot_type not in equipment: return False
         if slot_num >= len(equipment[slot_type]): return False
-        if equipment[slot_type][slot_num] != specname: return False
+        if specname and (equipment[slot_type][slot_num] != specname): return False
         return True
 
     @staticmethod
-    def equip_remove(equipment, addr, specname):
+    def equip_remove(equipment, addr, specname = None):
         assert type(equipment) is dict
         slot_type, slot_num = addr
-        assert Equipment.equip_has(equipment, addr, specname)
+        assert Equipment.equip_has(equipment, addr, specname = specname)
+        old_item = {'spec': equipment[slot_type][slot_num]}
         equipment[slot_type][slot_num] = None
         if not any(equipment[slot_type]): del equipment[slot_type]
-        return True
+        return old_item
 
     @staticmethod
     def equip_add(equipment, my_spec, my_level, addr, item_spec, probe_only = False, probe_will_remove = False):
@@ -16950,6 +16951,10 @@ class GAMEAPI(resource.Resource):
         if ui_tag: # sanity-check against DoS
             assert type(ui_tag) in (str, unicode)
             assert len(ui_tag) < 128
+
+        # replace item that's already in destination slot? (pre-existing item will be destroyed when crafting starts with no refund)
+        do_replace = delivery_address and delivery_address.get('replace', False)
+
         recipe = gamedata['crafting']['recipes'].get(recipe_name, None)
         # check sanity
         if (not recipe) or (not object.is_crafter()) or \
@@ -16979,10 +16984,11 @@ class GAMEAPI(resource.Resource):
                         return
 
             # anti-race check #2 - check if destination slot is already full
-            target = session.get_object(delivery_address['obj_id'])
-            if not Equipment.equip_add(target.equipment or {}, target.spec, target.level, (delivery_address['slot_type'],delivery_address.get('slot_index',0)), gamedata['items'][recipe['product'][0]['spec']], probe_only = True):
-                retmsg.append(["ERROR", "EQUIP_INVALID"])
-                return
+            target = session.get_object(delivery_address['obj_id']) # target will be used below if do_replace is true
+            if not do_replace:
+                if not Equipment.equip_add(target.equipment or {}, target.spec, target.level, (delivery_address['slot_type'],delivery_address.get('slot_index',0)), gamedata['items'][recipe['product'][0]['spec']], probe_only = True):
+                    retmsg.append(["ERROR", "EQUIP_INVALID"])
+                    return
 
         # check workshop business
         if object.is_damaged() or object.is_upgrading() or object.is_under_construction() or object.is_researching() or object.is_manufacturing():
@@ -17082,6 +17088,16 @@ class GAMEAPI(resource.Resource):
                 d -= min(max(server_time - entry.start_time, 0), entry.total_time)
             delay += d
         object.crafting.queue.append(Business.CraftingBusiness(state, init_total_time = craft_time, init_start_time = server_time + max(0, delay)))
+
+        # destroy currently-equipped item in target slot
+        if do_replace and delivery == 'building_slot' and target.equipment and \
+           Equipment.equip_has(target.equipment, (delivery_address['slot_type'],delivery_address.get('slot_index',0))):
+            removed = Equipment.equip_remove(target.equipment, (delivery_address['slot_type'],delivery_address.get('slot_index',0)))
+            if len(target.equipment) < 1:
+                target.equipment = None
+            session.player.inventory_log_event('5131_item_trashed', removed['spec'], -removed.get('stack',1), removed.get('expire_time',-1), reason='replaced')
+            if target is not object:
+                retmsg.append(["OBJECT_STATE_UPDATE2", target.serialize_state()])
 
         if 'on_start' in recipe:
             session.execute_consequent_safe(recipe['on_start'], session.player, retmsg, reason='crafting_recipe:%s:on_start' % recipe['name'])
