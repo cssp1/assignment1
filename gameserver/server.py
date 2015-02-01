@@ -5523,6 +5523,15 @@ class Building(GameObject):
                 ret[res] = ret.get(res,0) + amount
         return ret
 
+    def affects_power(self):
+        return bool(self.spec.provides_power) or \
+               bool(self.spec.consumes_power) or \
+               (self.equipment and any((item['spec'] in gamedata['items'] and gamedata['items'][item['spec']]['equip'].get('consumes_power',0)>0) \
+                                       for item in Equipment.equip_iter(self.equipment))) or \
+               (self.is_crafting() and any(entry.craft_state['recipe'] in gamedata['crafting']['receipes'] and \
+                                           gamedata['crafting']['recipes'][entry.craft_state['recipe']].get('consumes_power',0)>0 \
+                                           for entry in self.crafting.queue))
+
     def is_producer(self):
         return (self.get_leveled_quantity(self.spec.production_capacity) > 0)
 
@@ -5875,6 +5884,24 @@ class Base(object):
                         power[1] += GameObjectSpec.get_leveled_quantity(obj.spec.consumes_power_while_building, obj.level + 1)
                     else:
                         power[1] += obj.get_leveled_quantity(obj.spec.consumes_power)
+
+                    # items
+                    if obj.equipment:
+                        for item in Equipment.equip_iter(obj.equipment):
+                            if item['spec'] in gamedata['items']:
+                                item_spec = gamedata['items'][item['spec']]
+                                if 'equip' in item_spec:
+                                    power[1] += item_spec['equip'].get('consumes_power',0)
+
+                    # in-progress crafting recipes
+                    if obj.is_crafting():
+                        to_add = 0 # add max() of power consumed by all queued recipes
+                        for entry in obj.crafting.queue:
+                            if not entry.is_complete():
+                                if entry.craft_state['recipe'] in gamedata['crafting']['recipes']:
+                                    to_add = max(to_add, gamedata['crafting']['recipes'][entry.craft_state['recipe']].get('consumes_power',0))
+                        power[1] += to_add
+            gamesite.exception_log.event(server_time, 'power %r' % (power))
         return power
 
     def get_base_radius(self):
@@ -16233,7 +16260,7 @@ class GAMEAPI(resource.Resource):
                 if do_buildings and object.is_building() and object.is_damaged():
                     object.repair_finish_time = server_time - 1
                     self.ping_object(session, retmsg, object.obj_id, session.viewing_base)
-                    if object.spec.provides_power or object.spec.consumes_power:
+                    if object.affects_power():
                         recalc_power = True
                 elif do_units and object.is_mobile() and session.player.can_repair_unit(object): # and object.is_damaged():
                     # do this unconditionally, because object combat upates showing damage might be in-flight
@@ -17060,6 +17087,8 @@ class GAMEAPI(resource.Resource):
         if recipe['crafting_category'] == 'fishing':
             session.player.fishing_log_event('5150_fish_start', object.crafting.queue[0], ui_index = spellargs[0].get('ui_index',None), time_left = craft_time)
 
+        self.power_changed(session, session.viewing_base, object, retmsg)
+
     def do_cancel_craft(self, session, retmsg, object, spellarg):
         if not object.is_crafting(): return
 
@@ -17122,6 +17151,8 @@ class GAMEAPI(resource.Resource):
 
         if recipe['crafting_category'] == 'fishing':
             session.player.fishing_log_event('5152_fish_cancel', bus, time_left = time_left)
+
+        self.power_changed(session, session.viewing_base, object, retmsg)
 
     # collect product(s) for one crafting attempt.
     # returns [need_history_update, list_of_product_items, attempt_id for completed attempt]
@@ -17234,6 +17265,8 @@ class GAMEAPI(resource.Resource):
             retmsg.append(["LOOT_BUFFER_UPDATE", session.player.loot_buffer, True])
         if completed_ids:
             retmsg.append(["PLAYER_STATE_UPDATE", session.player.resources.calc_snapshot().serialize()])
+
+        self.power_changed(session, session.viewing_base, object, retmsg)
 
         if need_history_update and (object.owner is session.player):
             session.player.send_history_update(retmsg)
@@ -17808,6 +17841,7 @@ class GAMEAPI(resource.Resource):
         if len(obj.equipment) < 1: obj.equipment = None
 
         if ret:
+            self.power_changed(session, session.viewing_base, obj, retmsg)
             session.player.recalc_stattab(session.player)
             session.player.stattab.send_update(session, retmsg)
             if obj.is_producer():
@@ -18860,7 +18894,7 @@ class GAMEAPI(resource.Resource):
     # it re-initializes harvesters with the correct harvesting rate
     def power_changed(self, session, base, changed_object, retmsg):
         if not gamedata['enable_power']: return 1
-        if changed_object and (not (changed_object.spec.consumes_power or changed_object.spec.provides_power)): return 1
+        if changed_object and (not (changed_object.is_building() and changed_object.affects_power())): return 1
 
         power_state = base.get_power_state()
         power_factor = compute_power_factor(power_state)
@@ -19117,7 +19151,7 @@ class GAMEAPI(resource.Resource):
 
                 obj.hp = newhp
 
-                if obj.spec.consumes_power or obj.spec.provides_power:
+                if obj.is_building() and obj.affects_power():
                     recalc_power = True
 
                 # client initiated the damage - do not send OBJECT_STATE_UPDATE
@@ -21325,7 +21359,7 @@ class GAMEAPI(resource.Resource):
                     obj.owner.unit_repair_cancel(obj)
                 if obj in session.viewing_base.iter_objects():
                     session.viewing_base.drop_object(obj)
-                if obj.is_building() and (obj.spec.provides_power or obj.spec.consumes_power):
+                if obj.is_building():
                     self.power_changed(session, session.viewing_base, obj, retmsg)
                 retmsg.append(["PLAYER_STATE_UPDATE", session.player.resources.calc_snapshot().serialize()])
 
