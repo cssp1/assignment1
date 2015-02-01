@@ -6,6 +6,12 @@
 # gamedata Make rules common to all game titles
 # note: run from the root gamedata/ directory
 
+# requires environment variable:
+# GAME_ID: game title ID
+# PROCESSOR_ARGS: to be passed to preproces.py
+# DO_VERIFY: "1" if you want to run verify.py
+# VERIFY_ARGS: to be passed to verify.py
+
 GAMEDATA=.
 BUILT=${GAME_ID}/built
 PROCESSOR=${GAMEDATA}/preprocess.py
@@ -19,7 +25,7 @@ clean:
 	rm -f ${BUILT}/*
 
 # gather all dependency info
-# this is done for gamedata_main.json as well as the individual JSON files that are built but not linked into it
+# this is done for gamedata_main.json as well as each individual JSON file that is built but not linked into main
 dep:
 	rm -f ${BUILT}/deps
 	${PROCESSOR} -g ${GAME_ID} --get-deps ${GAME_ID}/${GAME_ID}_loading_screens.json --get-deps-as ${BUILT}/${GAME_ID}_loading_screens_compiled.json >> ${BUILT}/deps
@@ -88,10 +94,30 @@ ${BUILT}/${GAME_ID}_quests_tech_mods.json: ${GAMEDATA}/make_quests_tech_mods.py 
 ${BUILT}/${GAME_ID}_inverse_requirements.json: ${GAMEDATA}/invert_requirements.py ${GAME_ID}/${GAME_ID}_predicate_library.json ${GAME_ID}/${GAME_ID}_buildings.json ${BUILT}/${GAME_ID}_tech_compiled.json ${BUILT}/${GAME_ID}_crafting_compiled.json
 	@echo "    ${GAME_ID}_inverse_requirements.json..." && ${GAMEDATA}/invert_requirements.py -g ${GAME_ID} ${GAME_ID}/${GAME_ID}_predicate_library.json ${GAME_ID}/${GAME_ID}_buildings.json ${BUILT}/${GAME_ID}_tech_compiled.json ${BUILT}/${GAME_ID}_crafting_compiled.json $@
 
-${BUILT}/gamedata-${GAME_ID}.json.unverified: gamedata_main.json
+# master main JSON file
+${BUILT}/gamedata-${GAME_ID}.json.unverified: ${GAMEDATA}/gamedata_main.json
 	@echo "    gamedata-${GAME_ID}.json..." && ${PROCESSOR} ${PROCESSOR_ARGS} $< -o $@
 
-all: ${BUILT}/gamedata-${GAME_ID}.json.unverified \
+# same as above, but passed through the verifier
+${BUILT}/gamedata-${GAME_ID}.json: ${GAMEDATA}/verify.py ${BUILT}/gamedata-${GAME_ID}.json.unverified \
+	${BUILT}/${GAME_ID}_ai_bases_compiled.json \
+        ${BUILT}/${GAME_ID}_ai_attacks_compiled.json \
+        ${BUILT}/${GAME_ID}_quarries_compiled.json \
+        ${BUILT}/${GAME_ID}_hives_compiled.json \
+        ${BUILT}/${GAME_ID}_loot_tables_compiled.json \
+        ${BUILT}/${GAME_ID}_promo_codes_compiled.json \
+	${BUILT}/${GAME_ID}_server_compiled.json \
+	${BUILT}/${GAME_ID}_loading_screens_compiled.json
+ifeq (${DO_VERIFY}, 1)
+	@echo "Checking gamedata-${GAME_ID}.json for errors..."
+	@(cd ${GAMEDATA} && ./${^} ${VERIFY_ARGS})
+else
+	@echo "Skipping verification."
+endif
+# note: only perform the copy when the verification passes, or is skipped
+	@cp ${BUILT}/gamedata-${GAME_ID}.json.unverified ${BUILT}/gamedata-${GAME_ID}.json
+
+all: ${BUILT}/gamedata-${GAME_ID}.json \
 	${BUILT}/${GAME_ID}_loading_screens_compiled.json \
 	${BUILT}/${GAME_ID}_server_compiled.json \
 	${BUILT}/${GAME_ID}_loot_tables.json \
@@ -102,7 +128,7 @@ all: ${BUILT}/gamedata-${GAME_ID}.json.unverified \
 	${BUILT}/${GAME_ID}_hives_compiled.json \
 	${BUILT}/${GAME_ID}_quarries_compiled.json
 
-# create a localization
+# create a localized .json from the main compiled gamedata.json
 .PRECIOUS: ${BUILT}/gamedata-${GAME_ID}-%.json
 ${BUILT}/gamedata-${GAME_ID}-%.json: ${BUILT}/gamedata-${GAME_ID}.json ${GAME_ID}/localize/${GAME_ID}-%.po
 	@echo "Creating localization gamedata-${GAME_ID}-${*}.json..." && \
