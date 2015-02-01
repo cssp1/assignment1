@@ -877,6 +877,11 @@ def check_crafting_recipe(recname, spec):
 
     if spec['crafting_category'] not in gamedata['crafting']['categories']:
         error |=1; print '%s: uses unknown crafting_category "%s"' % (recname, spec['crafting_category'])
+
+    if spec['crafting_category'] == 'turret_heads':
+        if 'consumes_power' not in spec:
+            error |= 1; print '%s: missing consumes_power (while crafting)' % (recname,)
+
     if ('associated_item_set' in spec):
         if spec['associated_item_set'] not in gamedata['item_sets']:
             error |=1; print '%s: has invalid associated_item_set "%s"' % (recname, spec['associated_item_set'])
@@ -1089,6 +1094,10 @@ def check_item(itemname, spec):
                 elif ('min_level' in equip):
                     if len(host_spec[GameDataUtil.MAX_LEVEL_FIELD[source]]) < equip['min_level']:
                         error |= 1; print '%s: equips to %s L%d+ but the unit/building does not actually upgrade that high' % (itemname, equip['name'], equip['min_level'])
+
+        if equip.get('slot_type',None) == 'turret_head':
+            if 'consumes_power' not in equip:
+                error |= 1; print '%s: equip is missing "consumes_power"' % (itemname,)
 
         if equip.get('min_level',1) > 1:
             if ('L%d or higher' % equip['min_level'] not in spec['ui_description']) and \

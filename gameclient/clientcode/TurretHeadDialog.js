@@ -277,13 +277,14 @@ TurretHeadDialog.set_recipe_display = function(dialog, emplacement_obj, recipe_n
     }
 
     // POWER requirement
-    if(1) { // XXXXXX where to store power? on product_spec['equip']?
-        var old_power = 555;
-        var new_power = 666;
+    if(1) {
+        var old_power = (current_spec ? current_spec['equip']['consumes_power']||0 : 0);
+        var during_power = recipe_spec['consumes_power']||0;
+        var new_power = product_spec['equip']['consumes_power']||0;
         dialog.widgets['cost_power'].show =
             dialog.widgets['resource_power_icon'].show = (new_power > 0 || old_power > 0);
         if(dialog.widgets['cost_power'].show) {
-            dialog.widgets['cost_power'].tooltip.str = dialog.data['widgets']['cost_power']['ui_tooltip'].replace('%CUR', pretty_print_number(old_power)).replace('%AFTER', pretty_print_number(new_power));
+            dialog.widgets['cost_power'].tooltip.str = dialog.data['widgets']['cost_power']['ui_tooltip'].replace('%CUR', pretty_print_number(old_power)).replace('%AFTER', pretty_print_number(new_power)).replace('%DURING', pretty_print_number(during_power));
 
             dialog.widgets['cost_power'].str = pretty_print_number(new_power);
 

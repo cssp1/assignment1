@@ -1984,7 +1984,7 @@
 
             "resource_power_icon": { "kind": "StaticImage", "xy": [240,72], "dimensions": [21,21], "asset": "resource_icon_power" },
             "cost_power": { "kind": "TextField", "xy": [240,72], "dimensions": [100,21], "text_offset": [31,0], "text_size": 13, "text_hjustify": "left",
-                            "ui_tooltip": "%AFTER power needed after mounting\n(Current power usage: %CUR)",
+                            "ui_tooltip": "%AFTER power needed after mounting\n%DURING power needed during mounting process\n(Current power usage: %CUR)",
                             "ui_tooltip_maxlevel": "Power needed", "tooltip_delay": 0},
 
             "requirements_text":  { "kind": "TextField", "xy": [160,101], "dimensions": [180,74], "text_size": 13, "text_leading": 17, "text_hjustify": "left", "text_vjustify": "top",
