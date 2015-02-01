@@ -5528,7 +5528,7 @@ class Building(GameObject):
                bool(self.spec.consumes_power) or \
                (self.equipment and any((item['spec'] in gamedata['items'] and gamedata['items'][item['spec']]['equip'].get('consumes_power',0)>0) \
                                        for item in Equipment.equip_iter(self.equipment))) or \
-               (self.is_crafting() and any(entry.craft_state['recipe'] in gamedata['crafting']['receipes'] and \
+               (self.is_crafting() and any(entry.craft_state['recipe'] in gamedata['crafting']['recipes'] and \
                                            gamedata['crafting']['recipes'][entry.craft_state['recipe']].get('consumes_power',0)>0 \
                                            for entry in self.crafting.queue))
 
