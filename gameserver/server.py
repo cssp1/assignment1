@@ -5897,11 +5897,10 @@ class Base(object):
                     if obj.is_crafting():
                         to_add = 0 # add max() of power consumed by all queued recipes
                         for entry in obj.crafting.queue:
-                            if not entry.is_complete():
+                            if not entry.is_complete(server_time):
                                 if entry.craft_state['recipe'] in gamedata['crafting']['recipes']:
                                     to_add = max(to_add, gamedata['crafting']['recipes'][entry.craft_state['recipe']].get('consumes_power',0))
                         power[1] += to_add
-            gamesite.exception_log.event(server_time, 'power %r' % (power))
         return power
 
     def get_base_radius(self):
