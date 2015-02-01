@@ -68,6 +68,6 @@ compiled-client.js: clientcode/*.js
 		${CHECK_FLAGS} ${OPT_FLAGS} \
 		--output_file=$@ || (rm -f $@ *.out; false) # clean up on failure
 	@echo "var gameclient_build_date = \"${BUILD_DATE}\";" >> $@
-	@echo ${BUILD_DATE} > $@.date
+	@echo "${BUILD_DATE}" > $@.date
 	@mv _props_map.out $@_props_map.out
 	@mv _vars_map.out $@_vars_map.out
