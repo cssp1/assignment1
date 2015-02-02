@@ -1420,6 +1420,7 @@ function get_next_level_with_stat_increase(spec, statname, cur_level) {
 GameObject.prototype.hit_radius = function() { return 0; };
 
 GameObject.prototype.get_auto_spell = function() { return null; }; // for inerts etc
+GameObject.prototype.get_auto_spell_level = function() { return this.level; }; // index for stats of the auto spell
 
 function is_melee_spell(spell) {
     if(spell['projectile_color'] === null && spell['projectile_speed'] < 0 &&
@@ -1461,7 +1462,7 @@ GameObject.prototype.weapon_range = function() {
         var s = gamedata['spells'][this.spec['continuous_cast']];
         if(s['code'] == 'pbaoe' && 'splash_range' in s) { spell = s; }
     }
-    return get_weapon_range(this.combat_stats, this.level, spell);
+    return get_weapon_range(this.combat_stats, this.get_auto_spell_level(), spell);
 };
 GameObject.prototype.is_invul = function() { return this.spec['quarry_invul'] && session.is_quarry(); };
 
@@ -1607,7 +1608,7 @@ GameObject.prototype.cast_client_spell = function(spell_name, spell, target, loc
                     return false;
                 }
             }
-            this.fire_projectile(client_time, -1, spell, target, location, 0);
+            this.fire_projectile(client_time, -1, spell, this.level, target, location, 0); // use object level for the spell
         }
     }
 
@@ -2354,11 +2355,13 @@ GameObject.prototype.run_control = function() {
                 this.control_state = control_states.CONTROL_STOP;
                 return;
             }
+
             var spell = gamedata['spells'][this.control_spellname];
+            var spell_level = this.get_auto_spell_level(); // assumes auto_spell here
 
             if(('firing_arc' in spell) && ('turn_rate' in this.spec)) {
                 // convert max angle difference to radians
-                var max_arc = Math.min(this.get_leveled_quantity(spell['firing_arc'])*(Math.PI/180.0), Math.PI);
+                var max_arc = Math.min(get_leveled_quantity(spell['firing_arc'], spell_level)*(Math.PI/180.0), Math.PI);
 
                 // to avoid complex modulo math, do the computations with 2D vectors
                 var cur = [Math.cos(this.cur_facing), Math.sin(this.cur_facing)];
@@ -2374,7 +2377,7 @@ GameObject.prototype.run_control = function() {
                 }
             }
 
-            var cooldown = this.get_leveled_quantity(spell['cooldown']);
+            var cooldown = get_leveled_quantity(spell['cooldown'], spell_level);
 
             var cd = cooldown/this.combat_stats.rate_of_fire;
             cd /= this.combat_power_factor(); // increase cooldown if power_factor < 1
@@ -2383,7 +2386,7 @@ GameObject.prototype.run_control = function() {
             if('cooldown_name' in spell) {
                 // trigger non-auto-attack cooldown
                 if(!this.get_cooldown(spell['cooldown_name'])) { return; }
-                var cd_ticks = Math.floor(this.get_leveled_quantity(spell['cooldown'])/TICK_INTERVAL);
+                var cd_ticks = Math.floor(get_leveled_quantity(spell['cooldown'], spell_level)/TICK_INTERVAL);
                 this.set_cooldown(spell['cooldown_name'], client_tick, client_tick + cd_ticks);
             }
 
@@ -2397,7 +2400,7 @@ GameObject.prototype.run_control = function() {
                 target_height = target.is_flying() ? target.altitude : 0;
             }
 
-            this.fire_projectile(client_time, -1, spell, target, target_pos, target_height);
+            this.fire_projectile(client_time, -1, spell, spell_level, target, target_pos, target_height);
         }
     } else if(this.control_state === control_states.CONTROL_STOP) {
 
@@ -2455,6 +2458,22 @@ function apply_target_lead(P, target_vel, speed) {
     return -1; // no solution found
 }
 
+/** @param {GameObject} my_source
+    @param {string} my_id
+    @param {string} my_spec_name
+    @param {number} my_level
+    @param {string} my_team
+    @param {Object} my_stats
+    @param {Array.<number>} my_pos
+    @param {number} my_height
+    @param {number} fire_time
+    @param {number} force_hit_time
+    @param {Object} spell
+    @param {GameObject|null} target
+    @param {Array.<number>} target_pos
+    @param {number} target_height
+    @param {boolean} fizzle
+*/
 function do_fire_projectile(my_source, my_id, my_spec_name, my_level, my_team, my_stats, my_pos, my_height, fire_time, force_hit_time, spell, target, target_pos, target_height, fizzle) {
     var max_range = gamedata['map']['range_conversion'] * get_leveled_quantity(spell['range'], my_level) * (my_stats ? my_stats.weapon_range : 1);
     var eff_range = ('effective_range' in spell ? (gamedata['map']['range_conversion'] * get_leveled_quantity(spell['effective_range'], my_level) * (my_stats ? my_stats.effective_weapon_range : 1)) : max_range);
@@ -2804,7 +2823,14 @@ function do_fire_projectile(my_source, my_id, my_spec_name, my_level, my_team, m
     return hit_time;
 };
 
-GameObject.prototype.fire_projectile = function(fire_time, force_hit_time, spell, target, target_pos, target_height) {
+/** @param {number} fire_time
+    @param {number} force_hit_time
+    @param {Object} spell
+    @param {number} spell_level
+    @param {GameObject|null} target
+    @param {Array.<number>} target_pos
+    @param {number} target_height */
+GameObject.prototype.fire_projectile = function(fire_time, force_hit_time, spell, spell_level, target, target_pos, target_height) {
     var my_pos = this.interpolate_pos();
     var my_height = (this.is_flying() ? this.altitude : 0);
 
@@ -2825,7 +2851,9 @@ GameObject.prototype.fire_projectile = function(fire_time, force_hit_time, spell
         damage_effect_queue.push(new KillDamageEffect(fire_time + (spell['kills_self_delay']||0), this, this));
     }
 
-    var hit_time = do_fire_projectile(this, this.id, this.spec['name'], this.level, this.team, this.combat_stats, my_pos, my_height, fire_time, force_hit_time, spell, target, target_pos, target_height, false);
+    var hit_time = do_fire_projectile(this, this.id, this.spec['name'],
+                                      spell_level,
+                                      this.team, this.combat_stats, my_pos, my_height, fire_time, force_hit_time, spell, target, target_pos, target_height, false);
 };
 
 
@@ -2850,6 +2878,7 @@ GameObject.prototype.ai_threatlist_update = function() {
 
     var auto_spell = this.get_auto_spell();
     if(!auto_spell) { return; }
+    var auto_spell_level = this.get_auto_spell_level();
 
     var aggro_radius;
     if(this.is_mobile()) {
@@ -2862,7 +2891,7 @@ GameObject.prototype.ai_threatlist_update = function() {
         aggro_radius = Math.sqrt(2)*Math.max(ncells[0], ncells[1]);
     } else {
         // turrets only look within weapon range
-        aggro_radius = gamedata['map']['range_conversion'] * this.get_leveled_quantity(auto_spell['range']) * this.combat_stats.weapon_range;
+        aggro_radius = gamedata['map']['range_conversion'] * get_leveled_quantity(auto_spell['range'], auto_spell_level) * this.combat_stats.weapon_range;
     }
 
     var targeting_result = this.ai_pick_target_classic(auto_spell, aggro_radius, false, prev_target_id, 'ai_threatlist_update');
@@ -3722,6 +3751,9 @@ Building.prototype.get_auto_spell = function() {
         }
     }
     return null;
+};
+Building.prototype.get_auto_spell_level = function() {
+    return this.get_stat('weapon_level', this.level);
 };
 
 Building.prototype.receive_state = function(data, init, is_deploying) {
@@ -6934,10 +6966,17 @@ function get_auto_spell_for_unit(player_or_enemy, unit_spec) {
     }
     return null;
 }
+function get_auto_spell_level_for_unit(player_or_enemy, unit_spec, unit_level) {
+    return get_unit_stat(player_or_enemy.stattab, unit_spec['name'], 'weapon_level', unit_level);
+}
 
 Mobile.prototype.get_auto_spell = function() {
     var owner = (this.team === 'player' ? player : enemy);
     return get_auto_spell_for_unit(owner, this.spec);
+};
+Mobile.prototype.get_auto_spell_level = function() {
+    var owner = (this.team === 'player' ? player : enemy);
+    return get_auto_spell_level_for_unit(owner, this.spec, this.level);
 };
 
 function get_auto_spell_for_item(item_spec) {
@@ -12357,7 +12396,7 @@ BuildUICursor.prototype.draw = function(offset) {
     if(this.obj) {
         spell_range_aoe = this.obj.weapon_range();
     } else if(selection.spellkind && (selection.spellkind in gamedata['buildings'])) {
-        spell_range_aoe = get_weapon_range(null, 1, get_auto_spell_raw(gamedata['buildings'][selection.spellkind]));
+        spell_range_aoe = get_weapon_range(null, 1, get_auto_spell_raw(gamedata['buildings'][selection.spellkind])); // assume level 1 spell for newly-constructed buildings
     }
     var spell = spell_range_aoe[0], range = (spell_range_aoe[3] > 0 ? spell_range_aoe[3] : spell_range_aoe[1]), aoe = spell_range_aoe[2], min_range = spell_range_aoe[4];
     if(range > 0 || (this.obj && this.obj.is_building() && this.obj.is_minefield())) {
@@ -28347,6 +28386,7 @@ function manufacture_dialog_select_unit(dialog, name) {
 
     // fill in unit stats
     var auto_spell = get_auto_spell_for_unit(player, spec);
+    var auto_spell_level = Math.max(level, 1);
 
     var features = ['max_hp'];
     if(gamedata['show_armor_in_ui']) { features.push('armor'); }
@@ -28362,7 +28402,7 @@ function manufacture_dialog_select_unit(dialog, name) {
     goog.array.forEach(features, function(stat) {
         var modchain = (player.stattab['units'][spec['name']] || {})[stat] || null;
         dialog.widgets['feature_value'+row.toString()].show = dialog.widgets['feature_label'+row.toString()].show = true;
-        ModChain.display_widget(dialog.widgets['feature_value'+row.toString()], stat, modchain, spec, Math.max(level, 1), auto_spell, Math.max(level, 1));
+        ModChain.display_widget(dialog.widgets['feature_value'+row.toString()], stat, modchain, spec, Math.max(level, 1), auto_spell, auto_spell_level);
         ModChain.display_label_widget(dialog.widgets['feature_label'+row.toString()], stat, auto_spell);
         row += 1;
     });
@@ -37167,9 +37207,6 @@ function update_upgrade_dialog(dialog) {
             spec = gamedata['units'][tech['associated_unit']];
         } else if('associated_item' in tech) {
             spec = ItemDisplay.get_inventory_item_spec(get_leveled_quantity(tech['associated_item'], Math.min(new_level, max_level))); // note! doesn't handle item type changing!
-            if(spec['level_determined_by_tech'] != tech['name']) {
-                old_spell_level = new_spell_level = 1; // the item itself stays at level 1
-            }
         } else if('associated_building' in tech) {
             spec = gamedata['buildings'][tech['associated_building']];
         } else {
@@ -40920,12 +40957,12 @@ function handle_server_message(data) {
                             }
 
                             // missile effect
-                            var hit_time = do_fire_projectile(player.virtual_units["PLAYER"], 0, 'PLAYER', 1, 'player', null, launch_loc, launch_height, client_time, -1, spell, null, target_loc, target_height, (interceptor!=null));
+                            var hit_time = do_fire_projectile(player.virtual_units["PLAYER"], '0', 'PLAYER', 1, 'player', null, launch_loc, launch_height, client_time, -1, spell, null, target_loc, target_height, (interceptor!=null));
 
                             if(interceptor) {
                                 // intecepting shot effect
                                 // hack - don't bother computing the actual fire time
-                                interceptor.fire_projectile(hit_time-0.25, hit_time, get_auto_spell_raw(interceptor.spec), null, target_loc, target_height);
+                                interceptor.fire_projectile(hit_time-0.25, hit_time, interceptor.get_auto_spell(), interceptor.get_auto_spell_level(), null, target_loc, target_height);
                             }
                         }
                     }
