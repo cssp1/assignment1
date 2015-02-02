@@ -36978,7 +36978,7 @@ function update_upgrade_dialog(dialog) {
     dialog.widgets['resource_power_button'].show = false;
     dialog.widgets['cost_power'].show =
         dialog.widgets['resource_power_icon'].show =
-        (!tech && (unit.spec['kind'] === 'building') && ('consumes_power' in unit.spec));
+        (!tech && (unit.spec['kind'] === 'building') && (get_leveled_quantity(unit.spec['consumes_power']||0, max_level) > 0));
 
     // resource costs
     if(new_level > max_level) {
@@ -37185,6 +37185,7 @@ function update_upgrade_dialog(dialog) {
                             function(modchain, stat) {
                                 if(stat in gamedata['strings']['modstats']['stats'] && !goog.array.contains(feature_list, stat) &&
                                    (stat.indexOf('weapon_')!=0 || stat.indexOf('weapon_damage_vs:')==0) && /* weapon* stats, except for weapon_damage_vs, should be handled above since they need to look up auto_spell */
+                                   (stat != 'weapon' || !(unit && unit.is_emplacement())) && /* don't show "weapon" stat on emplacements */
                                    (modchain['mods'].length>1 && modchain['val'] != modchain['mods'][0]['val'])) {
                                     feature_list.push(stat);
                                 }

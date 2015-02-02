@@ -28,7 +28,7 @@ ModChain.get_base_value = function(stat, spec, level) {
         return level;
     } else if(stat == 'weapon') {
         var spell = get_auto_spell_raw(spec);
-        if(!spell) { throw Error('no base auto_spell value for weapon stat on '+spec['name']); }
+        if(!spell) { return null; }
         return spell['name'];
     } else if(stat.indexOf('limit:') == 0) { // for GUI only
         var stat_data = gamedata['strings']['modstats']['stats'][stat];
@@ -154,8 +154,12 @@ ModChain.display_value = function(value, mode, context) {
         } else if(mode == 'boolean') {
             ui_value = (value ? '\u2713' : 'X'); // use Unicode checkmark to indicate "yes"
         } else if(mode == 'spellname') {
-            if(!(value in gamedata['spells'])) { throw Error('bad value for spellname modstat: '+(value ? value.toString() : 'null')); }
-            ui_value = gamedata['spells'][value]['ui_name'];
+            if(!value) {
+                ui_value = '-';
+            } else {
+                if(!(value in gamedata['spells'])) { throw Error('bad value for spellname modstat: '+(value ? value.toString() : 'null')); }
+                ui_value = gamedata['spells'][value]['ui_name'];
+            }
         } else if(mode == 'auras') {
             var ui_list = [];
             goog.array.forEach(value, function(data) {
