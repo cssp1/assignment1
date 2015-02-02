@@ -23101,8 +23101,8 @@ function player_info_statistics_tab_receive(dialog, data, status_code, query_gen
             }
         });
 
-        // if looking at "all time" data, add some "fake" stats that are just player history keys
-        if(dialog.user_data['time_displayed'] == -1) {
+        // if looking at your own "all time" data, add some "fake" stats that are just player history keys
+        if(dialog.user_data['user_id'] == session.user_id && dialog.user_data['time_displayed'] == -1) {
             goog.object.forEach({
                 'resources_looted_from_human': player.history['resources_looted_from_human'] || 0,
                 'resources_stolen_by_human': player.history['resources_stolen_by_human'] || 0,
