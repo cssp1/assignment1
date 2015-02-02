@@ -28686,7 +28686,7 @@ function update_manufacture_dialog(dialog) {
         widget.state = ((builder &&
                          unit_unlock_level(name) > 0 &&
                          builder.level >= get_leveled_quantity(gamedata['units'][name]['requires_factory_level']||0, unit_unlock_level(name))) ||
-                        player.is_cheater) ? (asset_is_3d ? 'icon' : 'normal') : (asset_is_3d ? 'icon_disabled' : 'disabled');
+                        player.is_cheater) ? (asset_is_3d ? 'icon' : 'normal') : (asset_is_3d ? 'icon_disabled' : 'disabled_clickable');
 
         if((builder && unit_unlock_level(name) > 0) || qty_current + qty_queued > 0 || player.is_cheater) {
             var str = qty_current.toString();
