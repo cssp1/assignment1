@@ -3813,7 +3813,7 @@ Building.prototype.turret_head_item = function() {
 };
 // return name of turret head item currently being crafted (assumes is_crafting() is true)
 Building.prototype.turret_head_inprogress_item = function() {
-    var craft_queue = this.get_client_prediction('crafting.queue', this.crafting ? this.crafting['queue'] : []);
+    var craft_queue = this.get_crafting_queue();
     if(craft_queue.length > 0) {
         return gamedata['crafting']['recipes'][craft_queue[0]['craft']['recipe']]['product'][0]['spec'];
     }
@@ -3896,6 +3896,19 @@ Building.prototype.manuf_total_time = function() {
         tot += this.manuf_queue[i]['total_time'];
     }
     return tot;
+};
+
+Building.prototype.is_using_foreman = function() {
+    if(this.is_under_construction() || this.is_upgrading()) { return true; }
+    if(this.is_crafting()) {
+        var craft_queue = this.get_crafting_queue();
+        for(var i = 0; i < craft_queue.length; i++) {
+            if(gamedata['crafting']['categories'][gamedata['crafting']['recipes'][craft_queue[0]['craft']['recipe']]['crafting_category']]['foreman']) {
+                return true;
+            }
+        }
+    }
+    return false;
 };
 
 Building.prototype.time_until_finish = function() {
@@ -5424,7 +5437,7 @@ player.foreman_get_tasks = function() {
 
     for(var id in session.cur_objects.objects) {
         var obj = session.cur_objects.objects[id];
-        if(obj.is_building() && (obj.is_upgrading() || obj.is_under_construction())) {
+        if(obj.is_building() && obj.is_using_foreman()) {
             tasks.push(obj);
         }
     }
@@ -38780,7 +38793,7 @@ Store.get_base_price = function(unit_id, spell, spellarg, ignore_error) {
             }
             // check existing queue
             // we don't bother with the more detailed checks the server does, since only a client bug would cause mal-formed requests here
-            var craft_queue = unit.get_client_prediction('crafting.queue', unit.crafting ? unit.crafting['queue'] : []);
+            var craft_queue = unit.get_crafting_queue();
             if('queueable' in category && !category['queueable']) {
                 if(craft_queue.length > 0) { return [-1, p_currency]; } // note: doesn't handle uncollected finished jobs
             }

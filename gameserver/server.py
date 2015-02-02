@@ -5634,6 +5634,17 @@ class Building(GameObject):
     def is_busy(self):
         return self.is_repairing() or self.is_upgrading() or self.is_under_construction() or self.is_researching() or self.is_manufacturing() or self.is_crafting()
 
+    def is_using_foreman(self):
+        if self.is_under_construction() or self.is_upgrading(): return True
+        # check for in-progress crafting tasks that need a foreman
+        if self.is_crafting():
+            for entry in self.crafting.queue:
+                if not entry.is_complete(server_time):
+                    if entry.craft_state['recipe'] in gamedata['crafting']['recipes']:
+                        if gamedata['crafting']['categories'][gamedata['crafting']['recipes'][entry.craft_state['recipe']]['crafting_category']].get('foreman', False):
+                            return True
+        return False
+
 class ResourceStateSnapshot:
     def __init__(self, inventory, res_max, res_cur, gamebucks, facebook_credits, player_level, xp, protection_end_time):
         self.inventory = inventory
@@ -8032,11 +8043,11 @@ class Player(AbstractPlayer):
         busy = 0
 
         for obj in self.home_base_iter():
-            if obj.is_under_construction() or \
-            (obj.is_building() and obj.is_upgrading()):
-                busy += 1
-                if busy >= self.stattab.total_foremen:
-                    return True
+            if obj.is_building():
+                if obj.is_using_foreman():
+                    busy += 1
+                    if busy >= self.stattab.total_foremen:
+                        return True
 
         return False
 
