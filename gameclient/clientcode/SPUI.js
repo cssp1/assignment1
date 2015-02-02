@@ -1661,6 +1661,15 @@ SPUI.RichTextField = function(data) {
     this.onenter = null;
     this.mouse_enter_time = -1;
     this.onleave_cb = null; // .onleave() is already used internally by SPUI :(
+
+    if('ui_tooltip' in data) {
+        var params = {'ui_name': data['ui_tooltip'] };
+        if('tooltip_delay' in data) { params['delay'] = data['tooltip_delay']; }
+        this.tooltip = new SPUI.Tooltip(params, this);
+    } else {
+        this.tooltip = null;
+    }
+    this.fixed_tooltip_offset = data['fixed_tooltip_offset'] || null;
 };
 goog.inherits(SPUI.RichTextField, SPUI.DialogWidget);
 SPUI.RichTextField.prototype.set_text_ablocks = function(ablocks) {
@@ -1713,6 +1722,7 @@ SPUI.RichTextField.prototype.update_dims = function() {
     SPUI.ctx.restore();
 }
 SPUI.RichTextField.prototype.do_draw = function(offset) {
+    if(this.tooltip) { this.tooltip.activation_check(); }
     this.update_dims();
     if(!this.rtxt) {
         return false;
@@ -1730,6 +1740,7 @@ SPUI.RichTextField.prototype.do_draw = function(offset) {
     return true;
 };
 SPUI.RichTextField.prototype.onleave = function() {
+    if(this.tooltip) { this.tooltip.onleave(); }
     this.mouse_enter_time = -1;
     if(this.onleave_cb) { this.onleave_cb(this); }
 };
@@ -1742,6 +1753,15 @@ SPUI.RichTextField.prototype.on_mousemove = function(uv, offset) {
         if(this.mouse_enter_time == -1) {
             this.mouse_enter_time = SPUI.time;
             if(this.onenter) { this.onenter(this); }
+        }
+        if(this.tooltip) {
+            this.tooltip.onenter();
+            if(this.fixed_tooltip_offset) {
+                this.tooltip.xy = [this.fixed_tooltip_offset[0] + offset[0],
+                                   this.fixed_tooltip_offset[1] + offset[1]];
+            } else {
+                this.tooltip.xy = [uv[0]+10, uv[1]+10];
+            }
         }
         // do not stop event handling here; allow other widgets to detect mouse-out
         //return true;
@@ -1776,6 +1796,8 @@ SPUI.RichTextField.prototype.on_mouseup = function(uv, offset, button) {
        uv[1]  < this.xy[1]+offset[1]+this.wh[1]) { // click is inside the area
         if(this.state === 'disabled') { return true; }
         if(this.onclick) {
+            // force the tooltip to disappear
+            if(this.tooltip) { this.tooltip.onleave(); }
             this.onclick(this, button);
         }
         return true;
