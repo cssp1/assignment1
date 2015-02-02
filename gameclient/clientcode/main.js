@@ -35782,7 +35782,11 @@ function invoke_build_dialog(newcategory) {
     } else if(newcategory) {
         category = newcategory;
     } else {
-        category = last_build_dialog_category;
+        var preselect = null;
+        if('default_build_dialog_category' in gamedata['client']) {
+            preselect = eval_cond_or_literal(gamedata['client']['default_build_dialog_category'], player, null);
+        }
+        category = preselect || last_build_dialog_category;
     }
     build_dialog_change_category(dialog, category);
 
