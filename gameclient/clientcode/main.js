@@ -37119,7 +37119,7 @@ function update_upgrade_dialog(dialog) {
         if(unit.spec['show_hp_stat']) { feature_list.push('max_hp'); }
         if(unit.is_researcher()) { feature_list.push('research_level'); }
         if(unit.is_researcher()) { feature_list.push('research_speed'); }
-        if(unit.is_crafter() && !('crafting_speed' in unit.spec)) { feature_list.push('crafting_level'); }
+        if(unit.is_crafter() && !unit.is_emplacement() && !('crafting_speed' in unit.spec)) { feature_list.push('crafting_level'); }
         if(unit.is_crafter() && ('crafting_queue_space' in unit.spec)) { feature_list.push('crafting_queue_space'); }
         goog.object.forEach(gamedata['resources'], function(resdata, resname) {
             if(('produces_'+resname) in unit.spec) { feature_list.push('produces_'+resname); }
@@ -37159,11 +37159,11 @@ function update_upgrade_dialog(dialog) {
             feature_list.push('unit_repair_speed');
         }
 
-        if(unit.is_crafter()) {
+        if(unit.is_crafter() && ('crafting_speed' in unit.spec)) {
             feature_list.push('crafting_speed');
         }
 
-        var auto_spell = unit.get_auto_spell();
+        var auto_spell = get_auto_spell_raw(unit.spec); // not unit.get_auto_spell(), since that includes equipped item mods
         if(auto_spell) {
             feature_list = feature_list.concat(get_weapon_spell_features2(unit.spec, auto_spell));
         }
@@ -37415,7 +37415,7 @@ function update_upgrade_dialog(dialog) {
 
     // set up damage_vs icons
     if(!tech) {
-        init_damage_vs_icons(dialog, unit.spec, unit.get_auto_spell());
+        init_damage_vs_icons(dialog, unit.spec, get_auto_spell_raw(unit.spec)); // note: not unit.get_auto_spell(), since that includes equipped item mods
     } else if(tech['associated_unit']) {
         init_damage_vs_icons(dialog, gamedata['units'][tech['associated_unit']], get_auto_spell_for_unit(player, gamedata['units'][tech['associated_unit']]));
     } else if(tech['associated_item']) {
