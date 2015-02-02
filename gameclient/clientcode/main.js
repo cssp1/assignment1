@@ -2894,7 +2894,7 @@ GameObject.prototype.ai_threatlist_update = function() {
         aggro_radius = gamedata['map']['range_conversion'] * get_leveled_quantity(auto_spell['range'], auto_spell_level) * this.combat_stats.weapon_range;
     }
 
-    var targeting_result = this.ai_pick_target_classic(auto_spell, aggro_radius, false, prev_target_id, 'ai_threatlist_update');
+    var targeting_result = this.ai_pick_target_classic(auto_spell, auto_spell_level, aggro_radius, false, prev_target_id, 'ai_threatlist_update');
     if(targeting_result && targeting_result.target) {
         this.ai_threatlist.push({'obj_id': targeting_result.target.id,
                                  'spec': targeting_result.target.spec.name,
@@ -2903,21 +2903,29 @@ GameObject.prototype.ai_threatlist_update = function() {
 };
 
 // find "best" thing to target within shoot_range (which may be <= 0, or longer than weapon range)
-GameObject.prototype.ai_pick_target = function(auto_spell, shoot_range, nearest_only, tag) {
+/** @param {Object} auto_spell
+    @param {number} auto_spell_level
+    @param {number} shoot_range
+    @param {boolean} nearest_only
+    @param {string} tag */
+GameObject.prototype.ai_pick_target = function(auto_spell, auto_spell_level, shoot_range, nearest_only, tag) {
     if(this.spec['enable_ai_threatlist']) {
         if(this.ai_threatlist !== null) {
-            return this.ai_pick_target_by_threatlist(auto_spell, shoot_range);
+            return this.ai_pick_target_by_threatlist(auto_spell, auto_spell_level, shoot_range);
         } else {
             // this can happen if A* is starved
             if(AI_DEBUG >= 2) { console.log(this.spec['name']+' no active threatlist!'); }
             return {target:null};
         }
     } else {
-        return this.ai_pick_target_classic(auto_spell, shoot_range, nearest_only, null, tag);
+        return this.ai_pick_target_classic(auto_spell, auto_spell_level, shoot_range, nearest_only, null, tag);
     }
 };
 
-GameObject.prototype.ai_pick_target_by_threatlist = function(auto_spell, shoot_range) {
+/** @param {Object} auto_spell
+    @param {number} auto_spell_level
+    @param {number} shoot_range */
+GameObject.prototype.ai_pick_target_by_threatlist = function(auto_spell, auto_spell_level, shoot_range) {
     // weed out dead objects
     this.ai_threatlist = goog.array.filter(this.ai_threatlist, function(a) {
         var obj = session.cur_objects.get_object(a['obj_id']);
@@ -2937,12 +2945,18 @@ GameObject.prototype.ai_pick_target_by_threatlist = function(auto_spell, shoot_r
 };
 
 // stateless version of target-picking
-GameObject.prototype.ai_pick_target_classic = function(auto_spell, shoot_range, nearest_only, prev_target_id, tag) {
+/** @param {Object} auto_spell
+    @param {number} auto_spell_level
+    @param {number} shoot_range
+    @param {boolean} nearest_only
+    @param {string|null} prev_target_id
+    @param {string} tag */
+GameObject.prototype.ai_pick_target_classic = function(auto_spell, auto_spell_level, shoot_range, nearest_only, prev_target_id, tag) {
     var verbose = (AI_DEBUG >= 2 && this.is_mobile());
 
-    var auto_spell_range = gamedata['map']['range_conversion'] * this.get_leveled_quantity(auto_spell['range']) * this.combat_stats.weapon_range;
-    var auto_spell_min_range = ('min_range' in auto_spell) ? gamedata['map']['range_conversion'] * this.get_leveled_quantity(auto_spell['min_range']) : -1; // * Math.max(1,this.combat_stats.weapon_range); ?
-    var priority_far_range = ('priority_far_range' in auto_spell) ? (gamedata['map']['range_conversion'] * this.get_leveled_quantity(auto_spell['priority_far_range']) * Math.max(1,this.combat_stats.weapon_range)) : -1;
+    var auto_spell_range = gamedata['map']['range_conversion'] * get_leveled_quantity(auto_spell['range'], auto_spell_level) * this.combat_stats.weapon_range;
+    var auto_spell_min_range = ('min_range' in auto_spell) ? gamedata['map']['range_conversion'] * get_leveled_quantity(auto_spell['min_range'], auto_spell_level) : -1; // * Math.max(1,this.combat_stats.weapon_range); ?
+    var priority_far_range = ('priority_far_range' in auto_spell) ? (gamedata['map']['range_conversion'] * get_leveled_quantity(auto_spell['priority_far_range'], auto_spell_level) * Math.max(1,this.combat_stats.weapon_range)) : -1;
 
     var target_team = null;
 
@@ -3230,10 +3244,13 @@ GameObject.prototype.ai_move_towards = function(new_dest, target, reason) {
 };
 
 // AI-level function - set control state to attack or pursue a target, as retured by ai_pick_target()
-GameObject.prototype.ai_pursue_target = function(auto_spell, targeting_result) {
-    var auto_spell_range = gamedata['map']['range_conversion'] * this.get_leveled_quantity(auto_spell['range']) * this.combat_stats.weapon_range;
-    var auto_spell_eff_range = ('effective_range' in auto_spell) ? gamedata['map']['range_conversion'] * this.get_leveled_quantity(auto_spell['effective_range']) * this.combat_stats.effective_weapon_range : auto_spell_range;
-    var auto_spell_min_range = ('min_range' in auto_spell) ? gamedata['map']['range_conversion'] * this.get_leveled_quantity(auto_spell['min_range']) : -1; // * Math.max(1,this.combat_stats.weapon_range); ?
+/** @param {Object} auto_spell
+    @param {number} auto_spell_level
+    @param {Object} targeting_result */
+GameObject.prototype.ai_pursue_target = function(auto_spell, auto_spell_level, targeting_result) {
+    var auto_spell_range = gamedata['map']['range_conversion'] * get_leveled_quantity(auto_spell['range'], auto_spell_level) * this.combat_stats.weapon_range;
+    var auto_spell_eff_range = ('effective_range' in auto_spell) ? gamedata['map']['range_conversion'] * get_leveled_quantity(auto_spell['effective_range'], auto_spell_level) * this.combat_stats.effective_weapon_range : auto_spell_range;
+    var auto_spell_min_range = ('min_range' in auto_spell) ? gamedata['map']['range_conversion'] * get_leveled_quantity(auto_spell['min_range'], auto_spell_level) : -1; // * Math.max(1,this.combat_stats.weapon_range); ?
 
     this.ai_target = targeting_result.target;
 
@@ -3319,11 +3336,12 @@ GameObject.prototype.next_ai_order = function() {
 
 GameObject.prototype.run_ai = function() {
     var auto_spell = this.get_auto_spell();
+    var auto_spell_level = this.get_auto_spell_level();
     var auto_spell_range, auto_spell_eff_range, auto_spell_min_range;
     if(auto_spell) {
-        auto_spell_range = gamedata['map']['range_conversion'] * this.get_leveled_quantity(auto_spell['range']) * this.combat_stats.weapon_range;
-        auto_spell_eff_range = ('effective_range' in auto_spell) ? gamedata['map']['range_conversion'] * this.get_leveled_quantity(auto_spell['effective_range']) * this.combat_stats.effective_weapon_range : auto_spell_range;
-        auto_spell_min_range = ('min_range' in auto_spell) ? gamedata['map']['range_conversion'] * this.get_leveled_quantity(auto_spell['min_range']) : -1; // * Math.max(1,this.combat_stats.weapon_range); ?
+        auto_spell_range = gamedata['map']['range_conversion'] * get_leveled_quantity(auto_spell['range'], auto_spell_level) * this.combat_stats.weapon_range;
+        auto_spell_eff_range = ('effective_range' in auto_spell) ? gamedata['map']['range_conversion'] * get_leveled_quantity(auto_spell['effective_range'], auto_spell_level) * this.combat_stats.effective_weapon_range : auto_spell_range;
+        auto_spell_min_range = ('min_range' in auto_spell) ? gamedata['map']['range_conversion'] * get_leveled_quantity(auto_spell['min_range'], auto_spell_level) : -1; // * Math.max(1,this.combat_stats.weapon_range); ?
 
     } else {
         auto_spell_range = auto_spell_eff_range = auto_spell_min_range = -1;
@@ -3350,7 +3368,7 @@ GameObject.prototype.run_ai = function() {
         } else {
             var target_pos = this.ai_target.interpolate_pos();
             var dist = vec_distance(this.interpolate_pos(), target_pos) - this.ai_target.hit_radius();
-            this.ai_pursue_target(auto_spell, {target:this.ai_target, pos:target_pos, dist:dist});
+            this.ai_pursue_target(auto_spell, auto_spell_level, {target:this.ai_target, pos:target_pos, dist:dist});
         }
     }
 
@@ -3402,12 +3420,12 @@ GameObject.prototype.run_ai = function() {
         if(this.is_mobile() && this.ai_state !== ai_states.AI_ATTACK_STATIONARY && (gamedata['enable_global_targeting'] || auto_spell['global_targeting'])) {
             targeting_result = null; // skip directly to the aggro-range query
         } else if(shoot_range > 0) {
-            targeting_result = this.ai_pick_target(auto_spell, shoot_range, false, 'enemies_near');
+            targeting_result = this.ai_pick_target(auto_spell, auto_spell_level, shoot_range, false, 'enemies_near');
         }
 
         if(targeting_result && targeting_result.target) {
             // a target has been found within max weapon range
-            this.ai_pursue_target(auto_spell, targeting_result);
+            this.ai_pursue_target(auto_spell, auto_spell_level, targeting_result);
 
             // BUT, as a special case, if we are mobile and shooting at a
             // nonmobile, non-dangerous target, and we are being
@@ -3424,7 +3442,7 @@ GameObject.prototype.run_ai = function() {
                 //console.log('SPECIAL CASE: SWITCHING TARGET TO '+this.last_attacker.spec['name']);
 
                 var last_attacker_pos = this.last_attacker.interpolate_pos();
-                this.ai_pursue_target(auto_spell, {target:this.last_attacker, pos:last_attacker_pos, dist:vec_distance(this.interpolate_pos(), last_attacker_pos) - this.last_attacker.hit_radius()});
+                this.ai_pursue_target(auto_spell, auto_spell_level, {target:this.last_attacker, pos:last_attacker_pos, dist:vec_distance(this.interpolate_pos(), last_attacker_pos) - this.last_attacker.hit_radius()});
             }
 
         } else {
@@ -3491,10 +3509,10 @@ GameObject.prototype.run_ai = function() {
                     // unexpectedly change combat AI behavior in old
                     // games, so optionally use the old behavior.
                     var bad_long_range_targeting = !gamedata['enable_prioritized_long_range_targeting'];
-                    var targeting_result = this.ai_pick_target(auto_spell, aggro_radius, bad_long_range_targeting, 'enemies_far');
+                    var targeting_result = this.ai_pick_target(auto_spell, auto_spell_level, aggro_radius, bad_long_range_targeting, 'enemies_far');
 
                     if(targeting_result && targeting_result.target) {
-                        this.ai_pursue_target(auto_spell, targeting_result);
+                        this.ai_pursue_target(auto_spell, auto_spell_level, targeting_result);
                     } else if(this.ai_dest) {
                         // leash back to "home" location
                         this.ai_move_towards(this.ai_dest, null, 'leash');
