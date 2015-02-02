@@ -133,6 +133,18 @@ ItemDisplay.get_inventory_item_ui_name = function(spec) {
     }
 };
 
+/** hack - cut off the " Lxx" level suffix where we don't want it
+    @param {string} ui_name
+    @returns {string} */
+ItemDisplay.strip_inventory_item_ui_name_level_suffix = function(ui_name) {
+    var fields = ui_name.split(' ');
+    if(fields[fields.length-1][0] == 'L') {
+        fields = fields.slice(0, fields.length-1);
+        ui_name = fields.join(' ');
+    }
+    return ui_name;
+};
+
 /** return displayable name for item of given spec, using "ui_name_long" if available
     @param {Object} spec
     @returns {string} */

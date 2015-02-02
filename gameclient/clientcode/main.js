@@ -17385,7 +17385,7 @@ function invoke_building_context_menu(mouse_xy) {
         if(cur_item_name) {
             var item_spec = ItemDisplay.get_inventory_item_spec(cur_item_name);
             if(item_spec) {
-                dialog.widgets['head_title'].str = ItemDisplay.get_inventory_item_ui_name(item_spec);
+                dialog.widgets['head_title'].str = ItemDisplay.strip_inventory_item_ui_name_level_suffix(ItemDisplay.get_inventory_item_ui_name(item_spec));
                 if(item_spec['associated_tech']) {
                     var item_cur_level = item_spec['level']; // note: level of item itself, NOT the tech
                     var tech_max_level = get_max_level(gamedata['tech'][item_spec['associated_tech']]);
@@ -43046,6 +43046,21 @@ function create_mouse_tooltip() {
                 mouse_tooltip.onleave();
                 return;
             }
+
+            if(obj.is_building() && obj.is_emplacement() && obj.turret_head_item) {
+                var item_name = obj.turret_head_item();
+                if(item_name) {
+                    var item_spec = ItemDisplay.get_inventory_item_spec(item_name);
+                    var ui_name = ItemDisplay.strip_inventory_item_ui_name_level_suffix(ItemDisplay.get_inventory_item_ui_name(item_spec));
+                    str.push(ui_name);
+                    if((obj.team === 'player' || gamedata['enemy_tooltip_detail'][obj.spec['kind']])) {
+                        var cur_level = item_spec['level'];
+                        var max_level = get_max_level(gamedata['tech'][item_spec['associated_tech']]);
+                        str.push(gamedata['strings']['cursors']['level_x_of_y'].replace('%cur', cur_level.toString()).replace('%max', max_level.toString()));
+                    }
+                }
+            }
+
             var nameline = obj.spec['ui_name'];
             if(obj.is_building() && obj.is_minefield() && (obj.id in session.minefield_tags_by_obj_id)) {
                 nameline += ' '+session.minefield_tags_by_obj_id[obj.id];
