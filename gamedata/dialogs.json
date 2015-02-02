@@ -811,7 +811,7 @@
         "xy_top_left": [10,0],
         "xy_top_right": [-214,0],
         "xy_desktop_top": [525,0],
-        "dimensions": [209,125],
+        "dimensions": [209,59],
         "widgets": {
             "enemy_portrait": { "kind": "FriendPortrait", "xy":[3,6], "dimensions": [50,50], "push_bg_image": 1,
                                 "ui_tooltip": "Click for Player Info", "tooltip_delay": 0, "fixed_tooltip_offset": [10,72]},
