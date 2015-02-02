@@ -37134,7 +37134,7 @@ function update_upgrade_dialog(dialog) {
     }
 
     var grid_y = 0;
-    var delta_color = new SPUI.Color(1.0, 0.5, 0.05, 1);
+    var delta_color = SPUI.make_colorv(dialog.data['widgets']['col0,']['delta_color']);
 
     function feature_widget(dialog, y, x) { return dialog.widgets['col'+x.toString()+','+y.toString()]; }
 

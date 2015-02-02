@@ -1956,8 +1956,9 @@
             "descriptionL": { "kind": "TextField", "xy": [13,113], "dimensions": [64,17], "text_size": 13, "text_style": "normal",
                               "text_hjustify": "right", "text_vjustify": "top", "ui_tooltip": "", "tooltip_delay": 0, "fixed_tooltip_offset": [0,140],
                               "array": [1,3], "array_offset": [0,19] },
-            "descriptionR": { "kind": "TextField", "xy": [83,113], "dimensions": [64,50], "text_size": 13, "text_style": "normal",
+            "descriptionR": { "kind": "RichTextField", "xy": [83,113], "dimensions": [64,50], "text_size": 13, "text_style": "normal",
                               "text_hjustify": "left", "text_vjustify": "top", "ui_tooltip": "", "tooltip_delay": 0, "fixed_tooltip_offset": [50,140],
+                              "better_color": "#00ff00", "worse_color": "#ff0000",
                               "array": [1,3], "array_offset": [0,19] }
         }
     },
@@ -2348,7 +2349,7 @@
                             "show": 0
                           },
 
-            "col0,": { "kind": "TextField", "xy": [50,100], "dimensions": [58,18], "text_size": 13, "text_hjustify": "right",
+            "col0,": { "kind": "TextField", "xy": [50,100], "dimensions": [58,18], "text_size": 13, "text_hjustify": "right", "delta_color": [1.0,0.5,0.05,1],
                        "ui_tooltip": "", "tooltip_delay": 0, "fixed_tooltip_offset": [35,132],
                        "array": [1,8], "array_offset": [0,19] },
             "col1,": { "kind": "TextField", "xy": [116,100], "dimensions": [58,18], "text_size": 13, "text_hjustify": "left",

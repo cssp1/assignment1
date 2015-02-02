@@ -195,7 +195,7 @@ TurretHeadDialog.ondraw = function(dialog) {
     dialog.widgets['current'].show = !!current_name;
 
     if(current_name) {
-        TurretHeadDialog.set_stats_display(dialog.widgets['current'], dialog.user_data['emplacement'], current_name);
+        TurretHeadDialog.set_stats_display(dialog.widgets['current'], dialog.user_data['emplacement'], current_name, null);
     }
 
     // click-to-select
@@ -232,7 +232,7 @@ TurretHeadDialog.set_recipe_display = function(dialog, emplacement_obj, recipe_n
     var product_spec = ItemDisplay.get_inventory_item_spec(product_name);
     var product_level = product_spec['level'];
 
-    TurretHeadDialog.set_stats_display(dialog.widgets['stats'], emplacement_obj, product_name);
+    TurretHeadDialog.set_stats_display(dialog.widgets['stats'], emplacement_obj, product_name, (current_name && current_name != product_name) ? current_name : null);
 
     // XXX most of this is copy/pasted from update_upgrade_dialog() - maybe unify into some kind of can_cast_spell variant
     var use_resources_offered = true;
@@ -491,15 +491,18 @@ TurretHeadDialog.set_recipe_display = function(dialog, emplacement_obj, recipe_n
 // operates on turret_head_dialog_stats
 /** @param {SPUI.Dialog} dialog
     @param {GameObject} emplacement_obj it will go onto
-    @param {string} name of the turret head item */
-TurretHeadDialog.set_stats_display = function(dialog, emplacement_obj, name) {
+    @param {string} name of the turret head item
+    @param {string|null} relative_to name of another item to compare this one to */
+TurretHeadDialog.set_stats_display = function(dialog, emplacement_obj, name, relative_to) {
     var spec = ItemDisplay.get_inventory_item_spec(name);
+    var relative_spec = (relative_to ? ItemDisplay.get_inventory_item_spec(relative_to) : null);
 
     dialog.widgets['name'].str = ItemDisplay.get_inventory_item_ui_name(spec);
     // main icon
     ItemDisplay.set_inventory_item_asset(dialog.widgets['icon'], spec);
 
     var spell = gamedata['spells'][spec['equip']['effects'][0]['strength']];
+    var relative_spell = (relative_to ? gamedata['spells'][relative_spec['equip']['effects'][0]['strength']] : null);
 
     // fill in damage_vs icons
     init_damage_vs_icons(dialog, {'kind':'building', 'ui_damage_vs':{}}, // fake building spec to fool init_damage_vs_icons()
@@ -508,19 +511,50 @@ TurretHeadDialog.set_stats_display = function(dialog, emplacement_obj, name) {
     // set up stats display
     var statlist = get_weapon_spell_features2(emplacement_obj.spec, spell);
 
-    goog.array.forEach([['descriptionL0', 'descriptionR0'], ['descriptionL1', 'descriptionR1']], function(wnames, i) {
-        var left = dialog.widgets[wnames[0]], right = dialog.widgets[wnames[1]];
+    // create the UNION of the two stat lists
+    if(relative_to) {
+        var relative_statlist = get_weapon_spell_features2(emplacement_obj.spec, relative_spell);
+        goog.array.forEach(relative_statlist, function(rstat) {
+            if(!goog.array.contains(statlist, rstat)) {
+                statlist.push(rstat);
+            }
+        });
+    }
+
+    for(var i = 0; i < dialog.data['widgets']['descriptionL']['array'][1]; i++) {
+        var left = dialog.widgets['descriptionL'+i.toString()], right = dialog.widgets['descriptionR'+i.toString()];
         if(i < statlist.length) {
             left.show = right.show = true;
             var stat = statlist[i];
             var modchain = null;
+
             ModChain.display_label_widget(left, stat, spell);
-            ModChain.display_widget(right, stat, modchain,
-                                    spec, // ??? emplacement_obj.spec
-                                    spec['level'] || 1, // ???
-                                    spell, spec['level'] || 1);
+
+            var detail = ModChain.display_value_detailed(stat, modchain,
+                                                         spec, // ??? emplacement_obj.spec
+                                                         spec['level'] || 1, // ???
+                                                         spell, spec['level'] || 1);
+
+            var relative_detail = (relative_to ? ModChain.display_value_detailed(stat, modchain,
+                                                                                 relative_spec, // ??? emplacement_obj.spec
+                                                                                 relative_spec['level'] || 1, // ???
+                                                                                 relative_spell, relative_spec['level'] || 1) : null);
+            var bbstr = detail.str;
+
+            var is_delta = relative_to && (relative_detail.value != detail.value);
+            if(is_delta) {
+                var sign = (detail.value - relative_detail.value >= 0 ? '+' : '-');
+                var is_worse = (detail.value < relative_detail.value);
+                if(stat == 'cooldown') {
+                    is_worse = !is_worse;
+                }
+                bbstr += ' [color='+dialog.data['widgets']['descriptionR'][(is_worse ? 'worse_color':'better_color')]+']('+sign+Math.abs(detail.value - relative_detail.value).toString()+')[/color]';
+            }
+            right.set_text_bbcode(bbstr);
+            right.tooltip.str = detail.tooltip;
+
         } else {
             left.show = right.show = false;
         }
-    });
+    }
 };
