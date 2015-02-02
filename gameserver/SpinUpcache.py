@@ -504,6 +504,7 @@ PURCHASE_CATEGORY_MAP = {'MAKE_DROIDS': 'manufacturing', # dummy entry for produ
                          'BUY_PROTECTION': 'protection', # dummy entry, parsed as a special case
                          'SPEEDUP_FOR_MONEY': 'speedup',
                          'RESEARCH_FOR_MONEY': 'research',
+                         'CRAFT_FOR_MONEY': 'crafting',
                          'UPGRADE_FOR_MONEY': 'building_upgrade',
                          'BOOST_IRON_10PCT': 'resource_boost', 'BOOST_IRON_25PCT': 'resource_boost', 'BOOST_IRON_50PCT': 'resource_boost', 'BOOST_IRON_100PCT': 'resource_boost',
                          'BOOST_WATER_10PCT': 'resource_boost', 'BOOST_WATER_25PCT': 'resource_boost', 'BOOST_WATER_50PCT': 'resource_boost', 'BOOST_WATER_100PCT': 'resource_boost',
@@ -565,13 +566,16 @@ def classify_purchase(gamedata, descr):
             catname = 'manufacturing'
         elif action == 'craft':
             catname = 'crafting'
-            #   SPEEDUP_FOR_MONEY,weapon_factory,craft,[u'craft,make_mine_anti_tracker_L2', u'craft,make_mine_anti_tracker_L2'],28.0min
-            # ->['CRAFT_FOR_MONEY','weapon_factory', "[u'craft,make_mine_anti_tracker_L2', u'craft,make_mine_anti_tracker_L2']"]
+            #   SPEEDUP_FOR_MONEY,weapon_factory,craft,[u'craft,make_mine_anti_tracker_L2', u'craft,make_mine_anti_tracker_L2,levelNN'],28.0min
+            # ->['CRAFT_FOR_MONEY','weapon_factory','make_mine_anti_tracker_L2','levelNN']
             if fields[-1].endswith('min'):
-                fields = ['CRAFT_FOR_MONEY', fields[1], ','.join(fields[3:-1])]
-            else:
-                assert fields[-1].endswith(']')
-                fields = ['CRAFT_FOR_MONEY', fields[1], ','.join(fields[3:])]
+                fields = fields[:-1]
+            action = eval(','.join(fields[3:]))[0].split(',')
+            first_recipe_name = action[1]
+            fields = ['CRAFT_FOR_MONEY', fields[1], first_recipe_name]
+            if len(action) >= 3:
+                fields.append(action[2]) # levelNN
+
     elif cat == 'BUY_ITEM':
         spellarg_str = descr[len("BUY_ITEM,"):]
         if ("':" in spellarg_str): # old Python repr()
@@ -637,9 +641,10 @@ def classify_purchase(gamedata, descr):
                 subcat = 'base_and_units'
 
     elif catname == 'crafting':
-        # e.g.: fields[3:] = "[u'craft", "make_mine_anti_tank_L1']"
-        subcat = eval(fields[2])[0].split(',')[1]
-
+        #['CRAFT_FOR_MONEY','weapons_lab','first_recipe_name', optional: 'first_recipe_levelNN']
+        subcat = fields[2]
+        if len(fields) >= 4 and fields[3].startswith('level'):
+            level = int(fields[3][5:]) # "levelNN"
     elif catname == 'manufacturing':
         subcat = fields[3]
 
