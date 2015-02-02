@@ -1124,7 +1124,7 @@ def check_item(itemname, spec):
 
 MODIFIABLE_STATS = {'unit/building': set(['max_hp', 'maxvel', 'weapon_damage', 'weapon_range', 'ice_effects', 'rate_of_fire',
                                           'damage_taken', 'armor', 'unit_repair_speed', 'repair_speed', 'swamp_effects',
-                                          'research_speed', 'manufacture_speed', 'weapon', 'permanent_auras',
+                                          'research_speed', 'manufacture_speed', 'weapon', 'weapon_level', 'permanent_auras',
                                           'anti_air', 'anti_missile', 'resurrection', 'on_destroy', 'splash_range','effective_range','accuracy']),
                     'player': set(['loot_factor_pvp', 'loot_factor_pve', 'travel_speed', 'deployable_unit_space',
                                    'chat_template', 'chat_gagged', 'quarry_yield_bonus', 'turf_quarry_yield_bonus',
@@ -1169,6 +1169,10 @@ def check_modstat(effect, reason, affects = None, expect_level = None, expect_it
                 level = int(matches.group(1))
                 if level != expect_level:
                     error |= 1; print '%s: leveled spell %s level number does not match item name' % (reason, effect['strength'])
+    elif effect['stat'] == 'weapon_level':
+        if expect_level is not None and expect_level != effect['strength']:
+            error |= 1; print '%s: probably a typo, weapon_level "strength" should be %d' % (reason, expect_level)
+
     return error
 
 def check_loot_table(table, reason = '', expire_time = -1, duration = -1, max_slots = -1, is_toplevel = True):
