@@ -3718,6 +3718,7 @@ function Building() {
     this.harvest_glow_time = -1; // graphical effect only
 
     this.idle_state_cache = null; // for GUI display only - cache result of get_idle_state()
+    this.idle_state_cache_valid_until = -1;
 }
 goog.inherits(Building, MapBlockingGameObject);
 
@@ -45295,12 +45296,18 @@ Building.prototype.get_idle_state = function() {
     if(this.is_destroyed()) { return null; }
     if(this.is_damaged() || this.is_upgrading() || this.is_under_construction()) { return null; }
 
-    if(this.idle_state_cache === null) {
+    if(this.idle_state_cache === null || (this.idle_state_cache_valid_until > 0 && client_time > this.idle_state_cache_valid_until)) {
         // note: assumes get_idle_state_advanced/legacy() never return null
         if(player.get_any_abtest_value('idle_icon_type', gamedata['client']['idle_icon_type'] || 'old') == 'advanced') {
             this.idle_state_cache = this.get_idle_state_advanced(); // new SuperCell-like version
         } else {
             this.idle_state_cache = this.get_idle_state_legacy(); // old SpinPunch version
+        }
+        this.idle_state_cache_valid_until = -1;
+
+        // for harvesters, invalidate a null cache every idle period in case its contents climb above threshold
+        if(this.idle_state_cache['state'] === null && this.is_producer() && (this.produce_start_time > 0 && this.produce_rate > 0)) {
+            this.idle_state_cache_valid_until = client_time + (gamedata['client']['harvester_idle_seconds'] || 60);
         }
     }
 
@@ -45330,7 +45337,7 @@ Building.prototype.get_idle_state_legacy = function() {
 
     if(this.is_producer()) {
         var contents = this.interpolate_contents();
-        var threshold = (this.produce_start_time > 0 && this.produce_rate > 0 ? Math.floor((this.produce_rate/3600.0) * gamedata['client']['harvester_idle_seconds']) : -1);
+        var threshold = (this.produce_start_time > 0 && this.produce_rate > 0 ? Math.max(2, Math.floor((this.produce_rate/3600.0) * (gamedata['client']['harvester_idle_seconds'] || 60))) : -1);
         var resname = null;
         for(var res in gamedata['resources']) {
             if(('produces_'+res) in this.spec) {
@@ -45428,7 +45435,7 @@ Building.prototype.get_idle_state_advanced = function() {
     // check for idleness
     if(this.is_producer()) {
         var contents = this.interpolate_contents();
-        var threshold = (this.produce_start_time > 0 && this.produce_rate > 0 ? Math.floor((this.produce_rate/3600.0) * gamedata['client']['harvester_idle_seconds']) : -1);
+        var threshold = (this.produce_start_time > 0 && this.produce_rate > 0 ? Math.max(2, Math.floor((this.produce_rate/3600.0) * (gamedata['client']['harvester_idle_seconds'] || 60))) : -1);
         var resname = null;
         for(var res in gamedata['resources']) {
             if(('produces_'+res) in this.spec) {

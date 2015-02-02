@@ -217,7 +217,6 @@
 
         "enable_idle_icons": 1, // enable building idle notification icons
         "idle_icon_type": "old", // building idle notification icons: "old" = legacy (stop signs), "advanced" = new system (SuperCell-like)
-        "harvester_idle_seconds": 60, // show "Collect" idle icon when harvester has more than this many seconds of product in it
 
         // enable Equipment UI
         "enable_equipment": 1,
