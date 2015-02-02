@@ -47,4 +47,4 @@ timeout 60 sh -c 'while ! curl -s localhost:5000 > /dev/null; do sleep 1; done'
 docker run -d --name sg-server-maintenance-tr-promo \
        -p 80:80 -p 443:443 \
        -v /ssl-keys:/etc/nginx/ssl \
-       localhost:5000/sg-server-maintenance-tr-promo 
+       localhost:5000/sg-server-maintenance-tr-promo

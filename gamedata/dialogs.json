@@ -1981,7 +1981,7 @@
 
             "resource_res3_icon": { "kind": "StaticImage", "xy": [240,43], "dimensions": [21,21], "asset": "resource_icon_res3", "show": 0 },
             "cost_res3": { "kind": "TextField", "xy": [240,43], "dimensions": [100,21], "text_offset": [31,0], "text_size": 13, "text_hjustify": "left",
-                            "ui_tooltip": "%QTY %RES needed to mount this weapon", "tooltip_delay": 0},
+                           "ui_tooltip": "%QTY %RES needed to mount this weapon", "tooltip_delay": 0},
 
             "resource_power_icon": { "kind": "StaticImage", "xy": [240,72], "dimensions": [21,21], "asset": "resource_icon_power" },
             "cost_power": { "kind": "TextField", "xy": [240,72], "dimensions": [100,21], "text_offset": [31,0], "text_size": 13, "text_hjustify": "left",

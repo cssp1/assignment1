@@ -16,7 +16,7 @@ for GAMEDIR in ransomerrift thudrunner piratewarmers tablettransform rummageston
         # global database maintenance
         (cd /home/ec2-user/$GAMEDIR/gameserver && ./SpinNoSQL.py --maint > /dev/null )
         # region maintenance
-	if [ ${test_regions[$GAMEDIR]} ]; then
-	        (cd /home/ec2-user/$GAMEDIR/gameserver && ./maptool.py ${test_regions[$GAMEDIR]} ALL maint --quiet > /dev/null )
-	fi
+    if [ ${test_regions[$GAMEDIR]} ]; then
+            (cd /home/ec2-user/$GAMEDIR/gameserver && ./maptool.py ${test_regions[$GAMEDIR]} ALL maint --quiet > /dev/null )
+    fi
 done
