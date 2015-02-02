@@ -12543,7 +12543,7 @@ class Store:
             price_description.append('%dunits' % n_units)
             return sum_price, p_currency
 
-        elif (formula == 'upgrade') or (formula == 'research'):
+        elif (formula == 'upgrade') or (formula == 'research') or (formula == 'craft_gamebucks'):
             unit = None
 
             if unit_id == 0 and session.player.is_cheater and formula == 'research':
@@ -12564,14 +12564,14 @@ class Store:
                     return -1, p_currency
 
                 if (not unit.is_building()):
-                    error_reason.append('only buildings can be upgraded or perform research')
+                    error_reason.append('only buildings can be upgraded or perform research or crafting')
                     return -1, p_currency
                 if unit.is_damaged():
-                    error_reason.append('cannot upgrade or research because building is damaged')
+                    error_reason.append('cannot upgrade, research, or craft because building is damaged')
                     return -1, p_currency
                 # can't upgrade or research while busy, with the one exception that instant research is allowed if building is currently researching
                 if unit.is_busy() and (not ((formula == 'research') and unit.is_researching())):
-                    error_reason.append('cannot upgrade or research while busy with activity: '+unit.activity_description(session.player))
+                    error_reason.append('cannot upgrade, research, or craft while busy with activity: '+unit.activity_description(session.player))
                     return -1, p_currency
 
             if formula == 'upgrade':
@@ -12607,6 +12607,28 @@ class Store:
                     factor = session.player.get_any_abtest_value('building_muffin_factor', gamedata['store']['building_muffin_factor'])
                     if factor != 1:
                         price = int((factor*price)+0.5) # round()
+
+            elif formula == 'craft_gamebucks':
+                p_currency = 'gamebucks' # more modern JSON now uses gamebucks as the currency unit
+                arg = gamesite.gameapi.CraftSpellarg(spellarg)
+                recipe = gamedata['crafting']['recipes'][arg.recipe_name]
+
+                if (not session.player.is_cheater):
+                    for res, resdata in gamedata['resources'].iteritems():
+                        if (not resdata.get('allow_instant', True)) and \
+                           GameObjectSpec.get_leveled_quantity(recipe['cost'].get(res,0), arg.recipe_level) > 0:
+                            error_reason.append('requires rare resource: %s' % resdata['name'])
+                            return -1, p_currency
+
+                can_craft_retmsg = []
+                if not gamesite.gameapi.can_craft(session, session.player, unit, arg, retmsg = can_craft_retmsg,
+                                                  check_predicates = True, take_resources = False, take_ingredients = False):
+                    error_reason.append('cannot craft because: '+repr(can_craft_retmsg))
+                    return -1, p_currency
+
+                #if 'level' in spellarg: price_description.append('level'+str(arg.recipe_level))
+                price = GameObjectSpec.get_leveled_quantity(recipe.get('craft_gamebucks_cost',-1), arg.recipe_level)
+
             else:
                 assert formula == 'research'
                 spec = session.player.get_abtest_spec(TechSpec, spellarg)
@@ -12709,20 +12731,33 @@ class Store:
             raise Exception('Unknown price formula')
 
     # return the abbreviated order description that will be written to log files
+    # note: this must coordinate with SpinUpcache.classify_purchase() to return reasonable results for SQL insertion
     @classmethod
     def get_description(cls, session, unit_id, spellname, spellarg, price_description):
         descr = spellname
-        if spellarg:
-            if type(spellarg) in (dict,list):
-                s = SpinJSON.dumps(spellarg)
-            else:
-                s = str(spellarg)
-            descr += ','+s
-        if unit_id:
-            object = session.get_object(unit_id)
-            descr += ','+object.spec.name
+
+        # special cases that want to parse the spellarg a bit
+        if spellname == 'CRAFT_FOR_MONEY':
+            # return format expected by SpinUpcache.classify_purchase(), matching the speedup version
+            descr += ','+session.get_object(unit_id).spec.name+','+spellarg['recipe']
+            if 'level' in spellarg:
+                descr += ','+str(spellarg['level'])
+
+        else: # default case
+            if spellarg:
+                if type(spellarg) in (dict,list):
+                    s = SpinJSON.dumps(spellarg)
+                else:
+                    s = str(spellarg)
+                descr += ','+s
+
+            if unit_id:
+                object = session.get_object(unit_id)
+                descr += ','+object.spec.name
+
         if price_description and len(price_description) > 0:
             descr += ','+string.join(price_description, ',')
+
         return descr
 
     # convert Facebook Credits to US Dollar receipts
@@ -13245,6 +13280,12 @@ class Store:
             session.increment_player_metric('building:'+object.spec.name+':upgrades_purchased', 1)
             session.increment_player_metric('building:'+object.spec.name+':'+record_spend_type+'_spent_on_upgrades', record_amount)
 
+        elif spellname == "CRAFT_FOR_MONEY":
+            object = session.get_object(unit_id)
+            assert gameapi.do_craft(session, session.player, retmsg, object, gameapi.CraftSpellarg(spellarg),
+                                    take_resources = False, take_ingredients = False, take_time = False)
+            # run the completion
+            gameapi.ping_object(session, retmsg, object.obj_id, session.viewing_base)
 
         elif spellname.startswith("UPGRADE_BARRIERS_LEVEL"):
             new_level = int(spellname[-1])
@@ -16944,97 +16985,112 @@ class GAMEAPI(resource.Resource):
 
         retmsg.append(["OBJECT_STATE_UPDATE", object.serialize_state(), session.player.resources.calc_snapshot().serialize()])
 
-    def do_craft(self, session, retmsg, object, spellargs):
-        recipe_name = spellargs[0]['recipe']
-        delivery_address = spellargs[0].get('delivery', None)
-        ui_tag = spellargs[0].get('ui_tag', None)
-        if ui_tag: # sanity-check against DoS
-            assert type(ui_tag) in (str, unicode)
-            assert len(ui_tag) < 128
+    # parse the dictionary of arguments sent by the client for starting a craft operation
+    class CraftSpellarg(object):
+        def __init__(self, spellarg):
+            self.recipe_name = spellarg['recipe']
+            self.recipe_level = spellarg.get('level', 1)
+            self.delivery_address = spellarg.get('delivery', None)
+            self.do_replace = self.delivery_address and self.delivery_address.get('replace', False)
+            self.ui_tag = spellarg.get('ui_tag', None)
+            self.ui_index = spellarg.get('ui_index',None)
+            if self.ui_tag: # sanity-check against DoS
+                assert type(self.ui_tag) in (str, unicode)
+                assert len(self.ui_tag) < 128
 
-        # replace item that's already in destination slot? (pre-existing item will be destroyed when crafting starts with no refund)
-        do_replace = delivery_address and delivery_address.get('replace', False)
+    def can_craft(self, session, player, object, arg, retmsg = None,
+                  take_resources = True, take_ingredients = True, check_predicates = True):
 
-        recipe = gamedata['crafting']['recipes'].get(recipe_name, None)
-        # check sanity
+        recipe = gamedata['crafting']['recipes'].get(arg.recipe_name, None)
+
+        # check recipe sanity
         if (not recipe) or (not object.is_crafter()) or \
            (recipe['crafting_category'] not in object.spec.crafting_categories) or \
            (recipe['crafting_category'] not in gamedata['crafting']['categories']):
-            retmsg.append(["ERROR", "OBJECT_IS_NOT_CAPABLE"])
-            return
+            if retmsg is not None: retmsg.append(["ERROR", "OBJECT_IS_NOT_CAPABLE"])
+            return False
 
         catdata = gamedata['crafting']['categories'][recipe['crafting_category']]
 
         # check delivery options
         delivery = recipe.get('delivery', catdata.get('delivery', None))
         if delivery == 'building_slot':
-            if (not delivery_address) or \
-               ('obj_id' not in delivery_address) or ('slot_type' not in delivery_address) or \
-               (delivery_address['slot_type'] != catdata['delivery_slot_type']) or \
-               (not session.has_object(delivery_address['obj_id'])) or \
-               (session.get_object(delivery_address['obj_id']) not in session.player.home_base_iter()):
-                retmsg.append(["ERROR", "OBJECT_IS_NOT_CAPABLE"])
-                return
-            # anti-race check #1 - check existing queue
+            # check that target building exists, is in player's home base
+            if (not arg.delivery_address) or \
+               ('obj_id' not in arg.delivery_address) or ('slot_type' not in arg.delivery_address) or \
+               (arg.delivery_address['slot_type'] != catdata['delivery_slot_type']) or \
+               (not session.has_object(arg.delivery_address['obj_id'])):
+                if retmsg is not None: retmsg.append(["ERROR", "OBJECT_IS_NOT_CAPABLE"])
+                return False
+
+            target = session.get_object(arg.delivery_address['obj_id'])
+
+            if (target.owner is not player) or \
+               (target not in player.home_base_iter()):
+                if retmsg is not None: retmsg.append(["ERROR", "OBJECT_IS_NOT_CAPABLE"])
+                return False
+
+            # anti-race check #1 - check existing queue for anything that's already targeting this slot
             if object.crafting:
                 for entry in object.crafting.queue:
                     addr = entry.craft_state.get('delivery',None)
-                    if addr and addr.get('obj_id',None) == delivery_address['obj_id'] and addr.get('slot_type',None) == delivery_address['slot_type'] and addr.get('slot_index',0) == delivery_address.get('slot_index',0):
-                        retmsg.append(["ERROR", "HARMLESS_RACE_CONDITION"])
-                        return
+                    if addr and addr.get('obj_id',None) == arg.delivery_address['obj_id'] and addr.get('slot_type',None) == arg.delivery_address['slot_type'] and addr.get('slot_index',0) == arg.delivery_address.get('slot_index',0):
+                        if retmsg is not None: retmsg.append(["ERROR", "HARMLESS_RACE_CONDITION"])
+                        return False
 
             # anti-race check #2 - check if destination slot is already full
-            target = session.get_object(delivery_address['obj_id']) # target will be used below if do_replace is true
-            if not do_replace:
-                if not Equipment.equip_add(target.equipment or {}, target.spec, target.level, (delivery_address['slot_type'],delivery_address.get('slot_index',0)), gamedata['items'][recipe['product'][0]['spec']], probe_only = True):
-                    retmsg.append(["ERROR", "EQUIP_INVALID"])
-                    return
+            if not arg.do_replace:
+                if not Equipment.equip_add(target.equipment or {}, target.spec, target.level, (arg.delivery_address['slot_type'],arg.delivery_address.get('slot_index',0)), gamedata['items'][recipe['product'][0]['spec']], probe_only = True):
+                    if retmsg is not None: retmsg.append(["ERROR", "EQUIP_INVALID"])
+                    return False
 
         # check workshop business
         if object.is_damaged() or object.is_upgrading() or object.is_under_construction() or object.is_researching() or object.is_manufacturing():
-            retmsg.append(["ERROR", "WORKSHOP_IS_BUSY", object.obj_id])
-            return
+            if retmsg is not None: retmsg.append(["ERROR", "WORKSHOP_IS_BUSY", object.obj_id])
+            return False
 
         if catdata.get('foreman', False) and session.player.foreman_is_busy():
-            retmsg.append(["ERROR", "FOREMAN_IS_BUSY"])
-            return
+            if retmsg is not None: retmsg.append(["ERROR", "FOREMAN_IS_BUSY"])
+            return False
 
         # check predicates
-        for PRED in ('show_if', 'activation','requires'):
-            if PRED in recipe:
-                req = Predicates.read_predicate(recipe[PRED])
-                if (not session.player.is_cheater) and (not req.is_satisfied(session.player, None)):
-                    retmsg.append(["ERROR", "REQUIREMENTS_NOT_SATISFIED", recipe[PRED]])
-                    return
+        if check_predicates:
+            for PRED in ('show_if', 'activation','requires'):
+                if PRED in recipe:
+                    req = Predicates.read_predicate(GameObjectSpec.get_leveled_quantity(recipe[PRED], arg.recipe_level))
+                    if (not player.is_cheater) and (not req.is_satisfied2(session, player, None)):
+                        if retmsg is not None: retmsg.append(["ERROR", "REQUIREMENTS_NOT_SATISFIED", recipe[PRED]])
+                        return False
+
         # check resource cost
-        cost = {}
-        if 'cost' in recipe:
-            for res, amount in recipe['cost'].iteritems():
-                if (not session.player.is_cheater) and (getattr(session.player.resources, res) < amount):
-                    retmsg.append(["ERROR", "INSUFFICIENT_"+res.upper(), amount])
-                    return
-                cost[res] = amount
+        if take_resources and ('cost' in recipe):
+            for res, amount_list in recipe['cost'].iteritems():
+                amount = GameObjectSpec.get_leveled_quantity(amount_list, arg.recipe_level)
+                if (not player.is_cheater) and (getattr(player.resources, res) < amount):
+                    if retmsg is not None: retmsg.append(["ERROR", "INSUFFICIENT_"+res.upper(), amount])
+                    return False
+
         # check inventory slot availability
 #        if gamedata['crafting_delivery_method'] == 'reserve_slot_on_start':
 #            # check for space
 #            slots_needed = LootTable.max_slots_needed(gamedata['loot_tables'], recipe['product'])
-#            snap = session.player.resources.calc_snapshot()
+#            snap = player.resources.calc_snapshot()
 #            if snap.max_usable_inventory() - snap.cur_inventory() < slots_needed:
-#                retmsg.append(["ERROR", "INVENTORY_LIMIT"])
+#                if retmsg is not None: retmsg.append(["ERROR", "INVENTORY_LIMIT"])
 #                return
-        # check for ingredient items
-        if 'ingredients' in recipe:
+
+        # check for ingredient items (note: no recipe_level dependence)
+        if take_ingredients and ('ingredients' in recipe):
             # have to pre-sum by specname in case there are multiple entries in the array with the same specname
             by_specname = {}
             for entry in recipe['ingredients']:
                 by_specname[entry['spec']] = by_specname.get(entry['spec'],0) + entry.get('stack',1)
             for specname, qty in by_specname.iteritems():
-                if session.player.inventory_item_quantity(specname) < qty:
-                    retmsg.append(["ERROR", "CRAFT_INGREDIENT_MISSING", entry])
-                    return
+                if player.inventory_item_quantity(specname) < qty:
+                    if retmsg is not None: retmsg.append(["ERROR", "CRAFT_INGREDIENT_MISSING", entry])
+                    return False
 
         # check for queue usage exclusivity and collection buffer
-
         if object.is_crafting():
             uncollected = 0
             for bus in object.crafting.queue:
@@ -17042,14 +17098,14 @@ class GAMEAPI(resource.Resource):
                 # exclusivity constraint - cannot start this craft if a recipe belonging to a different category is in the queue
                 if catdata.get('exclusive',False):
                     if gamedata['crafting']['recipes'][bus.craft_state['recipe']]['crafting_category'] != recipe['crafting_category']:
-                        retmsg.append(["ERROR", "WORKSHOP_IS_BUSY", object.obj_id])
-                        return
+                        if retmsg is not None: retmsg.append(["ERROR", "WORKSHOP_IS_BUSY", object.obj_id])
+                        return False
 
                 # queueability constraint - if crafting is still in progress, and new recipe is not queuable, then we cannot start it
                 if not bus.is_complete(server_time):
                     if not catdata.get('queueable', True):
-                        retmsg.append(["ERROR", "WORKSHOP_IS_BUSY", object.obj_id])
-                        return
+                        if retmsg is not None: retmsg.append(["ERROR", "WORKSHOP_IS_BUSY", object.obj_id])
+                        return False
 
                 # keep track of queue length
                 uncollected += 1
@@ -17057,30 +17113,59 @@ class GAMEAPI(resource.Resource):
             # if crafting buffer space is already full, cannot start a new job
             space = object.get_leveled_quantity(object.spec.crafting_queue_space)
             if (space >= 0) and (uncollected >= space):
-                retmsg.append(["ERROR", "WORKSHOP_IS_BUSY", object.obj_id])
-                return
+                if retmsg is not None: retmsg.append(["ERROR", "WORKSHOP_IS_BUSY", object.obj_id])
+                return False
 
-        # subtract resources/ingredients
-        if cost:
+        return True
+
+    def do_craft(self, session, player, retmsg, object, arg,
+                 check_predicates = True, take_resources = True, take_ingredients = True, take_time = True):
+
+        if not self.can_craft(session, player, object, arg, retmsg = retmsg,
+                              check_predicates = check_predicates, take_resources = take_resources, take_ingredients = take_ingredients):
+            return
+
+        # target object for delivery
+        if arg.delivery_address and ('obj_id' in arg.delivery_address) and session.has_object(arg.delivery_address['obj_id']):
+            target = session.get_object(arg.delivery_address['obj_id'])
+        else:
+            target = None
+
+        recipe = gamedata['crafting']['recipes'][arg.recipe_name]
+        catdata = gamedata['crafting']['categories'][recipe['crafting_category']]
+        delivery = recipe.get('delivery', catdata.get('delivery', None))
+
+        # subtract resources
+        if take_resources and recipe.get('cost'):
+            cost = dict((res,GameObjectSpec.get_leveled_quantity(amount, arg.recipe_level)) for res, amount in recipe['cost'].iteritems())
             negative_cost = dict((res,-cost[res]) for res in cost)
-            session.player.resources.gain_res(negative_cost, reason='crafting')
-            admin_stats.econ_flow_res(session.player, recipe.get('econ_category','crafting'), 'crafting', negative_cost)
-        if 'ingredients' in recipe:
-            for entry in recipe['ingredients']:
-                session.player.inventory_remove_by_type(entry['spec'], entry.get('stack',1), '5130_item_activated', reason='crafting')
+            player.resources.gain_res(negative_cost, reason='crafting')
+            admin_stats.econ_flow_res(player, recipe.get('econ_category','crafting'), 'crafting', negative_cost)
+        else:
+            cost = {}
 
-        # reduce craft time by structure speed bonus
-        speed = object.get_stat('crafting_speed', object.get_leveled_quantity(object.spec.crafting_speed))
-        craft_time = max(1, int(recipe['craft_time'] / speed))
+        # subtract ingredients (note: no recipe_level dependence)
+        if take_ingredients and ('ingredients' in recipe):
+            for entry in recipe['ingredients']:
+                player.inventory_remove_by_type(entry['spec'], entry.get('stack',1), '5130_item_activated', reason='crafting')
+            if player is session.player:
+                session.player.send_inventory_update(retmsg)
+
+        if take_time:
+            # reduce craft time by structure speed bonus
+            speed = object.get_stat('crafting_speed', object.get_leveled_quantity(object.spec.crafting_speed))
+            craft_time = max(1, int(recipe['craft_time'] / speed))
+        else:
+            craft_time = -1
 
         # start crafting
         if not object.crafting:
             object.crafting = Business.QueuedBusiness(Business.CraftingBusiness)
 
-        state = {'recipe':recipe_name, 'cost':cost, 'attempt_id': generate_mail_id()}
-        if 'ingredients' in recipe: state['ingredients'] = copy.deepcopy(recipe['ingredients'])
-        if delivery: state['delivery'] = delivery_address
-        if ui_tag: state['ui_tag'] = ui_tag
+        state = {'recipe':recipe['name'], 'cost':cost, 'attempt_id': generate_mail_id()}
+        if take_ingredients and ('ingredients' in recipe): state['ingredients'] = copy.deepcopy(recipe['ingredients'])
+        if arg.delivery_address: state['delivery'] = arg.delivery_address
+        if arg.ui_tag: state['ui_tag'] = arg.ui_tag
         delay = 0
         for entry in object.crafting.queue:
             d = entry.total_time - entry.done_time
@@ -17089,26 +17174,29 @@ class GAMEAPI(resource.Resource):
             delay += d
         object.crafting.queue.append(Business.CraftingBusiness(state, init_total_time = craft_time, init_start_time = server_time + max(0, delay)))
 
+        if recipe['crafting_category'] == 'fishing':
+            player.fishing_log_event('5150_fish_start', object.crafting.queue[0], ui_index = arg.ui_index, time_left = craft_time)
+
         # destroy currently-equipped item in target slot
-        if do_replace and delivery == 'building_slot' and target.equipment and \
-           Equipment.equip_has(target.equipment, (delivery_address['slot_type'],delivery_address.get('slot_index',0))):
-            removed = Equipment.equip_remove(target.equipment, (delivery_address['slot_type'],delivery_address.get('slot_index',0)))
+        if arg.do_replace and delivery == 'building_slot' and target.equipment and \
+           Equipment.equip_has(target.equipment, (arg.delivery_address['slot_type'],arg.delivery_address.get('slot_index',0))):
+            removed = Equipment.equip_remove(target.equipment, (arg.delivery_address['slot_type'],arg.delivery_address.get('slot_index',0)))
             if len(target.equipment) < 1:
                 target.equipment = None
-            session.player.inventory_log_event('5131_item_trashed', removed['spec'], -removed.get('stack',1), removed.get('expire_time',-1), reason='replaced')
+            player.inventory_log_event('5131_item_trashed', removed['spec'], -removed.get('stack',1), removed.get('expire_time',-1), reason='replaced')
             if target is not object:
                 retmsg.append(["OBJECT_STATE_UPDATE2", target.serialize_state()])
 
         if 'on_start' in recipe:
-            session.execute_consequent_safe(recipe['on_start'], session.player, retmsg, reason='crafting_recipe:%s:on_start' % recipe['name'])
+            session.execute_consequent_safe(GameObjectSpec.get_leveled_quantity(recipe['on_start'], arg.recipe_level),
+                                            player, retmsg, reason='crafting_recipe:%s:on_start' % recipe['name'])
 
-        if 'ingredients' in recipe: session.player.send_inventory_update(retmsg)
-        retmsg.append(["OBJECT_STATE_UPDATE", object.serialize_state(), session.player.resources.calc_snapshot().serialize()])
-
-        if recipe['crafting_category'] == 'fishing':
-            session.player.fishing_log_event('5150_fish_start', object.crafting.queue[0], ui_index = spellargs[0].get('ui_index',None), time_left = craft_time)
+        retmsg.append(["OBJECT_STATE_UPDATE2", object.serialize_state()])
+        if player is session.player:
+            retmsg.append(["PLAYER_STATE_UPDATE", session.player.resources.calc_snapshot().serialize()])
 
         self.power_changed(session, session.viewing_base, object, retmsg)
+        return True
 
     def do_cancel_craft(self, session, retmsg, object, spellarg):
         if not object.is_crafting(): return
@@ -17149,7 +17237,7 @@ class GAMEAPI(resource.Resource):
 
         # figure out how many resources to return to player
         if recipe:
-            cost = bus.craft_state['cost']
+            cost = bus.craft_state.get('cost',{})
             refund = dict((res, int(gamedata['manufacture_cancel_refund']*cost.get(res,0))) for res in gamedata['resources'])
             refund = session.player.resources.gain_res(refund, reason='canceled_crafting')
             admin_stats.econ_flow_res(session.player, recipe.get('econ_category','crafting') if recipe else 'crafting', 'crafting', refund)
@@ -22937,7 +23025,11 @@ class GAMEAPI(resource.Resource):
                 if object not in session.player.home_base_iter():
                     retmsg.append(["ERROR", "CANNOT_CAST_SPELL_OUTSIDE_HOME_BASE"])
                     return
-                self.do_craft(session, retmsg, object, spellargs)
+                self.do_craft(session, session.player, retmsg, object, self.CraftSpellarg(spellargs[0]),
+                              check_predicates = (not session.player.is_cheater),
+                              take_resources = (not session.player.is_cheater),
+                              take_ingredients = (not session.player.is_cheater))
+
             elif spellname == "CANCEL_CRAFT":
                 if object not in session.player.home_base_iter():
                     retmsg.append(["ERROR", "CANNOT_CAST_SPELL_OUTSIDE_HOME_BASE"])
