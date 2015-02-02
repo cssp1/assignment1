@@ -277,8 +277,19 @@ ModChain.display_label_widget = function(widget, stat, auto_spell) {
     }
 };
 
-// apply SPUI widget settings for a nice GUI display of a modified stat, including bigass explanatory tooltip
-ModChain.display_widget = function(widget, stat, modchain, spec, level, auto_spell, auto_spell_level) {
+/** get SPUI widget settings for a nice GUI display of a modified stat, including bigass explanatory tooltip
+    @param {string} stat
+    @param {Object|null} modchain
+    @param {Object} spec
+    @param {number} level
+    @param {Object} auto_spell
+    @param {number} auto_spell_level
+    @return {{str:string,
+              value:?,
+              tooltip:string,
+              color:SPUI.Color}}
+*/
+ModChain.display_value_detailed = function(stat, modchain, spec, level, auto_spell, auto_spell_level) {
     if(!modchain) {
         modchain = ModChain.make_chain(ModChain.get_base_value(stat, spec, level), {'level':level});
     }
@@ -331,11 +342,24 @@ ModChain.display_widget = function(widget, stat, modchain, spec, level, auto_spe
         show_base = true;
     }
 
-    widget.str = ModChain.display_value(modchain['val'], ui_data['display']||null, 'widget');
+    return {str: ModChain.display_value(modchain['val'], ui_data['display']||null, 'widget'),
+            value: modchain['val'],
+            tooltip: gamedata['strings']['modstats']['tooltip_'+(!show_base && (modchain['mods'].length<2) ? 'base':'mods')].replace('%NAME', ui_data['ui_name']).replace('%DESCRIPTION', ui_data['ui_tooltip']).replace('%MODS', ModChain.display_tooltip(stat, modchain, show_base, ui_data)) + (extra ? '\n\n'+extra : ''),
+            color: ((modchain['mods'].length>1 && modchain['val'] != modchain['mods'][0]['val']) ? SPUI.good_text_color : SPUI.default_text_color)};
+};
 
-    widget.tooltip.str = gamedata['strings']['modstats']['tooltip_'+(!show_base && (modchain['mods'].length<2) ? 'base':'mods')].replace('%NAME', ui_data['ui_name']).replace('%DESCRIPTION', ui_data['ui_tooltip']).replace('%MODS', ModChain.display_tooltip(stat, modchain, show_base, ui_data));
-
-    if(extra) { widget.tooltip.str += '\n\n'+extra; }
-
-    widget.text_color = ((modchain['mods'].length>1 && modchain['val'] != modchain['mods'][0]['val']) ? SPUI.good_text_color : SPUI.default_text_color);
+/** same as above, and then apply to a SPUI widget
+    @param {SPUI.DialogWidget} widget
+    @param {string} stat
+    @param {Object|null} modchain
+    @param {Object} spec
+    @param {number} level
+    @param {Object} auto_spell
+    @param {number} auto_spell_level
+*/
+ModChain.display_widget = function(widget, stat, modchain, spec, level, auto_spell, auto_spell_level) {
+    var detail = ModChain.display_value_detailed(stat, modchain, spec, level, auto_spell, auto_spell_level);
+    widget.str = detail.str;
+    widget.tooltip.str = detail.tooltip;
+    widget.text_color = detail.color;
 };
