@@ -196,8 +196,8 @@ def check_mandatory_fields(specname, spec, kind):
         if gamedata['game_id'] == 'sg':
             if spec.get('quantize_location',1) != 4:
                 error |= 1; print 'building %s has invalid quantize_location setting. In SG, all buildings must have "quantize_location": 4' % specname
-            if spec['name'] != 'barrier' and spec.get('exclusion_zone',None) != [4,4]:
-                error |= 1; print 'building %s has invalid exclusion_zone setting. In SG, all buildings (except barriers) must have "exclusion_zone": [4,4]' % specname
+#            if spec['name'] != 'barrier' and spec.get('exclusion_zone',None) != [4,4]:
+#                error |= 1; print 'building %s has invalid exclusion_zone setting. In SG, all buildings (except barriers) must have "exclusion_zone": [4,4]' % specname
     max_level = -1
 
     if kind in GameDataUtil.MAX_LEVEL_FIELD:
