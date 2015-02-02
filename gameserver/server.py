@@ -11275,7 +11275,8 @@ def init_game(player, add_extras):
 
     deposit_config = player.get_any_abtest_value('iron_deposits', gamedata['server']['iron_deposits'])
     if deposit_config['max'] > 0:
-        deposit = instantiate_object_for_player(player, player, 'iron_deposit', x=72, y=63, metadata = deposit_config.get('starting_contents', {'iron': 150}))
+        loc = deposit_config.get('starting_location', [72,63])
+        deposit = instantiate_object_for_player(player, player, 'iron_deposit', x=loc[0], y=loc[1], metadata = deposit_config.get('starting_contents', {'iron': 150}))
         player.home_base_add(deposit)
 
     player.my_home.init_production(player)
