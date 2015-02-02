@@ -43031,7 +43031,14 @@ function on_mouseup(e) {
                 }
 
                 if(allow_invoke) {
-                    invoke_building_context_menu(xy);
+                    if(session.home_base && found.is_building() && found.is_producer() && gamedata['enable_oneclick_harvest'] &&
+                       found.idle_state_cache && found.idle_state_cache['state'] && found.idle_state_cache['state'].indexOf('harvest_') == 0 &&
+                       found.is_in_sync()) {
+                        // do a one-click harvest iff the idle state is showing as "Collect"
+                        do_harvest(false);
+                    } else {
+                        invoke_building_context_menu(xy);
+                    }
                 }
                 return;
             } else if(player.is_cheater && found.is_inert()) {
