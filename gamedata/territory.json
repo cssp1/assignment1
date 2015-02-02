@@ -15,6 +15,8 @@
     "deployments_per_travel": 1, // number of times you can attack/reinforce per travel "trip"
 
     "unit_travel_speed_factor": 0.25, // coefficient that relates unit maxvel to map travel_speed (in hexes per second)
+    "pass_moving_squads": 1, // allow passing through the destination hex of a moving squad before the squad settles down there
+    "pass_moving_squads_fudge_time": 5.0, // add some conservative leeway for network latency, otherwise players could get frustrated
 
     "quarry_requirement": { "predicate": "LIBRARY", "name": "quarry_requirement" },
     "quarry_play_requirement": { "predicate": "LIBRARY", "name": "quarry_play_requirement" },
