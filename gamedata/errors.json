@@ -25,6 +25,7 @@
     "CANNOT_EQUIP_BUILDING_WHILE_BUSY": { "ui_title": "Building Not Ready", "ui_name": "Cannot change equipment on this building while it is busy or damaged.\n\nSpeed Up the building to continue."},
     "EQUIP_INVALID": { "ui_name": "Invalid equip request - destination slot is full or does not match item"},
     "EQUIP_INVALID_UNIQUE": { "ui_name": "Cannot equip - mutually-exclusive item already equipped: %s"},
+    "EQUIP_INVALID_LIMITED": { "ui_name": "Cannot equip - max number of similar items already equipped: %s"},
     "EQUIP_BUILDING_LEVEL_TOO_LOW": { "ui_name": "Cannot equip item until this building is upgraded to Level %s." },
     "EQUIP_TECH_LEVEL_TOO_LOW": { "ui_name": "Cannot equip item until this unit is upgraded to Level %s." },
     "RARE_RESOURCE_REQUIRED": { "ui_name": "Cannot perform this action instantly because it requires a rare resource"},

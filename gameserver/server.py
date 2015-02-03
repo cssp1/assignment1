@@ -4842,6 +4842,16 @@ class Equipment (object):
         if specname and (equipment[slot_type][slot_num] != specname): return False
         return True
 
+    # get the item at this address (None if missing)
+    @staticmethod
+    def equip_get(equipment, addr):
+        assert type(equipment) is dict
+        slot_type, slot_num = addr
+        if not equipment: return None
+        if slot_type not in equipment: return None
+        if slot_num >= len(equipment[slot_type]): return None
+        return {'spec': equipment[slot_type][slot_num]}
+
     @staticmethod
     def equip_remove(equipment, addr, specname = None):
         assert type(equipment) is dict
@@ -7038,6 +7048,28 @@ class Player(AbstractPlayer):
                 for ret in Equipment.equip_serialize(obj.equipment):
                     ret['obj_id'] = obj.obj_id
                     yield ret
+
+    def count_limited_equipped_items(self, tag):
+        count = 0
+        for item in self.equipped_item_iter():
+            if item['spec'] in gamedata['items'] and \
+               gamedata['items'][item['spec']].get('limited_equipped',None) == tag:
+                count += item.get('stack', 1)
+
+        # check current crafting products that are going to be delivered into building slots
+        for obj in self.home_base_iter():
+            if obj.is_building() and obj.is_crafter() and obj.is_crafting():
+                for bus in obj.crafting.queue:
+                    if 'delivery' in bus.craft_state and ('obj_id' in bus.craft_state['delivery']):
+                        recipe_name = bus.craft_state['recipe']
+                        recipe = gamedata['crafting']['recipes'].get(recipe_name, None)
+                        if recipe:
+                            for prod in recipe['product']:
+                                if ('spec' in prod): # only works with deterministic products!
+                                    item_spec = gamedata['items'][prod['spec']]
+                                    if item_spec.get('limited_equipped',None) == tag:
+                                        count += prod.get('stack', 1)
+        return count
 
     def has_item(self, name, min_count = 1, check_mail = False, check_crafting = False):
         count = 0
@@ -17059,10 +17091,30 @@ class GAMEAPI(resource.Resource):
                         return False
 
             # anti-race check #2 - check if destination slot is already full
-            if not arg.do_replace:
-                if not Equipment.equip_add(target.equipment or {}, target.spec, target.level, (arg.delivery_address['slot_type'],arg.delivery_address.get('slot_index',0)), gamedata['items'][recipe['product'][0]['spec']], probe_only = True):
-                    if retmsg is not None: retmsg.append(["ERROR", "EQUIP_INVALID"])
-                    return False
+            dest_addr = (arg.delivery_address['slot_type'],arg.delivery_address.get('slot_index',0))
+            for product in recipe['product']:
+                if 'spec' in product: # only for deterministic products
+                    product_spec = gamedata['items'][product['spec']]
+
+                    if not arg.do_replace:
+                        if not Equipment.equip_add(target.equipment or {}, target.spec, target.level, dest_addr, product_spec, probe_only = True):
+                            if retmsg is not None: retmsg.append(["ERROR", "EQUIP_INVALID"])
+                            return False
+
+                    # check limited_equipped constraint
+                    if check_predicates and ('limited_equipped' in product_spec):
+                        # see if we are replacing an equivalent item
+                        if arg.do_replace:
+                            old_item = Equipment.equip_get(target.equipment or {}, dest_addr)
+                            if old_item and old_item['spec'] in gamedata['items'] and gamedata['items'][old_item['spec']].get('limited_equipped',None) == product_spec['limited_equipped']:
+                                # replacing, no need to count
+                                continue
+
+                        # do need to count existing items
+                        if session.player.stattab.limited_equipped.get(product_spec['limited_equipped'],0) < \
+                           product.get('stack',1) + session.player.count_limited_equipped_items(product_spec['limited_equipped']):
+                            if retmsg is not None: retmsg.append(["ERROR", "EQUIP_INVALID_LIMITED", product_spec['name']])
+                            return False
 
         # check workshop business
         if object.is_damaged() or object.is_upgrading() or object.is_under_construction() or object.is_researching() or object.is_manufacturing():
@@ -18026,6 +18078,7 @@ class GAMEAPI(resource.Resource):
                 session.player.send_inventory_update(retmsg)
                 return False
 
+            # check unique_equipped constraint
             if ('unique_equipped' in add_spec) and ((not remove_spec) or (remove_spec.get('unique_equipped',None) != add_spec['unique_equipped'])):
                 for item in session.player.equipped_item_iter():
                     item_spec = gamedata['items'].get(item['spec'], None)
@@ -18033,6 +18086,13 @@ class GAMEAPI(resource.Resource):
                         # doubled
                         retmsg.append(["ERROR", "EQUIP_INVALID_UNIQUE", item['spec']])
                         return False
+
+            # check limited_equipped constraint
+            if ('limited_equipped' in add_spec) and ((not remove_spec) or (remove_spec.get('limited_equipped',None) != add_spec['limited_equipped'])):
+                if session.player.stattab.limited_equipped.get(add_spec['limited_equipped'],0) < \
+                   1 + session.player.count_limited_equipped_items(add_spec['limited_equipped']):
+                    retmsg.append(["ERROR", "EQUIP_INVALID_LIMITED", add_spec['name']])
+                    return False
 
             if not Equipment.equip_add(equipment, obj_spec, obj_level, dest_addr, add_spec, probe_only = True, probe_will_remove = bool(remove_specname)):
                 retmsg.append(["ERROR", "EQUIP_INVALID"])
