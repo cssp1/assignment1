@@ -51,10 +51,15 @@ Congrats.cc_upgrade = function(cc, level) {
     ret.push([[new SPText.ABlock(gamedata['strings']['cc_upgrade_congrats']['max_number']['ui_name'].toUpperCase(), Congrats.props.bold)]]);
     for(var name in gamedata['buildings']) {
         var spec = gamedata['buildings'][name];
-        // ignore developer_only if in production
-        if(spec['developer_only'] && (spin_secure_mode || !player.is_developer)) {
-            continue;
+
+        // ignore developer_only / hidden specs
+        if(spin_secure_mode || !player.is_developer) {
+            if(spec['developer_only'] ||
+               (spec['show_if'] && !read_predicate(spec['show_if']).is_satisfied(player, null))) {
+                continue;
+            }
         }
+
         if('limit' in spec && (typeof spec['limit']) !== 'number') {
             var start = spec['limit'][level-2], end = spec['limit'][level-1];
             if(start != end) {
