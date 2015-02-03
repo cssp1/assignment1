@@ -45735,8 +45735,11 @@ Building.prototype.get_idle_state_advanced = function() {
 };
 
 function draw_building_or_inert(obj, powerfac) {
-    var xy = ortho_to_draw([obj.x, obj.y]);
-    xy[0] = Math.floor(xy[0]); xy[1] = Math.floor(xy[1]);
+    // for odd gridsizes, add one-half unit to center the sprite on the grid bounds
+    var gridsize = obj.spec['gridsize'];
+    var odd_shift = [gridsize[0] > 1 && (gridsize[0]&1) ? 0.5 : 0,
+                     gridsize[1] > 1 && (gridsize[1]&1) ? 0.5 : 0];
+    var xy = vec_floor(ortho_to_draw(vec_add([obj.x, obj.y], odd_shift)));
 
     var icon;
     var icon_state = 'unset';
