@@ -1883,7 +1883,7 @@
             "dev_title": { "show": 0, "kind": "TextField", "xy": [50,50], "dimensions": [221, 41], "text_size": 13,
                            "text_style": "thick", "text_color": [1,0,0,1], "drop_shadow": 1,
                            "text_hjustify": "left",
-                           "ui_name": "You are in DEV Edit mode - unlock/resource requirements are NOT enforced!" },
+                           "ui_name": "You are in DEV Edit mode - unlock/resource requirements and other limits are NOT enforced!" },
 
             "close_button": { "kind": "ActionButton", "xy": [706,1], "dimensions": [19,22], "bg_image": "close_button_small", "push_bg_image": 1 },
 
@@ -1900,7 +1900,14 @@
                                    "state": "disabled",
                                    "array": [2,3], "array_offset": [59,57] },
             "recipe_frame": { "kind": "ActionButton", "xy": [213,126], "dimensions": [50,50], "bg_image": "inventory_frame",
-                              "ui_tooltip": "", "ui_tooltip_requires": "Requires: %s", "tooltip_delay":0,
+                              "ui_tooltip": "",
+                              "ui_tooltip_limit": "%cur mounted or mounting, out of a maximum of %max",
+                              "ui_tooltip_requires": "Requires: %s", "tooltip_delay":0,
+                              "array": [2,3], "array_offset": [59,57] },
+            "recipe_limit": { "kind": "TextField", "xy": [213,126], "dimensions": [50,50], "text_size": 13, "drop_shadow": 1,
+                              //"text_hjustify": "center", "text_vjustify": "bottom", "text_offset": [0,-6],
+                              "text_hjustify": "right", "text_vjustify": "bottom", "text_offset": [-3,-6],
+                              "text_color_ok": [0,1,0,1], "text_color_limit": [1,1,0,1], "ui_name": "%cur/%max",
                               "array": [2,3], "array_offset": [59,57] },
             "scroll_left": { "kind": "Dialog", "dialog": "crafting_dialog_scroll_left", "xy": [237,104], "dimensions": [50,16] },
             "scroll_right": { "kind": "Dialog", "dialog": "crafting_dialog_scroll_right", "xy": [237,292], "dimensions": [50,16] },
@@ -1936,6 +1943,7 @@
             "use_resources_button": { "kind": "ActionButton", "xy": [589,377], "dimensions": [134,28],  "text_size": 13, "text_style": "bold",
                                       "bg_image": "menu_button_resizable", "bg_image_resizable": 1, "ui_name": "Use Resources",
                                       "ui_tooltip_more_res": "%d more %s", "ui_tooltip_unmet": "Unmet Requirements:",
+                                      "ui_tooltip_limited_equipped": "Max number already mounted",
                                       "ui_tooltip": "", "tooltip_delay": 0 }
         }
     },
@@ -1967,31 +1975,33 @@
     "turret_head_dialog_recipe": {
         "dimensions": [360,205],
         "widgets": {
+            "description": { "kind": "ActionButton", // needed to support an inventory context tooltip
+                             "xy": [166,103], "dimensions": [170,74], "text_size": 13, "text_leading": 17, "text_hjustify": "left", "text_vjustify": "bottom",
+                             "max_lines": 3, "ui_tooltip": "", "tooltip_delay": 0},
+
             "stats": {"kind": "Dialog", "dialog": "turret_head_dialog_stats", "xy":[2,0], "dimensions":[160,205]},
 
             "requirements": { "kind": "TextField", "xy": [160,11], "dimensions": [135,26], "text_size": 13, "text_style": "thick", "text_hjustify": "left", "ui_name": "REQUIREMENTS" },
 
             "resource_water_icon": { "kind": "StaticImage", "xy": [160,43], "dimensions": [21,21], "asset": "resource_icon_water", "show": 0 },
             "cost_water": { "kind": "TextField", "xy": [160,43], "dimensions": [100,21], "text_offset": [31,0], "text_size": 13, "text_hjustify": "left",
-                            "ui_tooltip": "%QTY %RES needed to mount this weapon", "tooltip_delay": 0},
+                            "ui_tooltip": "%QTY %RES needed to mount this weapon", "tooltip_delay": 0, "fixed_tooltip_offset": [160,73] },
 
             "resource_iron_icon": { "kind": "StaticImage", "xy": [160,72], "dimensions": [21,21], "asset": "resource_icon_iron", "show": 0 },
             "cost_iron": { "kind": "TextField", "xy": [160,72], "dimensions": [100,21], "text_offset": [31,0], "text_size": 13, "text_hjustify": "left",
-                           "ui_tooltip": "%QTY %RES needed to mount this weapon", "tooltip_delay": 0},
+                           "ui_tooltip": "%QTY %RES needed to mount this weapon", "tooltip_delay": 0, "fixed_tooltip_offset": [160,102] },
 
             "resource_res3_icon": { "kind": "StaticImage", "xy": [240,43], "dimensions": [21,21], "asset": "resource_icon_res3", "show": 0 },
             "cost_res3": { "kind": "TextField", "xy": [240,43], "dimensions": [100,21], "text_offset": [31,0], "text_size": 13, "text_hjustify": "left",
-                           "ui_tooltip": "%QTY %RES needed to mount this weapon", "tooltip_delay": 0},
+                           "ui_tooltip": "%QTY %RES needed to mount this weapon", "tooltip_delay": 0, "fixed_tooltip_offset": [240,73] },
 
             "resource_power_icon": { "kind": "StaticImage", "xy": [240,72], "dimensions": [21,21], "asset": "resource_icon_power" },
             "cost_power": { "kind": "TextField", "xy": [240,72], "dimensions": [100,21], "text_offset": [31,0], "text_size": 13, "text_hjustify": "left",
-                            "ui_tooltip": "%AFTER power needed after mounting\n%DURING power needed during mounting process\n(Current power usage: %CUR)",
-                            "ui_tooltip_maxlevel": "Power needed", "tooltip_delay": 0},
+                            "ui_tooltip": "%AFTER power needed after mounting\n%DURING power needed during mounting process\n(Current weapon power usage: %CUR)",
+                            "ui_tooltip_maxlevel": "Power needed", "tooltip_delay": 0, "fixed_tooltip_offset": [240,102] },
 
             "requirements_text":  { "kind": "TextField", "xy": [160,101], "dimensions": [180,74], "text_size": 13, "text_leading": 17, "text_hjustify": "left", "text_vjustify": "top",
-                                    "text_color": [1,0,0,1] },
-            "description": { "kind": "TextField", "xy": [160,103], "dimensions": [190,74], "text_size": 13, "text_leading": 17, "text_hjustify": "left", "text_vjustify": "bottom",
-                             "max_lines": 3, "ui_tooltip": "", "tooltip_delay": 0}
+                                    "text_color": [1,0,0,1] }
         }
     },
 

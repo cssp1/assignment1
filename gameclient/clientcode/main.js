@@ -6060,24 +6060,73 @@ player.stored_item_iter = function(func) {
     goog.array.forEach(player.inventory, function(entry) { stop |= func(entry); }); if(stop) { return; }
     goog.array.forEach(player.loot_buffer, function(entry) { stop |= func(entry); }); if(stop) { return; }
 };
+
+/** Reference to a specific slot in an equipment data structure
+    @constructor
+    @struct
+    @param {string} slot_type
+    @param {number} slot_index */
+var EquipSlotAddress = function(slot_type, slot_index) {
+    this.slot_type = slot_type;
+    this.slot_index = slot_index;
+};
+EquipSlotAddress.prototype.equals = function(other) {
+    return (this.slot_type == other.slot_type && this.slot_index == other.slot_index);
+};
+
+/** Reference to a specific slot on a specific building, e.g. used as delivery address for crafting products
+    @constructor
+    @struct
+    @extends EquipSlotAddress
+    @param {string} obj_id
+    @param {string} slot_type
+    @param {number} slot_index */
+var BuildingEquipSlotAddress = function(obj_id, slot_type, slot_index) {
+    goog.base(this, slot_type, slot_index);
+    this.obj_id = obj_id;
+};
+goog.inherits(BuildingEquipSlotAddress, EquipSlotAddress);
+BuildingEquipSlotAddress.prototype.equals = function(other) {
+    return (goog.base(this, 'equals', other) && this.obj_id == other.obj_id);
+};
+
+/** Reference to a specific slot on a specific unit type
+    @constructor
+    @struct
+    @extends EquipSlotAddress
+    @param {string} specname
+    @param {string} slot_type
+    @param {number} slot_index */
+var UnitEquipSlotAddress = function(specname, slot_type, slot_index) {
+    goog.base(this, slot_type, slot_index);
+    this.specname = specname;
+};
+goog.inherits(UnitEquipSlotAddress, EquipSlotAddress);
+UnitEquipSlotAddress.prototype.equals = function(other) {
+    return (goog.base(this, 'equals', other) && this.specname == other.specname);
+};
+
+/** Iterate through all equipped items
+    @param {function(Object, EquipSlotAddress):(boolean|undefined)} func (return true to stop iteration) */
 player.equipped_item_iter = function(func) {
     var stop = false;
-    goog.object.forEach(player.unit_equipment, function(equipment) {
-        goog.object.forEach(equipment, function(name_list) {
-            goog.array.forEach(name_list, function(name) { if(name) { stop |= func({'spec':name}); } });
+    goog.object.forEach(player.unit_equipment, function(equipment, specname) {
+        goog.object.forEach(equipment, function(name_list, slot_type) {
+            goog.array.forEach(name_list, function(name, slot_index) { if(name) { stop |= func({'spec':name}, new UnitEquipSlotAddress(specname, slot_type, slot_index)); } });
         });
     });
     if(stop) { return; }
     goog.object.forEach(session.cur_objects.objects, function(obj) {
         if(obj.is_building() && obj.team === 'player') {
             if(obj.equipment) {
-                goog.object.forEach(obj.equipment, function(name_list) {
-                    goog.array.forEach(name_list, function(name) { if(name) { stop |= func({'spec':name}); } });
+                goog.object.forEach(obj.equipment, function(name_list, slot_type) {
+                    goog.array.forEach(name_list, function(name, slot_index) { if(name) { stop |= func({'spec':name}, new BuildingEquipSlotAddress(obj.id, slot_type, slot_index)); } });
                 });
             }
         }
     });
 };
+
 player.mail_attachments_iter = function(func) {
     goog.array.forEach(player.mailbox, function(mail) {
         if('attachments' in mail) {
@@ -6085,6 +6134,9 @@ player.mail_attachments_iter = function(func) {
         }
     });
 };
+
+/** Iterate through all crafting queues for ingredients and products
+    @param {function(Object, (EquipSlotAddress|null)):(boolean|undefined)} func (return true to stop iteration) */
 player.crafting_queue_ingredients_and_products_iter = function(func) {
     goog.object.forEach(session.cur_objects.objects, function(obj) {
         if(obj.is_building() && obj.team === 'player' && obj.is_crafter() && obj.is_crafting()) {
@@ -6094,18 +6146,79 @@ player.crafting_queue_ingredients_and_products_iter = function(func) {
                 if(recipe) {
                     goog.array.forEach(recipe['product'], function(prod) {
                         if('spec' in prod) { // only works on deterministic products!
-                            func(prod);
+                            var address = null;
+                            var delivery = bus['craft']['delivery'];
+                            if(delivery && delivery['obj_id']) {
+                                address = new BuildingEquipSlotAddress(delivery['obj_id'], delivery['slot_type'], delivery['slot_index']);
+                            }
+                            func(prod, address);
                         }
                     });
                     var ingr_list = bus['craft']['ingredients'] || null;
                     if(ingr_list && gamedata['crafting']['categories'][recipe['crafting_category']]['refund_ingredients']) {
                         // only check ingredients if they are refundable and thus available to the player if cancelled
-                        goog.array.forEach(ingr_list, func);
+                        goog.array.forEach(ingr_list, (function(ingr_item) { func(ingr_item, null); }));
                     }
                 }
             });
         }
     });
+};
+
+/** Return true if crafting a new item of spec "product_spec" into "delivery_address" would violate a limited_equipped constraint
+ @param {Object} product_spec
+ @param {BuildingEquipSlotAddress|null} delivery_address
+ @return {boolean} */
+player.would_violate_limited_equipped = function(product_spec, delivery_address) {
+    if(!product_spec['limited_equipped']) { return false; }
+    var limit = player.stattab['limited_equipped'][product_spec['limited_equipped']] || 0;
+    if(limit < 1) { return true; }
+    var count = 0;
+    var check_func = function(other_item, other_address) {
+        var other_spec = ItemDisplay.get_inventory_item_spec(other_item['spec']);
+
+        // skip our own destination slot if it matches (assumes we're replacing this item)
+        if(delivery_address && other_address && other_address instanceof BuildingEquipSlotAddress && other_address.equals(delivery_address) &&
+           other_spec['limited_equipped'] == product_spec['limited_equipped']) { return false; }
+
+        if(other_spec && other_spec['limited_equipped']==product_spec['limited_equipped']) {
+            count += 1;
+            if(count+1 > limit) { return true; }
+        }
+        return false;
+    };
+
+    // check existing items
+    player.equipped_item_iter(check_func);
+    if(count+1 > limit) { return true; }
+
+    // check crafting queues
+    player.crafting_queue_ingredients_and_products_iter(check_func);
+    if(count+1 > limit) { return true; }
+
+    return false;
+};
+
+/** Return current count of a limited_equipped item pool, ignoring anything that matches in delivery_address
+    @param {Object} product_spec
+    @param {BuildingEquipSlotAddress|null} delivery_address
+    @return {number} */
+player.count_limited_equipped = function(product_spec, delivery_address) {
+    var count = 0;
+    var count_func = function(other_item, other_address) {
+        var other_spec = ItemDisplay.get_inventory_item_spec(other_item['spec']);
+
+        // skip our own destination slot if it matches (assumes we're replacing this item)
+        if(delivery_address && other_address && other_address instanceof BuildingEquipSlotAddress && other_address.equals(delivery_address) &&
+           other_spec['limited_equipped'] == product_spec['limited_equipped']) { return; }
+
+        if(other_spec && other_spec['limited_equipped']==product_spec['limited_equipped']) {
+            count += 1;
+        }
+    };
+    player.equipped_item_iter(count_func);
+    player.crafting_queue_ingredients_and_products_iter(count_func);
+    return count;
 };
 
 /** search player for an item with the given name
@@ -17450,7 +17563,7 @@ function invoke_building_context_menu(mouse_xy) {
         dialog.widgets['level'].str = '';
     }
 
-    if(obj.is_building() && obj.is_emplacement()) {
+    if(dialog_name == 'emplacement_context_menu') {
         var cur_item_name = obj.turret_head_item() || obj.turret_head_inprogress_item();
 
         if(cur_item_name) {
@@ -36506,6 +36619,20 @@ function get_requirements_help(kind, arg, options) {
     } else if(kind == 'cc_limit') {
         noun = 'cc_limit'; verb = 'upgrade'; target = player.get_townhall();
         ui_arg_s = target.spec['ui_name']; ui_arg_d = arg['ui_name'];
+    } else if(kind == 'limited_equipped') {
+        noun = kind;
+        var item_spec = ItemDisplay.get_inventory_item_spec(arg)
+        target = player.get_townhall(); // assumes townhall is the building that provides_limited_equipped
+        ui_arg_s = target.spec['ui_name']; ui_arg_d = ItemDisplay.get_inventory_item_ui_name_long(item_spec);
+
+        var provides = target.spec['provides_limited_equipped'] && (item_spec['limited_equipped'] in target.spec['provides_limited_equipped']) ? target.spec['provides_limited_equipped'][item_spec['limited_equipped']] : -1;
+        var cur = get_leveled_quantity(provides, target.level);
+        var max_ever = get_leveled_quantity(provides, target.get_max_ui_level());
+        if(max_ever > cur) {
+            verb = 'upgrade';
+        } else {
+            verb = 'max';
+        }
     } else if(kind == 'player_aura_limit') {
         noun = kind; verb = 'any';
     } else if(kind == 'invalid_building_location') {
@@ -37153,10 +37280,31 @@ function update_upgrade_dialog(dialog) {
 
         if(unit.spec['name'] === gamedata['townhall']) {
             // not enough space in dialog for "limit:barriers" :(
-            feature_list = feature_list.concat(['limit:storages','limit:harvesters','limit:turrets']);
+            goog.array.forEach(['limit:storages','limit:harvesters','limit:turrets','limit:emplacements'], function(statname) {
+                var statdata = gamedata['strings']['modstats']['stats'][statname];
+                if(statdata) {
+                    var check_spec = gamedata['buildings'][statdata['check_spec']];
+                    if(!(check_spec['show_if']) || read_predicate(check_spec['show_if']).is_satisfied(player, null)) {
+                        feature_list.push(statname);
+                    }
+                }
+            });
             if(gamedata['enable_power']) {
                 feature_list.push('limit:energy');
             }
+        }
+
+        if('provides_limited_equipped' in unit.spec) {
+            goog.object.forEach(unit.spec['provides_limited_equipped'], function(num_array, kind) {
+                var statname = 'provides_limited_equipped:'+kind;
+                var statdata = gamedata['strings']['modstats']['stats'][statname];
+                if(statdata) {
+                    var check_spec = gamedata['buildings'][statdata['check_spec']];
+                    if(!(check_spec['show_if']) || read_predicate(check_spec['show_if']).is_satisfied(player, null)) {
+                        feature_list.push(statname);
+                    }
+                }
+            });
         }
 
         if(unit.is_manufacturer()) {
@@ -38851,6 +38999,19 @@ Store.get_base_price = function(unit_id, spell, spellarg, ignore_error) {
                     if(predname in recipe && !read_predicate(recipe[predname]).is_satisfied(player, null)) { pred_fail = true; };
                 });
                 if(pred_fail) { return [-1, p_currency]; }
+
+                var limited_equipped_fail = false;
+                if(!ignore_error && delivery && delivery['obj_id']) {
+                    goog.array.forEach(recipe['product'], function(my_product) {
+                        if(my_product['spec']) {
+                            if(player.would_violate_limited_equipped(ItemDisplay.get_inventory_item_spec(my_product['spec']),
+                                                                     new BuildingEquipSlotAddress(delivery['obj_id'], delivery['slot_type'], delivery['slot_index']))) {
+                                limited_equipped_fail = true;
+                            }
+                        }
+                    });
+                }
+                if(limited_equipped_fail) { return [-1, p_currency]; }
             }
             // check existing queue
             // we don't bother with the more detailed checks the server does, since only a client bug would cause mal-formed requests here
@@ -39059,7 +39220,7 @@ Store.force_order_cleanup = function() {
 /** @param {number} unit_id
     @param {string} spellname
     @param {?} spellarg
-    @param {function()|null=} cb
+    @param {function(boolean)|null=} cb (called with true for success or false for failure)
     @param {Object|null=} props */
 Store.place_user_currency_order = function(unit_id, spellname, spellarg, cb, props) {
     return Store.place_order(Store.get_user_currency(), unit_id, spellname, spellarg, cb, props);
@@ -39069,7 +39230,7 @@ Store.place_user_currency_order = function(unit_id, spellname, spellarg, cb, pro
     @param {number} unit_id
     @param {string} spellname
     @param {?} spellarg
-    @param {function()|null=} cb
+    @param {function(boolean)|null=} cb (called with true for success or false for failure)
     @param {Object|null=} props */
 Store.place_order = function(currency, unit_id, spellname, spellarg, cb, props) {
     var no_clear = props && props['no_clear'];
@@ -42039,11 +42200,11 @@ function handle_server_message(data) {
             notification_queue.push(function() { invoke_ingame_tip('manufacture_overflow_to_reserves_tip', {force:true, dialog:'message_dialog_big'}); });
         }
     } else if(msg == "GAMEBUCKS_ORDER_ACK") {
-        var tag = data[1];
+        var tag = data[1], success = data[2];
         if(tag in Store.gamebucks_order_receivers) {
             var cb = Store.gamebucks_order_receivers[tag];
             delete Store.gamebucks_order_receivers[tag];
-            cb();
+            cb(success);
         }
     } else if(msg == "ITEM_ORDER_ACK") {
         var tag = data[1], success = data[2];
@@ -42280,6 +42441,9 @@ function handle_server_message(data) {
             var helper = get_requirements_help('unit_space', null); if(helper) { helper(); }
         } else if(name == "INVENTORY_LIMIT") {
             var helper = get_requirements_help('inventory_space_need', null); if(helper) { helper(); }
+        } else if(name == "EQUIP_INVALID_LIMITED" || name == "EQUIP_INVALID_UNIQUE") {
+            display_string = display_string.replace('%s', ItemDisplay.get_inventory_item_ui_name(ItemDisplay.get_inventory_item_spec(argument)));
+            invoke_child_message_dialog(display_title, display_string, {'dialog': 'message_dialog_big'});
         } else if(name == "PLAYER_AURA_LIMIT") {
             var helper = get_requirements_help('player_aura_limit', null); if(helper) { helper(); }
         } else if(name == "FOREMAN_IS_BUSY" && player.foreman_is_busy()) {

@@ -21,6 +21,7 @@ TurretHeadDialog.invoke = function(emplacement_obj) {
     dialog.user_data['selected_recipe'] = null;
 
     dialog.widgets['title'].str = dialog.data['widgets']['title']['ui_name'].replace('%s', gamedata['spells']['CRAFT_FOR_FREE']['ui_name_building_context_emplacement']);
+    dialog.widgets['dev_title'].show = player.is_cheater;
     dialog.widgets['flavor_text'].set_text_with_linebreaking(dialog.data['widgets']['flavor_text']['ui_name'].replace('%s', gamedata['buildings'][get_lab_for('turret_heads')]['ui_name']));
     dialog.widgets['close_button'].onclick = close_parent_dialog;
 
@@ -99,6 +100,7 @@ TurretHeadDialog.ondraw = function(dialog) {
                 dialog.widgets['recipe_frame'+wname].show = true;
             var can_craft = true;
 
+            var product_spec = ItemDisplay.get_inventory_item_spec(spec['product'][0]['spec']);
             tooltip_text.push(get_crafting_recipe_ui_name(spec));
             dialog.widgets['recipe_icon'+wname].asset = get_crafting_recipe_icon(spec);
 
@@ -112,6 +114,18 @@ TurretHeadDialog.ondraw = function(dialog) {
                     tooltip_text.push(dialog.data['widgets']['recipe_frame']['ui_tooltip_requires'].replace('%s', req));
                     can_craft = false;
                 }
+            }
+
+            // check limited_equipped
+            if(product_spec['limited_equipped']) {
+                var count = player.count_limited_equipped(product_spec, null);
+                var max = player.stattab['limited_equipped'][product_spec['limited_equipped']] || 0;
+                dialog.widgets['recipe_limit'+wname].show = true;
+                dialog.widgets['recipe_limit'+wname].str = dialog.data['widgets']['recipe_limit']['ui_name'].replace('%cur', count.toString()).replace('%max', max.toString());
+                dialog.widgets['recipe_limit'+wname].text_color = SPUI.make_colorv(dialog.data['widgets']['recipe_limit'][(count>=max ? 'text_color_limit' : 'text_color_ok')]);
+                tooltip_text.push(dialog.data['widgets']['recipe_frame']['ui_tooltip_limit'].replace('%cur', count.toString()).replace('%max', max.toString()));
+            } else {
+                dialog.widgets['recipe_limit'+wname].show = false;
             }
 
             dialog.widgets['recipe_frame'+wname].onclick = (function (_name) { return function(w) {
@@ -173,6 +187,7 @@ TurretHeadDialog.ondraw = function(dialog) {
             dialog.widgets['recipe_slot'+widget_name].show =
                 dialog.widgets['recipe_icon'+widget_name].show =
                 dialog.widgets['recipe_gray_outer'+widget_name].show =
+                dialog.widgets['recipe_limit'+widget_name].show =
                 dialog.widgets['recipe_frame'+widget_name].show = false;
             grid[0] += 1;
         }
@@ -309,7 +324,7 @@ TurretHeadDialog.set_recipe_display = function(dialog, emplacement_obj, recipe_n
     }
 
     // PREDICATE requirement
-    if('requires' in recipe_spec) {
+    if(!player.is_cheater && ('requires' in recipe_spec)) {
         var pred = read_predicate(get_leveled_quantity(recipe_spec['requires'], product_level));
         var text = pred.ui_describe(player);
         if(text) {
@@ -320,11 +335,19 @@ TurretHeadDialog.set_recipe_display = function(dialog, emplacement_obj, recipe_n
     }
     dialog.widgets['requirements_text'].set_text_with_linebreaking(req.join(', '));
 
+    // LIMITED EQUIPPED requirement
+    if(!player.is_cheater && player.would_violate_limited_equipped(product_spec, new BuildingEquipSlotAddress(emplacement_obj.id, 'turret_head', 0))) {
+        use_resources_requirements_ok = instant_requirements_ok = false;
+        use_resources_helper = instant_helper = get_requirements_help('limited_equipped', product_spec['name']);
+        var msg = parent.data['widgets']['use_resources_button']['ui_tooltip_limited_equipped'];
+        tooltip_req_instant.push(msg);
+        tooltip_req_use_resources.push(msg);
+    }
+
     // DESCRIPTION
     if(1) {
         var descr_nlines = SPUI.break_lines(product_spec['ui_description'], dialog.widgets['description'].font, dialog.widgets['description'].wh);
 
-        dialog.widgets['description'].tooltip.str = descr_nlines[0];
         var descr_list = descr_nlines[0].split('\n');
         var descr;
         if(descr_list.length > dialog.data['widgets']['description']['max_lines']) {
@@ -333,6 +356,9 @@ TurretHeadDialog.set_recipe_display = function(dialog, emplacement_obj, recipe_n
             descr = descr_list.join('\n');
         }
         dialog.widgets['description'].str = descr;
+        dialog.widgets['description'].onclick = null;
+        ItemDisplay.attach_inventory_item_tooltip(dialog.widgets['description'], {'spec':product_spec['name']}, parent);
+        //dialog.widgets['description'].tooltip.str = descr_nlines[0];
     }
 
     // NOW THE ACTION BUTTONS
@@ -414,6 +440,7 @@ TurretHeadDialog.set_recipe_display = function(dialog, emplacement_obj, recipe_n
         }
 
         // "Instant" button
+        parent.widgets['instant_button'].tooltip.str = null;
 
         if(get_leveled_quantity(recipe_spec['craft_gamebucks_cost']||-1, product_level) < 0) {
             // instant upgrade not offered
@@ -475,7 +502,7 @@ TurretHeadDialog.set_recipe_display = function(dialog, emplacement_obj, recipe_n
                         send_to_server.func(["CAST_SPELL", _obj.id, "CONFIG_SET", new_config]);
 
                         if(Store.place_user_currency_order(_obj.id, "CRAFT_FOR_MONEY", _craft_spellarg,
-                                                           (function (__parent) { return function() { close_dialog(__parent); } })(_parent))) {
+                                                           (function (__parent) { return function(success) { if(success) { close_dialog(__parent); } } })(_parent))) {
                             invoke_ui_locker(_obj.request_sync());
                         }
                     }; })(emplacement_obj, product_name, craft_spellarg, parent);
@@ -500,6 +527,8 @@ TurretHeadDialog.set_stats_display = function(dialog, emplacement_obj, name, rel
     dialog.widgets['name'].str = ItemDisplay.get_inventory_item_ui_name(spec);
     // main icon
     ItemDisplay.set_inventory_item_asset(dialog.widgets['icon'], spec);
+
+    ItemDisplay.attach_inventory_item_tooltip(dialog.widgets['frame'], {'spec':spec['name']});
 
     var spell = gamedata['spells'][spec['equip']['effects'][0]['strength']];
     var relative_spell = (relative_to ? gamedata['spells'][relative_spec['equip']['effects'][0]['strength']] : null);
