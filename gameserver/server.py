@@ -4551,6 +4551,7 @@ class GameObjectSpec(Spec):
         ["provides_total_space", 0],
         ["consumes_space", 0],
         ["provides_inventory", 0],
+        ["provides_limited_equipped", None],
         ["provides_quarry_control", 0],
         ["quarry_movable", False],
         ["quarry_buildable", False],
@@ -8556,6 +8557,7 @@ class Player(AbstractPlayer):
                 'chat_gagged': ModChain.make_chain(0)
                 }
             self.item_sets = {}
+            self.limited_equipped = {}
 
             self.player = player
             self.player.stattab = self # must set immediately here so that predicates will work below
@@ -8654,6 +8656,11 @@ class Player(AbstractPlayer):
                     self.quarry_control_limit += obj.get_leveled_quantity(obj.spec.provides_quarry_control)
 
                     self.total_foremen += obj.get_leveled_quantity(obj.spec.provides_foremen)
+
+                    if obj.spec.provides_limited_equipped:
+                        for tag, num in obj.spec.provides_limited_equipped.iteritems():
+                            if tag not in self.limited_equipped: self.limited_equipped[tag] = 0
+                            self.limited_equipped[tag] += obj.get_leveled_quantity(num)
 
                     if obj.auras is not None:
                         Aura.prune_auras(obj.auras, is_stattab_refresh = True)
@@ -8767,7 +8774,8 @@ class Player(AbstractPlayer):
                     'player': self.player_stats,
                     'units': self.units,
                     'buildings': dict([(obj.obj_id, obj.modstats) for obj in self.modded_buildings]),
-                    'item_sets': dict([(name, len(val)) for name, val in self.item_sets.iteritems()])
+                    'item_sets': dict([(name, len(val)) for name, val in self.item_sets.iteritems()]),
+                    'limited_equipped': self.limited_equipped
                     }
         def send_update(self, session, retmsg):
             assert self.player in (session.player, session.viewing_player)
