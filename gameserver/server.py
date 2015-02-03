@@ -21393,8 +21393,10 @@ class GAMEAPI(resource.Resource):
             assert client_price >= 0
             if client_price > 0 and (session.player.resources.gamebucks < client_price):
                 retmsg.append(["ERROR", "INSUFFICIENT_GAMEBUCKS", client_price - session.player.resources.gamebucks, client_price, unit_id, spellname, spellarg])
-                retmsg.append(["GAMEBUCKS_ORDER_ACK", tag])
+                retmsg.append(["GAMEBUCKS_ORDER_ACK", tag, False])
                 return
+
+            success = False
 
             try:
                 descr = Store.execute_gamebucks_order(self, request, session, retmsg, client_price,
@@ -21402,6 +21404,7 @@ class GAMEAPI(resource.Resource):
                                                       server_time_according_to_client)
                 # at this point the order has changed player state, so go ahead and subtract gamebucks
                 session.player.resources.gain_gamebucks(-client_price, reason='spent', subreason=descr)
+                success = True
                 retmsg.append(["PLAYER_STATE_UPDATE", session.player.resources.calc_snapshot().serialize()])
 
             except Exception:
@@ -21419,7 +21422,7 @@ class GAMEAPI(resource.Resource):
                     retmsg.append(["SQUADS_UPDATE", session.player.squads])
 
             finally:
-                retmsg.append(["GAMEBUCKS_ORDER_ACK", tag])
+                retmsg.append(["GAMEBUCKS_ORDER_ACK", tag, success])
 
         elif arg[0] == "ITEM_ORDER":
             tag = arg[1]
