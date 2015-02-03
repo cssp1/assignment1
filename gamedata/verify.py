@@ -221,6 +221,11 @@ def check_mandatory_fields(specname, spec, kind):
             error |= 1
             print '%s %s "%s" array length (%d) does not match max level (%d - as determined by length of %s array)' % (kind, specname, check_field, len(spec[check_field]), max_level, GameDataUtil.MAX_LEVEL_FIELD[kind])
 
+    if 'provides_limited_equipped' in spec:
+        for provides_name, provides_array in spec['provides_limited_equipped'].iteritems():
+            if type(provides_array) is list and len(provides_array) != max_level:
+                error |= 1; print '%s %s "provides_limited_equipped": "%s" array length (%d) does not match max level (%d)' % (kind, specname, provides_name, len(provides_array), max_level)
+
     for lev in xrange(1,max_level+1):
         cc_requirement = get_cc_requirement(spec['requires'], lev) if ('requires' in spec) else 0
         if spec['name'] == gamedata['townhall']:
@@ -980,6 +985,18 @@ def check_item(itemname, spec):
         if 'ui_name' in set_spec:
             if set_spec['ui_name'] not in spec['ui_description']:
                 error |= 1; print '%s\'s ui_description does not mention the name of the set it belongs to ("%s")' % (itemname, set_spec['ui_name'])
+
+    if 'limited_equipped' in spec:
+        # note: while the engine can deal with provides_limited_equipped on any building,
+        # the client currently assumes only the townhall has this stat
+        thspec = gamedata['buildings'][gamedata['townhall']]
+        if ('provides_limited_equipped' not in thspec) or (spec['limited_equipped'] not in thspec['provides_limited_equipped']):
+            error |= 1; print '%s has limited_equipped "%s" but the townhall does not list it in provides_limited_equipped' % (itemname, spec['limited_equipped'])
+
+        # this is also just a convention from TR, to avoid typos
+        if spec['limited_equipped'] not in spec['name']:
+            error |= 1; print '%s possible typo in limited_equipped, it looks different from the item name' % itemname
+
     if ('store_icon' in spec):
         error |= require_art_asset(spec['store_icon'], itemname+':store_icon')
 
