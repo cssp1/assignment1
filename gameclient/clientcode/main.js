@@ -37081,7 +37081,13 @@ function update_upgrade_dialog(dialog) {
                 }
             } else if('splash_image' in tech) { // TECH with splash image
                 asset = get_leveled_quantity(tech['splash_image'], (new_level > max_level ? max_level : new_level));
-                pos_state = 'xy_splash';
+                if(GameArt.assets[asset].has_state('hero')) {
+                    // 3D asset splash image
+                } else {
+                    // painted 2D splash image
+                    state = 'normal';
+                    pos_state = 'xy_splash';
+                }
             } else { // TECH icon
                 asset = get_leveled_quantity(tech['icon'], (new_level > max_level ? max_level : new_level));
             }
