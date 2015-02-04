@@ -23220,6 +23220,14 @@ class GAMEAPI(resource.Resource):
                 if not session.player.cooldown_active('hitlist_assigned'):
                     session.execute_consequent_safe(session.player.get_abtest_consequent('assign_hitlist'), session.player, retmsg, reason=spellname)
 
+            elif spellname == "MIGRATE_TURRET_HEADS":
+                spell = session.player.get_abtest_spell(spellname); assert spell
+                for PRED in ('requires','show_if'):
+                    if (PRED in spell) and (not Predicates.read_predicate(spell[PRED]).is_satisfied2(session, session.player, None)):
+                        retmsg.append(["ERROR", "SERVER_PROTOCOL"])
+                        return
+                session.execute_consequent_safe(spell['consequent'], session.player, retmsg, reason=spellname)
+
             elif spellname == "CHEAT_REMOVE_LIMITS":
                 if secure_mode:
                     retmsg.append(["ERROR", "DISALLOWED_IN_SECURE_MODE"])
