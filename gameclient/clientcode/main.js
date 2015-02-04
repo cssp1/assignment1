@@ -3785,7 +3785,7 @@ Building.prototype.receive_state = function(data, init, is_deploying) {
 
     if(this.is_emplacement()) {
         // we are not recognized as a shooter on the first update - make sure we are always set to attack
-        // (kind of a hack, would break wit hunits)
+        // (kind of a hack, might break if things get more complex)
         this.ai_state = ai_states.AI_ATTACK_ANY;
     }
 
@@ -37343,6 +37343,7 @@ function update_upgrade_dialog(dialog) {
         goog.object.forEach(modstats,
                             function(modchain, stat) {
                                 if(stat in gamedata['strings']['modstats']['stats'] && !goog.array.contains(feature_list, stat) &&
+                                   gamedata['strings']['modstats']['stats'][stat]['display'] !== null &&
                                    (stat.indexOf('weapon_')!=0 || stat.indexOf('weapon_damage_vs:')==0) && /* weapon* stats, except for weapon_damage_vs, should be handled above since they need to look up auto_spell */
                                    (stat != 'weapon' || !(unit && unit.is_emplacement())) && /* don't show "weapon" stat on emplacements */
                                    (modchain['mods'].length>1 && modchain['val'] != modchain['mods'][0]['val'])) {
