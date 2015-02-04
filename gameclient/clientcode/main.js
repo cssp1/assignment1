@@ -31853,12 +31853,16 @@ function missions_dialog_select_mission(dialog, row) {
         }; })(quest);
     } else {
         dialog.widgets['claim_button'].onclick = (function (q) { return function() {
-            if('ui_accept_consequent' in q) {
-                read_consequent(q['ui_accept_consequent']).execute();
-            } else if('ui_accept_url' in q) {
+            if('ui_accept_url' in q) {
                 // override default behavior with a URL open
                 window.open(q['ui_accept_url'], '_blank').focus();
                 return;
+            }
+
+            change_selection(null);
+
+            if('ui_accept_consequent' in q) {
+                read_consequent(q['ui_accept_consequent']).execute();
             }
 
             // "accept" button works like "close" if in skip_tutorial mode
@@ -31869,7 +31873,6 @@ function missions_dialog_select_mission(dialog, row) {
             } else {
                 tutorial_opt_in(q);
             }
-            change_selection(null);
         }; })(quest);
     }
 
