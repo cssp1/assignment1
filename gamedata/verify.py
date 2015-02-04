@@ -400,6 +400,7 @@ def check_levels(specname, spec):
     # list of fields that have array values that are NOT indexed by level
     # note: if you add something here, also update gameserver's Spec.compute_maxlevel() if the new field is also in GameObjectSpec
     ignore = ('limit', 'spells', 'gridsize', 'unit_collision_gridsize', 'exclusion_zone', 'equip_icon_offset', 'elite_marker_offset', 'equip_icon_delta', 'level_flag_offset', 'effects',
+              # note: the 3D weapon_offset must be a per-level array, since there is no easy way to distinguish it from a 3-level scalar
               'max_ui_level',
               'defense_types', 'health_bar_dims', 'show_alliance_at', 'scan_counter_offset', 'research_categories', 'crafting_categories',
               'harvest_glow_pos', 'hero_icon_pos', 'muzzle_offset', 'limit_requires', 'permanent_auras')
@@ -1141,7 +1142,7 @@ def check_item(itemname, spec):
 
 MODIFIABLE_STATS = {'unit/building': set(['max_hp', 'maxvel', 'weapon_damage', 'weapon_range', 'ice_effects', 'rate_of_fire',
                                           'damage_taken', 'armor', 'unit_repair_speed', 'repair_speed', 'swamp_effects',
-                                          'research_speed', 'manufacture_speed', 'weapon', 'weapon_level', 'permanent_auras',
+                                          'research_speed', 'manufacture_speed', 'weapon', 'weapon_level', 'weapon_asset', 'permanent_auras',
                                           'anti_air', 'anti_missile', 'resurrection', 'on_destroy', 'splash_range','effective_range','accuracy']),
                     'player': set(['loot_factor_pvp', 'loot_factor_pve', 'travel_speed', 'deployable_unit_space',
                                    'chat_template', 'chat_gagged', 'quarry_yield_bonus', 'turf_quarry_yield_bonus',
@@ -1189,7 +1190,14 @@ def check_modstat(effect, reason, affects = None, expect_level = None, expect_it
     elif effect['stat'] == 'weapon_level':
         if expect_level is not None and expect_level != effect['strength']:
             error |= 1; print '%s: probably a typo, weapon_level "strength" should be %d' % (reason, expect_level)
-
+    elif effect['stat'] == 'weapon_asset':
+        error |= require_art_asset(effect['strength'], reason+':weapon_asset')
+        if expect_level is not None:
+            matches = level_re.match(effect['strength'])
+            if matches:
+                level = int(matches.group(1))
+                if level != expect_level:
+                    error |= 1; print '%s: leveled weapon_asset %s level number does not match item name' % (reason, effect['strength'])
     return error
 
 def check_loot_table(table, reason = '', expire_time = -1, duration = -1, max_slots = -1, is_toplevel = True):
