@@ -413,6 +413,17 @@ InvokeUpgradeConsequent.prototype.execute = function(state) {
 
 /** @constructor
   * @extends Consequent */
+function InvokeBuildDialogConsequent(data) {
+    goog.base(this, data);
+    this.category = data['category'] || null;
+}
+goog.inherits(InvokeBuildDialogConsequent, Consequent);
+InvokeBuildDialogConsequent.prototype.execute = function(state) {
+    invoke_build_dialog(this.category);
+};
+
+/** @constructor
+  * @extends Consequent */
 function InvokeCraftingConsequent(data) {
     goog.base(this, data);
     this.category = data['category'] || null;
@@ -669,6 +680,7 @@ function read_consequent(data) {
     else if(kind === 'INVOKE_STORE_DIALOG') { return new InvokeStoreConsequent(data); }
     else if(kind === 'INVOKE_BUY_GAMEBUCKS_DIALOG') { return new InvokeBuyGamebucksConsequent(data); }
     else if(kind === 'INVOKE_UPGRADE_DIALOG') { return new InvokeUpgradeConsequent(data); }
+    else if(kind === 'INVOKE_BUILD_DIALOG') { return new InvokeBuildDialogConsequent(data); }
     else if(kind === 'INVOKE_CRAFTING_DIALOG') { return new InvokeCraftingConsequent(data); }
     else if(kind === 'INVOKE_MAP_DIALOG') { return new InvokeMapConsequent(data); }
     else if(kind === 'INVOKE_BLUEPRINT_CONGRATS') { return new InvokeBlueprintCongratsConsequent(data); }
