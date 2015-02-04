@@ -3783,6 +3783,12 @@ Building.prototype.receive_state = function(data, init, is_deploying) {
 
     goog.base(this, 'receive_state', data, init, is_deploying);
 
+    if(this.is_emplacement()) {
+        // we are not recognized as a shooter on the first update - make sure we are always set to attack
+        // (kind of a hack, would break wit hunits)
+        this.ai_state = ai_states.AI_ATTACK_ANY;
+    }
+
     var old_repair_time = this.repair_finish_time;
     this.repair_finish_time = data.shift();
     this.build_total_time = data.shift();
