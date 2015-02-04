@@ -982,6 +982,17 @@ FramePlatformPredicate.prototype.is_satisfied = function(player, qdata) {
     return spin_frame_platform == this.platform;
 };
 
+/** @constructor
+  * @extends Predicate */
+function FacebookAppNamespacePredicate(data) {
+    goog.base(this, data);
+    this.namespace = data['namespace'];
+}
+goog.inherits(FacebookAppNamespacePredicate, Predicate);
+FacebookAppNamespacePredicate.prototype.is_satisfied = function(player, qdata) {
+    return spin_app_namespace == this.namespace;
+};
+
 ///////////////////////////
 //// CLIENT SIDE PREDICATES
 ///////////////////////////
@@ -1431,6 +1442,8 @@ function read_predicate(data) {
         return new AlwaysFalsePredicate(data);
     } else if(kind === 'FACEBOOK_LIKES_CLIENT') {
         return new ClientFacebookLikesPredicate(data);
+    } else if(kind === 'FACEBOOK_APP_NAMESPACE') {
+        return new FacebookAppNamespacePredicate(data);
     } else if(kind === 'PRICE_REGION') {
         return new PriceRegionPredicate(data);
     } else if(kind === 'COUNTRY_TIER') {

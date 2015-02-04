@@ -397,6 +397,13 @@ class FacebookIDPredicate(Predicate):
     def is_satisfied(self, player, qdata):
         return str(player.facebook_id) in self.allow
 
+class FacebookAppNamespacePredicate(Predicate):
+    def __init__(self, data):
+        Predicate.__init__(self, data)
+        self.namespace = data['namespace']
+    def is_satisfied(self, player, qdata):
+        return SpinConfig.config.get('facebook_app_namespace',None) == self.namespace
+
 class PriceRegionPredicate(Predicate):
     def __init__(self, data):
         Predicate.__init__(self, data)
@@ -829,6 +836,8 @@ def read_predicate(data):
         return UserIDPredicate(data)
     elif kind == 'FACEBOOK_ID':
         return FacebookIDPredicate(data)
+    elif kind == 'FACEBOOK_APP_NAMESPACE':
+        return FacebookAppNamespacePredicate(data)
     elif kind == 'COUNTRY_TIER':
         return CountryTierPredicate(data)
     elif kind == 'COUNTRY':
