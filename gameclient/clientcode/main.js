@@ -17563,7 +17563,7 @@ function invoke_building_context_menu(mouse_xy) {
         dialog.widgets['level'].str = session.minefield_tags_by_obj_id[obj.id];
 
         dialog.widgets['level'].str += ' ('+gamedata['strings'][obj.is_minefield_armed() ? 'minefield_armed' : 'minefield_not_armed']+')';
-    } else if(obj.is_inert() && obj.metadata) {
+    } else if(obj.is_inert() && obj.metadata && ('ui_description' in spec)) {
         dialog.widgets['level'].str = spec['ui_description'].replace('%d', '??');
     } else {
         dialog.widgets['level'].str = '';
