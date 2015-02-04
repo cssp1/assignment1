@@ -358,6 +358,68 @@ class FindAndReplaceItemsConsequent(Consequent):
         if self.affect_inventory:
             session.player.send_inventory_update(retmsg)
 
+class FindAndReplaceObjectsConsequent(Consequent):
+    def __init__(self, data):
+        Consequent.__init__(self, data)
+        self.replacements = data['replacements']
+
+    def execute(self, session, player, retmsg, context=None):
+        obj_updates = set()
+        need_history_update = False
+
+        for obj in player.home_base_iter():
+            if obj.is_building(): # right now this only handles buildings
+                for select, replace in self.replacements:
+                    if obj.spec.name == select['spec'] and (('level' not in select) or (obj.level+1 if obj.is_upgrading() else obj.level) == select['level']):
+                        # we found it!
+
+                        # perform an automatic speedup to avoid corner cases
+                        obj.heal_to_full(); obj.repair_finish_time = -1
+                        if obj.is_under_construction():
+                            obj.build_total_time = obj.build_start_time = obj.build_done_time = -1
+                        if obj.is_upgrading():
+                            obj.upgrade_total_time = obj.upgrade_start_time = obj.upgrade_done_time = -1
+                            obj.change_level(obj.level + 1)
+
+                        # now perform replacements
+                        if 'spec' in replace:
+                            obj.change_spec(player.get_abtest_object_spec(replace['spec']))
+                        if 'level' in replace:
+                            obj.change_level(replace['level'])
+                        if 'equipment' in replace:
+                            for slot_type, name_list in replace['equipment'].iteritems():
+                                # XXXXXX separate Equipment.py from server.py and use it here
+                                if obj.equipment is None: obj.equipment = {}
+                                if slot_type not in obj.equipment: obj.equipment[slot_type] = []
+                                for name in name_list:
+                                    if name not in obj.equipment[slot_type]:
+                                        obj.equipment[slot_type].append(name)
+
+                        obj_updates.add(obj)
+
+                        # run history metrics
+                        # XXXXXX unify with server.py do_ping_object
+                        need_history_update = True
+                        num_built = sum([1 for p in obj.owner.home_base_iter() if p.spec.name == obj.spec.name])
+                        need_history_update |= session.setmax_player_metric('building:'+obj.spec.name+':num_built', num_built, bucket = bool(obj.spec.worth_less_xp))
+                        max_level = max([p.level for p in obj.owner.home_base_iter() if p.spec.name == obj.spec.name])
+                        need_history_update |= session.setmax_player_metric('building:'+obj.spec.name+':max_level', max_level, bucket = bool(obj.spec.worth_less_xp))
+                        if obj.spec.history_category:
+                            max_level = max([p.level for p in obj.owner.home_base_iter() if p.spec.history_category == obj.spec.history_category])
+                            need_history_update |= session.setmax_player_metric(obj.spec.history_category+'_max_level', max_level, bucket = bool(obj.spec.worth_less_xp))
+                        if obj.spec.track_level_in_player_history:
+                            need_history_update |= session.setmax_player_metric(obj.spec.name+'_level', obj.level, bucket = bool(obj.spec.worth_less_xp))
+
+        if obj_updates:
+            for obj in obj_updates:
+                retmsg.append(["OBJECT_STATE_UPDATE2", obj.serialize_state()])
+            # also need to do a stat and power update
+            session.player.recalc_stattab(session.player)
+            session.player.stattab.send_update(session, retmsg)
+            session.power_changed(session.viewing_base, None, retmsg)
+        if need_history_update:
+            session.player.send_history_update(retmsg)
+
 class ChatSendConsequent(Consequent):
    def __init__(self, data):
        Consequent.__init__(self, data)
@@ -462,6 +524,7 @@ def read_consequent(data):
     elif kind == 'COOLDOWN_TRIGGER': return CooldownTriggerConsequent(data)
     elif kind == 'COOLDOWN_RESET': return CooldownResetConsequent(data)
     elif kind == 'FIND_AND_REPLACE_ITEMS': return FindAndReplaceItemsConsequent(data)
+    elif kind == 'FIND_AND_REPLACE_OBJECTS': return FindAndReplaceObjectsConsequent(data)
     elif kind == 'CHAT_SEND': return ChatSendConsequent(data)
     elif kind == 'MARK_BIRTHDAY': return MarkBirthdayConsequent(data)
     elif kind == 'DISPLAY_DAILY_TIP': return DisplayDailyTipConsequent(data)

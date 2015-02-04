@@ -773,7 +773,7 @@ def check_spell(spellname, spec):
     for PRED in ('requires', 'show_if'):
         if PRED in spec:
             error |= check_predicate(spec[PRED], reason = spellname+':'+PRED)
-    for CONS in ('pre_activation',):
+    for CONS in ('pre_activation', 'consequent'):
         if CONS in spec:
             error |= check_consequent(spec[CONS], reason = spellname+':'+CONS)
 
@@ -1443,7 +1443,7 @@ def check_logic(log, reason = '', context = None):
 
 CONSEQUENT_TYPES = set(['NULL', 'AND', 'RANDOM', 'IF', 'COND', 'LIBRARY',
                         'PLAYER_HISTORY', 'GIVE_LOOT', 'SESSION_LOOT', 'GIVE_TROPHIES', 'GIVE_TECH', 'APPLY_AURA', 'REMOVE_AURA', 'COOLDOWN_TRIGGER', 'COOLDOWN_TRIGGER', 'COOLDOWN_RESET',
-                        'METRIC_EVENT', 'SPAWN_SECURITY_TEAM', 'CHAT_SEND', 'FIND_AND_REPLACE_ITEMS',
+                        'METRIC_EVENT', 'SPAWN_SECURITY_TEAM', 'CHAT_SEND', 'FIND_AND_REPLACE_ITEMS', 'FIND_AND_REPLACE_OBJECTS',
                         'VISIT_BASE', 'DISPLAY_MESSAGE', 'MESSAGE_BOX', 'TUTORIAL_ARROW', 'INVOKE_MAP_DIALOG', 'START_AI_ATTACK',
                         'INVOKE_CRAFTING_DIALOG', 'INVOKE_BUILD_DIALOG', 'INVOKE_MISSIONS_DIALOG', 'INVOKE_STORE_DIALOG', 'INVOKE_BUY_GAMEBUCKS_DIALOG',
                         'INVOKE_CHANGE_REGION_DIALOG', 'INVOKE_BLUEPRINT_CONGRATS', 'INVOKE_TOP_ALLIANCES_DIALOG', 'MARK_BIRTHDAY',
@@ -1546,7 +1546,22 @@ def check_consequent(cons, reason = '', context = None, context_data = None):
                     error |= 1; print '%s: %s consequent refers to invalid crafting recipe %s\n' % (reason, cons['consequent'], fr)
                 if (to not in gamedata['crafting']['recipes']):
                     error |= 1; print '%s: %s consequent refers to invalid crafting recipe %s\n' % (reason, cons['consequent'], to)
-
+    elif cons['consequent'] == "FIND_AND_REPLACE_OBJECTS":
+        for find, replace in cons['replacements']:
+            for sel in find, replace:
+                spec = gamedata['buildings'].get(sel['spec'], None)
+                if not spec:
+                    error |= 1; print '%s: invalid spec "%s"' % (reason, sel['spec'])
+                else:
+                    if 'level' in sel and sel['level'] > len(spec[GameDataUtil.MAX_LEVEL_FIELD['buildings']]):
+                        error |= 1; print '%s: spec "%s" level %d is beyond max' % (reason, sel['spec'], sel['level'])
+                    if 'equipment' in sel:
+                        for slot_type, name_list in sel['equipment'].iteritems():
+                            if slot_type not in gamedata['strings']['equip_slots']:
+                                error |= 1; print '%s: invalid slot_type %s' % (reason, slot_type)
+                            for name in name_list:
+                                if name not in gamedata['items']:
+                                    error |= 1; print '%s: invalid item %s' % (reason, name)
     elif cons['consequent'] == "SPAWN_SECURITY_TEAM":
         for name, qty in cons['units'].iteritems():
             error |= check_unit_name(name, reason)

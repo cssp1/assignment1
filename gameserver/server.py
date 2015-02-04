@@ -7965,6 +7965,7 @@ class Player(AbstractPlayer):
                 if name in patches:
                     ret = ret.make_patched(patches[name])
         return ret
+    def get_abtest_object_spec(self, name): return self.get_abtest_spec(GameObjectSpec, name)
 
     def get_abtest_quest(self, name):
         ret = Quest(name)
@@ -8011,6 +8012,8 @@ class Player(AbstractPlayer):
     def get_abtest_offer(self, name):
         return gamedata['offers'][name]
 
+    def get_abtest_spell(self, name):
+        return gamedata['spells'].get(name, None)
     def get_abtest_item(self, name):
         return gamedata['items'].get(name, None)
     def get_abtest_item_set(self, name):
