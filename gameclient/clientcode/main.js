@@ -3747,7 +3747,7 @@ Building.update_modstats = function(team, update) {
         if(obj.is_building() && obj.team == team) {
             obj.modstats = (obj.id in update ? update[obj.id] : {});
 
-            if(obj.modstats && obj.is_minefield()) {
+            if(obj.is_minefield() || obj.is_emplacement()) {
                 // initialize AI state
                 obj.ai_state = (obj.is_shooter() ? ai_states.AI_ATTACK_ANY : ai_states.AI_STOP);
             }
@@ -3782,12 +3782,6 @@ Building.prototype.receive_state = function(data, init, is_deploying) {
     var was_under_construction = this.is_under_construction();
 
     goog.base(this, 'receive_state', data, init, is_deploying);
-
-    if(this.is_emplacement()) {
-        // we are not recognized as a shooter on the first update - make sure we are always set to attack
-        // (kind of a hack, might break if things get more complex)
-        this.ai_state = ai_states.AI_ATTACK_ANY;
-    }
 
     var old_repair_time = this.repair_finish_time;
     this.repair_finish_time = data.shift();
