@@ -15848,6 +15848,10 @@ function invoke_message_dialog(title_text, body_text, props) {
     }
 
     dialog.widgets['title'].str = title_text;
+    if('title_text_color' in props) {
+        dialog.widgets['title'].text_color = SPUI.make_colorv(props['title_text_color']);
+    }
+
     dialog.widgets['description'].set_text_with_linebreaking(body_text);
     if('close_button' in props && !props['close_button']) {
         dialog.widgets['close_button'].show = false;
@@ -15895,6 +15899,10 @@ function invoke_child_message_dialog(title_text, body_text, props) {
     }
 
     dialog.widgets['title'].str = title_text;
+    if('title_text_color' in props) {
+        dialog.widgets['title'].text_color = SPUI.make_colorv(props['title_text_color']);
+    }
+
     dialog.widgets['description'].set_text_with_linebreaking(body_text);
 
     if('close_button' in props && !props['close_button']) {
@@ -17180,6 +17188,23 @@ function add_regional_map_button(buttons) {
 }
 
 /** @param {Array.<ContextMenuButton>} buttons */
+function add_migrate_turret_heads_button(buttons) {
+    var spell = gamedata['spells']['MIGRATE_TURRET_HEADS'];
+    buttons.push(new ContextMenuButton(spell['ui_name'], (function (_spell) { return function() {
+        invoke_child_message_dialog(_spell['ui_title'],
+                                    _spell['ui_description'],
+                                    {'dialog': 'message_dialog_big',
+                                     'title_text_color': _spell['title_text_color'],
+                                     'cancel_button': true,
+                                     'ok_button_ui_name': _spell['ui_button'],
+                                     'on_ok': function() {
+                                         send_to_server.func(["CAST_SPELL", 0, "MIGRATE_TURRET_HEADS"]);
+                                         invoke_ui_locker();
+                                     } });
+    }; })(spell)));
+}
+
+/** @param {Array.<ContextMenuButton>} buttons */
 function add_deploy_squads_button(buttons) {
     var pred = read_predicate({'predicate': 'AND', 'subpredicates':[
         {'predicate':'LIBRARY', 'name':'quarry_play_requirement'},
@@ -17477,8 +17502,13 @@ function invoke_building_context_menu(mouse_xy) {
                     }
                 }
 
-                buttons.push(new ContextMenuButton(spell['ui_name'+ (obj.level < obj.get_max_ui_level() ? (obj.is_emplacement() ? '_emplacement' : '') : '_maxlevel')],
-                                                   function() { invoke_upgrade_building_dialog(); }));
+                var migrate_spell = gamedata['spells']['MIGRATE_TURRET_HEADS'];
+                if(migrate_spell && obj.spec['history_category'] == 'turrets' && read_predicate(migrate_spell['requires']).is_satisfied(player, null)) {
+                    add_migrate_turret_heads_button(buttons);
+                } else {
+                    buttons.push(new ContextMenuButton(spell['ui_name'+ (obj.level < obj.get_max_ui_level() ? (obj.is_emplacement() ? '_emplacement' : '') : '_maxlevel')],
+                                                       function() { invoke_upgrade_building_dialog(); }));
+                }
             }
 
             if(session.home_base && obj.spec['name'] == gamedata['townhall']) {
