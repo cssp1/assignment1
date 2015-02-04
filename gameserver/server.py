@@ -17255,9 +17255,12 @@ class GAMEAPI(resource.Resource):
             removed = Equipment.equip_remove(target.equipment, (arg.delivery_address['slot_type'],arg.delivery_address.get('slot_index',0)))
             if len(target.equipment) < 1:
                 target.equipment = None
+            assert removed
             player.inventory_log_event('5131_item_trashed', removed['spec'], -removed.get('stack',1), removed.get('expire_time',-1), reason='replaced')
             if target is not object:
                 retmsg.append(["OBJECT_STATE_UPDATE2", target.serialize_state()])
+            player.recalc_stattab(player)
+            player.stattab.send_update(session, retmsg)
 
         if 'on_start' in recipe:
             session.execute_consequent_safe(GameObjectSpec.get_leveled_quantity(recipe['on_start'], arg.recipe_level),
