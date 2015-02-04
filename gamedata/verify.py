@@ -976,6 +976,11 @@ def check_item(itemname, spec):
     elif spec['icon'] != 'gamebucks_inventory_icon':
         error |= require_art_asset(spec['icon'], itemname+':icon')
 
+    if type(spec['ui_description']) is list:
+        ui_descr_list = [val for pred, val in spec['ui_description']]
+    else:
+        ui_descr_list = [spec['ui_description']]
+
     if ('item_set' in spec):
         if (spec['item_set'] not in gamedata['item_sets']):
             error |= 1; print '%s:item_set ("%s") is missing from item_sets.json' % (itemname, spec['item_set'])
@@ -984,8 +989,9 @@ def check_item(itemname, spec):
         if spec['name'] not in set_spec['members']:
             error |= 1; print '%s is not listed in item_set "%s" members' % (itemname, spec['item_set'])
         if 'ui_name' in set_spec:
-            if set_spec['ui_name'] not in spec['ui_description']:
-                error |= 1; print '%s\'s ui_description does not mention the name of the set it belongs to ("%s")' % (itemname, set_spec['ui_name'])
+            for ui_descr in ui_descr_list:
+                if set_spec['ui_name'] not in ui_descr:
+                    error |= 1; print '%s\'s ui_description does not mention the name of the set it belongs to ("%s")' % (itemname, set_spec['ui_name'])
 
     if 'limited_equipped' in spec:
         # note: while the engine can deal with provides_limited_equipped on any building,
@@ -1093,34 +1099,43 @@ def check_item(itemname, spec):
                 error |= check_modstat(effect, reason = 'item %s: effects' % itemname,
                                        expect_level = spec.get('level', None),
                                        expect_item_sets = set((spec['item_set'],)) if 'item_set' in spec else None)
-                if effect['stat'] == 'permanent_auras' and spec['equip']['kind'] != 'building':
+                if effect['stat'] == 'permanent_auras' and not any(x['kind'] == 'building' for x in spec['equip'].get('compatible',[spec['equip']])):
                     error |= 1; print '%s: permanent_auras mods are not supported on mobile units (buildings only)' % itemname
             if 'consequent' in effect:
                 error |= check_consequent(effect['consequent'], reason = 'item %s: effects' % itemname)
 
         equip = spec['equip']
-        if equip['kind'] in ('building','mobile') and ('name' in equip):
-            source = {'building':'buildings', 'mobile':'units'}[equip['kind']]
-            if equip['name'] not in gamedata[source]:
-                error |= 1; print '%s: invalid %s object name %s' % (itemname, equip['kind'], equip['name'])
-            else:
-                host_spec = gamedata[source][equip['name']]
-                if 'slot_type' not in equip:
-                    error |= 1;  print '%s: equip is missing a "slot_type"' % (itemname,)
-                elif (not equip.get('dev_only',False)) and (equip['slot_type'] not in host_spec.get('equip_slots',{})):
-                    error |= 1; print '%s: equips to %s but %s.json is missing a "%s" slot for it' % (itemname, equip['name'], source, equip['slot_type'])
-                elif ('min_level' in equip):
-                    if len(host_spec[GameDataUtil.MAX_LEVEL_FIELD[source]]) < equip['min_level']:
-                        error |= 1; print '%s: equips to %s L%d+ but the unit/building does not actually upgrade that high' % (itemname, equip['name'], equip['min_level'])
+        # check compatibility criteria
+        if 'compatible' in equip:
+            crit_list = equip['compatible']
+        else:
+            crit_list = [equip] # legacy raw outer JSON
+        for crit in crit_list:
+            if crit['kind'] in ('building','mobile') and ('name' in crit):
+                source = {'building':'buildings', 'mobile':'units'}[crit['kind']]
+                if crit['name'] not in gamedata[source]:
+                    error |= 1; print '%s: invalid %s object name %s' % (itemname, crit['kind'], crit['name'])
+                else:
+                    host_spec = gamedata[source][crit['name']]
+                    if 'slot_type' not in crit:
+                        error |= 1;  print '%s: equip is missing a "slot_type"' % (itemname,)
+                    elif (not crit.get('dev_only',False)) and (crit['slot_type'] not in host_spec.get('equip_slots',{})):
+                        error |= 1; print '%s: equips to %s but %s.json is missing a "%s" slot for it' % (itemname, crit['name'], source, crit['slot_type'])
+                    elif ('min_level' in crit):
+                        if len(host_spec[GameDataUtil.MAX_LEVEL_FIELD[source]]) < crit['min_level']:
+                            error |= 1; print '%s: equips to %s L%d+ but the unit/building does not actually upgrade that high' % (itemname, crit['name'], crit['min_level'])
 
-        if equip.get('slot_type',None) == 'turret_head':
-            if 'consumes_power' not in equip:
-                error |= 1; print '%s: equip is missing "consumes_power"' % (itemname,)
+            if crit.get('slot_type',None) == 'turret_head':
+                if 'consumes_power' not in equip:
+                    error |= 1; print '%s: equip is missing "consumes_power"' % (itemname,)
 
-        if equip.get('min_level',1) > 1:
-            if ('L%d or higher' % equip['min_level'] not in spec['ui_description']) and \
-               ('Level %d or higher' % equip['min_level'] not in spec['ui_description']):
-                error |= 1; print '%s: requires min_level %d but the ui_description does not include the words "L%d or higher" or "Level %d or higher": "%s"' % (itemname, equip['min_level'], equip['min_level'], equip['min_level'], spec['ui_description'])
+            if crit.get('min_level',1) > 1:
+                if not any(('L%d or higher' % crit['min_level'] in ui_descr) or \
+                           ('Level %d or higher' % crit['min_level'] in ui_descr) for ui_descr in ui_descr_list):
+                    error |= 1; print '%s: requires min_level %d but the ui_description does not include the words "L%d or higher" or "Level %d or higher": "%s"' % (itemname, crit['min_level'], crit['min_level'], crit['min_level'], spec['ui_description'])
+
+        if ('name' in equip) and (gamedata['game_id'] == 'tr') and ('turret_heads' in gamedata['crafting']['categories']) and (equip['name'] in ('mg_tower', 'mortar_emplacement', 'tow_emplacement')):
+            error |= 1; print '%s: needs migration to be "compatible" with turret heads' % itemname
 
     if 'store_price' in spec or 'store_requires' in spec:
         error |= 1; print '%s: has obsolete store_price or store_requires fields - these need to be migrated to the store catalog in gamedata_main.json' % (itemname)
@@ -1128,9 +1143,9 @@ def check_item(itemname, spec):
     if spec.get('remove_fragility',0) < 1 and (not spec.get('can_unequip', True)):
         error |= 1; print '%s: "can_unequip": 0 and "remove_fragility": 1 must be used together' % (itemname)
 
-    if 'force_expire_by' in spec:
-        if type(spec['force_expire_by']) is list:
-            error |= check_cond_chain(spec['force_expire_by'], reason = 'item %s: force_expire_by' % itemname)
+    for COND_CHAIN in ('force_expire_by', 'ui_description'):
+        if COND_CHAIN in spec and type(spec[COND_CHAIN]) is list:
+            error |= check_cond_chain(spec[COND_CHAIN], reason = 'item %s: %s' % (itemname, COND_CHAIN))
 
     if 'associated_tech' in spec and spec['associated_tech'] not in gamedata['tech']:
         error |= 1; print '%s: associated_tech "%s" not found in tech.json' % (itemname, spec['associated_tech'])

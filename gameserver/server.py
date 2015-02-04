@@ -4915,13 +4915,19 @@ class Equipment (object):
     @staticmethod
     def equip_is_compatible_with_slot(my_spec, my_level, slot_type, item_spec):
         if 'equip' not in item_spec: return False
-        if ('kind' in item_spec['equip']) and (item_spec['equip']['kind'] != my_spec.kind): return False
-        if ('name' in item_spec['equip']) and (item_spec['equip']['name'] != my_spec.name): return False
-        if ('manufacture_category' in item_spec['equip']) and (item_spec['equip']['manufacture_category'] != my_spec.manufacture_category): return False
-        if ('history_category' in item_spec['equip']) and (item_spec['equip']['history_category'] != my_spec.history_category): return False
-        if ('slot_type' in item_spec['equip']) and (item_spec['equip']['slot_type'] != slot_type): return False
-        if ('min_level' in item_spec['equip']) and (my_level < item_spec['equip']['min_level']): return False
-        return True
+        if 'compatible' in item_spec['equip']:
+            crit_list = item_spec['equip']['compatible']
+        else:
+            crit_list = [item_spec['equip']] # legacy items use raw outer JSON
+        for crit in crit_list:
+            if ('kind' in crit) and (crit['kind'] != my_spec.kind): continue
+            if ('name' in crit) and (crit['name'] != my_spec.name): continue
+            if ('manufacture_category' in crit) and (crit['manufacture_category'] != my_spec.manufacture_category): continue
+            if ('history_category' in crit) and (crit['history_category'] != my_spec.history_category): continue
+            if ('slot_type' in crit) and (crit['slot_type'] != slot_type): continue
+            if ('min_level' in crit) and (my_level < crit['min_level']): continue
+            return True
+        return False
 
 # confusing: player_auras are raw dicts, but object auras are instances of this class
 class Aura (object):

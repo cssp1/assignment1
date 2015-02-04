@@ -190,25 +190,47 @@ ItemDisplay.get_inventory_item_ui_subtitle = function(spec) {
         } else if('equip' in spec) {
             var equip_type;
             var name = '';
-            if(spec['equip']['kind'] == 'building') {
-                if(spec['equip']['slot_type'] == 'leader' && ('name' in spec['equip'])) {
-                    name = gamedata['buildings'][spec['equip']['name']]['ui_name'];
-                    equip_type = 'building_leader';
-                } else {
-                    equip_type = 'building_equip';
-                }
-            } else if(spec['equip']['kind'] == 'mobile') {
-                if(spec['equip']['slot_type'] == 'leader' && ('name' in spec['equip'])) {
-                    name = gamedata['units'][spec['equip']['name']]['ui_name'];
-                    equip_type = 'unit_leader';
-                } else {
-                    equip_type = 'unit_equip';
-                }
+            var crit_list;
+            if('compatible' in spec['equip']) {
+                crit_list = spec['equip']['compatible'];
             } else {
-                equip_type = 'equip';
+                crit_list = [spec['equip']]; // legacy raw outer JSON
             }
-            var slot_type = gamedata['strings']['equip_slots'][spec['equip']['slot_type']]['ui_name'];
-            subtitle += ' '+gamedata['strings']['item_types'][equip_type].replace('%SLOT', slot_type).replace('%NAME', name);
+
+            // try to find an applicable criterion for the item subtitle
+
+            for(var i = 0; i < crit_list.length; i++) {
+                var crit = crit_list[i];
+
+                if(crit['kind'] == 'building') {
+                    if(crit['slot_type'] == 'leader' && ('name' in crit)) {
+                        var bspec = gamedata['buildings'][crit['name']];
+                        if(('show_if' in bspec) && !read_predicate(bspec['show_if']).is_satisfied(player, null)) {
+                            continue; // reject invisible buildings
+                        }
+                        name = bspec['ui_name'];
+                        equip_type = 'building_leader';
+                    } else {
+                        equip_type = 'building_equip';
+                    }
+                } else if(crit['kind'] == 'mobile') {
+                    if(crit['slot_type'] == 'leader' && ('name' in crit)) {
+                        var uspec = gamedata['units'][crit['name']];
+                        if(('show_if' in uspec) && !read_predicate(uspec['show_if']).is_satisfied(player, null)) {
+                            continue; // reject invisible units
+                        }
+                        name = uspec['ui_name'];
+                        equip_type = 'unit_leader';
+                    } else {
+                        equip_type = 'unit_equip';
+                    }
+                } else {
+                    equip_type = 'equip';
+                }
+                var slot_type = gamedata['strings']['equip_slots'][crit['slot_type']]['ui_name'];
+                subtitle += ' '+gamedata['strings']['item_types'][equip_type].replace('%SLOT', slot_type).replace('%NAME', name);
+                break;
+            }
         }
     }
 
@@ -230,7 +252,7 @@ ItemDisplay.get_inventory_item_ui_subtitle = function(spec) {
             }=} opts
     @returns {string} BBCode result */
 ItemDisplay.get_inventory_item_ui_description = function(spec, stack, item_duration, opts) {
-    var descr = spec['ui_description'];
+    var descr = eval_cond_or_literal(spec['ui_description'], player, null);
     if(descr.indexOf("%price") != -1) { // special-case hack for cost-capping auras
         var price = spec['use']['spellarg'][2];
         descr = descr.replace("%price", Store.display_user_currency_amount(Store.convert_credit_price_to_user_currency(price), 'full'));

@@ -6061,26 +6061,48 @@ player.stored_item_iter = function(func) {
     goog.array.forEach(player.loot_buffer, function(entry) { stop |= func(entry); }); if(stop) { return; }
 };
 
+/** If an item of "espec" can theoretically go into a slot on a "thing" (works with both building and unit specs),
+    then return the applicable criteria object from within espec, otherwise null.
+    (ignores unique_equipped/limited_equipped constraints)
+    @param {Object} host_spec
+    @param {number} host_level
+    @param {string} slot_type
+    @param {Object} espec of the equipment item
+    @param {boolean=} ignore_min_level ignore the min_level requirment
+    @return {Object|null} */
+function equip_is_compatible_with_slot(host_spec, host_level, slot_type, espec, ignore_min_level) {
+    if(!('equip' in espec)) { return null; }
+    var crit_list;
+    if('compatible' in espec['equip']) {
+        crit_list = espec['equip']['compatible'];
+    } else {
+        crit_list = [espec['equip']]; // legacy items use raw outer JSON
+    }
+    for(var i = 0; i < crit_list.length; i++) {
+        var crit = crit_list[i];
+        if(('kind' in crit) && (crit['kind'] != host_spec['kind'])) { continue; }
+        if(('name' in crit) && (crit['name'] != host_spec['name'])) { continue; }
+        if(('manufacture_category' in crit) && (crit['manufacture_category'] != host_spec['manufacture_category'])) { continue; }
+        if(('history_category' in crit) && (crit['history_category'] != host_spec['history_category'])) { continue; }
+        if(('slot_type' in crit) && crit['slot_type'] != slot_type) { continue; }
+        if(!ignore_min_level && ('min_level' in crit) && (host_level < crit['min_level'])) { continue; }
+        return crit;
+    }
+    return null;
+}
+
 /** Return true if an item of "espec" can theoretically go into a slot on a building
     (ignores unique_equipped/limited_equipped constraints)
     @param {Building} unit
     @param {string} slot_type
     @param {Object} espec of the equipment item
     @param {boolean=} ignore_min_level
-    @return {boolean}
+    @return {Object|null}
 */
 function equip_is_compatible_with_building(unit, slot_type, espec, ignore_min_level) {
-    if(!('equip' in espec)) { return false; }
-    var crit = espec['equip'];
-    var host_spec = unit.spec;
-    if(('kind' in crit) && (crit['kind'] != host_spec['kind'])) { return false; }
-    if(('name' in crit) && (crit['name'] != host_spec['name'])) { return false; }
-    if(('manufacture_category' in crit) && (crit['manufacture_category'] != host_spec['manufacture_category'])) { return false; }
-    if(('history_category' in crit) && (crit['history_category'] != host_spec['history_category'])) { return false; }
-    if(('slot_type' in crit) && crit['slot_type'] != slot_type) { return false; }
-    if(!ignore_min_level && ('min_level' in crit) && (unit.level < crit['min_level'])) { return false; }
-    return true;
+    return equip_is_compatible_with_slot(unit.spec, unit.level, slot_type, espec, ignore_min_level);
 }
+
 /** Return true if an item of "espec" can theoretically go into a slot on a unit spec
     (ignores unique_equipped/limited_equipped constraints)
     @param {string} techname of the unit-associated tech
@@ -6088,19 +6110,10 @@ function equip_is_compatible_with_building(unit, slot_type, espec, ignore_min_le
     @param {string} slot_type
     @param {Object} espec of the equipment item
     @param {boolean=} ignore_min_level
-    @return {boolean}
+    @return {Object|null}
 */
 function equip_is_compatible_with_unit(techname, specname, slot_type, espec, ignore_min_level) {
-    if(!('equip' in espec)) { return false; }
-    var crit = espec['equip'];
-    var host_spec = gamedata['units'][specname];
-    if(('kind' in crit) && (crit['kind'] != host_spec['kind'])) { return false; }
-    if(('name' in crit) && (crit['name'] != host_spec['name'])) { return false; }
-    if(('manufacture_category' in crit) && (crit['manufacture_category'] != host_spec['manufacture_category'])) { return false; }
-    if(('history_category' in crit) && (crit['history_category'] != host_spec['history_category'])) { return false; }
-    if(('slot_type' in crit) && crit['slot_type'] != slot_type) { return false; }
-    if(!ignore_min_level && ('min_level' in crit) && ((player.tech[techname]||0) < crit['min_level'])) { return false; }
-    return true;
+    return equip_is_compatible_with_slot(gamedata['units'][specname], player.tech[techname]||0, slot_type, espec, ignore_min_level);
 }
 
 /** Reference to a specific slot in an equipment data structure
@@ -21216,12 +21229,17 @@ function invoke_equip_chooser(inv_dialog, parent_widget, tech, unit, slot_type, 
         var espec = ItemDisplay.get_inventory_item_spec(item['spec']);
         if('equip' in espec) {
             var can_equip_at_any_level, can_equip_now;
+            var min_level = -1; // only >0 if we don't meet the requirement right now
             if(tech) {
-                can_equip_at_any_level = equip_is_compatible_with_unit(tech['name'], tech['associated_unit'], slot_type, espec, true);
-                can_equip_now = can_equip_at_any_level && equip_is_compatible_with_unit(tech['name'], tech['associated_unit'], slot_type, espec, false);
+                var crit = equip_is_compatible_with_unit(tech['name'], tech['associated_unit'], slot_type, espec, true);
+                can_equip_at_any_level = !!crit;
+                can_equip_now = can_equip_at_any_level && !!equip_is_compatible_with_unit(tech['name'], tech['associated_unit'], slot_type, espec, false);
+                if(!can_equip_now && crit['min_level']) { min_level = crit['min_level']; }
             } else {
-                can_equip_at_any_level = equip_is_compatible_with_building(unit, slot_type, espec, true);
-                can_equip_now = can_equip_at_any_level && equip_is_compatible_with_building(unit, slot_type, espec, false);
+                var crit = equip_is_compatible_with_building(unit, slot_type, espec, true);
+                can_equip_at_any_level = !!crit;
+                can_equip_now = can_equip_at_any_level && !!equip_is_compatible_with_building(unit, slot_type, espec, false);
+                if(!can_equip_now && crit['min_level']) { min_level = crit['min_level']; }
             }
             if(!can_equip_at_any_level) { continue; }
 
@@ -21241,7 +21259,7 @@ function invoke_equip_chooser(inv_dialog, parent_widget, tech, unit, slot_type, 
                 player.equipped_item_iter(func);
             }
 
-            items.push([i, item, can_equip_now, unique_conflict]);
+            items.push([i, item, min_level, unique_conflict]);
         }
     }
 
@@ -21309,7 +21327,7 @@ function invoke_equip_chooser(inv_dialog, parent_widget, tech, unit, slot_type, 
 
     for(var i = 0; i < items.length; i++) {
         if(i >= dialog.data['widgets']['equip_item']['array'][0]) { break; }
-        var inv_slot = items[i][0], item = items[i][1], level_ok = items[i][2], unique_conflict = items[i][3];
+        var inv_slot = items[i][0], item = items[i][1], min_level = items[i][2], unique_conflict = items[i][3];
         var spec = ItemDisplay.get_inventory_item_spec(item['spec']);
 
         dialog.widgets['equip_frame'+i].show =
@@ -21321,10 +21339,9 @@ function invoke_equip_chooser(inv_dialog, parent_widget, tech, unit, slot_type, 
         //dialog.widgets['equip_frame'+i].state = (spec['name'] === equipped_now ? 'active' : 'normal');
         var context_props = {};
 
-        if(!level_ok) {
+        if(min_level > 0) {
             // show red text saying that player needs to upgrade the building
             dialog.widgets['equip_frame'+i].state = 'disabled_clickable';
-            var min_level = spec['equip']['min_level'];
             context_props['error_text'] = gamedata['errors'][(tech ? 'EQUIP_TECH_LEVEL_TOO_LOW' : 'EQUIP_BUILDING_LEVEL_TOO_LOW')]['ui_name'].replace('%s', min_level.toString());
             var helper = get_requirements_help(read_predicate(tech ? {'predicate': 'TECH_LEVEL', 'tech': tech['name'], 'min_level': min_level} :
                                                 {'predicate': 'BUILDING_LEVEL', 'building_type': unit.spec['name'], 'trigger_level': min_level}), null);
