@@ -4881,11 +4881,13 @@ class Equipment (object):
         if not any(equipment[slot_type]): del equipment[slot_type]
         return old_item
 
-    @staticmethod
-    def equip_add(equipment, my_spec, my_level, addr, item_spec, probe_only = False, probe_will_remove = False):
+    @classmethod
+    def equip_add(cls, equipment, my_spec, my_level, addr, item_spec, probe_only = False, probe_will_remove = False):
         assert type(equipment) is dict
         assert type(item_spec) is dict
         slot_type, slot_num = addr
+
+        # check that the slot exists and is empty
         if (not my_spec.equip_slots) or \
            (slot_type not in my_spec.equip_slots) or \
            (GameObjectSpec.get_leveled_quantity(my_spec.equip_slots[slot_type], my_level) < 1) or \
@@ -4898,13 +4900,7 @@ class Equipment (object):
             return False
 
         # check slot compatibility
-        if 'equip' not in item_spec: return False
-        if ('kind' in item_spec['equip']) and (item_spec['equip']['kind'] != my_spec.kind): return False
-        if ('name' in item_spec['equip']) and (item_spec['equip']['name'] != my_spec.name): return False
-        if ('manufacture_category' in item_spec['equip']) and (item_spec['equip']['manufacture_category'] != my_spec.manufacture_category): return False
-        if ('history_category' in item_spec['equip']) and (item_spec['equip']['history_category'] != my_spec.history_category): return False
-        if ('slot_type' in item_spec['equip']) and (item_spec['equip']['slot_type'] != slot_type): return False
-        if ('min_level' in item_spec['equip']) and (my_level < item_spec['equip']['min_level']): return False
+        if not cls.equip_is_compatible_with_slot(my_spec, my_level, slot_type, item_spec): return False
 
         if probe_only: return True
 
@@ -4913,6 +4909,18 @@ class Equipment (object):
         while len(equipment[slot_type]) < slot_num+1:
             equipment[slot_type].append(None)
         equipment[slot_type][slot_num] = item_spec['name']
+        return True
+
+    # similar to client's equip_is_compatible_with*() functions
+    @staticmethod
+    def equip_is_compatible_with_slot(my_spec, my_level, slot_type, item_spec):
+        if 'equip' not in item_spec: return False
+        if ('kind' in item_spec['equip']) and (item_spec['equip']['kind'] != my_spec.kind): return False
+        if ('name' in item_spec['equip']) and (item_spec['equip']['name'] != my_spec.name): return False
+        if ('manufacture_category' in item_spec['equip']) and (item_spec['equip']['manufacture_category'] != my_spec.manufacture_category): return False
+        if ('history_category' in item_spec['equip']) and (item_spec['equip']['history_category'] != my_spec.history_category): return False
+        if ('slot_type' in item_spec['equip']) and (item_spec['equip']['slot_type'] != slot_type): return False
+        if ('min_level' in item_spec['equip']) and (my_level < item_spec['equip']['min_level']): return False
         return True
 
 # confusing: player_auras are raw dicts, but object auras are instances of this class
