@@ -3764,7 +3764,7 @@ class Session(object):
                 if self.has_object(obj.obj_id):
                     retmsg.append(["OBJECT_STATE_UPDATE2", obj.serialize_state()])
 
-        gamesite.gameapi.power_changed(self, self.viewing_base, None, retmsg)
+        self.power_changed(self.viewing_base, None, retmsg)
 
     # send any one-time ad network events whose predicates have become true
     def adnetworks(self):
@@ -4179,7 +4179,26 @@ class Session(object):
         retmsg.append(["AI_ATTACK_WAVE_DEPLOYED", self.attack_finish_time, self.incoming_attack_units, self.incoming_attack_wave_time])
         return (len(self.incoming_attack_units) < 1)
 
+    # call this after any action that may change the player's power production or consumption
+    # it re-initializes harvesters with the correct harvesting rate
+    def power_changed(self, base, changed_object, retmsg):
+        if not gamedata['enable_power']: return 1
+        if changed_object and (not (changed_object.is_building() and changed_object.affects_power())): return 1
 
+        power_state = base.get_power_state()
+        power_factor = compute_power_factor(power_state)
+
+        for obj in base.iter_objects():
+            if obj.is_building() and obj.is_producer():
+                obj.update_production(obj.owner, base.base_type, base.base_region, power_factor)
+                base.nosql_write_one(obj, 'power_changed')
+                if self.has_object(obj.obj_id):
+                    retmsg.append(["OBJECT_STATE_UPDATE2", obj.serialize_state(update_hp = False)])
+
+        if base is self.viewing_base:
+            retmsg.append(["BASE_POWER_UPDATE", power_state])
+
+        return power_factor
 
 
 # This holds the state of an ongoing asynchronous session change request
@@ -16384,7 +16403,7 @@ class GAMEAPI(resource.Resource):
 
             session.player.unit_repair_send(retmsg)
             if recalc_power:
-                self.power_changed(session, session.viewing_base, None, retmsg)
+                session.power_changed(session.viewing_base, None, retmsg)
         else:
             raise Exception('unknown spell '+spellname)
 
@@ -16620,7 +16639,7 @@ class GAMEAPI(resource.Resource):
 
             # if the action had any possible impact on power generation, then re-initialize harvesters
             if did_a_repair or did_finish_construction or did_an_upgrade:
-                self.power_changed(session, base, object, retmsg)
+                session.power_changed(base, object, retmsg)
                 session.deferred_ladder_point_decay_check = True
 
             if did_finish_construction or did_an_upgrade:
@@ -16774,7 +16793,7 @@ class GAMEAPI(resource.Resource):
         refund = session.player.resources.gain_res(refund, reason='canceled_upgrade')
         admin_stats.econ_flow_res(session.player, 'investment', 'buildings', refund, spec = object.spec.name, level = object.level+1)
 
-        power_factor = self.power_changed(session, session.viewing_base, object, retmsg)
+        power_factor = session.power_changed(session.viewing_base, object, retmsg)
 
         if object.is_producer(): # re-start harvester
             object.update_production(object.owner, session.viewing_base.base_type, session.viewing_base.base_region, power_factor)
@@ -16845,7 +16864,7 @@ class GAMEAPI(resource.Resource):
             object.upgrade_done_time = 999
 
         # re-evaluate power situation
-        self.power_changed(session, session.viewing_base, object, retmsg)
+        session.power_changed(session.viewing_base, object, retmsg)
 
         retmsg.append(["OBJECT_STATE_UPDATE", object.serialize_state(), session.player.resources.calc_snapshot().serialize()])
         session.viewing_base.nosql_write_one(object, 'do_upgrade')
@@ -16894,7 +16913,7 @@ class GAMEAPI(resource.Resource):
 
         object.change_level(object.level+1)
 
-        self.power_changed(session, session.viewing_base, object, retmsg)
+        session.power_changed(session.viewing_base, object, retmsg)
 
         if object.spec.provides_inventory:
             session.player.send_inventory_update(retmsg)
@@ -17270,7 +17289,7 @@ class GAMEAPI(resource.Resource):
         if player is session.player:
             retmsg.append(["PLAYER_STATE_UPDATE", session.player.resources.calc_snapshot().serialize()])
 
-        self.power_changed(session, session.viewing_base, object, retmsg)
+        session.power_changed(session.viewing_base, object, retmsg)
         return True
 
     def do_cancel_craft(self, session, retmsg, object, spellarg):
@@ -17336,7 +17355,7 @@ class GAMEAPI(resource.Resource):
         if recipe['crafting_category'] == 'fishing':
             session.player.fishing_log_event('5152_fish_cancel', bus, time_left = time_left)
 
-        self.power_changed(session, session.viewing_base, object, retmsg)
+        session.power_changed(session.viewing_base, object, retmsg)
 
     # collect product(s) for one crafting attempt.
     # returns [need_history_update, list_of_product_items, attempt_id for completed attempt]
@@ -17450,7 +17469,7 @@ class GAMEAPI(resource.Resource):
         if completed_ids:
             retmsg.append(["PLAYER_STATE_UPDATE", session.player.resources.calc_snapshot().serialize()])
 
-        self.power_changed(session, session.viewing_base, object, retmsg)
+        session.power_changed(session.viewing_base, object, retmsg)
 
         if need_history_update and (object.owner is session.player):
             session.player.send_history_update(retmsg)
@@ -17620,7 +17639,7 @@ class GAMEAPI(resource.Resource):
         retmsg.append(["PLAYER_STATE_UPDATE", session.player.resources.calc_snapshot().serialize()])
 
         # re-evaluate power situation
-        self.power_changed(session, session.viewing_base, newobj, retmsg)
+        session.power_changed(session.viewing_base, newobj, retmsg)
 
         if build_time < 1 and spec.kind != 'inert':
             self.ping_object(session, retmsg, newobj.obj_id, session.viewing_base)
@@ -18025,7 +18044,7 @@ class GAMEAPI(resource.Resource):
         if len(obj.equipment) < 1: obj.equipment = None
 
         if ret:
-            self.power_changed(session, session.viewing_base, obj, retmsg)
+            session.power_changed(session.viewing_base, obj, retmsg)
             session.player.recalc_stattab(session.player)
             session.player.stattab.send_update(session, retmsg)
             if obj.is_producer():
@@ -19082,27 +19101,6 @@ class GAMEAPI(resource.Resource):
 
         retmsg.append(["PLAYER_STATE_UPDATE", session.player.resources.calc_snapshot().serialize()])
 
-    # call this after any action that may change the player's power production or consumption
-    # it re-initializes harvesters with the correct harvesting rate
-    def power_changed(self, session, base, changed_object, retmsg):
-        if not gamedata['enable_power']: return 1
-        if changed_object and (not (changed_object.is_building() and changed_object.affects_power())): return 1
-
-        power_state = base.get_power_state()
-        power_factor = compute_power_factor(power_state)
-
-        for obj in base.iter_objects():
-            if obj.is_building() and obj.is_producer():
-                obj.update_production(obj.owner, base.base_type, base.base_region, power_factor)
-                base.nosql_write_one(obj, 'power_changed')
-                if session.has_object(obj.obj_id):
-                    retmsg.append(["OBJECT_STATE_UPDATE2", obj.serialize_state(update_hp = False)])
-
-        if base is session.viewing_base:
-            retmsg.append(["BASE_POWER_UPDATE", power_state])
-
-        return power_factor
-
     def object_combat_updates(self, session, retmsg, arg):
         # update hitpoints and (for mobile units only) XY position and movement orders
 
@@ -19387,7 +19385,7 @@ class GAMEAPI(resource.Resource):
         # record state changes to affected players
         if recalc_power:
             # note: this sends OBJECT_STATE_UPDATE for harvesters as well as BASE_POWER_UPDATE
-            self.power_changed(session, session.viewing_base, None, retmsg)
+            session.power_changed(session.viewing_base, None, retmsg)
 
         if recalc_resources:
             start_time = time.time()
@@ -21555,7 +21553,7 @@ class GAMEAPI(resource.Resource):
                 if obj in session.viewing_base.iter_objects():
                     session.viewing_base.drop_object(obj)
                 if obj.is_building():
-                    self.power_changed(session, session.viewing_base, obj, retmsg)
+                    session.power_changed(session.viewing_base, obj, retmsg)
                 retmsg.append(["PLAYER_STATE_UPDATE", session.player.resources.calc_snapshot().serialize()])
 
         elif arg[0] == "RECYCLE_UNIT":
