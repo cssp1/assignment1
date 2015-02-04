@@ -102,6 +102,8 @@ def setup_field(gamedata, key, val, field_mode = None):
             return 'INT1' # build/upgrade/manufacture concurrency
         elif key.endswith('_num') and key[:-4] in gamedata['buildings']:
             return 'INT2' if key[:-4] == 'barrier' else 'INT1' # building quantities
+        elif key.endswith('_migrated'):
+            return 'INT1' # migration flags
         else:
             return 'INT4'
 

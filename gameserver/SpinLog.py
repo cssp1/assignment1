@@ -221,6 +221,8 @@ def MetricsLogFilter(child):
                                   #'5140_mail_attachment_collected'
                                   '4701_change_region_success',
 
+                                  '5149_turret_heads_migrated',
+
                                   '5200_insufficient_resources_dialog',
                                   '5201_insufficient_resources_go_to_store',
                                   '5202_insufficient_resources_topup_dialog',

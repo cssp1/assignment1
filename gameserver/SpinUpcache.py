@@ -1369,7 +1369,7 @@ def update_upcache_entry(user_id, driver, entry, time_now, gamedata, user_mtime 
                              'units_manufactured',
                              'money_spent', 'largest_purchase', 'time_in_game', 'logged_in_times',
                              'alliances_joined', 'units_donated', 'donated_units_received', 'alliance_gift_items_sent',
-                             'thunder_dome_entered',
+                             'thunder_dome_entered', 'turret_heads_migrated',
                              'iron_deposits_collected',
                              'chat_messages_sent',
                              'ai_sirenum_progress', 'ai_erebus_progress', 'ai_erebus4_progress', 'ai_vostok_progress', 'ai_vostok2_progress', 'ai_hellas_progress', 'ai_medusa_progress', 'ai_medusa2_progress', 'ai_kirat_progress', 'ai_kirat2_progress', 'ai_phantom_progress', 'ai_phantom2_progress', 'ai_radiation_progress', 'ai_ice_progress', 'ai_arsenal_progress', 'ai_blaster_attack_progress',
