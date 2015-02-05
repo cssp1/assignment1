@@ -1861,8 +1861,9 @@ FUNNEL_ADVANCED = get_tutorial_stages(gamedata) + [
      'func': lambda user: user.get(gamedata['townhall']+'_level',0) >= 3 },
 
     # looting
-    {'name': 'D24A Harvested 50k Iron/Water', 'func': lambda user: user.get('resources_harvested',0) >= 50000, 'show_p': True },
-    {'name': 'D24B Harvested 500k Iron/Water', 'func': lambda user: user.get('resources_harvested',0) >= 500000, 'show_p': True },
+    {'name': 'D24A Harvested 1 Iron/Water', 'func': lambda user: user.get('resources_harvested',0) >= 1, 'show_p': True },
+    {'name': 'D24B Harvested 50k Iron/Water', 'func': lambda user: user.get('resources_harvested',0) >= 50000, 'show_p': True },
+    {'name': 'D24C Harvested 500k Iron/Water', 'func': lambda user: user.get('resources_harvested',0) >= 500000, 'show_p': True },
     {'name': 'D25A Looted 500k Iron/Water', 'func': lambda user: user.get('resources_looted',0) >= 500000, 'show_p': True },
     {'name': 'D25B Looted 500k Iron/Water in PvE', 'func': lambda user: user.get('resources_looted_from_ai',0) >= 500000, 'show_p': True },
     {'name': 'D25C Looted 500k Iron/Water in PvP', 'func': lambda user: user.get('resources_looted_from_human',0) >= 500000, 'show_p': True },

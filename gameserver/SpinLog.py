@@ -191,6 +191,7 @@ def MetricsLogFilter(child):
                                   '0145_deploy_one_unit',
                                   '0150_finish_battle',
                                   '0155_reward_finish_battle',
+                                  '0159_reward_collection',
                                   '0160_accept_barracks_mission',
                                   '0170_click_barracks_on_menu',
                                   '0180_reward_barracks_mission',
