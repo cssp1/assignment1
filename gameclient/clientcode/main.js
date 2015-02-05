@@ -1696,7 +1696,7 @@ function apply_queued_damage_effects() {
 
     if(damage_effect_queue.length <= 0 && session.no_more_units) {
         session.no_more_units = false;
-        session.battle_outcome_dirty = true;
+        session.set_battle_outcome_dirty();
     }
 }
 
@@ -1966,8 +1966,7 @@ function hurt_object(target, damage, vs_table, source) {
         var args = [[target.id, target.spec['name'], [target.x,target.y], target.hp, null, get_killer_info(source), null]];
         target.state_dirty = 0;
         send_to_server.func(["OBJECT_COMBAT_UPDATES", args]);
-        session.battle_outcome_sync_marker = synchronizer.request_sync();
-        session.battle_outcome_dirty = true;
+        session.set_battle_outcome_dirty();
     }
 
     if(target.is_blocker() && was_destroyed != target.is_destroyed()) {
@@ -4629,7 +4628,7 @@ session.incoming_attacker_name = ''; // user-visible name of the attacking AI
 session.incoming_attack_units_total = 0; // number of AI units involved in current attack
 session.incoming_attack_units_destroyed = 0; // number of AI units destroyed during current attack (not counting secteams)
 session.battle_outcome_sync_marker = Synchronizer.INIT; // synchronizer to make sure server is up to date before client tries to end battle
-session.battle_outcome_dirty = false; // whether we need to check for win/loss
+session.battle_outcome_dirty = false; // whether we need to check for win/loss - always update sync_marker when setting true
 session.deployed_unit_space = 0; // how much "space" worth of units has been deployed into battle
 session.weak_zombie_warned = false; // whether or not we have already shown the "you are about to deploy a zombie unit" warning
 session.manufacture_overflow_warned = false; // whether we have already shown the "base defenders full, new units diverted to reserves" message
@@ -4823,6 +4822,14 @@ session.clear_building_idle_state_caches = function() {
         var obj = session.cur_objects.objects[id];
         if(obj.is_building()) { obj.idle_state_cache = null; }
     }
+};
+
+// flag the session so that, after the server catches up, we'll check for battle end at next opportunity
+// should be called after any state change that could change the result of calculate_battle_outcome()
+session.set_battle_outcome_dirty = function() {
+    // delay checking for battle outcome until server acknowledges this
+    session.battle_outcome_sync_marker = synchronizer.request_sync();
+    session.battle_outcome_dirty = true;
 };
 
 // player state
@@ -7900,10 +7907,7 @@ function send_and_destroy_object(victim, killer) {
                          get_killer_info(killer)
                         ]);
     destroy_object(victim);
-
-    // delay checking for battle outcome until server acknowledges this
-    session.battle_outcome_sync_marker = synchronizer.request_sync();
-    session.battle_outcome_dirty = true;
+    session.set_battle_outcome_dirty();
 }
 
 
