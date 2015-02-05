@@ -6417,6 +6417,7 @@ class Base(object):
         random.seed(seed+1)
         num_to_spawn = gamedata['map']['random_scenery_spawn']
         ncells = self.ncells()
+        mid = self.midcell()
         num_to_spawn = int(num_to_spawn*((ncells[0]*ncells[1])/float(180*180)))
 
         my_climate = self.base_climate or 'normal'
@@ -6431,8 +6432,13 @@ class Base(object):
             index = int(random.random()*len(speclist))
             specname = speclist[index]
             spec = GameObjectSpec.lookup(specname)
-            xrange = [int(spec.gridsize[0]/2), ncells[0]-int(spec.gridsize[0]/2)-1]
-            yrange = [int(spec.gridsize[1]/2), ncells[1]-int(spec.gridsize[1]/2)-1]
+            rad = gamedata['map'].get('random_scenery_spawn_radius', ncells[0]//2)
+            # assumes square map
+            xbound = [max(0, mid[0]-rad), min(mid[0]+rad, ncells[0])]
+            ybound = [max(0, mid[1]-rad), min(mid[1]+rad, ncells[1])]
+
+            xrange = [xbound[0]+int(spec.gridsize[0]/2), xbound[1]-int(spec.gridsize[0]/2)-1]
+            yrange = [ybound[0]+int(spec.gridsize[1]/2), ybound[1]-int(spec.gridsize[1]/2)-1]
 
             x = int(xrange[0] + random.random()*(xrange[1]-xrange[0]))
             y = int(yrange[0] + random.random()*(yrange[1]-yrange[0]))
