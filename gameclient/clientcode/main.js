@@ -11510,7 +11510,10 @@ function update_desktop_dialogs() {
                 }
             }
 
-            dialog.widgets['resource_foreman_amount'].show = dialog.widgets['resource_foreman_icon'].show = gamedata['enable_multiple_foremen'];
+            dialog.widgets['resource_foreman_amount'].show =
+                dialog.widgets['resource_foreman_icon'].show =
+                dialog.widgets['resource_foreman_button'].show = gamedata['enable_multiple_foremen'];
+
             if(gamedata['enable_multiple_foremen']) {
                 var in_use = player.foremen_in_use();
 
@@ -11521,6 +11524,10 @@ function update_desktop_dialogs() {
                 } else {
                     dialog.widgets['resource_foreman_amount'].text_color = SPUI.default_text_color;
                 }
+                dialog.widgets['resource_foreman_button'].onclick = function() {
+                    var helper = get_requirements_help('foreman', null, {short_circuit:true});
+                    if(helper) { helper(); }
+                };
             }
         }
 

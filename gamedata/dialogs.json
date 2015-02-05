@@ -1112,7 +1112,7 @@
             "store_jewel": { "kind": "Dialog", "xy": [74,259], "dimensions": [17,14], "dialog": "notification_jewel" },
 
             "resource_space_icon": { "kind": "StaticImage", "xy": [528,255], "dimensions": [21,21], "asset": "resource_icon_cpu" },
-            "resource_space_amount": { "kind": "TextField", "xy": [549,255], "dimensions": [84,21], "ui_name": "x,xxx / x,xxx",
+            "resource_space_amount": { "kind": "TextField", "xy": [548,255], "dimensions": [84,21], "ui_name": "x,xxx / x,xxx",
                                        "text_size": 11, "text_style": "thick",
                                        "ui_tooltip": "Army Size (Current/Maximum)", "tooltip_delay": 0,
                                        "fixed_tooltip_offset": [492, 210] },
@@ -1124,10 +1124,11 @@
                                        "fixed_tooltip_offset": [540, 210] },
 
             "resource_foreman_icon": { "kind": "StaticImage", "xy": [648,255], "dimensions": [21,21], "asset": "resource_icon_foreman" },
-            "resource_foreman_amount": { "kind": "TextField", "xy": [668,255], "dimensions": [84,21],
+            "resource_foreman_amount": { "kind": "TextField", "xy": [658,255], "dimensions": [86,21],
                                          "text_size": 11, "text_style": "thick",
                                          "ui_tooltip": "Builders (Busy/Total)", "tooltip_delay": 0,
-                                         "fixed_tooltip_offset": [570, 210] },
+                                         "fixed_tooltip_offset": [630, 210] },
+            "resource_foreman_button": { "kind": "ActionButton", "xy": [648,253], "dimensions": [102,25], "bg_image_offset": [80,2], "bg_image": "resource_bar_add_button" },
 
             "robots_button": { "kind": "ActionButton", "xy": [522,218], "dimensions": [74,27], "bg_image": "menu_button_74x27px",
                                "ui_name": "!TX Army", "text_size": 13, "text_style": "bold" },
