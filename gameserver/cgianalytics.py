@@ -1661,7 +1661,7 @@ TUTORIAL_AI = {
     'bfm': [{'ui_name': 'Murdock (tutorial08)', 'key': 'ai_tutorial08_progress', 'level_to_key': [0,1,2,3,4,5,6,7,8]},
             {'ui_name': 'Crimson Armada (tutorial25)', 'key': 'ai_tutorial25_progress', 'num_levels': 25},
             ],
-    'sg': [],
+    'sg': [{'ui_name': 'Rall (tutorial25)', 'key': 'ai_tutorial25_progress', 'num_levels':25}],
     }
 
 TECH_BUILDINGS = {
@@ -1794,6 +1794,7 @@ FUNNEL_BASIC = [
     ]
 
 def get_tutorial_steps(gamedata):
+    if gamedata['starting_conditions'].get('tutorial_state') == "COMPLETE": return [] # no rails tutorial in this game
     ret = []
     cur = "START"
     while True:
@@ -1849,21 +1850,28 @@ FUNNEL_ADVANCED = get_tutorial_stages(gamedata) + [
 
     # storage/harvester upgrades on the way to CC L3
     #{'name': 'D10 Upgraded Storage L2', 'func': lambda user: user.get('storages_max_level',0) >= 2 },
-    {'name': 'D11 Upgraded Harvesters L2', 'func': lambda user: user.get('harvesters_max_level',0) >= 2 },
+    {'name': 'D11 Built 3+ Harvesters', 'func': lambda user: user.get('harvesters_built',0) >= 3 },
+    {'name': 'D12 Built 3+ Storages', 'func': lambda user: user.get('storages_built',0) >= 3 },
+    {'name': 'D13 Built 4+ Harvesters', 'func': lambda user: user.get('harvesters_built',0) >= 4 },
+    {'name': 'D14 Built 4+ Storages', 'func': lambda user: user.get('storages_built',0) >= 4 },
+    {'name': 'D15 Upgraded a Harvester L2', 'func': lambda user: user.get('harvesters_max_level',0) >= 2 },
+    {'name': 'D16 Upgraded a Storage L2', 'func': lambda user: user.get('storages_max_level',0) >= 2 },
 
-    {'name': 'D20 CC2 %CONV% Built 4 Storages', 'convert_from': lambda user: user.get(gamedata['townhall']+'_level',0) >= 2,
-     'func': lambda user: user.get('storages_built',0) >= 4 },
-    {'name': 'D21 %CONV% Storage L3', 'convert_from': lambda user: user.get('storages_built',0) >= 4,
-     'func': lambda user: user.get('storages_max_level',0) >= 3 },
-    {'name': 'D22 %CONV% Storage L4', 'convert_from': lambda user: user.get('storages_max_level',0) >= 3,
-     'func': lambda user: user.get('storages_max_level',0) >= 4 },
-    {'name': 'D23 %CONV% Central Computer L3', 'convert_from': lambda user: user.get('storages_max_level',0) >= 4,
-     'func': lambda user: user.get(gamedata['townhall']+'_level',0) >= 3 },
+#    {'name': 'D20 CC2 %CONV% Built 4 Storages', 'convert_from': lambda user: user.get(gamedata['townhall']+'_level',0) >= 2,
+#     'func': lambda user: user.get('storages_built',0) >= 4 },
+#    {'name': 'D21 %CONV% Storage L3', 'convert_from': lambda user: user.get('storages_built',0) >= 4,
+#     'func': lambda user: user.get('storages_max_level',0) >= 3 },
+#    {'name': 'D22 %CONV% Storage L4', 'convert_from': lambda user: user.get('storages_max_level',0) >= 3,
+#     'func': lambda user: user.get('storages_max_level',0) >= 4 },
+#    {'name': 'D23 %CONV% Central Computer L3', 'convert_from': lambda user: user.get('storages_max_level',0) >= 4,
+#     'func': lambda user: user.get(gamedata['townhall']+'_level',0) >= 3 },
 
     # looting
     {'name': 'D24A Harvested 1 Iron/Water', 'func': lambda user: user.get('resources_harvested',0) >= 1, 'show_p': True },
     {'name': 'D24B Harvested 50k Iron/Water', 'func': lambda user: user.get('resources_harvested',0) >= 50000, 'show_p': True },
     {'name': 'D24C Harvested 500k Iron/Water', 'func': lambda user: user.get('resources_harvested',0) >= 500000, 'show_p': True },
+    {'name': 'D25A Looted 5k Iron/Water', 'func': lambda user: user.get('resources_looted',0) >= 5000, 'show_p': True },
+    {'name': 'D25A Looted 50k Iron/Water', 'func': lambda user: user.get('resources_looted',0) >= 50000, 'show_p': True },
     {'name': 'D25A Looted 500k Iron/Water', 'func': lambda user: user.get('resources_looted',0) >= 500000, 'show_p': True },
     {'name': 'D25B Looted 500k Iron/Water in PvE', 'func': lambda user: user.get('resources_looted_from_ai',0) >= 500000, 'show_p': True },
     {'name': 'D25C Looted 500k Iron/Water in PvP', 'func': lambda user: user.get('resources_looted_from_human',0) >= 500000, 'show_p': True },
@@ -2083,7 +2091,9 @@ FUNNEL_ADVANCED = get_tutorial_stages(gamedata) + [
 
     # time in game
 
-    {'name': 'S01 Spent 15min in game', 'func': lambda user: user.get('time_in_game',0) >= 15*60, 'show_p': True },
+    {'name': 'S00 Spent 5min in game', 'func': lambda user: user.get('time_in_game',0) >= 5*60, 'show_p': True },
+    {'name': 'S01 %CONV% Spent 15min in game', 'convert_from': lambda user: user.get('time_in_game',0) >= 5*60,
+     'func': lambda user: user.get('time_in_game',0) >= 15*60, 'show_p': True },
     {'name': 'S02 %CONV% Spent 30min in game', 'convert_from': lambda user: user.get('time_in_game',0) >= 15*60,
      'func': lambda user: user.get('time_in_game',0) >= 30*60, 'show_p': True },
     {'name': 'S03 %CONV% Spent 1hr in game', 'convert_from': lambda user: user.get('time_in_game',0) >= 30*60,

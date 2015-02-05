@@ -149,6 +149,7 @@ FACEBOOK_GAME_FAN_PAGES = {
     'war_star_empire':'633274570056000',
     'thunder_run_days_of_valor':'294870984023668',
     'battlefront_mars':'1436033100000042',
+    'summoners_gate':'653216284776703',
     'war_commander':'166402620131249',
     'battle_pirates':'323061097715783',
     'total_domination':'330939280268735',
