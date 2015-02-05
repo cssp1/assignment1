@@ -159,8 +159,8 @@ TurretHeadDialog.ondraw = function(dialog) {
                 dialog.widgets['recipe_frame'+wname].tooltip.str = null;
             }
             grid[0] += 1;
-            if(grid[0] >= dialog.user_data['recipe_columns']) {
-                // clear out unused columns to the right-hand side
+            if(grid[0] >= dialog.data['widgets']['recipe_icon']['array'][0]) {
+                // clear out unused columns to the right-hand side (unused code)
                 while(grid[0] < dialog.data['widgets']['recipe_icon']['array'][0]) {
                     var widget_name = grid[0].toString() + ',' + grid[1].toString();
                     dialog.widgets['recipe_slot'+widget_name].show =
