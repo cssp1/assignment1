@@ -666,7 +666,7 @@ function force_scroll(obj_type, pos, key, speed) {
 }
 
 function force_scroll_eval() {
-    if(force_scroll_state.key === null) { return; }
+    if(player.is_cheater || force_scroll_state.key === null) { return; }
     var delta = vec_sub(force_scroll_state.target, view_pos);
     var dist = vec_length(delta);
 
