@@ -46370,7 +46370,7 @@ function draw_building_or_inert(obj, powerfac) {
     if(session.home_base && !session.has_attacked && gamedata['client']['enable_idle_icons'] && !player.is_cheater &&
        obj.is_building() && obj.team === 'player' && !obj.spec['worth_less_xp'] &&
        player.tutorial_state == "COMPLETE" && get_preference_setting(player.preferences, 'show_idle_buildings') &&
-       read_predicate({'predicate':'LIBRARY', 'name': 'extended_tutorial_complete'}).is_satisfied(player,null)) {
+       read_predicate({'predicate':'LIBRARY', 'name': ('show_idle_buildings' in gamedata['predicate_library'] ? 'show_idle_buildings' : 'extended_tutorial_complete')}).is_satisfied(player,null)) {
         var idle = obj.get_idle_state();
         if(idle) {
             if(idle['can_upgrade']) {
