@@ -15312,6 +15312,14 @@ function update_valentina_nonmodal_message(dialog) {
         dialog.xy = vec_sub(dialog.xy, dialog.parent.get_absolute_xy());
     }
 
+    // make sure dialog does not actually go off screen
+    var corner = dialog.get_absolute_xy();
+    if(corner[1] < 0) {
+        dialog.xy[1] += -corner[1];
+    } else if(corner[1] + dialog.wh[1] >= canvas_height) {
+        dialog.xy[1] -= (corner[1]+dialog.wh[1])-canvas_height;
+    }
+
     goog.array.forEach(['enemy', 'player'], function(team) {
         goog.array.forEach(['rovers', 'townhall'], function(kind) {
             if(dialog.user_data[team+'_'+kind] ||
