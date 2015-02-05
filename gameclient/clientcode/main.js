@@ -17223,6 +17223,24 @@ function do_harvest_quarries() {
     }
 }
 
+/** Collect a deposit, but if storage is full, tell player to add storage instead.
+    @param {Inert} deposit */
+function do_collect_deposit(deposit) {
+    if(deposit.metadata) {
+        for(var res in gamedata['resources']) {
+            if(res in deposit.metadata && (deposit.metadata[res] > (player.resource_state[res][0]-player.resource_state[res][1]))) {
+                var s = gamedata['strings']['requirements_help']['storages_full']['trying_to_collect_deposit'];
+                invoke_message_dialog(s['ui_title'], s['ui_description']);
+                return;
+            }
+        }
+    }
+    if(deposit.collect_sent) { return; }
+    deposit.collect_sent = true;
+    send_to_server.func(["CAST_SPELL", deposit.id, "COLLECT_DEPOSIT"]);
+    change_selection_unit(null);
+}
+
 /** @param {Array.<ContextMenuButton>} buttons */
 function add_change_region_button(buttons) {
     if(gamedata['enable_region_map'] && player.get_any_abtest_value('change_region_requirement', gamedata['territory']['change_region_requirement'])['predicate'] != 'ALWAYS_FALSE') {
@@ -17590,26 +17608,14 @@ function invoke_building_context_menu(mouse_xy) {
 
     // END is_building()
     } else if(obj.is_inert() && session.home_base && ('spells' in obj.spec)) {
-        for(var i = 0; i < obj.spec['spells'].length; i++) {
-            // COLLECT_DEPOSIT etc.
-            var spellname = obj.spec['spells'][i];
-            var spell = gamedata['spells'][spellname];
-            buttons.push(new ContextMenuButton(spell['ui_name'],
-                          function() {
-                              if(spellname == "COLLECT_DEPOSIT") {
-                                  for(var res in gamedata['resources']) {
-                                      if(res in selection.unit.metadata && (selection.unit.metadata[res] > (player.resource_state[res][0]-player.resource_state[res][1]))) {
-                                          var s = gamedata['strings']['requirements_help']['storages_full']['trying_to_collect_deposit'];
-                                          invoke_message_dialog(s['ui_title'], s['ui_description']);
-                                          return;
-                                      }
-                                  }
-                                  if(selection.unit.collect_sent) { return; }
-                                  selection.unit.collect_sent = true;
-                              }
-                              send_to_server.func(["CAST_SPELL", selection.unit.id, spellname]);
-                              change_selection(null);
-                          }));
+        if(goog.array.contains(obj.spec['spells'], "COLLECT_DEPOSIT")) {
+            var collect_func = (function (_obj) { return function() { do_collect_deposit(_obj); }; })(obj);
+            if(gamedata['enable_oneclick_harvest']) {
+                collect_func();
+            } else {
+                var spell = gamedata['spells']['COLLECT_DEPOSIT'];
+                buttons.push(new ContextMenuButton(spell['ui_name'], collect_func));
+            }
         }
     }
 
