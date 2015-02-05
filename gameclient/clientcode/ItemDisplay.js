@@ -27,6 +27,45 @@ ItemDisplay.get_inventory_item_spec = function(specname) {
     return gamedata['items'][specname];
 };
 
+/** For items that apply a new weapon to something (e.g. turret heads), return the spellname of the weapon they apply.
+    @param {Object} spec
+    @return {string|null} the weapon spellname */
+ItemDisplay.get_inventory_item_weapon_spellname = function(spec) {
+    if('equip' in spec && ('effects' in spec['equip'])) {
+        var effect_list = spec['equip']['effects'];
+        for(var i = 0; i < effect_list.length; i++) {
+            var effect = effect_list[i];
+            if(effect['code'] == 'modstat' && effect['stat'] == 'weapon' && effect['method'] == 'replace') {
+                return effect['strength'];
+            }
+        }
+    }
+    return null;
+};
+
+/** For items that apply a new weapon to something (e.g. turret heads), return the spell of the weapon.
+    Throw exception if spell doesn't exist.
+    @param {Object} spec
+    @return {Object} the weapon spell */
+ItemDisplay.get_inventory_item_weapon_spell = function(spec) {
+    var name = ItemDisplay.get_inventory_item_weapon_spellname(spec);
+    if(name && name in gamedata['spells']) { return gamedata['spells'][name]; }
+    throw Error('item spec does not carry a weapon or weapon spellname is invalid: '+spec['name']+' spellname '+(name ? name : 'null'));
+};
+
+/** For a crafting recipe that deterministically yields only one item, return the spec of that item.
+    If the crafting recipe doesn't fit that description, throw exception.
+    @param {Object} recipe
+    @return {Object} the product spec */
+ItemDisplay.get_crafting_recipe_product_spec = function(recipe) {
+    var product_list = recipe['product'];
+    if(product_list.length == 1 && ('spec' in product_list[0]) &&
+       (product_list[0]['spec'] in gamedata['items'])) { // note: do not use get_inventory_item_spec() because we want to fail for unknown items
+        return gamedata['items'][product_list[0]['spec']];
+    }
+    throw Error('crafting recipe does not deterministically yield one item: '+recipe['name']);
+};
+
 /** given a 50x50 SPUI.StaticImage widget, set the widget's asset/state/alpha to show the item indicated by 'spec' (a spec from gamedata['items'])
    @param {SPUI.DialogWidget} widget
    @param {Object} spec */

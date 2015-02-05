@@ -141,7 +141,7 @@ UpgradeBar.update_contents = function(dialog, kind, specname, new_level, obj_id)
             if('ui_name' in recipe) {
                 n = recipe['ui_name'];
             } else {
-                n = ItemDisplay.get_inventory_item_ui_name(recipe['products'][0]['spec']);
+                n = ItemDisplay.get_inventory_item_ui_name(ItemDisplay.get_crafting_recipe_product_spec(recipe));
             }
             temp = temp.replace('%THING', n);
             linkcode = 'crafting_recipe='+goody['crafting_recipe'];

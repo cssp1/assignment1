@@ -530,8 +530,8 @@ TurretHeadDialog.set_stats_display = function(dialog, emplacement_obj, name, rel
 
     ItemDisplay.attach_inventory_item_tooltip(dialog.widgets['frame'], {'spec':spec['name']});
 
-    var spell = gamedata['spells'][spec['equip']['effects'][0]['strength']];
-    var relative_spell = (relative_to ? gamedata['spells'][relative_spec['equip']['effects'][0]['strength']] : null);
+    var spell = ItemDisplay.get_inventory_item_weapon_spell(spec);
+    var relative_spell = (relative_to ? ItemDisplay.get_inventory_item_weapon_spell(relative_spec) : null);
 
     // fill in damage_vs icons
     init_damage_vs_icons(dialog, {'kind':'building', 'ui_damage_vs':{}}, // fake building spec to fool init_damage_vs_icons()

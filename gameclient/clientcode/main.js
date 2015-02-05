@@ -3875,9 +3875,9 @@ Building.prototype.is_minefield_armed = function() { return (this.equipment && t
 // returns the name of mine item associated with this minefield, if any, otherwise null
 Building.prototype.minefield_item = function() {
     if(this.equipment && this.equipment['mine'] && this.equipment['mine'].length > 0) {
-        return this.equipment['mine'];
+        return this.equipment['mine'][0];
     } else if(this.config && this.config['mine'] && this.config['mine'].length > 0) {
-        return this.config['mine'];
+        return (typeof(this.config['mine']) === 'string' ? this.config['mine'] : this.config['mine'][0]);
     }
     return null;
 };
@@ -6472,7 +6472,7 @@ function inventory_items_can_all_fit(items, inventory, max_usable_inventory) {
     return true;
 }
 
-function get_crafting_recipe_ui_name(spec) {
+function get_crafting_recipe_ui_name(spec) { // XXXXXX move to ItemDisplay.js
     if('ui_name' in spec) {
         return spec['ui_name'];
     }
@@ -6482,7 +6482,7 @@ function get_crafting_recipe_ui_name(spec) {
     throw Error('cannot determine ui_name for crafting recipe '+spec['name']);
 
 }
-function get_crafting_recipe_icon(spec) {
+function get_crafting_recipe_icon(spec) { // XXXXXX move to ItemDisplay.js
     if('icon' in spec) {
         return spec['icon'];
     }
@@ -7167,8 +7167,9 @@ Mobile.prototype.get_auto_spell_level = function() {
 };
 
 function get_auto_spell_for_item(item_spec) {
-    if(item_spec['equip'] && item_spec['equip']['effects'][0]['stat'] == 'weapon') {
-        return gamedata['spells'][item_spec['equip']['effects'][0]['strength']];
+    var spellname = ItemDisplay.get_inventory_item_weapon_spellname(item_spec);
+    if(spellname) {
+        return gamedata['spells'][spellname];
     }
     return null;
 }
@@ -7885,7 +7886,7 @@ function get_killer_info(killer) {
                    'level': killer.level,
                    'id': killer.id};
         if(killer.is_building() && killer.is_minefield() && killer.is_minefield_armed()) {
-            ret['mine'] = killer.equipment['mine'][0];
+            ret['mine'] = killer.minefield_item();
         }
         return ret;
     }
@@ -29539,8 +29540,8 @@ function crafting_dialog_select_recipe_mines(dialog, specname, recipe) {
         }
     };
 
-    var mine_spec = gamedata['items'][recipe['product'][0]['spec']];
-    var mine_spell = gamedata['spells'][mine_spec['equip']['effects'][0]['strength']];
+    var mine_spec = ItemDisplay.get_crafting_recipe_product_spec(recipe);
+    var mine_spell = ItemDisplay.get_inventory_item_weapon_spell(mine_spec);
     init_damage_vs_icons(dialog, {'kind':'building', 'ui_damage_vs':{}}, // fake building spec to fool init_damage_vs_icons()
                          mine_spell);
     var stat_spec = mine_spec;
@@ -29567,7 +29568,7 @@ function crafting_dialog_select_recipe_mines(dialog, specname, recipe) {
     });
 }
 function crafting_dialog_select_recipe_missiles(dialog, specname, recipe) {
-    var product_spec = gamedata['items'][recipe['product'][0]['spec']];
+    var product_spec = ItemDisplay.get_crafting_recipe_product_spec(recipe);
     dialog.widgets['name'].str = ItemDisplay.get_inventory_item_ui_name_long(product_spec);
     dialog.widgets['description'].set_text_with_linebreaking(product_spec['ui_description']); // XXX overflow?
     ItemDisplay.display_item(dialog.widgets['item'], {'spec':product_spec['name']}, {context_parent: dialog.parent});
@@ -29617,7 +29618,7 @@ function crafting_dialog_select_recipe_missiles(dialog, specname, recipe) {
 }
 
 function crafting_dialog_select_recipe_leaders(dialog, specname, recipe) {
-    var leader_spec = gamedata['items'][recipe['product'][0]['spec']];
+    var leader_spec = ItemDisplay.get_crafting_recipe_product_spec(recipe);
     var set_spec = gamedata['item_sets'][leader_spec['item_set']];
     var ui_item_set = set_spec['ui_name'];
     var ui_level = leader_spec['level'] || 1;
@@ -30111,7 +30112,7 @@ function update_crafting_dialog_status_mines_and_missiles(dialog) {
     var catspec = gamedata['crafting']['categories'][category];
     var selected_recipe = dialog.parent.user_data['selected_recipe'];
     var selected_recipe_spec = (selected_recipe ? gamedata['crafting']['recipes'][selected_recipe] : null);
-    var selected_mine = (selected_recipe_spec ? selected_recipe_spec['product'][0]['spec'] : null);
+    var selected_mine = (selected_recipe_spec ? ItemDisplay.get_crafting_recipe_product_spec(selected_recipe_spec)['name'] : null);
     var selected_mine_spec = (selected_mine ? ItemDisplay.get_inventory_item_spec(selected_mine) : null);
 
     var craft_queue = (builder ? builder.get_crafting_queue() : []);
@@ -30197,7 +30198,7 @@ function update_crafting_dialog_status_mines_and_missiles(dialog) {
                         // look up the recipe for a DIFFERENT mine
                         for(var n in gamedata['crafting']['recipes']) {
                             var rec = gamedata['crafting']['recipes'][n];
-                            if(rec['crafting_category'] == category && rec['product'][0]['spec'] == build_mine) {
+                            if(rec['crafting_category'] == category && ItemDisplay.get_crafting_recipe_product_spec(rec)['name'] == build_mine) {
                                 build_recipe = n; break;
                             }
                         }
@@ -30271,7 +30272,7 @@ function update_crafting_dialog_status_mines_and_missiles(dialog) {
                     dialog.widgets['mine_icon'+wname].asset = get_crafting_recipe_icon(gamedata['crafting']['recipes'][in_progress_recipe]);
                     dialog.widgets['mine_icon'+wname].alpha = 1;
                     dialog.widgets['mine_frame'+wname].onclick = null;
-                    dialog.widgets['mine_frame'+wname].tooltip.str = dialog.data['widgets']['mine_frame']['ui_tooltip_inprogress'].replace('%s', gamedata['items'][gamedata['crafting']['recipes'][in_progress_recipe]['product'][0]['spec']]['ui_name']);
+                    dialog.widgets['mine_frame'+wname].tooltip.str = dialog.data['widgets']['mine_frame']['ui_tooltip_inprogress'].replace('%s', ItemDisplay.get_inventory_item_ui_name(ItemDisplay.get_crafting_recipe_product_spec(gamedata['crafting']['recipes'][in_progress_recipe])));
                     dialog.widgets['mine_cancel'+wname].tooltip.str = dialog.data['widgets']['mine_cancel']['ui_tooltip_cancel'];
                     dialog.widgets['mine_cancel'+wname].onclick = (function (_builder, _in_progress_bus, _unconfig_cb) { return function(w) {
                         do_cancel_crafting(_builder, _in_progress_bus);
@@ -30406,7 +30407,7 @@ function update_crafting_dialog_status_leaders(dialog) {
     var builder = dialog.parent.user_data['builder'];
     var selected_recipe = dialog.parent.user_data['selected_recipe'];
     var selected_recipe_spec = (selected_recipe ? gamedata['crafting']['recipes'][selected_recipe] : null);
-    var selected_leader = (selected_recipe_spec ? selected_recipe_spec['product'][0]['spec'] : null);
+    var selected_leader = (selected_recipe_spec ? ItemDisplay.get_crafting_recipe_product_spec(selected_recipe_spec)['name'] : null);
     var selected_leader_spec = (selected_leader ? ItemDisplay.get_inventory_item_spec(selected_leader) : null);
 
     var craft_queue = (builder ? builder.get_crafting_queue() : []);
@@ -30461,7 +30462,7 @@ function update_crafting_dialog_status_leaders(dialog) {
         dialog.widgets['leader_icon'].asset = get_crafting_recipe_icon(gamedata['crafting']['recipes'][in_progress_recipe]);
         dialog.widgets['leader_icon'].alpha = 1;
         dialog.widgets['leader_frame'].onclick = null;
-        dialog.widgets['leader_frame'].tooltip.str = dialog.data['widgets']['leader_frame']['ui_tooltip_inprogress'].replace('%s', ItemDisplay.get_inventory_item_ui_name_long(gamedata['items'][gamedata['crafting']['recipes'][in_progress_recipe]['product'][0]['spec']]));
+        dialog.widgets['leader_frame'].tooltip.str = dialog.data['widgets']['leader_frame']['ui_tooltip_inprogress'].replace('%s', ItemDisplay.get_inventory_item_ui_name_long(ItemDisplay.get_crafting_recipe_product_spec(gamedata['crafting']['recipes'][in_progress_recipe])));
         dialog.widgets['leader_frame'].tooltip.text_color = SPUI.default_text_color;
         dialog.widgets['leader_cancel'].tooltip.str = dialog.data['widgets']['leader_cancel']['ui_tooltip_cancel'];
         dialog.widgets['leader_cancel'].onclick = (function (_builder, _in_progress_bus) { return function(w) {
