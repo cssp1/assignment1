@@ -2057,7 +2057,7 @@ FUNNEL_ADVANCED = get_tutorial_stages(gamedata) + [
 
     {'name': 'P01 Launched one PvP Attack', 'func': lambda user: user.get('attacks_launched_vs_human',0) > 0, 'show_p': True },
     {'name': 'P02 Launched >=10 PvP Attacks', 'func': lambda user: user.get('attacks_launched_vs_human',0) >= 10, 'show_p': True },
-    {'name': 'P03 Suffered one PvP Attack', 'func': lambda user: len(user.get('attacks_suffered_at_time',{})) > 0, 'show_p': True }, # workaround because we forgot to put the raw counter into upcache earlier user.get('attacks_suffered',0) > 0 },
+    {'name': 'P03 Suffered one PvP Attack', 'func': lambda user: user.get('attacks_suffered',0) > 0 },
 
     {'name': 'P10 Conquered 1+ Ladder PvP AI', 'func': lambda user: user.get('ai_ladder_conquests',0) >= 1, 'show_p': True },
     {'name': 'P10 Conquered 5+ Ladder PvP AIs', 'func': lambda user: user.get('ai_ladder_conquests',0) >= 5, 'show_p': True },
