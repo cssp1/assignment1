@@ -40,7 +40,7 @@
     var msg_anchor = null;
     for(var i = 0; i < layers.length; i++) {
         var layer = layers[i];
-        var img = new Image();
+        var img = document.createElement('img');
         handles.push({'img':img,'start_time':-1});
         img.src = art_url(layer['image']);
 
