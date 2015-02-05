@@ -11467,6 +11467,7 @@ def setup_ai_base(strid, cb):
             obj = instantiate_object_for_player(player, player, p['spec'], x=p['xy'][0], y=p['xy'][1], level=p.get('level',1))
             if 'force_level' in p: obj.force_ai_level = int(p['force_level'])
             if 'equipment' in p: obj.equipment = copy.deepcopy(p['equipment'])
+            if 'hp_ratio' in p: obj.hp = int(obj.hp * p['hp_ratio'])
 
             # max out harvesters
             if obj.is_producer():
