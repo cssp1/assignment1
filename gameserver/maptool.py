@@ -1016,6 +1016,7 @@ def spawn_hive(hives, map_cache, db, lock_manager, region_id, id_num, name_idx, 
         'base_template': template_name
         }
     if 'base_richness' in template: base_data['base_richness'] = template['base_richness']
+    if 'base_resource_loot' in template: base_data['base_resource_loot'] = template['base_resource_loot']
     if 'base_size' in template: base_data['base_size'] = template['base_size']
 
     ncells = None
