@@ -1996,23 +1996,25 @@ def check_ai_base_contents(strid, base, owner, base_type):
                     max_level = len(spec['build_time'])
                     is_storage = False
                     is_producer = False
-                    has_exotic_resources = False
+                    has_exotic_resource = None
                     for res in gamedata['resources']:
+                        has_this_res = False
                         if 'storage_'+res in spec:
+                            has_this_res = True
                             is_storage = True
                         if 'produces_'+res in spec:
+                            has_this_res = True
                             is_producer = True
-                        if is_storage or is_producer:
-                            if res not in ('iron','water'):
-                                has_exotic_resources = True
+                        if has_this_res and (res not in ('iron','water')):
+                            has_exotic_resource = (item['spec'], res)
 
                     # check that quarries do not have storage buildings (unsupported/exploitable code path)
                     if base_type == 'quarry' and is_storage:
                         error |= 1
                         print 'ERROR: quarry %s should not have a storage building (%s) in it!' % (strid, item['spec'])
 
-                    if base_type != 'quarry' and has_exotic_resources and ('base_resource_loot' not in base):
-                        error |= 1; print 'ERROR: AI base %s has exotic resources, it should be using "base_resource_loot" instead of the old loot system' % (strid,)
+                    if base_type != 'quarry' and has_exotic_resource and ('base_resource_loot' not in base):
+                        error |= 1; print 'ERROR: AI base %s has a %s that will drop exotic resource "%s" loot. It should be using "base_resource_loot" instead of the old loot system' % (strid, has_exotic_resource[0], has_exotic_resource[1])
 
                 elif KIND == 'units':
                     max_level = len(gamedata['units'][item['spec']]['max_hp'])
