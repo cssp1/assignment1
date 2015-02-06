@@ -47,6 +47,9 @@ ModChain.get_base_value = function(stat, spec, level) {
             // assume that we are the townhall
             return get_leveled_quantity(check_spec['limit'], level);
         }
+    } else if(stat.indexOf('provides_limited_equipped:') == 0) {
+        var thing = stat.replace('provides_limited_equipped:','');
+        return get_leveled_quantity(spec['provides_limited_equipped'][thing]||0, level);
     } else {
         return 1;
     }
