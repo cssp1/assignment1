@@ -3209,7 +3209,7 @@ def main(args):
             else:
                 expect_player_history_keys = set([thing+'_blueprint_unlocked'])
                 if my_level >= 0: # allow any item of equal or lesser level
-                    for level in xrange(1, my_level+1):
+                    for level in xrange(my_level, my_level+1):
                         expect_player_history_keys.add(thing+'_blueprint_unlocked'+('_L%d' % level))
 
         error |= check_predicate(pred, reason='predicate_library:'+name, expect_player_history_keys = expect_player_history_keys)
