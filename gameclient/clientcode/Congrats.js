@@ -53,12 +53,8 @@ Congrats.cc_upgrade = function(cc, level) {
         var spec = gamedata['buildings'][name];
 
         // ignore developer_only / hidden specs
-        if(spin_secure_mode || !player.is_developer) {
-            if(spec['developer_only'] ||
-               (spec['show_if'] && !read_predicate(spec['show_if']).is_satisfied(player, null))) {
-                continue;
-            }
-        }
+        if(spec['developer_only'] && (spin_secure_mode || !player.is_developer())) { continue; }
+        if(spec['show_if'] && !read_predicate(spec['show_if']).is_satisfied(player, null)) { continue; }
 
         if('limit' in spec && (typeof spec['limit']) !== 'number') {
             var start = spec['limit'][level-2], end = spec['limit'][level-1];
@@ -83,7 +79,7 @@ Congrats.cc_upgrade = function(cc, level) {
     for(var name in gamedata['buildings']) {
         var os = gamedata['buildings'][name];
         // ignore developer_only if in production
-        if(os['developer_only'] && (spin_secure_mode || !player.is_developer)) {
+        if(os['developer_only'] && (spin_secure_mode || !player.is_developer())) {
             continue;
         }
         var start = 0, end = 0;

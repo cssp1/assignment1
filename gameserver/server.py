@@ -338,7 +338,7 @@ invalid_sessions_by_time = collections.deque() # (time,sid) for session invalida
 
 # load server configuration file
 game_id = SpinConfig.config['game_id']
-secure_mode = SpinConfig.config.get('secure_mode', 0)
+spin_secure_mode = SpinConfig.config.get('secure_mode', 0)
 spin_log_verbosity = SpinConfig.config.get('log_verbosity', 0)
 spin_log_dir = SpinConfig.config.get('log_dir', 'logs')
 machine_stats_filesystems = ['/',
@@ -957,10 +957,8 @@ class User:
                         return True
         return False
 
-    def is_developer(self):
-        return self.developer or (self.user_id in SpinConfig.config.get('developer_user_id_list', []))
-    def is_superdeveloper(self):
-        return self.is_developer() and (self.user_id in SpinConfig.config.get('superdeveloper_user_id_list', []))
+    def is_developer(self): return bool(self.developer)
+
     def is_suspicious(self):
         return self.user_id in gamedata['server']['suspicious_user_id_list']
 
@@ -1550,7 +1548,10 @@ class User:
                 payment_id = payment['id']
                 if 'request_id' in payment: # Gift Card orders can come without request_ids
                     assert (payment['request_id'] == request_id)
-                assert (not payment.get('test',False)) or session.user.is_developer()
+
+                # do allow Facebook "test" payment for developers on live server, because they might be Credits Testers flow test payments
+                assert (not payment.get('test',False)) or (session.player.is_developer() or (not spin_secure_mode))
+
                 item = payment['items'][0]
                 assert int(item['quantity']) == 1 or (payment_data['spellname'] == 'FB_GAMEBUCKS_PAYMENT')
 
@@ -2903,7 +2904,7 @@ class Session(object):
         self.sent_metrics = {} # keep track of once-per-session Consequent metric events we've already sent
 
         gamesite.chat_mgr.join(self, 'BROADCAST')
-        if self.user.is_developer():
+        if self.player.is_developer():
             gamesite.chat_mgr.join(self, 'DEVELOPER')
             self.do_chat_catchup('DEVELOPER', self.deferred_messages)
 
@@ -3037,7 +3038,7 @@ class Session(object):
             gamesite.chat_mgr.leave(self, self.alliance_chat_channel)
         gamesite.chat_mgr.leave(self, self.global_chat_channel)
         gamesite.chat_mgr.leave(self, 'BROADCAST')
-        if self.user.is_developer():
+        if self.player.is_developer():
             gamesite.chat_mgr.leave(self, 'DEVELOPER')
 
         assert self.user.active_session is self
@@ -6583,7 +6584,7 @@ class AbstractPlayer(object):
             return 'ai'
         else:
             return 'human'
-
+    def is_developer(self): return False
     class AbstractStattab(object):
         def get_player_stat(self, stat): raise Exception('AbstractPlayer has no stat table')
         def get_unit_stat(self, specname, stat, default_value): return default_value
@@ -6844,6 +6845,7 @@ class Player(AbstractPlayer):
             return 'ai'
         else:
             return 'human'
+    def is_developer(self): return bool(self.developer) # use our copy of the usertable field
 
     def squad_base_id(self, squad_id): return 's%d_%d' % (self.user_id, squad_id)
     def squad_is_deployed(self, squad_id):
@@ -8473,7 +8475,7 @@ class Player(AbstractPlayer):
         return bool(my_alliances.intersection(other_alliances)), my_alliances, other_alliances
 
     def can_spy_despite_map_violation(self, self_user, other_player_id, other_social_id):
-        if self_user.is_developer(): return True
+        if self.is_developer(): return True
         if self_user.is_friends_with(other_social_id): return True
         if self.is_same_alliance(other_player_id): return True
         return False
@@ -10408,8 +10410,7 @@ class LivePlayer(Player):
                     gamesite.exception_log.event(server_time, 'override_abtests_from_url: user %d %s GROUP %s NOT FOUND' % \
                                                  (self.user_id, test_name, group))
 
-
-        if ((not secure_mode) or (user.is_developer())):
+        if self.is_developer():
             if ('event_time_override' in q):
                 self.event_time_override = int(q['event_time_override'][0])
                 gamesite.exception_log.event(server_time, 'event_time_override: user %d -> %d' % \
@@ -11065,7 +11066,7 @@ class LivePlayer(Player):
                                    (('auto_join_if' not in x) or Predicates.read_predicate(x['auto_join_if']).is_satisfied(self,None)) and \
                                    (('show_if' not in x) or Predicates.read_predicate(x['show_if']).is_satisfied(session.player, None)) and \
                                    (('requires' not in x) or Predicates.read_predicate(x['requires']).is_satisfied(session.player, None)) and \
-                                   ((not secure_mode) or (not x.get('developer_only',0))))
+                                   ((not x.get('developer_only',0)) or session.player.is_developer()))
                                   ])
 
             if gamedata['server']['log_map']:
@@ -11102,7 +11103,7 @@ class LivePlayer(Player):
             if gamedata['server']['log_map']:
                 gamesite.exception_log.event(server_time, 'map: player %d change_region picked invalid region %s' % (self.user_id, repr(new_region)))
             return False, [], []
-        if gamedata['regions'][new_region].get('developer_only',0) and secure_mode:
+        if gamedata['regions'][new_region].get('developer_only',0) and (not session.player.is_developer()):
             return False, [], []
 
         # get population
@@ -12740,7 +12741,7 @@ class Store:
                 if new_level > max_level:
                     error_reason.append('tech already at max level')
                     return -1, p_currency
-                if secure_mode and spec.developer_only:
+                if spec.developer_only and (spin_secure_mode or (not session.player.is_developer())):
                     error_reason.append('research is restricted to developer mode only')
                     return -1, p_currency
                 if unit:
@@ -13662,7 +13663,7 @@ class CREDITAPI(resource.Resource):
         # check expiration time of signed request
         if request_data.has_key('expires') and \
            (server_time >= int(request_data['expires'])) and \
-           secure_mode:
+           spin_secure_mode:
             raise Exception('bad signature: timestamp expired')
 
         retmsg = {}
@@ -15670,7 +15671,7 @@ class GAMEAPI(resource.Resource):
             self.do_receive_mail(session, retmsg)
             battle_history = session.player.battle_history
         else:
-            if (not session.user.is_developer()):
+            if (not session.player.is_developer()):
                 # no peeking at others' battle histories unless you are a developer
                 retmsg.append(["ERROR", "DISALLOWED_IN_SECURE_MODE"])
                 return
@@ -15877,7 +15878,7 @@ class GAMEAPI(resource.Resource):
         tag = arg[5]
 
         # do not allow peeking at others' battles, unless you are a developer
-        if session.user.user_id != attacker and session.user.user_id != defender and (not session.user.is_developer()):
+        if session.user.user_id != attacker and session.user.user_id != defender and (not session.player.is_developer()):
             retmsg.append(["ERROR", "DISALLOWED_IN_SECURE_MODE"])
             return
 
@@ -16134,7 +16135,7 @@ class GAMEAPI(resource.Resource):
             assert (new_region is None) or (new_region in gamedata['regions'])
 
             # see if this is an ordinary request or a developer request
-#            if session.user.is_developer(): # developer request
+#            if session.player.is_developer(): # developer request
 #                gamesite.exception_log.event(server_time, 'developer %d request to change region: %s %s' % \
 #                                             (session.player.user_id, new_region, repr(new_loc)))
 #                pass
@@ -16149,8 +16150,8 @@ class GAMEAPI(resource.Resource):
                 data = gamedata['regions'][new_region]
                 if (session.player.home_region != new_region):
                     if (not data.get('open_join',True)) or \
-                       ((not session.user.is_developer()) and data.get('developer_only',0)) or \
-                       ((not session.user.is_developer()) and (data.get('pop_hard_cap',-1) >= 0 and gamesite.nosql_client.get_map_feature_population(new_region,'home',reason='change_region_specific') >= data['pop_hard_cap'])) or \
+                       ((not session.player.is_developer()) and data.get('developer_only',0)) or \
+                       ((not session.player.is_developer()) and (data.get('pop_hard_cap',-1) >= 0 and gamesite.nosql_client.get_map_feature_population(new_region,'home',reason='change_region_specific') >= data['pop_hard_cap'])) or \
                        (('show_if' in data) and (not Predicates.read_predicate(data['show_if']).is_satisfied(session.player, None))) or \
                        ((spellname != "CHANGE_REGION_INSTANTLY_ANYWHERE") and ('requires' in data) and (not Predicates.read_predicate(data['requires']).is_satisfied(session.player, None))):
                         retmsg.append(["ERROR", "CANNOT_CHANGE_REGION_DESTINATION_FULL"])
@@ -17012,7 +17013,7 @@ class GAMEAPI(resource.Resource):
             retmsg.append(["ERROR", "MAX_LEVEL_REACHED", spec.maxlevel])
             return
 
-        if secure_mode and spec.developer_only:
+        if spec.developer_only and (spin_secure_mode or (not session.player.is_developer())):
             retmsg.append(["ERROR", "DISALLOWED_IN_SECURE_MODE"])
             return
 
@@ -17559,7 +17560,7 @@ class GAMEAPI(resource.Resource):
         else:
             assert spec.kind == 'building'
 
-        if secure_mode and spec.developer_only:
+        if spec.developer_only and (spin_secure_mode or (not session.player.is_developer())):
             retmsg.append(["ERROR", "DISALLOWED_IN_SECURE_MODE"])
             return
 
@@ -17728,7 +17729,7 @@ class GAMEAPI(resource.Resource):
             retmsg.append(["ERROR", "FACTORY_IS_UPGRADING"])
             return
 
-        if secure_mode and spec.developer_only:
+        if spec.developer_only and (spin_secure_mode or (not session.player.is_developer())):
             retmsg.append(["ERROR", "DISALLOWED_IN_SECURE_MODE"])
             return
 
@@ -20305,6 +20306,8 @@ class GAMEAPI(resource.Resource):
             # person has never played a SpinPunch game before
             user = User(user_id)
             user.account_creation_time = server_time
+            if not spin_secure_mode: # mark new accounts as developers
+                user.developer = 1
 
         user.frame_platform = frame_platform
         user.social_id = social_id
@@ -20347,7 +20350,7 @@ class GAMEAPI(resource.Resource):
 
         user.country = client_login_country
 
-        if (not secure_mode) and 'country_override' in url_qs:
+        if ('country_override' in url_qs) and user.is_developer():
             user.country = str(url_qs['country_override'][0])
 
         # prep player ###############################
@@ -20572,7 +20575,7 @@ class GAMEAPI(resource.Resource):
                        session.player.price_region,
                        session.player.history['logged_in_times'],
                        session.player.abtests,
-                       session.user.is_developer(),
+                       session.player.is_developer(),
                        session.user.is_suspicious(),
                        session.player.isolate_pvp,
                        session.user.acquisition_campaign,
@@ -21358,7 +21361,7 @@ class GAMEAPI(resource.Resource):
             coded_order_info = arg[1]
             currency = arg[2]
             # don't allow this to happen on the live server!
-            if secure_mode:
+            if spin_secure_mode:
                 retmsg.append(["ERROR", "DISALLOWED_IN_SECURE_MODE"])
             else:
                 if currency == 'kgcredits':
@@ -21434,14 +21437,14 @@ class GAMEAPI(resource.Resource):
             return session.user.ping_fbpayment(request, session, retmsg, request_id, signed_request = signed_request)
         elif arg[0] == "FBPAYMENT_SIMULATE_PURCHASE":
             request_id = arg[1]
-            if secure_mode:
+            if spin_secure_mode:
                 retmsg.append(["ERROR", "DISALLOWED_IN_SECURE_MODE"])
             else:
                 if request_id in session.player.fbpayments_inflight:
                     # set a flag so the next FBPAYMENT_PING will pick it up
                     session.player.fbpayments_inflight[request_id]['simulate_purchase'] = 1
         elif arg[0] == "FBPAYMENT_SIMULATE_REFUND":
-            if secure_mode and (not session.user.is_developer()):
+            if spin_secure_mode:
                 retmsg.append(["ERROR", "DISALLOWED_IN_SECURE_MODE"])
                 return
             for ent in reversed(session.player.history.get('money_purchase_history',[])):
@@ -21563,7 +21566,7 @@ class GAMEAPI(resource.Resource):
 
         elif arg[0] == "REMOVE_OBJECT":
             # only for debugging/level-editing
-            if (secure_mode or (not session.player.is_cheater)):
+            if (not session.player.is_cheater):
                 retmsg.append(["ERROR", "DISALLOWED_IN_SECURE_MODE"])
                 return
 
@@ -21743,7 +21746,7 @@ class GAMEAPI(resource.Resource):
             if not gamesite.nosql_client: return
             region_list = [data for data in gamedata['regions'].itervalues() if \
                            (data.get('open_join',True)) and \
-                           (session.user.is_developer() or (not data.get('developer_only',0))) and \
+                           ((not data.get('developer_only',0)) or session.player.is_developer()) and \
                            (('show_if' not in data) or (Predicates.read_predicate(data['show_if']).is_satisfied(session.player, None)))]
             populations = dict([(data['id'], gamesite.nosql_client.get_map_feature_population(data['id'],'home',reason='REGION_POP_QUERY')) for data in region_list])
 
@@ -22565,7 +22568,7 @@ class GAMEAPI(resource.Resource):
                     bypass_gag = False
                 elif channel == 'ALLIANCE' and session.alliance_chat_channel:
                     channel = session.alliance_chat_channel
-                elif channel == 'DEVELOPER' and session.user.is_developer():
+                elif channel == 'DEVELOPER' and session.player.is_developer():
                     pass
                 else:
                     retmsg.append(["ERROR", "INVALID_CHAT_CHANNEL"])
@@ -23253,31 +23256,31 @@ class GAMEAPI(resource.Resource):
                 session.execute_consequent_safe(spell['consequent'], session.player, retmsg, reason=spellname)
 
             elif spellname == "CHEAT_REMOVE_LIMITS":
-                if secure_mode:
+                if spin_secure_mode or (not session.player.is_developer()):
                     retmsg.append(["ERROR", "DISALLOWED_IN_SECURE_MODE"])
                 else:
                     session.player.is_cheater = bool(spellargs[0])
             elif spellname == "CHEAT_CLEAR_COOLDOWNS":
-                if secure_mode:
+                if not session.player.is_cheater:
                     retmsg.append(["ERROR", "DISALLOWED_IN_SECURE_MODE"])
                 else:
                     session.player.cooldowns = {}
                     retmsg.append(["COOLDOWNS_UPDATE", session.player.cooldowns])
             elif spellname == "CHEAT_CLEAR_PLAYER_AURAS":
-                if secure_mode:
+                if not session.player.is_cheater:
                     retmsg.append(["ERROR", "DISALLOWED_IN_SECURE_MODE"])
                 else:
                     session.player.player_auras = []
                     session.player.recalc_stattab(session.player)
                     session.player.stattab.send_update(session, retmsg)
             elif spellname == "CHEAT_GIVE_GAMEBUCKS":
-                if secure_mode:
+                if not session.player.is_cheater:
                     retmsg.append(["ERROR", "DISALLOWED_IN_SECURE_MODE"])
                 else:
                     session.player.resources.gain_gamebucks(spellargs[0], reason=spellname)
                     retmsg.append(["PLAYER_STATE_UPDATE", session.player.resources.calc_snapshot().serialize()])
             elif spellname == "CHEAT_DRAIN_RESOURCES":
-                if secure_mode:
+                if not session.player.is_cheater:
                     retmsg.append(["ERROR", "DISALLOWED_IN_SECURE_MODE"])
                 else:
                     for res in gamedata['resources']:
@@ -23285,12 +23288,12 @@ class GAMEAPI(resource.Resource):
                     session.player.resources.gamebucks = 0
                     retmsg.append(["PLAYER_STATE_UPDATE", session.player.resources.calc_snapshot().serialize()])
             elif spellname == "CHEAT_EXECUTE_CONSEQUENT":
-                if secure_mode:
+                if not session.player.is_cheater:
                     retmsg.append(["ERROR", "DISALLOWED_IN_SECURE_MODE"])
                 else:
                     session.execute_consequent_safe(spellargs[0], session.player, retmsg, reason='CHEAT_EXECUTE_CONSEQUENT')
             elif spellname == "CHEAT_GIVE_ITEMS":
-                if secure_mode:
+                if not session.player.is_cheater:
                     retmsg.append(["ERROR", "DISALLOWED_IN_SECURE_MODE"])
                     return
 
@@ -23346,7 +23349,7 @@ class GAMEAPI(resource.Resource):
                     #session.player.send_history_update(retmsg)
 
             elif spellname == "CHEAT_MODIFY_ABTESTS":
-                if secure_mode and (not session.user.is_developer()):
+                if spin_secure_mode or (not session.player.is_developer()):
                     retmsg.append(["ERROR", "DISALLOWED_IN_SECURE_MODE"])
                     return
                 data = spellargs[0]
@@ -23363,7 +23366,7 @@ class GAMEAPI(resource.Resource):
                 #retmsg.append(["ABTEST_UPDATE", session.player.abtests])
 
             elif spellname == "CHEAT_RESET_GAME":
-                if secure_mode:
+                if spin_secure_mode:
                     retmsg.append(["ERROR", "DISALLOWED_IN_SECURE_MODE"])
                 else:
                     if session.player.is_on_map():
@@ -23388,13 +23391,13 @@ class GAMEAPI(resource.Resource):
                     retmsg.append(["QUEST_STATE_UPDATE", session.player.completed_quests])
 
             elif spellname == "CHEAT_SPAWN_UNITS":
-                if secure_mode:
+                if not session.player.is_cheater:
                     retmsg.append(["ERROR", "DISALLOWED_IN_SECURE_MODE"])
                 else:
                     self.execute_spell(session, retmsg, "GIVE_UNITS_LIMIT_BREAK", spellargs[0])
 
             elif spellname == "LOAD_AI_BASE":
-                if secure_mode or not session.home_base:
+                if spin_secure_mode or not session.home_base:
                     retmsg.append(["ERROR", "DISALLOWED_IN_SECURE_MODE"])
                 else:
                     success = True
@@ -23448,7 +23451,7 @@ class GAMEAPI(resource.Resource):
                     retmsg.append(["LOAD_AI_BASE_RESULT", success, "LOAD_AI_BASE_ERROR" if (not success) else None, error_msg if (not success) else filename])
 
             elif spellname == "SAVE_AI_BASE":
-                if secure_mode or not session.home_base:
+                if spin_secure_mode or not session.home_base:
                     retmsg.append(["ERROR", "DISALLOWED_IN_SECURE_MODE"])
                 else:
                     success = True
@@ -23498,7 +23501,7 @@ class GAMEAPI(resource.Resource):
 
                     retmsg.append(["SAVE_AI_BASE_RESULT", success, "SAVE_AI_BASE_ERROR" if (not success) else None, error_msg if (not success) else filename])
             elif spellname == "PUBLISH_AI_BASE":
-                if secure_mode or not session.home_base:
+                if spin_secure_mode or not session.home_base:
                     retmsg.append(["ERROR", "DISALLOWED_IN_SECURE_MODE"])
                 else:
                     success = True
@@ -23537,7 +23540,7 @@ class GAMEAPI(resource.Resource):
                     retmsg.append(["PUBLISH_AI_BASE_RESULT", success, "PUBLISH_AI_BASE_ERROR" if (not success) else None, error_msg if (not success) else str(idnum)])
 
             elif spellname == "CHEAT_AI_ATTACK":
-                if secure_mode:
+                if (not session.player.is_developer()):
                     retmsg.append(["ERROR", "DISALLOWED_IN_SECURE_MODE"])
                 else:
                     session.start_ai_attack(retmsg, spellargs[0] if spellargs else 'daily', override_protection = True)
@@ -24760,9 +24763,6 @@ class AdminStats:
         self.quarry_cache_misses = 0
         self.quarry_cache_hits = 0
 
-    def user_is_developer(self, user_id):
-        return user_id in SpinConfig.config.get('developer_user_id_list', [])
-
     def econ_flow_res(self, player, category, reason, res, spec = None, level = None):
         # eventually need to separate third resource out
         total = sum(res.itervalues(),0)
@@ -24788,8 +24788,6 @@ class AdminStats:
         self.latency[name]['max'] = max(self.latency[name]['max'], elapsed)
 
     def add_visit(self, user_id, is_new, is_paying):
-        if self.user_is_developer(user_id):
-            return
         self.users_seen.add(user_id)
         if is_paying:
             self.paying_users_seen.add(user_id)
@@ -24797,25 +24795,19 @@ class AdminStats:
             self.new_users_seen.add(user_id)
 
     def add_revenue(self, user_id, dollar_amount, descr):
-        if self.user_is_developer(user_id):
-            self.developer_revenue += dollar_amount
-        else:
-            self.revenue += dollar_amount
-            # add here in case this is the user's first payment
-            self.paying_users_seen.add(user_id)
-            self.last_payments.append({'user_id':user_id,
-                                       'time':server_time,
-                                       'dollar_amount':dollar_amount,
-                                       'description':descr})
+        self.revenue += dollar_amount
+        # add here in case this is the user's first payment
+        self.paying_users_seen.add(user_id)
+        self.last_payments.append({'user_id':user_id,
+                                   'time':server_time,
+                                   'dollar_amount':dollar_amount,
+                                   'description':descr})
 
     def add_gamebucks_spend(self, user_id, bucks, descr):
-        if self.user_is_developer(user_id):
-            return
-        else:
-            self.last_gamebucks.append({'user_id':user_id,
-                                        'time':server_time,
-                                        'gamebucks_amount':bucks,
-                                        'description':descr})
+        self.last_gamebucks.append({'user_id':user_id,
+                                    'time':server_time,
+                                    'gamebucks_amount':bucks,
+                                    'description':descr})
 
     def add_logout(self, user_id, campaign, length):
         # only track FIRST visits
@@ -25019,7 +25011,7 @@ class AdminResource(resource.Resource):
 
         # protect with auth
         if (not SpinGoogleAuth.twisted_request_is_local(request)):
-            if SpinConfig.config.get('secure_mode',False) and (not SpinGoogleAuth.twisted_request_is_ssl(request)): return 'must use HTTPS'
+            if spin_secure_mode and (not SpinGoogleAuth.twisted_request_is_ssl(request)): return 'must use HTTPS'
             auth_info = SpinGoogleAuth.twisted_do_auth(request, 'ADMIN', server_time)
             if not auth_info['ok']:
                 if 'redirect' in auth_info:
@@ -25257,7 +25249,7 @@ def do_main(pidfile, do_ai_setup, do_daemonize, cmdline_config):
         if not os.path.exists(mypath):
             os.mkdir(mypath)
 
-    if secure_mode and (not SpinConfig.config.get('use_compiled_client', 0)):
+    if spin_secure_mode and (not SpinConfig.config.get('use_compiled_client', 0)):
         raise Exception('use_compiled_client must be enabled in config.json when in secure_mode')
 
     # get server instance configuration (port numbers etc)
@@ -25331,8 +25323,8 @@ def do_main(pidfile, do_ai_setup, do_daemonize, cmdline_config):
 
     # startup completes here
 
-    if not secure_mode:
-        print 'SERVER IS RUNNING IN DEVELOPER MODE - NOT FOR PRODUCTION!'
+    if not spin_secure_mode:
+        print 'SERVER IS NOT RUNNING IN SECURE MODE - NOT FOR PRODUCTION!'
 
     if not has_lz4:
         print 'warning: lz4 compression library not detected, cannot use it for regional map :('

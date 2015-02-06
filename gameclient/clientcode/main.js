@@ -1487,7 +1487,7 @@ GameObject.prototype.get_special_ability_spell = function() {
         var sp = gamedata['spells'][spell_name];
         if((sp['activation'] === 'instant' || sp['activation'] === 'targeted_area') &&
            spell_name !== 'MOVE_UNIT' &&
-           (!spin_secure_mode || !sp['developer_only'])) {
+           (!sp['developer_only'] || (!spin_secure_mode && player.is_developer()))) {
             spell = sp; break;
         }
     }
@@ -5016,7 +5016,7 @@ player.abtests = {};
 player.cooldowns = {};
 // NOTE! global_cooldown is relative to client_time, NOT server_time like all other cooldowns!
 player.global_cooldown = {'start':-1, 'end':-1}; // the GCD is client-side only for now
-player.is_developer = false; // developer access ON LIVE SERVER (e.g. shows chat gagging options)
+player.developer = false; // developer access ON LIVE SERVER (e.g. shows chat gagging options)
 player.is_suspicious = false; // extra logging to track suspected hackers
 player.is_chat_mod = false; // whether player has chat moderation authority
 player.isolate_pvp = 0; // same as server's isolate_pvp flag
@@ -5039,9 +5039,11 @@ player.creation_time = -1;
 player.chat_seen = {}; // same as server
 
 function enable_muffins() {
-    if(!player.is_developer) { return; }
+    if(!player.is_developer()) { return; }
     player.enable_muffins = !player.enable_muffins;
 };
+
+player.is_developer = function() { return player.developer; };
 
 player.has_facebook_permissions = function(scope) {
     var want_perms = scope.split(',');
@@ -5076,7 +5078,7 @@ player.get_denormalized_summary_props = function(format) {
                'rcpt': player.history['money_spent'] || 0,
                'ct': player.country,
                'tier': player.country_tier};
-    if(player.is_developer) { ret['developer'] = 1; }
+    if(player.is_developer()) { ret['developer'] = 1; }
     return ret;
 };
 
@@ -5159,7 +5161,7 @@ player.travel_satisfied = function(base_loc) {
 player.travel_time_to = function(dest_loc) {
     if(!dest_loc || !player.home_base_loc || vec_equals(dest_loc, player.home_base_loc)) { return 0; }
     var delta = hex_distance(player.home_base_loc, dest_loc);
-    if((!spin_secure_mode || player.is_developer) && get_query_string('fast_travel')) {
+    if(player.is_developer() && get_query_string('fast_travel')) {
         // developer-only option for debugging
         delta = Math.min(delta, 1);
     }
@@ -5217,7 +5219,7 @@ player.claim_achievements = function () {
 player.get_quest_status = function(quest) {
     var status = 0;
     if('show' in quest && !quest['show']) { return status; }
-    if(quest['developer_only'] && (spin_secure_mode || !player.is_developer)) { return status; }
+    if(quest['developer_only'] && (spin_secure_mode || !player.is_developer())) { return status; }
 
     var qdata = (quest['name'] in player.completed_quests ? player.completed_quests[quest['name']] : null);
 
@@ -8449,7 +8451,7 @@ function flush_message_queue(force, my_timeout) {
         return;
     }
 
-    if(player.is_developer) {
+    if(player.is_developer()) {
         goog.array.forEach(message_queue.queue, function(msg) {
             console.log(['To Server ('+gameapi_connection_method()+')', message_serial.toString()].concat(msg));
         });
@@ -8609,7 +8611,7 @@ function longpoll_send() {
     if(spin_game_use_websocket) { return; }
 
     var msg = 'myarg='+JSON.stringify([["LONGPOLL"]])+'&serial=-1&longpoll=1&session='+session.session_id.toString()+'&nokeepalive=1';
-    if(player.is_developer) {
+    if(player.is_developer()) {
         console.log('To Server: LONGPOLL');
     }
 
@@ -9251,14 +9253,6 @@ function init_desktop_dialogs() {
         }
     }
 
-    if(0 && !spin_secure_mode) {
-        if(!global_spell_icon) {
-            global_spell_icon = new SPUI.SpellIcon({'xy':[0,0],'dimensions':[50,50]});
-            global_spell_icon.onclick = function() { if(selection.unit) { selection.unit.use_special_ability(); } };
-        }
-        SPUI.root.add(global_spell_icon);
-    }
-
     // top dialog
     var dialog_name;
     if(session.home_base) {
@@ -9342,7 +9336,7 @@ function init_desktop_dialogs() {
 
     if(session.home_base) {
         // developer button
-        if(!spin_secure_mode && !anon_mode) {
+        if(!spin_secure_mode && player.is_developer() && !anon_mode) {
             dialog.widgets['developer_button'].show = true;
             dialog.widgets['developer_button'].onclick = invoke_cheat_menu;
         } else {
@@ -13010,7 +13004,7 @@ function invoke_cheat_menu() {
 
     layout.add(new SPUI.Button("Toggle Edit Mode", function() {
         change_selection_ui(null);
-        player.is_cheater = !player.is_cheater; player.is_developer = 1;
+        player.is_cheater = !player.is_cheater;
         send_to_server.func(["CAST_SPELL", 0, "CHEAT_REMOVE_LIMITS", player.is_cheater]);
     }));
 
@@ -13314,7 +13308,7 @@ function init_chat_frame() {
     if(player.get_any_abtest_value('enable_alliances', gamedata['client']['enable_alliances'])) {
         dialog.user_data['channel_names'].push('ALLIANCE');
     }
-    if(player.is_developer) {
+    if(player.is_developer()) {
         dialog.user_data['channel_names'].push('DEVELOPER');
     }
 
@@ -14179,7 +14173,7 @@ function invoke_say_thanks_with_permissions(viral, recipient_fb_id, recipient_us
                               'facebook_post_id':response['post_id']});
             }
             if(gamedata['enable_fb_open_graph'] &&
-               (!gamedata['fb_open_graph']['developer_only'] || player.is_developer) &&
+               (!gamedata['fb_open_graph']['developer_only'] || player.is_developer()) &&
                gamedata['fb_open_graph']['thank']['enable']) {
                 SPFB.api('/me/'+spin_app_namespace+':thank', 'post', {'profile': _recipient_fb_id, 'loot': _loot_text}); // say thanks
             }
@@ -15241,7 +15235,7 @@ function tutorial_step_slideshow(data) {
         tutorial_step(true);
     }; })(data['next']);
 
-    if(!spin_secure_mode) {
+    if(!spin_secure_mode && player.is_developer()) {
         // developer-mode-only button that skips the entire tutorial
         dialog.widgets['skip_button'].onclick = function() {
             var s = gamedata['strings']['dev_skip_rails_tutorial_confirm'];
@@ -19138,7 +19132,7 @@ function change_region_dialog_pop_results(dialog, populations) {
     var ignore_pred = (dialog.user_data['spellname'] == 'CHANGE_REGION_INSTANTLY_ANYWHERE');
 
     for(var id in gamedata['regions']) {
-        if(!player.is_developer && gamedata['regions'][id]['developer_only']) { continue; }
+        if(!player.is_developer() && gamedata['regions'][id]['developer_only']) { continue; }
         if(('show_if' in gamedata['regions'][id]) && !read_predicate(gamedata['regions'][id]['show_if']).is_satisfied(player, null)) { continue; }
         dialog.user_data['rowdata'].push(id);
     }
@@ -22371,7 +22365,7 @@ function battle_history_change_page(dialog, chapter, page) {
                 invoke_battle_log_dialog(_from, _uid, _opprole, _summary);
             }; })(dialog.user_data['from_id'], user_id, opprole, summary);
 
-            dialog.widgets['row_log_button'+row].show = (player.is_developer || player.get_any_abtest_value('enable_battle_logs',true));
+            dialog.widgets['row_log_button'+row].show = (player.is_developer() || player.get_any_abtest_value('enable_battle_logs',true));
             dialog.widgets['row_log_button'+row].state = 'normal';
             dialog.widgets['row_log_button'+row].onclick = callback;
 
@@ -25817,7 +25811,7 @@ function invoke_player_profile_tab(w) {
                         }; })(user_id, name, level);
 
         // see all battles from OPPONENT'S perspective (developer only)
-        dialog.widgets['dev_battles_button'].show = (player.is_developer && (session.viewing_user_id == user_id));
+        dialog.widgets['dev_battles_button'].show = (player.is_developer() && (session.viewing_user_id == user_id));
         dialog.widgets['dev_battles_button'].onclick = (function(_uid, _name, _level) { return function() {
                                 invoke_battle_history_dialog(_uid, -1, '(DEV-ALL)', -1);
                         }; })(user_id, name, level);
@@ -28519,7 +28513,7 @@ function manufacture_dialog_change_category(dialog, catname) {
         if(spec['manufacture_category'] != dialog.user_data['category']) {
             continue;
         }
-        if(spec['developer_only'] && spin_secure_mode) {
+        if(spec['developer_only'] && (spin_secure_mode || !player.is_developer())) {
             continue;
         }
         if('show_if' in spec && !read_predicate(spec['show_if']).is_satisfied(player, null)) { continue; }
@@ -29271,7 +29265,7 @@ function invoke_crafting_table_of_contents_dialog(category) {
             var spec = gamedata['crafting']['recipes'][name];
             if(spec['crafting_category'] != category) { continue; }
             if(!('associated_item_set' in spec)) { continue; }
-            if(spec['developer_only'] && spin_secure_mode) { continue; }
+            if(spec['developer_only'] && (spin_secure_mode || !player.is_developer())) { continue; }
             if('show_if' in spec && !read_predicate(spec['show_if']).is_satisfied(player, null)) { continue; }
             if('activation' in spec && !read_predicate(spec['activation']).is_satisfied(player, null)) { continue; }
             if(goog.array.contains(dialog.user_data['rowdata'], spec['associated_item_set'])) { continue; }
@@ -29429,7 +29423,7 @@ function crafting_dialog_change_category(dialog, category, page) {
             // subcategory/associated_item_set mismatch
             if(dialog.user_data['subcategory'] && (dialog.user_data['subcategory'] != spec['associated_item_set'])) { continue; }
 
-            if(spec['developer_only'] && spin_secure_mode) { continue; }
+            if(spec['developer_only'] && (spin_secure_mode || !player.is_developer())) { continue; }
             if('show_if' in spec && !read_predicate(spec['show_if']).is_satisfied(player, null)) { continue; }
             if('activation' in spec && !read_predicate(spec['activation']).is_satisfied(player, null)) { continue; }
             dialog.user_data['recipes'].push(name);
@@ -31098,7 +31092,7 @@ function research_dialog_change_category(dialog, category, num)
             if(spec['research_category'] != category) {
                 continue;
             }
-            if(spec['developer_only'] && spin_secure_mode) { continue; }
+            if(spec['developer_only'] && (spin_secure_mode || !player.is_developer())) { continue; }
             if('show_if' in spec && !read_predicate(spec['show_if']).is_satisfied(player, null)) { continue; }
             if('activation' in spec && !read_predicate(spec['activation']).is_satisfied(player, null)) { continue; }
 
@@ -36117,7 +36111,7 @@ function build_dialog_change_category(dialog, category) {
             if(spec['build_category'] != category) {
                 continue;
             }
-            if(spec['developer_only'] && (spin_secure_mode || !player.is_developer)) {
+            if(spec['developer_only'] && (spin_secure_mode || !player.is_developer())) {
                 continue;
             }
             if('show_if' in spec && !read_predicate(spec['show_if']).is_satisfied(player, null)) { continue; }
@@ -38502,7 +38496,7 @@ function can_cast_spell_detailed(unit_id, spellname, spellarg) {
         if(!session.home_base) { return [false, gamedata['errors']["CANNOT_CAST_SPELL_OUTSIDE_HOME_BASE"]['ui_name'], null]; }
         var building_type = spellarg[0], j_i = spellarg[1];
         var spec = gamedata['buildings'][building_type];
-        if(spec['developer_only'] && !player.is_developer) { return [false, gamedata['errors']['DISALLOWED_IN_SECURE_MODE']['ui_name'], null]; }
+        if(spec['developer_only'] && (spin_secure_mode || !player.is_developer())) { return [false, gamedata['errors']['DISALLOWED_IN_SECURE_MODE']['ui_name'], null]; }
         if(j_i && !player.is_building_location_valid(j_i, spec, null, {ignore_perimeter: !!spec['ignore_perimeter']})) {
             return [false, gamedata['errors']['INVALID_BUILDING_LOCATION']['ui_name'], ['invalid_building_location','any']];
         }
@@ -39159,7 +39153,7 @@ Store.get_base_price = function(unit_id, spell, spellarg, ignore_error) {
             if(new_level > get_max_ui_level(spec)) {
                 return [-1, p_currency];
             }
-            if(spin_secure_mode && spec['developer_only']) {
+            if(spec['developer_only'] && (spin_secure_mode || !player.is_developer())) {
                 return [-1, p_currency];
             }
             if(!unit && !player.is_cheater) {
@@ -40192,7 +40186,7 @@ function handle_server_message_bundle(serial, bundle) {
     for(var msgnum = 0; msgnum < messages.length; msgnum++) {
         var msg = messages[msgnum];
         try {
-            if(player.is_developer) {
+            if(player.is_developer()) {
                 console.log(['From Server ('+bundle['kind']+')', serial.toString()].concat(msg));
             }
             handle_server_message(msg);
@@ -40230,7 +40224,7 @@ function handle_server_message(data) {
         player.price_region = data[11];
         player.logged_in_times = data[12];
         player.init_abtests(data[13]);
-        player.is_developer = data[14];
+        player.developer = !!data[14];
         player.is_suspicious = data[15];
         player.isolate_pvp = data[16];
         player.acquisition_campaign = data[17];
@@ -40957,7 +40951,7 @@ function handle_server_message(data) {
 
         // allow developers to link directly to someone's base
         var immediate_visit = get_query_string('visit_base');
-        if(player.is_developer && immediate_visit) {
+        if(player.is_developer() && immediate_visit) {
             visit_base(parseInt(immediate_visit,10));
         }
 
@@ -42381,13 +42375,13 @@ function handle_server_message(data) {
         synchronizer.receive_sync(data[1]);
     } else if(msg == "CLIENT_TRACKING_PIXEL") {
         var str = data[1], tag = data[2];
-        if(player.is_developer) { console.log("CLIENT_TRACKING_PIXEL "+str); }
+        if(player.is_developer()) { console.log("CLIENT_TRACKING_PIXEL "+str); }
         var result = eval(str);
         if(typeof result == 'undefined') { result = null; }
         send_to_server.func(["CLIENT_TRACKING_PIXEL_RESULT", tag, result]);
     } else if(msg == "CLIENT_TRACKING_PIXEL_IMAGE") {
         var str = data[1], tag = data[2];
-        if(player.is_developer) { console.log("CLIENT_TRACKING_PIXEL_IMAGE "+str); }
+        if(player.is_developer()) { console.log("CLIENT_TRACKING_PIXEL_IMAGE "+str); }
         var img = new Image();
         //img.src = (location.protocol=='http:'?'http':'https')+'://'+str;
         img.src = 'https://'+str;
@@ -43208,7 +43202,7 @@ function on_mouseup(e) {
             player.record_feature_use('unit_attack_command');
             var add_waypoint = !!e.shiftKey;
             if(found &&
-               (gamedata['allow_self_attack'] || player.is_developer || (found.team != selection.unit.team))) {
+               (gamedata['allow_self_attack'] || player.is_developer() || (found.team != selection.unit.team))) {
                 unit_command_attack(found, add_waypoint);
             } else {
                 unit_command_move(j, i, true, add_waypoint);
@@ -43530,7 +43524,7 @@ function create_mouse_tooltip() {
         var alt = (mouse_state.hovering_over.is_mobile() && mouse_state.hovering_over.is_flying() ?
                    mouse_state.hovering_over.altitude - 1 : 0);
 
-        if(!spin_secure_mode) {
+        if(!spin_secure_mode && player.is_developer()) {
             str.push('Coords: '+pos[0].toFixed(0)+','+pos[1].toFixed(0));
         }
 
@@ -45060,7 +45054,7 @@ function do_draw() {
                 origin = [btm.xy[0]+10, btm.xy[1]-33];
             }
             // draw nonessential art download progress (only for first minute though)
-            if(client_art_state != client_art_states.DONE && (player.is_developer || (client_time - session.connect_time < 60.0))) {
+            if(client_art_state != client_art_states.DONE && (player.is_developer() || (client_time - session.connect_time < 60.0))) {
                 ctx.fillText("Downloading ("+(100*GameArt.get_dl_progress_all()).toFixed(0)+"%)...", origin[0], origin[1]);
             }
             if(fps_counter.show) {
