@@ -946,7 +946,7 @@ def check_item_set(setname, spec):
 
     return error
 
-level_re = re.compile('.+_L([0-9]+)(_SHOOT)?$')
+level_re = re.compile('(?P<root>.+)_L(?P<level>[0-9]+)(_SHOOT)?$')
 
 def check_item(itemname, spec):
     error = 0
@@ -956,14 +956,14 @@ def check_item(itemname, spec):
 
     matches = level_re.match(itemname)
     if matches:
-        level = int(matches.group(1))
+        level = int(matches.group('level'))
         if 'level' in spec and spec['level'] != level:
             error |= 1; print '%s: probably a typo: "level" number %d does not match item name suffix "%s"' % (itemname, level, itemname)
 
         for FIELD in ('ui_name', 'icon',):
             ui_matches = level_re.match(spec[FIELD])
             if ui_matches:
-                ui_level = int(ui_matches.group(1))
+                ui_level = int(ui_matches.group('level'))
                 if ui_level != level:
                     error |= 1; print '%s: probably a typo: "%s" Lxx number suffix does not match item name "%s"' % (itemname, FIELD, itemname)
 
@@ -1199,7 +1199,7 @@ def check_modstat(effect, reason, affects = None, expect_level = None, expect_it
         if expect_level is not None:
             matches = level_re.match(effect['strength'])
             if matches:
-                level = int(matches.group(1))
+                level = int(matches.group('level'))
                 if level != expect_level:
                     error |= 1; print '%s: leveled spell %s level number does not match item name' % (reason, effect['strength'])
     elif effect['stat'] == 'weapon_level':
@@ -1210,7 +1210,7 @@ def check_modstat(effect, reason, affects = None, expect_level = None, expect_it
         if expect_level is not None:
             matches = level_re.match(effect['strength'])
             if matches:
-                level = int(matches.group(1))
+                level = int(matches.group('level'))
                 if level != expect_level:
                     error |= 1; print '%s: leveled weapon_asset %s level number does not match item name' % (reason, effect['strength'])
     return error
@@ -1385,9 +1385,9 @@ def check_predicate(pred, reason = '', context = None, context_data = None,
         else:
             spec = gamedata['items'][pred['item_name']]
             if expect_items is not None and pred['item_name'] not in expect_items:
-                error |= 1; print '%s: %s predicate refers to item "%s" but is only allowed to have item_name in %s' % (reason, pred['predicate'], pred['item_name'], repr(expect_items))
+                error |= 1; print '%s: %s predicate refers to item "%s" but is only allowed to refer to one of %s' % (reason, pred['predicate'], pred['item_name'], repr(expect_items))
             if expect_items_unique_equipped is not None and spec.get('unique_equipped','NONE') not in expect_items_unique_equipped:
-                error |= 1; print '%s: %s predicate refers to item "%s" but is only allowed to have items with a unique_equipped value in %s' % (reason, pred['predicate'], pred['item_name'], repr(expect_items_unique_equipped))
+                error |= 1; print '%s: %s predicate refers to item "%s" but is only allowed to refer to items with a unique_equipped value in %s' % (reason, pred['predicate'], pred['item_name'], repr(expect_items_unique_equipped))
 
     elif pred['predicate'] == 'HAS_ITEM_SET':
         if pred['item_set'] not in gamedata['item_sets']:
@@ -1404,7 +1404,7 @@ def check_predicate(pred, reason = '', context = None, context_data = None,
             error |= 1
             print '%s: %s predicate refers to nonexistent library predicate "%s"' % (reason, pred['predicate'], pred['name'])
         if expect_library_preds is not None and pred['name'] not in expect_library_preds:
-            error |= 1; print '%s: %s predicate refers to "%s" but is only allowed to have name in %s' % (reason, pred['predicate'], pred['name'], repr(expect_library_preds))
+            error |= 1; print '%s: %s predicate refers to LIBRARY "%s" but is only allowed to refer to one of %s' % (reason, pred['predicate'], pred['name'], repr(expect_library_preds))
 
     elif pred['predicate'] == 'SELECTED':
         if (pred['type'] not in ('ANY','CURSOR')) and (pred['type'] not in gamedata['units']) and (pred['type'] not in gamedata['buildings']):
@@ -2686,14 +2686,34 @@ def check_store_sku(sku_name, sku):
         if sku['item'].startswith('leader_'):
             expect_items_unique_equipped = set([gamedata['items'][sku['item']]['unique_equipped']])
         else:
+            # guard against typos where a predicate refers to the wrong item or level
             expect_items = set([sku['item']])
+
+            match = level_re.match(sku['item'])
+            if match: # per-level item
+                # allow any item of lesser level (still might not protect against all typos!)
+                root = match.group('root')
+                my_level = int(match.group('level'))
+                for level in xrange(1, my_level+1):
+                    expect_items.add(root + ('_L%d' % level))
 
             # special case to support stinger_blueprint in TR
             if sku['item'].endswith('stinger_gunner_blueprint'):
                 expect_items.add(sku['item'][:-len('stinger_gunner_blueprint')] + 'stinger_blueprint')
 
-        if sku['item'].endswith('_blueprint'):
-            expect_library_preds = set([sku['item'][:-len('_blueprint')]+'_unlocked'])
+        if '_blueprint' in sku['item']:
+            # guard against typos where a library predicate of the wrong name or level is listed
+            expect_library_preds = set()
+
+            match = level_re.match(sku['item'])
+            if match: # per-level blueprint
+                # allow any blueprint of same or lesser level (still might not protect against all typos!)
+                root = match.group('root')[:-len('_blueprint')]
+                my_level = int(match.group('level'))
+                for level in xrange(1, my_level+1):
+                    expect_library_preds.add(root + ('_unlocked_L%d' % level))
+            else: # non-per-level blueprint
+                expect_library_preds.add(sku['item'][:-len('_blueprint')]+'_unlocked')
 
 
     for PRED in ('activation', 'requires', 'collected', 'show_if'):
@@ -3169,14 +3189,27 @@ def main(args):
     for name, pred in gamedata['predicate_library'].iteritems():
         expect_player_history_keys = None
         # check unit unlock predicates
-        if gamedata['game_id'] != 'mf' and name.endswith('_unlocked'):
-            thing = name[:-len('_unlocked')]
+        if gamedata['game_id'] != 'mf' and ('_unlocked' in name):
+            match = level_re.match(name)
+            if match:
+                thing = match.group('root')[:-len('_unlocked')]
+                my_level = int(match.group('level'))
+            else:
+                thing = name[:-len('_unlocked')]
+                my_level = -1
+
             if thing in gamedata['units']:
                 expect_player_history_keys = set([thing+'_blueprint_unlocked'])
 
                 # special case to support stinger_blueprint_unlocked in TR
                 if thing.endswith('stinger_gunner'):
                     expect_player_history_keys.add(thing[:-len('stinger_gunner')] + 'stinger_blueprint_unlocked')
+            else:
+                expect_player_history_keys = set([thing+'_blueprint_unlocked'])
+                if my_level >= 0: # allow any item of equal or lesser level
+                    for level in xrange(1, my_level+1):
+                        expect_player_history_keys.add(thing+'_blueprint_unlocked'+('_L%d' % level))
+
         error |= check_predicate(pred, reason='predicate_library:'+name, expect_player_history_keys = expect_player_history_keys)
 
     for name, cons in gamedata['consequent_library'].iteritems():
