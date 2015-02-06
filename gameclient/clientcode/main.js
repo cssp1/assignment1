@@ -14806,6 +14806,11 @@ function update_attack_button_dialog(dialog) {
                 top.widgets['violation_message'].show = true;
                 top.widgets['violation_message'].str = gamedata['errors']['CANNOT_ATTACK_LADDER_'+ladder_violation]['ui_instructions'];
                 dialog.widgets['attack_button'].tooltip.str = gamedata['errors']['CANNOT_ATTACK_LADDER_'+ladder_violation]['ui_name'];
+                // for games with no regions, don't even show the attack button here (not sure if this is right - check gamedata['ladder_pvp']?)
+                if(goog.object.getCount(gamedata['regions']) < 1) {
+                    top.widgets['violation_message'].show = false;
+                    dialog.widgets['attack_button'].show = false;
+                }
             } else if(map_violation) {
                 top.widgets['violation_message'].show = true;
                 var viewing_region = (session.viewing_player_home_region && session.viewing_player_home_region in gamedata['regions'] ? gamedata['regions'][session.viewing_player_home_region]['ui_name'] : gamedata['strings']['regional_map']['unknown_name']);
@@ -14813,6 +14818,11 @@ function update_attack_button_dialog(dialog) {
                 if(session.viewing_base.base_map_loc) { xs = session.viewing_base.base_map_loc[0].toString(); ys = session.viewing_base.base_map_loc[1].toString(); }
                 top.widgets['violation_message'].str = gamedata['errors']['CANNOT_ATTACK_MAP_'+map_violation]['ui_instructions'].replace('%VIEWING_REGION', viewing_region).replace('%X',xs).replace('%Y',ys).replace('%TOWNHALL',gamedata['buildings'][gamedata['townhall']]['ui_name']);
                 dialog.widgets['attack_button'].tooltip.str = gamedata['errors']['CANNOT_ATTACK_MAP_'+map_violation]['ui_name'];
+                // for games with no regions, don't even show the attack button here (not sure if this is right - check gamedata['ladder_pvp']?)
+                if(goog.object.getCount(gamedata['regions']) < 1) {
+                    top.widgets['violation_message'].show = false;
+                    dialog.widgets['attack_button'].show = false;
+                }
             } else if(is_sandstorm_max) {
                 dialog.widgets['attack_button'].tooltip.str = dialog.data['widgets']['sandstorm_max_message']['ui_name'];
                 top.widgets['sandstorm_max_message'].show = true;
