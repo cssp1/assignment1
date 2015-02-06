@@ -3884,6 +3884,20 @@ Building.prototype.minefield_item = function() {
 Building.prototype.is_producer = function() {
     return ('production_capacity' in this.spec);
 };
+
+/** Return the name of the resource this building produces
+    @return {string|null} */
+Building.prototype.produces_res = function() {
+    if('production_capacity' in this.spec) {
+        for(var res in gamedata['resources']) {
+            if(('produces_'+res) in this.spec) {
+                return res;
+            }
+        }
+    }
+    return null;
+};
+
 Building.prototype.get_production_capacity = function() {
     var cap = this.get_leveled_quantity(this.spec['production_capacity']);
     //cap = Math.floor(cap * player.get_abtest_value('T001_harvester_cap', 'modifier', 1));
@@ -43321,7 +43335,9 @@ function on_mouseup(e) {
 
                 if(allow_invoke) {
                     if(session.home_base && found.is_building() && found.is_producer() && gamedata['enable_oneclick_harvest'] &&
-                       found.idle_state_cache && found.idle_state_cache['state'] && found.idle_state_cache['state'].indexOf('harvest_') == 0 &&
+                       found.idle_state_cache && found.idle_state_cache['state'] &&
+                       found.idle_state_cache['state'].indexOf('harvest_') == 0 &&
+                       get_storage_fullness(found.produces_res()) < 1 &&
                        found.is_in_sync()) {
                         // do a one-click harvest iff the idle state is showing as "Collect"
                         do_harvest(false);
