@@ -577,7 +577,7 @@ TurretHeadDialog.set_stats_display = function(dialog, emplacement_obj, name, rel
                 if(stat == 'cooldown') {
                     is_worse = !is_worse;
                 }
-                bbstr += ' [color='+dialog.data['widgets']['descriptionR'][(is_worse ? 'worse_color':'better_color')]+']('+sign+Math.abs(detail.value - relative_detail.value).toString()+')[/color]';
+                bbstr += ' [color='+dialog.data['widgets']['descriptionR'][(is_worse ? 'worse_color':'better_color')]+']('+sign+pretty_print_number(Math.abs(detail.value - relative_detail.value))+')[/color]';
             }
             right.set_text_bbcode(bbstr);
             right.tooltip.str = detail.tooltip;
