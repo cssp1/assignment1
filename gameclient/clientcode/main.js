@@ -2054,7 +2054,7 @@ function calculate_battle_outcome() {
             if(obj.spec['name'] === 'barrier') { continue; }
 
             // do not count invulnerable objects (e.g. quarry harvesters)
-            if(obj.is_invul()) { continue; }
+            if(obj.spec['max_hp'] === 0 || obj.is_invul()) { continue; }
 
             if(player.tutorial_state != "COMPLETE") {
                 // special case for tutorial: end battle once the three main buildings are destroyed
@@ -2064,6 +2064,12 @@ function calculate_battle_outcome() {
                 }
             } else {
                 if(obj.team === 'enemy' && !obj.is_destroyed()) {
+                    /*
+                    if(player.is_developer()) {
+                        console.log('undestroyed enemy '+obj.spec['name']);
+                        console.log(obj);
+                    }
+                    */
                     victory = false;
                 }
             }
