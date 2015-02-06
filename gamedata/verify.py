@@ -1994,12 +1994,25 @@ def check_ai_base_contents(strid, base, owner, base_type):
                 if KIND == 'buildings' and ('%RESOURCE' not in item['spec']):
                     spec = gamedata['buildings'][item['spec']]
                     max_level = len(spec['build_time'])
+                    is_storage = False
+                    is_producer = False
+                    has_exotic_resources = False
+                    for res in gamedata['resources']:
+                        if 'storage_'+res in spec:
+                            is_storage = True
+                        if 'produces_'+res in spec:
+                            is_producer = True
+                        if is_storage or is_producer:
+                            if res not in ('iron','water'):
+                                has_exotic_resources = True
+
                     # check that quarries do not have storage buildings (unsupported/exploitable code path)
-                    if base_type == 'quarry':
-                        for res in gamedata['resources']:
-                            if 'storage_'+res in spec:
-                                error |= 1
-                                print 'ERROR: quarry %s should not have a storage building (%s) in it!' % (strid, item['spec'])
+                    if base_type == 'quarry' and is_storage:
+                        error |= 1
+                        print 'ERROR: quarry %s should not have a storage building (%s) in it!' % (strid, item['spec'])
+
+                    if base_type != 'quarry' and has_exotic_resources and ('base_resource_loot' not in base):
+                        error |= 1; print 'ERROR: AI base %s has exotic resources, it should be using "base_resource_loot" instead of the old loot system' % (strid,)
 
                 elif KIND == 'units':
                     max_level = len(gamedata['units'][item['spec']]['max_hp'])

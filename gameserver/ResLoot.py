@@ -83,7 +83,14 @@ class SpecificPvEResLoot(BaseResLoot):
         BaseResLoot.__init__(self, gamedata, session, player, base)
 
         self.modifier = 1.0
-        self.modifier *= session.player.get_any_abtest_value('ai_loot_scale', gamedata['ai_bases']['loot_scale'])
+        self.modifier *= session.player.get_any_abtest_value('ai_loot_scale', 1) # note: do NOT apply gamedata['ai_bases']['loot_scale']
+
+        # ALSO NOTE: gamedata['ai_bases']['loot_randomness'] IS NOT APPLIED!
+        # Doing this would be complicated since we need to "freeze"
+        # its value upon first Spy of the base, meaning it'd have to
+        # be stored in AIInstanceTable or in a cooldown or random
+        # number seed on the player or something.
+
         self.modifier *= session.player.stattab.get_player_stat('loot_factor_pve')
         if self.base.base_type != 'quarry' and self.base.base_richness > 0:
             self.modifier *= self.base.base_richness
