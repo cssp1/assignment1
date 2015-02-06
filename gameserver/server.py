@@ -8210,19 +8210,28 @@ class Player(AbstractPlayer):
     def get_lootable_buildings(self):
         return sum([1 for obj in self.home_base_iter() if (obj.is_building() and (obj.is_storage() or obj.is_producer()) and (not obj.is_destroyed()))], 0)
 
-    def query_suitable_ladder_match(self, exclude_user_ids = [], exclude_alliance_ids = [], trophy_range = None, townhall_range = None):
+    def query_suitable_ladder_match(self, exclude_user_ids = [], exclude_alliance_ids = [], trophy_range = None, townhall_range = None,
+                                    min_trophies = None):
         # note: order of fields here is important for query speed
-        if trophy_range:
-            mycount = self.ladder_points()
-
+        if trophy_range or (min_trophies is not None):
             # note: SpinNoSQL translates this into a fake join on player score data - it's not really in player cache
             if self.leaderboard_impl() == 'scores2':
                 trophy_field = ('scores2', ('trophies_pvp', self.scores2_ladder_master_point()))
             else:
                 trophy_field = ('scores1', score_field_name(self, 'trophies_pvp', gamedata['matchmaking']['ladder_point_frequency']))
 
-            trophy_filter = [trophy_field, mycount - trophy_range[0], mycount + trophy_range[1]]
+            if trophy_range:
+                mycount = self.ladder_points()
+                trophy_filter = [trophy_field, mycount - trophy_range[0], mycount + trophy_range[1]]
+            else:
+                trophy_filter = [trophy_field, -999999, 999999]
+
+            if min_trophies is not None:
+                trophy_filter[1] = max(trophy_filter[1], min_trophies) # adjust the min upwards
+
             trophy_filter_includes_zero = (trophy_filter[1] <= 0 and trophy_filter[2] >= 0)
+        else:
+            trophy_filter = None
 
         if townhall_range:
             gamesite.db_client.player_cache_ensure_index(gamedata['townhall']+'_level') # make sure there's an index
@@ -8233,7 +8242,7 @@ class Player(AbstractPlayer):
         query = []
 
         # if the trophy filter does NOT include players with 0 trophies, then it's almost a reject-all filter, so put at the beginning
-        if trophy_range and (not trophy_filter_includes_zero):
+        if (trophy_filter is not None) and (not trophy_filter_includes_zero):
             query.append(trophy_filter)
 
         if townhall_range and (not townhall_filter_is_huge):
@@ -8267,7 +8276,7 @@ class Player(AbstractPlayer):
                   ]
 
         # if the trophy filter includes players with 0 trophies, then it's almost an accept-all filter, so put it at the end
-        if trophy_range and trophy_filter_includes_zero:
+        if (trophy_filter is not None) and trophy_filter_includes_zero:
             query.append(trophy_filter)
 
         if townhall_range and townhall_filter_is_huge:
@@ -8319,14 +8328,19 @@ class Player(AbstractPlayer):
     def find_suitable_ladder_match(self, exclude_user_ids = [], exclude_alliance_ids = []):
         start_time = time.time()
         id = None
+        min_trophies = None
+        if 'ladder_match_min_trophies' in gamedata['matchmaking']:
+            min_trophies = Predicates.eval_cond_or_literal(gamedata['matchmaking']['ladder_match_min_trophies'], None, self)
         if gamedata['matchmaking']['ladder_match_by'] == 'trophies':
             for passnum in xrange(len(gamedata['matchmaking']['ladder_match_trophy_range'])):
                 id = self.query_suitable_ladder_match(exclude_user_ids = exclude_user_ids, exclude_alliance_ids = exclude_alliance_ids,
+                                                      min_trophies = min_trophies,
                                                       trophy_range = gamedata['matchmaking']['ladder_match_trophy_range'][passnum]) # note: may be None/null
                 if id: break
         elif gamedata['matchmaking']['ladder_match_by'] == 'townhall':
             for passnum in xrange(len(gamedata['matchmaking']['ladder_match_townhall_range'])):
                 id = self.query_suitable_ladder_match(exclude_user_ids = exclude_user_ids, exclude_alliance_ids = exclude_alliance_ids,
+                                                      min_trophies = min_trophies,
                                                       townhall_range = gamedata['matchmaking']['ladder_match_townhall_range'][passnum]) # note: may be None/null
                 if id: break
         else:

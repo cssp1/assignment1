@@ -3173,7 +3173,7 @@ def main(args):
     for name in ('ladder_point_decay_if',):
         if name in matchmaking:
             error |= check_predicate(matchmaking[name], reason='matchmaking:'+name)
-    for name in ('ladder_match_switch_cost','ladder_match_history_exclude'):
+    for name in ('ladder_match_switch_cost','ladder_match_history_exclude','ladder_match_min_trophies'):
         if name in matchmaking and (type(matchmaking[name]) is list):
             error |= check_cond_chain(matchmaking[name], reason='matchmaking:'+name)
 
