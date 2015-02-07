@@ -1732,7 +1732,12 @@ CUSTOM_STAGES = {
     {'name': 'E136G Completed FASCAM Shield Set', 'func': lambda user: user.get('achievement:aoefire_shield_infantry_complete',0) >= 1 },
     ],
     'bfm': [],
-    'sg': [],
+    'sg': [
+        {'name': 'E02 Maker House L2+', 'func': lambda user: user.get('extra_foreman_level',1) >= 2 },
+        {'name': 'E03 Maker House L3+', 'func': lambda user: user.get('extra_foreman_level',1) >= 3 },
+        {'name': 'E04 Maker House L4+', 'func': lambda user: user.get('extra_foreman_level',1) >= 4 },
+        {'name': 'E05 Maker House L5+', 'func': lambda user: user.get('extra_foreman_level',1) >= 5 },
+    ],
     'mf': [],
     'mf2': [],
 }
