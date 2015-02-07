@@ -27088,10 +27088,30 @@ player.squad_halt = function(squad_id) {
 };
 player.squad_move = function(squad_id, path) {
     if(player.squad_is_moving(squad_id)) { throw Error('squad_move but squad '+squad_id.toString()+' is still moving'); }
+    if(!path || path.length < 1) { throw Error('squad_move with invalid path'); }
     var squad_data = player.squads[squad_id.toString()];
     send_to_server.func(["CAST_SPELL", 0, "SQUAD_STEP", squad_id, path]);
     player.squad_clear_client_data(squad_id); // erase current movement orders
     player.squad_set_client_data(squad_id, 'move_pending', squad_data['map_loc']); // wait for squad to move before issuing new orders - remember original loc
+
+    // client-side predict - assumes success, may get corrected by server later
+    if(gamedata['client']['predict_squad_movement']) {
+        // translate path into xy/eta format for the map feature
+        var next_eta = server_time + (-server_time_offset); // add 1x your buest-guess network latency
+        next_eta += gamedata['client']['predict_squad_movement_estimated_latency'] || 0; // even more optional latency prediction
+        var map_path = [{'xy': squad_data['map_loc'], 'eta': next_eta}];
+
+        for(var i = 0; i < path.length; i++) {
+            next_eta += 1.0 / (gamedata['territory']['unit_travel_speed_factor']*get_player_stat(player.stattab, 'travel_speed')*(squad_data['travel_speed']||1.0));
+            map_path.push({'xy': path[i], 'eta': next_eta});
+        }
+
+        session.region.receive_feature_update({'base_id':player.squad_base_id(squad_id),
+                                               'base_map_path': map_path,
+                                               'base_map_loc': path[path.length-1]});
+        squad_data['map_loc'] = path[path.length-1];
+        squad_data['map_path'] = map_path;
+    }
 };
 
 player.advance_squads = function() {
