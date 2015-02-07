@@ -34,17 +34,27 @@ class ANSIColor:
 def decode_time(amztime):
     return calendar.timegm(time.strptime(amztime.split('.')[0], '%Y-%m-%dT%H:%M:%S'))
 
+def ec2_inst_is_vpc(inst): return (inst.vpc_id is not None)
+def ec2_res_is_vpc(res): return ('VPC' in res.description)
+
 # return true if this reservation can cover this instance
 def ec2_res_match(res, inst):
     return res.instance_type == inst.instance_type and \
+           ec2_res_is_vpc(res) == ec2_inst_is_vpc(inst) and \
            res.availability_zone == inst.placement and \
            res.state == 'active'
+
+def rds_product_engine_match(product, engine):
+    return (product, engine) in (('postgresql','postgres'),
+                                 ('mysql','mysql'), # not sure if this is correct
+                                 )
+
 def rds_res_match(res, inst, rds_offerings):
     # note: RDS uses slightly different terminology for the reservation "product" and the instance "engine"
     product = rds_offerings[res['ReservedDBInstancesOfferingId']]['ProductDescription']
     engine = inst['Engine']
     return res['DBInstanceClass'] == inst['DBInstanceClass'] and \
-           (product == 'postgresql' and engine == 'postgres') and \
+           rds_product_engine_match(product, engine) and \
            res['MultiAZ'] == inst['MultiAZ']
 
 def pretty_print_ec2_res_price(res):
@@ -59,15 +69,20 @@ def pretty_print_ec2_res(res, override_count = None, my_index = None):
     assert res.state == 'active'
     lifetime = decode_time(res.start) + res.duration - time_now
     days = lifetime//86400
+    is_vpc = '--VPC--' if ec2_res_is_vpc(res) else 'Classic'
     if my_index is not None and res.instance_count > 1:
         count = ' (%d of %d)' % (my_index+1, res.instance_count)
     else:
         instance_count = override_count if override_count is not None else res.instance_count
         count = ' (x%d)' % instance_count if (instance_count!=1 or override_count is not None) else ''
-    return '%-10s %-22s %10s  %3d days left' % (res.availability_zone, res.instance_type+count, pretty_print_ec2_res_price(res), days)
+    return '%-10s %-7s %-22s %10s  %3d days left' % (res.availability_zone, is_vpc, res.instance_type+count, pretty_print_ec2_res_price(res), days)
+
+def pretty_print_ec2_res_id(res):
+    return res.id.split('-')[0]+'...'
 
 def pretty_print_ec2_instance(inst):
-    return '%-16s %-10s %-16s' % (inst.tags['Name'], inst.placement, inst.instance_type)
+    is_vpc = '--VPC--' if ec2_inst_is_vpc(inst) else 'Classic'
+    return '%-16s %-10s %-7s %-16s' % (inst.tags['Name'], inst.placement, is_vpc, inst.instance_type)
 
 def pretty_print_rds_offering_price(offer):
     yearly = float(offer['FixedPrice']) * (365*86400)/float(offer['Duration'])
@@ -181,7 +196,7 @@ if __name__ == '__main__':
         res = ec2_res_coverage[inst.id]
         if res:
             my_index = ec2_res_usage[res.id].index(inst)
-            print ANSIColor.green(pretty_print_ec2_instance(inst)+' '+pretty_print_ec2_res(res, my_index = my_index)),
+            print ANSIColor.green(pretty_print_ec2_instance(inst)+' '+pretty_print_ec2_res(res, my_index = my_index)), pretty_print_ec2_res_id(res),
         else:
             print ANSIColor.red(pretty_print_ec2_instance(inst)+' NOT COVERED'),
         if inst.id in ec2_instance_status:
@@ -196,7 +211,7 @@ if __name__ == '__main__':
         if not ec2_any_unused:
             print
             ec2_any_unused = True
-        print ANSIColor.red(pretty_print_ec2_res(res, override_count = res.instance_count - use_count)), res.id
+        print ANSIColor.red(pretty_print_ec2_res(res, override_count = res.instance_count - use_count)), pretty_print_ec2_res_id(res)
     if not ec2_any_unused:
         print '(none)'
 
