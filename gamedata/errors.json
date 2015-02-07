@@ -210,7 +210,7 @@
     "CANNOT_ALTER_SQUAD_WHILE_TRAVELING": { "ui_title": "Battalion Deployed", "ui_name": "Cannot edit a battalion while it is away from home base." },
     "CANNOT_ALTER_SQUAD_WHILE_UNDER_ATTACK": { "ui_title": "Battalion in Combat", "ui_name": "Cannot edit a battalion while it is in combat." },
     "INVALID_SQUAD": { "ui_name": "Battalion is not available for this action." },
-    "INVALID_MAP_LOCATION": { "ui_title": "Battalion Cannot Reach Destination", "ui_name": "The path may be blocked by enemies, friendlies, or mountains - check the Regional Map." },
+    "INVALID_MAP_LOCATION": { "ui_title": "Battalion Cannot Reach Target", "ui_name": "The path may be blocked by enemies, friendlies, or mountains - check the Regional Map." },
     "CANNOT_RECALL_SQUAD_MAP_BLOCKED": { "ui_title": "Cannot Recall Battalion", "ui_name": "The path home may be blocked by friendlies, enemies or mountains. Try moving other battalions out of the way first." },
     "SERVER_PROTOCOL": { "ui_name": "Server communication protocol error" },
     "SERVER_EXCEPTION": { "ui_name": "Server encountered an exception while processing this request" },
