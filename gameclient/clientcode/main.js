@@ -18215,19 +18215,25 @@ Region.prototype.receive_feature_update = function(res) {
             if('LOCK_OWNER' in feature) { delete feature['LOCK_OWNER']; }
             if('protection_end_time' in feature) { delete feature['protection_end_time']; }
 
-            var cur_loc = feature['base_map_loc'] || null, new_loc = res['base_map_loc'] || cur_loc;
-            if(cur_loc && (cur_loc[0] != new_loc[0] || cur_loc[1] != new_loc[1])) {
-                // XXXXXX this is really scary that feature isn't blocked sometimes - check invariant violations!
-                this.occupancy.unblock_hex_maybe(cur_loc, feature);
-                //this.occupancy.block_hex(cur_loc, -1, feature);
+            var cur_loc = feature['base_map_loc'] || null, new_loc = ('base_map_loc' in res ? res['base_map_loc'] : cur_loc);
+            if((!cur_loc && new_loc) ||
+               (cur_loc && (!new_loc || cur_loc[0] != new_loc[0] || cur_loc[1] != new_loc[1]))) {
 
-                this.map_index.remove(feature['base_id'], cur_loc, feature);
-                this.occupancy.block_hex(new_loc, 1, feature);
-                this.map_index.insert(feature['base_id'], new_loc, feature);
+                // XXXXXX check if block_hex assumed invariant still fails sometimes
+                if(cur_loc) {
+                    this.occupancy.unblock_hex_maybe(cur_loc, feature);
+                    //this.occupancy.block_hex(cur_loc, -1, feature);
+                }
+                this.map_index.remove(feature['base_id'], cur_loc||null, feature);
+
+                if(new_loc) {
+                    this.occupancy.block_hex(new_loc, 1, feature);
+                }
+                this.map_index.insert(feature['base_id'], new_loc||null, feature);
             }
 
             for(var propname in res) {
-                feature[propname] = res[propname];
+                feature[propname] = res[propname]; // might want to delete if null
             }
 
             if(gamedata['territory']['check_map_integrity'] >= 2) { this.check_map_integrity('receive_feature_update, existing, update, exit'); }
