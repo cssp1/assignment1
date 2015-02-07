@@ -26995,7 +26995,9 @@ player.squad_find_path_adjacent_to = function(squad_id, dest) {
                 // good path
 
                 // trim off unnecessary extra moves at the end of the path that just circle around the destination hex
-                while(path.length >= 2 && hex_distance(path[path.length-2], dest) == 1) {
+                // note: need to check for blockage on this intermediate waypoint before changing the final destination to it,
+                // because it might be the destination of another moving squad, where we aren't allowed to land.
+                while(path.length >= 2 && hex_distance(path[path.length-2], dest) == 1 && !session.region.occupancy.is_blocked(path[path.length-2])) {
                     goog.array.removeAt(path, path.length-1);
                 }
                 var travel_time = player.squad_travel_time(squad_id, path);
