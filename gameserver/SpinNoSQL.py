@@ -1487,6 +1487,7 @@ class NoSQLClient (object):
                {'$and': [ # is a feature present here before we'd pass it?
                  {'base_map_loc_flat': self.flatten_map_loc(w['xy'])},
                  {'$or':[{'base_map_path':{'$exists':False}},
+                         {'base_map_path':{'$type':10}}, # is null
                          {'base_map_path_eta':{'$exists':False}},
                          {'base_map_path_eta':{'$lte':w['eta']}}]}
                ] } \
@@ -1577,7 +1578,8 @@ class NoSQLClient (object):
                                                 {'$unset':{'LOCK_STATE':1,'LOCK_OWNER':1,'LOCK_TIME':1,'LOCK_GENERATION':1}},
                                                 multi=True)
         # get rid of path data for moving features that have already arrived at their destination by now
-        self.region_table(region, 'map').update({'base_map_path_eta':{'$exists':True, '$lt': self.time}},
+        self.region_table(region, 'map').update({'$or': [{'base_map_path':{'$exists':True, '$type':10}}, # somehow a null path got left in here
+                                                         {'base_map_path_eta':{'$exists':True, '$lt': self.time}}]},
                                                 {'$unset':{'base_map_path':1,'base_map_path_eta':1}},
                                                 multi=True)
 
