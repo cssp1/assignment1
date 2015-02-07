@@ -7755,7 +7755,9 @@ class Player(AbstractPlayer):
                    'base_icon': icon_unit_specname,
                    'base_ui_name': squad['ui_name'], # denormalized for ease of querying
                    'base_landlord_id': self.user_id,
-                   'base_map_loc': coords}
+                   'base_map_loc': coords,
+                   'base_map_path': None # explicit null for client's benefit
+                   }
 
         # note: to avoid two successive map update broadcasts, wait until after lock release to send
         if not gamesite.nosql_client.create_map_feature(self.home_region, feature['base_id'], feature, exclusive=0, originator=self.user_id, do_hook=False, reason='squad_enter_map'):
@@ -7845,6 +7847,10 @@ class Player(AbstractPlayer):
             for FIELD in ('LOCK_STATE', 'LOCK_OWNER'):
                 if FIELD in entry: del entry[FIELD]
 
+            # add explicit null for the path, to make sure the client takes the update
+            if 'base_map_path' not in entry:
+                entry['base_map_path'] = None # XXX move this to client-side? (assume a map_loc update without path nulls the path?)
+
             if entry['base_map_loc'][0] != squad['map_loc'][0] or entry['base_map_loc'][1] != squad['map_loc'][1]:
                 gamesite.exception_log.event(server_time, 'player %d squad %d trying to step, but base location mismatches: squad %s map_cache %s' % \
                                              (self.user_id, squad_id, repr(squad['map_loc']), repr(entry['base_map_loc'])))
@@ -7877,6 +7883,9 @@ class Player(AbstractPlayer):
                                                                   old_loc=entry['base_map_loc'], old_path=entry.get('base_map_path',None),
                                                                   exclusive=-1, originator=self.user_id, reason='squad_step')
                 else:
+                    for c in conflict_list: # add explicit nulls for client
+                        if 'base_map_path' not in c:
+                            c['base_map_path'] = None # XXX move this to client-side? (assume a map_loc update without path nulls the path?)
                     return False, [], [entry] + conflict_list, ["INVALID_MAP_LOCATION", squad_id, 'dest', destination] # map location already occupied
 
             new_lock_gen = entry.get('LOCK_GENERATION',-1)+1
