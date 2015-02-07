@@ -1352,7 +1352,10 @@ class NoSQLClient (object):
         if 'base_id' in props: del props['base_id']
         if 'base_map_loc' in props: props['base_map_loc_flat'] = self.flatten_map_loc(props['base_map_loc'])
         # arrival time at final waypoint - needed for dynamic occupancy query
-        if 'base_map_path' in props: props['base_map_path_eta'] = props['base_map_path'][-1]['eta']
+        if props.get('base_map_path'):
+            props['base_map_path_eta'] = props['base_map_path'][-1]['eta']
+        elif 'base_map_path' in props:
+            del props['base_map_path']
         self.region_table(region, 'map').update({'_id':base_id}, {'$set': props}, upsert = False)
 
     def create_map_feature(self, region, base_id, props, exclusive = -1, originator=None, do_hook = True, reason=''):
@@ -1377,7 +1380,10 @@ class NoSQLClient (object):
             if 'base_id' in props: del props['base_id']
 
             props['base_map_loc_flat'] = self.flatten_map_loc(props['base_map_loc'])
-            if 'base_map_path' in props: props['base_map_path_eta'] = props['base_map_path'][-1]['eta']
+            if props.get('base_map_path'):
+                props['base_map_path_eta'] = props['base_map_path'][-1]['eta']
+            elif 'base_map_path' in props:
+                del props['base_map_path']
 
             # when creating a new feature, create it in the "locked" state
             props['LOCK_STATE'] = self.LOCK_BEING_ATTACKED
