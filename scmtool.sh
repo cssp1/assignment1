@@ -156,7 +156,7 @@ function do_diff_git {
 function do_commit_git {
     for dir in $GIT_DIRS; do
         echo "committing game-${dir}..."
-        (cd $dir && git commit -am "$1")
+        (cd $dir && git commit -am "$1" || true)
     done
 }
 function do_push_git {
