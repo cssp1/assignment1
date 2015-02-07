@@ -18079,7 +18079,7 @@ Region.prototype.find_features_at_coords = function(cell, options) {
     if(options && options.include_moving_squads) {
         goog.object.forEach(player.squads, function(squad_data) {
             if(player.squad_is_moving(squad_data['id'])) {
-                var feature = this.find_feature_by_id('s'+session.user_id.toString()+'_'+squad_data['id'].toString());
+                var feature = this.find_feature_by_id(player.squad_base_id(squad_data['id']));
                 if(feature) {
                     var last_next_progress = this.feature_interpolate_pos(feature);
                     // check "last" and "next"
@@ -26884,10 +26884,11 @@ player.squad_is_deployed = function(squad_id) {
     var key = squad_id.toString();
     return (key in player.squads && ('map_loc' in player.squads[key]));
 };
+player.squad_base_id = function(squad_id) { return 's'+session.user_id.toString()+'_'+squad_id.toString(); };
 player.squad_is_in_battle = function(squad_id) {
     var key = squad_id.toString();
     if(player.squad_is_deployed(squad_id) && session.region && session.region.data) {
-        var feature = session.region.find_feature_by_id('s'+session.user_id.toString()+'_'+squad_id.toString());
+        var feature = session.region.find_feature_by_id(player.squad_base_id(squad_id));
         if(feature && feature['LOCK_STATE']) { return true; }
     }
     return false;
