@@ -28501,7 +28501,11 @@ function invoke_manufacture_dialog(reason, category, unit, want_builder) {
 }
 
 // return function that helps player to unlock unit "specname" (or units of category "category")
-function manufacture_dialog_unlock_helper(category, specname) {
+/** @param {string|null} category
+    @param {string|null} specname
+    @param {string} reason
+    @return {function()|null} */
+function manufacture_dialog_unlock_helper(category, specname, reason) {
     var builder_type = null;
 
     if(specname) {
@@ -28521,7 +28525,7 @@ function manufacture_dialog_unlock_helper(category, specname) {
                 // pass "even_if_tutorial_incomplete" option since this is vital for the manufacture_dialog to work properly, even during the tutorial
                 return get_requirements_help(read_predicate(pred), null, {even_if_tutorial_incomplete:1});
             } else {
-                throw Error('cannot determine what is wrong for '+specname);
+                throw Error('cannot determine what is wrong for '+specname+' reason '+reason);
             }
         } else {
             // fall through
@@ -28533,7 +28537,7 @@ function manufacture_dialog_unlock_helper(category, specname) {
     if(builder_type) {
         return get_requirements_help(read_predicate({'predicate': 'BUILDING_LEVEL', 'building_type': builder_type, 'trigger_level': 1}), null, {even_if_tutorial_incomplete:1});
     }
-    throw Error('cannot determine what is wrong for cat '+ (category||'null') + ' spec '+(specname||'null'));
+    throw Error('cannot determine what is wrong for cat '+ (category||'null') + ' spec '+(specname||'null')+' reason '+reason);
 }
 
 
@@ -28772,7 +28776,7 @@ function update_manufacture_dialog(dialog) {
 
     if(!builder && !player.is_cheater) {
         // factory building does not exist, do not show queue
-        dialog.user_data['replace_queue_with_unlock_helper'] = manufacture_dialog_unlock_helper(dialog.user_data['category'], dialog.user_data['current_unit']);
+        dialog.user_data['replace_queue_with_unlock_helper'] = manufacture_dialog_unlock_helper(dialog.user_data['category'], dialog.user_data['current_unit'], '!builder');
     }
 
     if(dialog.user_data['replace_queue_with_unlock_helper'] && dialog.user_data['current_unit']) {
@@ -28936,7 +28940,7 @@ function update_manufacture_dialog(dialog) {
                     }
 
                 } else {
-                    var helper = manufacture_dialog_unlock_helper(dialog.user_data['category'], dialog.user_data['current_unit']);
+                    var helper = manufacture_dialog_unlock_helper(dialog.user_data['category'], dialog.user_data['current_unit'], 'closure:builder'+(builder?'1':'0')+'unlock_level'+unlock_level.toString());
                     dialog.user_data['replace_queue_with_unlock_helper'] = helper;
                     if(helper) { helper(); }
                 }
@@ -28949,7 +28953,7 @@ function update_manufacture_dialog(dialog) {
         }
 
         if(!builder && !player.is_cheater) {
-            dialog.user_data['replace_queue_with_unlock_helper'] = manufacture_dialog_unlock_helper(dialog.user_data['category'], dialog.user_data['current_unit']);
+            dialog.user_data['replace_queue_with_unlock_helper'] = manufacture_dialog_unlock_helper(dialog.user_data['category'], dialog.user_data['current_unit'], '!builder');
         }
 
         var qty_current = (name in unit_count ? unit_count[name] : 0);
