@@ -2571,7 +2571,7 @@ def do_funnel(qlist, significance_test, use_stages, conversion_rates):
 
         if len(qlist) == 2:
             # perform significance tests when comparing 2 cohorts
-            if (not fun.get('show_p',False)): continue
+            #if (not fun.get('show_p',False)): continue
             A = stage['cohorts'][0]
             B = stage['cohorts'][1]
 
