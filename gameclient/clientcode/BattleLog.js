@@ -180,14 +180,16 @@ BattleLog.parse = function(my_id, summary, metlist) {
     names[myrole] = names[my_id] = 'You';
     poss[myrole] = poss[my_id] = 'Your';
 
-    // special handling for Mr. Skilling
+    // special handling for "Mr. Skilling" -> "Skilling" and "The Hammers" -> "The Hammers" (instead of "Hammers")
     if(1) {
-        var name_segment = 0;
+        var name_start = 0, name_end = 0;
         if(summary[opprole+'_name'].indexOf('Mr. ') == 0) {
-            name_segment = 1;
+            name_start = 1; name_end = 1;
+        } else if(summary[opprole+'_name'].indexOf('The ') == 0) {
+            name_start = 0; name_end = 1;
         }
         var broken_name = summary[opprole+'_name'].split(' ');
-        names[opprole] = names[summary[opprole+'_id']] = broken_name[Math.min(broken_name.length-1, name_segment)];
+        names[opprole] = names[summary[opprole+'_id']] = broken_name.slice(name_start, name_end+1).join(' ');
     } else {
         names[opprole] = names[summary[opprole+'_id']] = summary[opprole+'_name'].split(' ')[0];
     }
