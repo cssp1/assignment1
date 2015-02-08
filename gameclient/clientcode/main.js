@@ -962,9 +962,10 @@ function playfield_check_path(path, reason) {
 // flags for tracking which parts of the GameObject state are dirty and need to be sent to the server
 var obj_state_flags = {
     XY: 1, // position
-    HP: 2, // health/damage (also includes last_attacker)
+    HP: 2, // health/damage (also includes last_attacker, and killer_info if destroyed)
     ORDERS: 4, // movement orders
     PATROL: 8, // patrol flag
+    URGENT: 16, // mark that this object should be flushed immediately at the end of the tick, instead of waiting for the next time-interval-based save
     ALL: 255
 };
 
@@ -1838,30 +1839,28 @@ function hurt_object(target, damage, vs_table, source) {
     target.last_attacker = source;
     target.state_dirty |= obj_state_flags.HP;
 
-    var send_update_immediately = false;
-
     if(target.is_building()) {
         // immediately show that repair/research/upgrade/production stops in the UI. Subsequent OBJECT_STATE_UPDATE will return correct HP value and start/stop times.
         target.repair_finish_time = -1;
         if(target.research_start_time > 0) {
             target.research_done_time += server_time - target.research_start_time;
             target.research_start_time = -1;
-            send_update_immediately = true;
+            target.state_dirty |= obj_state_flags.URGENT;
         }
         if(target.build_start_time > 0) {
             target.build_done_time += server_time - target.build_start_time;
             target.build_start_time = -1;
-            send_update_immediately = true;
+            target.state_dirty |= obj_state_flags.URGENT;
         }
         if(target.upgrade_start_time > 0) {
             target.upgrade_done_time += server_time - target.upgrade_start_time;
             target.upgrade_start_time = -1;
-            send_update_immediately = true;
+            target.state_dirty |= obj_state_flags.URGENT;
         }
         if(target.manuf_start_time > 0) {
             target.manuf_done_time += server_time - target.manuf_start_time;
             target.manuf_start_time = -1;
-            send_update_immediately = true;
+            target.state_dirty |= obj_state_flags.URGENT;
         }
         if(target.is_crafting()) {
             var cat = gamedata['crafting']['categories'][gamedata['crafting']['recipes'][target.is_crafting()]['crafting_category']];
@@ -1886,7 +1885,7 @@ function hurt_object(target, damage, vs_table, source) {
                         if(bus['start_time'] > 0) {
                             bus['done_time'] += Math.max(0, server_time - bus['start_time']);
                             bus['start_time'] = -1;
-                            send_update_immediately = true;
+                            target.state_dirty |= obj_state_flags.URGENT;
                         }
                     });
                 }
@@ -1897,6 +1896,10 @@ function hurt_object(target, damage, vs_table, source) {
     if(target.hp <= 0) {
         // object is destroyed
         target.hp = 0;
+
+        if(target.is_building() && target.killer_info === null) {
+            target.killer_info = get_killer_info(source);
+        }
 
         // visual explosion and debris effects
         var fx_data = null;
@@ -1936,11 +1939,13 @@ function hurt_object(target, damage, vs_table, source) {
                 send_and_destroy_object(target, source);
             }
         } else if(target.is_building() || target.is_inert()) {
-            // manually send a single update, spamming a flush_dirty_objects() hitches the client
-            send_update_immediately = true;
+            target.state_dirty |= obj_state_flags.URGENT;
 
             // mark the tracked quest as dirty so we can update any quest tips
             player.quest_tracked_dirty = true;
+            if(target.is_building()) {
+                session.set_battle_outcome_dirty();
+            }
         }
 
     } else if(damage < 0) {
@@ -1957,16 +1962,23 @@ function hurt_object(target, damage, vs_table, source) {
             target.apply_orders();
         }
 
+        // check for gradual looting
+        if(target.is_building() && (target.is_storage() || target.is_producer())) {
+            // "ticks" here refer to the chunks of loot given out as certain hitpoint thresholds are crossed
+            // see gameserver/ResLoot.py for the details.
+            var tick_size = ('gradual_loot' in gamedata ? gamedata['gradual_loot'] : -1);
+            if(tick_size > 0) {
+                var last_tick = Math.floor((original_target_hp-1)/tick_size) + 1;
+                var this_tick = Math.floor((target.hp-1)/tick_size) + 1;
+                if(this_tick < last_tick) {
+                    target.state_dirty |= obj_state_flags.URGENT; // transmit the new hp value at the end of this tick
+                }
+            }
+        }
+
         if('damaged_effect' in target.spec) {
             SPFX.add_visual_effect(pos, (target.is_mobile() && target.is_flying() ? target.altitude : 0), [0,1,0], client_time+time_offset, target.spec['damaged_effect'], true, null);
         }
-    }
-
-    if(send_update_immediately) {
-        var args = [[target.id, target.spec['name'], [target.x,target.y], target.hp, null, get_killer_info(source), null]];
-        target.state_dirty = 0;
-        send_to_server.func(["OBJECT_COMBAT_UPDATES", args]);
-        session.set_battle_outcome_dirty();
     }
 
     if(target.is_blocker() && was_destroyed != target.is_destroyed()) {
@@ -3719,6 +3731,10 @@ function Building() {
     this.equip_pending = false; // true if we are waiting to hear back from the server on an equip request XXX use sync_marker
     this.sync_marker = Synchronizer.INIT; // for holding the UI until server catches up to a specific request
     this.client_predictions = null; // client-side predicted manuf_queue, only non-null if out of sync
+
+    // dictionary of data about the object who killed us - used to track between the actual kill and the transmission of the combat update
+    // note that this is data is queried from the attacker and "frozen" at the moment of the kill to avoid race conditions
+    this.killer_info = null;
 
     this.harvest_glow_time = -1; // graphical effect only
 
@@ -7022,6 +7038,7 @@ function run_unit_ticks() {
         });
 
         apply_queued_damage_effects();
+        flush_dirty_objects({urgent_only:true, skip_check:true});
         client_tick += 1;
     }
 }
@@ -7917,6 +7934,7 @@ function get_killer_info(killer) {
         if(killer.is_building() && killer.is_minefield() && killer.is_minefield_armed()) {
             ret['mine'] = killer.minefield_item();
         }
+        // XXXXXX turret heads?
         return ret;
     }
     return null;
@@ -42822,6 +42840,7 @@ function invoke_login_error_message(error_name) {
 
 /** store the combat damage state of all mutated objects to the server
  * @param {{buildings_only:(boolean|undefined),
+ *          urgent_only:(boolean|undefined),
  *          skip_check:(boolean|undefined)}} options
  * buildings_only: only flush building damage deltas
  * skip_check: do not trigger slow integrity checks
@@ -42832,6 +42851,7 @@ function flush_dirty_objects(options) {
     for(var id in session.cur_objects.objects) {
         var obj = session.cur_objects.objects[id];
         if(obj.state_dirty != 0) {
+            if(options.urgent_only && !(obj.state_dirty & obj_state_flags.URGENT)) { continue; }
             if(options.buildings_only && !obj.is_building()) { continue; }
             var xy, orders = null;
             if(obj.is_mobile()) {
@@ -42852,7 +42872,7 @@ function flush_dirty_objects(options) {
                             xy,
                             (obj.state_dirty & obj_state_flags.HP ? obj.hp : -1),
                             orders,
-                            null, // no longer send attacker info here, it's racy
+                            (obj.is_building() ? obj.killer_info : null),
                             ((obj.is_mobile() && (obj.state_dirty & obj_state_flags.PATROL)) ? obj.patrol : null)
                            ];
             args.push(this_arg);
