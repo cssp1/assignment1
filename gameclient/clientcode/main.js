@@ -43563,6 +43563,7 @@ function create_mouse_tooltip() {
                         var max_level = get_max_level(gamedata['tech'][item_spec['associated_tech']]);
                         str.push(gamedata['strings']['cursors']['level_x_of_y'].replace('%cur', cur_level.toString()).replace('%max', max_level.toString()));
                     }
+                    str.push('---'); // separator between head and emplacement
                 }
             }
 
