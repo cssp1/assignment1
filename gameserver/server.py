@@ -17223,7 +17223,8 @@ class GAMEAPI(resource.Resource):
             if retmsg is not None: retmsg.append(["ERROR", "WORKSHOP_IS_BUSY", object.obj_id])
             return False
 
-        if catdata.get('foreman', False) and session.player.foreman_is_busy():
+        # check foreman availability (but not if using "Instant" which will set take_resources false)
+        if take_resources and catdata.get('foreman', False) and session.player.foreman_is_busy():
             if retmsg is not None: retmsg.append(["ERROR", "FOREMAN_IS_BUSY"])
             return False
 
