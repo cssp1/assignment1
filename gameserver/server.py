@@ -17203,20 +17203,40 @@ class GAMEAPI(resource.Resource):
                             if retmsg is not None: retmsg.append(["ERROR", "EQUIP_INVALID"])
                             return False
 
+                    # check unique_equipped constraint
+                    if check_predicates and ('unique_equipped' in product_spec):
+                        # see if we are replacing an equivalent item
+                        replacing_equivalent = False
+                        if arg.do_replace:
+                            old_item = Equipment.equip_get(target.equipment or {}, dest_addr)
+                            if old_item and old_item['spec'] in gamedata['items'] and gamedata['items'][old_item['spec']].get('unique_equipped',None) == product_spec['unique_equipped']:
+                                # replacing, no need to count
+                                replacing_equivalent = True
+
+                        if not replacing_equivalent:
+                            # do need to check existing items
+                            for item in session.player.equipped_item_iter():
+                                item_spec = gamedata['items'].get(item['spec'], None)
+                                if item_spec and item_spec.get('unique_equipped',None) == product_spec['unique_equipped']:
+                                    if retmsg is not None: retmsg.append(["ERROR", "EQUIP_INVALID_UNIQUE", product_spec['name']])
+                                    return False
+
                     # check limited_equipped constraint
                     if check_predicates and ('limited_equipped' in product_spec):
                         # see if we are replacing an equivalent item
+                        replacing_equivalent = False
                         if arg.do_replace:
                             old_item = Equipment.equip_get(target.equipment or {}, dest_addr)
                             if old_item and old_item['spec'] in gamedata['items'] and gamedata['items'][old_item['spec']].get('limited_equipped',None) == product_spec['limited_equipped']:
                                 # replacing, no need to count
-                                continue
+                                replacing_equivalent = True
 
-                        # do need to count existing items
-                        if session.player.stattab.limited_equipped.get(product_spec['limited_equipped'],0) < \
-                           product.get('stack',1) + session.player.count_limited_equipped_items(product_spec['limited_equipped']):
-                            if retmsg is not None: retmsg.append(["ERROR", "EQUIP_INVALID_LIMITED", product_spec['name']])
-                            return False
+                        if not replacing_equivalent:
+                            # do need to count existing items
+                            if session.player.stattab.limited_equipped.get(product_spec['limited_equipped'],0) < \
+                               product.get('stack',1) + session.player.count_limited_equipped_items(product_spec['limited_equipped']):
+                                if retmsg is not None: retmsg.append(["ERROR", "EQUIP_INVALID_LIMITED", product_spec['name']])
+                                return False
 
         # check workshop business
         if object.is_damaged() or object.is_upgrading() or object.is_under_construction() or object.is_researching() or object.is_manufacturing():

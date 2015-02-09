@@ -6299,6 +6299,38 @@ player.would_violate_limited_equipped = function(product_spec, delivery_address)
     return false;
 };
 
+/** Return true if crafting a new item of spec "product_spec" into "delivery_address" would violate a unique_equipped constraint
+ @param {Object} product_spec
+ @param {BuildingEquipSlotAddress|null} delivery_address
+ @return {boolean} */
+player.would_violate_unique_equipped = function(product_spec, delivery_address) {
+    if(!product_spec['unique_equipped']) { return false; }
+    var count = 0;
+    var check_func = function(other_item, other_address) {
+        var other_spec = ItemDisplay.get_inventory_item_spec(other_item['spec']);
+
+        // skip our own destination slot if it matches (assumes we're replacing this item)
+        if(delivery_address && other_address && other_address instanceof BuildingEquipSlotAddress && other_address.equals(delivery_address) &&
+           other_spec['unique_equipped'] == product_spec['unique_equipped']) { return false; }
+
+        if(other_spec && other_spec['unique_equipped']==product_spec['unique_equipped']) {
+            count += 1;
+            if(count > 0) { return true; }
+        }
+        return false;
+    };
+
+    // check existing items
+    player.equipped_item_iter(check_func);
+    if(count > 0) { return true; }
+
+    // check crafting queues
+    player.crafting_queue_ingredients_and_products_iter(check_func);
+    if(count > 0) { return true; }
+
+    return false;
+};
+
 /** Return current count of a limited_equipped item pool, ignoring anything that matches in delivery_address
     @param {Object} product_spec
     @param {BuildingEquipSlotAddress|null} delivery_address
@@ -39199,18 +39231,19 @@ Store.get_base_price = function(unit_id, spell, spellarg, ignore_error) {
                 });
                 if(pred_fail) { return [-1, p_currency]; }
 
-                var limited_equipped_fail = false;
+                var limited_or_unique_equipped_fail = false;
                 if(!ignore_error && delivery && delivery['obj_id']) {
                     goog.array.forEach(recipe['product'], function(my_product) {
+                        var delivery_address = new BuildingEquipSlotAddress(delivery['obj_id'], delivery['slot_type'], delivery['slot_index']);
                         if(my_product['spec']) {
-                            if(player.would_violate_limited_equipped(ItemDisplay.get_inventory_item_spec(my_product['spec']),
-                                                                     new BuildingEquipSlotAddress(delivery['obj_id'], delivery['slot_type'], delivery['slot_index']))) {
-                                limited_equipped_fail = true;
+                            if(player.would_violate_limited_equipped(ItemDisplay.get_inventory_item_spec(my_product['spec']), delivery_address) ||
+                               player.would_violate_unique_equipped(ItemDisplay.get_inventory_item_spec(my_product['spec']), delivery_address)) {
+                                limited_or_unique_equipped_fail = true;
                             }
                         }
                     });
                 }
-                if(limited_equipped_fail) { return [-1, p_currency]; }
+                if(limited_or_unique_equipped_fail) { return [-1, p_currency]; }
             }
             // check existing queue
             // we don't bother with the more detailed checks the server does, since only a client bug would cause mal-formed requests here
