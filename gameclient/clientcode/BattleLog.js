@@ -64,13 +64,14 @@ BattleLog.unit = function(met, is_mine) {
     }
 };
 
-BattleLog.attacker = function(met, is_mine) {
+BattleLog.attacker = function(met, is_mine) { // is_mine here means "is friendly" not "is a landmine"
     if(met['attacker_mine']) {
         // mine detonation
         if(met['attacker_mine'] in gamedata['items']) {
             return gamedata['items'][met['attacker_mine']]['ui_name'];
         }
     }
+
     var kind = met['attacker_type'];
     var dat = gamedata['units'][kind] || gamedata['buildings'][kind];
     var tx = dat['ui_name'];
@@ -78,6 +79,17 @@ BattleLog.attacker = function(met, is_mine) {
     if(level && (level > 0) && (is_mine || gamedata['battle_log_detail'])) {
         tx += ' (L'+level.toString()+')';
     }
+
+    if(met['attacker_turret_head'] && met['attacker_turret_head'] in gamedata['items']) {
+        var head_spec = ItemDisplay.get_inventory_item_spec(met['attacker_turret_head']);
+        var head_name = ItemDisplay.strip_inventory_item_ui_name_level_suffix(ItemDisplay.get_inventory_item_ui_name(head_spec));
+        var head_level = head_spec['level'];
+        if(head_level && (head_level > 0) && (is_mine || gamedata['battle_log_detail'])) {
+            head_name += ' (L'+head_spec['level'].toString()+')';
+        }
+        tx = tx + ' / ' + head_name;
+    }
+
     return tx;
 };
 

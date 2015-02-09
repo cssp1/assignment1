@@ -3413,8 +3413,8 @@ class Session(object):
             props['attacker_type'] = killer_info['spec']
             props['attacker_level'] = killer_info['level']
             if 'id' in killer_info: props['attacker_obj_id'] = killer_info['id']
-            if 'mine' in killer_info: props['attacker_mine'] = killer_info['mine']
-            if 'spellname' in killer_info: props['attacker_spellname'] = killer_info['spellname']
+            for EXTRA in ('spellname','mine','turret_head'): # extra metadata on the killer
+                if EXTRA in killer_info: props['attacker_'+EXTRA] = killer_info[EXTRA]
 
         self.attack_event(owner_id, event_name, props)
 

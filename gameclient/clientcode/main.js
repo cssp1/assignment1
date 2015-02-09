@@ -7931,10 +7931,13 @@ function get_killer_info(killer) {
                    'spec': killer.spec['name'],
                    'level': killer.level,
                    'id': killer.id};
-        if(killer.is_building() && killer.is_minefield() && killer.is_minefield_armed()) {
-            ret['mine'] = killer.minefield_item();
+        if(killer.is_building()) {
+            if(killer.is_minefield() && killer.is_minefield_armed()) {
+                ret['mine'] = killer.minefield_item();
+            } else if(killer.is_emplacement() && killer.turret_head_item()) {
+                ret['turret_head'] = killer.turret_head_item();
+            }
         }
-        // XXXXXX turret heads?
         return ret;
     }
     return null;
