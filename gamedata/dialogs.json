@@ -7276,7 +7276,7 @@
             "title": { "kind": "TextField", "xy": [236,51], "dimensions": [194, 45], "text_size": 19, "text_style": "bold",
                        "text_hjustify": "left", "ui_name": "Congratulations\nCommander!" },
             "description": { "kind": "TextField", "xy": [241,129], "dimensions": [174, 181], "text_size": 13, "text_style": "thick",
-                             "text_hjustify": "left", "text_vjustify": "top", "ui_name": "Blueprints activated!\n\nNow use your %lab to unlock this unit." },
+                             "text_hjustify": "left", "text_vjustify": "top", "ui_name": "Blueprints activated!\n\nNow use your %lab to unlock it!" },
 
             "you_completed": { "kind": "TextField", "xy": [477,73], "dimensions": [218,23], "text_size": 15, "text_style": "thick",
                                "text_hjustify": "left", "ui_name": "You Downloaded:" },

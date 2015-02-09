@@ -34024,8 +34024,10 @@ function invoke_blueprint_congrats(item_spec_name, tech_spec_name) {
     var tech_spec = gamedata['tech'][tech_spec_name];
     var unit_spec = null;
     if('associated_unit' in tech_spec) {
-        // tech for unlocking a unit
+        // tech for unlocking/upgrading a unit
         unit_spec = gamedata['units'][tech_spec['associated_unit']];
+    } else if('associated_item' in tech_spec) {
+        // tech for unlocking/upgrading an item (via crafting recipe)
     } else {
         return;
     }
@@ -34035,15 +34037,17 @@ function invoke_blueprint_congrats(item_spec_name, tech_spec_name) {
     change_selection_ui(dialog);
     dialog.auto_center();
     dialog.modal = true;
-    dialog.widgets['small_icon'].asset = get_leveled_quantity(unit_spec['art_asset'],1);
+    if(unit_spec) {
+        dialog.widgets['small_icon'].asset = get_leveled_quantity(unit_spec['art_asset'],1);
+    }
     if('splash_image' in tech_spec) {
         dialog.widgets['splash_icon'].asset = get_leveled_quantity(tech_spec['splash_image'],1);
         dialog.widgets['splash_icon_bg'].show = true;
     } else {
         dialog.widgets['big_icon'].asset = dialog.widgets['small_icon'].asset;
-        dialog.widgets['big_icon'].alpha = get_leveled_quantity(unit_spec['cloaked'] || 0, 1) ? gamedata['client']['cloaked_opacity'] : 1;
+        dialog.widgets['big_icon'].alpha = get_leveled_quantity((unit_spec ? unit_spec['cloaked'] : 0), 1) ? gamedata['client']['cloaked_opacity'] : 1;
     }
-    dialog.widgets['level_text'].set_text_with_linebreaking(dialog.data['widgets']['level_text']['ui_name'].replace('%s',item_spec['ui_name']));
+    dialog.widgets['level_text'].set_text_with_linebreaking(dialog.data['widgets']['level_text']['ui_name'].replace('%s',ItemDisplay.get_inventory_item_ui_name(item_spec)));
     dialog.widgets['description'].set_text_with_linebreaking(dialog.data['widgets']['description']['ui_name'].replace('%lab', gamedata['buildings'][get_lab_for(tech_spec['research_category'])]['ui_name']));
 
     dialog.widgets['close_button'].onclick = function() { change_selection(null); };
