@@ -2816,8 +2816,12 @@ class Session(object):
         # list of outgoing game messages to deliver to the client's browser next time it contacts the server
         self.deferred_messages = []
 
+        # flags that we need to perform a recaculation and send the results to the client on next transmission
         self.deferred_ping_squads = False
         self.deferred_ladder_point_decay_check = False
+        self.deferred_stattab_update = False
+        self.deferred_history_update = False
+        self.deferred_power_change = False
 
         # prevent overlapping SPROBE_RUN requests
         self.sprobe_in_progress = False
@@ -20023,6 +20027,19 @@ class GAMEAPI(resource.Resource):
         if session.deferred_ladder_point_decay_check:
             session.deferred_ladder_point_decay_check = False
             session.player.ladder_point_decay_check(session, retmsg)
+
+        if session.deferred_stattab_update:
+            session.deferred_stattab_update = False
+            session.player.recalc_stattab(session.player)
+            session.player.stattab.send_update(session, retmsg)
+
+        if session.deferred_power_change: # probably needs to come after stattab
+            session.deferred_power_change = False
+            session.power_changed(session.viewing_base, None, retmsg)
+
+        if session.deferred_history_update:
+            session.deferred_history_update = False
+            session.player.send_history_update(retmsg)
 
         if gamesite.raw_log:
             client_str = 'sid %s' % pretty_print_session(session.session_id)

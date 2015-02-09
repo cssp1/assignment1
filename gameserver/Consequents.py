@@ -68,11 +68,11 @@ class PlayerHistoryConsequent(Consequent):
             new_value = self.value
 
         if self.method == 'max':
-            session.setmax_player_metric(self.key, new_value)
+            session.deferred_history_update |= session.setmax_player_metric(self.key, new_value)
         elif self.method == 'set':
-            session.setvalue_player_metric(self.key, new_value)
+            session.deferred_history_update |= session.setvalue_player_metric(self.key, new_value)
         elif self.method == 'increment':
-            session.increment_player_metric(self.key, new_value)
+            session.deferred_history_update |= session.increment_player_metric(self.key, new_value)
         else:
             raise Exception('unknown method '+self.method)
 
@@ -365,7 +365,6 @@ class FindAndReplaceObjectsConsequent(Consequent):
 
     def execute(self, session, player, retmsg, context=None):
         obj_updates = set()
-        need_history_update = False
 
         for obj in player.home_base_iter():
             if obj.is_building(): # right now this only handles buildings
@@ -399,26 +398,22 @@ class FindAndReplaceObjectsConsequent(Consequent):
 
                         # run history metrics
                         # XXXXXX unify with server.py do_ping_object
-                        need_history_update = True
                         num_built = sum([1 for p in obj.owner.home_base_iter() if p.spec.name == obj.spec.name])
-                        need_history_update |= session.setmax_player_metric('building:'+obj.spec.name+':num_built', num_built, bucket = bool(obj.spec.worth_less_xp))
+                        session.deferred_history_update |= session.setmax_player_metric('building:'+obj.spec.name+':num_built', num_built, bucket = bool(obj.spec.worth_less_xp))
                         max_level = max([p.level for p in obj.owner.home_base_iter() if p.spec.name == obj.spec.name])
-                        need_history_update |= session.setmax_player_metric('building:'+obj.spec.name+':max_level', max_level, bucket = bool(obj.spec.worth_less_xp))
+                        session.deferred_history_update |= session.setmax_player_metric('building:'+obj.spec.name+':max_level', max_level, bucket = bool(obj.spec.worth_less_xp))
                         if obj.spec.history_category:
                             max_level = max([p.level for p in obj.owner.home_base_iter() if p.spec.history_category == obj.spec.history_category])
-                            need_history_update |= session.setmax_player_metric(obj.spec.history_category+'_max_level', max_level, bucket = bool(obj.spec.worth_less_xp))
+                            session.deferred_history_update |= session.setmax_player_metric(obj.spec.history_category+'_max_level', max_level, bucket = bool(obj.spec.worth_less_xp))
                         if obj.spec.track_level_in_player_history:
-                            need_history_update |= session.setmax_player_metric(obj.spec.name+'_level', obj.level, bucket = bool(obj.spec.worth_less_xp))
+                            session.deferred_history_update |= session.setmax_player_metric(obj.spec.name+'_level', obj.level, bucket = bool(obj.spec.worth_less_xp))
 
         if obj_updates:
             for obj in obj_updates:
                 retmsg.append(["OBJECT_STATE_UPDATE2", obj.serialize_state()])
             # also need to do a stat and power update
-            session.player.recalc_stattab(session.player)
-            session.player.stattab.send_update(session, retmsg)
-            session.power_changed(session.viewing_base, None, retmsg)
-        if need_history_update:
-            session.player.send_history_update(retmsg)
+            session.deferred_stattab_update = True
+            session.deferred_power_change = True
 
 class ChatSendConsequent(Consequent):
    def __init__(self, data):
