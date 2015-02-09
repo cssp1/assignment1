@@ -21311,12 +21311,12 @@ function invoke_equip_chooser(inv_dialog, parent_widget, tech, unit, slot_type, 
                 var crit = equip_is_compatible_with_unit(tech['name'], tech['associated_unit'], slot_type, espec, true);
                 can_equip_at_any_level = !!crit;
                 can_equip_now = can_equip_at_any_level && !!equip_is_compatible_with_unit(tech['name'], tech['associated_unit'], slot_type, espec, false);
-                if(!can_equip_now && crit['min_level']) { min_level = crit['min_level']; }
+                if(can_equip_at_any_level && !can_equip_now && crit['min_level']) { min_level = crit['min_level']; }
             } else {
                 var crit = equip_is_compatible_with_building(unit, slot_type, espec, true);
                 can_equip_at_any_level = !!crit;
                 can_equip_now = can_equip_at_any_level && !!equip_is_compatible_with_building(unit, slot_type, espec, false);
-                if(!can_equip_now && crit['min_level']) { min_level = crit['min_level']; }
+                if(can_equip_at_any_level && !can_equip_now && crit['min_level']) { min_level = crit['min_level']; }
             }
             if(!can_equip_at_any_level) { continue; }
 
