@@ -43095,6 +43095,14 @@ function event_to_canvas(e) {
 }
 
 function on_mouseup(e) {
+   try {
+       do_on_mouseup(e);
+   } catch (ex) {
+       log_exception(ex, 'do_on_mouseup');
+   }
+}
+
+function do_on_mouseup(e) {
     e.preventDefault();
 
     mouse_state.clear_button(e.button);
@@ -43450,6 +43458,14 @@ function on_mouseup(e) {
 }
 
 function on_mouseout(e) {
+   try {
+       do_on_mouseout(e);
+   } catch (ex) {
+       log_exception(ex, 'do_on_mouseout');
+   }
+}
+
+function do_on_mouseout(e) {
     mouse_state.clear_all_buttons();
     mouse_state.dripper.stop();
     mouse_state.has_scrolled = false;
@@ -43678,6 +43694,14 @@ function do_on_mousemove_update_drag_selection(xmin, xmax, ymin, ymax, add_to_se
     }
 }
 
+function on_mousewheel(e) {
+   try {
+       do_on_mousewheel(e);
+   } catch (ex) {
+       log_exception(ex, 'do_on_mousewheel');
+   }
+}
+
 function do_on_mousewheel(e) {
     if(client_state != client_states.RUNNING) { return; }
     // get canvas coordinates of mouse pointer location
@@ -43696,14 +43720,13 @@ function do_on_mousewheel(e) {
     }
 }
 
-function on_mousewheel(e) {
+function on_mousemove(e) {
    try {
-       do_on_mousewheel(e);
+       do_on_mousemove(e);
     } catch (ex) {
-        log_exception(ex, 'do_on_mousewheel');
+        log_exception(ex, 'do_on_mousemove');
     }
 }
-
 
 function do_on_mousemove(e) {
     // do not fire event until server connection
@@ -43817,14 +43840,6 @@ function do_on_mousemove(e) {
 
     mouse_state.last_x = x; mouse_state.last_y = y;
     // draw(); may cause performance problems
-}
-
-function on_mousemove(e) {
-   try {
-       do_on_mousemove(e);
-    } catch (ex) {
-        log_exception(ex, 'do_on_mousemove');
-    }
 }
 
 // emulate a regular mouse event based on a TouchEvent
@@ -43971,6 +43986,14 @@ function register_player_input() {
 }
 
 function on_mousedown(e) {
+   try {
+       do_on_mousedown(e);
+   } catch (ex) {
+       log_exception(ex, 'do_on_mousedown');
+   }
+}
+
+function do_on_mousedown(e) {
     canvas.focus();
     register_player_input();
 
