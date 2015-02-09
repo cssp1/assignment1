@@ -2672,8 +2672,9 @@ def check_resource(name, data):
     for ART in ('icon_small',):
         error |= require_art_asset(data[ART], name+':'+ART)
 
-    if 'harvest_effect' in data:
-        error |= check_visual_effect('resources:'+name, data['harvest_effect'])
+    for FX in ('harvest_effect', 'loot_effect'):
+        if FX in data:
+            error |= check_visual_effect('resources:'+name, data[FX])
 
     return error
 

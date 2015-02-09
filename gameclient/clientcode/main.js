@@ -41630,12 +41630,14 @@ function handle_server_message(data) {
                 if((res[resname]||0) > 0) {
                     var bonus_str = ((resname+'_bonus') in res ? ' '+gamedata['strings']['combat_messages']['resource_bonus'].replace('%d', pretty_print_number(res[resname+'_bonus'])) : '');
                     text.push({'color':gamedata['resources'][resname]['loot_text_color'],
+                               'size': ((msg == "LOOTED_RESOURCES" && 'loot_text_size' in gamedata['resources'][resname]) ? gamedata['resources'][resname]['loot_text_size'] : null),
+                               'rise_time': ((msg == "LOOTED_RESOURCES" && 'loot_text_rise_time' in gamedata['resources'][resname]) ? gamedata['resources'][resname]['loot_text_rise_time'] : null),
                                'str': prefix + sign + pretty_print_number(res[resname]) + ' '+gamedata['resources'][resname]['ui_name'] + bonus_str});
                     if(msg == "LOOTED_RESOURCES" &&
-                       player.get_any_abtest_value('enable_loot_burst_effects', gamedata['client']['enable_loot_burst_effects']) &&
+                       gamedata['resources'][resname]['loot_effect'] &&
                        pos && pos[0] >= 0 && pos[1] >= 0) {
-                        var props = goog.object.clone(gamedata['client']['vfx'][resname+'_burst']);
-                        props['emit_instant'] = props['max_count'] = (res[resname] >= props['res_big'] ? props['count_big'] : (res[resname] >= props['res_med'] ? props['count_med'] : props['count_small']));
+                        var props = goog.object.clone(gamedata['resources'][resname]['loot_effect']);
+                        //props['emit_instant'] = props['max_count'] = (res[resname] >= props['res_big'] ? props['count_big'] : (res[resname] >= props['res_med'] ? props['count_med'] : props['count_small']));
                         SPFX.add_visual_effect(pos, 0, [0,1,0], client_time, props, true);
                     }
                 }
@@ -41649,20 +41651,26 @@ function handle_server_message(data) {
 
         if(pos && pos[0] >= 0 && pos[1] >= 0) {
             // prevent overlap
-            if(client_time - last_loot_text_time < 1.0) {
-                if(last_loot_text_pos && last_loot_text_pos[0] == pos[0] && last_loot_text_pos[1] == pos[1]) {
-                    last_loot_text_count += 1;
+            var text_delay = 0;
+            if(msg != "LOOTED_RESOURCES") {
+                if(client_time - last_loot_text_time < 1.0) {
+                    if(last_loot_text_pos && last_loot_text_pos[0] == pos[0] && last_loot_text_pos[1] == pos[1]) {
+                        last_loot_text_count += 1;
+                    }
+                } else {
+                    last_loot_text_count = 0;
                 }
-            } else {
-                last_loot_text_count = 0;
+                text_delay = 0.5 * last_loot_text_count;
             }
 
-            var text_delay = 0.5 * last_loot_text_count;
-            var rise_time = ((base_type == 'quarry') ? 5.0 : 3.0);
-            var text_props = { drop_shadow: true, font_size: 20, text_style: 'thick' };
+            var default_rise_time = ((base_type == 'quarry') ? 5.0 : 3.0);
+            var text_props = { drop_shadow: true, text_style: 'thick' };
             var center = (text.length > 1 ? 0.5 : 0);
             for(var i = 0; i < text.length; i++) {
-                SPFX.add(new SPFX.CombatText([pos[0]-4 + (i-center)*7,pos[1]-4 - (i-center)*7], 0,
+                text_props.font_size = (text[i]['size'] || 20);
+                var left_right_offset = 7 * (text_props.font_size/20);
+                var rise_time = (text[i]['rise_time'] || default_rise_time);
+                SPFX.add(new SPFX.CombatText([pos[0]-4 + (i-center)*left_right_offset,pos[1]-4 - (i-center)*left_right_offset], 0,
                                              text[i]['str'], text[i]['color'],
                                              client_time + text_delay, client_time + rise_time + text_delay,
                                              text_props));
