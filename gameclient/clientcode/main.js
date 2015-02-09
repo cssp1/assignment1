@@ -45811,20 +45811,43 @@ Building.prototype.get_idle_state_legacy = function() {
         if(!this.is_researching()) { draw_idle_icon = 'research'; }
     } else if(this.is_crafter()) {
         if((!this.is_crafting() || this.crafting_progress_one() < 0) && !(this.is_emplacement() && this.turret_head_item())) {
-            var cat = gamedata['crafting']['categories'][this.spec['crafting_categories'][0]];
-            draw_idle_icon = cat['idle_state'] || 'craft';
-            if(draw_idle_icon == 'fish') {
-                if(player.cooldown_active('fish_slate_assigned')) {
-                    // show no idle icon if all available fishing SKUs are exhausted
-                    if(!goog.object.findKey(gamedata['crafting']['recipes'], function(recipe) {
-                        return (recipe['crafting_category'] == 'fishing' && read_predicate(recipe['show_if']).is_satisfied(player, null));
-                    })) {
-                        draw_idle_icon = null;
+            for(var i = 0; i < this.spec['crafting_categories'].length; i++) {
+                var catname = this.spec['crafting_categories'][i];
+                var cat = gamedata['crafting']['categories'][catname];
+                if(catname == 'mines') {
+                    if(!player.all_minefields_armed()) {
+                        draw_idle_icon = cat['idle_state'] || 'craft';
+                        break;
+                    } else {
+                        continue;
                     }
                 }
+                draw_idle_icon = cat['idle_state'] || 'craft';
+                if(draw_idle_icon == 'fish') {
+                    if(player.cooldown_active('fish_slate_assigned')) {
+                        // show no idle icon if all available fishing SKUs are exhausted
+                        if(!goog.object.findKey(gamedata['crafting']['recipes'], function(recipe) {
+                            return (recipe['crafting_category'] == 'fishing' && read_predicate(recipe['show_if']).is_satisfied(player, null));
+                        })) {
+                            draw_idle_icon = null;
+                        }
+                    }
+                }
+                break;
             }
         } else if(this.crafting_progress_one() < 0) {
             /* draw_idle_icon = 'craft_done'; */
+        }
+
+        if(this.is_emplacement() && this.turret_head_item()) { // assumes emplacements are crafters
+            var item_spec = ItemDisplay.get_inventory_item_spec(this.turret_head_item());
+            // check if our tech level for this item is above its own level
+            if('level' in item_spec && 'associated_tech' in item_spec) {
+                var tech_level = player.tech[item_spec['associated_tech']] || 0;
+                if(tech_level > item_spec['level']) {
+                    draw_idle_icon = 'under_leveled_turret_head';
+                }
+            }
         }
     } else if(this.is_lottery_building()) {
         if(this.contents >= 1) { draw_idle_icon = 'scan'; }
@@ -45964,13 +45987,43 @@ Building.prototype.get_idle_state_advanced = function() {
                 }
             }
         }
-    } else if(this.is_crafter() && (!this.is_crafting() || this.crafting_progress_one() < 0) && !(this.is_emplacement() && this.turret_head_item())) {
-        for(var i = 0; i < this.spec['crafting_categories'].length; i++) {
-            var cat = this.spec['crafting_categories'][i];
-            if(cat == 'mines') {
-                if(!player.all_minefields_armed()) {
-                    draw_idle_icon = 'craft_advanced';
-                    break;
+    } else if(this.is_crafter()) {
+        if((!this.is_crafting() || this.crafting_progress_one() < 0) && !(this.is_emplacement() && this.turret_head_item())) {
+            for(var i = 0; i < this.spec['crafting_categories'].length; i++) {
+                var catname = this.spec['crafting_categories'][i];
+                var cat = gamedata['crafting']['categories'][catname];
+                if(catname == 'mines') {
+                    if(!player.all_minefields_armed()) {
+                        draw_idle_icon = cat['idle_state'] || 'craft_advacned';
+                        break;
+                    } else {
+                        continue;
+                    }
+                }
+                draw_idle_icon = cat['idle_state'] || 'craft_advanced';
+                if(draw_idle_icon == 'fish') {
+                    if(player.cooldown_active('fish_slate_assigned')) {
+                        // show no idle icon if all available fishing SKUs are exhausted
+                        if(!goog.object.findKey(gamedata['crafting']['recipes'], function(recipe) {
+                            return (recipe['crafting_category'] == 'fishing' && read_predicate(recipe['show_if']).is_satisfied(player, null));
+                        })) {
+                            draw_idle_icon = null;
+                        }
+                    }
+                }
+                break;
+            }
+        } else if(this.crafting_progress_one() < 0) {
+            /* draw_idle_icon = 'craft_done'; */
+        }
+
+        if(this.is_emplacement() && this.turret_head_item()) { // assumes emplacements are crafters
+            var item_spec = ItemDisplay.get_inventory_item_spec(this.turret_head_item());
+            // check if our tech level for this item is above its own level
+            if('level' in item_spec && 'associated_tech' in item_spec) {
+                var tech_level = player.tech[item_spec['associated_tech']] || 0;
+                if(tech_level > item_spec['level']) {
+                    draw_idle_icon = 'under_leveled_turret_head';
                 }
             }
         }
