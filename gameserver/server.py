@@ -12776,7 +12776,7 @@ class Store:
 
                 can_craft_retmsg = []
                 if not gamesite.gameapi.can_craft(session, session.player, unit, arg, retmsg = can_craft_retmsg,
-                                                  check_predicates = True, take_resources = False, take_ingredients = False):
+                                                  check_predicates = (not session.player.is_cheater), take_resources = False, take_ingredients = False):
                     error_reason.append('cannot craft because: '+repr(can_craft_retmsg))
                     return -1, p_currency
 
@@ -13437,7 +13437,7 @@ class Store:
         elif spellname == "CRAFT_FOR_MONEY":
             object = session.get_object(unit_id)
             assert gameapi.do_craft(session, session.player, retmsg, object, gameapi.CraftSpellarg(spellarg),
-                                    take_resources = False, take_ingredients = False, take_time = False)
+                                    check_predicates = (not session.player.is_cheater), take_resources = False, take_ingredients = False, take_time = False)
             # run the completion
             gameapi.ping_object(session, retmsg, object.obj_id, session.viewing_base)
 
