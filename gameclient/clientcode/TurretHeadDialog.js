@@ -8,6 +8,7 @@ goog.require('goog.array');
 goog.require('SPUI');
 goog.require('SPText');
 goog.require('ItemDisplay');
+goog.require('ModChain');
 
 // tightly coupled to main.js, sorry!
 
@@ -515,6 +516,31 @@ TurretHeadDialog.set_recipe_display = function(dialog, emplacement_obj, recipe_n
     }
 };
 
+/** Does this item apply any anti_missile modstats?
+    @param {string} item_spec
+    @private */
+TurretHeadDialog._has_anti_missile = function(item_spec) {
+    var has_it = false;
+    goog.array.forEach(item_spec['equip']['effects'], function(effect) {
+        if(effect['stat'] == 'anti_missile') {
+            has_it = true;
+        }
+    });
+    return has_it;
+};
+/** Create a new modchain with the item's anti-missile stats appended
+    @param {ModChain.ModChain} modchain
+    @param {string} item_spec
+    @private */
+TurretHeadDialog._add_anti_missile_mod = function(modchain, item_spec) {
+    goog.array.forEach(item_spec['equip']['effects'], function(effect) {
+        if(effect['stat'] == 'anti_missile') {
+            modchain = ModChain.add_mod(modchain, effect['method'], effect['strength'], 'equipment', item_spec['name']);
+        }
+    });
+    return modchain;
+};
+
 // operates on turret_head_dialog_stats
 /** @param {SPUI.Dialog} dialog
     @param {GameObject} emplacement_obj it will go onto
@@ -550,21 +576,35 @@ TurretHeadDialog.set_stats_display = function(dialog, emplacement_obj, name, rel
         });
     }
 
+    if(TurretHeadDialog._has_anti_missile(spec) ||
+       (relative_spec && TurretHeadDialog._has_anti_missile(relative_spec))) {
+           statlist.push('anti_missile');
+    }
+
     for(var i = 0; i < dialog.data['widgets']['descriptionL']['array'][1]; i++) {
         var left = dialog.widgets['descriptionL'+i.toString()], right = dialog.widgets['descriptionR'+i.toString()];
         if(i < statlist.length) {
             left.show = right.show = true;
             var stat = statlist[i];
-            var modchain = null;
+
+            var modchain = ModChain.make_chain(ModChain.get_base_value(stat, spec, spec['level'] || 1), {'level':spec['level'] || 1});
+            var relative_modchain = (relative_to ? ModChain.make_chain(ModChain.get_base_value(stat, relative_spec, relative_spec['level'] || 1), {'level':relative_spec['level'] || 1}) : null);
 
             ModChain.display_label_widget(left, stat, spell);
+
+            if(stat == 'anti_missile') { // needs special handling because it is a stat of the building, not the weapon spell
+                modchain = TurretHeadDialog._add_anti_missile_mod(modchain, spec);
+                if(relative_to) {
+                    relative_modchain = TurretHeadDialog._add_anti_missile_mod(relative_modchain, relative_spec);
+                }
+            }
 
             var detail = ModChain.display_value_detailed(stat, modchain,
                                                          spec, // ??? emplacement_obj.spec
                                                          spec['level'] || 1, // ???
                                                          spell, spec['level'] || 1);
 
-            var relative_detail = (relative_to ? ModChain.display_value_detailed(stat, modchain,
+            var relative_detail = (relative_to ? ModChain.display_value_detailed(stat, relative_modchain,
                                                                                  relative_spec, // ??? emplacement_obj.spec
                                                                                  relative_spec['level'] || 1, // ???
                                                                                  relative_spell, relative_spec['level'] || 1) : null);
@@ -572,12 +612,21 @@ TurretHeadDialog.set_stats_display = function(dialog, emplacement_obj, name, rel
 
             var is_delta = relative_to && (relative_detail.value != detail.value);
             if(is_delta) {
-                var sign = (detail.value - relative_detail.value >= 0 ? '+' : '-');
+                var delta_sign = (detail.value - relative_detail.value >= 0 ? 1 : -1);
                 var is_worse = (detail.value < relative_detail.value);
-                if(stat == 'cooldown') {
+                var ui_stat = gamedata['strings']['modstats']['stats'][stat];
+                if(ui_stat['display'] == 'cooldown' || ui_stat['display'] == 'one_minus_pct') {
                     is_worse = !is_worse;
                 }
-                bbstr += ' [color='+dialog.data['widgets']['descriptionR'][(is_worse ? 'worse_color':'better_color')]+']('+sign+pretty_print_number(Math.abs(detail.value - relative_detail.value))+')[/color]';
+                var ui_delta;
+                if(ui_stat['display'] == 'one_minus_pct') {
+                    ui_delta = pretty_print_number(100.0*Math.abs(detail.value - relative_detail.value)) + '%';
+                    delta_sign *= -1;
+                } else {
+                    ui_delta = pretty_print_number(Math.abs(detail.value - relative_detail.value));
+                }
+                var ui_sign = delta_sign > 0 ? '+' : '-';
+                bbstr += ' [color='+dialog.data['widgets']['descriptionR'][(is_worse ? 'worse_color':'better_color')]+']('+ui_sign+ui_delta+')[/color]';
             }
             right.set_text_bbcode(bbstr);
             right.tooltip.str = detail.tooltip;

@@ -11,7 +11,8 @@ goog.require('goog.object');
 
 // imports: get_leveled_quantity
 
-var ModChain = {};
+/** @typedef {Object|null} */
+ModChain.ModChain;
 
 ModChain.get_base_value = function(stat, spec, level) {
     if(stat in spec) {
@@ -55,6 +56,12 @@ ModChain.get_base_value = function(stat, spec, level) {
     }
 };
 
+/** @param {ModChain.ModChain} modchain
+    @param {string} method
+    @param {?} strength
+    @param {string} kind
+    @param {string} source
+    @param {Object=} props */
 ModChain.add_mod = function(modchain, method, strength, kind, source, props) {
     var lastval = modchain['val'];
     var newval;
@@ -98,7 +105,8 @@ ModChain.get_stat = function(modchain, default_value) {
 };
 
 /** @param {?} base_val
-    @param {Object=} props */
+    @param {Object=} props
+    @return {ModChain.ModChain} */
 ModChain.make_chain = function(base_val, props) {
     var mod = {'kind': 'base', 'val':base_val};
     if(props) { for(var k in props) { mod[k] = props[k]; } }
