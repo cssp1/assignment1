@@ -35,13 +35,13 @@ class BaseResLoot(object):
 
     # compute and return (looted, looted_uncapped, lost) amounts (dictionaries like {"iron": 1234, "water": 500})
     # and also perform the actual resource transfers
-    def loot_building(self, gamedata, session, obj,
+    def loot_building(self, gamedata, session, obj, old_hp, new_hp,
                       owning_player, # usually obj.owner, but may be None for "virtual" owners like Rogue/Environment
                       attacker):
         if obj.spec.worth_less_xp or (not (obj.is_storage() or obj.is_producer())): return None, None, None # not lootable
 
         # call into subclass to determine amounts and to subtract lost resources
-        looted, lost = self.do_loot_building(gamedata, session, obj, owning_player)
+        looted, lost = self.do_loot_building(gamedata, session, obj, old_hp, new_hp, owning_player)
 
         for res, amount in looted.iteritems():
             self.total_looted_uncapped[res] = self.total_looted_uncapped.get(res,0) + amount
@@ -77,6 +77,69 @@ class BaseResLoot(object):
                                                   'opponent_type': owning_player.ai_or_human() if owning_player else 'ai'})
         return looted, looted_uncapped, lost
 
+
+# utility for tracking specific amounts of loot attached to a building and dispensed in gradual "ticks"
+class PerBuildingGradualLoot(object):
+    def __init__(self, gamedata, obj, amount_by_res):
+
+        # loot is divided into a "tick" for every N hitpoints of damage taken
+        # we store only the unclaimed "ticks" in the self.ticks array (per-resource dictionary of amounts)
+
+        self.tick_size = gamedata.get('gradual_loot', -1)
+        if self.tick_size > 0:
+            n_ticks = ((obj.hp-1) // self.tick_size) + 1 # number of claimable ticks this battle
+            assert n_ticks > 0
+        else:
+            n_ticks = 1
+
+        # divide the total amount_by_res into ticks
+        self.ticks = []
+        total_so_far = {}
+        # XXX this might benefit from "dithering" if the loot amount is lower than n_ticks
+        for t in xrange(0, n_ticks):
+            tick = {}
+            for res, amount in amount_by_res.iteritems():
+                tick_amount = amount // n_ticks # might be zero
+                if tick_amount > 0:
+                    tick[res] = tick_amount
+                    total_so_far[res] = total_so_far.get(res,0) + tick_amount
+            self.ticks.append(tick)
+
+        # add any left-over remainder into tick zero
+        for res, amount in amount_by_res.iteritems():
+            remainder = amount - total_so_far.get(res,0)
+            if remainder > 0:
+                self.ticks[0][res] = self.ticks[0].get(res,0) + remainder
+
+    # perform the actual looting. Add looted amounts into "output" dictionary (resource -> amount)
+    def grab(self, new_hp, output):
+
+        # zero-based index of the lowest-numbered tick this amount of damage can claim
+        if new_hp <= 0:
+            this_tick = 0
+        else:
+            this_tick = ((new_hp-1) // self.tick_size) + 1
+
+        while len(self.ticks) > this_tick:
+            tick = self.ticks.pop() # pull the highest-numbered tick off the list
+
+            for res, amount in tick.iteritems():
+                output[res] = output.get(res,0) + amount
+
+        return len(self.ticks) == 0 # return true if all loot is completely gone
+
+    def scale_by(self, factors):
+        for tick in self.ticks:
+            for res, factor in factors.iteritems():
+                if res in tick:
+                    tick[res] = int(factor * tick[res] + 0.5)
+    def total(self):
+        ret = {}
+        for tick in self.ticks:
+            for res, amount in tick.iteritems():
+                ret[res] = ret.get(res,0) + amount
+        return ret
+
 # SG-style PvE looting: decrements a persistent base-wide specific total, deterministically
 class SpecificPvEResLoot(BaseResLoot):
     def __init__(self, gamedata, session, player, base):
@@ -97,14 +160,17 @@ class SpecificPvEResLoot(BaseResLoot):
         if self.base.base_region and (self.base.base_region in gamedata['regions']):
             self.modifier *= gamedata['regions'][self.base.base_region].get('hive_yield', 1)
 
+        # this is how much we'd give out if all non-destroyed buildings get destroyed
         self.starting_base_resource_loot = dict((res, int(self.modifier * base.base_resource_loot[res] + 0.5)) for res in base.base_resource_loot)
+
+        # keep track of loot on a per-building basis
         self.by_building_id = None
 
-    def assign_loot_to_buildings(self):
-        if self.by_building_id is not None: return
+    def assign_loot_to_buildings(self, gamedata):
+        if self.by_building_id is not None: return # already assigned
         self.by_building_id = {}
 
-        # compute total contribution of all buildings
+        # compute total contribution coefficient of all buildings
         total_contribution = {}
         last_ids = {} # keep track of last building seen (per resource), to deposit rounded-off amounts on
         for p in self.base.iter_objects():
@@ -115,24 +181,28 @@ class SpecificPvEResLoot(BaseResLoot):
                         total_contribution[res] = total_contribution.get(res,0) + amount
                         last_ids[res] = p.obj_id
 
+        # divide out starting loot among the buildings, weighted by each building's contribution coefficient
         if total_contribution and last_ids:
             total_so_far = {} # keep track of how much resource loot was assigned so far
-            # we need to ensure it adds up to starting_base_resource_loot when all buildings are destroyed
+            # (we need to ensure it adds up to starting_base_resource_loot when all buildings are destroyed)
 
             for p in self.base.iter_objects():
                 if p.is_building() and (not p.is_destroyed()):
                     contrib = p.resource_loot_contribution()
                     if contrib:
-                        self.by_building_id[p.obj_id] = {}
+                        amount_by_res = {}
                         for res in contrib:
                             if p.obj_id is last_ids[res]:
-                                # add any left-over amount from rounding onto the last building
-                                self.by_building_id[p.obj_id][res] = self.starting_base_resource_loot.get(res,0) - total_so_far.get(res,0)
+                                # add any left-over amount from rounding remainders onto the last building for this resource type
+                                amount = self.starting_base_resource_loot.get(res,0) - total_so_far.get(res,0)
                             else:
                                 # note: this needs to multiply the base_loot the AI had at the *start* of the battle, not the current value
                                 amount = int( (contrib[res]/float(total_contribution[res])) * self.starting_base_resource_loot.get(res, 0) + 0.5)
-                                self.by_building_id[p.obj_id][res] = amount
                                 total_so_far[res] = total_so_far.get(res,0) + amount
+                            if amount:
+                                amount_by_res[res] = amount
+                        if amount_by_res:
+                            self.by_building_id[p.obj_id] = PerBuildingGradualLoot(gamedata, p, amount_by_res)
 
     def send_update(self, retmsg):
         # return the starting and current amounts of loot the base has to offer the player
@@ -146,26 +216,28 @@ class SpecificPvEResLoot(BaseResLoot):
         ret['starting_base_resource_loot'] = self.starting_base_resource_loot
         return ret
 
-    def do_loot_building(self, gamedata, session, obj, owning_player):
-        looted = {}
+    def do_loot_building(self, gamedata, session, obj, old_hp, new_hp, owning_player):
+        # perform one-time setup, if necessary
+        self.assign_loot_to_buildings(gamedata)
+
         lost = {}
 
-        self.assign_loot_to_buildings()
-
         if obj.obj_id in self.by_building_id:
-            looted = lost = self.by_building_id[obj.obj_id]
-            del self.by_building_id[obj.obj_id]
+            if self.by_building_id[obj.obj_id].grab(new_hp, lost):
+                del self.by_building_id[obj.obj_id] # all gone
 
             for res in lost:
                 if lost[res] > 0:
                     # take the loot away from the base itself, so that less will be available next battle
                     self.base.base_resource_loot[res] = max(0, self.base.base_resource_loot[res] - int(lost[res]/self.modifier + 0.5))
 
+        looted = copy.copy(lost)
         return looted, lost
 
 # MF/TR-style PvE looting: based on a per-building "loot table" amount, with randomization
 class TablePvEResLoot(BaseResLoot):
-    def do_loot_building(self, gamedata, session, obj, owning_player):
+    def do_loot_building(self, gamedata, session, obj, old_hp, new_hp, owning_player):
+        assert new_hp == 0
         looted = {}
         lost = {}
 
@@ -249,7 +321,8 @@ class PvPResLoot(BaseResLoot):
 
 # MF/TR-style PvP looting: fractional, randomized amounts taken from harvesters/storages
 class HardcorePvPResLoot(PvPResLoot):
-    def do_loot_building(self, gamedata, session, obj, owning_player):
+    def do_loot_building(self, gamedata, session, obj, old_hp, new_hp, owning_player):
+        assert new_hp == 0
         looted = {}
         lost = {}
 
@@ -331,51 +404,62 @@ class SpecificPvPResLoot(PvPResLoot):
                         total_storage_weight[res] += qty
 
 
-        # mapping from obj_id to amount remaining to be (looted, lost)
-        self.storage_amounts = dict((res, {}) for res in gamedata['resources'])
+        # mapping from obj_id to PerBuilding amounts remaining to be (looted, lost)
+        self.storage_building_amounts = {}
 
         for p in self.base.iter_objects():
             if p.is_building() and p.is_storage():
+                loot_amounts = {}
+                lost_amounts = {}
                 for res in gamedata['resources']:
                     qty = p.get_leveled_quantity(getattr(p.spec, 'storage_'+res))
                     if qty > 0:
                         weight = qty / float(total_storage_weight[res])
-                        loot_amount = int(weight * loot_attacker_gains_storage[res] * getattr(player.resources, res))
-                        lost_amount = int(weight * loot_defender_loses_storage[res] * getattr(player.resources, res))
-                        self.storage_amounts[res][p.obj_id] = (loot_amount, lost_amount)
-                        self.starting_resource_loot[res] += loot_amount
+                        loot_amounts[res] = int(weight * loot_attacker_gains_storage[res] * getattr(player.resources, res))
+                        lost_amounts[res] = int(weight * loot_defender_loses_storage[res] * getattr(player.resources, res))
+                        self.starting_resource_loot[res] += loot_amounts[res]
+                if loot_amounts or lost_amounts:
+                    self.storage_building_amounts[p.obj_id] = (PerBuildingGradualLoot(gamedata, p, loot_amounts),
+                                                               PerBuildingGradualLoot(gamedata, p, lost_amounts))
 
-        # mapping from obj_id to amount remaining to be (looted, lost)
-        self.producer_amounts = dict((res, {}) for res in gamedata['resources'])
+        # mapping from obj_id to PerBuilding amounts remaining to be (looted, lost)
+        self.producer_building_amounts = {}
 
         # compute total contribution of all buildings of each kind
         for p in self.base.iter_objects():
             if p.is_building() and p.is_producer():
+                loot_amounts = {}
+                lost_amounts = {}
                 for res in gamedata['resources']:
                     if p.get_leveled_quantity(getattr(p.spec, 'produces_'+res)) > 0:
                         # XXX might need to halt and restart p to get contents up to date
-                        loot_amount = min(max(int(loot_attacker_gains_producer[res] * p.contents), 0), p.contents)
-                        lost_amount = min(max(int(loot_defender_loses_producer[res] * p.contents), 0), p.contents)
-                        self.producer_amounts[res][p.obj_id] = (loot_amount, lost_amount)
-                        self.starting_resource_loot[res] += loot_amount
+                        loot_amounts[res] = min(max(int(loot_attacker_gains_producer[res] * p.contents), 0), p.contents)
+                        lost_amounts[res] = min(max(int(loot_defender_loses_producer[res] * p.contents), 0), p.contents)
+                        self.starting_resource_loot[res] += loot_amounts[res]
+                if loot_amounts or lost_amounts:
+                    self.producer_building_amounts[p.obj_id] = (PerBuildingGradualLoot(gamedata, p, loot_amounts),
+                                                                PerBuildingGradualLoot(gamedata, p, lost_amounts))
 
         # apply caps
-        for kind, amounts in (('storage', self.storage_amounts), ('producer', self.producer_amounts)):
+        for kind, amounts in (('storage', self.storage_building_amounts), ('producer', self.producer_building_amounts)):
             for res in gamedata['resources']:
                 factor = 1
-                total_loot = sum([x[0] for x in amounts[res].itervalues()],0)
-                total_lost = sum([x[1] for x in amounts[res].itervalues()],0)
+                total_loot = sum((x[0].total().get(res,0) for x in amounts.itervalues()), 0)
+                total_lost = sum((x[1].total().get(res,0) for x in amounts.itervalues()), 0)
                 if attacker_caps[kind][res] >= 0 and total_loot > attacker_caps[kind][res]:
                     factor = min(factor, attacker_caps[kind][res] / float(total_loot))
                 if defender_caps[kind][res] >= 0 and total_lost > defender_caps[kind][res]:
                     factor = min(factor, defender_caps[kind][res] / float(total_lost))
                 if factor < 1:
                     # scale down all loot amounts to meet cap
-                    for obj_id in amounts[res]:
-                        old_loot, old_lost = amounts[res][obj_id]
-                        amounts[res][obj_id] = (int(factor * old_loot + 0.5), int(factor * old_lost + 0.5))
+                    for amt_loot, amt_lost in amounts.itervalues():
+                        old_loot = amt_loot.total().get(res,0)
+                        old_lost = amt_lost.total().get(res,0)
+                        amt_loot.scale_by({res: factor})
+                        amt_lost.scale_by({res: factor})
+
                         # subtract delta from total lootable count
-                        self.starting_resource_loot[res] -= (old_loot - amounts[res][obj_id][0])
+                        self.starting_resource_loot[res] -= (old_loot - amt_loot.total().get(res,0))
 
         # cur_resource_loot will be decremented as the attacker loots resources, leaving starting_resource_loot alone
         self.cur_resource_loot = copy.deepcopy(self.starting_resource_loot)
@@ -393,29 +477,32 @@ class SpecificPvPResLoot(PvPResLoot):
         ret['starting_base_resource_loot'] = self.starting_resource_loot
         return ret
 
-    def do_loot_building(self, gamedata, session, obj, owning_player):
+    def do_loot_building(self, gamedata, session, obj, old_hp, new_hp, owning_player):
         looted = {}
         lost = {}
 
         if obj.is_storage():
-            for res in gamedata['resources']:
-                if obj.obj_id in self.storage_amounts[res]:
-                    looted[res], lost[res] = self.storage_amounts[res][obj.obj_id]
-                    del self.storage_amounts[res][obj.obj_id]
+            if obj.obj_id in self.storage_building_amounts:
+                self.storage_building_amounts[obj.obj_id][0].grab(new_hp, looted)
+                self.storage_building_amounts[obj.obj_id][1].grab(new_hp, lost)
+                # delete?
 
+                for res in looted:
                     self.cur_resource_loot[res] -= looted[res]
 
-                    # loot is taken directly from the owner's stored resources
-                    owning_player.resources.gain_res(dict((res,-lost[res]) for res in lost), reason='looted_by_attacker')
+                # loot is taken directly from the owner's stored resources
+                owning_player.resources.gain_res(dict((res,-lost[res]) for res in lost), reason='looted_by_attacker')
 
         elif obj.is_producer():
-            for res in gamedata['resources']:
-                if obj.obj_id in self.producer_amounts[res]:
-                    looted[res], lost[res] = self.producer_amounts[res][obj.obj_id]
-                    del self.producer_amounts[res][obj.obj_id]
+            if obj.obj_id in self.producer_building_amounts:
+                self.producer_building_amounts[obj.obj_id][0].grab(new_hp, looted)
+                self.producer_building_amounts[obj.obj_id][1].grab(new_hp, lost)
+                # delete?
 
+                for res in looted:
                     self.cur_resource_loot[res] -= looted[res]
 
+                for res in lost:
                     # take from the uncollected resources inside the harvester
                     obj.contents -= lost[res]
 

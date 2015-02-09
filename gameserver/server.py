@@ -19294,31 +19294,40 @@ class GAMEAPI(resource.Resource):
                         session.loot['havoc_caused'] = session.loot.get('havoc_caused',0) + 1
 
                 # if a building is completely destroyed, perform looting
-                if (newhp == 0) and (obj.hp > 0) and (obj.is_building()) and owning_player:
+                if (obj.hp > 0) and \
+                   ((newhp == 0) or gamedata.get('gradual_loot',-1) > 0) and \
+                   (obj.is_building()) and owning_player:
 
                     event_props = {} # these will eventually be passed along with the 3920_building_destroyed event
 
+                    # when using gradual loot and not logging it to battle log, don't include ANY loot in event_props, because it would only show
+                    # the loot for the final 0hp tick on building destruction
+                    event_props_include_loot = (gamedata.get('gradual_loot',-1) <= 0 or gamedata['server'].get('battle_log_gradual_loot',False))
+
                     # compute loot amounts and perform resource transfers
-                    looted, looted_uncapped, lost = session.res_looter.loot_building(gamedata, session, obj, owning_player, attacker)
+                    looted, looted_uncapped, lost = session.res_looter.loot_building(gamedata, session, obj, obj.hp, newhp, owning_player, attacker)
 
                     # record amounts in session.loot and in the event_props
                     if looted or looted_uncapped or lost:
                         for res in looted:
                             if looted[res] > 0:
                                 session.loot[res] = session.loot.get(res,0) + looted[res]
-                                event_props['looted_'+res] = looted[res]
+                                if event_props_include_loot:
+                                    event_props['looted_'+res] = looted[res]
                                 recalc_resources = True
 
                         for res in looted_uncapped:
                             if looted_uncapped[res] > 0:
                                 # this is for metrics and GUI display only, no game mechanics influence
                                 session.loot['looted_uncapped_'+res] = session.loot.get('looted_uncapped_'+res,0) + looted_uncapped[res]
-                                event_props['looted_uncapped_'+res] = looted_uncapped[res]
+                                if event_props_include_loot:
+                                    event_props['looted_uncapped_'+res] = looted_uncapped[res]
 
                         for res in lost:
                             if lost[res] > 0:
                                 session.loot[res+'_lost'] = session.loot.get(res+'_lost',0) + lost[res]
-                                event_props['lost_'+res] = lost[res]
+                                if event_props_include_loot:
+                                    event_props['lost_'+res] = lost[res]
                                 recalc_resources = True
 
                         if gamedata.get('show_uncapped_loot', False):
@@ -19353,67 +19362,76 @@ class GAMEAPI(resource.Resource):
                                 econ_reason = 'friction'+flow_suffix
                             admin_stats.econ_flow_res(session.player, 'loot', econ_reason, econ_delta)
 
-                    # give XP for destroying and looting the building
-                    if attacker is session.player:
-                        xp_why = 'destroy_building'
+                    if newhp == 0:
+                        # give XP for destroying and looting the building
+                        if attacker is session.player:
+                            xp_why = 'destroy_building'
 
-                        if obj.spec.worth_less_xp:
-                            # only give 1 XP, and do not count towards the destroyed_building_levels victory bonus
-                            xp = gamedata['player_xp']['destroy_building_min_xp']
-                        else:
-                            xp = int(obj.level * gamedata['player_xp']['destroy_building'])
+                            if obj.spec.worth_less_xp:
+                                # only give 1 XP, and do not count towards the destroyed_building_levels victory bonus
+                                xp = gamedata['player_xp']['destroy_building_min_xp']
+                            else:
+                                xp = int(obj.level * gamedata['player_xp']['destroy_building'])
 
-                            # keep track of total levels of destroyed buildings for awarding victory bonus XP
-                            session.loot['destroyed_building_levels'] = session.loot.get('destroyed_building_levels',0) + obj.level
+                                # keep track of total levels of destroyed buildings for awarding victory bonus XP
+                                session.loot['destroyed_building_levels'] = session.loot.get('destroyed_building_levels',0) + obj.level
 
-                        if lost and sum(lost.itervalues(),0) > 0:
-                            coeff = gamedata['player_xp']['pve_loot_xp' if owning_player.is_ai() else 'pvp_loot_xp']
-                            xp_why += ','+'looted_from_ai' if owning_player.is_ai() else 'looted_from_human'
-                            xp += int(coeff * gamedata['player_xp']['loot'] * sum(lost.itervalues(),0))
+                            if lost and sum(lost.itervalues(),0) > 0:
+                                coeff = gamedata['player_xp']['pve_loot_xp' if owning_player.is_ai() else 'pvp_loot_xp']
+                                xp_why += ','+'looted_from_ai' if owning_player.is_ai() else 'looted_from_human'
+                                xp += int(coeff * gamedata['player_xp']['loot'] * sum(lost.itervalues(),0))
 
-                        self.give_xp(session, retmsg, xp, xp_why, [obj.x,obj.y], obj_session_id = obj.obj_id)
-                        session.loot['xp'] = session.loot.get('xp',0) + xp
+                            self.give_xp(session, retmsg, xp, xp_why, [obj.x,obj.y], obj_session_id = obj.obj_id)
+                            session.loot['xp'] = session.loot.get('xp',0) + xp
 
-                    if not obj.spec.worth_less_xp:
-                        if owning_player is session.player:
-                            if 'buildings_lost' not in session.loot: session.loot['buildings_lost'] = {}
-                            dict_increment(session.loot['buildings_lost'], obj.spec.name, 1)
-                        elif owning_player is session.viewing_player:
-                            if 'buildings_killed' not in session.loot: session.loot['buildings_killed'] = {}
-                            dict_increment(session.loot['buildings_killed'], obj.spec.name, 1)
+                        if not obj.spec.worth_less_xp:
+                            if owning_player is session.player:
+                                if 'buildings_lost' not in session.loot: session.loot['buildings_lost'] = {}
+                                dict_increment(session.loot['buildings_lost'], obj.spec.name, 1)
+                            elif owning_player is session.viewing_player:
+                                if 'buildings_killed' not in session.loot: session.loot['buildings_killed'] = {}
+                                dict_increment(session.loot['buildings_killed'], obj.spec.name, 1)
 
-                    # check for equipment that has on_destroy consequents (such as security team spawning)
-                    on_destroy_cons_list = obj.get_stat('on_destroy', obj.get_leveled_quantity(obj.spec.on_destroy))
-                    if on_destroy_cons_list:
-                        for cons in on_destroy_cons_list:
-                            session.execute_consequent_safe(cons, obj.owner, retmsg, context = {'source_obj': obj, 'xy': [obj.x,obj.y]}, reason='on_destroy(%s)' % obj.spec.name)
+                        # check for equipment that has on_destroy consequents (such as security team spawning)
+                        on_destroy_cons_list = obj.get_stat('on_destroy', obj.get_leveled_quantity(obj.spec.on_destroy))
+                        if on_destroy_cons_list:
+                            for cons in on_destroy_cons_list:
+                                session.execute_consequent_safe(cons, obj.owner, retmsg, context = {'source_obj': obj, 'xy': [obj.x,obj.y]}, reason='on_destroy(%s)' % obj.spec.name)
 
-                    # check for fragile equipment
-                    items_destroyed = None
-                    if obj.equipment:
-                        items_destroyed = []
-                        for slot_type in obj.equipment:
-                            for slot_num in xrange(len(obj.equipment[slot_type])):
-                                specname = obj.equipment[slot_type][slot_num]
-                                if specname in gamedata['items']:
-                                    spec = gamedata['items'][specname]
-                                    if spec.get('fragility',0) > 0 and random.random() < spec['fragility']:
-                                        items_destroyed.append((slot_type, slot_num, specname))
+                        # check for fragile equipment
+                        items_destroyed = None
+                        if obj.equipment:
+                            items_destroyed = []
+                            for slot_type in obj.equipment:
+                                for slot_num in xrange(len(obj.equipment[slot_type])):
+                                    specname = obj.equipment[slot_type][slot_num]
+                                    if specname in gamedata['items']:
+                                        spec = gamedata['items'][specname]
+                                        if spec.get('fragility',0) > 0 and random.random() < spec['fragility']:
+                                            items_destroyed.append((slot_type, slot_num, specname))
 
-                        for slot_type, slot_num, specname in items_destroyed:
-                            Equipment.equip_remove(obj.equipment, (slot_type, slot_num), specname)
-                            # record expenditure of the item (e.g. landmines)
-                            if owning_player:
-                                session.attack_item_expended(owning_player.user_id, specname, 1)
-                                owning_player.inventory_log_event('5131_item_trashed', specname, -1, -1, reason='destroyed')
+                            for slot_type, slot_num, specname in items_destroyed:
+                                Equipment.equip_remove(obj.equipment, (slot_type, slot_num), specname)
+                                # record expenditure of the item (e.g. landmines)
+                                if owning_player:
+                                    session.attack_item_expended(owning_player.user_id, specname, 1)
+                                    owning_player.inventory_log_event('5131_item_trashed', specname, -1, -1, reason='destroyed')
 
-                    if items_destroyed:
-                        event_props['items_destroyed'] = [x[2] for x in items_destroyed]
+                        if items_destroyed:
+                            event_props['items_destroyed'] = [x[2] for x in items_destroyed]
 
-                    session.log_attack_unit(owning_user.user_id if owning_user else 0, obj, '3920_building_destroyed', props = event_props, killer_info = killer_info)
+                        session.log_attack_unit(owning_user.user_id if owning_user else 0, obj, '3920_building_destroyed', props = event_props, killer_info = killer_info)
+
+                        # END destroyed a building
+                    else:
+                        if gamedata['server'].get('battle_log_gradual_loot',False):
+                            session.log_attack_unit(owning_user.user_id if owning_user else 0, obj, '3921_building_damaged', props = event_props, killer_info = killer_info)
+
+                        # END damaged, but did not destroy, a building
+
                     # note: damage log updates at end of battle
 
-                    # END destroyed a building
+                    # END damaged a building
 
                 if (attacker is session.player) and (obj.owner is not session.player) and (not obj.spec.worth_less_xp):
                     session.loot['damage_inflicted'] = session.loot.get('damage_inflicted',0) + max(0, int(obj.hp-newhp))
