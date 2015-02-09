@@ -2456,7 +2456,7 @@
                                     "ui_name_busy": "%s busy",
                                     "text_color": [1,0,0,1] },
 
-            "flavor_text": { "kind": "TextField", "xy": [16,322], "dimensions": [378,80], "text_size": 13, "text_leading": 17, "text_hjustify": "left", "text_vjustify": "center" },
+            "flavor_text": { "kind": "TextField", "xy": [16,322], "dimensions": [372,80], "text_size": 13, "text_leading": 17, "text_hjustify": "left", "text_vjustify": "center" },
 
             "instant_credits": { "kind": "ActionButton", "xy": [470,334], "dimensions": [120,32], "text_offset": [8,0], "text_size": 13, "text_style": "thick",
                                  "bg_image": "price_display", "ui_name": "%d", "ui_tooltip": "", "tooltip_delay": 0 }, // PRICE
