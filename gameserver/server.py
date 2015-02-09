@@ -18183,21 +18183,22 @@ class GAMEAPI(resource.Resource):
                 session.player.send_inventory_update(retmsg)
                 return False
 
-            # check unique_equipped constraint
-            if ('unique_equipped' in add_spec) and ((not remove_spec) or (remove_spec.get('unique_equipped',None) != add_spec['unique_equipped'])):
-                for item in session.player.equipped_item_iter():
-                    item_spec = gamedata['items'].get(item['spec'], None)
-                    if item_spec and item_spec.get('unique_equipped',None) == add_spec['unique_equipped']:
-                        # doubled
-                        retmsg.append(["ERROR", "EQUIP_INVALID_UNIQUE", item['spec']])
-                        return False
+            if (not session.player.is_cheater):
+                # check unique_equipped constraint
+                if ('unique_equipped' in add_spec) and ((not remove_spec) or (remove_spec.get('unique_equipped',None) != add_spec['unique_equipped'])):
+                    for item in session.player.equipped_item_iter():
+                        item_spec = gamedata['items'].get(item['spec'], None)
+                        if item_spec and item_spec.get('unique_equipped',None) == add_spec['unique_equipped']:
+                            # doubled
+                            retmsg.append(["ERROR", "EQUIP_INVALID_UNIQUE", item['spec']])
+                            return False
 
-            # check limited_equipped constraint
-            if ('limited_equipped' in add_spec) and ((not remove_spec) or (remove_spec.get('limited_equipped',None) != add_spec['limited_equipped'])):
-                if session.player.stattab.limited_equipped.get(add_spec['limited_equipped'],0) < \
-                   1 + session.player.count_limited_equipped_items(add_spec['limited_equipped']):
-                    retmsg.append(["ERROR", "EQUIP_INVALID_LIMITED", add_spec['name']])
-                    return False
+                # check limited_equipped constraint
+                if ('limited_equipped' in add_spec) and ((not remove_spec) or (remove_spec.get('limited_equipped',None) != add_spec['limited_equipped'])):
+                    if session.player.stattab.limited_equipped.get(add_spec['limited_equipped'],0) < \
+                       1 + session.player.count_limited_equipped_items(add_spec['limited_equipped']):
+                        retmsg.append(["ERROR", "EQUIP_INVALID_LIMITED", add_spec['name']])
+                        return False
 
             if not Equipment.equip_add(equipment, obj_spec, obj_level, dest_addr, add_spec, probe_only = True, probe_will_remove = bool(remove_specname)):
                 retmsg.append(["ERROR", "EQUIP_INVALID"])
