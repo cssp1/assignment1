@@ -46272,7 +46272,7 @@ function draw_building_or_inert(obj, powerfac) {
                 var x = obj.x + odd_shift[0], z = obj.y + odd_shift[1];
                 var weapon_offset = obj.get_leveled_quantity(obj.spec['weapon_offset']);
                 var pos = vec_floor(ortho_to_draw_3d(v3_add([x,0,z], weapon_offset)));
-                weapon_icon.draw(pos, facing, icon_time, icon_state);
+                weapon_icon.draw(pos, facing + (obj.spec['weapon_facing_fudge']||0), icon_time, icon_state);
             } else {
                 //console.log('cannot find '+weapon_asset);
             }
