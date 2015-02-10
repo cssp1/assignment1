@@ -36799,11 +36799,16 @@ function get_requirements_help(kind, arg, options) {
         // see if we have already built enough storages
         var cc = player.get_townhall();
         var cc_level = player.get_townhall_level();
+        var under_construction_obj = null;
         var num_built = 0;
         var min_level = 999, need_to_upgrade_obj = null;
         for(var id in session.cur_objects.objects) {
             var obj = session.cur_objects.objects[id];
             if(obj.spec['name'] === specname && obj.team === 'player') {
+                if(obj.is_under_construction()) {
+                    under_construction_obj = obj;
+                    continue;
+                }
                 num_built += 1;
                 if(obj.level < min_level && obj.level < obj.get_max_ui_level()) {
                     min_level = obj.level;
@@ -36816,7 +36821,11 @@ function get_requirements_help(kind, arg, options) {
         unit_icon = get_leveled_quantity(gamedata['buildings'][specname]['art_asset'], 1);
         if(num_built < 1) {
             // player has not built any storages yet
-            verb = 'build_first'; target = specname;
+            if(under_construction_obj) {
+                verb = 'finish_construction'; target = under_construction_obj;
+            } else {
+                verb = 'build_first'; target = specname;
+            }
         } else if(num_built < get_leveled_quantity(gamedata['buildings'][specname]['limit'], cc_level)) {
             // player has not built the full number of storages yet
             verb = 'build_more'; target = specname;
@@ -37113,7 +37122,7 @@ function get_requirements_help(kind, arg, options) {
                 invoke_repair_dialog();
             }
         }; })(target);
-    } else if(verb == 'speedup') {
+    } else if(verb == 'speedup' || verb == 'finish_construction') {
         help_function = (function (_target) { return function() {
             change_selection_unit(_target);
             if(_target.time_until_finish() > 0) {

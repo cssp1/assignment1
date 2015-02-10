@@ -1072,6 +1072,9 @@
             "upgrade_cc": { "ui_title": "No room in %s",
                             "ui_description": "To add capacity, upgrade our Tactical Ops Center, so that we can build more depots."
                           },
+            "finish_construction": { "ui_title": "No %s Yet",
+                                     "ui_description": "To add capacity, finish construction of our %s."
+                                   },
             "trying_to_collect_deposit": { "ui_title": "Commander, your storage is full.",
                                            "ui_description": "Construct a new storage unit from the Buildings\nmenu, or upgrade existing storage buildings." }
         },
@@ -1081,40 +1084,50 @@
             "build_more": { "ui_title": "Warning: %s Nearly Full",
                             "ui_description": "We cannot loot much %d from this base because our depot is almost full.\n\nIf you wish to profit from attacking, build another %s to increase capacity.",
                             "ui_button": "More Info",
-                            "ui_cancel_button": "Proceed"
+                            "ui_cancel_button": "Attack Anyway"
                           },
             "upgrade": { "ui_title": "Warning: %s Nearly Full",
                          "ui_description": "We cannot loot much %d from this base because our depot is almost full.\n\nIf you wish to profit from attacking, upgrade our %s to increase capacity.",
                          "ui_button": "More Info",
-                         "ui_cancel_button": "Proceed"
+                         "ui_cancel_button": "Attack Anyway"
                        },
             "upgrade_cc": { "ui_title": "Not enough %s",
                             "ui_description": "We cannot loot much %d from this base because our depot is almost full.\n\nIf you wish to profit from attacking, upgrade our Tactical Ops Center, so that we can build more depots.",
                             "ui_button": "More Info",
-                            "ui_cancel_button": "Proceed"
-                          }
+                            "ui_cancel_button": "Attack Anyway"
+                          },
+            "finish_construction": { "ui_title": "No %s Yet",
+                                     "ui_description": "We cannot loot much %d from this base because our storage building is not complete.\n\nIf you wish to profit from attacking, finish construction of our %s.",
+                                     "ui_button": "Show Me",
+                                     "ui_cancel_button": "Attack Anyway"
+                                   }
         },
         "storages_full_attack": {
             "build_first": { "ui_title": "Warning: No %s",
                              "ui_description": "We cannot loot any %d from this base because we have no place to store it.\n\nIf you wish to profit from attacking, build a %s.",
                              "ui_button": "More Info",
-                             "ui_cancel_button": "Proceed"
+                             "ui_cancel_button": "Attack Anyway"
                            },
             "build_more": { "ui_title": "Warning: %s Full",
                             "ui_description": "We cannot loot any %d from this base because our depot is full.\n\nIf you wish to profit from attacking, build another %s to increase capacity.",
                             "ui_button": "More Info",
-                            "ui_cancel_button": "Proceed"
+                            "ui_cancel_button": "Attack Anyway"
                           },
             "upgrade": { "ui_title": "Warning: %s Full",
                          "ui_description": "We cannot loot any %d from this base because our depot is full.\n\nIf you wish to profit from attacking, upgrade our %s to increase capacity.",
                          "ui_button": "More Info",
-                         "ui_cancel_button": "Proceed"
+                         "ui_cancel_button": "Attack Anyway"
                        },
             "upgrade_cc": { "ui_title": "Not enough %s",
                             "ui_description": "We cannot loot any %d from this base because our depot is full.\n\nIf you wish to profit from attacking, upgrade our Tactical Ops Center, so that we can build more depots.",
                             "ui_button": "More Info",
-                            "ui_cancel_button": "Proceed"
-                          }
+                            "ui_cancel_button": "Attack Anyway"
+                          },
+            "finish_construction": { "ui_title": "No %s Yet",
+                                     "ui_description": "We cannot loot any %d from this base because our storage building is not complete.\n\nIf you wish to profit from attacking, finish construction of our %s.",
+                                     "ui_button": "Show Me",
+                                     "ui_cancel_button": "Attack Anyway"
+                                   }
         },
 
         // trying to do an upgrade but you don't have enough storage to hold the kickoff amount
@@ -1130,7 +1143,10 @@
                        },
             "upgrade_cc": { "ui_title": "Not enough %s",
                             "ui_description": "To add capacity, upgrade our Tactical Ops Center, so that we can build more depots."
-                          }
+                          },
+            "finish_construction": { "ui_title": "No %s Yet",
+                                     "ui_description": "To add capacity, finish construction of our %s."
+                                   }
         },
 
         "power": {
