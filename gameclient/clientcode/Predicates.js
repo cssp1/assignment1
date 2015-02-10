@@ -1507,7 +1507,7 @@ function read_predicate(data) {
     } else if(kind === 'VIEWING_BASE_OBJECT_DESTROYED') {
         return new ViewingBaseObjectDestroyedPredicate(data);
     } else {
-        console.log(data); throw Error('unknown predicate type '+kind);
+        throw Error('unknown predicate '+JSON.stringify(data));
     }
 }
 
