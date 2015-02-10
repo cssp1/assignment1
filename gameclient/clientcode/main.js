@@ -43465,7 +43465,8 @@ function do_on_mouseup(e) {
 
                 return;
             } else if((found.team === 'player') &&
-                      /* session.home_base && */
+                      /* enable if not in combat (where "combat" explicitly excludes reinforcement mode at a friendly quarry/squad) */
+                      (!session.has_attacked || (!session.home_base && session.viewing_user_id == session.user_id)) &&
                       (found.is_building() || found.is_inert()) &&
                       (session.home_base || !found.spec['quarry_invul'] || found.is_producer())) {
                 // naked click on a player's own building
