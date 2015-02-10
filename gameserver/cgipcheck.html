@@ -358,7 +358,7 @@ var pretty_log_entry = function(e) {
     if(e['code'] == 970) {
         // special handling for client exceptions
         $.each(['_id','time','ip','player_state','event_name','locale','code','anon_id','acquisition_ad_skynet',
-                'gameclient_build_date','gamedata_build_info','browser_hardware','User-Agent','ident'], function(index, field) {
+                'gameclient_build_date','gamedata_build_info','browser_hardware','User-Agent'], function(index, field) {
             if(field in e) { delete e[field]; }
         });
 
