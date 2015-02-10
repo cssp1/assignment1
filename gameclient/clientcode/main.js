@@ -10323,13 +10323,14 @@ function update_resource_bars(dialog, primary, use_res_looter) {
             var spec = ItemDisplay.get_inventory_item_spec(token_name);
             var qty_expr = player.inventory_item_quantity_and_expiration(token_name);
             var qty = qty_expr[0], expr = qty_expr[1];
-            dialog.widgets['resource_bar_tokens_expire_icon'].show = (qty > 0 && expr > 0);
+            dialog.widgets['resource_bar_tokens_expire_icon'].show = (expr > 0);
             dialog.widgets['resource_bar_tokens_icon'].asset = spec['store_icon'];
             dialog.widgets['resource_bar_tokens_amount'].str = pretty_print_number(qty);
             dialog.widgets['resource_bar_tokens'].tooltip.str = dialog.data['widgets']['resource_bar_tokens']['ui_tooltip'].replace('%d0', pretty_print_number(qty)).replace('%s1', spec['ui_name_plural'] || spec['ui_name']).replace('%s2', spec['ui_name_plural'] || spec['ui_name']).replace('%expire', (expr > 0 ? dialog.data['widgets']['resource_bar_tokens']['ui_tooltip_expire'].replace('%s', pretty_print_time(expr-server_time)) : ''));
 
         }
         // update other widget positions
+        /*
         var shift = (show_tokens ? dialog.data['widgets']['resource_bar_tokens']['shift_other_bars'] : [0,0]);
         for(var wname in dialog.widgets) {
             if(wname.indexOf('resource_bar_') == 0 && wname.indexOf('resource_bar_tokens') == -1) {
@@ -10339,6 +10340,7 @@ function update_resource_bars(dialog, primary, use_res_looter) {
                 }
             }
         }
+        */
     }
 
     // tooltips
