@@ -13706,6 +13706,8 @@ function invoke_you_were_attacked_dialog(recent_attacks) {
 
     for(var res in gamedata['resources']) {
         if(res+'_amount' in dialog.widgets) {
+            dialog.widgets[res+'_amount'].show = dialog.widgets[res+'_icon'].show = true;
+            dialog.widgets[res+'_icon'].asset = gamedata['resources'][res]['icon_small'];
             dialog.widgets[res+'_amount'].str = pretty_print_number(lost_res[res]||0);
         }
     }
@@ -13715,9 +13717,16 @@ function invoke_you_were_attacked_dialog(recent_attacks) {
     dialog.widgets['you_destroyed'].show = (killed_units>0);
     dialog.widgets['you_destroyed'].str = dialog.data['widgets']['you_destroyed']['ui_name'].replace('%d', pretty_print_number(killed_units));
 
-    dialog.widgets['attrition'].str = dialog.data['widgets']['attrition']['ui_name'];
-    for(var res in gamedata['resources']) {
-        dialog.widgets['attrition'].str = dialog.widgets['attrition'].str.replace('%d'+res[0] /*yes, first character :P */, pretty_print_number(killed_units_res[res]||0)).replace('%'+res.toUpperCase(),gamedata['resources'][res]['ui_name']);
+
+    if(show_attrition) {
+        var att_list = [];
+        for(var res in gamedata['resources']) {
+            if(killed_units_res[res]) {
+                att_list.push(pretty_print_number(killed_units_res[res]) + ' ' + gamedata['resources'][res]['ui_name']);
+            }
+        }
+        var att_str = att_list.join(', ');
+        dialog.widgets['attrition'].str = dialog.data['widgets']['attrition']['ui_name'].replace('%COST', att_str);
     }
 
     dialog.widgets['attrition'].show = show_attrition;
