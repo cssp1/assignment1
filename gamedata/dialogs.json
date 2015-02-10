@@ -7098,7 +7098,7 @@
     },
 
     "showcase": {
-        "dimensions": [816,436],
+        "dimensions": [766,471],
         "default_button": "ok_button",
         "widgets": {
             "flash": { "show": 0, "kind":"StaticImage","xy":[-16,-16],"dimensions":[798,503],"asset":"dialog_glow_thin_resizable", "bg_image_resizable":1, "composite_mode": "lighter", "alpha": 0.5, "fade":1, "fade_peak": 0.1, "delay": 0, "duration": 1.0},
@@ -7210,9 +7210,16 @@
 
             // ADDITIONAL STORE ITEMS
             "plus_label": { "show": 0, "kind": "TextField", "xy": [228,371], "dimensions": [100, 30], "text_size": 14, "text_style": "thick", "text_hjustify": "left", "text_color": [1,1,1,1], "drop_shadow": 1, "ui_name": "PLUS:" },
-            "plus_text": { "show": 0, "kind": "ScrollingTextField", "xy": [273,377], "dimensions": [315,60], "text_size": 14, "text_leading": 16, "text_hjustify": "left", "text_vjustify": "top", "text_color": [1,1,1,1], "link_color": [0.916, 0.549, 0.0015, 1], "drop_shadow": 1 },
+            "plus_text": { "show": 0, "kind": "ScrollingTextField", "xy": [273,377], "dimensions": [315,64], "text_size": 14, "text_leading": 16,
+                           "text_hjustify": "left", "text_vjustify": "top", "text_color": [1,1,1,1],
+                           "ui_name_more": "", // "and more"
+                           "link_color": [0.916, 0.549, 0.0015, 1], "drop_shadow": 1 },
             "sale_label": { "show": 0, "kind": "TextField", "xy": [228,426], "dimensions": [100, 30], "text_size": 14, "text_style": "thick", "text_hjustify": "left", "text_color": [1,1,1,1], "drop_shadow": 1, "ui_name": "ON SALE:" },
-            "sale_text": { "show": 0, "kind": "ScrollingTextField", "xy": [297,431], "dimensions": [315,60], "text_size": 14, "text_leading": 16, "text_hjustify": "left", "text_vjustify": "top", "text_color": [1,1,1,1], "link_color": [0.916, 0.549, 0.0015, 1], "drop_shadow": 1 },
+            "sale_text": { "show": 0, "kind": "ScrollingTextField", "xy": [297,431], "dimensions": [305,26],
+                           "clip_to": [297,431,305,26],
+                           "text_size": 14, "text_leading": 16, "text_hjustify": "left", "text_vjustify": "top", "text_color": [1,1,1,1],
+                           "link_color": [0.916, 0.549, 0.0015, 1], "drop_shadow": 1,
+                           "ui_name_more": "and more"},
 
             // VICTORY
             "victory_splash_frame":  { "show":0, "kind": "SolidRect", "xy": [228,58], "dimensions": [506,158], "outline_color": [1,1,1,0.5], "outline_width": 1.5 },

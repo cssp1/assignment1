@@ -13,6 +13,29 @@ goog.require('ItemDisplay');
 
 // also implicitly references a bunch of stuff from main.js like "player"/"session"/etc
 
+// XXXXXX convert the sale_text/plus_text to SPUI.RichTextWidget and move this function into there
+/** @param {SPUI.ScrollingTextField} widget
+    @param {string} big_string
+    @param {Object} props
+    @param {Object} click_handlers
+    @param {string} and_more added to end of last line if no more will fit
+*/
+Showcase.append_bbcode_text_with_line_breaking = function(widget, big_string, props, click_handlers, and_more) {
+    // break lines, protecting BBCode
+    var broken_s = SPUI.break_lines(big_string, widget.font, widget.wh, {bbcode:true})[0];
+    var max_lines = Math.max(1, Math.floor(widget.wh[1] / widget.font.leading));
+    goog.array.forEach(broken_s.split('\n'), function(line, n) {
+        if(n+1 == max_lines) {
+            line += and_more;
+        } else if(n+1 > max_lines) {
+            return;
+        }
+        console.log(line);
+        widget.append_text(SPText.cstring_to_ablocks_bbcode(line, props, click_handlers));
+    });
+    widget.scroll_to_top();
+};
+
 Showcase.apply_showcase_hacks = function(dialog, hack) {
     if('ui_title' in hack) {
         dialog.widgets['mission_title'].str = eval_cond_or_literal(hack['ui_title'], player, null);
@@ -54,15 +77,16 @@ Showcase.apply_showcase_hacks = function(dialog, hack) {
         ItemDisplay.set_inventory_item_asset(dialog.widgets['corner_token'], token_item_spec);
 
         // create a fake token item for use by the tooltip
-        var token_item = {'spec': hack['token_item'], 'expire_time': eval_cond_or_literal(token_item_spec['force_expire_by'] || -1, player, null)};
+        var force_expire_by = (eval_cond_or_literal(token_item_spec['force_expire_by'] || -1, player, null) || -1);
+        var token_item = {'spec': hack['token_item'], 'expire_time': force_expire_by};
         ItemDisplay.attach_inventory_item_tooltip(dialog.widgets['corner_token'], token_item);
 
         var txt = dialog.data['widgets']['corner_token_instr']['ui_name_'+hack['corner_token_mode']].replace('%AI', hack['ui_villain_name']);
         while(txt.indexOf('%TOKEN') != -1) {
             txt = txt.replace('%TOKEN', token_item_name);
         }
-        if(txt.indexOf('%EXPIRE_IN') != -1) {
-            txt = txt.replace('%EXPIRE_IN', pretty_print_time_brief(eval_cond_or_literal(token_item_spec['force_expire_by'], player, null) - player.get_absolute_time()));
+        if(force_expire_by > 0 && txt.indexOf('%EXPIRE_IN') != -1) {
+            txt = txt.replace('%EXPIRE_IN', pretty_print_time_brief(force_expire_by - player.get_absolute_time()));
         }
         dialog.widgets['corner_token_instr'].set_text_with_linebreaking(txt);
     }
@@ -154,13 +178,15 @@ Showcase.apply_showcase_hacks = function(dialog, hack) {
 
         if('final_reward_items' in hack) {
             var item_list = eval_cond_or_literal(hack['final_reward_items'],player,null);
-            ItemDisplay.display_item_array(dialog, 'final_reward_item', item_list, {glow: true});
-            for(var x = 0; x < dialog.data['widgets']['final_reward_item']['array'][0]; x++) {
-                var is_owned = (x < item_list.length && player.has_item(item_list[x]['spec']))
-                dialog.widgets['final_reward_owned_bg'+x.toString()].show =
-                    dialog.widgets['final_reward_owned_text'+x.toString()].show = is_owned;
-                if(is_owned) {
-                    dialog.widgets['final_reward_item'+x.toString()].widgets['frame'].state = 'disabled';
+            if(item_list) {
+                ItemDisplay.display_item_array(dialog, 'final_reward_item', item_list, {glow: true});
+                for(var x = 0; x < dialog.data['widgets']['final_reward_item']['array'][0]; x++) {
+                    var is_owned = (x < item_list.length && player.has_item(item_list[x]['spec']))
+                    dialog.widgets['final_reward_owned_bg'+x.toString()].show =
+                        dialog.widgets['final_reward_owned_text'+x.toString()].show = is_owned;
+                    if(is_owned) {
+                        dialog.widgets['final_reward_item'+x.toString()].widgets['frame'].state = 'disabled';
+                    }
                 }
             }
         }
@@ -219,7 +245,9 @@ Showcase.apply_showcase_hacks = function(dialog, hack) {
     if(plus_str && !('show_plus_text' in hack && !hack['show_plus_text'])) {
         dialog.widgets['plus_label'].show = dialog.widgets['plus_text'].show = 1;
 
-        dialog.widgets['plus_text'].append_text(SPText.cstring_to_ablocks_bbcode(plus_str, null, bbcode_click_handlers));
+        var plus_and_more = ' ... [color=#'+link_color+'][u][sku='+hack['plus_store_category']+'/]'+
+            dialog.data['widgets']['plus_text']['ui_name_more'] +'[/sku][/u][/color]';
+        Showcase.append_bbcode_text_with_line_breaking(dialog.widgets['plus_text'], plus_str, null, bbcode_click_handlers, plus_and_more);
 
         var sales = Showcase.collect_active_sales_data({'name':'', 'skus':gamedata['store']['catalog']});
         if(sales.length > 0) {
@@ -229,19 +257,11 @@ Showcase.apply_showcase_hacks = function(dialog, hack) {
                 sale_str_list.push('[color=#'+link_color+'][u][sku=' + sales[i]['path'] + ']' + sales[i]['ui_name'] + '[/sku][/u][/color]');
             }
             var sale_str = sale_str_list.join(', ');
-            /* doesn't work, you can't cut a string in the middle of BBCode
-               var max_len = dialog.widgets['sale_item_text'].wh[0] / (em_width/4);
-               var trimmed = false;
-               while(sale_str.length > max_len) {
-               sale_str = sale_str.substr(0, sale_str.lastIndexOf(','));
-               trimmed = true;
-               }
-               if (trimmed) { sale_str += "..."; }
-               else { sale_str = sale_str.slice(0,-2); }
-            */
             if(sale_str.length > 0) {
                 dialog.widgets['sale_label'].show = dialog.widgets['sale_text'].show = true;
-                dialog.widgets['sale_text'].append_text(SPText.cstring_to_ablocks_bbcode(sale_str, null, bbcode_click_handlers));
+                var sale_and_more = ' ... [color=#'+link_color+'][u][sku='+hack['plus_store_category']+'/]'+
+                    dialog.data['widgets']['sale_text']['ui_name_more'] +'[/sku][/u][/color]';
+                Showcase.append_bbcode_text_with_line_breaking(dialog.widgets['sale_text'], sale_str, null, bbcode_click_handlers, sale_and_more);
             }
         }
     }
@@ -249,16 +269,18 @@ Showcase.apply_showcase_hacks = function(dialog, hack) {
     // RANDOM REWARD ITEMS
     if('ui_random_rewards_text' in hack) { dialog.widgets['random_rewards_title'].str = eval_cond_or_literal(hack['ui_random_rewards_text'], player, null); }
     var item_list = ('feature_random_items' in hack ? eval_cond_or_literal(hack['feature_random_items'], player, null) : []);
-    ItemDisplay.display_item_array(dialog, 'random_rewards', item_list,
-                                   {max_count_limit: ('feature_random_item_count' in hack) ? eval_cond_or_literal(hack['feature_random_item_count'], player, null) : -1,
-                                    permute: true, glow: false});
+    if(item_list) {
+        ItemDisplay.display_item_array(dialog, 'random_rewards', item_list,
+                                       {max_count_limit: ('feature_random_item_count' in hack) ? eval_cond_or_literal(hack['feature_random_item_count'], player, null) : -1,
+                                        permute: true, glow: false});
+    }
 
     // PROGRESSION REWARD ITEMS
     if('progression_reward_items' in hack) {
         dialog.widgets['progression_rewards_bg'].show = true;
 
         // this will be a list of [{"level": N, "item": {"spec": ...}}, ... ]
-        var progression_item_list = eval_cond_or_literal(hack['progression_reward_items'], player, null);
+        var progression_item_list = eval_cond_or_literal(hack['progression_reward_items'], player, null) || [];
 
         function flatten_loot(loot) {
             if('spec' in loot) {
@@ -429,17 +451,19 @@ Showcase.apply_showcase_hacks = function(dialog, hack) {
 
     // PROGRESSION REWARD TEXT
     if('ui_progression_text' in hack) {
-        dialog.widgets['progression_text'].show = true;
-        var link_color = SPUI.make_colorv(dialog.data['widgets']['progression_text']['link_color']).hex();
         var text = eval_cond_or_literal(hack['ui_progression_text'], player, null);
-        while(text.indexOf('%TOKEN') != -1) { text = text.replace('%TOKEN', token_item_name); }
-        if(hack['plus_store_category'] && plus_store_category_name) {
-            // make hyperlink to the event_prizes store category, if possible
-            text = text.replace('%PLUS_STORE_CATEGORY', '[color=#' + link_color + '][u][sku=' + hack['plus_store_category'] + '/]' + plus_store_category_name + '[/sku][/u][/color]');
-        } else {
-            text = text.replace('%PLUS_STORE_CATEGORY', token_item_name);
+        if(text) {
+            dialog.widgets['progression_text'].show = true;
+            var link_color = SPUI.make_colorv(dialog.data['widgets']['progression_text']['link_color']).hex();
+            while(text.indexOf('%TOKEN') != -1) { text = text.replace('%TOKEN', token_item_name); }
+            if(hack['plus_store_category'] && plus_store_category_name) {
+                // make hyperlink to the event_prizes store category, if possible
+                text = text.replace('%PLUS_STORE_CATEGORY', '[color=#' + link_color + '][u][sku=' + hack['plus_store_category'] + '/]' + plus_store_category_name + '[/sku][/u][/color]');
+            } else {
+                text = text.replace('%PLUS_STORE_CATEGORY', token_item_name);
+            }
+            dialog.widgets['progression_text'].append_text(SPText.cstring_to_ablocks_bbcode(text, null, bbcode_click_handlers));
         }
-        dialog.widgets['progression_text'].append_text(SPText.cstring_to_ablocks_bbcode(text, null, bbcode_click_handlers));
     }
 
 };

@@ -3185,6 +3185,8 @@ SPUI.ScrollingTextField.prototype.destroy = function() {
     this.clear_text();
 };
 
+/** @param {Array.<SPText.ABlock>} text
+    @param {Object=} user_data */
 SPUI.ScrollingTextField.prototype.append_text = function(text, user_data) {
     var node;
     if(this.n_lines >= this.max_lines) {
