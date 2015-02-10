@@ -5180,65 +5180,67 @@
     },
 
     "defense_end_dialog": {
-        "bg_image": "dialog_487x337_bg",
-        "dimensions": [487,337],
+        "dimensions": [487,343],
         "default_button": "repair_instant_button",
         "clip_children": 0, // because it can spawn the buy gamebucks dialog
         "widgets": {
-            "sunken_left":{"kind":"StaticImage","xy":[12,12],"dimensions":[153,273],"asset":"dialog_sunken_153x273"},
-            //"sunken_left":{"kind":"StaticImage","xy":[10,12],"dimensions":[153,315],"asset":"dialog_sunken_153x315"},
-            "sidebar_splash":{"kind":"StaticImage","xy":[16,17],"dimensions":[143,303],"asset":"dialog_sidebar_valentina",
+            "bg": {"kind": "StaticImage", "xy":[0,0], "dimensions":[487,343], "asset": "dialog_resizable", "bg_image_resizable": 1 },
+            "sunken_left":{"kind":"StaticImage","xy":[12,12],"dimensions":[153,278], "asset": "dialog_sunken_resizable", "bg_image_resizable": 1},
+            "sidebar_splash":{"kind":"StaticImage","xy":[16,20],"dimensions":[143,303],"asset":"dialog_sidebar_valentina",
                               "clip_to": [17,17,143,263]},
 
-            "sunken_right":{"kind":"StaticImage","xy":[169,12],"dimensions":[306,273],"asset":"dialog_sunken_306x273"},
+            "sunken_right":{"kind":"StaticImage","xy":[169,12],"dimensions":[306,278], "asset": "dialog_sunken_resizable", "bg_image_resizable": 1},
 
-            "title_victory": { "show": 0, "kind": "TextField", "xy": [188,22], "dimensions": [277, 25], "text_size": 17, "text_style": "bold",
+            "title_victory": { "show": 0, "kind": "TextField", "xy": [188,19], "dimensions": [277, 25], "text_size": 17, "text_style": "bold",
                                "text_hjustify": "left", "ui_name": "Victory!" },
-            "subtitle_victory": { "show": 0, "kind": "TextField", "xy": [188,47], "dimensions": [277,22], "text_size": 13, "text_style": "normal",
+            "subtitle_victory": { "show": 0, "kind": "TextField", "xy": [188,44], "dimensions": [277,22], "text_size": 13, "text_style": "normal",
                                   "text_hjustify": "left", "ui_name": "You repelled %s's attack" },
 
-            "title_defeat": { "show": 0, "kind": "TextField", "xy": [188,22], "dimensions": [277, 25], "text_size": 17, "text_style": "bold",
+            "title_defeat": { "show": 0, "kind": "TextField", "xy": [188,19], "dimensions": [277, 25], "text_size": 17, "text_style": "bold",
                               "text_hjustify": "left", "ui_name": "Defeat!" },
-            "subtitle_defeat": { "show": 0, "kind": "TextField", "xy": [188,47], "dimensions": [277,22], "text_size": 13, "text_style": "normal",
+            "subtitle_defeat": { "show": 0, "kind": "TextField", "xy": [188,44], "dimensions": [277,22], "text_size": 13, "text_style": "normal",
                                  "text_hjustify": "left", "ui_name": "%s's attack overcame your defenses" },
 
-            "you_gained": { "kind": "TextField", "xy": [188,77], "dimensions": [125,22], "text_size": 13, "text_style": "normal",
+            "you_gained": { "kind": "TextField", "xy": [188,64], "dimensions": [125,22], "text_size": 13, "text_style": "normal",
                             "text_hjustify": "left", "ui_name": "YOU GAINED:" },
-            "xp_icon": { "kind": "StaticImage", "xy": [199,103], "dimensions": [21,21], "asset": "resource_icon_xp" },
-            "xp_amount": { "kind": "TextField", "xy": [234,103], "dimensions": [83,21], "ui_name": "xxx,xxx,xxx",
+            "xp_icon": { "kind": "StaticImage", "xy": [199,90], "dimensions": [21,21], "asset": "resource_icon_xp" },
+            "xp_amount": { "kind": "TextField", "xy": [234,90], "dimensions": [83,21], "ui_name": "xxx,xxx,xxx",
                            "text_size": 13, "text_style": "bold" },
 
-            "units_destroyed_title": { "kind": "TextField", "xy": [325,77], "dimensions": [125,22], "text_size": 13, "text_style": "normal",
+            "units_destroyed_title": { "kind": "TextField", "xy": [325,67], "dimensions": [125,22], "text_size": 13, "text_style": "normal",
                                        "text_hjustify": "left", "ui_name": "UNITS DESTROYED:" },
-            "units_destroyed": { "kind": "TextField", "xy": [325,103], "dimensions": [70,70], "text_size": 13, "text_style": "normal",
+            "units_destroyed": { "kind": "TextField", "xy": [325,93], "dimensions": [70,70], "text_size": 13, "text_style": "normal",
                                  "text_hjustify": "left", "text_vjustify": "top", "ui_name": "99 Kitchen Sinks" },
 
 
-            "you_lost": { "kind": "TextField", "xy": [189,193], "dimensions": [277,22], "text_size": 13, "text_style": "normal",
+            "you_lost": { "kind": "TextField", "xy": [189,177], "dimensions": [277,22], "text_size": 13, "text_style": "normal",
                           "text_hjustify": "left", "ui_name": "YOU LOST:" },
 
-            "water_icon": { "kind": "StaticImage", "xy": [199,219], "dimensions": [21,21], "asset": "resource_icon_water" },
-            "water_amount": { "kind": "TextField", "xy": [234,219], "dimensions": [83,21], "ui_name": "xxx,xxx,xxx",
+            "water_icon": { "kind": "StaticImage", "xy": [199,200], "dimensions": [21,21], "asset": "resource_icon_water" },
+            "water_amount": { "kind": "TextField", "xy": [234,200], "dimensions": [83,21],
                               "text_size": 13, "text_style": "bold" },
-            "iron_icon": { "kind": "StaticImage", "xy": [199,247], "dimensions": [21,21], "asset": "resource_icon_iron" },
-            "iron_amount": { "kind": "TextField", "xy": [234,247], "dimensions": [83,21], "ui_name": "xxx,xxx,xxx",
+            "iron_icon": { "kind": "StaticImage", "xy": [199,228], "dimensions": [21,21], "asset": "resource_icon_iron" },
+            "iron_amount": { "kind": "TextField", "xy": [234,228], "dimensions": [83,21],
+                             "text_size": 13, "text_style": "bold" },
+            "res3_icon": { "show": 0, "kind": "StaticImage", "xy": [199,256], "dimensions": [21,21], "asset": "resource_icon_res3" },
+            "res3_amount": { "show": 0, "kind": "TextField", "xy": [234,256], "dimensions": [83,21],
                              "text_size": 13, "text_style": "bold" },
 
-            "base_damage_title": { "kind": "TextField", "xy": [325,193], "dimensions": [125,22], "text_size": 13, "text_style": "normal",
+            "base_damage_title": { "kind": "TextField", "xy": [325,177], "dimensions": [125,22], "text_size": 13, "text_style": "normal",
                                    "text_hjustify": "left", "ui_name": "BASE DAMAGE:" },
-            "base_damage": { "kind": "TextField", "xy": [335,211], "dimensions": [70,33], "text_size": 17, "text_style": "bold",
+            "base_damage": { "kind": "TextField", "xy": [335,195], "dimensions": [70,33], "text_size": 17, "text_style": "bold",
                              "ui_name": "99%" },
 
 
-            "price_display": { "kind": "ActionButton", "xy": [82,294], "dimensions": [120,32], "text_offset": [8,1],
+            "price_display": { "kind": "ActionButton", "xy": [82,300], "dimensions": [120,32], "text_offset": [8,1],
                                "text_size": 13, "text_style": "thick", "bg_image": "price_display", "ui_name": "%d", "ui_tooltip": "", "tooltip_delay": 0 }, // PRICE
 
-            "repair_instant_button": { "kind": "ActionButton", "xy": [200,296], "dimensions": [134,28],  "text_size": 13, "text_style": "bold",
+            "repair_instant_button": { "kind": "ActionButton", "xy": [200,302], "dimensions": [134,28],  "text_size": 13, "text_style": "bold",
                                        "bg_image": "action_button_134px","ui_name": "Repair Instantly", "ui_name_pending": "Working...", "ui_tooltip": "", "tooltip_delay": 0 },
 
-            "repair_slow_button": { "kind": "ActionButton", "xy": [338,296], "dimensions": [134,28], "text_size": 13, "text_style": "bold",
+            "repair_slow_button": { "kind": "ActionButton", "xy": [338,302], "dimensions": [134,28], "text_size": 13, "text_style": "bold",
                                     "bg_image": "menu_button_134px", "text_color": [0,0,0,1], "ui_name": "Start Repairs" },
-            "repair_not_necessary_button": { "show":0, "kind": "ActionButton", "xy": [338,296], "dimensions": [134,28], "text_size": 13, "text_style": "bold",
+            "repair_not_necessary_button": { "show":0, "kind": "ActionButton", "xy": [338,302], "dimensions": [134,28], "text_size": 13, "text_style": "bold",
                                              "bg_image": "menu_button_134px", "text_color": [0,0,0,1], "ui_name": "Affirmative" }
         }
     },

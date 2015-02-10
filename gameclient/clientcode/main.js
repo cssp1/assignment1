@@ -15216,6 +15216,8 @@ function invoke_defense_end_dialog(battle_type, battle_base, battle_opponent_use
     for(var res in gamedata['resources']) {
         var lost = loot[res] || 0;
         if(res+'_amount' in dialog.widgets) {
+            dialog.widgets[res+'_amount'].show = dialog.widgets[res+'_icon'].show = true;
+            dialog.widgets[res+'_icon'].asset = gamedata['resources'][res]['icon_small'];
             dialog.widgets[res+'_amount'].str = pretty_print_number(lost);
         }
     }
