@@ -873,12 +873,13 @@
     },
 
     "combat_resource_bars": {
-        "dimensions": [270, 213],
+        "dimensions": [142,202],
         "xy": [10,150],
         "xy_no_damage": [10,110], // if combat_damage_bar placement is not top_left
         "widgets": {
             "resource_bar_water_glow": { "kind": "StaticImage", "xy": [-83,1], "dimensions": [307,98], "asset": "resource_bar_glow", "alpha": 0 },
             "resource_bar_iron_glow": { "kind": "StaticImage", "xy": [-83,35], "dimensions": [307,98], "asset": "resource_bar_glow", "alpha": 0 },
+            "resource_bar_res3_glow": { "kind": "StaticImage", "xy": [-83,69], "dimensions": [307,98], "asset": "resource_bar_glow", "alpha": 0 },
 
             "resource_bar_water": { "kind": "StaticImage", "xy": [0,34], "dimensions": [142,32], "asset": "resource_bar_142px", "ui_tooltip": "%RES looted", "tooltip_delay": 0, "fixed_tooltip_offset": [154,41] },
             "resource_bar_water_prog": { "kind": "ProgressBar", "xy": [25, 41], "dimensions": [111, 17], "outline_width": 2, "flash_color": [1,1,1,1],
@@ -892,29 +893,35 @@
             "resource_bar_iron_icon": { "kind": "StaticImage", "xy": [4,73], "dimensions": [21,21], "asset": "resource_icon_iron" },
             "resource_bar_iron_amount": { "kind": "TextField", "xy": [35,73], "dimensions": [75,21], "text_size": 13, "drop_shadow": 1,  "text_hjustify": "left" },
 
-            "trophies_current_icon": { "show": 0, "kind": "StaticImage", "xy": [4,109], "dimensions": [21,21], "asset": "trophy_21x21" },
-            "trophies_current_amount": { "show": 0, "kind": "TextField", "xy": [35,109], "dimensions": [75,21], "text_size": 13, "drop_shadow": 1, "text_hjustify": "left", "text_color_victory": [1,1,1,1], "text_color_defeat": [1,0,0,1] },
-            "trophies_victory_icon": { "show": 0, "kind": "StaticImage", "xy": [4,109], "dimensions": [21,21], "asset": "trophy_21x21" },
-            "trophies_victory_amount": { "show": 0, "kind": "TextField", "xy": [35,109], "dimensions": [75,21], "text_size": 13, "drop_shadow": 1,  "text_hjustify": "left" },
-            "trophies_defeat_label": { "show": 0, "kind": "TextField", "xy": [35,136], "dimensions": [21,21], "text_size": 13, "drop_shadow": 1,  "text_hjustify": "left", "ui_name": "Defeat", "text_color": [1,0.75,0,1] },
-            "trophies_defeat_icon": { "show": 0, "kind": "StaticImage", "xy": [4,159], "dimensions": [21,21], "asset": "trophy_21x21"},
-            "trophies_defeat_amount": { "show": 0, "kind": "TextField", "xy": [35,159], "dimensions": [75,21], "text_size": 13, "drop_shadow": 1,  "text_hjustify": "left" },
+            "resource_bar_res3": { "show":0, "kind": "StaticImage", "xy": [0,102], "dimensions": [142,32], "asset": "resource_bar_142px", "ui_tooltip": "%RES looted", "tooltip_delay": 0, "fixed_tooltip_offset": [154,109] },
+            "resource_bar_res3_prog": { "show":0, "kind": "ProgressBar", "xy": [25, 109], "dimensions": [111, 17], "outline_width": 2, "flash_color": [1,1,1,1],
+                                        "empty_color": [0.015,0.015,0.015,1], "outline_color": [0.015,0.015,0.015,1] },
+            "resource_bar_res3_icon": { "show":0, "kind": "StaticImage", "xy": [4,107], "dimensions": [21,21], "asset": "resource_icon_res3" },
+            "resource_bar_res3_amount": { "show":0, "kind": "TextField", "xy": [35,107], "dimensions": [75,21], "text_size": 13, "drop_shadow": 1, "text_hjustify": "left" },
 
-            "attack_time_bar": { "kind": "StaticImage", "xy": [0,102], "dimensions": [142,32], "asset": "resource_bar_142px", "ui_tooltip": "Time remaining in battle", "tooltip_delay": 0, "fixed_tooltip_offset": [154,109] },
-            "attack_time_icon": { "kind": "StaticImage", "xy": [4,106], "dimensions": [21,21], "asset": "resource_icon_combat_time" },
-            "attack_time_amount": { "kind": "TextField", "xy": [35,106], "dimensions": [75,21], "ui_name": "xxm xxs", "text_size": 13,
+            "trophies_current_icon": { "show": 0, "kind": "StaticImage", "xy": [4,143], "dimensions": [21,21], "asset": "trophy_21x21" },
+            "trophies_current_amount": { "show": 0, "kind": "TextField", "xy": [35,143], "dimensions": [75,21], "text_size": 13, "drop_shadow": 1, "text_hjustify": "left", "text_color_victory": [1,1,1,1], "text_color_defeat": [1,0,0,1] },
+            "trophies_victory_icon": { "show": 0, "kind": "StaticImage", "xy": [4,143], "dimensions": [21,21], "asset": "trophy_21x21" },
+            "trophies_victory_amount": { "show": 0, "kind": "TextField", "xy": [35,143], "dimensions": [75,21], "text_size": 13, "drop_shadow": 1,  "text_hjustify": "left" },
+            "trophies_defeat_label": { "show": 0, "kind": "TextField", "xy": [35,170], "dimensions": [21,21], "text_size": 13, "drop_shadow": 1,  "text_hjustify": "left", "ui_name": "Defeat", "text_color": [1,0.75,0,1] },
+            "trophies_defeat_icon": { "show": 0, "kind": "StaticImage", "xy": [4,193], "dimensions": [21,21], "asset": "trophy_21x21"},
+            "trophies_defeat_amount": { "show": 0, "kind": "TextField", "xy": [35,193], "dimensions": [75,21], "text_size": 13, "drop_shadow": 1,  "text_hjustify": "left" },
+
+            "attack_time_bar": { "kind": "StaticImage", "xy": [0,136], "dimensions": [142,32], "asset": "resource_bar_142px", "ui_tooltip": "Time remaining in battle", "tooltip_delay": 0, "fixed_tooltip_offset": [154,143] },
+            "attack_time_icon": { "kind": "StaticImage", "xy": [4,140], "dimensions": [21,21], "asset": "resource_icon_combat_time" },
+            "attack_time_amount": { "kind": "TextField", "xy": [35,140], "dimensions": [75,21], "ui_name": "xxm xxs", "text_size": 13,
                                     "drop_shadow": 1, "text_hjustify": "left" },
 
-            "unit_space_bar": { "kind": "StaticImage", "xy": [0,136], "dimensions": [142,32], "asset": "resource_bar_142px", "ui_tooltip": "Space available to deploy attacking units\nUpgrade %ATTACK_SPACE_BUILDING to raise limit", "tooltip_delay": 0, "fixed_tooltip_offset": [154,143] },
-            "unit_space_prog": { "kind": "ProgressBar", "xy": [24, 143], "dimensions": [112, 17], "outline_width": 2, "flash_color": [1,1,1,1],
+            "unit_space_bar": { "kind": "StaticImage", "xy": [0,170], "dimensions": [142,32], "asset": "resource_bar_142px", "ui_tooltip": "Space available to deploy attacking units\nUpgrade %ATTACK_SPACE_BUILDING to raise limit", "tooltip_delay": 0, "fixed_tooltip_offset": [154,177] },
+            "unit_space_prog": { "kind": "ProgressBar", "xy": [24, 177], "dimensions": [112, 17], "outline_width": 2, "flash_color": [1,1,1,1],
                                  "full_color": [0.101,0.067,0.151,1], "empty_color": [0.015,0.015,0.015,1], "outline_color": [0.015,0.015,0.015,1] },
-            "unit_space_icon": { "kind": "StaticImage", "xy": [4,141], "dimensions": [21,21], "asset": "resource_icon_cpu" },
-            "unit_space_amount": { "kind": "TextField", "xy": [35,141], "dimensions": [75,21], "ui_name": "x,xxx / x,xxx", "text_size": 13,
+            "unit_space_icon": { "kind": "StaticImage", "xy": [4,175], "dimensions": [21,21], "asset": "resource_icon_cpu" },
+            "unit_space_amount": { "kind": "TextField", "xy": [35,175], "dimensions": [75,21], "ui_name": "x,xxx / x,xxx", "text_size": 13,
                                    "drop_shadow": 1, "text_hjustify": "left" },
-            "unit_space_message_bg": { "kind": "SolidRect", "xy": [0,183], "dimensions": [280,62], "color":[0,0,0,0.45], "show": 0 },
-            "unit_space_message_line": { "kind": "Line", "xy": [27, 169], "dimensions": [7, 14], "color": [1,0.88,0,1], "stroke_width": 3, "show": 0 },
-            "unit_space_message_rect": { "kind": "SolidRect", "xy": [-2, 134], "dimensions": [145, 35], "color":[0,0,0,0], "outline_color": [1,0.88,0,1], "outline_width": 2, "show": 0 },
-            "unit_space_message": { "kind": "TextField", "xy": [8,186], "dimensions": [254,34], "text_size": 13, "text_style": "bold",
+            "unit_space_message_bg": { "kind": "SolidRect", "xy": [0,217], "dimensions": [280,62], "color":[0,0,0,0.45], "show": 0 },
+            "unit_space_message_line": { "kind": "Line", "xy": [27, 203], "dimensions": [7, 14], "color": [1,0.88,0,1], "stroke_width": 3, "show": 0 },
+            "unit_space_message_rect": { "kind": "SolidRect", "xy": [-2, 168], "dimensions": [145, 35], "color":[0,0,0,0], "outline_color": [1,0.88,0,1], "outline_width": 2, "show": 0 },
+            "unit_space_message": { "kind": "TextField", "xy": [8,220], "dimensions": [254,34], "text_size": 13, "text_style": "bold",
                                     "text_hjustify": "left", "drop_shadow": 1, "text_color": [1,0.88,0,1],
                                     "ui_name": "Not enough room. Attack now, or\nremove units before adding more.\nUpgrade %ATTACK_SPACE_BUILDING to raise limit.", "show": 0
                                   }
@@ -974,11 +981,11 @@
             "resource_bar_iron_icon": { "kind": "StaticImage", "xy": [4,39], "dimensions": [21,21], "asset": "resource_icon_iron" },
             "resource_bar_iron_amount": { "kind": "TextField", "xy": [35,39], "dimensions": [75,21], "text_size": 13, "drop_shadow": 1,  "text_hjustify": "left" },
 
-            "resource_bar_res3": { "kind": "StaticImage", "xy": [0,68], "dimensions": [142,32], "asset": "resource_bar_142px", "ui_tooltip": "Lootable %RES", "tooltip_delay": 0, "fixed_tooltip_offset": [-114,75] },
-            "resource_bar_res3_prog": { "kind": "ProgressBar", "xy": [25, 75], "dimensions": [111, 17], "outline_width": 2, "flash_color": [1,1,1,1],
+            "resource_bar_res3": { "show": 0, "kind": "StaticImage", "xy": [0,68], "dimensions": [142,32], "asset": "resource_bar_142px", "ui_tooltip": "Lootable %RES", "tooltip_delay": 0, "fixed_tooltip_offset": [-114,75] },
+            "resource_bar_res3_prog": { "show": 0, "kind": "ProgressBar", "xy": [25, 75], "dimensions": [111, 17], "outline_width": 2, "flash_color": [1,1,1,1],
                                         "empty_color": [0.015,0.015,0.015,1], "outline_color": [0.015,0.015,0.015,1] },
-            "resource_bar_res3_icon": { "kind": "StaticImage", "xy": [4,73], "dimensions": [21,21], "asset": "resource_icon_res3" },
-            "resource_bar_res3_amount": { "kind": "TextField", "xy": [35,73], "dimensions": [75,21], "text_size": 13, "drop_shadow": 1,  "text_hjustify": "left" }
+            "resource_bar_res3_icon": { "show": 0, "kind": "StaticImage", "xy": [4,73], "dimensions": [21,21], "asset": "resource_icon_res3" },
+            "resource_bar_res3_amount": { "show": 0, "kind": "TextField", "xy": [35,73], "dimensions": [75,21], "text_size": 13, "drop_shadow": 1,  "text_hjustify": "left" }
         }
     },
 

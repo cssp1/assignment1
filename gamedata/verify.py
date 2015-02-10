@@ -2675,7 +2675,9 @@ def check_resource(name, data):
     for FX in ('harvest_effect', 'loot_effect'):
         if FX in data:
             error |= check_visual_effect('resources:'+name, data[FX])
-
+    for PRED in ('show_if', 'loot_storage_warning_if'):
+        if PRED in data:
+            error |= check_predicate(data[PRED], 'resources:'+name+':'+PRED)
     return error
 
 def check_store_sku(sku_name, sku):

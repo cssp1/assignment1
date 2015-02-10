@@ -9388,24 +9388,6 @@ function init_desktop_dialogs() {
         dialog.widgets['alliances_button'].show = enable_control_buttons && ((player.tutorial_state === "COMPLETE") && player.get_any_abtest_value('enable_alliances', gamedata['client']['enable_alliances']));
         dialog.widgets['alliances_button'].onclick = invoke_alliance_dialog;
 
-        for(var res in gamedata['resources']) {
-            if('resource_bar_'+res+'_button' in dialog.widgets) {
-                dialog.widgets['resource_bar_'+res+'_button'].onclick = (function (_res) { return function(w) {
-                    if(w.parent) { w.parent.onleave(); } // get rid of tooltips
-                    if(('allow_instant' in gamedata['resources'][_res]) && !gamedata['resources'][_res]['allow_instant']) {
-                        var helper = get_requirements_help(_res, 1);
-                        if(helper) { helper(); }
-                    } else {
-                        invoke_store(_res);
-                    }
-                }; })(res);
-            }
-        }
-
-        dialog.widgets['resource_bar_fbcredits_button'].onclick =
-            dialog.widgets['resource_bar_fbcredits'].onclick =
-            dialog.widgets['resource_bar_fbcredits_icon'].onclick = Store.get_balance_plus_cb();
-
         dialog.widgets['quest_tracker_title'].onclick =
             dialog.widgets['quest_tracker_descr'].onclick = function() {
                 invoke_missions_dialog(true, player.quest_tracked);
@@ -10090,7 +10072,14 @@ function update_enemy_resource_bars(dialog) {
 
     // resource fullness progress bars
     for(var res in gamedata['resources']) {
-        var disp = cur[res];
+        var resdata = gamedata['resources'][res];
+        var disp = cur[res] || 0;
+        var show_me = (disp > 0) && (!('show_if' in resdata) || read_predicate(resdata['show_if']).is_satisfied(player,null));
+        goog.array.forEach(['', '_prog', '_icon', '_amount'], function(w) {
+            if('resource_bar_'+res+w in dialog.widgets) {
+                dialog.widgets['resource_bar_'+res+w].show = show_me;
+            }
+        });
         if('resource_bar_'+res+'_amount' in dialog.widgets) {
             dialog.widgets['resource_bar_'+res+'_amount'].str = pretty_print_number(disp);
             dialog.widgets['resource_bar_'+res+'_amount'].text_scale = 1;
@@ -10111,6 +10100,57 @@ function update_enemy_resource_bars(dialog) {
 // "primary" should be true iff it is updating the main resource displays on the game desktop
 function update_resource_bars(dialog, primary, use_res_looter) {
     var flashy_loot = player.flashy_loot();
+    var currency = (player.get_any_abtest_value('currency', gamedata['currency']) == 'gamebucks' ? 'gamebucks' : 'facebook_credits');
+
+    // overall hide/show
+    goog.array.forEach(goog.object.getKeys(gamedata['resources']).concat(['fbcredits']), function(res) {
+        if('resource_bar_'+res in dialog.widgets) {
+            var show_me, show_button, show_button_asset;
+            if(res == 'fbcredits') {
+                show_me = !session.has_attacked;
+                show_button = show_me;
+                show_button_asset = show_button;
+                if(currency == 'gamebucks') {
+                    dialog.widgets['resource_bar_'+res+'_icon'].asset = player.get_any_abtest_value('gamebucks_resource_icon', gamedata['store']['gamebucks_resource_icon']);
+                } else {
+                    dialog.widgets['resource_bar_'+res+'_icon'].asset = 'resource_icon_fbcredits';
+                }
+            } else {
+                var resdata = gamedata['resources'][res];
+                show_me = !('show_if' in resdata) || read_predicate(resdata['show_if']).is_satisfied(player,null);
+                show_button = show_me && !session.has_attacked;
+                show_button_asset = show_button && (!('allow_instant' in resdata) || resdata['allow_instant']);
+                dialog.widgets['resource_bar_'+res+'_icon'].asset = resdata['icon_small'];
+            }
+            goog.array.forEach(['', '_prog', '_icon', '_button', '_amount'], function (w) {
+                if('resource_bar_'+res+w in dialog.widgets) {
+                    dialog.widgets['resource_bar_'+res+w].show = (w == '_button' ? show_button : show_me);
+                    if(w == '_button' && !show_button_asset) {
+                        dialog.widgets['resource_bar_'+res+w].bg_image = null; // blank out the button, but still show it
+                    }
+                }
+            });
+            if('resource_bar_'+res+'_button' in dialog.widgets && show_me) {
+                dialog.widgets['resource_bar_'+res+'_button'].state = (player.tutorial_state === "COMPLETE") ? 'normal':'disabled';
+                if(res == 'fbcredits') {
+                    dialog.widgets['resource_bar_'+res+'_button'].onclick =
+                        dialog.widgets['resource_bar_'+res+'_icon'].onclick =
+                        dialog.widgets['resource_bar_'+res].onclick =
+                        Store.get_balance_plus_cb();
+                } else {
+                    dialog.widgets['resource_bar_'+res+'_button'].onclick =  (function (_res) { return function(w) {
+                        if(w.parent) { w.parent.onleave(); } // get rid of tooltips
+                        if(('allow_instant' in gamedata['resources'][_res]) && !gamedata['resources'][_res]['allow_instant']) {
+                            var helper = get_requirements_help(_res, 1);
+                            if(helper) { helper(); }
+                        } else {
+                            invoke_store(_res);
+                        }
+                    }; })(res);
+                }
+            }
+        }
+    });
 
     // SPFX physics attractors for loot burst effects
     if(primary && player.get_any_abtest_value('enable_loot_burst_effects', gamedata['client']['enable_loot_burst_effects']) && session.viewing_base) {
@@ -10223,17 +10263,8 @@ function update_resource_bars(dialog, primary, use_res_looter) {
         }
     }
 
-    var currency = (player.get_any_abtest_value('currency', gamedata['currency']) == 'gamebucks' ? 'gamebucks' : 'facebook_credits');
-
     if(session.home_base) {
         if('resource_bar_fbcredits_amount' in dialog.widgets) {
-
-            if(currency == 'gamebucks') {
-                dialog.widgets['resource_bar_fbcredits_icon'].asset = player.get_any_abtest_value('gamebucks_resource_icon', gamedata['store']['gamebucks_resource_icon']);
-            } else {
-                dialog.widgets['resource_bar_fbcredits_icon'].asset = 'resource_icon_fbcredits';
-            }
-
             var old_credits = player.last_resource_state[currency];
             var cur_credits = player.resource_state[currency];
 
@@ -10599,9 +10630,10 @@ function update_combat_resource_bars(dialog) {
                                 if(wname in dialog.widgets) {
                                     if(gamedata['client']['combat_resource_bars_transparent'] && goog.array.contains(['resource_bar_'+res,'resource_bar_'+res+'_prog'], wname)) {
                                         dialog.widgets[wname].show = false;
-                                    } else {
-                                        dialog.widgets[wname].show = (session.viewing_base.base_landlord_id != session.user_id &&
-                                                                      session.viewing_base.base_type != 'squad');
+                                    } else if(session.viewing_base.base_landlord_id == session.user_id ||
+                                              session.viewing_base.base_type == 'squad') {
+                                        // hide at friendly bases and any squad
+                                        dialog.widgets[wname].show = false;
                                     }
                                 }
                             });
@@ -11243,26 +11275,6 @@ function update_desktop_dialogs() {
         dialog.widgets['keyboard_shortcuts_jewel'].user_data['count'] = player.check_feature_use('keyboard_shortcuts_list') ? 0 : 1;
 
         update_resource_bars(dialog, true, false);
-        goog.array.forEach(goog.object.getKeys(gamedata['resources']).concat(['fbcredits']), function(res) {
-            if('resource_bar_'+res+'_button' in dialog.widgets) {
-                var show_me = false;
-                if(res == 'fbcredits') {
-                    show_me = !session.has_attacked;
-                    // icon asset is handled by update_resource_bars
-                } else {
-                    var resdata = gamedata['resources'][res];
-                    show_me = !session.has_attacked && (!('loot_storage_warning_if' in resdata) || read_predicate(resdata['loot_storage_warning_if']).is_satisfied(player,null));
-                    dialog.widgets['resource_bar_'+res+'_icon'].asset = gamedata['resources'][res]['icon_small'];
-                }
-                goog.array.forEach(['', '_prog', '_icon', '_button', '_amount'], function (w) {
-                    if('resource_bar_'+res+w in dialog.widgets) {
-                        dialog.widgets['resource_bar_'+res+w].show = show_me;
-                    }
-                });
-                dialog.widgets['resource_bar_'+res+'_button'].show = (res == 'fbcredits' || !('allow_instant' in gamedata['resources'][res]) || gamedata['resources'][res]['allow_instant']);
-                dialog.widgets['resource_bar_'+res+'_button'].state = enable_store ? 'normal':'disabled';
-            }
-        });
 
         dialog.widgets['low_power_bg'].show =
             dialog.widgets['low_power_message'].show = (gamedata['enable_power'] && player.tutorial_state == "COMPLETE" && session.viewing_base.power_factor() < 1);
