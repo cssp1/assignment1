@@ -34101,16 +34101,28 @@ function invoke_blueprint_congrats(item_spec_name, tech_spec_name) {
     change_selection_ui(dialog);
     dialog.auto_center();
     dialog.modal = true;
+
+    var icon_alpha = 1;
+    if(unit_spec) {
+        var is_cloaked = ('cloaked' in unit_spec ? unit_spec['cloaked'] : 0);
+        if(get_leveled_quantity(is_cloaked, 1)) {
+            icon_alpha = gamedata['client']['cloaked_opacity'];
+        }
+    }
+
     if(unit_spec) {
         dialog.widgets['small_icon'].asset = get_leveled_quantity(unit_spec['art_asset'],1);
+        dialog.widgets['small_icon'].alpha = icon_alpha;
+        dialog.widgets['big_icon'].alpha = icon_alpha;
     }
+
     if('splash_image' in tech_spec) {
         dialog.widgets['splash_icon'].asset = get_leveled_quantity(tech_spec['splash_image'],1);
         dialog.widgets['splash_icon_bg'].show = true;
     } else {
-        dialog.widgets['big_icon'].asset = dialog.widgets['small_icon'].asset;
-        dialog.widgets['big_icon'].alpha = get_leveled_quantity((unit_spec ? unit_spec['cloaked'] : 0), 1) ? gamedata['client']['cloaked_opacity'] : 1;
+        dialog.widgets['big_icon'].asset = dialog.widgets['small_icon'].asset; // might be null
     }
+
     dialog.widgets['level_text'].set_text_with_linebreaking(dialog.data['widgets']['level_text']['ui_name'].replace('%s',ItemDisplay.get_inventory_item_ui_name(item_spec)));
     dialog.widgets['description'].set_text_with_linebreaking(dialog.data['widgets']['description']['ui_name'].replace('%lab', gamedata['buildings'][get_lab_for(tech_spec['research_category'])]['ui_name']));
 
