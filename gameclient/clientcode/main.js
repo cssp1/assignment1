@@ -46128,7 +46128,7 @@ Building.prototype.get_idle_state_advanced = function() {
                 var cat = gamedata['crafting']['categories'][catname];
                 if(catname == 'mines') {
                     if(!player.all_minefields_armed()) {
-                        draw_idle_icon = cat['idle_state'] || 'craft_advacned';
+                        draw_idle_icon = cat['idle_state'] || 'craft_advanced';
                         break;
                     } else {
                         continue;
