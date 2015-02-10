@@ -120,7 +120,9 @@ SPText.bbcode_split_words = function(str) {
         } else if(c === '\\' && state == SPText.BBCODE_STATES.LITERAL) {
             state = SPText.BBCODE_STATES.ESCAPED;
         } else {
-            if(state == SPText.BBCODE_STATES.LITERAL) {
+            if(state == SPText.BBCODE_STATES.CODE) {
+                state = SPText.BBCODE_STATES.CODE_OPEN;
+            } else if(state == SPText.BBCODE_STATES.LITERAL) {
                 if(c === ' ' && depth == 0) {
                     if(word) { r.push(word); }
                     word = '';
