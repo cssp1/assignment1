@@ -7140,14 +7140,19 @@ function Mobile() {
     // seconds we send updates using OBJECT_COMBAT_UPDATES telling the
     // server roughly where the object is.
 
+    /** @type {Array.<number>} */
     this.pos = [-1,-1]; // position at end of last computed tick
+    /** @type {Array.<number>} */
     this.vel = [0,0];     // velocity at end of last computed tick
+    /** @type {Array.<number>} */
     this.next_pos = [-1,-1]; // position at beginning of next tick
 
-    // altitude above ground, if flying
+    /** @type {number} altitude above ground, if flying */
     this.altitude = 0;
 
+    /** @type {Array.<number>} */
     this.dest = [-1,-1]; // final movement destination
+
     /** @type {Array.<Array.<number>>} */
     this.path = []; // list of xy coords along A* path
     this.path_valid = false; // whether the A* path can be re-used
@@ -7368,6 +7373,10 @@ Mobile.prototype.receive_state = function(data, init, is_deploying) {
 };
 
 Mobile.prototype.apply_orders = function() {
+    if(typeof this.pos === 'undefined') {
+        throw Error('apply_orders on '+this.spec['name']+' with this.pos undefined');
+    }
+
     if(this.orders.length > 0) {
         var ord = this.orders[0];
         this.ai_state = ord['state'];
@@ -7820,6 +7829,10 @@ Mobile.prototype.run_control = function() {
             SPFX.add_visual_effect(this.pos, this.altitude, [0,1,0], client_time, this.spec['movement_effect'], true, null);
         }
     } // END control_moving
+
+    if(typeof(this.pos) == 'undefined') {
+        throw Error(this.spec['name']+' exited run_control (' + control_state_names[this.control_state] + ') with undefined this.pos');
+    }
 };
 
 var last_created_object = null; // for debugging messages
