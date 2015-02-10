@@ -50,16 +50,13 @@
 
         // {"name": "specials", "ui_name": "Specials", "icon": "inventory_random",
         //  "record_feature_use": "store_specials_wk%WEEK",
-        //  "jewel": [
-        //  ],
+        //  "skus": [
+        //      // free expedition
+        //      {"spell": "FREE_RANDOM_DAILY_ITEM",
+        //       "jewel": {"predicate": "NOT", "subpredicates": [{"predicate": "COOLDOWN_ACTIVE", "name": "FREE_RANDOM_DAILY_ITEM"}]}},
 
-        // "skus": [
-        //     // free expedition
-        //     {"spell": "FREE_RANDOM_DAILY_ITEM",
-        //      "jewel": {"predicate": "NOT", "subpredicates": [{"predicate": "COOLDOWN_ACTIVE", "name": "FREE_RANDOM_DAILY_ITEM"}]}},
-
-        //     // paid expeditions
-        //     {"spell": "BUY_RANDOM_ITEM", "ui_new_store_enterkey_priority": 10}
+        //      // paid expeditions
+        //      {"spell": "BUY_RANDOM_ITEM", "ui_new_store_enterkey_priority": 10}
         // ]}
 
     ],

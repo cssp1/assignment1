@@ -11524,12 +11524,8 @@ function update_desktop_dialogs() {
             // count up jewel triggers from all store categories
             for(var icat = 0; icat < gamedata['store']['catalog'].length; icat++) {
                 var catdata = gamedata['store']['catalog'][icat];
-                if('jewel' in catdata) {
-                    for(var i = 0; i < catdata['jewel'].length; i++) {
-                        if(read_predicate(catdata['jewel'][i]).is_satisfied(player, null)) {
-                            count += 1;
-                        }
-                    }
+                if('jewel' in catdata && read_predicate(catdata['jewel']).is_satisfied(player, null)) { // jewel on category itself - this is not usual
+                    count += 1;
                 }
                 for(var isku = 0; isku < gamedata['store']['catalog'][icat]['skus'].length; isku++) {
                     var skudata = gamedata['store']['catalog'][icat]['skus'][isku];
@@ -35238,12 +35234,8 @@ function update_new_store_category_label(d) {
     var count = 0;
 
     if(player.get_any_abtest_value('enable_store_jewel', gamedata['store']['enable_store_jewel'])) {
-        if('jewel' in d.user_data['category']) {
-            for(var i = 0; i < d.user_data['category']['jewel'].length; i++) {
-                if(read_predicate(d.user_data['category']['jewel'][i]).is_satisfied(player, null)) {
-                    count += 1;
-                }
-            }
+        if('jewel' in d.user_data['category'] && read_predicate(d.user_data['category']['jewel']).is_satisfied(player, null)) { // jewel on category itself - unusual
+            count += 1;
         }
         for(var isku = 0; isku < d.user_data['category']['skus'].length; isku++) {
             var skudata = d.user_data['category']['skus'][isku];

@@ -2755,6 +2755,12 @@ def check_store_sku(sku_name, sku):
                     error |= 1
                     print 'store sku %s currency item "%s" needs a store_icon' % (sku_name, item_name)
 
+    if 'jewel' in sku:
+        if type(sku['jewel']) is list and (len(sku['jewel']) == 0 or type(sku['jewel'][0]) is dict):
+            error |= 1; print 'store sku %s "jewel" must be single predicate' % (sku_name)
+        else:
+            error |= check_predicate(sku['jewel'], reason='sku:'+sku_name+':jewel')
+
     if 'ui_banner' in sku:
         if type(sku['ui_banner']) is list:
             error |= check_cond_chain(sku['ui_banner'], reason = 'sku %s: ui_banner' % sku_name)
