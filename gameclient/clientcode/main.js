@@ -13119,19 +13119,20 @@ function invoke_cheat_menu() {
     if(player.is_cheater) {
         layout.add(new SPUI.Button("Remove All Barriers", function() { remove_all_barriers(); change_selection(null); }));
         layout.add(new SPUI.Button("Upgrade All Barriers", function() { upgrade_all_barriers(); change_selection(null); }));
+        layout.add(new SPUI.Button("Give 10,000 Gamebucks", function() { change_selection_ui(null); send_to_server.func(["CAST_SPELL", 0, "CHEAT_GIVE_GAMEBUCKS", 10000]); }));
+        layout.add(new SPUI.Button("Drain Resources", function() { change_selection_ui(null); send_to_server.func(["CAST_SPELL", 0, "CHEAT_DRAIN_RESOURCES"]); }));
+        layout.add(new SPUI.Button("Clear Cooldowns/Auras", function() {
+            change_selection_ui(null);
+            send_to_server.func(["CAST_SPELL", 0, "CHEAT_CLEAR_COOLDOWNS"]);
+            send_to_server.func(["CAST_SPELL", 0, "CHEAT_CLEAR_PLAYER_AURAS"]);
+        }));
     }
     //layout.add(new SPUI.Button("Clear Hostile Units", function() { destroy_all_enemies(); change_selection(null); }));
     //layout.add(new SPUI.Button("Earn Credits Offerwall", Store.earn_fbcredits_with_offers));
     //layout.add(new SPUI.Button("Assign A/B Cohort", invoke_abtest_dialog ));
     //layout.add(new SPUI.Button("Test Video Widget", function() { change_selection(null); SPVideoWidget.init(SPVideoWidget.make_youtube_url('Icf6YiXV08Q'), null); } ));
 
-    layout.add(new SPUI.Button("Give 10,000 Gamebucks", function() { change_selection_ui(null); send_to_server.func(["CAST_SPELL", 0, "CHEAT_GIVE_GAMEBUCKS", 10000]); }));
-    layout.add(new SPUI.Button("Drain Resources", function() { change_selection_ui(null); send_to_server.func(["CAST_SPELL", 0, "CHEAT_DRAIN_RESOURCES"]); }));
-    layout.add(new SPUI.Button("Clear Cooldowns/Auras", function() {
-        change_selection_ui(null);
-        send_to_server.func(["CAST_SPELL", 0, "CHEAT_CLEAR_COOLDOWNS"]);
-        send_to_server.func(["CAST_SPELL", 0, "CHEAT_CLEAR_PLAYER_AURAS"]);
-    }));
+
 
     //layout.add(new SPUI.Button("Simulate Chargeback", function() { change_selection_ui(null); send_to_server.func(["FBPAYMENT_SIMULATE_REFUND"]); }));
 
