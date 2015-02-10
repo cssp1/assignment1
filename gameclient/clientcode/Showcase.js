@@ -30,7 +30,6 @@ Showcase.append_bbcode_text_with_line_breaking = function(widget, big_string, pr
         } else if(n+1 > max_lines) {
             return;
         }
-        console.log(line);
         widget.append_text(SPText.cstring_to_ablocks_bbcode(line, props, click_handlers));
     });
     widget.scroll_to_top();
