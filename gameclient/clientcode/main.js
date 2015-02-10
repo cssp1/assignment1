@@ -41220,6 +41220,8 @@ function handle_server_message(data) {
             }
         }
 
+        session.clear_building_idle_state_caches(); // for ALL buildings
+
     } else if(msg == "BASE_POWER_UPDATE") {
         session.viewing_base.update_power_state(data[1]);
     } else if(msg == "RES_LOOTER_UPDATE") {

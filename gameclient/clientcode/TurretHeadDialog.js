@@ -85,6 +85,47 @@ TurretHeadDialog.ondraw = function(dialog) {
     var recipes_per_page = dialog.data['widgets']['recipe_icon']['array'][0]*dialog.data['widgets']['recipe_icon']['array'][1];
     var grid = [0,0];
 
+    // count current heads, grouped by limited_equipped
+    var count_mounted = {}, count_mounting = {}, count_under_leveled = {};
+    // also look for a building that provides the limited_equipped keys
+    var provides_limit_building = {}, provides_limit_building_can_upgrade = {};
+
+    for(var id in session.cur_objects.objects) {
+        var obj = session.cur_objects.objects[id];
+        if(obj.is_building() && obj.team == 'player') {
+            if(obj.is_emplacement()) {
+                var head = obj.turret_head_item() || obj.turret_head_inprogress_item();
+                if(head) {
+                    var head_spec = ItemDisplay.get_inventory_item_spec(head);
+                    if('limited_equipped' in head_spec) {
+                        var key = head_spec['limited_equipped'];
+                        if(head == obj.turret_head_item()) {
+                            count_mounted[key] = (count_mounted[key]||0) + 1;
+                        } else {
+                            count_mounting[key] = (count_mounting[key]||0) + 1;
+                        }
+                    }
+                    if('level' in head_spec && 'associated_tech' in head_spec) {
+                        var tech_level = player.tech[head_spec['associated_tech']] || 0;
+                        if(tech_level > head_spec['level']) {
+                            count_under_leveled[key] = (count_under_leveled[key]||0) + 1;
+                        }
+                    }
+                }
+            }
+            if('provides_limited_equipped' in obj.spec) {
+                for(var key in obj.spec['provides_limited_equipped']) {
+                    provides_limit_building[key] = obj;
+                    if(obj.level < get_max_ui_level(obj.spec) &&
+                       get_leveled_quantity(obj.spec['provides_limited_equipped'][key], obj.level) <
+                       get_leveled_quantity(obj.spec['provides_limited_equipped'][key], get_max_ui_level(obj.spec))) {
+                        provides_limit_building_can_upgrade[key] = true;
+                    }
+                }
+            }
+        }
+    }
+
     // XXX copy/pasted from update_crafting_dialog()
     if(chapter_pages > 0) {
         dialog.user_data['recipes_by_widget'] = {};
@@ -102,7 +143,7 @@ TurretHeadDialog.ondraw = function(dialog) {
             var can_craft = true;
 
             var product_spec = ItemDisplay.get_inventory_item_spec(spec['product'][0]['spec']);
-            tooltip_text.push(get_crafting_recipe_ui_name(spec));
+            tooltip_text.push(ItemDisplay.strip_inventory_item_ui_name_level_suffix(get_crafting_recipe_ui_name(spec)));
             dialog.widgets['recipe_icon'+wname].asset = get_crafting_recipe_icon(spec);
 
             // get list of any unsatisfied requirements
@@ -121,10 +162,26 @@ TurretHeadDialog.ondraw = function(dialog) {
             if(product_spec['limited_equipped']) {
                 var count = player.count_limited_equipped(product_spec, null);
                 var max = player.stattab['limited_equipped'][product_spec['limited_equipped']] || 0;
+
                 dialog.widgets['recipe_limit'+wname].show = true;
                 dialog.widgets['recipe_limit'+wname].str = dialog.data['widgets']['recipe_limit']['ui_name'].replace('%cur', count.toString()).replace('%max', max.toString());
                 dialog.widgets['recipe_limit'+wname].text_color = SPUI.make_colorv(dialog.data['widgets']['recipe_limit'][(count>=max ? 'text_color_limit' : 'text_color_ok')]);
-                tooltip_text.push(dialog.data['widgets']['recipe_frame']['ui_tooltip_limit'].replace('%cur', count.toString()).replace('%max', max.toString()));
+
+                if(count_mounted[product_spec['limited_equipped']]) {
+                    tooltip_text.push(dialog.data['widgets']['recipe_frame']['ui_tooltip_mounted'].replace('%d', pretty_print_number(count_mounted[product_spec['limited_equipped']]||0)));
+                }
+                if(count_mounting[product_spec['limited_equipped']]) {
+                    tooltip_text.push(dialog.data['widgets']['recipe_frame']['ui_tooltip_mounting'].replace('%d', pretty_print_number(count_mounting[product_spec['limited_equipped']]||0)));
+                }
+                // note: the counts here might not agree with "count"?
+                var ui_limit = dialog.data['widgets']['recipe_frame']['ui_tooltip_limit'].replace('%d', max.toString());
+                if(provides_limit_building[product_spec['limited_equipped']] && provides_limit_building_can_upgrade[product_spec['limited_equipped']]) {
+                    ui_limit += ' '+dialog.data['widgets']['recipe_frame']['ui_tooltip_limit_upgrade'].replace('%building', provides_limit_building[product_spec['limited_equipped']].spec['ui_name']);
+                }
+                tooltip_text.push(ui_limit);
+                if(count_under_leveled[product_spec['limited_equipped']]) {
+                    tooltip_text.push(dialog.data['widgets']['recipe_frame']['ui_tooltip_under_leveled'].replace('%d', pretty_print_number(count_under_leveled[product_spec['limited_equipped']]||0)));
+                }
             } else {
                 dialog.widgets['recipe_limit'+wname].show = false;
             }
