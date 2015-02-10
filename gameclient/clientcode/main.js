@@ -16577,6 +16577,10 @@ function invoke_battle_end_dialog(battle_type, battle_base, battle_opponent_user
                 amount = loot[res] || 0;
             }
             dialog.widgets['loot_'+res+'_amount'].str = pretty_print_number(amount);
+            dialog.widgets['loot_'+res+'_icon'].asset = gamedata['resources'][res]['icon_small'];
+            if(amount) {
+                dialog.widgets['loot_'+res+'_amount'].show = dialog.widgets['loot_'+res+'_icon'].show = true;
+            }
         }
     }
     dialog.widgets['loot_xp_amount'].str = pretty_print_number(loot['xp'] || 0);

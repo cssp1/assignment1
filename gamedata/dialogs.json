@@ -3740,10 +3740,10 @@
     },
 
     "battle_dialog": {
-        "dimensions": [366, 271],
+        "dimensions": [366, 296],
         "default_button": "ok_button",
         "widgets": {
-            "bg": {"kind": "StaticImage", "xy":[0,0], "dimensions":[366,271], "asset":"dialog_resizable","bg_image_resizable":1,
+            "bg": {"kind": "StaticImage", "xy":[0,0], "dimensions":[366,296], "asset":"dialog_resizable","bg_image_resizable":1,
                    "sound": "success_sound_exploding_glass_01" },
             "sunken_left": {"kind": "StaticImage", "xy":[8,9], "dimensions":[116,121], "asset": "dialog_sunken_resizable", "bg_image_resizable": 1 },
             "valentina": { "kind": "StaticImage", "xy": [0,6], "dimensions": [143,155], "clip_to": [12,12,108,115], "asset": "valentina_143x155" },
@@ -3757,33 +3757,32 @@
                             "ui_name": "You Gained:" },
 
             "loot_water_icon": { "kind": "StaticImage", "xy": [136,93], "dimensions": [21,21], "asset": "resource_icon_water" },
-            "loot_water_amount": { "kind": "TextField", "xy": [166,93], "dimensions": [65,19],"text_size": 13, "text_style": "bold",
-                                   "ui_name": "xxx,xxx,xxx" },
+            "loot_water_amount": { "kind": "TextField", "xy": [166,93], "dimensions": [65,19],"text_size": 13, "text_style": "bold" },
 
             "loot_xp_icon": { "show": 0, "kind": "StaticImage", "xy": [251,93], "dimensions": [21,21], "asset": "resource_icon_xp" },
-
-            "loot_xp_amount": { "show": 0, "kind": "TextField", "xy": [281,93], "dimensions": [70,19],"text_size": 13, "text_style": "bold",
-                                "ui_name": "xxx,xxx,xxx" },
+            "loot_xp_amount": { "show": 0, "kind": "TextField", "xy": [281,93], "dimensions": [70,19],"text_size": 13, "text_style": "bold" },
 
             "loot_iron_icon": { "kind": "StaticImage", "xy": [136,118], "dimensions": [21,21], "asset": "resource_icon_iron" },
-            "loot_iron_amount": { "kind": "TextField", "xy": [166,118], "dimensions": [65,19],"text_size": 13, "text_style": "bold",
-                                  "ui_name": "xxx,xxx,xxx" },
+            "loot_iron_amount": { "kind": "TextField", "xy": [166,118], "dimensions": [65,19],"text_size": 13, "text_style": "bold" },
 
-            "trophy_sunken": { "show": 0, "kind": "StaticImage", "xy": [245,94], "dimensions": [112,42], "bg_image_resizable": 1, "asset": "tooltip_bg",
+            "loot_res3_icon": { "show": 0, "kind": "StaticImage", "xy": [136,143], "dimensions": [21,21], "asset": "resource_icon_res3" },
+            "loot_res3_amount": { "show": 0, "kind": "TextField", "xy": [166,143], "dimensions": [65,19],"text_size": 13, "text_style": "bold" },
+
+            "trophy_sunken": { "show": 0, "kind": "StaticImage", "xy": [245,106], "dimensions": [112,42], "bg_image_resizable": 1, "asset": "tooltip_bg",
                                "ui_tooltip": "%s Points", "tooltip_delay": 0, "fixed_tooltip_offset": [242, 148] },
 
-            "trophy_icon": { "show":0, "kind": "StaticImage", "xy": [250,100], "dimensions": [30,30], "asset": "trophy_30x30" },
-            "trophy_amount": { "show":0, "kind": "TextField", "xy": [280,104], "dimensions": [77,21], "text_size": 17, "text_style": "bold",
+            "trophy_icon": { "show":0, "kind": "StaticImage", "xy": [250,112], "dimensions": [30,30], "asset": "trophy_30x30" },
+            "trophy_amount": { "show":0, "kind": "TextField", "xy": [280,116], "dimensions": [77,21], "text_size": 17, "text_style": "bold",
                                "text_hjustify": "center", "ui_name_plus": "+%d", "ui_name_minus": "-%d", "text_color_plus": [1,1,1,1], "text_color_minus": [1,0,0,1] },
-            "trophy_shine": { "show": 0, "alpha": 0.85, "kind": "StaticImage", "xy": [244,94], "dimensions": [62,13], "asset": "button_shine" },
+            "trophy_shine": { "show": 0, "alpha": 0.85, "kind": "StaticImage", "xy": [244,106], "dimensions": [62,13], "asset": "button_shine" },
 
 
-            "splash_image": { "kind": "StaticImage", "xy": [6,146], "dimensions": [354,82], "asset": "splash_defeat" },
+            "splash_image": { "kind": "StaticImage", "xy": [6,171], "dimensions": [354,82], "asset": "splash_defeat" },
 
-            "viral_button": { "kind": "ActionButton", "xy": [6,235], "dimensions": [134,28], "text_offset": [0,1], "show": 0,
+            "viral_button": { "kind": "ActionButton", "xy": [6,260], "dimensions": [134,28], "text_offset": [0,1], "show": 0,
                               "bg_image": "action_button_134px", "text_color": [0,0,0,1], "text_size": 13, "text_style": "bold", "ui_name": "Notify Earth" },
 
-            "ok_button": { "kind": "ActionButton", "xy": [227,235], "dimensions": [134,28], "text_offset": [0,1],
+            "ok_button": { "kind": "ActionButton", "xy": [227,260], "dimensions": [134,28], "text_offset": [0,1],
                            "bg_image": "action_button_134px", "text_color": [0,0,0,1], "text_size": 13, "text_style": "bold", "ui_name": "OK" }
         }
     },
