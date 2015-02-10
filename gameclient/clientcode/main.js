@@ -17779,10 +17779,10 @@ function invoke_building_context_menu(mouse_xy) {
             // moves are not allowed while repairing, constructing, or upgrading
         } else {
             buttons.push(new ContextMenuButton(gamedata['spells']['MOVE_BUILDING']['ui_name'],
-                          function() {
-                              selection.spellname = "MOVE_BUILDING";
-                              change_selection_ui_under(new BuildUICursor(selection.unit, selection.unit.spec));
-                          }));
+                                               (function (_obj) { return function() {
+                                                   selection.spellname = "MOVE_BUILDING";
+                                                   change_selection_ui_under(new BuildUICursor(_obj, _obj.spec));
+                                               }; })(obj)));
         }
     }
 
