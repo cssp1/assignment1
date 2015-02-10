@@ -925,9 +925,20 @@ if __name__ == '__main__':
                 ("portrait", data['villain_portrait'][diff]),
                 ("resources", { "player_level": data['starting_ai_level'][diff]+ i * data['ai_level_gain_per_base'],
                                "water": 0, "iron": 0 }),
-                ("base_richness", data['base_richness'][diff][i]),
-                ("auto_level", 1),
                 ]
+
+            if 'base_resource_loot' in data and data['base_resource_loot'][diff][i] is not None:
+                json += [("base_resource_loot", data['base_resource_loot'][diff][i])]
+                if 'base_richness' in data and data['base_richness'][diff][i] is not None:
+                    raise Exception('you cannot use base_richness at the same time as base_resource_loot')
+            else:
+                assert data['base_richness'][diff][i] is not None
+                rich = data['base_richness'][diff][i]
+                if type(rich) not in (int, float):
+                    raise Exception('base_richness value must be a number: %r' % rich)
+                json += [("base_richness", data['base_richness'][diff][i])]
+
+            json.append(('auto_level',1))
 
             for FIELD in ('ui_info_url', 'analytics_tag'):
                 if FIELD in data: json.append((FIELD, data[FIELD]))
