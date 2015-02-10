@@ -17262,13 +17262,18 @@ function do_harvest(all) {
     var doit = true;
     var num_resources = 0;
 
+    // check for fullness
     for(var rsrc in gamedata['resources']) {
-        if(!all && !(('produces_'+rsrc) in selection.unit.spec)) {
+        var resdata = gamedata['resources'][rsrc];
+        if(all) {
+            if(!find_object_by_type(resdata['harvester_building'])) { // player has no harvesters that yield this resource
+                continue;
+            }
+        } else if(!(('produces_'+rsrc) in selection.unit.spec)) {
             continue; // for single-harvester collect, skip resources other than the one this harvester produces
         }
 
-        if(('loot_storage_warning_if' in gamedata['resources'][rsrc]) &&
-           !read_predicate(gamedata['resources'][rsrc]['loot_storage_warning_if']).is_satisfied(player,null)) { continue; }
+        if(('loot_storage_warning_if' in resdata) && !read_predicate(resdata['loot_storage_warning_if']).is_satisfied(player,null)) { continue; }
 
         num_resources += 1;
         if(player.resource_state[rsrc][1] >= player.resource_state[rsrc][0]) {
