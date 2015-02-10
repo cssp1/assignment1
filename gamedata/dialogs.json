@@ -4059,6 +4059,8 @@
             "row_water_amount": { "type": "same_as", "ref": "loot_xp_amount", "delay": 0.2 },
             "row_iron_icon": { "type": "same_as", "ref": "row_water_icon" },
             "row_iron_amount": { "type": "same_as", "ref": "row_water_amount" },
+            "row_res3_icon": { "type": "same_as", "ref": "row_water_icon" },
+            "row_res3_amount": { "type": "same_as", "ref": "row_water_amount" },
 
             //          "total_name": { "type": "same_as", "ref": "row_name", "delay": 0.9 },
             //          "total_water_icon": { "type": "same_as", "ref": "row_water_icon", "delay": 0.9 },
@@ -4258,6 +4260,8 @@
             "row_water_amount": { "kind": "TextField", "xy": [175,160], "dimensions": [70,19],"text_size": 15, "text_style": "bold" },
             "row_iron_icon": { "kind": "StaticImage", "xy": [145,190], "dimensions": [21,21], "asset": "resource_icon_iron" },
             "row_iron_amount": { "kind": "TextField", "xy": [175,190], "dimensions": [70,19],"text_size": 15, "text_style": "bold" },
+            "row_res3_icon": { "show": 0, "kind": "StaticImage", "xy": [256,160], "dimensions": [21,21], "asset": "resource_icon_res3" },
+            "row_res3_amount": { "show": 0, "kind": "TextField", "xy": [286,160], "dimensions": [70,19],"text_size": 15, "text_style": "bold" },
 
             "you_spent":  { "show": 0, "kind": "TextField", "xy": [45,237], "dimensions": [187,21], "text_size": 16, "text_style": "bold",
                             "text_hjustify": "left", "ui_name": "Spend:" },

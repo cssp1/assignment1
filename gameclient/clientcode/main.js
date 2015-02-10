@@ -16781,6 +16781,14 @@ function invoke_fancy_victory_dialog(battle_type, battle_base, battle_opponent_u
                 /* dialog.widgets['total_'+res+'_amount'].num_val = */ dialog.widgets['row_'+res+'_amount'].num_val = looted_res[res];
                 /* dialog.widgets['total_'+res+'_amount'].str = */ dialog.widgets['row_'+res+'_amount'].str = pretty_print_number(looted_res[res]);
             }
+            if(looted_res[res]) {
+                goog.array.forEach(['row_%s_icon', 'row_%s_amount', 'total_%s_icon', 'total_%s_amount'], function(s) {
+                    var wname = s.replace('%s', res);
+                    if(wname in dialog.widgets) {
+                        dialog.widgets[wname].show = true;
+                    }
+                });
+            }
         }
     } else {
         dialog.widgets['separator_top'].xy = vec_copy(dialog.data['widgets']['separator_top']['xy_home']);
