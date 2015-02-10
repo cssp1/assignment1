@@ -7238,7 +7238,7 @@
 
             // ADDITIONAL STORE ITEMS
             "plus_label": { "show": 0, "kind": "TextField", "xy": [228,371], "dimensions": [100, 30], "text_size": 14, "text_style": "thick", "text_hjustify": "left", "text_color": [1,1,1,1], "drop_shadow": 1, "ui_name": "PLUS:" },
-            "plus_text": { "show": 0, "kind": "ScrollingTextField", "xy": [273,377], "dimensions": [315,64], "text_size": 14, "text_leading": 16,
+            "plus_text": { "show": 0, "kind": "ScrollingTextField", "xy": [273,377], "dimensions": [315,62], "text_size": 14, "text_leading": 16,
                            "text_hjustify": "left", "text_vjustify": "top", "text_color": [1,1,1,1],
                            "ui_name_more": "", // "and more"
                            "link_color": [0.916, 0.549, 0.0015, 1], "drop_shadow": 1 },
