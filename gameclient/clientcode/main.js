@@ -8872,7 +8872,13 @@ function log_exception(e, where) {
     if(e) {
         msg = e.toString();
         if(e.stack) {
-            msg += '\nstack: '+e.stack.toString();
+            // some browsers (Chrome) repeat the message at the beginning of the stack - trim that off
+            var stack = e.stack.toString();
+            if(stack.indexOf(msg) == 0) {
+                stack = stack.slice(msg.length);
+                while(stack.length >= 1 && stack[0] == '\n') { stack = stack.slice(1); } // strip off leading newlines
+            }
+            msg += '\nstack:\n'+stack;
         }
         if(e.message) {
             msg += '\nmessage: '+e.message.toString();
@@ -8887,6 +8893,8 @@ function log_exception(e, where) {
     var MAX_LEN = gamedata['client']['max_exception_msg_length'];
     if(msg.length > MAX_LEN) { msg = msg.slice(0,MAX_LEN); }
     metric_event('0970_client_exception', add_demographics({'method':msg, 'location':where,
+                                                            'since_connect': (session.connected() ? client_time - session.connect_time : -1),
+                                                            'since_pageload': client_time - spin_pageload_begin,
                                                             'gameclient_build_date':(typeof gameclient_build_date === 'undefined' ? 'unknown' : gameclient_build_date),
                                                             'gamedata_build_info':gamedata['gamedata_build_info']}));
 }
