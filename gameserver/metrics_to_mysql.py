@@ -144,6 +144,7 @@ if __name__ == '__main__':
                                    '0280_reward_activate_item_mission',
                                    '0399_tutorial_complete',
                                    '0700_login_abuse_detected',
+                                   '5149_turret_heads_migrated',
                                    '5200_insufficient_resources_dialog',
                                    '5201_insufficient_resources_go_to_store',
                                    '5202_insufficient_resources_topup_dialog',
