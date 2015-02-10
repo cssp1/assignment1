@@ -587,7 +587,8 @@
                                    "ui_tooltip": "%RES in %STORAGES1\nCapacity (Units): %d0\n\nTo increase capacity, upgrade\nor build more %STORAGES2.",
                                    "tooltip_delay": 0,
                                    "fixed_tooltip_offset": [356, 74] },
-            "resource_bar_res3_prog": { "show":0, "kind": "ProgressBar", "xy": [381,34], "dimensions": [77, 17], "flash_color": [1,1,1,1],
+            "resource_bar_res3_prog": { "show":0, "kind": "ProgressBar", "xy": [381,34], "dimensions": [96,18], // deliberately different since this has no "+" button
+                                        "flash_color": [1,1,1,1],
                                         "empty_color": [0.015,0.015,0.015,1], "outline_width": 2,
                                         "outline_color": [0.015,0.015,0.015,1] },
             "resource_bar_res3_icon": { "show":0, "kind": "StaticImage", "xy": [360,33], "dimensions": [21,21] },
@@ -957,7 +958,7 @@
     },
 
     "enemy_resource_bars": {
-        "dimensions": [142,60],
+        "dimensions": [142,100],
         "xy_top_right_under_portrait": [-147,62],
         "xy_top_right": [-147,8],
         "widgets": {
@@ -971,7 +972,13 @@
             "resource_bar_iron_prog": { "kind": "ProgressBar", "xy": [25, 41], "dimensions": [111, 17], "outline_width": 2, "flash_color": [1,1,1,1],
                                         "empty_color": [0.015,0.015,0.015,1], "outline_color": [0.015,0.015,0.015,1] },
             "resource_bar_iron_icon": { "kind": "StaticImage", "xy": [4,39], "dimensions": [21,21], "asset": "resource_icon_iron" },
-            "resource_bar_iron_amount": { "kind": "TextField", "xy": [35,39], "dimensions": [75,21], "text_size": 13, "drop_shadow": 1,  "text_hjustify": "left" }
+            "resource_bar_iron_amount": { "kind": "TextField", "xy": [35,39], "dimensions": [75,21], "text_size": 13, "drop_shadow": 1,  "text_hjustify": "left" },
+
+            "resource_bar_res3": { "kind": "StaticImage", "xy": [0,68], "dimensions": [142,32], "asset": "resource_bar_142px", "ui_tooltip": "Lootable %RES", "tooltip_delay": 0, "fixed_tooltip_offset": [-114,75] },
+            "resource_bar_res3_prog": { "kind": "ProgressBar", "xy": [25, 75], "dimensions": [111, 17], "outline_width": 2, "flash_color": [1,1,1,1],
+                                        "empty_color": [0.015,0.015,0.015,1], "outline_color": [0.015,0.015,0.015,1] },
+            "resource_bar_res3_icon": { "kind": "StaticImage", "xy": [4,73], "dimensions": [21,21], "asset": "resource_icon_res3" },
+            "resource_bar_res3_amount": { "kind": "TextField", "xy": [35,73], "dimensions": [75,21], "text_size": 13, "drop_shadow": 1,  "text_hjustify": "left" }
         }
     },
 

@@ -11259,6 +11259,7 @@ function update_desktop_dialogs() {
                         dialog.widgets['resource_bar_'+res+w].show = show_me;
                     }
                 });
+                dialog.widgets['resource_bar_'+res+'_button'].show = (res == 'fbcredits' || !('allow_instant' in gamedata['resources'][res]) || gamedata['resources'][res]['allow_instant']);
                 dialog.widgets['resource_bar_'+res+'_button'].state = enable_store ? 'normal':'disabled';
             }
         });
@@ -17687,7 +17688,7 @@ function invoke_building_context_menu(mouse_xy) {
 
             if(obj.time_until_finish() > 0) {
                 // object is busy with something, cannot upgrade
-            } else if((session.home_base || quarry_buildable) && (obj.get_max_ui_level() > 1 || (('equip_slots' in obj.spec) && !obj.is_minefield()))) {
+            } else if((session.home_base || quarry_buildable) && (obj.get_max_ui_level() > 1 || obj.is_storage() || (('equip_slots' in obj.spec) && !obj.is_minefield()))) {
                 var spell = gamedata['spells']['SHOW_UPGRADE'];
                 if(obj.level < obj.get_max_ui_level()) {
                     if(gamedata['store']['enable_upgrade_all_barriers'] && (obj.spec['name'] === 'barrier')) {
