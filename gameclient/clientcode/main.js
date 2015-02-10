@@ -13706,7 +13706,7 @@ function invoke_you_were_attacked_dialog(recent_attacks) {
 
     for(var res in gamedata['resources']) {
         if(res+'_amount' in dialog.widgets) {
-            dialog.widgets[res+'_amount'].show = dialog.widgets[res+'_icon'].show = true;
+            dialog.widgets[res+'_amount'].show = dialog.widgets[res+'_icon'].show = !!(lost_res[res]||0);
             dialog.widgets[res+'_icon'].asset = gamedata['resources'][res]['icon_small'];
             dialog.widgets[res+'_amount'].str = pretty_print_number(lost_res[res]||0);
         }
@@ -22628,11 +22628,9 @@ function invoke_battle_log_dialog(from_id, user_id, opprole, summary) {
             }
         }
 
-        dialog.widgets['loot_'+resname].str = pretty_print_number(amount);
-    });
-    goog.object.forEach(gamedata['resources'], function(resdata, resname) {
-        if('loot_'+resname+'_label' in dialog.widgets) {
-            dialog.widgets['loot_'+resname+'_label'].show = dialog.widgets['loot_'+resname].show = true;
+        dialog.widgets['loot_'+resname+'_label'].show = dialog.widgets['loot_'+resname].show = !!amount;
+        if(amount) {
+            dialog.widgets['loot_'+resname].str = pretty_print_number(amount);
             dialog.widgets['loot_'+resname+'_label'].str = dialog.data['widgets']['loot_'+resname+'_label']['ui_name'+(is_lost?'_lost':'')].replace('%RES', resdata['ui_name']);
         }
     });

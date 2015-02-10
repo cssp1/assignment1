@@ -877,9 +877,9 @@
         "xy": [10,150],
         "xy_no_damage": [10,110], // if combat_damage_bar placement is not top_left
         "widgets": {
-            "resource_bar_water_glow": { "kind": "StaticImage", "xy": [-83,1], "dimensions": [307,98], "asset": "resource_bar_glow", "alpha": 0 },
-            "resource_bar_iron_glow": { "kind": "StaticImage", "xy": [-83,35], "dimensions": [307,98], "asset": "resource_bar_glow", "alpha": 0 },
-            "resource_bar_res3_glow": { "kind": "StaticImage", "xy": [-83,69], "dimensions": [307,98], "asset": "resource_bar_glow", "alpha": 0 },
+            "resource_bar_water_glow": { "show": 0, "kind": "StaticImage", "xy": [-83,1], "dimensions": [307,98], "asset": "resource_bar_glow", "alpha": 0 },
+            "resource_bar_iron_glow": { "show": 0, "kind": "StaticImage", "xy": [-83,35], "dimensions": [307,98], "asset": "resource_bar_glow", "alpha": 0 },
+            "resource_bar_res3_glow": { "show": 0, "kind": "StaticImage", "xy": [-83,69], "dimensions": [307,98], "asset": "resource_bar_glow", "alpha": 0 },
 
             "resource_bar_water": { "kind": "StaticImage", "xy": [0,34], "dimensions": [142,32], "asset": "resource_bar_142px", "ui_tooltip": "%RES looted", "tooltip_delay": 0, "fixed_tooltip_offset": [154,41] },
             "resource_bar_water_prog": { "kind": "ProgressBar", "xy": [25, 41], "dimensions": [111, 17], "outline_width": 2, "flash_color": [1,1,1,1],
@@ -4914,14 +4914,14 @@
                              "ui_name": "99%" },
 
             "water_icon": { "kind": "StaticImage", "xy": [42,123], "dimensions": [21,21], "asset": "resource_icon_water" },
-            "water_amount": { "kind": "TextField", "xy": [77,123], "dimensions": [83,21], "ui_name": "xxx,xxx,xxx",
+            "water_amount": { "kind": "TextField", "xy": [77,123], "dimensions": [83,21],
                               "text_size": 13, "text_style": "bold" },
             "iron_icon": { "kind": "StaticImage", "xy": [42,151], "dimensions": [21,21], "asset": "resource_icon_iron" },
-            "iron_amount": { "kind": "TextField", "xy": [77,151], "dimensions": [83,21], "ui_name": "xxx,xxx,xxx",
+            "iron_amount": { "kind": "TextField", "xy": [77,151], "dimensions": [83,21],
                              "text_size": 13, "text_style": "bold" },
 
-            "res3_icon": { "kind": "StaticImage", "xy": [42,179], "dimensions": [21,21], "asset": "resource_icon_res3" },
-            "res3_amount": { "kind": "TextField", "xy": [77,179], "dimensions": [83,21], "ui_name": "xxx,xxx,xxx",
+            "res3_icon": { "show": 0, "kind": "StaticImage", "xy": [42,179], "dimensions": [21,21], "asset": "resource_icon_res3" },
+            "res3_amount": { "show": 0, "kind": "TextField", "xy": [77,179], "dimensions": [83,21],
                              "text_size": 13, "text_style": "bold" },
 
             "attacked_by": { "kind": "TextField", "xy": [32,205], "dimensions": [277,22], "text_size": 13, "text_style": "normal",
