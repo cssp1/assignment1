@@ -22621,6 +22621,7 @@ function invoke_battle_log_dialog(from_id, user_id, opprole, summary) {
     });
     goog.object.forEach(gamedata['resources'], function(resdata, resname) {
         if('loot_'+resname+'_label' in dialog.widgets) {
+            dialog.widgets['loot_'+resname+'_label'].show = dialog.widgets['loot_'+resname].show = true;
             dialog.widgets['loot_'+resname+'_label'].str = dialog.data['widgets']['loot_'+resname+'_label']['ui_name'+(is_lost?'_lost':'')].replace('%RES', resdata['ui_name']);
         }
     });

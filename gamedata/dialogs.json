@@ -5933,15 +5933,20 @@
             "message_button":  { "kind": "ActionButton", "xy": [55,342], "dimensions": [74,27], "bg_image": "menu_button_74x27px", "text_size": 13, "text_style": "bold",
                                  "ui_name": "Trash Talk", "show": 0 },
 
-            "loot_iron_label": { "kind": "TextField", "xy": [57,235], "dimensions": [105,19],"text_size": 13, "text_style": "bold",
-                                 "text_hjustify": "left", "ui_name": "%RES looted", "ui_name_lost": "%RES lost" },
-            "loot_iron": { "kind": "TextField", "xy": [57,254], "dimensions": [105,19],"text_size": 13, "text_style": "normal",
+            "loot_iron_label": { "show": 0, "kind": "TextField", "xy": [53,235], "dimensions": [105,19],"text_size": 13, "text_style": "bold",
+                                 "text_hjustify": "left", "ui_name": "%RES loot", "ui_name_lost": "%RES lost" },
+            "loot_iron": { "show": 0, "kind": "TextField", "xy": [53,254], "dimensions": [105,19],"text_size": 13, "text_style": "normal",
                            "text_hjustify": "left", "text_color": [0.8,0.8,0.8,1], "ui_name": "-" },
-            "loot_water_label": { "kind": "TextField", "xy": [57,285], "dimensions": [105,19],"text_size": 13, "text_style": "bold",
-                                  "text_hjustify": "left", "ui_name": "%RES looted", "ui_name_lost": "%RES lost" },
-            "loot_water": { "kind": "TextField", "xy": [57,304],
+            "loot_water_label": { "show": 0, "kind": "TextField", "xy": [53,285], "dimensions": [105,19],"text_size": 13, "text_style": "bold",
+                                  "text_hjustify": "left", "ui_name": "%RES loot", "ui_name_lost": "%RES lost" },
+            "loot_water": { "show": 0, "kind": "TextField", "xy": [53,304],
                             "dimensions": [105,19],"text_size": 13, "text_style": "normal",
                             "text_hjustify": "left", "text_color": [0.8,0.8,0.8,1], "ui_name": "-" },
+            "loot_res3_label": { "show": 0, "kind": "TextField", "xy": [53,335], "dimensions": [105,19],"text_size": 13, "text_style": "bold",
+                                 "text_hjustify": "left", "ui_name": "%RES loot", "ui_name_lost": "%RES lost" },
+            "loot_res3": { "show": 0, "kind": "TextField", "xy": [53,354],
+                           "dimensions": [105,19],"text_size": 13, "text_style": "normal",
+                           "text_hjustify": "left", "text_color": [0.8,0.8,0.8,1], "ui_name": "-" },
 
             "trophy_sunken": { "show": 0, "kind": "StaticImage", "xy": [55,185], "dimensions": [100,42], "bg_image_resizable": 1, "asset": "tooltip_bg",
                                "ui_tooltip": "Points", "tooltip_delay": 0, "fixed_tooltip_offset": [85, 239] },
@@ -5972,7 +5977,7 @@
             "battle_duration": { "kind": "TextField", "xy": [517,129], "dimensions": [105,19],"text_size": 13, "text_style": "thick",
                                  "text_hjustify": "left", "ui_name": "Battle Duration: %s" },
 
-            "divider": { "kind": "Line", "xy": [166, 81], "dimensions": [0, 317], "color": [0.7,0.7,0.7,0.5], "stroke_width": 1 },
+            "divider": { "kind": "Line", "xy": [172, 81], "dimensions": [0, 317], "color": [0.7,0.7,0.7,0.5], "stroke_width": 1 },
 
             // full size xy 186,80 dims 492 313
             "log": { "kind": "ScrollingTextField", "xy": [186,172], "dimensions": [492,221], "text_size": 13, "text_hjustify": "left",
