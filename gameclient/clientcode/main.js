@@ -43259,23 +43259,25 @@ function do_on_mouseup(e) {
             do_build(ji);
             return;
         } else if(selection.spellname === "MOVE_BUILDING") {
-            ji = player.quantize_building_location(ji, selection.unit.spec);
-            if((ji[0] != selection.unit.x || ji[1] != selection.unit.y) &&
-               player.is_building_location_valid(ji, selection.unit.spec, selection.unit, {ignore_perimeter: !!selection.unit.spec['ignore_perimeter']})) {
-                send_to_server.func(["CAST_SPELL",
-                                selection.unit.id,
-                                selection.spellname,
-                                ji]);
-                // play sound effect
-                if(1) {
-                    var state = GameArt.assets['action_button_134px'].states['bigaction'];
-                    if(state.audio) { state.audio.play(client_time); }
-                }
+            if(selection.unit && ((selection.unit.is_building() && selection.unit.team == 'player') || player.is_cheater)) {
+                ji = player.quantize_building_location(ji, selection.unit.spec);
+                if((ji[0] != selection.unit.x || ji[1] != selection.unit.y) &&
+                   player.is_building_location_valid(ji, selection.unit.spec, selection.unit, {ignore_perimeter: !!selection.unit.spec['ignore_perimeter']})) {
+                    send_to_server.func(["CAST_SPELL",
+                                         selection.unit.id,
+                                         selection.spellname,
+                                         ji]);
+                    // play sound effect
+                    if(1) {
+                        var state = GameArt.assets['action_button_134px'].states['bigaction'];
+                        if(state.audio) { state.audio.play(client_time); }
+                    }
 
-                // client-side predict - not 100% sure if this is safe?
-                var old_x = selection.unit.x, old_y = selection.unit.y;
-                selection.unit.x = ji[0]; selection.unit.y = ji[1];
-                selection.unit.update_map(old_x, old_y, selection.unit.is_destroyed());
+                    // client-side predict - not 100% sure if this is safe?
+                    var old_x = selection.unit.x, old_y = selection.unit.y;
+                    selection.unit.x = ji[0]; selection.unit.y = ji[1];
+                    selection.unit.update_map(old_x, old_y, selection.unit.is_destroyed());
+                }
             }
             change_selection(null);
             return;
