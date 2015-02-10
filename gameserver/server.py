@@ -18689,7 +18689,7 @@ class GAMEAPI(resource.Resource):
                     spec = session.player.get_abtest_spec(GameObjectSpec, item['spec'])
                     qty = item.get('stack',1)
                     deployed_qty = 0
-                    level = session.player.tech.get(spec.level_determined_by_tech, 1)
+                    level = session.player.tech.get(spec.level_determined_by_tech, 1) # XXXXXX allow level to transfer?
 
                     # skip inapplicable units
                     if (not session.viewing_base.can_deploy_unit(spec)): continue

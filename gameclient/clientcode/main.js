@@ -12950,8 +12950,17 @@ function add_unit_deployment_vfx(kind, ji, spec, level) {
 function do_deploy(ji, ids_to_deploy) {
     send_to_server.func(["CAST_SPELL", 0, "DEPLOY_UNITS", ji, ids_to_deploy]);
 
-    var army_unit = session.pre_deploy_units[ids_to_deploy[0]];
-    add_unit_deployment_vfx('pre_deploy', ji, gamedata['units'][army_unit['spec']], army_unit['level']);
+    var fx_specname, fx_level;
+    if(ids_to_deploy[0] == 'DONATED_UNITS') {
+        var item = player.donated_units[0];
+        fx_specname = item['spec'];
+        fx_level = Math.max(item['level']||1, unit_unlock_level(item['spec']));
+    } else {
+        var army_unit = session.pre_deploy_units[ids_to_deploy[0]];
+        fx_specname = army_unit['spec'];
+        fx_level = army_unit['level'];
+    }
+    add_unit_deployment_vfx('pre_deploy', ji, gamedata['units'][fx_specname], fx_level);
 
     goog.array.forEach(ids_to_deploy, function(obj_id) {
         session.post_deploy_units[obj_id] = session.pre_deploy_units[obj_id];
