@@ -28608,7 +28608,7 @@ function manufacture_dialog_unlock_helper(category, specname, reason) {
                 // pass "even_if_tutorial_incomplete" option since this is vital for the manufacture_dialog to work properly, even during the tutorial
                 return get_requirements_help(read_predicate(pred), null, {even_if_tutorial_incomplete:1});
             } else {
-                throw Error('cannot determine what is wrong for '+specname+' reason '+reason);
+                throw Error('cannot determine what is wrong for '+specname+' reason '+reason+' current unlock level '+unit_unlock_level(specname).toString());
             }
         } else {
             // fall through
@@ -28912,9 +28912,11 @@ function update_manufacture_dialog(dialog) {
         widget.onenter = (function(_name) { return function(w) { manufacture_dialog_select_unit(w.parent, _name); } })(name);
 
         // this is the function that handles the mouse click
-        var closure = (function(builder, spec_name, unlock_level) {
+        var closure = (function(spec_name) {
             return function(w) {
                 var dialog = w.parent;
+                var builder = dialog.user_data['builder'];
+                var unlock_level = unit_unlock_level(spec_name);
 
                 if(player.is_cheater) {
                     var props = {}; props[spec_name] = 1;
@@ -29028,7 +29030,7 @@ function update_manufacture_dialog(dialog) {
                     if(helper) { helper(); }
                 }
             };
-        })(builder, name, unit_unlock_level(name));
+        })(name);
         widget.onclick = closure;
 
         if(!gamedata['client']['unit_manufacture_dripper']) {
