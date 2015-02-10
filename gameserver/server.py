@@ -7105,7 +7105,7 @@ class Player(AbstractPlayer):
         for obj in self.home_base_iter():
             if obj.is_building() and obj.is_crafter() and obj.is_crafting():
                 for bus in obj.crafting.queue:
-                    if 'delivery' in bus.craft_state and ('obj_id' in bus.craft_state['delivery']):
+                    if bus.craft_state.get('delivery',None) and ('obj_id' in bus.craft_state['delivery']):
                         recipe_name = bus.craft_state['recipe']
                         recipe = gamedata['crafting']['recipes'].get(recipe_name, None)
                         if recipe:
