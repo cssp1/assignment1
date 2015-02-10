@@ -12340,7 +12340,7 @@ class Store:
             return p
 
         # only check for currency match when price > 0
-        if (not sale_currency.startswith('item:')):
+        if (not (sale_currency.startswith('item:') or (sale_currency in gamedata['resources']))):
             spell_currency = spell.get('currency', session.player.get_any_abtest_value('currency', gamedata['currency']) if session else gamedata['currency'])
             if spell_currency == 'fbpayments:*' and sale_currency.startswith('fbpayments:'):
                 pass
@@ -13193,7 +13193,13 @@ class Store:
         Store.execute_order(gameapi, request, session, retmsg, 'item:'+str(item_name), amount_willing_to_pay,
                             unit_id, spellname, spellarg,
                             server_time_according_to_client)
-
+    @classmethod
+    def execute_fungible_order(cls, gameapi, request, session, retmsg, resname, amount_willing_to_pay,
+                               unit_id, spellname, spellarg,
+                               server_time_according_to_client):
+        Store.execute_order(gameapi, request, session, retmsg, resname, amount_willing_to_pay,
+                            unit_id, spellname, spellarg,
+                            server_time_according_to_client)
     @classmethod
     def execute_order(cls, gameapi, request, session, retmsg, currency, amount_willing_to_pay,
                       unit_id, spellname, spellarg,
@@ -13279,6 +13285,10 @@ class Store:
             item_name = currency.split(':')[1]
             record_spend_type = item_name
             record_price_type = item_name+'_price'
+            record_amount = amount_willing_to_pay
+        elif currency in gamedata['resources']:
+            record_spend_type = currency
+            record_price_type = currency+'_price'
             record_amount = amount_willing_to_pay
         else:
             raise Exception('unknown currency '+currency)
@@ -21668,6 +21678,41 @@ class GAMEAPI(resource.Resource):
             finally:
                 retmsg.append(["ITEM_ORDER_ACK", tag, success])
                 session.player.send_inventory_update(retmsg)
+
+        elif arg[0] == "FUNGIBLE_ORDER":
+            tag = arg[1]
+            resname = arg[2]
+            client_price = int(arg[3])
+            unit_id = arg[4]
+            spellname = arg[5]
+            spellarg = arg[6]
+            server_time_according_to_client = arg[7]
+            success = False
+
+            # note: client_price is UNTRUSTED input, but if it's too low, then execute_order() will throw an exception
+            assert client_price >= 0
+
+            try:
+                # check for insufficient resources
+                if getattr(session.player.resources, resname) < client_price:
+                    retmsg.append(["ERROR", "INSUFFICIENT_"+resname.upper(), client_price])
+                else:
+                    Store.execute_fungible_order(self, request, session, retmsg, resname, client_price,
+                                                 unit_id, spellname, spellarg,
+                                                 server_time_according_to_client)
+                    # at this point the order has changed player state, so go ahead and take the resources
+                    negative_cost = {resname: -client_price}
+                    session.player.resources.gain_res(negative_cost, reason='fungible_order')
+                    admin_stats.econ_flow_res(session.player, 'consumption', 'store_purchase', negative_cost) # may want more detail by specifying an econ_category on the item or store sku
+                    success = True
+
+            except Exception:
+                text = traceback.format_exc()
+                gamesite.exception_log.event(server_time, 'FUNGIBLE_ORDER Exception: '+text)
+                retmsg.append(["ERROR", "ORDER_PROCESSING"])
+
+            retmsg.append(["FUNGIBLE_ORDER_ACK", tag, success])
+            retmsg.append(["PLAYER_STATE_UPDATE", session.player.resources.calc_snapshot().serialize()])
 
         elif arg[0] == "DSTROY_OBJECT":
             id = arg[1]

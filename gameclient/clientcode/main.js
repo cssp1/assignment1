@@ -35946,6 +35946,8 @@ function update_new_store_sku(d) {
             d.widgets['price_icon'].asset = 'resource_icon_fbcredits';
         } else if(sale_currency.indexOf('item:') === 0) {
             d.widgets['price_icon'].asset = ItemDisplay.get_inventory_item_spec(sale_currency.split(':')[1])['store_icon'];
+        } else if(sale_currency in gamedata['resources']) {
+            d.widgets['price_icon'].asset = gamedata['resources'][sale_currency]['icon_small'];
         } else {
             throw Error('unknown sale_currency '+sale_currency);
         }
@@ -35958,6 +35960,9 @@ function update_new_store_sku(d) {
             var currency_item_spec = ItemDisplay.get_inventory_item_spec(sale_currency.split(':')[1]);
             d.widgets['price_display'].tooltip.str = (shown_price > 0 ? gamedata['strings']['store']['buy_for'].replace('%s',
                                                                                                                         ItemDisplay.get_inventory_item_stack_prefix(currency_item_spec, shown_price)+ItemDisplay.get_inventory_item_ui_name(currency_item_spec)) : null);
+        } else if(sale_currency in gamedata['resources']) {
+            d.widgets['price_display'].str = (shown_price > 0 ? pretty_print_number(shown_price) : '-');
+            d.widgets['price_display'].tooltip.str = (shown_price > 0 ? gamedata['strings']['store']['buy_for'].replace('%s', pretty_print_number(shown_price) + ' ' +gamedata['resources'][sale_currency]['ui_name']) : null);
         }
     }
 
@@ -38522,7 +38527,7 @@ Store.get_price = function(sale_currency, unit_id, spell, spellarg, ignore_error
     if(p <= 0) { return p; }
 
     // only check for currency match when price > 0
-    if(sale_currency.indexOf('item:') !== 0) {
+    if(sale_currency.indexOf('item:') !== 0 && !(sale_currency in gamedata['resources'])) {
         var spell_currency = ('currency' in spell ? spell['currency'] : Store.get_user_currency());
         if(sale_currency != spell_currency) { return -1; }
     }
@@ -39528,6 +39533,8 @@ Store.place_order = function(currency, unit_id, spellname, spellarg, cb, props) 
         return Store.place_gamebucks_order(price, unit_id, spellname, spellarg, cb);
     } else if(currency.indexOf('item:') === 0) {
         return Store.place_item_order(currency.split(':')[1], price, unit_id, spellname, spellarg, cb);
+    } else if(currency in gamedata['resources']) {
+        return Store.place_fungible_order(currency, price, unit_id, spellname, spellarg, cb);
     } else {
         throw Error('unknown currency '+currency);
     }
@@ -39578,6 +39585,35 @@ Store.place_item_order = function(specname, price, unit_id, spellname, spellarg,
     if(cb) {
         Store.item_order_receivers[tag] = cb;
     }
+    return true;
+}
+
+Store.fungible_order_serial = 7345;
+Store.fungible_order_receivers = {};
+Store.place_fungible_order = function(resname, price, unit_id, spellname, spellarg, cb) {
+    var has_qty = player.resource_state[resname][1];
+    if(has_qty < price) {
+        var resources_needed = {}; resources_needed[resname] = price - has_qty;
+        var helper = get_requirements_help('resources', resources_needed, {even_if_tutorial_incomplete:true, continuation: null}); // maybe cb?
+        if(helper) {
+            helper();
+        } else { // worst-case fallback
+            var cost = {}; cost[resname] = price;
+            invoke_insufficient_resources_message(cost, gamedata['errors']['INSUFFICIENT_RESOURCES']['ui_name']);
+        }
+        return false;
+    }
+
+    Store.fungible_order_serial += 1;
+    var tag = "fo"+Store.fungible_order_serial.toString();
+    send_to_server.func(["FUNGIBLE_ORDER", tag, resname, price, unit_id, spellname, spellarg, Math.floor(server_time)]);
+    if(cb) {
+        Store.fungible_order_receivers[tag] = cb;
+    }
+
+    // client-side prediction
+    player.resource_state[resname][1] -= price;
+
     return true;
 }
 
@@ -42489,6 +42525,13 @@ function handle_server_message(data) {
         if(tag in Store.item_order_receivers) {
             var cb = Store.item_order_receivers[tag];
             delete Store.item_order_receivers[tag];
+            cb(success);
+        }
+    } else if(msg == "FUNGIBLE_ORDER_ACK") {
+        var tag = data[1], success = data[2];
+        if(tag in Store.fungible_order_receivers) {
+            var cb = Store.fungible_order_receivers[tag];
+            delete Store.fungible_order_receivers[tag];
             cb(success);
         }
     } else if(msg == "FBCREDITS_ORDER_ACK" || msg == "KGCREDITS_ORDER_ACK") {
