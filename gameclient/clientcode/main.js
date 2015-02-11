@@ -21871,48 +21871,88 @@ function update_unit_donation_dialog(dialog) {
     var pending = dialog.user_data['pending'];
     var alliance_building = dialog.user_data['alliance_building'];
     var proposed_space = 0;
+
+    /** @type {Object.<string,number>} specname -> number proposed for donation */
     var donation_by_type = {};
 
     var max_individual_space = (alliance_building ? alliance_building.get_leveled_quantity(alliance_building.spec['max_individual_donation_space']) : 0);
 
-    // trim nonexistent, damaged, or too-big units out of donation
+    // "army" or "session"
+    var source = gamedata['donated_units_source'] || 'session';
+    if(!goog.array.contains(['army','session'], source)) { throw Error('bad donated_units_source '+source); }
+
+    // trim nonexistent, damaged, or too-big units out of proposed donation
     for(var i = 0; i < donation.length; i++) {
-        if(!(donation[i] in session.cur_objects.objects)) {
+        if((source == 'session' && !(donation[i] in session.cur_objects.objects)) ||
+           (source == 'army' && !(donation[i] in player.my_army))) {
             donation.splice(i,1); continue;
         }
-        var obj = session.cur_objects.objects[donation[i]];
-        var space = get_leveled_quantity(obj.spec['consumes_space'], obj.level);
+
+        var obj_spec, obj_level, hp_ratio;
+        if(source == 'session') {
+            var obj = session.cur_objects.objects[donation[i]];
+            obj_spec = obj.spec;
+            obj_level = obj.level;
+            hp_ratio = obj.hp / obj.max_hp;
+        } else if(source == 'army') {
+            var unit = player.my_army[donation[i]];
+            if(SQUAD_IDS.is_mobile_squad_id(unit['squad_id']||0)) { // can't donate units in mobile squads
+                donation.splice(i,1); continue;
+            }
+            obj_spec = gamedata['units'][unit['spec']];
+            obj_level = ('level' in unit ? unit['level'] : 1);
+            hp_ratio = ('hp_ratio' in unit ? unit['hp_ratio'] : 1);
+        }
+        var space = get_leveled_quantity(obj_spec['consumes_space'], obj_level);
         proposed_space += space;
 
-        if((obj.hp < obj.max_hp) || (proposed_space + req['cur_space'] > req['max_space'])) {
+        if((hp_ratio < 1) || (proposed_space + req['cur_space'] > req['max_space'])) {
             // damaged, or won't fit
             proposed_space -= space;
             donation.splice(i,1); continue;
         }
-        if(!(obj.spec['name'] in donation_by_type)) { donation_by_type[obj.spec['name']] = 0; }
-        donation_by_type[obj.spec['name']] += 1;
+        if(!(obj_spec['name'] in donation_by_type)) { donation_by_type[obj_spec['name']] = 0; }
+        donation_by_type[obj_spec['name']] += 1;
     }
 
     var cur_plus_proposed_space = req['cur_space']+proposed_space;
 
+    /** @type {Array.<{obj_id:string, spec:string, level:number}>} */
     var available_unit_list = [];
-    for(var id in session.cur_objects.objects) {
-        var obj = session.cur_objects.objects[id];
-        if(obj.is_mobile() && (obj.team === 'player') && (obj.hp >= obj.max_hp)) {
-            available_unit_list.push(obj);
+
+    if(source == 'session') {
+        for(var id in session.cur_objects.objects) {
+            var obj = session.cur_objects.objects[id];
+            if(obj.is_mobile() && (obj.team === 'player') && (obj.hp >= obj.max_hp)) {
+                available_unit_list.push({obj_id: obj.id, spec: obj.spec['name'], level:obj.level});
+            }
         }
+    } else if(source == 'army') {
+        goog.object.forEach(player.my_army, function(unit) {
+            if(!('hp_ratio' in unit) || unit['hp_ratio'] >= 1 &&
+               !SQUAD_IDS.is_mobile_squad_id(unit['squad_id']||0)) {
+                available_unit_list.push({obj_id: unit['obj_id'], spec: unit['spec'], level: ('level' in unit ? unit['level'] : 1)});
+            }
+        });
     }
+
+    /** @type {Object.<string,number>} specname -> number available */
     var available_units_by_type = {};
     for(var i = 0; i < available_unit_list.length; i++) {
         var unit = available_unit_list[i];
-        if(!(unit.spec['name'] in available_units_by_type)) {
-            available_units_by_type[unit.spec['name']] = 0;
+        if(!(unit.spec in available_units_by_type)) {
+            available_units_by_type[unit.spec] = 0;
         }
-        available_units_by_type[unit.spec['name']] += 1;
+        available_units_by_type[unit.spec] += 1;
     }
 
     // iterate in order found in units.json
-    var available_unit_types = [], donation_unit_types = [];
+
+    /** @type {Array.<string>} list of specnames */
+    var available_unit_types = [];
+    /** @type {Array.<string>} list of specnames */
+    var donation_unit_types = [];
+
     for(var specname in gamedata['units']) {
         if(specname in available_units_by_type) {
             available_unit_types.push(specname);
@@ -21936,7 +21976,9 @@ function update_unit_donation_dialog(dialog) {
             dialog.widgets['my_item'+wname].show =
             dialog.widgets['my_stack'+wname].show =
             dialog.widgets['my_frame'+wname].show = true;
-        dialog.widgets['my_item'+wname].asset = get_leveled_quantity(gamedata['units'][specname]['art_asset'],1);
+        var asset_name = get_leveled_quantity(gamedata['units'][specname]['icon'] || gamedata['units'][specname]['art_asset'],1);
+        dialog.widgets['my_item'+wname].asset = asset_name;
+        dialog.widgets['my_item'+wname].state = GameArt.assets[asset_name].has_state('icon') ? 'icon' : 'normal';
         dialog.widgets['my_stack'+wname].str = pretty_print_number(qty);
 
         var ttip, ttip_s = '', ttip_bldg = '', ttip_col = SPUI.default_text_color, upgrade_alliance_building_level = -1;
@@ -21972,30 +22014,43 @@ function update_unit_donation_dialog(dialog) {
                 if(helper) { helper(); }
             }; })(upgrade_alliance_building_level);
         } else {
-            dialog.widgets['my_frame'+wname].onclick = (function (_specname) { return function(w) {
+            dialog.widgets['my_frame'+wname].onclick = (function (_source, _specname) { return function(w) {
                 var _dialog = w.parent;
+
+                // find ID of next unit to donate
+                var obj_id = null;
+
                 // XXX really inefficient
-                var obj = null;
-                for(var id in session.cur_objects.objects) {
-                    var o = session.cur_objects.objects[id];
-                    if((o.spec['name'] === _specname) && (o.team === 'player') && (o.hp >= o.max_hp)) {
-                        var found = false;
-                        for(var i = 0; i < _dialog.user_data['donation'].length; i++) {
-                            if(_dialog.user_data['donation'][i] == o.id) {
-                                found = true; break;
+                if(_source == 'session') {
+                    for(var id in session.cur_objects.objects) {
+                        var o = session.cur_objects.objects[id];
+                        if((o.spec['name'] === _specname) && (o.team === 'player') && (o.hp >= o.max_hp)) {
+                            if(!goog.array.contains(_dialog.user_data['donation'], o.id)) {
+                                // found a new candidate
+                                obj_id = o.id;
+                                break;
                             }
                         }
-                        if(!found) {
-                            obj = o; break;
+                    }
+                } else if(_source == 'army') {
+                    for(var id in player.my_army) {
+                        var o = player.my_army[id];
+                        if(o['spec'] == _specname && (!('hp_ratio' in o) || o['hp_ratio'] >= 1)) {
+                            if(!goog.array.contains(_dialog.user_data['donation'], id)) {
+                                // found a new candidate
+                                obj_id = id;
+                                break;
+                            }
                         }
                     }
                 }
-                if(obj) {
-                    _dialog.user_data['donation'].push(obj.id);
+
+                if(obj_id) {
+                    _dialog.user_data['donation'].push(obj_id);
                 } else {
                     console.log('could not find unit to donate of type '+_specname);
                 }
-            }; })(specname);
+            }; })(source, specname);
         }
 
         my_unit_slot += 1;
@@ -22027,21 +22082,32 @@ function update_unit_donation_dialog(dialog) {
         var specname = donation_unit_types[donate_unit_slot];
         var qty = (donation_by_type[specname] || 0);
 
-        dialog.widgets['donate_item'+wname].asset = get_leveled_quantity(gamedata['units'][specname]['art_asset'],1);
+        var asset_name = get_leveled_quantity(gamedata['units'][specname]['icon'] || gamedata['units'][specname]['art_asset'],1);
+
+        dialog.widgets['donate_item'+wname].asset = asset_name;
+        dialog.widgets['donate_item'+wname].state = GameArt.assets[asset_name].has_state('icon') ? 'icon' : 'normal';
         dialog.widgets['donate_stack'+wname].str = pretty_print_number(qty);
         dialog.widgets['donate_frame'+wname].tooltip.str = gamedata['units'][specname]['ui_name'];
         dialog.widgets['donate_frame'+wname].onclick =
-            dialog.widgets['donate_cancel'+wname].onclick = (function (_specname) { return function(w) {
+            dialog.widgets['donate_cancel'+wname].onclick = (function (_source, _specname) { return function(w) {
                 var _dialog = w.parent;
                 // XXX really inefficient
                 for(var i = 0; i < _dialog.user_data['donation'].length; i++) {
-                    var o = session.cur_objects.objects[_dialog.user_data['donation'][i]];
-                    if(o && o.spec['name'] === _specname) {
-                        _dialog.user_data['donation'].splice(i, 1);
-                        break;
+                    if(_source == 'session') {
+                        var o = session.cur_objects.objects[_dialog.user_data['donation'][i]];
+                        if(o && o.spec['name'] === _specname) {
+                            _dialog.user_data['donation'].splice(i, 1);
+                            break;
+                        }
+                    } else if(_source == 'army') {
+                        var o = player.my_army[_dialog.user_data['donation'][i]];
+                        if(o['spec'] == _specname) {
+                            _dialog.user_data['donation'].splice(i, 1);
+                            break;
+                        }
                     }
                 }
-            }; })(specname);
+            }; })(source, specname);
 
         donate_unit_slot += 1;
     }
