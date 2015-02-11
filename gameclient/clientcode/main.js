@@ -17269,6 +17269,9 @@ function do_harvest(all) {
         var resdata = gamedata['resources'][rsrc];
         if(all) {
             if(!find_object_by_type(resdata['harvester_building'])) { // player has no harvesters that yield this resource
+                // note: this won't catch remote quarries that yield the resource
+                // but, the plan is to have an unlock requirement that prevents you from
+                // attacking a quarry until you have a storage for the contained resources.
                 continue;
             }
         } else if(!(('produces_'+rsrc) in selection.unit.spec)) {
