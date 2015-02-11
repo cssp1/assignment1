@@ -2822,6 +2822,9 @@ class Session(object):
         self.deferred_stattab_update = False
         self.deferred_history_update = False
         self.deferred_power_change = False
+        self.deferred_player_state_update = False
+        self.deferred_donated_units_update = False
+        self.deferred_object_state_updates = set()
 
         # prevent overlapping SPROBE_RUN requests
         self.sprobe_in_progress = False
@@ -18343,7 +18346,7 @@ class GAMEAPI(resource.Resource):
     # deploy units against a foreign (human or AI) player
     def do_attack(self, session, retmsg, spellargs):
         loc = spellargs[0]
-        unit_dic = spellargs[1]
+        unit_id_list = spellargs[1]
 
         if session.complete_attack_in_progress:
             # This can happen due to race conditions, like the server
@@ -18358,11 +18361,11 @@ class GAMEAPI(resource.Resource):
 
         if session.complete_attack_in_progress or session.visit_base_in_progress or session.logout_in_progress or (not session.has_attacked and (session.viewing_base_lock is not None)):
             retmsg.append(["ERROR", "SERVER_PROTOCOL"])
-            gamesite.exception_log.event(server_time, 'do_attack() with invalid session state: %s args [%r,%r]' % (session.dump_exception_state(), loc, unit_dic))
+            gamesite.exception_log.event(server_time, 'do_attack() with invalid session state: %s args [%r,%r]' % (session.dump_exception_state(), loc, unit_id_list))
             return
 
-        # if unit_dic is empty, that means the client wants to start the fight but not deploy any units right away
-        if len(unit_dic) and (not session.viewing_base.is_deployment_location_valid(session.player, loc)):
+        # if unit_id_list is empty, that means the client wants to start the fight but not deploy any units right away
+        if len(unit_id_list) and (not session.viewing_base.is_deployment_location_valid(session.player, loc)):
             retmsg.append(["ERROR", "CANNOT_DEPLOY_INVALID_LOCATION"])
             return
 
@@ -18704,51 +18707,54 @@ class GAMEAPI(resource.Resource):
             if ai_data and ('on_attack' in ai_data):
                 session.execute_consequent_safe(ai_data['on_attack'], session.player, retmsg, reason='on_attack')
 
+            session.deferred_player_state_update = True # for removal of protection time etc
+
         deployment_limit = session.player.stattab.get_player_stat('deployable_unit_space')
 
         # dump mobile units from player's base into the session
         units = []
+        need_donated_units_update = False
 
-        for obj_id in unit_dic:
-            if obj_id == 'DONATED_UNITS':
-                to_remove = []
-                for item in session.player.donated_units:
-                    spec = session.player.get_abtest_spec(GameObjectSpec, item['spec'])
-                    qty = item.get('stack',1)
-                    deployed_qty = 0
-                    level = session.player.tech.get(spec.level_determined_by_tech, 1) # XXXXXX allow level to transfer?
+        # unit_id_list takes the form
+        # [{'obj_id':'2345sdfg234','source':'home_or_squad'}, # regular home or squad unit
+        #  {'obj_id':'DONATED-1234','source':'donated'}, # donated unit
+        #  ...]
+        for entry in unit_id_list:
+            source = entry.get('source', 'home_or_squad')
+            obj_id = entry['obj_id']
 
-                    # skip inapplicable units
-                    if (not session.viewing_base.can_deploy_unit(spec)): continue
+            if session.has_object(obj_id):
+                # already deployed
+                retmsg.append(["ERROR", "HARMLESS_RACE_CONDITION", obj_id, 'already deployed'])
+                continue
 
-                    for i in xrange(qty):
-                        # make sure to give it a bogus NoSQL obj_id so that it never gets written to the database
-                        unit = instantiate_object_for_player(session.player, session.player, item['spec'], x=loc[0], y=loc[1], level=level, obj_id = 'DONATED-'+gamesite.nosql_id_generator.generate())
-                        if gamedata['donated_units_take_space']:
-                            space = unit.get_leveled_quantity(unit.spec.consumes_space)
-                            if (session.deployed_unit_space + space) > deployment_limit:
-                                retmsg.append(["ERROR", "CANNOT_DEPLOY_MORE_UNITS"])
-                                break
-                            session.deployed_unit_space += space
-
-                        deployed_qty += 1
-                        units.append((unit,{'method':'donated'}))
-
-                    if deployed_qty >= qty:
-                        to_remove.append(item)
-                    else:
-                        item['stack'] = qty - deployed_qty
-                for item in to_remove:
-                    session.player.donated_units.remove(item)
-
-                retmsg.append(["DONATED_UNITS_UPDATE", session.player.donated_units])
-
-            else:
-                if session.has_object(obj_id):
-                    # already deployed
-                    retmsg.append(["ERROR", "HARMLESS_RACE_CONDITION", obj_id, 'already deployed'])
+            if source == 'donated':
+                entry = session.player.donated_units.get(obj_id, None)
+                if not entry:
+                    retmsg.append(["ERROR", "HARMLESS_RACE_CONDITION", obj_id, 'not found in donated_units'])
                     continue
 
+                spec = session.player.get_abtest_spec(GameObjectSpec, entry['spec'])
+                # skip inapplicable units
+                if (not session.viewing_base.can_deploy_unit(spec)): continue
+                level = entry.get('level', session.player.tech.get(spec.level_determined_by_tech, 1))
+
+                unit = instantiate_object_for_player(session.player, session.player, entry['spec'], x=loc[0], y=loc[1], level=level, obj_id=obj_id)
+                if gamedata['donated_units_take_space']:
+                    space = unit.get_leveled_quantity(unit.spec.consumes_space)
+                    if (session.deployed_unit_space + space) > deployment_limit:
+                        retmsg.append(["ERROR", "CANNOT_DEPLOY_MORE_UNITS"])
+                        break
+                    session.deployed_unit_space += space
+
+                units.append((unit,{'method':'donated'}))
+                entry['stack'] = entry.get('stack', 1) - 1
+                if entry['stack'] <= 0:
+                    del session.player.donated_units[obj_id]
+
+                session.deferred_donated_units_update = True
+
+            else:
                 unit = None
 
                 # when attacking out of home base, you can attack with undeployed squads (acutal deployability is tested below)
@@ -18819,9 +18825,6 @@ class GAMEAPI(resource.Resource):
                 # need to think about how to track donated units (props['method']=='donated')
                 session.damage_log.init(unit, consumable = unit.spec.consumable)
             session.deployed_units[unit.spec.name] = session.deployed_units.get(unit.spec.name,0) + 1
-
-        # includes the removal of protection time
-        retmsg.append(["PLAYER_STATE_UPDATE", session.player.resources.calc_snapshot().serialize()])
 
     def push_gamedata(self, session, retmsg):
         data_str = open(SpinConfig.gamedata_filename()).read()
@@ -20091,6 +20094,21 @@ class GAMEAPI(resource.Resource):
         if session.deferred_history_update:
             session.deferred_history_update = False
             session.player.send_history_update(retmsg)
+
+        if session.deferred_object_state_updates:
+            updates = session.deferred_object_state_updates
+            session.deferred_object_state_updates = set()
+            for obj in updates:
+                if session.has_object(obj.obj_id):
+                    retmsg.append(["OBJECT_STATE_UPDATE2", obj.serialize_state()])
+
+        if session.deferred_player_state_update:
+            session.deferred_player_state_update = False
+            retmsg.append(["PLAYER_STATE_UPDATE", session.player.resources.calc_snapshot().serialize()])
+
+        if session.deferred_donated_units_update:
+            session.deferred_donated_units_update = False
+            retmsg.append(["DONATED_UNITS_UPDATE", session.player.donated_units])
 
         if gamesite.raw_log:
             client_str = 'sid %s' % pretty_print_session(session.session_id)
@@ -24213,7 +24231,7 @@ class GAMEAPI(resource.Resource):
                             error_reason = "HARMLESS_RACE_CONDITION"
                             break
                         units.append(unit)
-                        attachments.append({'spec':unit.spec.name}) # XXXXXX carry over level here?
+                        attachments.append({'spec':unit.spec.name}) # XXXXXX carry over level here? compress stacks for efficiency?
 
                 if success:
                     total_space = sum([u.get_leveled_quantity(u.spec.consumes_space) for u in units])
