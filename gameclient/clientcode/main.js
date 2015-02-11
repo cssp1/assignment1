@@ -12160,24 +12160,6 @@ function update_desktop_dialogs() {
                 var home_qty = player.donated_units.length;
                 var consumes_space = (gamedata['donated_units_take_space'] ? player.donated_units_space() : 0);
 
-                var d = dialog.widgets['unit_deployment_bar'].widgets['unit'+i.toString()];
-                d.show = true;
-                d.widgets['plus_all'].str = d.data['widgets']['plus_all']['ui_name_donated_units'];
-                d.widgets['plus_one'].show = false;
-
-                d.widgets['cancel'].show = (deploy_qty > 0);
-
-                var can_deploy = (deploy_qty < home_qty) &&
-                    (session.deployed_unit_space + consumes_space <= get_player_stat(player.stattab, 'deployable_unit_space'));
-
-                d.widgets['plus_one'].state = d.widgets['plus_all'].state = (can_deploy ? 'normal' : 'disabled');
-
-                d.widgets['bg'].tooltip.str = gamedata['auras']['donated_units']['ui_description'] + '\n' + player.donated_units_description('\n');
-
-                d.widgets['unit'].bg_image = player.donated_units_icon();
-                d.widgets['unit'].state = 'normal';
-                d.widgets['counter'].str = deploy_qty+'/'+home_qty;
-
                 // set up callbacks
                 var donated_incr_callback = function (name, _consumes_space) { return function() {
                     // check quantity limit
@@ -12206,24 +12188,83 @@ function update_desktop_dialogs() {
                     if(player.tutorial_state.indexOf('deploy_robots_action') != -1) { advance_tutorial(); }
                 }; };
 
-                d.widgets['unit'].onclick = d.widgets['plus_one'].onclick = donated_incr_callback(specname, consumes_space);
-                d.widgets['plus_all'].onclick = donated_incr_callback(specname, consumes_space);
+                var d = dialog.widgets['unit_deployment_bar'].widgets['unit'+i.toString()];
+                d.show = true;
 
-                d.widgets['cancel'].onclick = (function (name, _consumes_space) { return function() {
-                    if('DONATED_UNITS' in session.pre_deploy_units) {
-                        delete session.pre_deploy_units['DONATED_UNITS'];
-                        session.deployed_unit_space -= _consumes_space;
-                    }
+                if(gamedata['unit_deploy_style'] == 'drip') {
+                    if(consumes_space) { throw Error('this case not handled'); }
+                    can_deploy = true;
 
-                    // if in combat, and no more units are left in session.pre_deploy_units, kill the cursor
-                    if(session.has_deployed) {
-                        var any_left = goog.object.getCount(session.pre_deploy_units) > 0;
-                        if(!any_left) {
-                            change_selection(null);
+                    var init_deployer = (function(_incr_callback) { return function(_specname) {
+                        if(selection.ui && selection.ui.user_data && selection.ui.user_data['cursor'] == 'DeployUICursor') { return; }
+                        change_selection(player.virtual_units["DEPLOYER"]);
+                        selection.spellname = "DEPLOY_UNITS";
+                        var cursor = new DeployUICursor();
+                        change_selection_ui_under(cursor);
+
+                        while(true) {
+                            if(!_incr_callback(_specname, 1)()) { break; }
                         }
-                    }
 
-                }; })(specname, consumes_space);
+                    };})(donated_incr_callback);
+
+                    // initialize drip_unit
+                    if(d.parent.user_data['drip_unit'] === null && can_deploy) {
+                        d.parent.user_data['drip_unit'] = specname;
+                        d.parent.user_data['drip_unit_push_time'] = -1;
+                        init_deployer(specname);
+                    }
+                    d.user_data['specname'] = specname;
+                    d.widgets['item'].asset = player.donated_units_icon();
+
+                    d.widgets['stack'].str = home_qty.toString();
+                    d.widgets['frame'].state = (d.parent.user_data['drip_unit'] == specname ? 'active': (can_deploy ? 'normal' : 'disabled'));
+                    d.widgets['frame'].tooltip.str = gamedata['auras']['donated_units']['ui_description'] + '\n' + player.donated_units_description('\n');
+                    d.widgets['frame'].tooltip.delay = 0.25;
+
+                    d.widgets['frame'].onclick = (function (_init_deployer) { return function(w) {
+                        var _d = w.parent;
+                        _d.parent.user_data['drip_unit'] = _d.user_data['specname'];
+                        change_selection_ui(null);
+                        _init_deployer(_d.user_data['specname']);
+                    }; })(init_deployer);
+
+                } else {
+                    d.widgets['plus_all'].str = d.data['widgets']['plus_all']['ui_name_donated_units'];
+                    d.widgets['plus_one'].show = false;
+
+                    d.widgets['cancel'].show = (deploy_qty > 0);
+
+                    var can_deploy = (deploy_qty < home_qty) &&
+                        (session.deployed_unit_space + consumes_space <= get_player_stat(player.stattab, 'deployable_unit_space'));
+
+                    d.widgets['plus_one'].state = d.widgets['plus_all'].state = (can_deploy ? 'normal' : 'disabled');
+
+                    d.widgets['bg'].tooltip.str = gamedata['auras']['donated_units']['ui_description'] + '\n' + player.donated_units_description('\n');
+
+                    d.widgets['unit'].bg_image = player.donated_units_icon();
+                    d.widgets['unit'].state = 'normal';
+                    d.widgets['counter'].str = deploy_qty+'/'+home_qty;
+
+                    d.widgets['unit'].onclick = d.widgets['plus_one'].onclick = donated_incr_callback(specname, consumes_space);
+                    d.widgets['plus_all'].onclick = donated_incr_callback(specname, consumes_space);
+
+                    d.widgets['cancel'].onclick = (function (name, _consumes_space) { return function() {
+                        if('DONATED_UNITS' in session.pre_deploy_units) {
+                            delete session.pre_deploy_units['DONATED_UNITS'];
+                            session.deployed_unit_space -= _consumes_space;
+                        }
+
+                        // if in combat, and no more units are left in session.pre_deploy_units, kill the cursor
+                        if(session.has_deployed) {
+                            var any_left = goog.object.getCount(session.pre_deploy_units) > 0;
+                            if(!any_left) {
+                                change_selection(null);
+                            }
+                        }
+
+                    }; })(specname, consumes_space);
+                }
 
                 i += 1;
             }
@@ -12943,12 +12984,17 @@ DeployUICursor.prototype.draw = function(offset) {
 
         var text = null;
         if(location_valid && 'click_to_deploy' in gamedata['strings']['cursors']) {
-            // grab a unit spec
-            var spec = null;
+            // grab any unit spec
             for(var army_id in session.pre_deploy_units) {
-                spec = gamedata['units'][session.pre_deploy_units[army_id]['spec']];
-                if(spec) {
-                    text = gamedata['strings']['cursors']['click_to_deploy'].replace('%s', spec['ui_name_plural'] || spec['ui_name']);
+                if(army_id == 'DONATED_UNITS') {
+                    text = gamedata['strings']['cursors']['click_to_deploy'].replace('%s', player.donated_units_description('\n'));
+                    break;
+                } else {
+                    var spec = gamedata['units'][session.pre_deploy_units[army_id]['spec']];
+                    if(spec) {
+                        text = gamedata['strings']['cursors']['click_to_deploy'].replace('%s', spec['ui_name_plural'] || spec['ui_name']);
+                        break;
+                    }
                 }
             }
         } else if(!location_valid && 'location_blocked' in gamedata['strings']['cursors']) {
@@ -44327,11 +44373,18 @@ function do_on_mousedown(e) {
             }
             var id_to_deploy = null;
             for(var obj_id in session.pre_deploy_units) {
-                var obj = session.pre_deploy_units[obj_id];
-                id_to_deploy = obj_id;
-                // predict new space accounting
-                session.deployed_unit_space += get_leveled_quantity(gamedata['units'][obj['spec']]['consumes_space'] || 0, obj['level']||1);
-                break;
+                if(obj_id == 'DONATED_UNITS') {
+                    id_to_deploy = obj_id;
+                    // predict new space accounting
+                    session.deployed_unit_space += session.pre_deploy_units[obj_id]['space'];
+                    break;
+                } else {
+                    var obj = session.pre_deploy_units[obj_id];
+                    id_to_deploy = obj_id;
+                    // predict new space accounting
+                    session.deployed_unit_space += get_leveled_quantity(gamedata['units'][obj['spec']]['consumes_space'] || 0, obj['level']||1);
+                    break;
+                }
             }
             if(id_to_deploy) {
                 do_deploy(ji, [id_to_deploy]);
