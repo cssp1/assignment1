@@ -4976,10 +4976,14 @@ function units_description(unit_list, separator) {
         by_type[specname] += incr;
     }
     var descr_list = [];
-    for(var name in by_type) {
-        var qty = by_type[name];
-        descr_list.push(qty.toFixed(0)+'x '+gamedata['units'][name]['ui_name']);
+    // list donated units in reverse "coolness" order from gamedata['units']
+    for(var name in gamedata['units']) {
+        if(name in by_type) {
+            var qty = by_type[name];
+            descr_list.push(qty.toFixed(0)+'x '+gamedata['units'][name]['ui_name']);
+        }
     }
+    descr_list.reverse();
     var descr = descr_list.join(separator);
     return descr;
 }
