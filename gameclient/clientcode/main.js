@@ -4780,14 +4780,20 @@ session.count_deployable_units_of_spec = function(specname) {
     return session.count_deployable_units(function(obj) { return (obj['spec'] === specname); });
 };
 
+// note: checking obj['source'] == 'donated' might make sense if we ever start considering donated units as part of space limits again
+
 // count units of this type loaded into the deployment cursor
 session.count_pre_deploy_units_of_spec = function(specname) {
-    return goog.object.getCount(goog.object.filter(session.pre_deploy_units, function(obj) { return obj['spec'] == specname; }));
+    return goog.object.getCount(goog.object.filter(session.pre_deploy_units, function(obj) { return obj['spec'] == specname && obj['source'] !== 'donated'; }));
 };
 // count units of this type that have been deployed on the battlefield
 session.count_post_deploy_units_of_spec = function(specname) {
-    return goog.object.getCount(goog.object.filter(session.post_deploy_units, function(obj) { return obj['spec'] == specname; }));
+    return goog.object.getCount(goog.object.filter(session.post_deploy_units, function(obj) { return obj['spec'] == specname && obj['source'] !== 'donated'; }));
 };
+session.count_post_deploy_units = function() {
+    return goog.object.getCount(goog.object.filter(session.post_deploy_units, function(obj) { return obj['source'] !== 'donated'; }));
+};
+
 // return [army_unit, zombie_status] representing next (healthiest undeployed) unit we can deploy of a certain spec
 session.get_next_deployable_unit = function(specname) {
     var unit = null, highest_hp = -1, is_zombie = false;

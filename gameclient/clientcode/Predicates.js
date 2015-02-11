@@ -1092,8 +1092,8 @@ goog.inherits(HasDeployedPredicate, Predicate);
 HasDeployedPredicate.prototype.is_satisfied = function(player, qdata) {
     // when quests check this predicate they are looking to see if units are deployed, not that combat is initiated,
     // so return false unless there are deployed units
-    var deployed_units = goog.object.getCount(session.post_deploy_units);
     if(session.has_deployed) {
+        var deployed_units = session.count_post_deploy_units();
         if(this.method == '>=') {
             return deployed_units >= this.qty;
         } else if(this.method == '==') {
