@@ -24176,9 +24176,10 @@ class GAMEAPI(resource.Resource):
 
                 if success:
                     for id in unit_ids:
-                        unit = session.get_object_if_exists(id)
+                        unit = session.player.get_object_by_obj_id(id, fail_missing = False)
                         if (not unit) or (unit.owner is not session.player) or (not unit.is_mobile()) or \
-                           (unit.hp < unit.max_hp) or (unit not in session.player.home_base_iter()) or \
+                           (unit.hp < unit.max_hp) or \
+                           SQUAD_IDS.is_mobile_squad_id(unit.squad_id or 0) or \
                            (unit.get_leveled_quantity(unit.spec.consumes_space) > object.get_leveled_quantity(object.spec.max_individual_donation_space)):
                             success = False
                             error_reason = "HARMLESS_RACE_CONDITION"
@@ -24201,8 +24202,9 @@ class GAMEAPI(resource.Resource):
                                                        'from_name': session.user.get_chat_name()}])
 
                         for unit in units:
-                            retmsg.append(["OBJECT_REMOVED2", unit.obj_id])
-                            session.rem_object(unit.obj_id)
+                            if session.has_object(unit.obj_id):
+                                retmsg.append(["OBJECT_REMOVED2", unit.obj_id])
+                                session.rem_object(unit.obj_id)
                             session.player.unit_repair_cancel(unit)
                             session.player.home_base_remove(unit)
                             session.player.send_army_update_destroyed(unit, retmsg) # may be redundant with OBJECT_REMOVED, but a player reported army desync here
