@@ -13351,7 +13351,7 @@ function update_chat_frame(dialog) {
         var togo = player.cooldown_togo(spell['cooldown_name']);
         if(player.donated_units_space() >= player.donated_units_max_space()) {
             tab.widgets['request_donation_button'].state = 'disabled';
-            tab.widgets['request_donation_button'].tooltip.str = tab.data['widgets']['request_donation_button']['ui_tooltip_space_limit'];
+            tab.widgets['request_donation_button'].tooltip.str = tab.data['widgets']['request_donation_button']['ui_tooltip_space_limit'].replace('%s', gamedata['buildings'][gamedata['alliance_building']]['ui_name']);
         } else if(togo > 0) {
             tab.widgets['request_donation_button'].state = 'disabled';
             tab.widgets['request_donation_button'].tooltip.str = tab.data['widgets']['request_donation_button']['ui_tooltip_cooldown'].replace('%s', pretty_print_time(togo));
@@ -21922,7 +21922,7 @@ function update_unit_donation_dialog(dialog) {
         dialog.widgets['my_item'+wname].asset = get_leveled_quantity(gamedata['units'][specname]['art_asset'],1);
         dialog.widgets['my_stack'+wname].str = pretty_print_number(qty);
 
-        var ttip, ttip_s = '', ttip_col = SPUI.default_text_color, upgrade_alliance_building_level = -1;
+        var ttip, ttip_s = '', ttip_bldg = '', ttip_col = SPUI.default_text_color, upgrade_alliance_building_level = -1;
         if(space > max_individual_space) {
             var level;
             for(level = alliance_building.level; level <= alliance_building.get_max_ui_level(); level++) {
@@ -21934,6 +21934,7 @@ function update_unit_donation_dialog(dialog) {
                 ttip = 'ui_tooltip_unit_too_big';
             } else {
                 ttip = 'ui_tooltip_upgrade_transmitter';
+                ttip_bldg = alliance_building.spec['ui_name'];
                 ttip_s = level.toFixed(0);
                 upgrade_alliance_building_level = level;
             }
@@ -21945,7 +21946,7 @@ function update_unit_donation_dialog(dialog) {
         }
 
         dialog.widgets['my_frame'+wname].state = (upgrade_alliance_building_level > 0 ? 'disabled_clickable' : ((space <= max_individual_space) && (qty > 0) && (cur_plus_proposed_space+space <= req['max_space']) ? 'normal' : 'disabled'));
-        dialog.widgets['my_frame'+wname].tooltip.str = dialog.data['widgets']['my_frame'][ttip].replace('%s', ttip_s).replace('%UNITNAME',gamedata['units'][specname]['ui_name']);
+        dialog.widgets['my_frame'+wname].tooltip.str = dialog.data['widgets']['my_frame'][ttip].replace('%s', ttip_s).replace('%BUILDING', ttip_bldg).replace('%UNITNAME',gamedata['units'][specname]['ui_name']);
         dialog.widgets['my_frame'+wname].tooltip.text_color = ttip_col;
 
         if(upgrade_alliance_building_level > 0) {

@@ -5314,7 +5314,7 @@
                                          "text_color": [0,0,0,1], "ui_name": "Reinforce Me",
                                          "ui_tooltip": "Request one-time reinforcement units from your alliance",
                                          "ui_tooltip_cooldown": "Request more reinforcements in %s",
-                                         "ui_tooltip_space_limit": "No space for more reinforcements.\nTo make room, upgrade Transmitter or deploy\nexisting reinforcements in battle.",
+                                         "ui_tooltip_space_limit": "No space for more reinforcements.\nTo make room, upgrade %s or deploy\nexisting reinforcements in battle.",
                                          "tooltip_delay": 0 },
             "output_bg": { "kind": "StaticImage", "xy": [8,76], "dimensions": [297,180], "asset": "chat_output", "bg_image_resizable": 1 },
             "output": { "kind": "ScrollingTextField", "xy": [16,81], "dimensions": [282,155], "text_size": 13, "text_hjustify": "left",
@@ -8007,7 +8007,7 @@
                           "ui_tooltip": "%UNITNAME",
                           "ui_tooltip_no_space": "Not enough space",
                           "ui_tooltip_unit_too_big": "This unit is too large to be donated",
-                          "ui_tooltip_upgrade_transmitter": "Upgrade Transmitter to Level %s to donate this unit",
+                          "ui_tooltip_upgrade_transmitter": "Upgrade %BUILDING to Level %s to donate this unit",
                           "tooltip_delay": 0,
                           "array": [8,3], "array_offset": [59,74] },
 
