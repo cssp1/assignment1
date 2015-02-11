@@ -16843,9 +16843,9 @@ function invoke_fancy_victory_dialog(battle_type, battle_base, battle_opponent_u
                     d.widgets['item'].asset = get_leveled_quantity(spec['art_asset'],1);
                 }
                 d.widgets['item'].state = GameArt.assets[d.widgets['item'].asset].has_state('icon') ? 'icon' : 'normal';
-                d.widgets['stack'].str = qty.toString();
+                d.widgets['stack'].str = pretty_print_number(qty);
                 d.widgets['frame'].state = 'normal_nohighlight'; // 'disabled' use grayed-out frame
-                d.widgets['frame'].tooltip.str = spec['ui_name'];
+                d.widgets['frame'].tooltip.str = pretty_print_number(qty)+'x '+((spec['ui_name_plural'] && qty != 1) ? spec['ui_name_plural'] : spec['ui_name']);
                 i += 1;
                 if(i >= dialog.data['widgets']['spent_unit']['array'][0]) {
                     i = 0;
