@@ -4788,6 +4788,11 @@ session.count_deployable_units_of_spec = function(specname) {
 session.count_pre_deploy_units_of_spec = function(specname) {
     return goog.object.getCount(goog.object.filter(session.pre_deploy_units, function(obj) { return obj['spec'] == specname && obj['source'] !== 'donated'; }));
 };
+
+session.count_pre_deploy_donated_units = function() {
+    return goog.object.getCount(goog.object.filter(session.pre_deploy_units, function(obj) { return obj['source'] === 'donated'; }));
+};
+
 // count units of this type that have been deployed on the battlefield
 session.count_post_deploy_units_of_spec = function(specname) {
     return goog.object.getCount(goog.object.filter(session.post_deploy_units, function(obj) { return obj['spec'] == specname && obj['source'] !== 'donated'; }));
@@ -5032,6 +5037,14 @@ player.donated_units_space = function() {
         consumes_space += stack * get_leveled_quantity(gamedata['units'][entry['spec']]['consumes_space'], entry['level'] || 1);
     });
     return consumes_space;
+};
+
+player.count_donated_units = function() {
+    var count = 0;
+    goog.object.forEach(player.donated_units, function(entry) {
+        count += ('stack' in entry ? entry['stack'] : 1);
+    });
+    return count;
 };
 
 player.has_donated_units = function() { return goog.object.getCount(player.donated_units) > 0; };
@@ -12187,8 +12200,8 @@ function update_desktop_dialogs() {
 
                 var specname = 'DONATED_UNITS';
                 dialog.user_data['deploy_button_specs'].push(specname);
-                var deploy_qty = ('DONATED_UNITS' in session.pre_deploy_units ? player.donated_units.length : 0);
-                var home_qty = player.donated_units.length;
+                var deploy_qty = session.count_pre_deploy_donated_units();
+                var home_qty = player.count_donated_units();
                 var consumes_space = (gamedata['donated_units_take_space'] ? player.donated_units_space() : 0);
 
                 // set up callbacks
