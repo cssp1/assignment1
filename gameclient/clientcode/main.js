@@ -4908,7 +4908,7 @@ player.max_inventory = 0;
 player.reserved_inventory = 0;
 player.inventory = [];
 player.loot_buffer = [];
-player.donated_units = [];
+player.donated_units = {};
 
 player.init = function() {
     for(var res in gamedata['resources']) {
@@ -4995,18 +4995,28 @@ function units_description(unit_list, separator) {
 }
 
 player.donated_units_description = function(separator) {
-    return units_description(player.donated_units, separator);
+    var by_specname = {};
+    goog.object.forEach(player.donated_units, function(entry) {
+        if(!(entry['spec'] in by_specname)) { by_specname[entry['spec']] = 0; }
+        by_specname[entry['spec']] += ('stack' in entry ? entry['stack'] : 1);
+    });
+    var ret = [];
+    goog.object.forEach(by_specname, function(count, specname) {
+        ret.push({'spec': specname, 'stack':count});
+    });
+    return units_description(ret, separator);
 };
 
 player.donated_units_space = function() {
     var consumes_space = 0;
-    for(var i = 0; i < player.donated_units.length; i++) {
-        var item = player.donated_units[i];
-        var stack = item['stack'] || 1;
-        consumes_space += stack * get_leveled_quantity(gamedata['units'][item['spec']]['consumes_space'], item['level'] || 1);
-    }
+    goog.object.forEach(player.donated_units, function(entry) {
+        var stack = ('stack' in entry ? entry['stack'] : 1);
+        consumes_space += stack * get_leveled_quantity(gamedata['units'][entry['spec']]['consumes_space'], entry['level'] || 1);
+    });
     return consumes_space;
 };
+
+player.has_donated_units = function() { return goog.object.getCount(player.donated_units) > 0; };
 
 player.donated_units_max_space = function() {
     var alliance_building = find_object_by_type(gamedata['alliance_building']);
@@ -10840,7 +10850,7 @@ function update_aura_bar(dialog) {
     }
 
     // DUMMY AURA FOR DONATED UNITS
-    if(player.unit_donation_enabled() && (player.donated_units.length > 0)) {
+    if(player.unit_donation_enabled() && player.has_donated_units()) {
         dialog.widgets['aura_slot'+first_aura].show = true;
         dialog.widgets['aura_icon'+first_aura].show = true;
         dialog.widgets['aura_icon'+first_aura].asset = player.donated_units_icon();
@@ -11964,7 +11974,7 @@ function update_desktop_dialogs() {
             });
             var uniques = goog.object.getCount(unique_specs);
 
-            if(player.unit_donation_enabled() && (player.donated_units.length > 0)) { uniques += 1; }
+            if(player.unit_donation_enabled() && player.has_donated_units()) { uniques += 1; }
 
             var skip = 0;
             if(uniques > ROWS) {
@@ -12163,7 +12173,7 @@ function update_desktop_dialogs() {
             }
 
             // DONATED UNITS
-            if(player.unit_donation_enabled() && (player.donated_units.length > 0) &&
+            if(player.unit_donation_enabled() && player.has_donated_units() &&
                !session.viewing_base.has_climate_unit_restrictions()) {
 
                 var specname = 'DONATED_UNITS';
