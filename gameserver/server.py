@@ -23443,6 +23443,12 @@ class GAMEAPI(resource.Resource):
                         setattr(session.player.resources, res, 0)
                     session.player.resources.gamebucks = 0
                     retmsg.append(["PLAYER_STATE_UPDATE", session.player.resources.calc_snapshot().serialize()])
+            elif spellname == "CHEAT_GET_DONATED_UNITS":
+                if not session.player.is_cheater:
+                    retmsg.append(["ERROR", "DISALLOWED_IN_SECURE_MODE"])
+                else:
+                    session.player.donated_units = [{'spec':specname, 'stack':4} for specname in gamedata['units'].iterkeys()]
+                    retmsg.append(["DONATED_UNITS_UPDATE", session.player.donated_units])
             elif spellname == "CHEAT_EXECUTE_CONSEQUENT":
                 if not session.player.is_cheater:
                     retmsg.append(["ERROR", "DISALLOWED_IN_SECURE_MODE"])

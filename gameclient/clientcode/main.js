@@ -13191,6 +13191,7 @@ function invoke_cheat_menu() {
             send_to_server.func(["CAST_SPELL", 0, "CHEAT_CLEAR_COOLDOWNS"]);
             send_to_server.func(["CAST_SPELL", 0, "CHEAT_CLEAR_PLAYER_AURAS"]);
         }));
+        layout.add(new SPUI.Button("Get Donated Units", function() { change_selection_ui(null); send_to_server.func(["CAST_SPELL", 0, "CHEAT_GET_DONATED_UNITS"]); }));
     }
     //layout.add(new SPUI.Button("Clear Hostile Units", function() { destroy_all_enemies(); change_selection(null); }));
     //layout.add(new SPUI.Button("Earn Credits Offerwall", Store.earn_fbcredits_with_offers));
