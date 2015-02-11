@@ -6703,7 +6703,7 @@ class Player(AbstractPlayer):
         self.resources = ResourceState(self)
 
         self.loot_buffer = []
-        self.donated_units = []
+        self.donated_units = {} # same format as player.my_army, i.e. {'DONATED-1234': {'obj_id':'DONATED-1234', 'spec':'asdf', 'level':2}}
         self.inventory = []
         self.mailbox = []
         self.map_bookmarks = {} # { "region_id": [{"ui_name": "yyy", "region": "region_id", "coords": [123,456]}] }
@@ -8603,9 +8603,20 @@ class Player(AbstractPlayer):
     def unit_donation_enabled(self):
         return self.get_any_abtest_value('enable_unit_donation', gamedata['enable_unit_donation'])
 
+    def make_donated_unit(self, specname, level = None):
+        # generate bogus ID, ensuring this won't be written to MongoDB
+        obj_id = 'DONATED-'+gamesite.nosql_id_generator.generate()
+        ret = {'obj_id': obj_id, 'spec': specname, 'source':'donated'}
+        if level is not None: ret['level'] = level
+        return ret
+
+    def add_donated_unit(self, *args, **kwargs):
+        new_entry = self.make_donated_unit(*args, **kwargs)
+        self.donated_units[new_entry['obj_id']] = new_entry
+
     def donated_units_space(self):
         consumes_space = 0
-        for item in self.donated_units:
+        for item in self.donated_units.itervalues():
             stack = item.get('stack',1)
             consumes_space += stack * GameObjectSpec.get_leveled_quantity(gamedata['units'][item['spec']]['consumes_space'], item.get('level',1))
         return consumes_space
@@ -9440,6 +9451,15 @@ class Player(AbstractPlayer):
         # fix bad techs
         if ('' in self.tech):
             del self.tech['']
+
+        # donated_units list -> dict migration
+        if type(self.donated_units) is list:
+            new_donated_units = {}
+            for entry in self.donated_units:
+                for i in xrange(entry.get('stack',1)):
+                    new_entry = self.make_donated_unit(entry['spec'], level = entry.get('level',None))
+                    new_donated_units[new_entry['obj_id']] = new_entry
+            self.donated_units = new_donated_units
 
         # do per-object migrations here
         to_delete = []
@@ -10804,12 +10824,9 @@ class LivePlayer(Player):
                 pass
 
         # remove invalid objects from donated units
-        to_remove = []
-        for item in self.donated_units:
-            if item['spec'] not in gamedata['units']:
-                to_remove.append(item)
-        for item in to_remove:
-            self.donated_units.remove(item)
+        for obj_id, entry in self.donated_units.items():
+            if entry['spec'] not in gamedata['units']:
+                del self.donated_units[obj_id]
 
         # give free gamebucks
         if self.get_any_abtest_value('currency', gamedata['currency']) == 'gamebucks' and \
@@ -19088,7 +19105,9 @@ class GAMEAPI(resource.Resource):
                 elif msg['type'] == 'donated_units':
                     # XXX check for capacity limit?
                     units = msg['attachments']
-                    session.player.donated_units += units
+                    for entry in units: # these come in the form [{'spec':'asdf','stack':3},...]
+                        for i in xrange(entry.get('stack',1)):
+                            session.player.add_donated_unit(entry['spec'], level = entry.get('level', None))
                     retmsg.append(["DONATED_UNITS_UPDATE", session.player.donated_units])
                     retmsg.append(["DONATED_UNITS_RECEIVED", units, msg.get('from',-1), msg.get('from_fbid','-1'), msg.get('from_name','unknown')])
                     to_ack.append(msg['msg_id'])
@@ -23447,7 +23466,10 @@ class GAMEAPI(resource.Resource):
                 if not session.player.is_cheater:
                     retmsg.append(["ERROR", "DISALLOWED_IN_SECURE_MODE"])
                 else:
-                    session.player.donated_units = [{'spec':specname, 'stack':4} for specname in gamedata['units'].iterkeys()]
+                    session.player.donated_units = {}
+                    for specname in gamedata['units'].iterkeys():
+                        for i in xrange(4):
+                            session.player.add_donated_unit(specname)
                     retmsg.append(["DONATED_UNITS_UPDATE", session.player.donated_units])
             elif spellname == "CHEAT_EXECUTE_CONSEQUENT":
                 if not session.player.is_cheater:
@@ -24191,7 +24213,7 @@ class GAMEAPI(resource.Resource):
                             error_reason = "HARMLESS_RACE_CONDITION"
                             break
                         units.append(unit)
-                        attachments.append({'spec':unit.spec.name})
+                        attachments.append({'spec':unit.spec.name}) # XXXXXX carry over level here?
 
                 if success:
                     total_space = sum([u.get_leveled_quantity(u.spec.consumes_space) for u in units])
