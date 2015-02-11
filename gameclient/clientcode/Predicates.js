@@ -1536,6 +1536,12 @@ function eval_cond_or_literal(qty, player, qdata) {
 
     // if it's a list, treat it as a cond chain, otherwise assume it's a literal
     if(qty && (typeof qty === 'object') && (qty instanceof Array)) {
+
+        // exception: if it's a list and the first element is not itself a list, treat it as a literal
+        // (this happens with e.g. ai_ambush_progression_showcase with "progression_reward_items"
+        if(qty.length > 0 && !(qty[0] instanceof Array)) {
+            return qty;
+        }
         return eval_cond(qty, player, qdata);
     }
     return qty;
