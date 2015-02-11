@@ -4673,6 +4673,8 @@ session.deployable_squads = [];
 session.defending_squads = [];
 
 // pre/post_deploy_units are dictionaries of "army_unit" structures, indexed by obj_id
+// {'123456': {'obj_id': '123456', 'spec': 'asdf', 'level': 1},
+//  'DONATED-1234': {'obj_id': 'DONATED-1234', 'source':'DONATED', 'spec': 'asdf', 'stack': 2}}
 session.pre_deploy_units = {}; // units that are "loaded" into the cursor to be deployed
 session.post_deploy_units = {}; // units that are already deployed
 
@@ -4814,6 +4816,22 @@ session.get_next_deployable_unit = function(specname) {
         if(ratio < gamedata['zombie_debuff_threshold']) { is_zombie = true; }
     }
     return [unit, is_zombie];
+};
+
+// return the army_unit of the weakest (non-donated) unit of this spec in pre-deploy, for canceling unit deployment one-by-one
+session.get_weakest_pre_deploy_unit = function(specname) {
+    var weakest = null, lowest_hp = Infinity;
+    for(var obj_id in session.pre_deploy_units) {
+        var obj = session.pre_deploy_units[obj_id];
+        if(obj['spec'] == specname && obj['source'] !== 'donated') {
+            var hp = army_unit_hp(obj)[0];
+            if(hp < lowest_hp) {
+                lowest_hp = hp;
+                weakest = obj;
+            }
+        }
+    }
+    return weakest;
 };
 
 session.quarry_victory_satisfied = function() {
@@ -12125,20 +12143,11 @@ function update_desktop_dialogs() {
 
                     d.widgets['cancel'].onclick = (function (name) { return function() {
                         // un-pre-deploy the weakest unit
-                        var weakest = null, lowest_hp = 999999;
-                        for(var obj_id in session.pre_deploy_units) {
-                            var obj = session.pre_deploy_units[obj_id];
-                            if(obj['spec'] == name) {
-                                var hp = army_unit_hp(obj)[0];
-                                if(hp < lowest_hp) {
-                                    lowest_hp = hp;
-                                weakest = obj;
-                            }
-                            }
-                        }
+                        var weakest = session.get_weakest_pre_deploy_unit(name);
+
                         if(weakest) {
                             delete session.pre_deploy_units[weakest['obj_id']];
-                            session.deployed_unit_space -= gamedata['units'][name]['consumes_space'];
+                            session.deployed_unit_space -= get_leveled_quantity(gamedata['units'][weakest['spec']]['consumes_space'], weakest['level']||1);
                         }
 
                         // if in combat, and no more units are left in session.pre_deploy_units, kill the cursor
