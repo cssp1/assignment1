@@ -21839,9 +21839,26 @@ function invoke_unit_donation_dialog(req) {
         if(!_dialog || _dialog.user_data['pending']) { return; }
         var alliance_building = find_object_by_type(gamedata['alliance_building']);
         if(alliance_building) {
-            _dialog.user_data['pending'] = true;
             send_to_server.func(["CAST_SPELL", alliance_building.id, 'DONATE_UNITS', _dialog.user_data['req']['recipient_id'],
                                  _dialog.user_data['req']['tag'], _dialog.user_data['donation']]);
+
+            // client-side prediction
+            if(gamedata['client']['predict_donated_units']) {
+                _dialog.user_data['pending'] = true;
+                goog.array.forEach(_dialog.user_data['donation'], function(obj_id) {
+                    // snoop update into my_army
+                    if(obj_id in player.my_army) {
+                        delete player.my_army[obj_id];
+                        session.lazy_update_citizens();
+                    }
+                    // remove from session
+                    if(obj_id in session.cur_objects.objects) {
+                        remove_object(session.cur_objects.objects[obj_id]);
+                    }
+                });
+            } else {
+                invoke_ui_locker();
+            }
         }
     };
 
@@ -42347,11 +42364,10 @@ function handle_server_message(data) {
     } else if(msg == "DONATE_UNITS_RESULT") {
         var success = data[1], error_reason = data[2];
         var dialog = find_dialog('unit_donation_dialog');
-        if(!dialog) { return; }
-        dialog.user_data['pending'] = false;
+        if(dialog) { dialog.user_data['pending'] = false; }
         if(success) {
             GameArt.assets["success_playful_22"].states['normal'].audio.play(client_time);
-            close_parent_dialog(dialog.widgets['close_button']);
+            if(dialog) { close_parent_dialog(dialog.widgets['close_button']); }
         } else {
             var error = gamedata['errors'][error_reason];
             if(error) {
