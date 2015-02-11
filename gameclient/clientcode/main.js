@@ -16957,20 +16957,30 @@ function invoke_fancy_victory_dialog(battle_type, battle_base, battle_opponent_u
         }
     }
 
-    // set uiname here so animation will work
-    dialog.widgets['valentina_says'].data = goog.object.clone(dialog.widgets['valentina_says'].data);
-    if(trophies > 0) {
-        var template = dialog.widgets['valentina_says'].data['ui_name_trophies_'+dialog.user_data['trophy_type']] || dialog.widgets['valentina_says'].data['ui_name_trophies'];
-        dialog.widgets['valentina_says'].data['ui_name'] = template.replace('%d', pretty_print_number(trophies));
-    } else {
-        var win_type = (gamedata['common_win_condition'] == 'battle_stars' ? battle_type+'_battle_stars' : battle_type);
-        if(!('ui_name_'+win_type in dialog.widgets['valentina_says'].data)) {
-            throw Error('no ui_name_'+win_type+' in valentina_says');
+    // make a private copy of widget.data here so the animation will work, since it repeatedly pulls .str from from widget.data
+    if(1) {
+        dialog.widgets['valentina_says'].data = goog.object.clone(dialog.widgets['valentina_says'].data);
+        /** @type {string} template for what she says (random alternatives separated by "|") */
+        var valentina_says;
+        /** @type {Object.<string, string>} substrings to replace inside the template*/
+        var replacements = {};
+        if(trophies > 0) {
+            valentina_says = dialog.widgets['valentina_says'].data['ui_name_trophies_'+dialog.user_data['trophy_type']] || dialog.widgets['valentina_says'].data['ui_name_trophies'];
+            replacements['%d'] = pretty_print_number(trophies);
+        } else {
+            var win_type = (gamedata['common_win_condition'] == 'battle_stars' ? battle_type+'_battle_stars' : battle_type);
+            if(!('ui_name_'+win_type in dialog.widgets['valentina_says'].data)) {
+                throw Error('no ui_name_'+win_type+' in valentina_says');
+            }
+            valentina_says = dialog.widgets['valentina_says'].data['ui_name_'+win_type];
+            replacements['%LADDER_WIN_DAMAGE'] = (100.0*gamedata['matchmaking']['ladder_win_damage']).toFixed(0);
+            replacements['%TOWNHALL'] = gamedata['buildings'][gamedata['townhall']]['ui_name'];
         }
-        dialog.widgets['valentina_says'].data['ui_name'] =
-            dialog.widgets['valentina_says'].data['ui_name_'+win_type].replace('%LADDER_WIN_DAMAGE',
-                                                                               (100.0*gamedata['matchmaking']['ladder_win_damage']).toFixed(0)).replace('%TOWNHALL',
-                                                                                                                                                        gamedata['buildings'][gamedata['townhall']]['ui_name']);
+        var alternatives = valentina_says.split('|');
+        var idx = Math.floor(Math.random() * alternatives.length);
+        valentina_says = alternatives[idx];
+        for(var k in replacements) { valentina_says = valentina_says.replace(k, replacements[k]); }
+        dialog.widgets['valentina_says'].data['ui_name'] = valentina_says;
     }
 
     if(battle_type == 'home') {
