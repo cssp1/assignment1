@@ -10099,10 +10099,12 @@ function update_enemy_resource_bars(dialog) {
     }
 }
 
-// update resource displays for desktop dialogs and the Store
-// with fancy ticker effects
-// "primary" should be true iff it is updating the main resource displays on the game desktop
-function update_resource_bars(dialog, primary, use_res_looter) {
+// update resource displays for desktop dialogs and the Store, with fancy ticker effects
+/** @param {SPUI.Dialog} dialog
+    @param {boolean} primary - if true, then apply the magnetic attractors for loot burst particle effects (only main desktop should have this)
+    @param {boolean} use_res_looter - if true, reference session.res_looter instead of player resource state
+    @param {boolean} show_during_combat */
+function update_resource_bars(dialog, primary, use_res_looter, show_during_combat) {
     var flashy_loot = player.flashy_loot();
     var currency = (player.get_any_abtest_value('currency', gamedata['currency']) == 'gamebucks' ? 'gamebucks' : 'facebook_credits');
 
@@ -10111,7 +10113,7 @@ function update_resource_bars(dialog, primary, use_res_looter) {
         if('resource_bar_'+res in dialog.widgets) {
             var show_me, show_button, show_button_asset;
             if(res == 'fbcredits') {
-                show_me = !session.has_attacked;
+                show_me = show_during_combat || !session.has_attacked;
                 show_button = show_me;
                 show_button_asset = show_button;
                 if(currency == 'gamebucks') {
@@ -10121,7 +10123,7 @@ function update_resource_bars(dialog, primary, use_res_looter) {
                 }
             } else {
                 var resdata = gamedata['resources'][res];
-                show_me = !('show_if' in resdata) || read_predicate(resdata['show_if']).is_satisfied(player,null);
+                show_me = (show_during_combat || !session.has_attacked) && (!('show_if' in resdata) || read_predicate(resdata['show_if']).is_satisfied(player,null));
                 show_button = show_me && !session.has_attacked;
                 show_button_asset = show_button && (!('allow_instant' in resdata) || resdata['allow_instant']);
                 dialog.widgets['resource_bar_'+res+'_icon'].asset = resdata['icon_small'];
@@ -10623,7 +10625,7 @@ var FORCE_BASE_DAMAGE_PING = false; // for debugging/profiling
 
 function update_combat_resource_bars(dialog) {
     dialog.xy = dialog.data[(gamedata['client']['combat_damage_bar_placement']||'top_left') != 'top_left' ? 'xy_no_damage' : 'xy'];
-    update_resource_bars(dialog, true, !!session.res_looter);
+    update_resource_bars(dialog, true, !!session.res_looter, true);
 
     var is_nosql = session.region.data && (session.region.data['storage'] == 'nosql');
 
@@ -11284,7 +11286,7 @@ function update_desktop_dialogs() {
         dialog.widgets['battle_history_jewel'].user_data['count'] = player.new_battle_histories;
         dialog.widgets['keyboard_shortcuts_jewel'].user_data['count'] = player.check_feature_use('keyboard_shortcuts_list') ? 0 : 1;
 
-        update_resource_bars(dialog, true, false);
+        update_resource_bars(dialog, true, false, false);
 
         dialog.widgets['low_power_bg'].show =
             dialog.widgets['low_power_message'].show = (gamedata['enable_power'] && player.tutorial_state == "COMPLETE" && session.viewing_base.power_factor() < 1);
@@ -35810,7 +35812,7 @@ function invoke_new_store_category(catdata, parent_catdata, scroll_to_sku_name) 
 }
 
 function update_new_store_category(dialog) {
-    update_resource_bars(dialog, false, false);
+    update_resource_bars(dialog, false, false, true);
     var skulist = dialog.user_data['skulist'];
 
     if(!dialog.user_data['scrolled'] &&
