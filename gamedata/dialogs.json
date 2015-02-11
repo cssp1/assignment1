@@ -4166,7 +4166,7 @@
 
             // "typewriter" makes the TextField "type" itself out one letter at a time.
             // if "cursor" is true, then it displays a blinking "|" at the end of the text.
-            "valentina_says": [{"type": "typewriter", "start_time": 2.5, "end_time": 5.0, "cursor": 1 },
+            "valentina_says": [{"type": "typewriter", "start_time": 2.5, "end_time": 5.5, "cursor": 0 },
                                { "type": "same_as", "ref": "sunken_val" }],
 
             "ok_button": { "type": "fadein", "start_time": 2.5, "end_time": 3.0 },
@@ -4317,7 +4317,7 @@
 
 
             "valentina": { "kind": "StaticImage", "xy": [25,368], "dimensions": [72,72], "asset": "valentina_72x72" },
-            "valentina_says": { "kind": "TextField", "xy": [110,377], "dimensions": [412,62], "text_size": 13,
+            "valentina_says": { "kind": "TextField", "xy": [110,370], "dimensions": [412,62], "text_size": 13,
                                 "text_hjustify": "left", "text_vjustify": "top",
                                 "ui_name_away": "Congratulations, Commander!\nYou destroyed your opponent's\n%TOWNHALL.",
                                 "ui_name_away_battle_stars": "Congratulations, Commander!\nYou won the battle!",

@@ -16960,11 +16960,16 @@ function invoke_fancy_victory_dialog(battle_type, battle_base, battle_opponent_u
     // make a private copy of widget.data here so the animation will work, since it repeatedly pulls .str from from widget.data
     if(1) {
         dialog.widgets['valentina_says'].data = goog.object.clone(dialog.widgets['valentina_says'].data);
+
         /** @type {string} template for what she says (random alternatives separated by "|") */
         var valentina_says;
         /** @type {Object.<string, string>} substrings to replace inside the template*/
         var replacements = {};
-        if(trophies > 0) {
+
+        if(is_ai_user_id_range(battle_opponent_user_id) && battle_opponent_user_id.toString() in gamedata['ai_bases_client']['bases'] &&
+           'ui_fancy_victory_text' in gamedata['ai_bases_client']['bases'][battle_opponent_user_id.toString()]) {
+            valentina_says = gamedata['ai_bases_client']['bases'][battle_opponent_user_id.toString()]['ui_fancy_victory_text'];
+        } else if(trophies > 0) {
             valentina_says = dialog.widgets['valentina_says'].data['ui_name_trophies_'+dialog.user_data['trophy_type']] || dialog.widgets['valentina_says'].data['ui_name_trophies'];
             replacements['%d'] = pretty_print_number(trophies);
         } else {
