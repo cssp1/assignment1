@@ -17922,10 +17922,8 @@ class GAMEAPI(resource.Resource):
             object.manuf_done_time = 0
 
         object.manuf_queue.append({'spec_name': spec_name, 'level': level, 'total_time': build_time})
-
-        retmsg.append(["OBJECT_STATE_UPDATE2", object.serialize_state()])
-        retmsg.append(["PLAYER_STATE_UPDATE", session.player.resources.calc_snapshot().serialize()])
-
+        session.deferred_object_state_updates.add(object)
+        session.deferred_player_state_update = True
         session.activity_classifier.manufactured_unit()
 
     def do_cancel_make_droids(self, session, retmsg, object, spellargs):
