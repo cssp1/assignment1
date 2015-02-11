@@ -10785,6 +10785,7 @@ function update_aura_bar(dialog) {
 
     // DUMMY AURA FOR DAMAGE PROTECTION
     if(player.resource_state["protection_end_time"] > server_time) {
+        dialog.widgets['aura_slot'+first_aura].show = false;
         dialog.widgets['aura_icon'+first_aura].show = true;
         dialog.widgets['aura_icon'+first_aura].asset = gamedata['auras']['damage_protection']['icon'];
         dialog.widgets['aura_stack'+first_aura].show = false;
@@ -10828,6 +10829,7 @@ function update_aura_bar(dialog) {
 
     // DUMMY AURA FOR DONATED UNITS
     if(player.unit_donation_enabled() && (player.donated_units.length > 0)) {
+        dialog.widgets['aura_slot'+first_aura].show = true;
         dialog.widgets['aura_icon'+first_aura].show = true;
         dialog.widgets['aura_icon'+first_aura].asset = player.donated_units_icon();
 
@@ -10885,6 +10887,7 @@ function update_aura_bar(dialog) {
             var aura_spec = gamedata['auras'][aura['spec']];
             // show aura
             dialog.widgets['aura_glow'+i].show = false;
+            dialog.widgets['aura_slot'+i].show = false;
             dialog.widgets['aura_icon'+i].show = true;
             dialog.widgets['aura_icon'+i].asset = aura_spec['icon'] || 'inventory_unknown';
             dialog.widgets['aura_stack'+i].str = ('stack' in aura ? (('stack_prefix' in aura_spec) ? aura_spec['stack_prefix'] : '') + pretty_print_number(aura['stack']) : null);
@@ -10939,6 +10942,7 @@ function update_aura_bar(dialog) {
             aura_index += 1;
         } else {
             dialog.widgets['aura_glow'+i].show =
+                dialog.widgets['aura_slot'+i].show =
                 dialog.widgets['aura_icon'+i].show =
                 dialog.widgets['aura_stack'+i].show =
                 dialog.widgets['aura_frame'+i].show =

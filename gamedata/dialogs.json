@@ -699,6 +699,8 @@
                           "pulse_frequency": 60,
                           "array": [8,1], "array_offset": [70,0]
                          },
+            "aura_slot": { "kind": "StaticImage", "xy": [0,0], "dimensions": [50,50], "asset": "inventory_slot",
+                           "array": [8,1], "array_offset": [70,0] },
             "aura_icon": { "kind": "StaticImage", "xy": [0,0], "dimensions": [50,50],
                            "array": [8,1], "array_offset": [70,0] },
             "aura_stack": { "kind": "TextField", "xy": [19,27], "dimensions": [24,19], "text_size": 17, "text_style": "thick", "drop_shadow": 1,
