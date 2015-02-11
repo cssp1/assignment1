@@ -151,6 +151,13 @@ OrPredicate.prototype.do_ui_describe = function(player) {
     }
     return ret.join(' OR\n');
 };
+OrPredicate.prototype.do_ui_help = function(player) {
+    for(var i = 0; i < this.subpredicates.length; i++) {
+        var h = this.subpredicates[i].ui_help(player);
+        if(h) { return h; }
+    }
+    return null;
+};
 OrPredicate.prototype.ui_expire_time = function(player) {
     var etime = -1;
     for(var i = 0; i < this.subpredicates.length; i++) {
@@ -309,8 +316,11 @@ BuildingQuantityPredicate.prototype.is_satisfied = function(player, qdata) {
     return (howmany >= this.trigger_qty);
 };
 BuildingQuantityPredicate.prototype.do_ui_describe = function(player) {
-    var ret = gamedata['strings']['predicates'][this.kind]['ui_name'];
     var building_spec = gamedata['buildings'][this.building_type];
+    if(('show_if' in building_spec) && !read_predicate(building_spec['show_if']).is_satisfied(player, null)) {
+        return null;
+    }
+    var ret = gamedata['strings']['predicates'][this.kind]['ui_name'];
     ret = ret.replace('%s', building_spec['ui_name']);
     var qty_string;
     if(this.trigger_qty > 1) {
@@ -322,6 +332,12 @@ BuildingQuantityPredicate.prototype.do_ui_describe = function(player) {
     return ret;
 };
 BuildingQuantityPredicate.prototype.do_ui_help = function(player) {
+    var building_spec = gamedata['buildings'][this.building_type];
+    // do not return help for hidden buildings
+    if(('show_if' in building_spec) && !read_predicate(building_spec['show_if']).is_satisfied(player, null)) {
+        return null;
+    }
+
     var count = 0;
     for(var id in session.cur_objects.objects) {
         var obj = session.cur_objects.objects[id];
@@ -366,6 +382,9 @@ BuildingLevelPredicate.prototype.is_satisfied = function(player, qdata) {
     return (count >= this.trigger_qty);
 };
 BuildingLevelPredicate.prototype.do_ui_describe = function(player) {
+    if(('show_if' in this.building_spec) && !read_predicate(this.building_spec['show_if']).is_satisfied(player, null)) {
+        return null;
+    }
     var ret = gamedata['strings']['predicates'][this.kind]['ui_name' + (this.trigger_qty != 1 ? (this.trigger_qty < 0 ? '_all' : '_multiple') : '')];
     if(this.trigger_qty != 1 && this.trigger_qty > 0) {
         ret = ret.replace('%qty', this.trigger_qty.toString());
@@ -375,6 +394,11 @@ BuildingLevelPredicate.prototype.do_ui_describe = function(player) {
     return ret;
 };
 BuildingLevelPredicate.prototype.do_ui_help = function(player) {
+    // do not return help for hidden buildings
+    if(('show_if' in this.building_spec) && !read_predicate(this.building_spec['show_if']).is_satisfied(player, null)) {
+        return null;
+    }
+
     var raw_count = 0;
     var level_count = 0;
     var min_level = 999, need_to_upgrade_obj = null;
