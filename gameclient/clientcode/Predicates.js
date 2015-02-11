@@ -1534,14 +1534,9 @@ function eval_cond_or_literal(qty, player, qdata) {
         throw Error('eval_cond_or_literal of undefined');
     }
 
-    if(qty === null ||
-       (typeof qty) === 'number' ||
-       (typeof qty) === 'string' ||
-       (typeof qty) === 'boolean' ||
-       ((typeof qty) === 'object' &&
-        (0 in qty) &&
-        !(typeof(qty[0]) === 'object' && (0 in qty[0]) && (typeof(qty[0][0]) === 'object') && ('predicate' in qty[0][0])))) {
-        return qty;
+    // if it's a list, treat it as a cond chain, otherwise assume it's a literal
+    if(qty && (typeof qty === 'object') && (qty instanceof Array)) {
+        return eval_cond(qty, player, qdata);
     }
-    return eval_cond(qty, player, qdata);
+    return qty;
 }
