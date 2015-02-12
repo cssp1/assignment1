@@ -22115,11 +22115,15 @@ function update_unit_donation_dialog(dialog) {
                 if(obj_id) {
                     _dialog.user_data['donation'].push(obj_id);
                 } else {
-                    console.log('could not find unit to donate of type '+_specname);
+                    // dripper normally can get here, just pass silently
+                    //console.log('could not find unit to donate of type '+_specname);
+                    return;
                 }
             }; })(source, specname);
         }
-
+        if(!gamedata['client']['unit_manufacture_dripper']) {
+            dialog.widgets['my_frame'+wname].dripper_cb = null; // disable dripper behavior
+        }
         my_unit_slot += 1;
     }
 
@@ -22176,6 +22180,10 @@ function update_unit_donation_dialog(dialog) {
                 }
             }; })(source, specname);
 
+        if(!gamedata['client']['unit_manufacture_dripper']) {
+            dialog.widgets['donate_frame'+wname].dripper_cb =
+                dialog.widgets['donate_cancel'+wname].dripper_cb = null; // disable dripper behavior
+        }
         donate_unit_slot += 1;
     }
     while(donate_unit_slot < dialog.data['widgets']['donate_slot']['array'][0]*dialog.data['widgets']['donate_slot']['array'][1]) {
