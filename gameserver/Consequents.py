@@ -364,8 +364,6 @@ class FindAndReplaceObjectsConsequent(Consequent):
         self.replacements = data['replacements']
 
     def execute(self, session, player, retmsg, context=None):
-        obj_updates = set()
-
         for obj in player.home_base_iter():
             if obj.is_building(): # right now this only handles buildings
                 for select, replace in self.replacements:
@@ -394,7 +392,9 @@ class FindAndReplaceObjectsConsequent(Consequent):
                                     if name not in obj.equipment[slot_type]:
                                         obj.equipment[slot_type].append(name)
 
-                        obj_updates.add(obj)
+                        session.deferred_object_state_updates.add(obj)
+                        session.deferred_stattab_update = True
+                        session.deferred_power_change = True
 
                         # run history metrics
                         # XXXXXX unify with server.py do_ping_object
@@ -407,13 +407,6 @@ class FindAndReplaceObjectsConsequent(Consequent):
                             session.deferred_history_update |= session.setmax_player_metric(obj.spec.history_category+'_max_level', max_level, bucket = bool(obj.spec.worth_less_xp))
                         if obj.spec.track_level_in_player_history:
                             session.deferred_history_update |= session.setmax_player_metric(obj.spec.name+'_level', obj.level, bucket = bool(obj.spec.worth_less_xp))
-
-        if obj_updates:
-            for obj in obj_updates:
-                retmsg.append(["OBJECT_STATE_UPDATE2", obj.serialize_state()])
-            # also need to do a stat and power update
-            session.deferred_stattab_update = True
-            session.deferred_power_change = True
 
 class ChatSendConsequent(Consequent):
    def __init__(self, data):
