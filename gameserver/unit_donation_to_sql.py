@@ -19,9 +19,10 @@ def unit_donation_schema(sql_util): return {
                ('event_name', 'VARCHAR(128) NOT NULL')] + \
               sql_util.summary_in_dimensions() + \
               [('alliance_id', 'INT4'),
+               ('recipient_id', 'INT4'),
                ('spec', 'VARCHAR(32)'),
-               ('stack', 'INT2'),
                ('level', 'INT1'),
+               ('stack', 'INT2'),
                ],
     'indices': {'by_time': {'keys': [('time','ASC')]}}
     }
@@ -90,7 +91,7 @@ if __name__ == '__main__':
                        ('user_id',row['user_id']),
                        ('event_name',row['event_name'])] + \
                        sql_util.parse_brief_summary(row['sum'])
-            for FIELD in ('alliance_id',):
+            for FIELD in ('alliance_id','recipient_id',):
                 if FIELD in row:
                     keyvals.append((FIELD, row[FIELD]))
 
@@ -98,9 +99,9 @@ if __name__ == '__main__':
                 sql_util.do_insert_batch(cur, unit_donation_table,
                                          [keyvals + \
                                           [('spec', a['spec']),
-                                           ('stack', a.get('stack',1)),
-                                           ('level', a.get('level',1))] \
-                                          for a in row['attachments']]
+                                           ('level', a.get('level',1)),
+                                           ('stack', a.get('stack',1))] \
+                                          for a in row['units']]
                                          )
             else:
                 pass # unrecognized event

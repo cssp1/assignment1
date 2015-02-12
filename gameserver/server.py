@@ -24287,6 +24287,7 @@ class GAMEAPI(resource.Resource):
                         session.player.send_history_update(retmsg)
                         metric_event_coded(session.player.user_id, '4150_units_donated', {'sum':session.player.get_denormalized_summary_props('brief'),
                                                                                           'alliance_id':alliance_id,
+                                                                                          'recipient_id':recipient_id,
                                                                                           'tag':tag,
                                                                                           'units':attachments})
 
