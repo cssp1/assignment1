@@ -4514,10 +4514,10 @@
                      "array": [0,1], // these are created dynamically in JavaScript
                      "array_offset": [206,0] },
 
-            "resource_bar_water_glow": { "kind": "StaticImage", "xy": [-83,344], "dimensions": [307,98], "asset": "resource_bar_glow", "alpha": 0 },
-            "resource_bar_iron_glow": { "kind": "StaticImage", "xy": [49,344], "dimensions": [307,98], "asset": "resource_bar_glow", "alpha": 0 },
-            "resource_bar_res3_glow": { "kind": "StaticImage", "xy": [181,344], "dimensions": [307,98], "asset": "resource_bar_glow", "alpha": 0 },
-            "resource_bar_fbcredits_glow": { "kind": "StaticImage", "xy": [445,344], "dimensions": [307,98], "asset": "resource_bar_glow", "alpha": 0 },
+            "resource_bar_water_glow": { "show": 0, "kind": "StaticImage", "xy": [-83,344], "dimensions": [307,98], "asset": "resource_bar_glow", "alpha": 0 },
+            "resource_bar_iron_glow": { "show": 0, "kind": "StaticImage", "xy": [49,344], "dimensions": [307,98], "asset": "resource_bar_glow", "alpha": 0 },
+            "resource_bar_res3_glow": { "show": 0, "kind": "StaticImage", "xy": [181,344], "dimensions": [307,98], "asset": "resource_bar_glow", "alpha": 0 },
+            "resource_bar_fbcredits_glow": { "show": 0, "kind": "StaticImage", "xy": [445,344], "dimensions": [307,98], "asset": "resource_bar_glow", "alpha": 0 },
 
             "resource_bar_water": { "kind": "StaticImage", "xy": [10,377], "dimensions": [122,32], "asset": "dialog_sunken_resizable", "bg_image_resizable": 1,
                                     "ui_tooltip": "%RES in %STORAGES1",
