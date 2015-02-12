@@ -24285,7 +24285,10 @@ class GAMEAPI(resource.Resource):
                         session.increment_player_metric('units_donated_cur_alliance', num_donated, time_series = False)
                         retmsg.append(["PLAYER_STATE_UPDATE", session.player.resources.calc_snapshot().serialize()])
                         session.player.send_history_update(retmsg)
-                        metric_event_coded(session.player.user_id, '4150_units_donated', {'alliance_id':alliance_id,'tag':tag,'units':attachments})
+                        metric_event_coded(session.player.user_id, '4150_units_donated', {'sum':session.player.get_denormalized_summary_props('brief'),
+                                                                                          'alliance_id':alliance_id,
+                                                                                          'tag':tag,
+                                                                                          'units':attachments})
 
                         if session.alliance_chat_channel:
                             session.do_chat_send(session.alliance_chat_channel,
@@ -24471,6 +24474,7 @@ class GameSite(server.Site):
                                              SpinLog.InventoryLogFilter(SpinNoSQLLog.NoSQLJSONLog(self.nosql_client, 'log_inventory')), # inventory events to MongoDB log_inventory
                                              SpinLog.LadderPvPLogFilter(SpinNoSQLLog.NoSQLJSONLog(self.nosql_client, 'log_ladder_pvp')), # ladder pvp events to MongoDB log_ladder_pvp
                                              SpinLog.DamageProtectionLogFilter(SpinNoSQLLog.NoSQLJSONLog(self.nosql_client, 'log_damage_protection')), # damage protection events to MongoDB log_damage_protection
+                                             SpinLog.UnitDonationLogFilter(SpinNoSQLLog.NoSQLJSONLog(self.nosql_client, 'log_unit_donation')), # unit donation events to MongoDB log_unit_donation
                                              SpinLog.FishingLogFilter(SpinNoSQLLog.NoSQLJSONLog(self.nosql_client, 'log_fishing')), # fishing events to MongoDB log_fishing
                                              SpinLog.LoginSourcesFilter(SpinNoSQLLog.NoSQLJSONLog(self.nosql_client, 'log_login_sources')), # login source events to MongoDB log_login_sources
                                              SpinLog.LoginFlowFilter(SpinNoSQLLog.NoSQLJSONLog(self.nosql_client, 'log_login_flow')), # login flow events to MongoDB log_login_flow

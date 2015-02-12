@@ -274,6 +274,10 @@ def DamageProtectionLogFilter(child):
                                   '3884_protection_removed',
                                   '3885_i_got_attacked'
                                   ])
+def UnitDonationLogFilter(child):
+    return JSONLogFilter(child,
+                         allow = ['4150_units_donated'
+                                  ])
 def FishingLogFilter(child):
     return JSONLogFilter(child,
                          allow = ['5150_fish_start',

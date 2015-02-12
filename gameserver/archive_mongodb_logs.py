@@ -70,6 +70,9 @@ TABLES = {
     # inventory source/sink log
     'inventory': { 's3_name': 'inventory', 'table_name': 'log_inventory', 'compression': 'zip', 'retain_for': 60*86400 },
 
+    # unit donation log
+    'unit_donation': { 's3_name': 'unit_donation', 'table_name': 'log_unit_donation', 'compression': 'zip', 'retain_for': 7*86400 },
+
     # ladder PvP log
     'ladder_pvp': { 's3_name': 'ladder_pvp', 'table_name': 'log_ladder_pvp', 'compression': 'zip', 'retain_for': 10*86400 },
 

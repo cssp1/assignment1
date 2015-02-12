@@ -2379,6 +2379,7 @@ def do_main():
                                     SpinLog.LadderPvPLogFilter(SpinNoSQLLog.NoSQLJSONLog(db_client, 'log_ladder_pvp')), # ladder pvp events to MongoDB log_ladder_pvp
                                     SpinLog.DamageProtectionLogFilter(SpinNoSQLLog.NoSQLJSONLog(db_client, 'log_damage_protection')), # damage protection events to MongoDB log_damage_protection
                                     SpinLog.FishingLogFilter(SpinNoSQLLog.NoSQLJSONLog(db_client, 'log_fishing')), # fishing events to MongoDB log_fishing
+                                    SpinLog.UnitDonationLogFilter(SpinNoSQLLog.NoSQLJSONLog(db_client, 'log_unit_donation')), # unit donation events to MongoDB log_unit_donation
                                     SpinLog.LoginSourcesFilter(SpinNoSQLLog.NoSQLJSONLog(db_client, 'log_login_sources')), # login source events to MongoDB log_login_sources
                                     SpinLog.LoginFlowFilter(SpinNoSQLLog.NoSQLJSONLog(db_client, 'log_login_flow')), # login flow events to MongoDB log_login_flow
                                     SpinLog.FBPermissionsLogFilter(SpinNoSQLLog.NoSQLJSONLog(db_client, 'log_fb_permissions')), # FB Permissions events to MongoDB log_fb_notifications

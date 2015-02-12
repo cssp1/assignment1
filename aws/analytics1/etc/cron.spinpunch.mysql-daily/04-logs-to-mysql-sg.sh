@@ -16,6 +16,7 @@ GAME_DIR=/home/ec2-user/summonersgate
 (cd $GAME_DIR/gameserver && nice ./chat_to_sql.py -q --prune) > /dev/null
 (cd $GAME_DIR/gameserver && nice ./econ_res_to_sql.py -q --prune) > /dev/null
 (cd $GAME_DIR/gameserver && nice ./inventory_to_sql.py -q --prune) > /dev/null
+(cd $GAME_DIR/gameserver && nice ./unit_donation_to_sql.py -q --prune) > /dev/null
 (cd $GAME_DIR/gameserver && nice ./fishing_to_sql.py -q --prune) > /dev/null
 (cd $GAME_DIR/gameserver && nice ./fb_notifications_to_sql.py -q --prune) > /dev/null
 (cd $GAME_DIR/gameserver && nice ./fb_requests_to_sql.py -q --prune) > /dev/null
