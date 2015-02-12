@@ -8063,8 +8063,8 @@ class Player(AbstractPlayer):
                     ret = patches[name]
         return ret
 
-    def get_abtest_consequent(self, name):
-        ret = gamedata['consequent_library'][name]
+    def get_abtest_consequent(self, name, fail_missing = True):
+        ret = gamedata['consequent_library'].get(name, None) # ret can be None here!
         key = 'consequent_library'
         for test_name, group in self.abtests.iteritems():
             if test_name in gamedata['abtests'] and \
@@ -8075,6 +8075,8 @@ class Player(AbstractPlayer):
                 patches = self.get_abtest_value(test_name, key, {})
                 if name in patches:
                     ret = patches[name]
+        if (ret is None) and fail_missing:
+            raise Exception('consequent not found: '+name)
         return ret
 
     def get_abtest_offer(self, name):
@@ -15493,6 +15495,7 @@ class GAMEAPI(resource.Resource):
             session.pvp_balance = 'same_alliance'
 
         # add relevant objects into the session
+        session.deferred_object_state_updates = set() # no need to send anymore
         obj_states = []
         aura_states = []
 
@@ -20661,6 +20664,10 @@ class GAMEAPI(resource.Resource):
             possible_alts = map(int, client_session_data.split(','))
             for alt in possible_alts:
                 player.possible_alt_record_login(alt)
+
+        on_login_cons = player.get_abtest_consequent('on_login_pre_hello', fail_missing = False)
+        if on_login_cons:
+            session.execute_consequent_safe(on_login_cons, session.player, retmsg, reason='on_login_pre_hello')
 
         # add to list of days since account creation on which this user logged in
         # player.history['logins_by_day'] = {"0":5, "2":1, "3":1, ...}
