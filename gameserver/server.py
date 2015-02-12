@@ -24226,6 +24226,8 @@ class GAMEAPI(resource.Resource):
                 attachments = []
 
                 if success:
+                    # dictionary mapping (specname,level) -> qty donated
+                    qty_by_specname_and_level = {}
                     for id in unit_ids:
                         unit = session.player.get_object_by_obj_id(id, fail_missing = False)
                         if (not unit) or (unit.owner is not session.player) or (not unit.is_mobile()) or \
@@ -24235,8 +24237,21 @@ class GAMEAPI(resource.Resource):
                             success = False
                             error_reason = "HARMLESS_RACE_CONDITION"
                             break
-                        units.append(unit)
-                        attachments.append({'spec':unit.spec.name}) # XXXXXX carry over level here? compress stacks for efficiency?
+                        units.append(unit) # mark this as a unit we'd delete if the donation succeeds
+                        level = 1 # XXXXXX carry over level here?
+                        key = (unit.spec.name, level)
+                        qty_by_specname_and_level[key] = qty_by_specname_and_level.get(key,0) + 1
+
+                    if len(qty_by_specname_and_level) < 1:
+                        success = False # nothing to donate
+                    else:
+                        # compress to a single attachment by specname and level
+                        for key, qty in qty_by_specname_and_level.iteritems():
+                            specname, level = key
+                            p = {'spec': specname}
+                            if qty > 1: p['stack'] = qty
+                            if level > 1: p['level'] = level
+                            attachments.append(p)
 
                 if success:
                     total_space = sum([u.get_leveled_quantity(u.spec.consumes_space) for u in units])
