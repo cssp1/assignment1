@@ -62,7 +62,7 @@ if __name__ == '__main__':
     unit_donation_daily_summary_table = cfg['table_prefix']+game_id+'_unit_donation_daily_summary'
 
     cur = con.cursor(MySQLdb.cursors.DictCursor)
-    sql_util.ensure_table(cur, unit_donation_table, unit_donation_schema)
+    sql_util.ensure_table(cur, unit_donation_table, unit_donation_schema(sql_util))
     sql_util.ensure_table(cur, unit_donation_daily_summary_table, unit_donation_summary_schema(sql_util, 'day'))
     con.commit()
 
