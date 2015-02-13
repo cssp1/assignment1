@@ -3060,8 +3060,7 @@ GameObject.prototype.ai_pick_target_classic = function(auto_spell, auto_spell_le
 
         }
 
-        var recurse_blockers = false;
-        if(override_priority === null || recurse_blockers) {
+        if(override_priority === null) {
 
             if(priority > 0 && (dist > auto_spell_range) && ('inaccessible' in priority_table)) {
                 // if the spell cares about accessibility, we have to
@@ -3129,14 +3128,10 @@ GameObject.prototype.ai_pick_target_classic = function(auto_spell, auto_spell_le
                     if(!accessible && ('blocker' in priority_table)) {
                         // if we can identify an obstacle in the way, promote it up near the target's priority
 
-                        // check for blockers along the staight line from the end of the test_path to the target
-                        // (this used to check from our location to the target, but that would cause units to
-                        // bash away at pretty much any nearby barrier instead of making good progress towards the target).
-
                         var blocker = null;
 
-                        // really hard to figure out what to do here. But need to be sure the blocker isn't itself blocked!
-                        var straight_path_origin = (recurse_blockers && test_path && test_path.length >= 1 ? test_path[test_path.length-1] : cur_cell);
+                        // really hard to figure out what to do here. Need to be sure the blocker isn't itself blocked!
+                        var straight_path_origin = cur_cell;
                         var blocker_path_end = null;
                         var straight_path = astar_map.get_linear_path(straight_path_origin, dest_cell);
                         seen_objects = {};
