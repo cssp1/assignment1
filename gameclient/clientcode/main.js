@@ -221,6 +221,8 @@ function vec_equals_integer(v, w) {
     return false;
 }
 
+function vec_print(v) { return v[0].toString()+','+v[1].toString(); };
+
 function hex_slanted(a) {
     // transform to "slanted" coordinate system for easier distance computation
     var new_x = a[0] - Math.floor(a[1]/2);
@@ -3027,12 +3029,12 @@ GameObject.prototype.ai_pick_target_classic = function(auto_spell, auto_spell_le
     var min_dist = 9999;
     var min_pos = null;
     var min_path_end = null; // best target requires movement towards this point to reach firing range
-    var seen_objects = {};
 
     for(var i = 0; i < obj_list.length; i++) {
         var obj = obj_list[i][0], dist = obj_list[i][1], pos = obj_list[i][2];
         var override_priority = (obj_list[i].length >= 4 ? obj_list[i][3] : null); // this is set for "blocker" objects
         var override_path_end = (obj_list[i].length >= 5 ? obj_list[i][4] : null); // this is set for "blocker" objects
+        var debug_orig_target = (obj_list[i].length >= 6 ? obj_list[i][5] : null); // this is set for "blocker" objects
 
         var path_end = (override_path_end || null);
 
@@ -3056,8 +3058,14 @@ GameObject.prototype.ai_pick_target_classic = function(auto_spell, auto_spell_le
                 is_far = true;
             }
 
-            if(verbose) { console.log(this.spec['name']+' -> '+obj.spec['name']+': dist '+dist.toString()+' auto_spell_range '+auto_spell_range.toString()+' prio '+priority.toString() + (is_far ? 'FAR' : '')); }
+            //if(verbose) { console.log(this.spec['name']+' -> '+obj.spec['name']+': dist '+dist.toString()+' auto_spell_range '+auto_spell_range.toString()+' prio '+priority.toString() + (is_far ? 'FAR' : '')); }
 
+        }
+
+        if(verbose) {
+            var s = 'considering target: '+obj.spec['name']+' at '+vec_print(obj.interpolate_pos());
+            if(debug_orig_target) { s += ' blocking '+debug_orig_target.spec['name']; }
+            console.log(s);
         }
 
         if(override_priority === null) {
@@ -3082,9 +3090,9 @@ GameObject.prototype.ai_pick_target_classic = function(auto_spell, auto_spell_le
                 var dest_cell = [clamp(Math.floor(dest[0]),0,ncells[0]-1),
                                  clamp(Math.floor(dest[1]),0,ncells[1]-1)];
                 var accessible = astar_map.linear_path_is_clear(cur_cell, dest_cell) ? 1 : 0;
-                if(verbose) { console.log('direct path clear? '+accessible.toString()); }
+                if(verbose) { console.log('    direct path clear? '+accessible.toString()); }
 
-                if(!accessible) { // try an A* path to any cell within shooting range of the target
+                if(!accessible) { // straight-line path is not clear - try an A* path to any cell within shooting range of the target
                     var test_path = null;
 
                     var test_point = vec_floor(pos);
@@ -3098,88 +3106,43 @@ GameObject.prototype.ai_pick_target_classic = function(auto_spell, auto_spell_le
                     }
 
                     if(verbose) {
-                        console.log(obj.spec['name']+' PATH'); console.log(test_path);
+                        console.log('    PATH to '+obj.spec['name']+':'); console.log(test_path);
                         if(test_path && test_path.length >= 1) {
-                            console.log('remainder '+(vec_distance(test_path[test_path.length-1], pos) - obj.hit_radius()).toString());
+                            console.log('    remainder '+(vec_distance(test_path[test_path.length-1], pos) - obj.hit_radius()).toString());
                         }
                     }
 
                     if(test_path && test_path.length >= 1 && vec_distance(test_path[test_path.length-1], pos) - obj.hit_radius() <= auto_spell_range) {
                         // target IS accessible by moving around obstacles
 
-                        if(verbose) { console.log(obj.spec['name']+' obstacles '+(vec_distance(test_path[test_path.length-1], pos)).toString()+' hit_radius '+obj.hit_radius().toString()+' spell_range '+auto_spell_range.toString()); }
+                        if(verbose) { console.log('    obstacles '+(vec_distance(test_path[test_path.length-1], pos)).toString()+' hit_radius '+obj.hit_radius().toString()+' spell_range '+auto_spell_range.toString()); }
 
                         // but if the path takes us farther away than our priority_far_range BEYOND the direct path, consider the path not usable
                         // note: using test_path.length here directly is the Manhattan distance approximation, not true distance
                         // XXX the middle test in this if() statement might need further refinement, tweaking exactly
                         // how far out of the way a unit should be willing to go before deciding to break through obstacles instead.
                         if(priority_far_range > 0 && test_path.length >= priority_far_range && ('far' in priority_table)) {
-                            if(verbose) { console.log(obj.spec['name']+' deviation too big ('+test_path.length.toString()+' vs '+priority_far_range.toString()+'), treating it as inaccessible'); }
+                            if(verbose) { console.log('    deviation too big ('+test_path.length.toString()+' vs '+priority_far_range.toString()+'), treating it as inaccessible'); }
                             accessible = 0;
                             path_end = test_path[test_path.length-1];
                         } else {
                             // target CAN be reached with small path deviation
-                            if(verbose) { console.log(obj.spec['name']+' deviation small, going around obstacles'); }
+                            if(verbose) { console.log('    deviation small, going around obstacles'); }
                             accessible = 2;
                             path_end = test_path[test_path.length-1];
                         }
                     }
 
-                    if(!accessible && ('blocker' in priority_table)) {
-                        // if we can identify an obstacle in the way, promote it up near the target's priority
+                    if(!accessible && ('blocker' in priority_table)) { // no cell within shooting range of the target is accessible by a fully clear path
+                        // try to identify a barrier along the way, and promote it up near the target's priority
+                        var temp = this.ai_pick_target_find_blocker(cur_cell, dest_cell, target_team, obj, auto_spell_range);
+                        var blocker = temp.blocker, blocker_path_end = temp.blocker_path_end;
 
-                        var blocker = null;
-
-                        // really hard to figure out what to do here. Need to be sure the blocker isn't itself blocked!
-                        var straight_path_origin = cur_cell;
-                        var blocker_path_end = null;
-                        var straight_path = astar_map.get_linear_path(straight_path_origin, dest_cell);
-                        seen_objects = {};
-
-                        for(var j = 0; j < straight_path.length; j++) {
-                            // XXX note: this will change targets slightly depending on map_accel_chunk!
-                            var blocker_list = voxel_map_accel.objects_at_xy(straight_path[j], target_team);
-                            if(blocker_list) {
-                                var min_blocker_dist = 9999;
-                                for(var k = 0; k < blocker_list.length; k++) {
-                                    var b = blocker_list[k];
-                                    if(b !== obj && !b.is_destroyed() && b.is_building() && b.is_blocker() && !(b.id in seen_objects)) {
-                                        seen_objects[b.id] = 1;
-                                        var b_pos = b.interpolate_pos();
-                                        var d = vec_distance(b_pos, straight_path_origin);
-                                        if(d < min_blocker_dist) { // use minimum distance to break ties
-
-                                            // construct linear path towards blocker
-                                            var b_path = astar_map.get_linear_path(cur_cell, b_pos);
-
-                                            // march along the linear path, trying to get in range before hitting a blocker
-                                            for(var p = 0; p < b_path.length; p++) {
-                                                var pt = b_path[p];
-                                                if(p > 0 && astar_map.is_blocked(vec_floor(pt))) {
-                                                    break;
-                                                }
-                                                // in range yet?
-                                                if(vec_distance(pt, b_pos) - b.hit_radius() <= auto_spell_range) {
-                                                    // found a viable blocker!
-                                                    blocker_path_end = pt;
-                                                    playfield_check_pos(blocker_path_end, 'blocker_path_end');
-                                                    blocker = b;
-                                                    min_blocker_dist = d;
-                                                    break;
-                                                }
-                                            }
-                                        }
-                                    }
-                                    // if(blocker) { break; } // don't stop - just picking the first one here causes grouped units to pick different targets - not good.
-                                }
-                            }
-                            if(blocker) { break; } // any objects would be further along the path and thus further away
-                        }
                         if(blocker) {
-                            // found something in the way that we can smash
-                            // append it to the list of objects to examine, with priority set to our 'blocker' priority times the object it blocks
-                            if(verbose) { console.log("BLOCKER "+blocker.spec['name']+ ' at '+blocker.raw_pos()[0].toString()+','+blocker.raw_pos()[1].toString()+' prio '+(priority * priority_table['blocker']).toString()); }
-                            obj_list.push([blocker, vec_distance(my_pos, blocker.raw_pos()) - blocker.hit_radius(), blocker.raw_pos(), priority * priority_table['blocker'], blocker_path_end]);
+                            // found something in the way that we can smash!
+                            // append it to the list of objects to examine, with priority set to *our main target's* priority, scaled by 'blocker'
+                            if(verbose) { console.log("    BLOCKER "+blocker.spec['name']+ ' at '+vec_print(blocker.raw_pos())+' prio '+(priority * priority_table['blocker']).toString()); }
+                            obj_list.push([blocker, vec_distance(my_pos, blocker.raw_pos()) - blocker.hit_radius(), blocker.raw_pos(), priority * priority_table['blocker'], blocker_path_end, obj]);
                         }
                     }
                 }
@@ -3189,8 +3152,6 @@ GameObject.prototype.ai_pick_target_classic = function(auto_spell, auto_spell_le
                 }
             }
         }
-
-        if(verbose) { console.log('    considering target: '+obj.spec['name']+' prio '+priority.toString()); }
 
         // switch to this target if it is higher priority than any other target we've checked,
         // OR (it is equal to the highest priority AND closer than any other target of that priority)
@@ -3202,7 +3163,11 @@ GameObject.prototype.ai_pick_target_classic = function(auto_spell, auto_spell_le
                 continue;
             }
 
-            if(verbose) { console.log('    new best target: '+obj.spec['name']+' prio '+priority.toString()); }
+            if(verbose) {
+                var s = 'new best target! '+obj.spec['name']+' prio '+priority.toString()+' at '+vec_print(obj.interpolate_pos());
+                if(debug_orig_target) { s += ' blocking '+debug_orig_target.spec['name']; }
+                console.log(s);
+            }
 
             max_priority = priority;
             min_dist = dist;
@@ -3213,10 +3178,65 @@ GameObject.prototype.ai_pick_target_classic = function(auto_spell, auto_spell_le
     }
 
     var ret = {target:ret_obj, pos:min_pos, dist:min_dist, /*priority:max_priority,*/ path_end:min_path_end};
-    if(verbose) { console.log(this.spec['name']+' '+this.id+' now targeting -> '); console.log(ret); }
+    if(verbose) {
+        console.log(this.spec['name']+' '+this.id+' now targeting -> '+ret_obj.spec['name']+' at '+vec_print(ret_obj.interpolate_pos()));
+        //console.log(ret);
+    }
     return ret;
 };
 
+
+/** @param {Array.<number>} cur_cell
+    @param {Array.<number>} dest_cell
+    @param {string} target_team - limit candidate objects to those on this team
+    @param {GameObject} obj - the actual target we're trying to reach
+    @param {number} auto_spell_range - our weapon range
+    @return {{blocker: (GameObject|null), blocker_path_end: (Array.<number>|null)}} */
+GameObject.prototype.ai_pick_target_find_blocker = function(cur_cell, dest_cell, target_team, obj, auto_spell_range) {
+    var blocker = null;
+    var blocker_path_end = null;
+    var straight_path = astar_map.get_linear_path(cur_cell, dest_cell);
+    var seen_objects = {};
+
+    for(var j = 0; j < straight_path.length; j++) {
+        // XXX note: this will change targets slightly depending on map_accel_chunk!
+        var blocker_list = voxel_map_accel.objects_at_xy(straight_path[j], target_team);
+        if(!blocker_list) { continue; }
+        var min_blocker_dist = Infinity; // use minimum distance to break ties
+        for(var k = 0; k < blocker_list.length; k++) {
+            var b = blocker_list[k];
+            if(b !== obj && !b.is_destroyed() && b.is_building() && b.is_blocker() && !(b.id in seen_objects)) {
+                seen_objects[b.id] = 1;
+                var b_pos = b.interpolate_pos();
+                var d = vec_distance(b_pos, cur_cell);
+                if(d < min_blocker_dist) {
+                    // construct linear path towards blocker
+                    var b_path = astar_map.get_linear_path(cur_cell, b_pos);
+
+                    // march along the linear path, trying to get in range before hitting a blocker
+                    for(var p = 0; p < b_path.length; p++) {
+                        var pt = b_path[p];
+                        if(p > 0 && astar_map.is_blocked(vec_floor(pt))) {
+                            break; // can't get directly to this blocker
+                        }
+                        // in range yet?
+                        if(vec_distance(pt, b_pos) - b.hit_radius() <= auto_spell_range) {
+                            // found a viable blocker!
+                            blocker_path_end = pt;
+                            playfield_check_pos(blocker_path_end, 'blocker_path_end');
+                            blocker = b;
+                            min_blocker_dist = d;
+                            break;
+                        }
+                    }
+                }
+            }
+            // don't stop here - just picking the first one found causes grouped units to pick different targets - not good
+        }
+        if(blocker) { break; } // stop - any other objects would be further along the path and thus further away
+    }
+    return {blocker:blocker, blocker_path_end:blocker_path_end};
+};
 
 // AI-level function - set control state to stop
 GameObject.prototype.ai_stop = function() {
