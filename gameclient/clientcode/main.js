@@ -17878,7 +17878,7 @@ function invoke_building_context_menu(mouse_xy) {
                     add_migrate_turret_heads_button(buttons);
                 } else {
                     buttons.push(new ContextMenuButton(spell['ui_name'+ (obj.level < obj.get_max_ui_level() ? (obj.is_emplacement() ? '_emplacement' : '') : '_maxlevel')],
-                                                       function() { invoke_upgrade_building_dialog(); }));
+                                                       (function (_obj) { return function() { invoke_upgrade_building_dialog(_obj); }; })(obj)));
                 }
             }
 
@@ -37448,9 +37448,14 @@ function invoke_upgrade_tech_dialog(techname, prev_dialog) { return invoke_upgra
     @param {SPUI.Dialog|null} prev_dialog
     @param {GameObject|null} preselect */
 function invoke_upgrade_dialog_generic(techname, prev_dialog, preselect) {
-    if(techname == 'BUILDING' &&
-       selection.unit.time_until_finish() > 0) {
-        return invoke_child_speedup_dialog('speedup');
+
+    if(techname == 'BUILDING') {
+        // if building is busy, divert to speedup dialog
+        var bldg = preselect || selection.unit;
+        if(bldg.time_until_finish() > 0) {
+            change_selection_unit(bldg);
+            return invoke_child_speedup_dialog('speedup');
+        }
     }
 
     // instantiate the dialog
