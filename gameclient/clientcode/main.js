@@ -3185,28 +3185,39 @@ GameObject.prototype.ai_pick_target_classic = function(auto_spell, auto_spell_le
     return ret;
 };
 
-
-/** @param {Array.<number>} cur_cell
-    @param {Array.<number>} dest_cell
+/** This function is called from the target-picking code when a target object is not accessibly by any clear path.
+    It tries to find the best blocking object to break to clear the way. (note: regular buildings can also count
+    as "blockers", it doesn't have to be a barrier).
+    @param {Array.<number>} cur_cell - where we are now
+    @param {Array.<number>} dest_cell - where we want to go (might be blocked)
     @param {string} target_team - limit candidate objects to those on this team
     @param {GameObject} obj - the actual target we're trying to reach
     @param {number} auto_spell_range - our weapon range
-    @return {{blocker: (GameObject|null), blocker_path_end: (Array.<number>|null)}} */
+    @return {{blocker: (GameObject|null), blocker_path_end: (Array.<number>|null)}} - the blocking object, and the nearby cell coordinates from which we can hit it */
+// XXX should be a member of Mobile, not GameObject
 GameObject.prototype.ai_pick_target_find_blocker = function(cur_cell, dest_cell, target_team, obj, auto_spell_range) {
     var blocker = null;
     var blocker_path_end = null;
-    var straight_path = astar_map.get_linear_path(cur_cell, dest_cell);
-    var seen_objects = {};
 
+    /** @type {Object.<string,boolean>} - set of object IDs we've seen */
+    var seen_objects = {}; // for making sure we only evaluate each candidate blocker once
+
+    // Naive/greedy blocker detection: march along the straight line from cur to dest, picking the closest reachable obstacle along it.
+    // This could be improved by using A* with a cost function.
+    var straight_path = astar_map.get_linear_path(cur_cell, dest_cell);
+
+    // Alternatively, this iteration could be done using astar_map, now that it can remember which objects are responsible for blocking a cell.
+    // It would probably be faster that way.
     for(var j = 0; j < straight_path.length; j++) {
         // XXX note: this will return slightly different results depending on map_accel_chunk!
         var blocker_list = voxel_map_accel.objects_near_xy(straight_path[j], target_team);
         if(!blocker_list) { continue; }
-        var min_blocker_dist = Infinity; // use minimum distance to break ties
+        var min_blocker_dist = Infinity; // use minimum distance from us to blocker to break ties
         for(var k = 0; k < blocker_list.length; k++) {
             var b = blocker_list[k];
             if(b !== obj && !b.is_destroyed() && b.is_building() && b.is_blocker() && !(b.id in seen_objects)) {
-                seen_objects[b.id] = 1;
+                seen_objects[b.id] = true;
+
                 var b_pos = b.interpolate_pos();
                 var d = vec_distance(b_pos, cur_cell);
                 if(d < min_blocker_dist) {
