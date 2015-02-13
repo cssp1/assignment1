@@ -1538,8 +1538,6 @@ SPFX.PhantomUnit.prototype.get_phantom_object = function() {
     return this.obj;
 };
 
-SPFX.random_seed = 0;
-
 /**
    @param {Array.<number>} pos
    @param {number} altitude
@@ -1582,8 +1580,14 @@ SPFX.add_visual_effect = function(pos, altitude, orient, time, data, allow_sound
     } else if(data['type'] === 'random') {
         var effects = data['effects'] || [];
         if(effects.length > 0) {
-            var index = Math.floor(SPFX.random_seed % effects.length);
-            SPFX.random_seed = index+1;
+            var total_weight = 0;
+            var breakpoints = [];
+            goog.array.forEach(data['effects'], function(fx) {
+                total_weight += ('random_weight' in fx ? fx['random_weight'] : 1);
+                breakpoints.push(total_weight);
+            });
+            var r = Math.random() * total_weight;
+            var index = -goog.array.binarySearch(breakpoints, r) - 1;
             return SPFX.add_visual_effect(pos, altitude, orient, time, effects[index], allow_sound, instance_data);
         }
     } else if(data['type'] === 'library') {
