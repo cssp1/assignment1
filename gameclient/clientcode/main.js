@@ -7462,8 +7462,10 @@ Mobile.prototype.receive_state = function(data, init, is_deploying) {
 
     if(is_deploying) {
         invalidate_defender_threatlists();
-        // spread sound effect time out by the min flush interval, to approximate units arriving smoothly over that time
-        add_unit_deployment_vfx('post_deploy', this.interpolate_pos(), this.spec, this.level, 2 * gamedata['client']['ajax_min_flush_interval']);
+        if(unit_deployment_latency_high()) {
+            // spread sound effect time out by the min flush interval, to approximate units arriving smoothly over that time
+            add_unit_deployment_vfx('post_deploy', this.interpolate_pos(), this.spec, this.level, 2 * gamedata['client']['ajax_min_flush_interval']);
+        }
     }
 };
 
@@ -13094,6 +13096,8 @@ function add_unit_deployment_vfx(kind, ji, spec, level, time_spread) {
                            vfx, true, instance_data);
 }
 
+function unit_deployment_latency_high() { return (-2*server_time_offset) > gamedata['client']['unit_deployment_effect_latency_threshold']; };
+
 /** @param {Array.<number>} ji
     @param {Array.<Object>} objs_to_deploy (list of values in same format as values of session.pre_deploy_units) */
 function do_deploy(ji, objs_to_deploy) {
@@ -13105,7 +13109,10 @@ function do_deploy(ji, objs_to_deploy) {
         var fx_specname = army_unit['spec'];
         var fx_level = ('level' in army_unit ? army_unit['level'] : 1);
         // this is evaluated at high frequency, so only spread by TICK_INTERVAL
-        add_unit_deployment_vfx('pre_deploy', ji, gamedata['units'][fx_specname], fx_level, TICK_INTERVAL);
+        add_unit_deployment_vfx(
+            // only use pre_deploy effect in high-latency environment - otherwise skip right to post_deploy
+            unit_deployment_latency_high() ? 'pre_deploy' : 'post_deploy',
+            ji, gamedata['units'][fx_specname], fx_level, TICK_INTERVAL);
     }
 
     // transfer from pre- to post-deploy

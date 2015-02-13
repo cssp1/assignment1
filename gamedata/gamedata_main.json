@@ -148,6 +148,10 @@
         "unit_declump_radius": 2, // map unit radius within which to avoid other units for the declumping AI
         "unit_declump_urgently": false, // prioritize declumping over shooting/moving
 
+        // if your ping is greater than this, use separate pre- and post-deployment VFX to hide latency
+        // otherwise skip the pre-deploy effect and go right to post-deploy
+        "unit_deployment_effect_latency_threshold": 2.0,
+
         "tut_battle_interact": "manual", // if "auto", automatically move units for user during first step of tutorial
 
         "default_deploy_ai_order": {
