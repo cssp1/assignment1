@@ -53,6 +53,8 @@ SPFX.init = function(canvas, ctx, use_low_gfx, use_high_gfx) {
         SPFX.detail = gamedata['client']['graphics_detail']['default'];
     }
 
+    if('sound_throttle' in gamedata['client']) { SPFX.sound_throttle = gamedata['client']['sound_throttle']; }
+
     SPFX.clear();
 
     SPFX.shake_synth = new ShakeSynth.Shake(0);
@@ -862,7 +864,7 @@ function quantize_streak(start, end) {
 SPFX.cue_tracker = {};
 
 // allow at least this much of a gap between successive plays of the
-// sound effect (helps with swarm firing)
+// same sound effect (helps with swarm firing and bad browsers)
 SPFX.sound_throttle = 0.3;
 
 /** @constructor
