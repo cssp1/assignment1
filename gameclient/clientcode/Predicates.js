@@ -517,12 +517,22 @@ TechLevelPredicate.prototype.is_satisfied = function(player, qdata) {
     return false;
 };
 TechLevelPredicate.prototype.do_ui_describe = function(player) {
+    var spec = gamedata['tech'][this.tech];
+    // do not return help for hidden techs
+    if(('show_if' in spec) && !read_predicate(spec['show_if']).is_satisfied(player, null)) {
+        return null;
+    }
     var ret = gamedata['strings']['predicates'][this.kind]['ui_name'];
-    ret = ret.replace('%s', gamedata['tech'][this.tech]['ui_name']);
+    ret = ret.replace('%s', spec['ui_name']);
     ret = ret.replace('%d', this.min_level.toString());
     return ret;
 };
 TechLevelPredicate.prototype.do_ui_help = function(player) {
+    var spec = gamedata['tech'][this.tech];
+    // do not return help for hidden techs
+    if(('show_if' in spec) && !read_predicate(spec['show_if']).is_satisfied(player, null)) {
+        return null;
+    }
     if(!this.is_satisfied(player, null)) {
         return {'noun': 'tech', 'verb': 'research', 'target': this.tech,
                 'ui_arg_s': gamedata['tech'][this.tech]['ui_name'], 'ui_arg_d': this.min_level};
