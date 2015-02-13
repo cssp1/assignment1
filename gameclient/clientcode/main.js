@@ -3218,6 +3218,12 @@ GameObject.prototype.ai_pick_target_find_blocker = function(cur_cell, dest_cell,
             if(b !== obj && !b.is_destroyed() && b.is_building() && b.is_blocker() && !(b.id in seen_objects)) {
                 seen_objects[b.id] = true;
 
+                // Check if b actually lies on any cell in the straight path.
+                // Since voxel_map_accel is conservative, we have to check each object it returns to see if it's actually on the path.
+                // The original SG release didn't have this check, so units would flail around destroying ALL
+                // nearby objects returned by voxel_map_accel, instead of only the ones that block their path!
+                if(!b.covers_any_of(straight_path)) { continue; }
+
                 var b_pos = b.interpolate_pos();
                 var d = vec_distance(b_pos, cur_cell);
                 if(d < min_blocker_dist) {
@@ -3653,6 +3659,17 @@ MapBlockingGameObject.prototype.update_map = function(old_x, old_y, was_destroye
             this.block_map(1);
         }
     }
+};
+
+/** Return true if this object overlays any grid cell along a list of cells
+    @param {Array.<Array.<number>>} path
+    @return {boolean} */
+MapBlockingGameObject.prototype.covers_any_of = function(path) {
+    var bounds = get_grid_bounds([this.x,this.y], this.spec['unit_collision_gridsize']);
+    return goog.array.some(path, function(xy) {
+        return (xy[0] >= bounds[0][0] && xy[0] < bounds[0][1] &&
+                xy[1] >= bounds[1][0] && xy[1] < bounds[1][1]);
+    });
 };
 
 MapBlockingGameObject.prototype.block_map_at = function(x,y,incr) {
