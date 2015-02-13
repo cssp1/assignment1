@@ -10270,7 +10270,9 @@ function update_resource_bars(dialog, primary, use_res_looter, show_during_comba
 
     // "resource_t" interpolates displayed resource values from old to new,
     // and controls the text-grow and ticker effect (but not the flashes)
-    var resource_t = (client_time - player.last_resource_time)/gamedata['client']['resource_ticker_duration'];
+    // use shorter ticker effects when gradual looting is happening
+    var ticker_duration = ((session.has_attacked && gamedata['gradual_loot'] > 0) ? 0.1 : 1) * gamedata['client']['resource_ticker_duration'];
+    var resource_t = (client_time - player.last_resource_time)/ticker_duration;
     if(resource_t >= 1) {
         resource_t = 1;
         player.last_resource_time = -1;
@@ -10309,7 +10311,7 @@ function update_resource_bars(dialog, primary, use_res_looter, show_during_comba
     // resource bar flashes (both main resources at home and looted resources in attacks)
     var glow_credits = 0;
     var glow_res = {}; for(var res in gamedata['resources']) { glow_res[res] = 0; }
-    if(flashy_loot && ((session.home_base && !session.has_attacked) || (!session.home_base && session.has_attacked))) {
+    if(flashy_loot && ((session.home_base && !session.has_attacked) || (!session.home_base && session.has_attacked && !(gamedata['gradual_loot']>0)))) {
         var t_credits = (player.flash_credits_time > 0 ? (client_time - player.flash_credits_time)/gamedata['client']['harvest_flash_time'] : 0);
         if(t_credits > 0 && t_credits < 1) {
             glow_credits = Math.sin(1*Math.PI*gamedata['client']['harvest_flash_count']*t_credits);
@@ -42101,9 +42103,13 @@ function handle_server_message(data) {
             ticker_delay = gamedata['client']['harvest_flash_delay'] + gamedata['client']['resource_ticker_delay'];
         } else {
             // combat loot
-            var loot_flash_delay = player.get_any_abtest_value('loot_flash_delay', gamedata['client']['loot_flash_delay']);
-            flash_delay = loot_flash_delay;
-            ticker_delay = loot_flash_delay + gamedata['client']['resource_ticker_delay'];
+            if(gamedata['gradual_loot'] > 0) {
+                flash_delay = ticker_delay = 0;
+            } else {
+                var loot_flash_delay = player.get_any_abtest_value('loot_flash_delay', gamedata['client']['loot_flash_delay']);
+                flash_delay = loot_flash_delay;
+                ticker_delay = loot_flash_delay + gamedata['client']['resource_ticker_delay'];
+            }
             // note: FORCE the previous flash to conclude so that we
             // can restart it with a delay
             player.last_resource_time = -1;
