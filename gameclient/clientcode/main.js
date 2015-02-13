@@ -3199,8 +3199,8 @@ GameObject.prototype.ai_pick_target_find_blocker = function(cur_cell, dest_cell,
     var seen_objects = {};
 
     for(var j = 0; j < straight_path.length; j++) {
-        // XXX note: this will change targets slightly depending on map_accel_chunk!
-        var blocker_list = voxel_map_accel.objects_at_xy(straight_path[j], target_team);
+        // XXX note: this will return slightly different results depending on map_accel_chunk!
+        var blocker_list = voxel_map_accel.objects_near_xy(straight_path[j], target_team);
         if(!blocker_list) { continue; }
         var min_blocker_dist = Infinity; // use minimum distance to break ties
         for(var k = 0; k < blocker_list.length; k++) {
@@ -46629,7 +46629,7 @@ function draw_building_or_inert(obj, powerfac) {
                       ];
 
         for(var i = 0; i < OFFSETS.length; i++) {
-            var objlist = voxel_map_accel.objects_at_xy([obj.x+OFFSETS[i][0], obj.y+OFFSETS[i][1]], obj.team);
+            var objlist = voxel_map_accel.objects_near_xy([obj.x+OFFSETS[i][0], obj.y+OFFSETS[i][1]], obj.team);
             if(objlist) {
                 for(var j = 0; j < objlist.length; j++) {
                     var o = objlist[j];

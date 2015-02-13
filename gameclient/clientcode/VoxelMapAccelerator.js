@@ -145,11 +145,12 @@ VoxelMapAccelerator.VoxelMapAccelerator.prototype.get_circle_bounds_xy_st = func
     return ret;
 };
 
-/** return list of objects in the voxel bucket that contains xy
+/** Return list of objects in the voxel bucket that contains xy
+    Note that this is conservative: it may return objects that are near, but don't actually cover xy!
  * @param {Array.<number>} xy coordinates
  * @param {string} team filter
  */
-VoxelMapAccelerator.VoxelMapAccelerator.prototype.objects_at_xy = function(xy, team) {
+VoxelMapAccelerator.VoxelMapAccelerator.prototype.objects_near_xy = function(xy, team) {
     // silently ignore out-of-bounds queries
     var x = xy[0], y = xy[1];
     if(x < 0 || x >= this.wh[0] || y < 0 || y >= this.wh[1]) { return null; }

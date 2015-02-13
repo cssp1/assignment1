@@ -286,7 +286,7 @@ AStar.AStarRectMap.prototype.get_unblocked_neighbors = function(node, checker, r
 
 /** update collision-detection data structure
  * @param {Array.<number>} xy upper-left corner of area to affect
- * @param {Array.<number>} wh width and height
+ * @param {Array.<number>} wh width and height (blockage is closed on the left and open on the right, i.e. [x,x+w-1] are the blocked cells, with x+w unblocked)
  * @param {number} value +1 to block, -1 to unblock
  */
 AStar.AStarRectMap.prototype.block_map = function(xy, wh, value) {
