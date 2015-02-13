@@ -11085,7 +11085,8 @@ function get_event_evil_valentina_props(event_data) {
         var url = eval_cond_or_literal(event_data['info_url'], player, null);
         if(url) {
             info_action = (function (_url) { return function() {
-                window.open(_url, '_blank').focus();
+                var handle = window.open(_url, '_blank');
+                if(handle) { handle.focus(); }
             }; })(url);
         }
     }
@@ -23525,7 +23526,8 @@ function invoke_statistics_tab(parent, preselect) {
         dialog.widgets['show_other_button'].show = true;
         dialog.widgets['show_other_button'].onclick = (function (_url) { return function(w) {
             if(w.parent) {
-                window.open(_url, '_blank').focus();
+                var handle = window.open(_url, '_blank');
+                if(handle) { handle.focus(); }
             }
         }; })(url);
     }
@@ -32314,7 +32316,8 @@ function missions_dialog_select_mission(dialog, row) {
         dialog.widgets['claim_button'].onclick = (function (q) { return function() {
             if('ui_accept_url' in q) {
                 // override default behavior with a URL open
-                window.open(q['ui_accept_url'], '_blank').focus();
+                var handle = window.open(q['ui_accept_url'], '_blank');
+                if(handle) { handle.focus(); }
                 return;
             }
 
@@ -33158,7 +33161,8 @@ function map_dialog_change_page(dialog, chapter, page) {
                         var info_url = eval_cond_or_literal(base['ui_info_url'], player, null);
                         if(info_url) {
                             var opener = (function (_info_url) { return function() {
-                                window.open(_info_url, '_blank').focus();
+                                var handle = window.open(_info_url, '_blank');
+                                if(handle) { handle.focus(); }
                             }; })(info_url);
 
                             // "?" Info button and level display are mutually exclusive
@@ -33372,7 +33376,10 @@ function update_daily_tip_pageable(dialog) {
             dialog.widgets['link_button'].state = (cons || url) ? 'normal' : 'disabled_clickable';
             dialog.widgets['link_button'].tooltip.str = helper_tooltip;
             dialog.widgets['link_button'].onclick = (function (_url, _cons, _helper) { return function() {
-                if(_url) { window.open(_url, '_blank').focus(); }
+                if(_url) {
+                    var handle = window.open(_url, '_blank');
+                    if(handle) { handle.focus(); }
+                }
                 if(_cons) { change_selection_ui(null); read_consequent(_cons).execute(); }
                 if(_helper) { _helper(); }
             }; })(url, cons, helper);
@@ -33413,7 +33420,8 @@ function invoke_daily_tip(tipname, skip_notification_queue) {
             send_to_server.func(["DAILY_TIP_UNDERSTOOD", _name, _ack]);
             close_parent_dialog(widget);
             if(_url) {
-                window.open(_url, '_blank').focus();
+                var handle = window.open(_url, '_blank');
+                if(handle) { handle.focus(); }
             }
             if(_cons) {
                 read_consequent(_cons).execute();
@@ -33447,7 +33455,10 @@ function invoke_daily_tip(tipname, skip_notification_queue) {
                     dialog.widgets['link_button'].str = _tip['link_button_ui_name'];
                 }
                 dialog.widgets['link_button'].onclick = (function (_url, _cons) { return function() {
-                    if(_url) { window.open(_url, '_blank').focus(); }
+                    if(_url) {
+                        var handle = window.open(_url, '_blank');
+                        if(handle) { handle.focus(); }
+                    }
                     if(_cons) { change_selection_ui(null); read_consequent(_cons).execute(); }
                 }; })(url, cons);
             }
@@ -33942,7 +33953,8 @@ function invoke_settings_dialog() {
         if('help_url' in data) {
             dialog.widgets['help'+row].show = true;
             dialog.widgets['help'+row].onclick = (function (_data) { return function(w) {
-                window.open(_data['help_url'], '_blank').focus();
+                var handle = window.open(_data['help_url'], '_blank');
+                if(handle) { handle.focus(); }
             }; })(data);
         }
         row += 1;
@@ -34009,7 +34021,7 @@ function invoke_keyboard_shortcuts() {
     if(gamedata['strings']['keyboard_shortcuts_help_url']) {
         dialog.widgets['link_button'].onclick = (function (_url) { return function() {
             var newWindow = window.open(_url, '_blank');
-            newWindow.focus();
+            if(newWindow) { newWindow.focus(); }
         }; })(gamedata['strings']['keyboard_shortcuts_help_url']);
     } else {
         dialog.widgets['link_button'].show = false;
@@ -34401,7 +34413,8 @@ function invoke_buy_gamebucks_dialog1(reason, amount, order) {
             dialog.widgets['info_button'].show = dialog.widgets['transition_msg_header'].show = dialog.widgets['transition_msg'].show = true;
             dialog.widgets['transition_msg'].set_text_with_linebreaking(dialog.data['widgets']['transition_msg']['ui_name_'+transition_msg]);
             dialog.widgets['info_button'].onclick = (function (_transition_msg) { return function(w) {
-                window.open(w.data['url_'+_transition_msg], '_blank').focus();
+                var handle = window.open(w.data['url_'+_transition_msg], '_blank');
+                if(handle) { handle.focus(); }
             }; })(transition_msg);
         }
     }
