@@ -7462,7 +7462,8 @@ Mobile.prototype.receive_state = function(data, init, is_deploying) {
 
     if(is_deploying) {
         invalidate_defender_threatlists();
-        add_unit_deployment_vfx('post_deploy', this.interpolate_pos(), this.spec, this.level);
+        // spread sound effect time out by the min flush interval, to approximate units arriving smoothly over that time
+        add_unit_deployment_vfx('post_deploy', this.interpolate_pos(), this.spec, this.level, 2 * gamedata['client']['ajax_min_flush_interval']);
     }
 };
 
@@ -13074,7 +13075,7 @@ DeployUICursor.prototype.draw = function(offset) {
     }
 };
 
-function add_unit_deployment_vfx(kind, ji, spec, level) {
+function add_unit_deployment_vfx(kind, ji, spec, level, time_spread) {
     var vfx;
 
     if(kind+'_effect' in spec) { // is there a per-unit override?
@@ -13087,7 +13088,10 @@ function add_unit_deployment_vfx(kind, ji, spec, level) {
     // base some characteristics of the pre_deploy effect on the first unit that is being deployed
     var height = spec['flying'] ? spec['altitude'] : 0;
     var instance_data = { '%OBJECT_SPRITE': get_leveled_quantity(spec['art_asset'], level) };
-    SPFX.add_visual_effect(ji, height, [0,0,0], client_time, vfx, true, instance_data);
+    SPFX.add_visual_effect(ji, height, [0,0,0],
+                           // spread out the effect time
+                           client_time + Math.random() * time_spread,
+                           vfx, true, instance_data);
 }
 
 /** @param {Array.<number>} ji
@@ -13100,7 +13104,8 @@ function do_deploy(ji, objs_to_deploy) {
         var army_unit = objs_to_deploy[0];
         var fx_specname = army_unit['spec'];
         var fx_level = ('level' in army_unit ? army_unit['level'] : 1);
-        add_unit_deployment_vfx('pre_deploy', ji, gamedata['units'][fx_specname], fx_level);
+        // this is evaluated at high frequency, so only spread by TICK_INTERVAL
+        add_unit_deployment_vfx('pre_deploy', ji, gamedata['units'][fx_specname], fx_level, TICK_INTERVAL);
     }
 
     // transfer from pre- to post-deploy
