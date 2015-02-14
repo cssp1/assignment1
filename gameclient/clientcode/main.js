@@ -15903,7 +15903,7 @@ function update_tutorial_arrow_for_landscape(_dialog, _unit_name, _loc, _directi
         if(unit_name) {
             unit = find_object_by_type(unit_name);
             if(unit) {
-                var effsize = ('unit_collision_gridsize' in unit.spec ? unit.spec['unit_collision_gridsize'] : unit.spec['gridsize'])[0];
+                var effsize = ('unit_collision_gridsize' in unit.spec && unit.spec['unit_collision_gridsize'][0] > 0 ? unit.spec['unit_collision_gridsize'] : unit.spec['gridsize'])[0];
                 dialog.user_data['reticle_size'] = 10 * effsize;
             } else {
                 dialog.show = false;
