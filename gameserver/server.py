@@ -17121,7 +17121,7 @@ class GAMEAPI(resource.Resource):
                 if (not session.player.is_cheater) and (not req.is_satisfied(session.player, None)):
                     fail = True
                     retmsg.append(["ERROR", "REQUIREMENTS_NOT_SATISFIED",
-                                   gamedata['tech'][tech_name][reqname]])
+                                   TechSpec.get_leveled_quantity(gamedata['tech'][tech_name][reqname], current+1)])
                     break
 
         cost = {}
