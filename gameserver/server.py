@@ -23583,6 +23583,7 @@ class GAMEAPI(resource.Resource):
                     session.player.reset()
                     init_game(session.player, 0)
                     session.player.history['sessions'] = [[server_time,-1],]
+                    session.player.creation_time = session.user.account_creation_time = server_time
                     retmsg.append(["ABTEST_UPDATE", session.player.abtests])
 
                     # have to reset the tutorial before changing sessions, so that client will apply special AI states correctly
