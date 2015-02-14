@@ -1871,6 +1871,9 @@ FUNNEL_ADVANCED = get_tutorial_stages(gamedata) + [
 #    {'name': 'D23 %CONV% Central Computer L3', 'convert_from': lambda user: user.get('storages_max_level',0) >= 4,
 #     'func': lambda user: user.get(gamedata['townhall']+'_level',0) >= 3 },
 
+    {'name': 'D23A Collected 1+ iron_deposit', 'func': lambda user: user.get('iron_deposits_collected',0) >= 1, 'show_p': True },
+    {'name': 'D23B Collected 10+ iron_deposits', 'func': lambda user: user.get('iron_deposits_collected',0) >= 10, 'show_p': True },
+
     # looting
     {'name': 'D24A Harvested 1 Iron/Water', 'func': lambda user: user.get('resources_harvested',0) >= 1, 'show_p': True },
     {'name': 'D24B Harvested 50k Iron/Water', 'func': lambda user: user.get('resources_harvested',0) >= 50000, 'show_p': True },
