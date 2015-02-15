@@ -125,7 +125,7 @@ def get_csv_fields(gamedata):
           [resname for resname in gamedata['resources']] + \
           ["harvested_"+resname+"_total" for resname in gamedata['resources']] + \
           [name+'_level' for name in get_building_names(gamedata)] + \
-          + ["attacks_launched", "attacks_victory", "attacks_launched_vs_ai", "attacks_launched_vs_ai:1007",
+          + ["attacks_launched", "attacks_victory", "attacks_launched_vs_ai",
           "attacks_suffered", "ai_attacks_suffered", "daily_attacks_suffered", "revenge_attacks_suffered",
           "random_items_purchased", "items_purchased", "free_random_items",
           "gift_orders_sent", "gift_orders_received", "gamebucks_received_from_gift_orders",
@@ -373,22 +373,22 @@ def get_csv_fields(gamedata):
           "units_manufactured",
           'resources_looted_from_ai', 'resources_looted_from_human', 'resources_stolen_by_human',
           "fb_gamer_status", "fb_credit_balance", "days_since_joined", "days_since_last_login", "join_week",
-          "is_paying_user", "is_whale", "time_of_first_purchase", "paid_within_24hrs",
+          "is_paying_user", "time_of_first_purchase", "paid_within_24hrs",
           "completed_tutorial", "browser_name", "browser_version", "browser_os", "browser_hardware",
           "canvas_width", "canvas_height",
           "browser_supports_canvas", "browser_supports_webgl", "browser_supports_websocket",
           "browser_supports_audio_element", "browser_supports_audio_ogg",
           "browser_supports_audio_wav", "browser_supports_audio_mp3", "browser_supports_audio_aac", "browser_supports_audio_context",
-          "friends_in_game", "initial_friends_in_game", "friends_at_least_10", ] + \
+          "friends_in_game", "initial_friends_in_game", ] + \
           ['likes_'+x for x in SpinConfig.FACEBOOK_GAME_FAN_PAGES.iterkeys()] + \
-          ["account_creation_wday", "account_creation_hour", "acquired_on_weekend", "timezone", "chat_gagged", "history_version", "last_fb_notification_time",
+          ["timezone", "chat_gagged", "last_fb_notification_time",
           ] + RETENTION_FIELDS + SPEND_FIELDS + VISITS_FIELDS + BROWSER_CAP_FIELDS + FEATURE_USE_FIELDS + get_quest_fields(gamedata) + get_unit_fields(gamedata) + get_item_fields(gamedata) + get_viral_fields(gamedata) + get_fb_notification_fields(gamedata) + ALL_ABTESTS
     FIELDS += TimeSeriesCSVWriter.TIME_CURRENT_FIELDS
     return FIELDS
 
 # fields that should be stripped out of userdb before inserting into upcache (because they are large and irrelevant to metrics)
 # note that we do need to *read* the facebook_profile and facebook_likes to compute and store a few values before getting rid of them
-HOG_FIELDS = ["last_login_ip", "fb_hit_time", "facebook_profile", "facebook_friends", "facebook_likes", "facebook_currency", "facebook_permissions", "acquisition_data", "preferences", "facebook_first_name", "facebook_friends_map", "browser_caps", "oauth_token", "fb_oauth_token", "kg_auth_token", "kg_friend_ids", "kg_avatar_url", "purchase_ui_log"]
+HOG_FIELDS = ["last_login_ip", "fb_hit_time", "kg_hit_time", "facebook_profile", "facebook_friends", "facebook_likes", "facebook_currency", "facebook_permissions", "acquisition_data", "preferences", "facebook_first_name", "facebook_friends_map", "browser_caps", "oauth_token", "fb_oauth_token", "fb_credit_balance", "fb_gamer_status", "kg_auth_token", "kg_friend_ids", "kg_avatar_url", "purchase_ui_log"]
 
 # fields that should be stripped out of upcache before writing CSV
 # in addition to these, any time-series field ending with "_at_time" is also stripped
@@ -992,18 +992,7 @@ class TimeSeriesCSVWriter(object):
                              "attacks_launched_vs_human",
                              "units_lost",
                              "units_killed",
-                             "units_lost_in_attacks",
-                             "units_killed_in_attacks",
-                             "units_lost_in_defenses",
-                             "units_killed_in_defenses",
-                             "buildings_killed",
-                             "buildings_lost",
-                             "turrets_killed",
-                             "turrets_lost",
-                             "storages_killed",
-                             "storages_lost",
-                             "harvesters_killed",
-                             "harvesters_lost"]), [])
+                             ]), [])
 
     SOURCE_FIELDS += map(lambda x: SeriesField(x, method = 'max'),
                         ["units_unlocked",
@@ -1360,8 +1349,7 @@ def update_upcache_entry(user_id, driver, entry, time_now, gamedata, user_mtime 
                             ['peak_'+resname for resname in gamedata['resources']] + \
                             ['peak_'+resname+'_at_townhall_L'+str(lev) for resname in gamedata['resources'] for lev in range(2,10)] + \
                             [catname+'_unlocked' for catname in gamedata['strings']['manufacture_categories']] + \
-                            ['history_version',
-                             'peak_gamebucks',
+                            ['peak_gamebucks',
                              'attacks_launched', 'attacks_launched_vs_ai', 'attacks_launched_vs_human', 'revenge_attacks_launched_vs_human',
                              'attacks_victory',
                              'attacks_suffered', 'ai_attacks_suffered', 'daily_attacks_suffered', 'revenge_attacks_suffered',
@@ -1655,11 +1643,6 @@ def update_upcache_entry(user_id, driver, entry, time_now, gamedata, user_mtime 
             if data.has_key('tech'):
                 obj['tech'] = data['tech']
 
-            obj['attacks_launched_vs_ai:1007'] = 0
-            if data.has_key('battle_history') and data['battle_history'].has_key('1007'):
-                obj['attacks_launched_vs_ai:1007'] = data['battle_history']['1007']['count']
-
-
             my_base = data['my_base']
 
             # get levels of important buildings
@@ -1699,7 +1682,6 @@ def update_upcache_entry(user_id, driver, entry, time_now, gamedata, user_mtime 
     # compute dervied metrics
 
     obj['is_paying_user'] = 0
-    obj['is_whale'] = 0
     obj['completed_tutorial'] = 0
 
     if obj.get('tutorial_state', 'START') == "COMPLETE":
@@ -1707,14 +1689,6 @@ def update_upcache_entry(user_id, driver, entry, time_now, gamedata, user_mtime 
 
     if obj.get('money_spent', 0) > 0:
         obj['is_paying_user'] = 1
-        if obj['money_spent'] >= WHALE_LINE:
-            obj['is_whale'] = 1
-
-    if 'friends_in_game' in obj:
-        if obj['friends_in_game'] >= 10:
-            obj['friends_at_least_10'] = 1
-        else:
-            obj['friends_at_least_10'] = 0
 
     # check for intervals when a user was reacquired after being lapsed for many days
     sessions = obj.get('sessions',[]) # list of sessions in [ [start1, end1], [start2, end2], ... ] format
@@ -1744,19 +1718,6 @@ def update_upcache_entry(user_id, driver, entry, time_now, gamedata, user_mtime 
             # game went live at this time
             join_week = int((account_creation_time - SpinConfig.game_launch_date())/(60*60*24*7))
             obj['join_week'] = join_week
-
-            # attempt to adjust creation_time to user's local time zone
-            # (note: does not handle daylight savings time, etc, so is imprecise)
-            timezone = obj.get('timezone', 0)
-            local_creation_time = account_creation_time + 60*60*int(timezone)
-
-            # 0=Mon, 1=Tue, 2=Wed, 3=Thu, 4=Fri, 5=Sat, 6=Sun
-            tmstruct = time.gmtime(local_creation_time)
-            obj['account_creation_wday'] = tmstruct.tm_wday
-            obj['account_creation_hour'] = tmstruct.tm_hour
-
-            # note: weekend is Friday->Sunday
-            obj['acquired_on_weekend'] = 1 if tmstruct.tm_wday in (4,5,6) else 0
 
     # NOTE: all computations above are based only on the
     # contents of the userdb/playerdb files. They can safely
