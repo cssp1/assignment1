@@ -1,2 +1,2 @@
-pysvg linguist-vendored
-dowser linguist-vendored
+pysvg/* linguist-vendored
+dowser/* linguist-vendored

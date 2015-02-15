@@ -1,2 +1,2 @@
 # mark our pasted copy of the Google Closure compiler/libs as third-party
-google linguist-vendored
+google/* linguist-vendored
