@@ -21891,6 +21891,7 @@ function request_unit_donation(alliance_building) {
     var spell = gamedata['spells']['REQUEST_UNIT_DONATION'];
     player.cooldown_client_trigger(spell['cooldown_name'], spell['cooldown']);
     send_to_server.func(["CAST_SPELL", alliance_building.id, 'REQUEST_UNIT_DONATION']);
+    session.clear_building_idle_state_caches(); // for ALL buildings
 }
 
 function resolve_region_map_building_problem() { return resolve_building_problem(gamedata['region_map_building']); };
