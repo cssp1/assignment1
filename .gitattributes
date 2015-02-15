@@ -1,0 +1,2 @@
+# treat our JSON files as JavaScript, for proper highlighting of // comments
+*.json linguist-language=JavaScript
