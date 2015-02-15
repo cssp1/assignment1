@@ -8964,7 +8964,6 @@ SPINPUNCHGAME.client_exception_sent = false;
 function log_exception(e, where) {
     if(SPINPUNCHGAME.client_exception_sent) { return; }
     SPINPUNCHGAME.client_exception_sent = true;
-    console.log('Exception thrown in '+where);
     var msg;
     if(e) {
         msg = e.toString();
@@ -8980,13 +8979,24 @@ function log_exception(e, where) {
         if(e.message) {
             msg += '\nmessage: '+e.message.toString();
         }
+
+        /* I don't think this works anymore...
         try {
             msg += '\ntraceback: ' +Traceback.printStackTrace({e:e, guess:false}).join('\n');
         } catch(ex) {}
+        */
     } else {
         msg = 'none';
     }
-    console.log(msg); console.log(where);
+
+    // show in JS console
+    console.log('Exception thrown in '+where+':\n'+msg);
+
+    if(player.is_developer()) {
+        window.alert('SpinPunch CLIENT EXCEPTION in \"'+where+'\" (check JS Console for more detail):\n'+msg);
+    }
+
+    // phone home
     var MAX_LEN = gamedata['client']['max_exception_msg_length'];
     if(msg.length > MAX_LEN) { msg = msg.slice(0,MAX_LEN); }
     metric_event('0970_client_exception', add_demographics({'method':msg, 'location':where,
