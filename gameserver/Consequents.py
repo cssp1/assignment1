@@ -153,8 +153,22 @@ class TakeItemsConsequent(Consequent):
         self.item_name = data['item_name']
         self.stack = data.get('stack',1)
     def execute(self, session, player, retmsg, context=None):
-        if session.player.inventory_remove_by_type(self.item_name, self.stack, '5130_item_activated', reason='quest'):
+        to_take = self.stack
+
+        to_take_from_inventory = min(to_take, session.player.inventory_item_quantity(self.item_name))
+        if to_take_from_inventory > 0:
+            # remove from regular inventory
+            to_take -= session.player.inventory_remove_by_type(self.item_name, to_take_from_inventory, '5130_item_activated', reason='quest')
             session.player.send_inventory_update(retmsg)
+
+        to_take_from_loot_buffer = min(to_take, session.player.loot_buffer_item_quantity(self.item_name))
+        if to_take_from_loot_buffer > 0:
+            # must be in the loot buffer then
+            to_take -= session.player.loot_buffer_remove_by_type(self.item_name, to_take_from_loot_buffer, '5130_item_activated', reason='quest')
+            retmsg.append(["LOOT_BUFFER_UPDATE", session.player.loot_buffer, False])
+
+        if to_take > 0:
+            raise Exception('did not take all the items requested (%d left)' % to_take)
 
 class GiveTechConsequent(Consequent):
     def __init__(self, data):

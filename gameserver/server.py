@@ -9675,6 +9675,7 @@ class Player(AbstractPlayer):
     # item_stack can be positive (item entering inventory) or negative (item exiting inventory)
     def inventory_log_event(self, event_name, item_specname, item_stack, expire_time, reason=None):
         if not event_name: return
+        if item_stack == 0: return
         if not gamedata['server'].get('log_inventory', True): return
         props = {'spec': item_specname, 'stack': item_stack}
         if expire_time and expire_time > 0: props['expire_time'] = expire_time
@@ -9985,44 +9986,62 @@ class LivePlayer(Player):
             return None
         return self.inventory[slot]
 
-    def inventory_item_quantity(self, specname):
-        return sum([item.get('stack',1) for item in self.inventory \
+    # return how many items in item_list (format of loot_buffer and inventory) match "specname" and are not expired
+    def get_item_quantity(self, item_list, specname):
+        return sum([item.get('stack',1) for item in item_list \
                     if ((item['spec'] == specname) and \
                         (('expire_time' not in item) or (item['expire_time'] >= server_time)))], 0)
 
-    def inventory_remove_by_type(self, specname, total, event_name, reason=None):
-        assert self.inventory_item_quantity(specname) >= total
+    def inventory_item_quantity(self, specname): return self.get_item_quantity(self.inventory, specname)
+    def loot_buffer_item_quantity(self, specname): return self.get_item_quantity(self.loot_buffer, specname)
+
+    # remove "total" number of items of spec "specname" from item_list (loot_buffer or inventory)
+    # throws exception if insufficient quantity is present
+    # returns number removed.
+    def item_remove_by_type(self, item_list, specname, total, event_name, reason=None):
+        assert self.get_item_quantity(item_list, specname) >= total
+        n_removed = 0
         while total > 0:
             item = None
-            for i in self.inventory:
+            for i in item_list:
                 if i['spec'] == specname:
                     item = i
                     break
             if item is None:
-                raise Exception('ran out of '+specname)
+                raise Exception('ran out of items: '+specname)
             to_rem = min(total, item.get('stack',1))
-            self.inventory_remove(item, to_rem, event_name, reason=reason)
+            self.item_remove(item_list, item, to_rem, event_name, reason=reason)
             total -= to_rem
-        return True
+            n_removed += to_rem
+        return n_removed
 
-    def inventory_remove(self, item, qty_to_rem, event_name, reason=None):
-        # note: item must be in self.inventory
-        count = item.get('stack',1)
+    def loot_buffer_remove_by_type(self, specname, total, event_name, reason=None): return self.item_remove_by_type(self.loot_buffer, specname, total, event_name, reason)
+    def inventory_remove_by_type(self, specname, total, event_name, reason=None): return self.item_remove_by_type(self.inventory, specname, total, event_name, reason)
+
+    # remove a quantity of "item" from "item_list" (which must contain it), and log inventory metric
+    def item_remove(self, item_list, item, qty_to_rem, event_name, reason=None):
+        original_count = count = item.get('stack',1)
         count -= qty_to_rem
         if count <= 0:
-            self.inventory.remove(item)
+            item_list.remove(item)
+            if count < 0: # probably should flag this somehow
+                count = 0
         elif count == 1 and 'stack' in item:
             del item['stack']
         elif count > 1:
             item['stack'] = count
-        self.inventory_log_event(event_name, item['spec'], -qty_to_rem, item.get('expire_time',-1), reason=reason)
-        return True
+        n_removed = original_count - count
+        self.inventory_log_event(event_name, item['spec'], -n_removed, item.get('expire_time',-1), reason=reason)
+        return n_removed
+
+    def loot_buffer_remove(self, item, qty_to_rem, event_name, reason=None): return self.item_remove(self.loot_buffer, item, qty_to_rem, event_name, reason)
+    def inventory_remove(self, item, qty_to_rem, event_name, reason=None): return self.item_remove(self.inventory, item, qty_to_rem, event_name, reason)
 
     def inventory_remove_stack(self, item, event_name, reason=None):
         # remove the entire stack. item must be in self.inventory
         self.inventory.remove(item)
         self.inventory_log_event(event_name, item['spec'], -item.get('stack',1), item.get('expire_time',-1), reason=reason)
-        return True
+        return item.get('stack',1)
 
     def inventory_has_space_for(self, item, max_slots):
         spec = gamedata['items'][item['spec']]
