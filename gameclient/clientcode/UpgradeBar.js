@@ -60,7 +60,7 @@ UpgradeBar.ondraw = function(dialog) {
     // hide the bar if the parent dialog is not the front-most dialog being shown right now
     // (otherwise the bar can "show through" a parent dialog onto the child)
     if(!dialog.parent.is_frontmost()) {
-        dialog.show = false; return;
+        dialog.show = false;
     } else {
         dialog.show = dialog.user_data['is_applicable'];
     }

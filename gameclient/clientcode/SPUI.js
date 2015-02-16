@@ -202,6 +202,8 @@ SPUI.Element.prototype.get_absolute_xy = function() {
     return pos;
 };
 
+SPUI.Element.prototype.is_frontmost = function() { return false; };
+
 // Container
 // an Element that contains child Elements
 
@@ -1054,13 +1056,25 @@ SPUI.Dialog.prototype.get_address = function() {
 
 /** return true if this dialog is the "front-most" dialog, i.e. the deepest-nested
     dialog that has a "modal" flag
+    @override
     @return {boolean} */
 SPUI.Dialog.prototype.is_frontmost = function() {
     if(!this.modal) { return false; }
-    if(goog.array.some(this.children, function(child) {
-        return (child.modal);
-    })) {
-        return false;
+
+    // if any child is a frontmost dialog, then we aren't.
+    if(goog.array.some(this.children, function(child) { return child.is_frontmost(); })) { return false; }
+
+    // if any child of the toplevel parent after us is a frontmost dialog, then we aren't either
+    // XXXXXX awkward - this has to do with the bad design of install_child_dialog() putting new children into selection.ui.children regardless of depth!
+    var p = this.parent;
+    var mypath = [this]; // keep track of the entire chain of parents
+    while(p.parent && p.parent instanceof SPUI.Dialog) { mypath.push(p); p = p.parent; }
+    var found = false;
+    for(var i = 0; i < p.children.length; i++) {
+        var sib = p.children[i];
+        if(goog.array.contains(mypath, sib)) { found = true; continue; }
+        // any subsequent children will override our "frontmost" property
+        if(found && sib.is_frontmost()) { return false; }
     }
     return true;
 };
