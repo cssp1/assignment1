@@ -28720,6 +28720,7 @@ var ARMY_DIALOG_BUTTONS = {
                                          'onclick': function(w) {
                                              var _dialog = w.parent.parent;
                                              var category = (('category' in _dialog.user_data) ? _dialog.user_data['category'] : null);
+                                             change_selection_ui(null);
                                              invoke_crafting_dialog(category);
                                          } },
                   'unlock_button': { 'dialog_names': ['research_dialog'],
@@ -29738,7 +29739,7 @@ function invoke_crafting_dialog(newcategory, newsubcategory, newpage) {
     }
 
     var dialog = new SPUI.Dialog(gamedata['dialogs']['crafting_dialog']);
-    change_selection_ui(dialog);
+    install_child_dialog(dialog);
     dialog.auto_center();
     dialog.modal = true;
 
