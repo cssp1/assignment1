@@ -1052,6 +1052,19 @@ SPUI.Dialog.prototype.get_address = function() {
     return ret;
 };
 
+/** return true if this dialog is the "front-most" dialog, i.e. the deepest-nested
+    dialog that has a "modal" flag
+    @return {boolean} */
+SPUI.Dialog.prototype.is_frontmost = function() {
+    if(!this.modal) { return false; }
+    if(goog.array.some(this.children, function(child) {
+        return (child.modal);
+    })) {
+        return false;
+    }
+    return true;
+};
+
 SPUI.Dialog.prototype.draw = function(offset) {
     if(this.ondraw) {
         try {

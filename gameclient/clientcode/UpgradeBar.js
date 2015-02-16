@@ -29,6 +29,7 @@ UpgradeBar.invoke = function(parent, kind, specname, new_level, obj_id) {
     // special case hack - if parented to the main "Upgrade" dialog, do not show a redundant upgrade button
     dialog.user_data['show_button'] = !(parent.user_data['dialog'] == 'upgrade_dialog');
     dialog.user_data['scroll_pos'] = 0;
+    dialog.user_data['is_applicable'] = false; // true if there is any meaningful data to show (otherwise dialog is permanently hidden)
     dialog.widgets['scroll_up'].onclick = function (w) { UpgradeBar.scroll(w.parent, -1); };
     dialog.widgets['scroll_down'].onclick = function (w) { UpgradeBar.scroll(w.parent, 1); };
     dialog.widgets['output'].scroll_up_button = dialog.widgets['scroll_up'];
@@ -55,6 +56,16 @@ UpgradeBar.scroll = function(dialog, incr) {
         dialog.widgets['output'].scroll_down_button.show = has_scrolling;
 };
 UpgradeBar.ondraw = function(dialog) {
+
+    // hide the bar if the parent dialog is not the front-most dialog being shown right now
+    // (otherwise the bar can "show through" a parent dialog onto the child)
+    if(!dialog.parent.is_frontmost()) {
+        dialog.show = false; return;
+    } else {
+        dialog.show = dialog.user_data['is_applicable'];
+    }
+    if(!dialog.show) { return; }
+
     var border = dialog.data['xy'];
     var show_button = dialog.user_data['show_button'];
     dialog.xy = [border[0], dialog.parent.wh[1]];
@@ -82,8 +93,8 @@ UpgradeBar.update_contents = function(dialog, kind, specname, new_level, obj_id)
     var prev_obj_id = dialog.user_data['obj_id'] || null; dialog.user_data['obj_id'] = obj_id;
     var prev_scroll_pos = dialog.user_data['scroll_pos'];
 
-    if(kind === null || specname === null) { dialog.show = false; return; }
-    dialog.show = true;
+    if(kind === null || specname === null) { dialog.user_data['is_applicable'] = false; return; }
+    dialog.user_data['is_applicable'] = true;
 
     var spec;
     if(kind == 'building') {
@@ -99,7 +110,7 @@ UpgradeBar.update_contents = function(dialog, kind, specname, new_level, obj_id)
     } else {
         throw Error('unknown kind '+kind);
     }
-    if(new_level > get_max_level(spec)) { dialog.show = false; return; } // maxed out
+    if(new_level > get_max_level(spec)) { dialog.user_data['is_applicable'] = false; return; } // maxed out
 
     dialog.widgets['upgrade_button'].show = dialog.user_data['show_button'];
 
@@ -130,13 +141,18 @@ UpgradeBar.update_contents = function(dialog, kind, specname, new_level, obj_id)
         var linkcode = null;
         var temp = dialog.data['widgets']['output'][(level > 1 ? 'ui_goody_leveled' : 'ui_goody_unleveled')];
         if('tech' in goody) {
-            temp = temp.replace('%THING', gamedata['tech'][goody['tech']]['ui_name']);
+            var tech_spec = gamedata['tech'][goody['tech']];
+            if(('show_if' in tech_spec) && !read_predicate(tech_spec['show_if']).is_satisfied(player,null)) { return; }
+            temp = temp.replace('%THING', tech_spec['ui_name']);
             linkcode = 'tech='+goody['tech'];
         } else if('building' in goody) {
-            temp = temp.replace('%THING', gamedata['buildings'][goody['building']]['ui_name']);
+            var building_spec = gamedata['buildings'][goody['building']];
+            if(('show_if' in building_spec) && !read_predicate(building_spec['show_if']).is_satisfied(player,null)) { return; }
+            temp = temp.replace('%THING', building_spec['ui_name']);
             linkcode = 'building='+goody['building'];
         } else if('crafting_recipe' in goody) {
             var recipe = gamedata['crafting']['recipes'][goody['crafting_recipe']];
+            if(('show_if' in recipe) && !read_predicate(recipe['show_if']).is_satisfied(player,null)) { return; }
             var n;
             if('ui_name' in recipe) {
                 n = recipe['ui_name'];
@@ -175,7 +191,7 @@ UpgradeBar.update_contents = function(dialog, kind, specname, new_level, obj_id)
     });
 
     if(ui_goodies_list.length < 1) { // nothing to talk about!
-        dialog.show = false; return;
+        dialog.user_data['is_applicable'] = false; return;
     }
 
     s = s.replace('%GOODIES', ui_goodies_list.join(', '));
@@ -199,7 +215,14 @@ UpgradeBar.update_contents = function(dialog, kind, specname, new_level, obj_id)
         }; } },
         'crafting_recipe': {'onclick': function(specname) { return function(w, mloc) {
             var recipe = gamedata['crafting']['recipes'][specname];
-            var dialog = invoke_crafting_dialog(recipe['crafting_category']);
+            var catdata = gamedata['crafting']['categories'][recipe['crafting_category']];
+            var dialog;
+            if(catdata['table_of_contents']) {
+                if(!recipe['associated_item_set']) { throw Error('recipe category requires table_of_contents but no item set is associated'); }
+                dialog = invoke_crafting_dialog(recipe['crafting_category'], recipe['associated_item_set']);
+            } else {
+                dialog = invoke_crafting_dialog(recipe['crafting_category']);
+            }
             if(dialog) { crafting_dialog_select_recipe(dialog.widgets['recipe'], specname); }
         }; } },
         'predicate': {'onclick': (function (_predicate_map) { return function(sindex) { return function(w, mloc) {
