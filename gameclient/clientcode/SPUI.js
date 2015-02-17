@@ -1554,7 +1554,9 @@ SPUI.break_lines = function(str, font, wh, options) {
 
             //console.log('HERE x '+x+' w '+word_width+' wh '+wh[0]+' '+words[i]);
 
-            if(x + word_width >= wh[0] || words[i] === '\n') {
+            // BBCode text tends to run slightly long because we can't apply kerning between blocks,
+            // so pretend we need to accommodate one extra space worth of padding per line
+            if(x + word_width + (bbcode ? space_width : 0) >= wh[0] || words[i] === '\n') {
                 ret += '\n'; x = 0; nlines += 1;
             } else if(x != 0 && i != 0) {
                 ret += ' ';
