@@ -41,16 +41,16 @@ UpgradeBar.invoke = function(parent, kind, specname, new_level, obj_id) {
     return dialog;
 };
 UpgradeBar.scroll = function(dialog, incr) {
-    if(incr < 0) {
-        if(incr < -1) {
-            dialog.widgets['output'].scroll_to_top();
-        } else {
-            dialog.widgets['output'].scroll_up();
-        }
+    if(incr === -2) { // reset to top
+        dialog.widgets['output'].scroll_to_top();
+    } else if(incr === 2) { // reset to bottom
+        dialog.widgets['output'].scroll_to_bottom();
+    } else if(incr < 0) {
+        dialog.widgets['output'].scroll_up();
     } else if(incr > 0) {
         dialog.widgets['output'].scroll_down();
     }
-    dialog.user_data['scroll_pos'] = dialog.widgets['output'].get_scroll_pos();
+    dialog.user_data['scroll_pos'] = dialog.widgets['output'].get_scroll_pos_from_head_to_bot();
     var has_scrolling = dialog.widgets['output'].can_scroll_up() || dialog.widgets['output'].can_scroll_down();
     dialog.widgets['output'].scroll_up_button.show =
         dialog.widgets['output'].scroll_down_button.show = has_scrolling;
@@ -241,7 +241,7 @@ UpgradeBar.update_contents = function(dialog, kind, specname, new_level, obj_id)
     } else {
         // break lines, protecting BBCode
         var broken_s = SPUI.break_lines(s, dialog.widgets['output'].font, dialog.widgets['output'].wh, {bbcode:true})[0];
-        //console.log(broken_s);
+        //console.log(broken_s.split('\n'));
         goog.array.forEach(broken_s.split('\n'), function(line) {
             dialog.widgets['output'].append_text(SPText.cstring_to_ablocks_bbcode(line, {}, click_handlers));
         });
@@ -252,9 +252,9 @@ UpgradeBar.update_contents = function(dialog, kind, specname, new_level, obj_id)
         UpgradeBar.scroll(dialog, -2);
     } else {
         // otherwise, return to previous scroll position
-        UpgradeBar.scroll(dialog, -2);
+        UpgradeBar.scroll(dialog, 2);
         for(var i = 0; i < prev_scroll_pos; i++) {
-            UpgradeBar.scroll(dialog, 1);
+            UpgradeBar.scroll(dialog, -1);
         }
     }
 };

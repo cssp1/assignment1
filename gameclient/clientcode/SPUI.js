@@ -3123,10 +3123,13 @@ SPUI.set_keyboard_focus = function(newfocus) {
 
 /** @constructor */
 SPUI.TextNode = function() {
-    // type of this.text = ABlocks from SPText
+    /** @type {Array.<SPText.ABlock>|null} */
     this.text = null;
+    /** @type {SPUI.TextNode|null} */
     this.prev = null;
+    /** @type {SPUI.TextNode|null} */
     this.next = null;
+    /** @type {function(SPUI.TextNode)|null} */
     this.on_destroy = null;
     this.user_data = null;
 };
@@ -3165,22 +3168,38 @@ SPUI.ScrollingTextField = function(data) {
     this.text_offset = data['text_offset'] || [0,0];
     this.alpha = ('alpha' in data ? data['alpha'] : 1);
 
+    // XXXXXX the circular-buffer scrolling mechanics here are very confusing.
+    // this was originally designed "IRC client" style, with the window by default
+    // keeping up with the last-appended line ("head" pointer), and the beginning
+    // of the displayed text pointed to by "bot". But now the in-game chat window
+    // uses the "invert" option to invert the vertical display. Also, other parts
+    // if the GUI are using this to make a scrolling rich text widget, where the
+    // "IRC" scrolling style doesn't make sense. Need to clean this up sometime.
+
+    /** @type {SPUI.TextNode}
+        @private */
     // sentinel element that represents the bottom of the scroll area
     // new lines are added before this
     this.head = new SPUI.TextNode();
     this.head.next = this.head;
     this.head.prev = this.head;
 
+    /** @type {SPUI.TextNode}
+        @private */
     // bot points to the bottom-most line currently being displayed
     this.bot = this.head;
 
+    /** @type {SPUI.TextNode}
+        @private */
     // top is read-only, updated only in update_text()
     this.top = this.head;
 
     this.n_lines = 0;
     this.max_lines = data['scrollback_buffer'] || 50;
     this.invert = data['invert'] || false; // show upside-down (newest at top)
-    this.rtext = null; // renderable text from SPText
+
+    /** @type {Array.<Array.<SPText.RBlock>>|null} */
+    this.rtxt = null; // renderable text from SPText
 
     if('ui_tooltip' in data) {
         var params = {'ui_name': data['ui_tooltip'] };
@@ -3400,12 +3419,15 @@ SPUI.ScrollingTextField.prototype.can_scroll_up = function() {
     return (this.bot.prev !== this.head && this.top != this.head);
 };
 
-SPUI.ScrollingTextField.prototype.get_scroll_pos = function() {
+/** return the number of times, after scroll_to_bottom(), you'd have to call scroll_up() to reach the current position
+    @return {number} */
+SPUI.ScrollingTextField.prototype.get_scroll_pos_from_head_to_bot = function() {
+    if(this.bot === this.head) { return 0; }
     var pos = 0;
-    var p = this.head;
-    while(p != this.top) {
+    var p = this.head.prev;
+    while(p != this.bot) {
         pos += 1;
-        p = p.next;
+        p = p.prev;
     }
     return pos;
 };
