@@ -29,9 +29,9 @@ if __name__=='__main__':
     if mode == 'size':
         cmd_args += ['-c',
 '''SELECT full_table_name AS table_name,
-          pg_size_pretty(table_size) AS table_size,
-          pg_size_pretty(indexes_size) AS indexes_size,
-          pg_size_pretty(total_size) AS total_size
+          round(total_size/(1024*1024)) AS "total (MB)",
+          round(table_size/(1024*1024), 0) AS "data (MB)",
+          round(indexes_size/(1024*1024), 0) AS "indexes (MB)"
           FROM (SELECT full_table_name,
                        pg_table_size(full_table_name) AS table_size,
                        pg_indexes_size(full_table_name) AS indexes_size,

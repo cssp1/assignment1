@@ -29,7 +29,13 @@ if __name__=='__main__':
 
     if mode == 'size':
         cmd_args += ['-e',
-'''SELECT table_name, round(((data_length + index_length) / 1024 / 1024), 0) as `size (MB)` FROM information_schema.TABLES WHERE table_schema = '%s' and (data_length+index_length) > 10*1024*1024 order by (data_length+index_length) DESC;''' % conf['dbname']]
+'''SELECT table_name,
+          round(((data_length + index_length) / 1024 / 1024), 0) as `total (MB)`,
+          round(((data_length) / 1024 / 1024), 0) as `data (MB)`,
+          round(((index_length) / 1024 / 1024), 0) as `indexes (MB)`
+   FROM information_schema.TABLES
+   WHERE table_schema = '%s' and (data_length+index_length) > 10*1024*1024 order by (data_length+index_length) DESC;'''
+        % conf['dbname']]
     elif execute:
         cmd_args += ['-e', execute]
 
