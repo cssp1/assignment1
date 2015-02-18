@@ -28809,14 +28809,21 @@ function hide_army_dialog_buttons(dialog, mode) {
     });
 }
 
+/** @type {string|null} category name to use, unless another one is specified */
 var last_manufacture_dialog_category = null;
 
-/** @param {string} reason
-    @param {string=} category
-    @param {GameObject|null=} unit
-    @param {boolean=} want_builder */
-function invoke_manufacture_dialog(reason, category, unit, want_builder) {
+/** @param {string} reason - arbitrary source ID, used for metrics only
+    @param {string=} category - preselect a particular manufacture_category
+    @param {string|null=} specname - preselect a particular unit (specname)
+    @param {GameObject|null=} want_builder - use THIS factory building (otherwise pick any applicable factory) */
+function invoke_manufacture_dialog(reason, category, specname, want_builder) {
+    if(player.tutorial_state != "COMPLETE") {
+        // during rails tutorial, force category to most basic one
+        category = goog.object.getKeys(gamedata['strings']['manufacture_categories'])[0];
+    }
+
     if(last_manufacture_dialog_category === null) {
+        // default to first-listed manufacture category (the most basic one)
         last_manufacture_dialog_category = goog.object.getKeys(gamedata['strings']['manufacture_categories'])[0];
     }
 
@@ -28839,13 +28846,13 @@ function invoke_manufacture_dialog(reason, category, unit, want_builder) {
     dialog.user_data['units_this_page'] = null;
     dialog.user_data['current_unit'] = null;
     dialog.user_data['scrolled'] = false;
-    dialog.user_data['replace_queue_with_unlock_helper'] = null;
     dialog.user_data['want_builder'] = want_builder || null; // prefer this builder, if available
 
-    dialog.widgets['close_button'].onclick = function() { change_selection(null); };
+    dialog.widgets['close_button'].onclick = close_parent_dialog;
 
     init_army_dialog_buttons(dialog.widgets['army_dialog_buttons_army'], 'army', 'manufacture_dialog');
 
+    // show labels for available manufacture categories and wire up click handlers
     var cat_i = 0;
     goog.object.forEach(gamedata['strings']['manufacture_categories'], function(data, cat) {
         if(!get_factory_for(cat)) { return; } // cannot be built
@@ -28855,6 +28862,8 @@ function invoke_manufacture_dialog(reason, category, unit, want_builder) {
         }
         cat_i += 1;
     });
+
+    // clear remaining unused labels
     while(cat_i < dialog.data['widgets']['cat_button']['array'][0]) {
         dialog.widgets['cat_button'+cat_i.toString()].show = false;
         cat_i += 1;
@@ -28865,12 +28874,10 @@ function invoke_manufacture_dialog(reason, category, unit, want_builder) {
 
     dialog.ondraw = update_manufacture_dialog;
 
-    if(category) { last_manufacture_dialog_category = category; }
-    manufacture_dialog_change_category(dialog, (player.tutorial_state != "COMPLETE" ? goog.object.getKeys(gamedata['strings']['manufacture_categories'])[0] : last_manufacture_dialog_category));
-    manufacture_dialog_select_unit(dialog, (unit ? unit : null));
+    manufacture_dialog_change_category(dialog, category || last_manufacture_dialog_category, specname || null);
 }
 
-// return function that helps player to unlock unit "specname" (or units of category "category")
+// return function that helps player to unlock unit "specname" (or units of category "category", whichever is non-null)
 /** @param {string|null} category
     @param {string|null} specname
     @param {string} reason
@@ -28911,10 +28918,14 @@ function manufacture_dialog_unlock_helper(category, specname, reason) {
 }
 
 
-function manufacture_dialog_change_category(dialog, catname) {
+/** @param {SPUI.Dialog} dialog
+    @param {string} catname
+    @param {string|null=} preselect_specname */
+function manufacture_dialog_change_category(dialog, catname, preselect_specname) {
     last_manufacture_dialog_category = catname;
     dialog.user_data['category'] = catname;
 
+    // set appearance and state for category buttons
     var cat_i = 0;
     goog.object.forEach(gamedata['strings']['manufacture_categories'], function(data, cat) {
         if(!get_factory_for(cat)) { return; } // cannot be built
@@ -28925,7 +28936,7 @@ function manufacture_dialog_change_category(dialog, catname) {
         cat_i += 1;
     });
 
-
+    // select builder (may be null if no factory is present)
     var builder = null;
     var builder_type = get_factory_for(catname);
     if(dialog.user_data['want_builder'] && dialog.user_data['want_builder'].spec['name'] == builder_type) {
@@ -28959,7 +28970,7 @@ function manufacture_dialog_change_category(dialog, catname) {
     }
 
     manufacture_dialog_scroll(dialog, 0);
-    manufacture_dialog_select_unit(dialog, null);
+    manufacture_dialog_select_unit(dialog, preselect_specname || null);
 }
 
 function manufacture_dialog_scroll(dialog, page) {
@@ -28991,10 +29002,10 @@ function manufacture_dialog_scroll(dialog, page) {
     player.quest_tracked_dirty = true;
 }
 
+/** "Select" a unit, meaning show its stats on the right-hand side
+    @param {SPUI.Dialog} dialog
+    @param {string|null} name - specname of the unit to select. If null, then show generic "<- Click to produce" message */
 function manufacture_dialog_select_unit(dialog, name) {
-    if(name != dialog.user_data['current_unit']) {
-        dialog.user_data['replace_queue_with_unlock_helper'] = null;
-    }
     dialog.user_data['current_unit'] = name;
 
     dialog.widgets['coverup_all'].show =
@@ -29092,7 +29103,7 @@ function cancel_manuf_item(builder, queue_slot, spec_name) {
     });
 }
 
-
+/** Main per-frame update - takes care of grid buttons and status displays*/
 function update_manufacture_dialog(dialog) {
     var builder = dialog.user_data['builder'];
 
@@ -29142,18 +29153,6 @@ function update_manufacture_dialog(dialog) {
                 }
             });
         }
-    }
-
-    if(!builder && !player.is_cheater) {
-        // factory building does not exist, do not show queue
-        dialog.user_data['replace_queue_with_unlock_helper'] = manufacture_dialog_unlock_helper(dialog.user_data['category'], dialog.user_data['current_unit'], '!builder');
-    }
-
-    if(dialog.user_data['replace_queue_with_unlock_helper'] && dialog.user_data['current_unit']) {
-        dialog.widgets['coverup_queue'].show =
-            dialog.widgets['click_to_unlock'].show =
-            dialog.widgets['click_to_unlock_button'].show = true;
-        dialog.widgets['click_to_unlock_button'].onclick = dialog.user_data['replace_queue_with_unlock_helper'];
     }
 
     // fill in grid of unit types
@@ -29313,7 +29312,6 @@ function update_manufacture_dialog(dialog) {
 
                 } else {
                     var helper = manufacture_dialog_unlock_helper(dialog.user_data['category'], dialog.user_data['current_unit'], 'closure:builder'+(builder?'1':'0')+'unlock_level'+unlock_level.toString());
-                    dialog.user_data['replace_queue_with_unlock_helper'] = helper;
                     if(helper) { helper(); }
                 }
             };
@@ -29322,10 +29320,6 @@ function update_manufacture_dialog(dialog) {
 
         if(!gamedata['client']['unit_manufacture_dripper']) {
             widget.dripper_cb = null; // disable dripper behavior
-        }
-
-        if(!builder && !player.is_cheater) {
-            dialog.user_data['replace_queue_with_unlock_helper'] = manufacture_dialog_unlock_helper(dialog.user_data['category'], dialog.user_data['current_unit'], '!builder');
         }
 
         var qty_current = (name in unit_count ? unit_count[name] : 0);
@@ -29443,80 +29437,66 @@ function update_manufacture_dialog(dialog) {
     if(!player.unit_speedups_enabled()) {
         dialog.widgets['finish_button'].show = dialog.widgets['price_display'].show = false;
     } else {
-    // ! this block is deliberately left one indent to minimize diff
-    if(builder && !builder.is_in_sync()) {
-        dialog.widgets['price_display'].str = '';
-        closure = null;
-        dialog.widgets['price_display'].onclick = null;
-        dialog.widgets['finish_button'].state = 'disabled';
-        dialog.widgets['finish_button'].str = dialog.data['widgets']['finish_button']['ui_name_pending'];
-        dialog.widgets['price_display'].tooltip.str = dialog.widgets['finish_button'].tooltip.str = '';
-    } else if(!builder || manuf_queue.length < 1 || !session.enable_dialog_completion_buttons) {
-        dialog.widgets['price_display'].str = '';
-        closure = null;
-        dialog.widgets['price_display'].onclick = null;
-        dialog.widgets['finish_button'].state = 'disabled';
-        dialog.widgets['finish_button'].str = dialog.data['widgets']['finish_button']['ui_name'];
-        dialog.widgets['price_display'].tooltip.str = dialog.widgets['finish_button'].tooltip.str = '';
-    } else {
-        // note: SPEEDUP_FOR_MONEY will repair the factory rather than speed up production if factory is damaged
-        dialog.widgets['finish_button'].str = dialog.data['widgets']['finish_button']['ui_name'+(builder.is_damaged() ? '_repair' : '')];
-        dialog.widgets['finish_button'].state = 'normal';
-
-        var price = Store.get_user_currency_price(builder.id, gamedata['spells']['SPEEDUP_FOR_MONEY'], null);
-        dialog.widgets['price_display'].str = Store.display_user_currency_price(price); // PRICE
-        dialog.widgets['price_display'].tooltip.str = Store.display_user_currency_price_tooltip(price);
-
-
-        if(price == 0) {
-            closure = (function(_builder) { return function() {
-                if(selection.ui.widgets['coverup_queue'].show || selection.ui.widgets['coverup_all'].show) { return; }
-                send_to_server.func(["CAST_SPELL", _builder.id, "SPEEDUP_FOR_FREE"]);
-                invoke_ui_locker(_builder.request_sync(), function() { change_selection(null); });
-            }; })(builder);
-        } else if(price > 0) {
-            closure = (function(_builder) { return function() {
-                var dialog = selection.ui;
-                if(dialog.widgets['coverup_queue'].show || dialog.widgets['coverup_all'].show) { return; }
-
-                var cleanup_cb = (function (_dialog) { return function() {
-//                  change_selection(null);
-                }; })(dialog);
-
-                if(Store.place_user_currency_order(_builder.id, "SPEEDUP_FOR_MONEY", null, cleanup_cb)) {
-                    invoke_ui_locker(_builder.request_sync(), function() { change_selection(null); });
-                }
-            };})(builder);
+        if(builder && !builder.is_in_sync()) {
+            dialog.widgets['price_display'].str = '';
+            closure = null;
+            dialog.widgets['price_display'].onclick = null;
+            dialog.widgets['finish_button'].state = 'disabled';
+            dialog.widgets['finish_button'].str = dialog.data['widgets']['finish_button']['ui_name_pending'];
+            dialog.widgets['price_display'].tooltip.str = dialog.widgets['finish_button'].tooltip.str = '';
+        } else if(!builder || manuf_queue.length < 1 || !session.enable_dialog_completion_buttons) {
+            dialog.widgets['price_display'].str = '';
+            closure = null;
+            dialog.widgets['price_display'].onclick = null;
+            dialog.widgets['finish_button'].state = 'disabled';
+            dialog.widgets['finish_button'].str = dialog.data['widgets']['finish_button']['ui_name'];
+            dialog.widgets['price_display'].tooltip.str = dialog.widgets['finish_button'].tooltip.str = '';
         } else {
-            // invalid order?
-            if(builder.is_damaged() && !builder.is_repairing()) {
-                closure = (function (obj) { return function() {
-                    change_selection(obj); invoke_repair_dialog();
+            // note: SPEEDUP_FOR_MONEY will repair the factory rather than speed up production if factory is damaged
+            dialog.widgets['finish_button'].str = dialog.data['widgets']['finish_button']['ui_name'+(builder.is_damaged() ? '_repair' : '')];
+            dialog.widgets['finish_button'].state = 'normal';
+
+            var price = Store.get_user_currency_price(builder.id, gamedata['spells']['SPEEDUP_FOR_MONEY'], null);
+            dialog.widgets['price_display'].str = Store.display_user_currency_price(price); // PRICE
+            dialog.widgets['price_display'].tooltip.str = Store.display_user_currency_price_tooltip(price);
+
+            if(price == 0) {
+                closure = (function(_builder) { return function() {
+                    if(selection.ui.widgets['coverup_queue'].show || selection.ui.widgets['coverup_all'].show) { return; } // ???
+                    send_to_server.func(["CAST_SPELL", _builder.id, "SPEEDUP_FOR_FREE"]);
+                    invoke_ui_locker(_builder.request_sync(), function() { change_selection(null); });
                 }; })(builder);
+            } else if(price > 0) {
+                closure = (function(_builder) { return function() {
+                    var dialog = selection.ui;
+                    if(dialog.widgets['coverup_queue'].show || dialog.widgets['coverup_all'].show) { return; }
+                    var cleanup_cb = (function (_dialog) { return function() {
+                    }; })(dialog);
+
+                    if(Store.place_user_currency_order(_builder.id, "SPEEDUP_FOR_MONEY", null, cleanup_cb)) {
+                        invoke_ui_locker(_builder.request_sync(), function() { change_selection(null); });
+                    }
+                };})(builder);
             } else {
-                closure = null;
-                dialog.widgets['finish_button'].state = 'disabled';
+                // invalid order?
+                if(builder.is_damaged() && !builder.is_repairing()) {
+                    closure = (function (obj) { return function() {
+                        change_selection(obj); invoke_repair_dialog();
+                    }; })(builder);
+                } else {
+                    closure = null;
+                    dialog.widgets['finish_button'].state = 'disabled';
+                }
             }
         }
-    }
 
-    dialog.widgets['price_display'].onclick =
-        dialog.widgets['finish_button'].onclick = closure;
+        dialog.widgets['price_display'].onclick =
+            dialog.widgets['finish_button'].onclick = closure;
     } // END unit speedups available
 
     // fill in capacity display
     var space_usage = player.get_army_space_usage_by_squad();
     var total_capacity = player.stattab['total_space'];
-
-    if(typeof(total_capacity) == 'undefined') { // temporary debugging code
-        var s = JSON.stringify(player.stattab);
-        throw Error('bad stattab: (client_state '+client_state.toString() +
-                    ' viewing_user_id ' +
-                    (session.viewing_user_id ? session.viewing_user_id.toString() : 'undefined/null') +
-                    ' client_death_sent ' +
-                    (SPINPUNCHGAME.client_death_sent? SPINPUNCHGAME.client_death_sent.toString() : 'null') +
-                    ' reason '+dialog.user_data['reason']+') '+(s ? s : 'undefined!'));
-    }
 
     var used_capacity = space_usage['ALL'];
     var available_space = total_capacity - used_capacity;
