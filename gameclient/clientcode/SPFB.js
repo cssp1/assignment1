@@ -106,7 +106,7 @@ SPFB.api_version_string = function(feature) {
     } else if(spin_facebook_api_versions && ('default' in spin_facebook_api_versions)) {
         sver = spin_facebook_api_versions['default'];
     } else {
-        sver = 'v2.1'; // fallback default (sync with: FacebookSDK.js, fb_guest.html, gameserver/SpinFacebook.py, gameclient/clientcode/SPFB.js)
+        sver = 'v2.2'; // fallback default (sync with: FacebookSDK.js, fb_guest.html, gameserver/SpinFacebook.py, gameclient/clientcode/SPFB.js)
     }
     return (sver ? sver+'/' : '');
 };
@@ -118,7 +118,7 @@ SPFB.api_version_number = function(feature) {
     if(s) {
         return parseFloat(s.slice(1, s.length-1));
     } else {
-        return 2.1; // fallback default (sync with: FacebookSDK.js, fb_guest.html, gameserver/SpinFacebook.py, gameclient/clientcode/SPFB.js)
+        return 2.2; // fallback default (sync with: FacebookSDK.js, fb_guest.html, gameserver/SpinFacebook.py, gameclient/clientcode/SPFB.js)
     }
 };
 
