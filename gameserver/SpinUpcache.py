@@ -1356,7 +1356,7 @@ def update_upcache_entry(user_id, driver, entry, time_now, gamedata, user_mtime 
                              'peak_trophies_pvp',
                              'units_manufactured',
                              'money_spent', 'largest_purchase', 'time_in_game', 'logged_in_times',
-                             'alliances_joined', 'units_donated', 'donated_units_received', 'alliance_gift_items_sent',
+                             'alliances_joined', 'unit_donations_requested', 'units_donated', 'donated_units_received', 'alliance_gift_items_sent',
                              'thunder_dome_entered', 'turret_heads_migrated',
                              'iron_deposits_collected',
                              'chat_messages_sent',

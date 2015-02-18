@@ -24200,6 +24200,8 @@ class GAMEAPI(resource.Resource):
 
                 if success:
                     session.player.cooldown_trigger(gamedata['spells'][spellname]['cooldown_name'], gamedata['spells'][spellname]['cooldown'])
+                    if session.increment_player_metric('unit_donations_requested', 1, time_series = False):
+                        session.deferred_history_update = True
                     metric_event_coded(session.player.user_id, '4140_unit_donation_requested', {'alliance_id':alliance_id,'tag':tag,'max_space':max_space,'cur_space':cur_space})
                     if session.alliance_chat_channel:
                         session.do_chat_send(session.alliance_chat_channel,
