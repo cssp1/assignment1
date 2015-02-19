@@ -16,6 +16,7 @@
     "INSUFFICIENT_RESOURCES": { "ui_name": "Not enough resources" },
     "OBJECT_IS_NOT_CAPABLE": { "ui_name": "The object is not capable of performing this function" },
     "FACTORY_LEVEL_TOO_LOW": { "ui_name": "Factory level too low", "ui_title": "%s Needs Upgrade", "ui_help": "To produce this unit, upgrade this %s to Level %d." },
+    "UNIT_COUNT_LIMIT": { "ui_title": "Unit Count Limit Reached", "ui_name": "You already have the maximum number of this unit in your army" },
     "FOREMAN_IS_BUSY": { "ui_name": "Construction Workers Are Busy" },
     "WORKSHOP_IS_BUSY": { "ui_name": "Workshop is busy" },
     "CRAFT_INGREDIENT_MISSING": { "ui_name": "Missing ingredients" },

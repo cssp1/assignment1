@@ -6543,7 +6543,15 @@ def spawn_units(owner, base, units, temporary = False,
             destination_squad = SQUAD_IDS.BASE_DEFENDERS
 
             if (not temporary) and (not limit_break):
-                cur = owner.get_army_space_usage_by_squad()
+                if spec.limit >= 0:
+                    if owner.get_army_unit_count_by_specname().get(spec.name, 0) + 1 > spec.limit:
+                        if limit_reduce_qty:
+                            break # skip adding the unit silently
+                        else:
+                            gamesite.exception_log.event(server_time, 'player %d not allowed to spawn unit of spec %s due to count limit' % (owner.user_id, spec.name))
+                            break # skip adding the unit, and log message
+
+                cur = owner.get_army_space_usage_by_squad() # wow, this goes to the database for every unit...
                 if (cur['ALL'] + space > owner.stattab.total_space):
                     if limit_reduce_qty:
                         break # skip adding the unit
@@ -7549,12 +7557,13 @@ class Player(AbstractPlayer):
         mailbox_update = False
         if (self.tutorial_state == "COMPLETE") and (self.stattab.total_space > 0) and \
            (not self.is_cheater) and Predicates.read_predicate(gamedata['server']['trim_unit_space_if']).is_satisfied(self, None):
-            space_usage = self.get_army_space_usage_by_squad(map_object_data = map_object_data)
+            to_remove = []
+            attachments = []
+            diff = 0
+
             # check overall army being too large
+            space_usage = self.get_army_space_usage_by_squad(map_object_data = map_object_data)
             if space_usage['ALL'] > self.stattab.total_space:
-                to_remove = []
-                attachments = []
-                diff = 0
                 candidates = sorted(filter(lambda obj: obj.is_mobile() and obj.owner is self, self.home_base_iter()), key = lambda obj: obj.get_leveled_quantity(obj.spec.consumes_space))
                 for obj in candidates:
                     item_spec = 'packaged_'+obj.spec.name
@@ -7572,22 +7581,53 @@ class Player(AbstractPlayer):
                     diff += obj.get_leveled_quantity(obj.spec.consumes_space)
                     if space_usage['ALL']-diff <= self.stattab.total_space:
                         break
-                if to_remove:
-                    for obj in to_remove:
-                        self.unit_repair_cancel(obj)
-                        self.home_base_remove(obj)
-                        # update objects_by_squad so that the following player_army_update shows the deletion
-                        statelist = home_objects_by_squad.get(obj.squad_id or 0, map_objects_by_squad.get(obj.squad_id or 0, []))
-                        for state in statelist:
-                            if state['obj_id'] == obj.obj_id:
-                                statelist.remove(state)
+
+            # check spec count limits
+            counts = self.get_army_unit_count_by_specname(map_object_data = map_object_data)
+            for name, qty in counts.iteritems():
+                spec = self.get_abtest_spec(GameObjectSpec, name)
+                if spec.limit >= 0 and qty > spec.limit:
+                    # pull units out of home base. Note, squad units are not affected!
+                    candidates = filter(lambda obj: obj.spec is spec and obj.owner is self, self.home_base_iter())
+                    for obj in candidates:
+                        item_spec = 'packaged_'+obj.spec.name
+                        if item_spec not in gamedata['items']:
+                            gamesite.exception_log.event(server_time, 'trim_unit_space needs item '+item_spec)
+                            continue
+                        to_remove.append(obj)
+                        found = False
+                        for att in attachments:
+                            if att['spec'] == item_spec and (att.get('stack',1) < gamedata['items'][item_spec].get('stack_max',1)):
+                                att['stack'] = att.get('stack',1)+1
+                                found = True
                                 break
-                        # note! we don't send OBJECT_REMOVED - we trust that this gets caught on login before the first session change!
-                    self.mailbox_append(self.make_system_mail(gamedata['strings']['trim_unit_space_mail' + ('_reserves' if (self.squads_enabled() and self.find_object_by_type(gamedata['squad_building'])) else '_townhall')], attachments = attachments))
-                    mailbox_update = True
-                    if diff >= gamedata['server']['log_trim_unit_space']:
-                        gamesite.exception_log.event(server_time, 'player %d trim_unit_space ALL %d (limit %d) -%d %s' % \
-                                                     (self.user_id, space_usage['ALL'], self.stattab.total_space, diff, repr(attachments)))
+                        if not found: attachments.append({'spec':item_spec})
+                        qty -= 1
+                        if qty <= spec.limit:
+                            break
+
+                    if qty > spec.limit:
+                        # still too many, but can't do anything about squads out on the map
+                        if gamedata['server']['log_trim_unit_space']:
+                            gamesite.exception_log.event(server_time, 'player %d trim_unit_space spec %s (count %d limit %d) on map, cannot trim' % \
+                                                         (self.user_id, name, qty, spec.limit))
+            # send units back in the mail
+            if to_remove:
+                for obj in to_remove:
+                    self.unit_repair_cancel(obj)
+                    self.home_base_remove(obj)
+                    # update objects_by_squad so that the following player_army_update shows the deletion
+                    statelist = home_objects_by_squad.get(obj.squad_id or 0, map_objects_by_squad.get(obj.squad_id or 0, []))
+                    for state in statelist:
+                        if state['obj_id'] == obj.obj_id:
+                            statelist.remove(state)
+                            break
+                    # note! we don't send OBJECT_REMOVED - we trust that this gets caught on login before the first session change!
+                self.mailbox_append(self.make_system_mail(gamedata['strings']['trim_unit_space_mail' + ('_reserves' if (self.squads_enabled() and self.find_object_by_type(gamedata['squad_building'])) else '_townhall')], attachments = attachments))
+                mailbox_update = True
+                if diff >= gamedata['server']['log_trim_unit_space']:
+                    gamesite.exception_log.event(server_time, 'player %d trim_unit_space ALL %d (limit %d) -%d %s' % \
+                                                 (self.user_id, space_usage['ALL'], self.stattab.total_space, diff, repr(attachments)))
 
             # check individual squads being too large
             if self.squads_enabled():
@@ -7646,6 +7686,28 @@ class Player(AbstractPlayer):
                     usage += GameObjectSpec.get_leveled_quantity(spec.consumes_space, item.get('level',1))
 
         return usage
+
+    # optionally supply map_object_data in case you just queried it
+    def get_army_unit_count_by_specname(self, map_object_data = None):
+        ret = {}
+
+        # count objects at home
+        for obj in self.home_base_iter():
+            if (obj.owner is self) and obj.is_mobile():
+                ret[obj.spec.name] = ret.get(obj.spec.name,0) + 1
+
+            # also count units that are under construction
+            elif (obj.owner is self) and obj.is_building() and obj.is_manufacturer():
+                for item in obj.manuf_queue:
+                    ret[item['spec_name']] = ret.get(item['spec_name'],0) + 1
+
+        # count objects on map
+        if gamesite.nosql_client and self.home_region:
+            if map_object_data is None: map_object_data = gamesite.nosql_client.get_mobile_objects_by_owner(self.my_home.base_region, self.user_id, reason='get_army_unit_count_by_squad')
+            for obj in map_object_data:
+                ret[obj['spec']] = ret.get(obj['spec'],0) + 1
+
+        return ret
 
     # optionally supply map_object_data in case you just queried it
     def get_army_space_usage_by_squad(self, map_object_data = None):
@@ -16152,6 +16214,18 @@ class GAMEAPI(resource.Resource):
             req = session.player.space_required_for_units(spellarg)
             cur = session.player.get_army_space_usage_by_squad()
 
+            # check unit count limit
+            for name, data in spellarg.iteritems():
+                spec = session.player.get_abtest_spec(GameObjectSpec, name)
+                if spec.limit >= 0:
+                    if type(data) is int:
+                        qty = data
+                    else:
+                        qty = data.get('qty',1)
+                    if session.player.get_army_unit_count_by_specname().get(name, 0) + qty > spec.limit:
+                        retmsg.append(["ERROR", "UNIT_COUNT_LIMIT"])
+                        return False
+
             if (cur['ALL'] + req > session.player.stattab.total_space):
                 retmsg.append(["ERROR", "UNIT_SPACE_LIMIT"])
                 return False
@@ -16583,7 +16657,6 @@ class GAMEAPI(resource.Resource):
             did_an_upgrade = False
             did_a_research = False
             did_a_manufacture = False
-            need_history_update = False
 
             xp = 0
             xp_why = []
@@ -16616,7 +16689,7 @@ class GAMEAPI(resource.Resource):
 
                     # run metrics for home-base buildings
                     if base is object.owner.my_home:
-                        need_history_update = True
+                        session.deferred_history_update = True
                         num_built = sum([1 for p in object.owner.home_base_iter() if p.spec.name == object.spec.name])
                         session.setmax_player_metric('building:'+object.spec.name+':num_built', num_built, bucket = bool(object.spec.worth_less_xp))
                         if object.spec.history_category:
@@ -16646,7 +16719,7 @@ class GAMEAPI(resource.Resource):
 
                     # run metrics for home-base buildings
                     if base is object.owner.my_home:
-                        need_history_update = True
+                        session.deferred_history_update = True
                         max_level = max([p.level for p in object.owner.home_base_iter() if p.spec.name == object.spec.name])
                         session.setmax_player_metric('building:'+object.spec.name+':max_level', max_level, bucket = bool(object.spec.worth_less_xp))
                         if object.spec.history_category:
@@ -16685,84 +16758,7 @@ class GAMEAPI(resource.Resource):
                         self.do_collect_craft(session, retmsg, object)
 
             if object.is_manufacturing() and (object.owner is session.player):
-                prog = object.manuf_done_time
-                if object.manuf_start_time >= 0:
-                    prog += (server_time - object.manuf_start_time)
-
-                if (len(object.manuf_queue)) > 0 and (prog >= object.manuf_queue[0]['total_time']):
-                    # manufacture is complete
-                    did_a_manufacture = True
-
-                    # keep track of added objects so we can send a UNIT_MANUFACTURED message to the client
-                    new_object_ids = []
-
-                    # grab items off the manufacturing queue in FIFO order
-                    while len(object.manuf_queue) > 0:
-                        if object.manuf_queue[0]['total_time'] > prog:
-                            break
-                        item = object.manuf_queue.pop(0)
-
-                        prog -= item['total_time']
-
-                        # knock off completed time from done_time
-                        # this can make done_time go negative!
-                        object.manuf_done_time -= item['total_time']
-
-                        spec = session.player.get_abtest_spec(GameObjectSpec, item['spec_name'])
-                        space = GameObjectSpec.get_leveled_quantity(spec.consumes_space, item.get('level',1))
-
-                        space_usage = session.player.get_army_space_usage_by_squad()
-                        destination_squad = SQUAD_IDS.BASE_DEFENDERS
-
-                        if (not session.player.is_cheater):
-                            if space_usage['ALL']+space > session.player.stattab.total_space:
-                                # only alert if trim_unit_space_if is enabled
-                                if Predicates.read_predicate(gamedata['server']['trim_unit_space_if']).is_satisfied(session.player, None):
-                                    gamesite.exception_log.event(server_time, 'player %d (CC%d) produced into oversize army! (new %d limit %d army %s)' % (session.player.user_id, session.player.get_townhall_level(), space, session.player.stattab.total_space, repr(space_usage)))
-
-                            if space_usage[str(SQUAD_IDS.BASE_DEFENDERS)] + space > session.player.stattab.main_squad_space:
-                                if session.player.squads_enabled() and gamedata['produce_to_reserves']:
-                                    # overflow production to reserves
-                                    destination_squad = SQUAD_IDS.RESERVES
-                                else:
-                                    # only alert if trim_unit_space_if is enabled
-                                    if Predicates.read_predicate(gamedata['server']['trim_unit_space_if']).is_satisfied(session.player, None):
-                                        gamesite.exception_log.event(server_time, 'player %d (CC%d) produced into oversize base defenders! (new %d limit %d army %s)' % (session.player.user_id, session.player.get_townhall_level(), space, session.player.stattab.main_squad_space, repr(space_usage)))
-
-                        if object.owner is session.player:
-                            need_history_update = True
-                            session.increment_player_metric('units_manufactured', 1, bucket = True, time_series = False)
-                            session.increment_player_metric('unit:'+spec.name+':manufactured', 1, bucket = True, time_series = False)
-                            if spec.manufacture_category:
-                                session.increment_player_metric(spec.manufacture_category+'_manufactured', 1, bucket = True, time_series = False)
-                        else:
-                            raise Exception('completed manufacturing on behalf of other than session.player! %d' % session.player.user_id)
-
-                        newobj = instantiate_object_for_player(session.player, object.owner, item['spec_name'], x=object.x+10, y=object.y+10, level=item['level'])
-                        newobj.squad_id = destination_squad
-
-                        base.adopt_object(newobj)
-                        session.player.send_army_update_one(newobj, retmsg)
-
-                        new_object_ids.append(newobj.obj_id)
-
-                        if gamedata.get('enable_defending_units',True) and destination_squad == SQUAD_IDS.BASE_DEFENDERS and (session.viewing_base is object.owner.my_home):
-                            session.add_object(newobj)
-                            if session.damage_log: session.damage_log.init(newobj)
-                            retmsg.append(["OBJECT_CREATED2", newobj.serialize_state()])
-                            if newobj.auras:
-                                retmsg.append(["OBJECT_AURAS_UPDATE", newobj.serialize_auras()])
-
-                        if destination_squad == SQUAD_IDS.RESERVES and object.owner is session.player:
-                            retmsg.append(["MANUFACTURE_OVERFLOW_TO_RESERVES", newobj.obj_id])
-
-                    retmsg.append(["UNIT_MANUFACTURED", object.obj_id, new_object_ids])
-
-                    # stop at end of production line
-                    if len(object.manuf_queue) < 1:
-                        object.manuf_start_time = -1
-                        object.manuf_done_time = -1
-
+                did_a_manufacture |= self.do_ping_manufacturing(session, retmsg, base, object)
 
             if did_finish_construction or did_an_upgrade:
                 # handle any updates to stattab
@@ -16819,10 +16815,7 @@ class GAMEAPI(resource.Resource):
             elif force_write:
                 base.nosql_write_one(object, 'do_ping_object')
 
-            retmsg.append(["OBJECT_STATE_UPDATE2", object.serialize_state()])
-
-            if need_history_update:
-                session.player.send_history_update(retmsg)
+            session.deferred_object_state_updates.add(object)
 
     def do_speedup_for_free(self, session, retmsg, object):
         assert object.is_building()
@@ -17918,6 +17911,11 @@ class GAMEAPI(resource.Resource):
 
         # apply unit capacity constraint
         if (not session.player.is_cheater):
+            if spec.limit >= 0:
+                if session.player.get_army_unit_count_by_specname().get(spec.name, 0) + 1 > spec.limit:
+                    retmsg.append(["ERROR", "UNIT_COUNT_LIMIT"])
+                    return
+
             cur = session.player.get_army_space_usage_by_squad()
             if (cur['ALL'] + space > session.player.stattab.total_space):
                 retmsg.append(["ERROR", "UNIT_SPACE_LIMIT"])
@@ -17982,6 +17980,93 @@ class GAMEAPI(resource.Resource):
 
         # save state
         retmsg.append(["OBJECT_STATE_UPDATE", object.serialize_state(), session.player.resources.calc_snapshot().serialize()])
+
+    def do_ping_manufacturing(self, session, retmsg, base, object):
+        assert object.owner is session.player # only handle for self now
+        did_a_manufacture = False
+
+        prog = object.manuf_done_time
+        if object.manuf_start_time >= 0:
+            prog += (server_time - object.manuf_start_time)
+
+        if (len(object.manuf_queue)) > 0 and (prog >= object.manuf_queue[0]['total_time']):
+            # manufacture is complete
+            did_a_manufacture = True
+
+            # keep track of added objects so we can send a UNIT_MANUFACTURED message to the client
+            new_object_ids = []
+
+            # grab items off the manufacturing queue in FIFO order
+            while len(object.manuf_queue) > 0:
+                if object.manuf_queue[0]['total_time'] > prog:
+                    break
+                item = object.manuf_queue.pop(0)
+
+                prog -= item['total_time']
+
+                # knock off completed time from done_time
+                # this can make done_time go negative!
+                object.manuf_done_time -= item['total_time']
+
+                spec = session.player.get_abtest_spec(GameObjectSpec, item['spec_name'])
+                space = GameObjectSpec.get_leveled_quantity(spec.consumes_space, item.get('level',1))
+
+                if spec.limit >= 0 and (not session.player.is_cheater):
+                    # this is an expensive database query, but we don't expect many units to have this restriction
+                    if session.player.get_army_unit_count_by_specname().get(spec.name, 0) + 1 > spec.limit:
+                        gamesite.exception_log.event(server_time, 'player %d not allowed to finish unit of spec %s due to count limit' % (session.player.user_id, spec.name))
+                        continue # drop the unit
+
+                space_usage = session.player.get_army_space_usage_by_squad()
+                destination_squad = SQUAD_IDS.BASE_DEFENDERS
+
+                if (not session.player.is_cheater):
+                    if space_usage['ALL']+space > session.player.stattab.total_space:
+                        # only alert if trim_unit_space_if is enabled
+                        if Predicates.read_predicate(gamedata['server']['trim_unit_space_if']).is_satisfied(session.player, None):
+                            gamesite.exception_log.event(server_time, 'player %d (CC%d) produced into oversize army! (new %d limit %d army %s)' % (session.player.user_id, session.player.get_townhall_level(), space, session.player.stattab.total_space, repr(space_usage)))
+
+                    if space_usage[str(SQUAD_IDS.BASE_DEFENDERS)] + space > session.player.stattab.main_squad_space:
+                        if session.player.squads_enabled() and gamedata['produce_to_reserves']:
+                            # overflow production to reserves
+                            destination_squad = SQUAD_IDS.RESERVES
+                        else:
+                            # only alert if trim_unit_space_if is enabled
+                            if Predicates.read_predicate(gamedata['server']['trim_unit_space_if']).is_satisfied(session.player, None):
+                                gamesite.exception_log.event(server_time, 'player %d (CC%d) produced into oversize base defenders! (new %d limit %d army %s)' % (session.player.user_id, session.player.get_townhall_level(), space, session.player.stattab.main_squad_space, repr(space_usage)))
+
+                session.increment_player_metric('units_manufactured', 1, bucket = True, time_series = False)
+                session.increment_player_metric('unit:'+spec.name+':manufactured', 1, bucket = True, time_series = False)
+                if spec.manufacture_category:
+                    session.increment_player_metric(spec.manufacture_category+'_manufactured', 1, bucket = True, time_series = False)
+                session.deferred_history_update = True
+
+                newobj = instantiate_object_for_player(session.player, object.owner, item['spec_name'], x=object.x+10, y=object.y+10, level=item.get('level',1))
+                newobj.squad_id = destination_squad
+
+                base.adopt_object(newobj)
+                session.player.send_army_update_one(newobj, retmsg)
+
+                new_object_ids.append(newobj.obj_id)
+
+                if gamedata.get('enable_defending_units',True) and destination_squad == SQUAD_IDS.BASE_DEFENDERS and (session.viewing_base is object.owner.my_home):
+                    session.add_object(newobj)
+                    if session.damage_log: session.damage_log.init(newobj)
+                    retmsg.append(["OBJECT_CREATED2", newobj.serialize_state()])
+                    if newobj.auras:
+                        retmsg.append(["OBJECT_AURAS_UPDATE", newobj.serialize_auras()])
+
+                if destination_squad == SQUAD_IDS.RESERVES and object.owner is session.player:
+                    retmsg.append(["MANUFACTURE_OVERFLOW_TO_RESERVES", newobj.obj_id])
+
+            retmsg.append(["UNIT_MANUFACTURED", object.obj_id, new_object_ids])
+
+            # stop at end of production line
+            if len(object.manuf_queue) < 1:
+                object.manuf_start_time = -1
+                object.manuf_done_time = -1
+
+        return did_a_manufacture
 
     def do_start_repairs(self, request, session, retmsg, base_id, repair_units = True):
         if base_id == session.player.my_home.base_id:

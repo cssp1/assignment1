@@ -27216,6 +27216,26 @@ player.get_manufacture_queue_space_usage = function() {
     return usage;
 };
 
+/** @return {Object.<string,number>} */
+player.get_army_unit_count_by_specname = function() {
+    var ret = {};
+    // count objects in army
+    goog.object.forEach(player.my_army, function(obj) {
+        ret[obj['spec']] = (ret[obj['spec']]||0) + 1;
+    });
+    // also count units that are under construction
+    goog.object.forEach(session.cur_objects.objects, function(obj) {
+        if(obj.team === 'player' && obj.is_building() && obj.is_manufacturer()) {
+            var manuf_queue = obj.get_client_prediction('manuf_queue', obj.manuf_queue);
+            goog.array.forEach(manuf_queue, function(item) {
+                ret[item['spec_name']] = (ret[item['spec_name']]||0) + 1;
+            });
+        }
+    });
+    return ret;
+};
+
+/** @return {Object.<string,number>} */
 player.get_army_space_usage_by_squad = function() {
     var reserve_sid = SQUAD_IDS.RESERVES.toString();
     var ret = {'ALL': 0}; ret[reserve_sid] = 0;
@@ -29276,7 +29296,25 @@ function update_manufacture_dialog(dialog) {
                         available_space = Math.min(available_space, player.stattab['main_squad_space'] - space_usage[SQUAD_IDS.BASE_DEFENDERS.toString()]);
                     }
 
-                    if((available_space) < cost_space && !player.is_cheater) {
+                    // check count limit
+                    var count_limit_problem = false;
+                    if(spec['limit'] && !player.is_cheater) {
+                        var counts = player.get_army_unit_count_by_specname();
+                        var cur_count = counts[spec['name']] || 0;
+                        if(cur_count + 1 > spec['limit']) {
+                            count_limit_problem = true;
+                        }
+                    }
+
+                    if(count_limit_problem) {
+                        var helper = get_requirements_help('unit_count', spec['name']);
+                        if(helper) {
+                            helper();
+                        } else {
+                            var s = gamedata['errors']['UNIT_COUNT_LIMIT'];
+                            invoke_child_message_dialog(s['ui_title'], s['ui_name'], {'dialog': 'message_dialog_big'});
+                        }
+                    } else if(available_space < cost_space && !player.is_cheater) {
                         var dripper = w.get_dripper();
                         if (!dripper || dripper.times_fired <= 1) { // do not repeatedly display help when dripper is rapid-firing more clicks
                             var helper = get_requirements_help('unit_space', cost_space - available_space);
@@ -37120,6 +37158,9 @@ function get_requirements_help(kind, arg, options) {
         } else {
             console.log('unable to help with power problem!');  return null;
         }
+    } else if(kind == 'unit_count') {
+        noun = kind; verb = 'default';
+        ui_arg_s = gamedata['units'][arg]['ui_name_plural'];
     } else if(kind == 'unit_space') {
         if(player.squads_enabled()) {
             // squads case
@@ -38923,6 +38964,14 @@ function can_cast_spell_detailed(unit_id, spellname, spellarg) {
             var level = player.tech[spec['level_determined_by_tech']] || 1;
             var space = get_leveled_quantity(spec['consumes_space'] || 0, level);
             total += qty*space;
+
+            if(spec['limit']) {
+                var counts = player.get_army_unit_count_by_specname();
+                var cur_count = counts[spec['name']] || 0;
+                if(cur_count + 1 > spec['limit']) {
+                    return [false, gamedata['errors']['UNIT_COUNT_LIMIT']['ui_name'], ['unit_count', spec['name']]];
+                }
+            }
         }
         var space_usage = player.get_army_space_usage_by_squad();
         var available_space = player.stattab['total_space'] - space_usage['ALL'];
