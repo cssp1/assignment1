@@ -36,6 +36,7 @@ fishing_slates_schema = {
 quest_stats_schema = {
     'fields': [('name', 'VARCHAR(64) NOT NULL'),
                ('ui_priority', 'INT4'),
+               ('townhall_level', 'INT1'),
                ('reward_xp', 'INT4'),
                ('reward_gamebucks', 'INT4'),
                ('reward_iron', 'INT4'),
@@ -282,7 +283,7 @@ if __name__ == '__main__':
         for name, data in gamedata['quests'].iteritems():
             keyvals = []
             # straight fields
-            for FIELD in ('name', 'ui_priority', 'reward_xp', 'reward_gamebucks', 'reward_iron', 'reward_water', 'reward_res3'):
+            for FIELD in ('name', 'ui_priority', 'townhall_level', 'reward_xp', 'reward_gamebucks', 'reward_iron', 'reward_water', 'reward_res3'):
                 if FIELD in data:
                     keyvals.append((FIELD, data[FIELD]))
             # do some basic parsing of the goal predicate
