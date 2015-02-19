@@ -284,7 +284,9 @@ def check_mandatory_fields(specname, spec, kind):
 
     for EFFECT in ('pre_deploy_effect','post_deploy_effect','explosion_effect','damaged_effect','movement_effect','permanent_effect','upgrade_finish_effect'):
         if EFFECT in spec:
-            error |= check_visual_effect(specname+':'+EFFECT, spec[EFFECT])
+            vfx_list = spec[EFFECT] if type(spec[EFFECT]) is list else [spec[EFFECT],]
+            for vfx in vfx_list:
+                error |= check_visual_effect(specname+':'+EFFECT, vfx)
 
     if 'upgrade_completion' in spec:
         if kind != 'buildings':

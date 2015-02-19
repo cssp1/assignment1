@@ -1042,7 +1042,11 @@ function GameObject() {
     this.last_ui_hp_time = -1;
     this.last_ui_hp = -1;
 
-    this.permanent_effect = null; // SPFX for effects that exist all the time the object is alive
+    // SPFX effect that exists all the time the object is alive
+    /** @type {Object|null} - pointer into gamedata for this effect (the level-dependent post-get_leveled_quantity value) */
+    this.permanent_effect_source = null;
+    /** @type {SPFX.Effect|null} */
+    this.permanent_effect = null;
 }
 
 // pull raw combat stats from gamedata and initialize non-gamedata values
@@ -3602,20 +3606,33 @@ function get_grid_bounds(xy, gridsize) {
  * in this.permanent_effect. Does nothing if that effect has already been created.
  */
 GameObject.prototype.update_permanent_effect = function() {
-    if(this.spec['permanent_effect']) {
-        if(!this.is_destroyed() && !this.is_under_construction()) {
-            var pos = this.interpolate_pos();
-
-            if(!this.permanent_effect) {
-                this.permanent_effect = SPFX.add_visual_effect(pos, this.altitude || 0, [0, 1, 0], client_time, this.spec['permanent_effect'], true, null);
-            } else {
-                this.permanent_effect.reposition([pos[0], this.altitude || 0, pos[1]]);
-            }
-        } else {
-            this.remove_permanent_effect();
-        }
+    if(this.is_destroyed() || this.is_under_construction()) {
+        this.remove_permanent_effect();
+        return;
     }
-}
+
+    var fx = this.get_leveled_quantity(this.spec['permanent_effect'] || null);
+    if(!fx) {
+        this.remove_permanent_effect();
+        return;
+    }
+
+    var pos = this.interpolate_pos();
+
+    // if we already have an effect, but it's the wrong one, then remove it
+    if(this.permanent_effect && (this.permanent_effect_source !== fx)) {
+        this.remove_permanent_effect();
+    }
+
+    if(this.permanent_effect) {
+        // move existing effect
+        this.permanent_effect.reposition([pos[0], this.altitude || 0, pos[1]]);
+    } else {
+        // create new effect
+        this.permanent_effect = SPFX.add_visual_effect(pos, this.altitude || 0, [0, 1, 0], client_time, fx, true, null);
+        this.permanent_effect_source = fx;
+    }
+};
 
 /**
  * Removes any permanent SPFX effects attached to this object.
@@ -3624,8 +3641,9 @@ GameObject.prototype.remove_permanent_effect = function() {
     if(this.permanent_effect) {
         SPFX.remove(this.permanent_effect);
         this.permanent_effect = null;
+        this.permanent_effect_source = null;
     }
-}
+};
 
 /**
  * @constructor
