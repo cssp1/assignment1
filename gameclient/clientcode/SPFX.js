@@ -776,7 +776,13 @@ SPFX.Projectile.prototype.draw = function() {
             var pt = t - Math.random()*dt;
             var ppos = vec_mad(this.from, pt, this.shot_vel);
             var vel = this.exhaust_vel;
-            this.particles.spawn([ppos[0], height, ppos[1]], 0, [vel[0], 0, vel[1]], this.exhaust_dvel, [1,1,1], 1);
+            var spawn_loc = [ppos[0], height, ppos[1]];
+            if(this.particles.spawn_radius > 0) {
+                for(var axis = 0; axis < 3; axis++) {
+                    spawn_loc[i] += this.particles.spawn_radius * (2*Math.random()-1);
+                }
+            }
+            this.particles.spawn(spawn_loc, 0, [vel[0], 0, vel[1]], this.exhaust_dvel, [1,1,1], 1);
         }
     }
 
