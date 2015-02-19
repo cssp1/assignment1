@@ -208,7 +208,7 @@ class SpecificPvEResLoot(BaseResLoot):
         # return the starting and current amounts of loot the base has to offer the player
         retmsg.append(["RES_LOOTER_UPDATE", {'starting': self.starting_base_resource_loot,
                                              # 'by_id': copy.deepcopy(self.by_building_id), # for debugging only
-                                             'cur': copy.deepcopy(self.base.base_resource_loot),
+                                             'cur': dict((res, int(self.modifier*amount+0.5)) for res, amount in self.base.base_resource_loot.iteritems()),
                                              'looted_uncapped': copy.deepcopy(self.total_looted_uncapped)}])
 
     def battle_summary_props(self):
