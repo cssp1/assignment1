@@ -839,9 +839,8 @@ SPFX.Projectile.prototype.draw = function() {
     }
 
     if(this.asset) {
-        var img = GameArt.assets[this.asset].states['normal'].images[0];
-        img.draw([stroke_start[0]-Math.floor(img.wh[0]/2),
-                  stroke_start[1]-Math.floor(img.wh[1]/2)]);
+        var sprite = GameArt.assets[this.asset].states['normal'];
+        sprite.draw(stroke_start, 0, SPFX.time);
     } else {
         SPFX.ctx.strokeStyle = this.color_str;
         SPFX.ctx.lineWidth = this.line_width;
