@@ -29311,7 +29311,7 @@ function update_manufacture_dialog(dialog) {
                     }
 
                 } else {
-                    var helper = manufacture_dialog_unlock_helper(dialog.user_data['category'], dialog.user_data['current_unit'], 'closure:builder'+(builder?'1':'0')+'unlock_level'+unlock_level.toString());
+                    var helper = manufacture_dialog_unlock_helper(dialog.user_data['category'], spec_name, 'closure:builder'+(builder?'1':'0')+'unlock_level'+unlock_level.toString());
                     if(helper) { helper(); }
                 }
             };
