@@ -16152,15 +16152,15 @@ class GAMEAPI(resource.Resource):
         # some quests may reveal new AI enemies on completion
         session.user.repopulate_ai_list(retmsg)
 
-
-        if gamedata['server'].get('log_quest_completion', False):
-            props = {'quest':quest.name}
-            if hasattr(quest, 'repeat_interval'):
-                evname = '4011_quest_complete_again'
-                props['count'] = session.player.completed_quests[quest.name]['count']
-            else:
-                evname = '4010_quest_complete'
-            metric_event_coded(session.user.user_id, evname, props)
+        props = {'quest':quest.name,
+                 'sum': session.player.get_denormalized_summary_props('brief')
+                 }
+        if hasattr(quest, 'repeat_interval'):
+            evname = '4011_quest_complete_again'
+            props['count'] = session.player.completed_quests[quest.name]['count']
+        else:
+            evname = '4010_quest_complete'
+        metric_event_coded(session.user.user_id, evname, props)
 
     def do_claim_achievement(self, session, retmsg, name):
         if name in session.player.achievements:
@@ -16177,7 +16177,7 @@ class GAMEAPI(resource.Resource):
         props = {'time': server_time}
         session.player.achievements[name] = props
         retmsg.append(["ACHIEVEMENT_CLAIMED", name, props])
-        metric_event_coded(session.user.user_id, '4055_achievement_claimed', {'name': name})
+        metric_event_coded(session.user.user_id, '4055_achievement_claimed', {'name': name, 'sum': session.player.get_denormalized_summary_props('brief')})
         if data.get('chat_announce', True) and \
            session.alliance_chat_channel and \
            session.player.get_any_abtest_value('chat_alliance_achievements', gamedata['chat_alliance_achievements']):
@@ -24583,6 +24583,8 @@ class GameSite(server.Site):
                                              SpinLog.DamageProtectionLogFilter(SpinNoSQLLog.NoSQLJSONLog(self.nosql_client, 'log_damage_protection')), # damage protection events to MongoDB log_damage_protection
                                              SpinLog.UnitDonationLogFilter(SpinNoSQLLog.NoSQLJSONLog(self.nosql_client, 'log_unit_donation')), # unit donation events to MongoDB log_unit_donation
                                              SpinLog.FishingLogFilter(SpinNoSQLLog.NoSQLJSONLog(self.nosql_client, 'log_fishing')), # fishing events to MongoDB log_fishing
+                                             SpinLog.QuestsLogFilter(SpinNoSQLLog.NoSQLJSONLog(self.nosql_client, 'log_quests')), # quests events to MongoDB log_quests
+                                             SpinLog.AchievementsLogFilter(SpinNoSQLLog.NoSQLJSONLog(self.nosql_client, 'log_achievements')), # achievements events to MongoDB log_achievements
                                              SpinLog.LoginSourcesFilter(SpinNoSQLLog.NoSQLJSONLog(self.nosql_client, 'log_login_sources')), # login source events to MongoDB log_login_sources
                                              SpinLog.LoginFlowFilter(SpinNoSQLLog.NoSQLJSONLog(self.nosql_client, 'log_login_flow')), # login flow events to MongoDB log_login_flow
                                              SpinLog.FBPermissionsLogFilter(SpinNoSQLLog.NoSQLJSONLog(self.nosql_client, 'log_fb_permissions')), # FB Permissions events to MongoDB log_fb_notifications

@@ -274,6 +274,15 @@ def DamageProtectionLogFilter(child):
                                   '3884_protection_removed',
                                   '3885_i_got_attacked'
                                   ])
+def QuestsLogFilter(child):
+    return JSONLogFilter(child,
+                         allow = ['4010_quest_complete',
+                                  '4011_quest_complete_again'
+                                  ])
+def AchievementsLogFilter(child):
+    return JSONLogFilter(child,
+                         allow = ['4055_achievement_claimed',
+                                  ])
 def UnitDonationLogFilter(child):
     return JSONLogFilter(child,
                          allow = ['4150_units_donated'

@@ -18,6 +18,8 @@ GAME_DIR=/home/ec2-user/thunderrun
 (cd $GAME_DIR/gameserver && nice ./inventory_to_sql.py -q --prune) > /dev/null
 (cd $GAME_DIR/gameserver && nice ./unit_donation_to_sql.py -q --prune) > /dev/null
 (cd $GAME_DIR/gameserver && nice ./fishing_to_sql.py -q --prune) > /dev/null
+(cd $GAME_DIR/gameserver && nice ./quests_to_sql.py -q --prune) > /dev/null
+(cd $GAME_DIR/gameserver && nice ./achievements_to_sql.py -q --prune) > /dev/null
 (cd $GAME_DIR/gameserver && nice ./fb_notifications_to_sql.py -q --prune) > /dev/null
 (cd $GAME_DIR/gameserver && nice ./fb_requests_to_sql.py -q --prune) > /dev/null
 (cd $GAME_DIR/gameserver && nice ./fb_permissions_to_sql.py -q --prune) > /dev/null

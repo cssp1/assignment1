@@ -82,6 +82,10 @@ TABLES = {
     # fishing log
     'fishing': { 's3_name': 'fishing', 'table_name': 'log_fishing', 'compression': 'zip', 'retain_for': 30*86400 },
 
+    # quests and achievements logs
+    'quests': { 's3_name': 'quests', 'table_name': 'log_quests', 'compression': 'zip', 'retain_for': 30*86400 },
+    'achievements': { 's3_name': 'achievements', 'table_name': 'log_achievements', 'compression': 'zip', 'retain_for': 30*86400 },
+
     # login flow log
     'login_flow': { 's3_name': 'login_flow', 'table_name': 'log_login_flow', 'compression': 'zip', 'retain_for': 2*86400 },
 
