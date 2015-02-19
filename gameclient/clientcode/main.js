@@ -8107,12 +8107,9 @@ function gameapi_url() {
     } else if(spin_game_use_websocket && parseInt(spin_game_server_ws_port,10) > 0) {
         return 'ws://'+spin_game_server_host+':'+spin_game_server_ws_port+'/WS_GAMEAPI';
     } else if(spin_game_direct_connect) {
-        // IE's default security settings do not allow AJAX connections via http from an https frame
-        // Firefox v25+ also has this problem - force use of HTTPS for GAMEAPI :(
-        if((spin_demographics['browser_name'] === 'Explorer' ||
-            spin_demographics['browser_name'] === 'Safari' ||
-            (spin_demographics['browser_name'] === 'Firefox' && spin_demographics['browser_version']>= 25)) &&
-           spin_server_protocol === 'https://') {
+        // most modern browsers now disallow pages hosted via HTTPS from making non-HTTPS AJAX requests :(
+        // so prefer HTTPS if available
+        if(spin_server_protocol === 'https://') {
             return 'https://'+spin_game_server_host+":"+spin_game_server_ssl_port+"/GAMEAPI";
         } else {
             return 'http://'+spin_game_server_host+":"+spin_game_server_http_port+"/GAMEAPI";
