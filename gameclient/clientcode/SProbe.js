@@ -186,12 +186,9 @@ SProbe.ProbeRun = function(cb, proxy_host, proxy_http_port, proxy_ssl_port,
     this.tests = {};
 
     var direct_http_must_be_ssl = false;
-    // IE's default security settings do not allow AJAX connections via http from an https frame
-    // Firefox v25+ also has this problem - force use of HTTPS for GAMEAPI :(
-    if((spin_demographics['browser_name'] === 'Explorer' ||
-        spin_demographics['browser_name'] === 'Safari' ||
-        (spin_demographics['browser_name'] === 'Firefox' && spin_demographics['browser_version']>= 25)) &&
-       spin_server_protocol === 'https://') {
+    // most modern browsers now disallow pages hosted via HTTPS from making non-HTTPS AJAX requests :(
+    // so use ONLY HTTPS, if available
+    if(spin_server_protocol === 'https://') {
         direct_http_must_be_ssl = true;
     }
 
