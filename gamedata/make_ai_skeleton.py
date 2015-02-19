@@ -411,8 +411,8 @@ def _generate_showcase_consequent(game_id, event_dirname, data, atom):
                           "showcase_hack": showcase }
         atom.fd.write('"ai_%s%s_showcase": ' % (data['event_name'], data['key_suffix'][diff]))
         if WRAP_IN_ABTEST:
-            schowcase_cons = { "consequent": "IF", "if": {"predicate": "ANY_ABTEST", "key": "enable_showcase", "value": 1},
-                               "then": showcase_cons }
+            showcase_cons = { "consequent": "IF", "if": {"predicate": "ANY_ABTEST", "key": "enable_showcase", "value": 1},
+                              "then": showcase_cons }
         dump_json_toplevel(showcase_cons, fd = atom.fd)
         atom.fd.write(',\n\n')
 

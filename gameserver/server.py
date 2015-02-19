@@ -6497,7 +6497,7 @@ def get_spawn_location_for_unit(specname, base):
 
 def spawn_units(owner, base, units, temporary = False,
                 limit_break = False, # if true, give full quantity of units even if it breaks space limit
-                limit_reduce_qty = False, # if true, reduce quantitiy of units to fit in unit space
+                limit_reduce_qty = False, # if true, reduce quantity of units to fit in unit space
                 xyloc = None, xyscatter = None, observer = None):
     if not observer: observer = owner
     if temporary: assert xyloc
@@ -18733,7 +18733,6 @@ class GAMEAPI(resource.Resource):
 
         # dump mobile units from player's base into the session
         units = []
-        need_donated_units_update = False
 
         # unit_id_list takes the form
         # [{'obj_id':'2345sdfg234','source':'home_or_squad'}, # regular home or squad unit

@@ -13,7 +13,7 @@ try: import simplejson as json
 except: import json
 
 import AtomicFileWrite
-import sys, re, traceback, os, time, getopt
+import sys, re, os, time, getopt
 
 # regular expression that matches C++-style comments
 # this is kind of an ugly regex, basically it's hard to detect and ignore // that appear within quoted strings

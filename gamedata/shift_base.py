@@ -7,7 +7,7 @@
 import SpinJSON
 import SpinConfig
 import AtomicFileWrite
-import sys, copy, getopt, os, random
+import sys, getopt
 
 if __name__ == '__main__':
     dx = 0

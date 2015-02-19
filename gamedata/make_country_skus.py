@@ -10,7 +10,7 @@
 import SpinJSON
 import SpinConfig
 
-import sys, re, traceback, os, string, getopt
+import sys, re, getopt
 
 import locale # for pretty number printing only
 locale.setlocale(locale.LC_ALL, '')

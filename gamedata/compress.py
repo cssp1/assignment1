@@ -9,11 +9,13 @@
 
 # note: requires Python 2.7 :(
 
-try:
-    import simplejson as json
-except:
-    import json
-import sys, collections
+import sys
+
+#try:
+#    import simplejson as json
+#except:
+#    import json
+#import collections
 
 #try:
 # json.dump(json.load(sys.stdin, object_pairs_hook=collections.OrderedDict), sys.stdout, separators=(',',':'))

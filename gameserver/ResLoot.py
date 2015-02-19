@@ -454,7 +454,7 @@ class SpecificPvPResLoot(PvPResLoot):
                     # scale down all loot amounts to meet cap
                     for amt_loot, amt_lost in amounts.itervalues():
                         old_loot = amt_loot.total().get(res,0)
-                        old_lost = amt_lost.total().get(res,0)
+                        # old_lost = amt_lost.total().get(res,0)
                         amt_loot.scale_by({res: factor})
                         amt_lost.scale_by({res: factor})
 

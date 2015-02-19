@@ -12,7 +12,7 @@ import SpinConfig
 import SpinJSON
 import AtomicFileWrite
 import GameDataUtil
-import sys, re, traceback, os, getopt
+import sys, os, getopt
 
 # if all entries in arr are false, then return None, else return arr
 def prune_array(arr):

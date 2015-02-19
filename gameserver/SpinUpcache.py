@@ -10,7 +10,7 @@
 # this is just for analytics
 
 import csv
-import sys, time, string, traceback, getopt
+import sys, string, traceback, getopt
 import bisect
 import SpinConfig
 import SpinJSON

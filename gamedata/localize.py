@@ -34,7 +34,7 @@ import SpinConfig
 import SpinJSON
 import AtomicFileWrite
 import polib
-import sys, os, getopt
+import sys, getopt
 
 def accum_entry(entries, msgid, where, verbose):
     if not msgid: return

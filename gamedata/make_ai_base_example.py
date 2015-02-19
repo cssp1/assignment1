@@ -11,8 +11,7 @@
 
 import SpinJSON # JSON reading/writing library
 import SpinConfig
-import AtomicFileWrite # little library for safely overwriting files atomically
-import sys, copy, getopt, os, random # import some misc. Python libraries
+import sys, getopt # import some misc. Python libraries
 
 # load in gamedata
 gamedata = SpinJSON.load(open(SpinConfig.gamedata_filename()))

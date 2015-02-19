@@ -113,7 +113,7 @@ def building_predicate_to_bom(name, want_qty, want_level, state):
 
         bom = bom_add(bom, incr_bom)
 
-    raise Exception('impossible predicate %s' % obj)
+    raise Exception('impossible predicate %s %d %d' % (name, want_qty, want_level))
 
 def predicate_to_bom(obj, state):
     if obj['predicate'] == 'ALWAYS_TRUE':

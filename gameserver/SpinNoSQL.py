@@ -6,7 +6,7 @@
 
 # MongoDB adaptor API
 
-import time, sys, re, itertools, random
+import time, sys, re, random
 import datetime
 import pymongo, bson
 import SpinConfig

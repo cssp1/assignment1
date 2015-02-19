@@ -1444,7 +1444,7 @@ def check_predicate(pred, reason = '', context = None, context_data = None,
             error |= 1; print '%s: %s predicate with invalid spec %s' % (reason, pred['predicate'], pred['spec'])
     elif pred['predicate'] == 'FACEBOOK_APP_NAMESPACE':
         if 'namespace' not in pred:
-            errro |= 1; print '%s: %s predicate missing a "namespace"' % (reason, pred['predicate'])
+            error |= 1; print '%s: %s predicate missing a "namespace"' % (reason, pred['predicate'])
     return error
 
 # check old-style "logic" blocks which are if/then/else compositions of predicates and consequents (used for quest tips)
@@ -1997,7 +1997,7 @@ def check_ai_base_contents(strid, base, owner, base_type):
                     spec = gamedata['buildings'][item['spec']]
                     max_level = len(spec['build_time'])
                     is_storage = False
-                    is_producer = False
+                    # is_producer = False
                     has_exotic_resource = None
                     for res in gamedata['resources']:
                         has_this_res = False
@@ -2006,7 +2006,7 @@ def check_ai_base_contents(strid, base, owner, base_type):
                             is_storage = True
                         if 'produces_'+res in spec:
                             has_this_res = True
-                            is_producer = True
+                            # is_producer = True
                         if has_this_res and (res not in ('iron','water')):
                             has_exotic_resource = (item['spec'], res)
 

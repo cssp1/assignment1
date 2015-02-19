@@ -8,7 +8,6 @@
 
 try: import simplejson as json
 except: import json
-import sys, re, traceback, os
 
 if __name__ == '__main__':
     print "// AUTO-GENERATED base file"

@@ -91,7 +91,6 @@ class JSONIndent(Processor):
 
         temp = self.comment_remover.sub('', line).strip()
         ends_with_opener = (temp and temp[-1] in ('[','{')) # XXX bad way to do this
-        first_opener = min(line.find('['), line.find('{')) # XXX bad way to do this
         last_opener = max(line.rfind('['), line.rfind('{')) # XXX bad way to do this
 
         last_quote_start = -1
@@ -143,7 +142,6 @@ class JSONIndent(Processor):
             if self.state == self.State.NORMAL:
                 jump = 0
                 if c in ('[','{'):
-                    seen_opener = True
 
                     # check if this is the last non-comment thing OR there's a net depth increase
                     is_final = True
