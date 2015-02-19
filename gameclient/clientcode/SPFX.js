@@ -165,7 +165,9 @@ SPFX.shake_camera = function(start_time, amp, falloff) {
 
 /** @constructor */
 SPFX.FXObject = function() {};
-/** Repositions this object in the game world. Useful when attaching effects to a moving object. */
+/** Repositions this object in the game world. Useful when attaching effects to a moving object.
+    @param {Array.<number>} xyz
+    @param {number=} rotation */
 SPFX.FXObject.prototype.reposition = function(xyz, rotation) {};
 /** Called by SPFX.remove to perform any work needed to cleanly remove this object. */
 SPFX.FXObject.prototype.dispose = function() {};
@@ -203,6 +205,7 @@ SPFX.MagnetField.prototype.eval_field = function(pos, vel) {
     }
     return v3_mul(v3_scale(-str, this.strength_3d), ray);
 };
+/** @override */
 SPFX.MagnetField.prototype.reposition = function(xyz, rotation) {
     this.pos = xyz;
 };
@@ -260,6 +263,7 @@ SPFX.CombineEffect.prototype.draw = function() {
     // SPFX maintains handles to each child effect so we don't need to draw them here
 };
 
+/** @override */
 SPFX.CombineEffect.prototype.reposition = function(xyz, rotation) {
     var len = this.effects.length;
     for(var i = 0; i < len; i++) {
@@ -385,6 +389,7 @@ SPFX.Particles = function(spawn_pos, start_time, end_time, data, instance_data) 
 };
 goog.inherits(SPFX.Particles, SPFX.Effect);
 
+/** @override */
 SPFX.Particles.prototype.reposition = function(xyz, rotation) {
     if(this.data && 'offset' in this.data) {
         this.spawn_pos = v3_add(xyz, this.data['offset']);
@@ -1014,6 +1019,7 @@ SPFX.Explosion = function(where, height, assetname, start_time, enable_audio, da
 };
 goog.inherits(SPFX.Explosion, SPFX.Effect);
 
+/** @override */
 SPFX.Explosion.prototype.reposition = function(xyz, rotation) {
     this.where = vec_add([xyz[0],xyz[2]], (this.data && 'offset' in this.data ? [this.data['offset'][0], this.data['offset'][2]] : [0,0]));
     this.height = xyz[1] + (this.data && 'offset' in this.data ? this.data['offset'][1] : 0.5);
