@@ -33,6 +33,22 @@ fishing_slates_schema = {
                ('recipe_id', 'VARCHAR(64) NOT NULL')],
     'indices': {'by_slate': {'keys': [('slate_id','ASC')]}}
     }
+quest_stats_schema = {
+    'fields': [('name', 'VARCHAR(64) NOT NULL'),
+               ('ui_priority', 'INT4'),
+               ('reward_xp', 'INT4'),
+               ('reward_gamebucks', 'INT4'),
+               ('reward_iron', 'INT4'),
+               ('reward_water', 'INT4'),
+               ('reward_res3', 'INT4'),
+               ('goal_history_key', 'VARCHAR(64)'),
+               ('goal_history_value', 'INT4'),
+               ('goal_building_spec', 'VARCHAR(64)'),
+               ('goal_building_qty', 'INT1'),
+               ('goal_building_level', 'INT1'),
+               ],
+    'indices': {'by_name': {'keys': [('name','ASC')]}}
+    }
 
 # commit block of inserts to a table
 def flush_keyvals(sql_util, cur, tbl, keyvals):
@@ -79,13 +95,15 @@ if __name__ == '__main__':
     stats_table = cfg['table_prefix']+game_id+'_stats'
     recipes_table = cfg['table_prefix']+game_id+'_crafting_recipes'
     fishing_slates_table = cfg['table_prefix']+game_id+'_fishing_slates'
+    quest_stats_table = cfg['table_prefix']+game_id+'_quest_stats'
 
     cur = con.cursor(MySQLdb.cursors.DictCursor)
     if not dry_run:
         filterwarnings('ignore', category = MySQLdb.Warning)
         for tbl, schema in ((stats_table, stats_schema),
                             (recipes_table, crafting_recipes_schema),
-                            (fishing_slates_table, fishing_slates_schema)):
+                            (fishing_slates_table, fishing_slates_schema),
+                            (quest_stats_table, quest_stats_schema)):
             cur.execute("DROP TABLE IF EXISTS "+sql_util.sym(tbl+'_temp'))
             sql_util.ensure_table(cur, tbl, schema)
             sql_util.ensure_table(cur, tbl+'_temp', schema)
@@ -258,6 +276,28 @@ if __name__ == '__main__':
     con.commit()
     if verbose: print 'total', total, 'crafting recipe inputs/outputs inserted'
 
+    # QUEST STATS
+    if 1:
+        total = 0
+        for name, data in gamedata['quests'].iteritems():
+            keyvals = []
+            # straight fields
+            for FIELD in ('name', 'ui_priority', 'reward_xp', 'reward_gamebucks', 'reward_iron', 'reward_water', 'reward_res3'):
+                if FIELD in data:
+                    keyvals.append((FIELD, data[FIELD]))
+            # do some basic parsing of the goal predicate
+            if data['goal']['predicate'] == 'PLAYER_HISTORY':
+                keyvals.append(('goal_history_key', data['goal']['key']))
+                keyvals.append(('goal_history_value', data['goal']['value']))
+            elif data['goal']['predicate'] in ('BUILDING_LEVEL','BUILDING_QUANTITY'):
+                keyvals.append(('goal_building_spec', data['goal']['building_type']))
+                keyvals.append(('goal_building_qty', data['goal'].get('trigger_qty',1)))
+                keyvals.append(('goal_building_level', data['goal'].get('trigger_level',1)))
+            sql_util.do_insert(cur, quest_stats_table+'_temp', keyvals)
+            total += 1
+        con.commit()
+        if verbose: print 'total', total, 'quest stats inserted'
+
     # FISHING SLATES
     if fishing_slates:
         total = 0
@@ -274,7 +314,7 @@ if __name__ == '__main__':
 
     if not dry_run:
         filterwarnings('ignore', category = MySQLdb.Warning)
-        for tbl in (stats_table, recipes_table, fishing_slates_table):
+        for tbl in (stats_table, recipes_table, fishing_slates_table, quest_stats_table):
             cur.execute("RENAME TABLE "+\
                         sql_util.sym(tbl)+" TO "+sql_util.sym(tbl+'_old')+","+\
                         sql_util.sym(tbl+'_temp')+" TO "+sql_util.sym(tbl))
