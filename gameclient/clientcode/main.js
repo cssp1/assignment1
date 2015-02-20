@@ -28891,6 +28891,8 @@ function invoke_manufacture_dialog(reason, category, specname, want_builder) {
     var cat_i = 0;
     goog.object.forEach(gamedata['strings']['manufacture_categories'], function(data, cat) {
         if(!get_factory_for(cat)) { return; } // cannot be built
+        if('show_if' in data && !read_predicate(data['show_if']).is_satisfied(player, null)) { return false; }
+
         if(cat_i < dialog.data['widgets']['cat_button']['array'][0]) {
             dialog.widgets['cat_button'+cat_i.toString()].str = data['plural'];
             dialog.widgets['cat_button'+cat_i.toString()].onclick = (function (_cat) { return function(w) { manufacture_dialog_change_category(w.parent, _cat); }; })(cat);
