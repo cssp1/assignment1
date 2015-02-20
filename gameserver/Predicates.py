@@ -619,6 +619,22 @@ class HasAttackedPredicate(Predicate):
     def is_satisfied2(self, session, player, qdata):
         return session.has_attacked
 
+class BaseSizePredicate(Predicate):
+    def __init__(self, data):
+        Predicate.__init__(self, data)
+        self.method = data['method']
+        self.value = data['value']
+    def is_satisfied(self, player, qdata):
+        cur = player.my_home.base_size
+        if self.method == '>=':
+            return cur >= self.value
+        elif self.method == '<':
+            return cur < self.value
+        elif self.method == '==':
+            return cur == self.value
+        else:
+            raise Exception('unknown method '+self.method)
+
 class HomeRegionPredicate(Predicate):
     def __init__(self, data):
         Predicate.__init__(self, data)
@@ -855,6 +871,8 @@ def read_predicate(data):
         # (on the client, has_attacked true and has_deployed false only occurs during the network
         # round-trip between asking for and receiving confirmation of the attack)
         return HasAttackedPredicate(data)
+    elif kind == 'BASE_SIZE':
+        return BaseSizePredicate(data)
     elif kind == 'HOME_REGION':
         return HomeRegionPredicate(data)
     elif kind == 'REGION_PROPERTY':

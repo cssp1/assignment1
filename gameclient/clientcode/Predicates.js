@@ -1242,6 +1242,28 @@ DialogOpenPredicate.prototype.is_satisfied = function(player, qdata) {
 
 /** @constructor
   * @extends Predicate */
+function BaseSizePredicate(data) {
+    goog.base(this, data);
+    this.method = data['method'];
+    this.value = data['value'];
+}
+goog.inherits(BaseSizePredicate, Predicate);
+BaseSizePredicate.prototype.is_satisfied = function(player, qdata) {
+    // note: this evaluates viewing_base, not necessarily player's home base
+    var cur = session.viewing_base.base_size;
+    if(this.method == '>=') {
+        return cur >= this.value;
+    } else if(this.method == '<') {
+        return cur < this.value;
+    } else if(this.method == '==') {
+        return cur == this.value;
+    } else {
+        throw Error('unknown method '+this.method);
+    }
+};
+
+/** @constructor
+  * @extends Predicate */
 function HomeRegionPredicate(data) {
     goog.base(this, data);
     this.regions = data['regions'] || null;
@@ -1528,6 +1550,8 @@ function read_predicate(data) {
         return new LadderPlayerPredicate(data);
     } else if(kind === 'IS_IN_ALLIANCE') {
         return new IsInAlliancePredicate(data);
+    } else if(kind === 'BASE_SIZE') {
+        return new BaseSizePredicate(data);
     } else if(kind === 'HOME_REGION') {
         return new HomeRegionPredicate(data);
     } else if(kind === 'REGION_PROPERTY') {

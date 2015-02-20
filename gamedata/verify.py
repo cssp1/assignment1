@@ -1310,8 +1310,9 @@ PREDICATE_TYPES = set(['AND', 'OR', 'NOT', 'ALWAYS_TRUE', 'ALWAYS_FALSE', 'TUTOR
                    'PRE_DEPLOY_UNITS', 'DIALOG_OPEN', 'FOREMAN_IS_BUSY', 'INVENTORY', 'HAS_ITEM', 'HAS_ITEM_SET', 'HOME_REGION', 'REGION_PROPERTY', 'LADDER_PLAYER',
                    'MAIL_ATTACHMENTS_WAITING', 'AURA_ACTIVE', 'AI_INSTANCE_GENERATION', 'USER_ID', 'LOGGED_IN_RECENTLY', 'PVP_AGGRESSED_RECENTLY', 'IS_IN_ALLIANCE', 'FRAME_PLATFORM', 'NEW_BIRTHDAY',
                    'PURCHASED_RECENTLY', 'SESSION_LENGTH_TREND', 'ARMY_SIZE',
-                   'VIEWING_BASE_DAMAGE', 'VIEWING_BASE_OBJECT_DESTROYED'
+                   'VIEWING_BASE_DAMAGE', 'VIEWING_BASE_OBJECT_DESTROYED', 'BASE_SIZE'
                    ])
+
 # context: 'ai_base', 'ai_attack', etc - describes the general environment of the predicate
 # context_data: for AI bases, it's the base JSON itself (used to check for typos)
 # expect_library_preds: for LIBRARY predicates, expect that it will be a member of this list/set
