@@ -193,9 +193,14 @@ if __name__ == '__main__':
 
         keyvals += summary
 
-        if row['event_name'] == '1400_gamebucks_spent':
-            keyvals.append(('price',row['gamebucks_price']))
-            keyvals.append(('currency','gamebucks'))
+        if row['event_name'] in ('1400_gamebucks_spent', '1401_fungible_spent'):
+            if row['event_name'] == '1400_gamebucks_spent':
+                keyvals.append(('price',row['gamebucks_price']))
+                keyvals.append(('currency','gamebucks'))
+            elif row['event_name'] == '1401_fungible_spent':
+                keyvals.append(('price',row['price']))
+                keyvals.append(('currency',row['price_currency']))
+
             descr = row['Billing Description']
             keyvals.append(('description',descr))
             if descr.startswith("BUY_ITEM,"):

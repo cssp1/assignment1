@@ -13293,16 +13293,16 @@ class Store:
     def execute_item_order(cls, gameapi, request, session, retmsg, item_name, amount_willing_to_pay,
                            unit_id, spellname, spellarg,
                            server_time_according_to_client):
-        Store.execute_order(gameapi, request, session, retmsg, 'item:'+str(item_name), amount_willing_to_pay,
-                            unit_id, spellname, spellarg,
-                            server_time_according_to_client)
+        return Store.execute_order(gameapi, request, session, retmsg, 'item:'+str(item_name), amount_willing_to_pay,
+                                   unit_id, spellname, spellarg,
+                                   server_time_according_to_client)
     @classmethod
     def execute_fungible_order(cls, gameapi, request, session, retmsg, resname, amount_willing_to_pay,
                                unit_id, spellname, spellarg,
                                server_time_according_to_client):
-        Store.execute_order(gameapi, request, session, retmsg, resname, amount_willing_to_pay,
-                            unit_id, spellname, spellarg,
-                            server_time_according_to_client)
+        return Store.execute_order(gameapi, request, session, retmsg, resname, amount_willing_to_pay,
+                                   unit_id, spellname, spellarg,
+                                   server_time_according_to_client)
     @classmethod
     def execute_order(cls, gameapi, request, session, retmsg, currency, amount_willing_to_pay,
                       unit_id, spellname, spellarg,
@@ -13770,8 +13770,8 @@ class Store:
 
         elif spellname == "BUY_ITEM":
             assert gameapi.execute_spell(session, retmsg, spellname, spellarg, reason = 'purchased_item')
-            session.increment_player_metric('item:'+spellarg['skudata']['item']+':purchased', int(spellarg['skudata'].get('stack',1)))
-            session.increment_player_metric('items_purchased', 1)
+            session.increment_player_metric('item:'+spellarg['skudata']['item']+':purchased', int(spellarg['skudata'].get('stack',1)), time_series = False)
+            session.increment_player_metric('items_purchased', 1, time_series = False)
             session.increment_player_metric(record_spend_type+'_spent_on_items', record_amount)
 
         elif spellname == "BUY_LOTTERY_TICKET":
@@ -21842,14 +21842,26 @@ class GAMEAPI(resource.Resource):
                 if getattr(session.player.resources, resname) < client_price:
                     retmsg.append(["ERROR", "INSUFFICIENT_"+resname.upper(), client_price])
                 else:
-                    Store.execute_fungible_order(self, request, session, retmsg, resname, client_price,
-                                                 unit_id, spellname, spellarg,
-                                                 server_time_according_to_client)
+                    price_description, detail_props = Store.execute_fungible_order(self, request, session, retmsg, resname, client_price,
+                                                                                   unit_id, spellname, spellarg,
+                                                                                   server_time_according_to_client)
                     # at this point the order has changed player state, so go ahead and take the resources
+                    success = True
                     negative_cost = {resname: -client_price}
                     session.player.resources.gain_res(negative_cost, reason='fungible_order')
                     admin_stats.econ_flow_res(session.player, 'consumption', 'store_purchase', negative_cost) # may want more detail by specifying an econ_category on the item or store sku
-                    success = True
+
+                    if spellname != 'BUY_ITEM': # awkward overlap with 5120_buy_item logging
+                        descr = Store.get_description(session, unit_id, spellname, spellarg, price_description)
+                        props = {'user_id': session.user.user_id,
+                                 'summary': session.player.get_denormalized_summary_props('brief'),
+                                 'event_name': '1401_fungible_spent',
+                                 'code': 1401,
+                                 'price': client_price,
+                                 'price_currency': resname,
+                                 'Billing Description': descr}
+                        props.update(detail_props)
+                        gamesite.gamebucks_log.event(server_time, props)
 
             except Exception:
                 text = traceback.format_exc()

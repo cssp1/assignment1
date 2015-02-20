@@ -663,7 +663,7 @@ def classify_purchase(gamedata, descr):
     else:
         subcat = string.join(descr.split(',')[1:],',')
 
-    return catname, subcat, level
+    return catname, (subcat or None), level
 
 # given an upcache etnry, crawl through purchase history looking for
 # the Nth purchase.
