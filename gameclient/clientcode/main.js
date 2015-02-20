@@ -29598,16 +29598,24 @@ function update_manufacture_dialog(dialog) {
         for(var res in gamedata['resources']) {
             if('requirements_'+res+'_value' in dialog.widgets) {
                 var cost = get_leveled_quantity(spec['build_cost_'+res]||0, level);
-                dialog.widgets['requirements_'+res+'_value'].str = pretty_print_number(cost);
-                dialog.widgets['requirements_'+res+'_value'].tooltip.str = dialog.data['widgets']['requirements_'+res+'_value']['ui_tooltip'].replace('%RES', gamedata['resources'][res]['ui_name']).replace('%VERB', gamedata['spells']['MAKE_DROIDS']['ui_name'].toLowerCase());
-                dialog.widgets['requirements_'+res+'_value'].text_color = (player.resource_state[res][1] >= cost ? SPUI.good_text_color : SPUI.error_text_color);
-                // don't show button for topup, since the main "Use Resources" button will take care of it
-                if(!gamedata['resources'][res]['allow_topup'] && player.resource_state[res][1] < cost) {
-                    var helper = get_requirements_help(res, cost - player.resource_state[res][1]);
-                    dialog.widgets['resource_'+res+'_button'].show = !!helper;
-                    dialog.widgets['resource_'+res+'_button'].onclick = helper;
+                if(cost > 0) {
+                    dialog.widgets['requirements_'+res+'_value'].show =
+                        dialog.widgets['requirements_'+res+'_icon'].show = true;
+                    dialog.widgets['requirements_'+res+'_value'].str = pretty_print_number(cost);
+                    dialog.widgets['requirements_'+res+'_value'].tooltip.str = dialog.data['widgets']['requirements_'+res+'_value']['ui_tooltip'].replace('%RES', gamedata['resources'][res]['ui_name']).replace('%VERB', gamedata['spells']['MAKE_DROIDS']['ui_name'].toLowerCase());
+                    dialog.widgets['requirements_'+res+'_value'].text_color = (player.resource_state[res][1] >= cost ? SPUI.good_text_color : SPUI.error_text_color);
+                    // don't show button for topup, since the main "Use Resources" button will take care of it
+                    if(!gamedata['resources'][res]['allow_topup'] && player.resource_state[res][1] < cost) {
+                        var helper = get_requirements_help(res, cost - player.resource_state[res][1]);
+                        dialog.widgets['resource_'+res+'_button'].show = !!helper;
+                        dialog.widgets['resource_'+res+'_button'].onclick = helper;
+                    } else {
+                        dialog.widgets['resource_'+res+'_button'].show = false;
+                    }
                 } else {
-                    dialog.widgets['resource_'+res+'_button'].show = false;
+                    dialog.widgets['requirements_'+res+'_value'].show =
+                        dialog.widgets['requirements_'+res+'_icon'].show =
+                        dialog.widgets['resource_'+res+'_button'].show = false;
                 }
             }
         }
