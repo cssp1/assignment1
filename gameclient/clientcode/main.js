@@ -35801,7 +35801,7 @@ function invoke_new_store_category(catdata, parent_catdata, scroll_to_sku_name) 
 
         if('spell' in skudata) {
             var spell = gamedata['spells'][skudata['spell']];
-            d.widgets['name'].set_text_with_linebreaking(spell['ui_new_store_name'] || spell['ui_name']);
+            d.widgets['name'].set_text_with_linebreaking(skudata['ui_name'] || spell['ui_new_store_name'] || spell['ui_name']);
             d.widgets['icon'].asset = spell['new_store_icon'] || spell['icon'];
 
             if('new_store_tip_item' in spell) {
@@ -36008,6 +36008,7 @@ function update_new_store_sku(d) {
         var pred = (('requires' in spell) ? read_predicate(spell['requires']) : null);
         var tip_item = ('new_store_tip_item' in spell ? {'spec':spell['new_store_tip_item']} : null);
         var tip_item_spec = (tip_item ? ItemDisplay.get_inventory_item_spec(tip_item['spec']) : null);
+        if('currency' in spell) { sale_currency = spell['currency']; }
 
         if(tip_item_spec) {
             var subtitle = ItemDisplay.get_inventory_item_ui_subtitle(tip_item_spec);
@@ -36020,10 +36021,10 @@ function update_new_store_sku(d) {
             }
         }
 
-        price = Store.get_user_currency_price(0, spell, null);
+        price = Store.get_price(sale_currency, 0, spell, null);
         if(price < 0) {
             // try to display a price even though spell is unavailable
-            shown_price = Store.get_price(Store.get_user_currency(), 0, spell, null, true);
+            shown_price = Store.get_price(sale_currency, 0, spell, null, true);
         } else {
             shown_price = price;
         }
@@ -36073,7 +36074,7 @@ function update_new_store_sku(d) {
             var req_text = pred.ui_describe(player);
             if(req_text) {
                 info_col = 'error';
-                info_str = d.data['widgets']['info']['ui_name_unmet'].replace('%s', req_text);
+                info_str = req_text; // d.data['widgets']['info']['ui_name_unmet'].replace('%s', req_text);
                 helper = get_requirements_help(pred, null);
             }
             info_high = info_small = false;
@@ -36339,7 +36340,7 @@ function update_new_store_sku(d) {
             var order_spell = ('spell' in skudata ? skudata['spell'] : "BUY_ITEM");
             var order_spellarg = ('spell' in skudata ? null : {'catpath': d.user_data['catpath'], 'ui_index': d.user_data['ui_index'], 'skudata':skudata});
             // note: there is no 0-credit order path for FB Credits or tokens, so make a gamebucks order for free items
-            var order_currency = (price == 0 ? 'gamebucks' : ('price_currency' in skudata ? skudata['price_currency'] : Store.get_user_currency()));
+            var order_currency = (price == 0 ? 'gamebucks' : sale_currency);
 
             // function to place the order, with a parameter for a spellarg that might come from further pre-order GUI
             var order_cb = (function (_d, _order_currency, _order_spell, _order_spellarg, _cleanup_cb) { return function(override_spellarg) {

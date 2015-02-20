@@ -779,6 +779,9 @@ def check_spell(spellname, spec):
         if CONS in spec:
             error |= check_consequent(spec[CONS], reason = spellname+':'+CONS)
 
+    if 'price_currency' in spec:
+        error |= 1; print 'spell %s has "price_currency" but this should just be "currency"' % spellname
+
     return error
 
 def check_region(name, data):
