@@ -1709,7 +1709,16 @@ function apply_queued_damage_effects() {
 
 function create_debris(target, pos) {
     // add client-side debris effect
-    var inertspec = gamedata['inert'][target.spec['destroyed_inert'] || gamedata['default_debris_inert']];
+    var inert_specname;
+    if('destroyed_insert' in target.spec) {
+        inert_specname = target.spec['destroyed_inert']; // can be null
+    } else {
+        inert_specname = gamedata['default_debris_inert'];
+    }
+
+    if(!inert_specname) { return; }
+
+    var inertspec = gamedata['inert'][inert_specname];
 
     var debris = new SPFX.Debris(pos, inertspec['art_asset'], target.interpolate_facing())
     debris.show = (!('show_debris' in session.viewing_base.base_climate_data) || session.viewing_base.base_climate_data['show_debris']);
@@ -47247,7 +47256,15 @@ function draw_unit(unit) {
         }
         alpha *= unit.cur_opacity;
     } else {
-        sprite = gamedata['inert'][unit.spec['destroyed_inert'] || gamedata['default_debris_inert']]['art_asset'];
+        if('destroyed_inert' in unit.spec) {
+            if(unit.spec['destroyed_inert']) {
+                sprite = gamedata['inert'][unit.spec['destroyed_inert']]['art_asset'];
+            } else {
+                sprite = null;
+            }
+        } else {
+            sprite = gamedata['inert'][gamedata['default_debris_inert']]['art_asset'];
+        }
         alpha = 1;
     }
 
@@ -47265,9 +47282,11 @@ function draw_unit(unit) {
         unit.last_opacity_time = Math.max(client_time, unit.last_opacity_time);
     }
 
-    if(alpha != 1) { ctx.save(); ctx.globalAlpha = alpha; }
-    GameArt.assets[sprite].draw(xy, unit.interpolate_facing(), client_time, state);
-    if(alpha != 1) { ctx.restore(); }
+    if(sprite) {
+        if(alpha != 1) { ctx.save(); ctx.globalAlpha = alpha; }
+        GameArt.assets[sprite].draw(xy, unit.interpolate_facing(), client_time, state);
+        if(alpha != 1) { ctx.restore(); }
+    }
 
     if(0 /*PLAYFIELD_DEBUG*/) {
         // draw team tag

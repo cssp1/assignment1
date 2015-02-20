@@ -186,6 +186,10 @@ def check_mandatory_fields(specname, spec, kind):
     if 'shadow_asset' in spec:
         error |= require_art_asset(spec['shadow_asset'], specname+':shadow_asset')
 
+    if 'destroyed_inert' in spec and (spec['destroyed_inert'] is not None):
+        if spec['destroyed_inert'] not in gamedata['inert']:
+            error |= 1; print 'object %s has invalid destroyed_inert %s' % (specname, spec['destroyed_inert'])
+
     if kind == 'buildings':
         # check that the under_construction and destroyed version exist at this gridsize
         misc_assets = {'under_construction_asset': spec.get('under_construction_asset', 'building_construction_%dx%d' % tuple(spec['gridsize'])),
