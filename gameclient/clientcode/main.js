@@ -3022,12 +3022,23 @@ GameObject.prototype.ai_pick_target_classic = function(auto_spell, auto_spell_le
     // in the future, this table could be used to cut down on the object query (by skipping objects whose priority would be <= 0)
 
     var my_pos = this.interpolate_pos();
+
+    // do we want to bother querying for barriers?
+    var exclude_barriers;
+    if('barrier' in auto_spell['priority_vs'] && auto_spell['priority_vs']['barrier'] > 0) {
+        // if the weapon spell has a positive priority_vs for "barrier", assume we always care about them
+        exclude_barriers = false;
+    } else {
+        // player units ignore barriers when on auto control, or when target_barriers preference is off.
+        exclude_barriers = (this.team === 'player' && (get_preference_setting(player.preferences, 'auto_unit_control') || !get_preference_setting(player.preferences, 'target_barriers')));
+    }
+
     var obj_list = query_objects_within_distance(my_pos, shoot_range,
                                                  { ignore_object: this,
                                                    exclude_invul: true,
                                                    only_team: target_team,
                                                    exclude_full_health: !target_full_health_objects,
-                                                   exclude_barriers: (this.team === 'player' && (get_preference_setting(player.preferences, 'auto_unit_control') || !get_preference_setting(player.preferences, 'target_barriers'))),
+                                                   exclude_barriers: exclude_barriers,
                                                    mobile_only: target_mobile_only,
                                                    exclude_flying: !(auto_spell['targets_air'] || this.combat_stats.anti_air),
                                                    flying_only: !auto_spell['targets_ground'],
