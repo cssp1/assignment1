@@ -286,24 +286,27 @@ class PvPResLoot(BaseResLoot):
         base_loot_attacker_gains_table = session.viewing_player.get_any_abtest_value('loot_attacker_gains', gamedata['loot_attacker_gains'])
 
         if type(base_loot_attacker_gains_table) is dict:
-            base_loot_attacker_gains = Predicates.eval_cond_or_literal(base_loot_attacker_gains_table[kind], session, session.viewing_player)['ratio'] # note: evaluated on viewing_player, not player!
+            # note: predicates evaluated on viewing_player, not player!
+            base_loot_attacker_gains = dict((res, Predicates.eval_cond_or_literal(base_loot_attacker_gains_table[res][kind], session, session.viewing_player)['ratio']) for res in gamedata['resources'])
         else: # one value for all kinds
-            base_loot_attacker_gains = base_loot_attacker_gains_table
+            base_loot_attacker_gains = dict((res, base_loot_attacker_gains_table) for res in gamedata['resources'])
 
         base_loot_defender_loses_table = session.viewing_player.get_any_abtest_value('loot_defender_loses', gamedata['loot_defender_loses'])
+
         if type(base_loot_defender_loses_table) is dict:
-            base_loot_defender_loses = Predicates.eval_cond_or_literal(base_loot_defender_loses_table[kind], session, session.viewing_player)['ratio'] # note: evaluated on viewing_player, not player!
+            # note: predicates evaluated on viewing_player, not player!
+            base_loot_defender_loses = dict((res, Predicates.eval_cond_or_literal(base_loot_defender_loses_table[res][kind], session, session.viewing_player)['ratio']) for res in gamedata['resources'])
         else: # one value for all kinds
-            base_loot_defender_loses = base_loot_defender_loses_table
+            base_loot_defender_loses = dict((res, base_loot_defender_loses_table) for res in gamedata['resources'])
 
         loot_attacker_gains = dict((res,
-                                    base_loot_attacker_gains * \
+                                    base_loot_attacker_gains[res] * \
                                     session.player.stattab.get_player_stat('loot_factor_pvp') * \
                                     resdata.get('loot_attacker_gains',1),
                                     ) for res, resdata in gamedata['resources'].iteritems())
 
         loot_defender_loses = dict((res,
-                                    base_loot_defender_loses * \
+                                    base_loot_defender_loses[res] * \
                                     session.player.stattab.get_player_stat('loot_factor_pvp') * \
                                     resdata.get('loot_defender_loses',1),
                                     ) for res, resdata in gamedata['resources'].iteritems())
@@ -380,16 +383,16 @@ class SpecificPvPResLoot(PvPResLoot):
 
         if type(gamedata['loot_attacker_gains'] is dict):
             for kind in attacker_caps:
-                cap = Predicates.eval_cond_or_literal(gamedata['loot_attacker_gains'][kind], session, session.viewing_player).get('cap',-1) # note: evaluated on viewing_player, not player!
-                if cap >= 0:
-                    for res in attacker_caps[kind]:
+                for res in attacker_caps[kind]:
+                    cap = Predicates.eval_cond_or_literal(gamedata['loot_attacker_gains'][res][kind], session, session.viewing_player).get('cap',-1) # note: evaluated on viewing_player, not player!
+                    if cap >= 0:
                         attacker_caps[kind][res] = cap
 
         if type(gamedata['loot_defender_loses'] is dict):
             for kind in defender_caps:
-                cap = Predicates.eval_cond_or_literal(gamedata['loot_defender_loses'][kind], session, session.viewing_player).get('cap',-1) # note: evaluated on viewing_player, not player!
-                if cap >= 0:
-                    for res in defender_caps[kind]:
+                for res in defender_caps[kind]:
+                    cap = Predicates.eval_cond_or_literal(gamedata['loot_defender_loses'][res][kind], session, session.viewing_player).get('cap',-1) # note: evaluated on viewing_player, not player!
+                    if cap >= 0:
                         defender_caps[kind][res] = cap
 
         # count how many storage buildings the owning player has for each resource
