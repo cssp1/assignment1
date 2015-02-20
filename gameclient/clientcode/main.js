@@ -36040,7 +36040,22 @@ function update_new_store_sku(d) {
         }
 
         var formula = spell['price_formula'];
-        if(formula === 'resource_boost' || formula === 'resource_boost_gamebucks') {
+        // ability to purchase is a combination of new-style "requires" predicates
+        // plus some ugly legacy code that checks specific price formulas
+
+        if(pred && (price < 0) && !pred.is_satisfied(player, null)) {
+            // show reason for unfulfilled predicate
+            var req_text = pred.ui_describe(player);
+            if(req_text) {
+                info_col = 'error';
+                info_str = req_text; // d.data['widgets']['info']['ui_name_unmet'].replace('%s', req_text);
+                helper = get_requirements_help(pred, null);
+            }
+            info_high = info_small = false;
+            if(formula.indexOf('resource_boost') == 0) {
+                shown_price = -1; // do not show "FREE" for unpurchaseable resource boosts
+            }
+        } else if(formula === 'resource_boost' || formula === 'resource_boost_gamebucks') {
             var resource = spell['resource'];
             var amount;
             if(spell['boost_amount'] < 1) {
@@ -36077,15 +36092,6 @@ function update_new_store_sku(d) {
             info_col = (price >= 0 ? 'ok' : 'error');
             if(price < 0) {
                 info_str = d.data['widgets']['info']['ui_name_already_upgraded'];
-            }
-            info_high = info_small = false;
-        } else if(pred && (price < 0) && !pred.is_satisfied(player, null)) {
-            // show reason for unfulfilled predicate
-            var req_text = pred.ui_describe(player);
-            if(req_text) {
-                info_col = 'error';
-                info_str = req_text; // d.data['widgets']['info']['ui_name_unmet'].replace('%s', req_text);
-                helper = get_requirements_help(pred, null);
             }
             info_high = info_small = false;
         }
