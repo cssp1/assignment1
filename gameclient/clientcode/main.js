@@ -44069,7 +44069,7 @@ function create_mouse_tooltip() {
         }
 
         if(obj.is_building()) {
-            if(obj.is_storage() && obj.spec['name'] != gamedata['townhall'] &&
+            if(obj.is_storage() && !obj.is_under_construction() && obj.spec['name'] != gamedata['townhall'] &&
                (obj.team === 'player' || gamedata['enemy_storage_detail'])) {
                 var resname = null;
                 for(var res in gamedata['resources']) {
@@ -44088,7 +44088,7 @@ function create_mouse_tooltip() {
                         str.push(gamedata['strings']['cursors']['fullness'].replace('%pct',(100*fullness).toFixed(0)));
                     }
                 }
-            } else if(obj.is_producer()) {
+            } else if(obj.is_producer() && !obj.is_under_construction()) {
                 if(obj.is_upgrading()) {
                     str.push(gamedata['strings']['cursors']['upgrading']);
                 } else if(obj.team === 'player') {
@@ -46721,12 +46721,8 @@ function draw_building_or_inert(obj, powerfac) {
     var producer_halted = false;
     if(obj.is_building() && obj.is_producer()) {
         // draw harvester stats
-        var str = '';
         var contents = obj.interpolate_contents();
         var capacity = obj.get_production_capacity();
-        str += pretty_print_number(contents);
-        str += '/';
-        str += pretty_print_number(capacity);
 
         // halt animation if full or disabled by low power
         if(powerfac == 0) {
