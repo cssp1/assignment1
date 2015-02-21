@@ -8393,12 +8393,18 @@ class Player(AbstractPlayer):
             gamesite.db_client.player_cache_ensure_index('player_level') # make sure there's an index
             query.append(['player_level', level_range[0], level_range[1]])
 
-        query += [['base_damage', 0, gamedata['matchmaking']['ladder_win_damage']-0.001], # note: missing (-1) data is treated as unsuitable
-                  ['base_repair_time', -100, server_time],
-                  ['lootable_buildings', 1, 9999],
-                  ['tutorial_complete', 1,1],
-                  ['protection_end_time', -100, server_time]
-                  ]
+        if gamedata.get('pvp_repair_on_victory', False) and gamedata.get('pvp_repair_on_defeat', False):
+            # no need to query base damage, since there won't be any
+            pass
+        else:
+            query += [['base_damage', 0, gamedata['matchmaking']['ladder_win_damage']-0.001], # note: missing (-1) data is treated as unsuitable
+                      ['base_repair_time', -100, server_time],
+                      ['lootable_buildings', 1, 9999]]
+
+        if gamedata['starting_conditions'].get('tutorial_state', None) != 'COMPLETE':
+            query += [['tutorial_complete',1,1]]
+
+        query += [['protection_end_time', -100, server_time]]
 
         # if the trophy filter includes players with 0 trophies, then it's almost an accept-all filter, so put it at the end
         if (trophy_filter is not None) and trophy_filter_includes_zero:
@@ -8411,10 +8417,10 @@ class Player(AbstractPlayer):
                   ['isolate_pvp', -999, 0.1], # not isolated
                   ['user_id', self.user_id, self.user_id, '!in']] # don't fight yourself
 
-        for aid in exclude_alliance_ids:
+        for aid in set(exclude_alliance_ids):
             # don't fight your own alliancemates
             query.append(['alliance_id', aid, aid, '!in'])
-        for excl in exclude_user_ids:
+        for excl in set(exclude_user_ids):
             # don't fight previously-matched user(s)
             query.append(['user_id', excl, excl, '!in'])
 
