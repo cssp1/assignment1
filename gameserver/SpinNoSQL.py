@@ -980,7 +980,7 @@ class NoSQLClient (object):
                 assert item[1] == item[2]
                 qand.append({key: {'$ne': item[1]}})
             elif len(item) == 3 and type(item[1]) in (int, float):
-                if item[1] <= -1 and item[2] >= -1: # include missing elements
+                if item[1] <= -1 and item[2] >= -1: # treat missing elements as zero
                     qand.append({'$or': [{key:{'$exists':False}}, {key:{'$gte':item[1],'$lte':item[2]}}]})
                 elif item[1] == item[2]:
                     qand.append({key:item[1]})

@@ -8323,6 +8323,8 @@ class Player(AbstractPlayer):
     def query_suitable_ladder_match(self, exclude_user_ids = [], exclude_alliance_ids = [], trophy_range = None, townhall_range = None,
                                     min_trophies = None):
         # note: order of fields here is important for query speed
+        mtime_filter = None
+
         if trophy_range or (min_trophies is not None):
             # note: SpinNoSQL translates this into a fake join on player score data - it's not really in player cache
             if self.leaderboard_impl() == 'scores2':
@@ -8346,8 +8348,17 @@ class Player(AbstractPlayer):
         if townhall_range:
             gamesite.db_client.player_cache_ensure_index(gamedata['townhall']+'_level') # make sure there's an index
             mycount = self.get_townhall_level_fast()
-            townhall_filter = [gamedata['townhall']+'_level', mycount - townhall_range[0], mycount + townhall_range[1]]
-            townhall_filter_is_huge = (townhall_filter[1] <= 2 and townhall_filter[2] <= 2)
+            townhall_filter = [gamedata['townhall']+'_level', max(1, mycount - townhall_range[0]), max(1, mycount + townhall_range[1])]
+
+            # any query that touches townhall 2 or below is considered "huge" because it's almost accept-all
+            townhall_filter_is_huge = (townhall_filter[1] <= 2)
+
+            # also see if we want to add an mtime filter
+            if 'ladder_match_mtime_limit_by_townhall' in gamedata['matchmaking']:
+                mtime_limit_table = gamedata['matchmaking']['ladder_match_mtime_limit_by_townhall']
+                mtime_limit = mtime_limit_table[min(townhall_filter[1]-1, len(mtime_limit_table)-1)]
+                if mtime_limit > 0:
+                    mtime_filter = ['last_mtime', server_time - mtime_limit, server_time]
 
         query = []
 
@@ -8357,6 +8368,9 @@ class Player(AbstractPlayer):
 
         if townhall_range and (not townhall_filter_is_huge):
             query.append(townhall_filter)
+
+        if mtime_filter:
+            query.append(mtime_filter)
 
         if not gamedata.get('ladder_pvp', False):
             query.append(['ladder_player',1,1])
