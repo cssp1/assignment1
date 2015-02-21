@@ -791,12 +791,12 @@ class NoSQLClient (object):
         coll = self._table('player_cache')
         if not self.seen_player_cache:
             coll.ensure_index('ui_name_searchable') # help with search-by-name
-            coll.ensure_index('player_level') # this is to help with the ladder rival query
             coll.ensure_index('last_mtime') # to help with get_users_modified_since()
-            coll.ensure_index('account_creation_time')
+            coll.ensure_index('account_creation_time') # for Facebook notification queries
             self.seen_player_cache = True
         return coll
 
+    # manually create an index - used for ladder rival queries, since some games want player_level and others want gamedata['townhall']_level
     def player_cache_ensure_index(self, name):
         if name not in self.seen_player_cache_indexes:
             self.seen_player_cache_indexes.add(name)

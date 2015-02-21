@@ -8376,6 +8376,7 @@ class Player(AbstractPlayer):
             level_range[0] = max(level_range[0], self.level() - gamedata['matchmaking']['ladder_match_down_levels'])
 
         if level_range[0] > 0 or level_range[1] < 9999:
+            gamesite.db_client.player_cache_ensure_index('player_level') # make sure there's an index
             query.append(['player_level', level_range[0], level_range[1]])
 
         query += [['base_damage', 0, gamedata['matchmaking']['ladder_win_damage']-0.001], # note: missing (-1) data is treated as unsuitable
