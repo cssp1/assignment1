@@ -4239,13 +4239,14 @@ Building.prototype.manuf_progress_one = function() {
 };
 
 // estimate the current contents of a producer building based on last server-provided data
+// this is only used for GUI purposes. Note: returns continuous float, not quantized!
 Building.prototype.interpolate_contents = function() {
     if(this.produce_start_time < 0) {
         // building is idle
         return this.contents;
     }
 
-    var estimate = this.contents + Math.floor(this.produce_rate * (server_time - this.produce_start_time)/(60*60));
+    var estimate = this.contents + this.produce_rate * (server_time - this.produce_start_time)/(60*60);
     estimate = Math.max(0, Math.min(estimate, this.get_production_capacity()));
     return estimate;
 };
@@ -17791,7 +17792,12 @@ function invoke_building_context_menu(mouse_xy) {
                     // placeholder that tells you to go back home and collect all
                     buttons.push(new ContextMenuButton(gamedata['spells']['HARVEST']['ui_name'], null, 'disabled', gamedata['spells']['HARVEST']['ui_name_quarry']));
                 } else if(session.home_base) {
-                    buttons.push(new ContextMenuButton(gamedata['spells']['HARVEST']['ui_name'], function() { do_harvest(false); }));
+                    if(obj.interpolate_contents() >= 1) {
+                        buttons.push(new ContextMenuButton(gamedata['spells']['HARVEST']['ui_name'], function() { do_harvest(false); }));
+                    } else {
+                        buttons.push(new ContextMenuButton(gamedata['spells']['HARVEST']['ui_name'], null, 'disabled', gamedata['errors']['CANNOT_COLLECT_INSUFFICIENT_CONTENTS']['ui_name'].replace('%s', gamedata['resources'][obj.produces_res()]['ui_name'])));
+                    }
+
                     if(player.get_any_abtest_value('enable_harvest_all', gamedata['enable_harvest_all'])) {
                         buttons.push(new ContextMenuButton(gamedata['spells']['HARVEST_ALL2']['ui_name'], function() { do_harvest(true); }));
                     }
@@ -44093,8 +44099,13 @@ function create_mouse_tooltip() {
                     str.push(gamedata['strings']['cursors']['upgrading']);
                 } else if(obj.team === 'player') {
                     var contents = obj.interpolate_contents();
+                    var ui_contents = pretty_print_number(Math.floor(contents));
+                    if(obj.produce_rate > 0 && obj.produce_rate < 120) {
+                        // slow harvester - show fractional amounts
+                        ui_contents += '.'+pad_with_zeros(Math.floor(100*(contents-Math.floor(contents))).toString(), 2);
+                    }
                     var capacity = obj.get_production_capacity();
-                    str.push(pretty_print_number(contents)+'/'+pretty_print_number(capacity));
+                    str.push(ui_contents+'/'+pretty_print_number(capacity));
                 }
             }
         }

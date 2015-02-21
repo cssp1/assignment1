@@ -50,6 +50,7 @@
     "OPPONENT_LOCK_TAKEN": { "ui_title": "Base Attacked", "ui_name": "The base you were spying on has come under attack by another player." },
 
     "CANNOT_COLLECT_QUARRY_LOST": { "ui_title": "Quarry Lost", "ui_name": "Unable to collect from Quarry %d because you do not own it anymore." },
+    "CANNOT_COLLECT_INSUFFICIENT_CONTENTS": { "ui_title": "Not enough resources", "ui_name": "Please wait - building has not yet gathered one unit of %s" },
     "QUARRY_LOAD_ERROR": { "ui_title": "Quarry Load Error", "ui_name": "Quarry %d cannot be loaded." },
     "QUARRY_COLLECT_ON_COOLDOWN": { "ui_name": "Cannot collect because the previous collection attempt was too recent" },
     "CANNOT_TRAVEL_DURING_BATTLE": { "ui_name": "Cannot travel because you are currently in combat" },
