@@ -339,16 +339,26 @@ BuildingQuantityPredicate.prototype.do_ui_help = function(player) {
     }
 
     var count = 0;
+    var under_construction_obj = null;
     for(var id in session.cur_objects.objects) {
         var obj = session.cur_objects.objects[id];
-        if(obj.spec['name'] === this.building_type && (this.under_construction_ok || !obj.is_under_construction()) && obj.team === 'player') {
-            count += 1;
+        if(obj.spec['name'] === this.building_type && obj.team === 'player') {
+            if(this.under_construction_ok || !obj.is_under_construction()) {
+                count += 1;
+            } else if(obj.is_under_construction()) {
+                under_construction_obj = obj;
+            }
         }
     }
     if(count < this.trigger_qty) {
-        return {'noun': 'building', 'verb': (count < 1 ? 'build_first' : 'build_more'), 'target': this.building_type,
-                'ui_arg_s': (count < 1 ? gamedata['buildings'][this.building_type]['ui_name_indefinite'] || gamedata['buildings'][this.building_type]['ui_name'] : gamedata['buildings'][this.building_type]['ui_name']),
-                'ui_arg_d': this.trigger_qty};
+        if(under_construction_obj) {
+            return {'noun': 'building', 'verb': 'speedup', 'target': under_construction_obj,
+                    'ui_arg_s': gamedata['buildings'][this.building_type]['ui_name']};
+        } else {
+            return {'noun': 'building', 'verb': (count < 1 ? 'build_first' : 'build_more'), 'target': this.building_type,
+                    'ui_arg_s': (count < 1 ? gamedata['buildings'][this.building_type]['ui_name_indefinite'] || gamedata['buildings'][this.building_type]['ui_name'] : gamedata['buildings'][this.building_type]['ui_name']),
+                    'ui_arg_d': this.trigger_qty};
+        }
     }
     return null;
 };
@@ -401,32 +411,40 @@ BuildingLevelPredicate.prototype.do_ui_help = function(player) {
 
     var raw_count = 0;
     var level_count = 0;
-    var min_level = 999, need_to_upgrade_obj = null;
+    var min_level = 999, need_to_upgrade_obj = null, need_to_speedup_obj = null;
     for(var id in session.cur_objects.objects) {
         var obj = session.cur_objects.objects[id];
         if(obj.spec === this.building_spec &&
-           obj.team === 'player' &&
-           !obj.is_under_construction()) {
-            raw_count += 1;
-            if(obj.level >= this.trigger_level) {
-                level_count += 1;
-            } else if(this.upgrading_ok && obj.is_upgrading() && (obj.level + 1) >= this.trigger_level) {
-                level_count += 1;
+           obj.team === 'player') {
+            if(obj.is_under_construction()) {
+                need_to_speedup_obj = obj;
             } else {
-                if((obj.level < this.trigger_level) &&
-                   (!obj.is_upgrading() || gamedata['enable_multiple_foremen'])) { // note: it may be safe to omit this check even if multiple_foreman are off
-                    if(obj.level < min_level) {
-                        need_to_upgrade_obj = obj;
-                        min_level = obj.level;
+                raw_count += 1;
+                if(obj.level >= this.trigger_level) {
+                    level_count += 1;
+                } else if(this.upgrading_ok && obj.is_upgrading() && (obj.level + 1) >= this.trigger_level) {
+                    level_count += 1;
+                } else {
+                    if((obj.level < this.trigger_level) &&
+                       (!obj.is_upgrading() || gamedata['enable_multiple_foremen'])) { // note: it may be safe to omit this check even if multiple_foreman are off
+                            if(obj.level < min_level) {
+                                need_to_upgrade_obj = obj;
+                                min_level = obj.level;
+                            }
                     }
                 }
             }
         }
     }
     if(raw_count < this.trigger_qty) {
-        return {'noun': 'building', 'verb': (raw_count < 1 ? 'build_first' : 'build_more'), 'target': this.building_spec['name'],
-                'ui_arg_s': (raw_count < 1 ? (this.building_spec['ui_name_indefinite'] || this.building_spec['ui_name']) : this.building_spec['ui_name']),
-                             'ui_arg_d': this.trigger_qty};
+        if(need_to_speedup_obj) {
+            return {'noun': 'building', 'verb': 'speedup', 'target': need_to_speedup_obj,
+                    'ui_arg_s': this.building_spec['ui_name']};
+        } else {
+            return {'noun': 'building', 'verb': (raw_count < 1 ? 'build_first' : 'build_more'), 'target': this.building_spec['name'],
+                    'ui_arg_s': (raw_count < 1 ? (this.building_spec['ui_name_indefinite'] || this.building_spec['ui_name']) : this.building_spec['ui_name']),
+                    'ui_arg_d': this.trigger_qty};
+        }
     } else if(level_count < this.trigger_qty && need_to_upgrade_obj) {
         return {'noun': 'building', 'verb': 'upgrade', 'target': need_to_upgrade_obj,
                 'ui_arg_s': this.building_spec['ui_name'], 'ui_arg_d': this.trigger_level};
