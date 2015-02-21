@@ -3025,7 +3025,7 @@ GameObject.prototype.ai_pick_target_classic = function(auto_spell, auto_spell_le
 
     // do we want to bother querying for barriers?
     var exclude_barriers;
-    if('barrier' in auto_spell['priority_vs'] && auto_spell['priority_vs']['barrier'] > 0) {
+    if(auto_spell['priority_vs'] && ('barrier' in auto_spell['priority_vs']) && (auto_spell['priority_vs']['barrier'] > 0)) {
         // if the weapon spell has a positive priority_vs for "barrier", assume we always care about them
         exclude_barriers = false;
     } else {
