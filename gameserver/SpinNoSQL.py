@@ -208,10 +208,9 @@ class NoSQLClient (object):
     def slave_for_table(self, table_name):
         if table_name not in self.slaves:
             self.slaves[table_name] = self.slaves['DEFAULT']
-            for delegate_re, delegate_name in self.dbconfig.get('delegate_tables',{}).iteritems():
-                if re.compile(delegate_re).match(table_name):
-                    self.slaves[table_name] = NoSQLDatabase(SpinConfig.get_mongodb_config(delegate_name), self.ident+':'+delegate_name)
-                    break
+            delegate_name = SpinConfig.get_mongodb_delegate_for_table(self.dbconfig, table_name)
+            if delegate_name:
+                self.slaves[table_name] = NoSQLDatabase(SpinConfig.get_mongodb_config(delegate_name), self.ident+':'+delegate_name)
         return self.slaves[table_name]
 
     def _table(self, name): return self.slave_for_table(name).table(name)

@@ -279,6 +279,13 @@ def get_mongodb_config(dbname):
         raise Exception('config.json: no mongodb_servers entry nor implicit entry for db '+dbname)
     return parse_mongodb_config(dbname, config['mongodb_servers'].get(dbname, {}), parent = parents.get(dbname, None))
 
+# get name for child instance that handles a specific table
+def get_mongodb_delegate_for_table(dbconfig, table_name):
+    for delegate_re, delegate_name in dbconfig.get('delegate_tables',{}).iteritems():
+        if re.compile(delegate_re).match(table_name):
+            return delegate_name
+    return None
+
 def get_credentials(filename):
     filename = filename.replace('$HOME', os.getenv('HOME'))
     try:
