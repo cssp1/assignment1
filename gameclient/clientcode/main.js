@@ -44100,7 +44100,7 @@ function create_mouse_tooltip() {
                 } else if(obj.team === 'player') {
                     var contents = obj.interpolate_contents();
                     var ui_contents = pretty_print_number(Math.floor(contents));
-                    if(obj.produce_rate > 0 && obj.produce_rate < 120) {
+                    if(obj.produce_rate > 0 && obj.produce_rate < 1000 && contents < 10) {
                         // slow harvester - show fractional amounts
                         ui_contents += '.'+pad_with_zeros(Math.floor(100*(contents-Math.floor(contents))).toString(), 2);
                     }
