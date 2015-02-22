@@ -5198,6 +5198,7 @@ player.ui_name = '(Unknown)';
 player.facebook_name = '(Unknown)';
 player.facebook_currency = null;
 player.facebook_permissions = spin_facebook_login_permissions.split(',');
+player.facebook_third_party_id = null;
 player.friends = [];
 player.preferences = {};
 player.country = 'unknown';
@@ -41016,6 +41017,8 @@ function handle_server_message(data) {
         player.map_bookmarks = data[1];
     } else if(msg == "FACEBOOK_NAME_UPDATE") {
         player.facebook_name = data[1];
+    } else if(msg == "FACEBOOK_THIRD_PARTY_ID_UPDATE") {
+        player.facebook_third_party_id = data[1];
     } else if(msg == "PLAYER_UI_NAME_UPDATE") {
         player.ui_name = data[1];
         var dlg = desktop_dialogs['desktop_top'];

@@ -634,6 +634,7 @@ class UserTable:
               ('facebook_friends', None),
               ('facebook_likes', None),
               ('facebook_currency', None),
+              ('facebook_third_party_id', None),
               ('facebook_name', None),
               ('facebook_first_name', None),
               ('fb_gamer_status', int),
@@ -845,6 +846,7 @@ class User:
         self.facebook_friends = None
         self.facebook_likes = None
         self.facebook_currency = None
+        self.facebook_third_party_id = None
         self.fb_is_eligible_promo = None
         self.fb_gamer_status = -1
         self.fb_credit_balance = -1
@@ -1307,10 +1309,9 @@ class User:
             self.retrieve_facebook_info_start(retmsg)
         else:
             log.msg('Facebook API disabled, using fake test profile')
-            self.facebook_profile = SpinJSON.load(open("test-facebook-profile.txt"))
-            self.facebook_friends = SpinJSON.load(open("test-facebook-friends.txt"))['data']
-            self.facebook_likes   = SpinJSON.load(open("test-facebook-likes.txt"))['data']
-            self.facebook_currency   = SpinJSON.load(open("test-facebook-currency.txt"))['currency']
+            self.facebook_profile  = SpinJSON.load(open("test-facebook-profile.txt"))
+            self.facebook_friends  = SpinJSON.load(open("test-facebook-friends.txt"))['data']
+            self.facebook_likes    = SpinJSON.load(open("test-facebook-likes.txt"))['data']
             self.retrieve_facebook_info_complete(retmsg)
 
     def ping_fbpayments(self, session, retmsg, request_ids):
@@ -1920,22 +1921,13 @@ class User:
         # this is a bad hack just for Thunder Run while it's not whitelisted in the U.S. - we use the app token rather than the session token
         tok_qs = app_tok_qs if SpinConfig.config.get('use_facebook_app_access_token_for_user_data',False) else session_tok_qs
 
-        # XXX after upgrading to the versioned endpoints, check that all the fields we need are present
-        profile_url = SpinFacebook.versioned_graph_endpoint('user', endpoint)+'?'+tok_qs # app_tok_qs results in no birthday info
+        profile_url = SpinFacebook.versioned_graph_endpoint('user', endpoint)+'?fields=id,birthday,email,name,first_name,last_name,gender,locale,third_party_id,currency,is_eligible_promo,permissions&'+tok_qs # app_tok_qs results in no birthday info and no currency/promo data
         friends_url = SpinFacebook.versioned_graph_endpoint('friend', endpoint+'/friends')+'?limit=500&offset=0&'+tok_qs # app_tok_qs
         likes_url = SpinFacebook.versioned_graph_endpoint('like', endpoint+'/likes')+'?limit=500&offset=0&'+tok_qs # app_tok_qs
-        currency_url = SpinFacebook.versioned_graph_endpoint('user', endpoint)+'?fields=currency,is_eligible_promo,permissions&'+tok_qs # app_tok_qs results in no data
 
-        if 0:
-            self.facebook_profile = SpinJSON.load(urllib.urlopen(profile_url))
-            self.facebook_friends = SpinJSON.load(urllib.urlopen(friends_url))['data']
-            self.facebook_likes = SpinJSON.load(urllib.urlopen(likes_url))['data']
-            self.retrieve_facebook_info_complete(retmsg)
-        else:
-            gamesite.AsyncHTTP_Facebook.queue_request(server_time, profile_url, lambda raw: self.retrieve_facebook_info_receive('profile', raw))
-            gamesite.AsyncHTTP_Facebook.queue_request(server_time, currency_url, lambda raw: self.retrieve_facebook_info_receive('currency', raw))
-            gamesite.AsyncHTTP_Facebook.queue_request(server_time, friends_url, lambda raw: self.retrieve_facebook_info_receive_paged('friends', raw))
-            gamesite.AsyncHTTP_Facebook.queue_request(server_time, likes_url, lambda raw: self.retrieve_facebook_info_receive_paged('likes', raw))
+        gamesite.AsyncHTTP_Facebook.queue_request(server_time, profile_url, lambda raw: self.retrieve_facebook_info_receive('profile', raw))
+        gamesite.AsyncHTTP_Facebook.queue_request(server_time, friends_url, lambda raw: self.retrieve_facebook_info_receive_paged('friends', raw))
+        gamesite.AsyncHTTP_Facebook.queue_request(server_time, likes_url, lambda raw: self.retrieve_facebook_info_receive_paged('likes', raw))
 
     def retrieve_facebook_info_receive_paged(self, dest, raw_result, buffer = None):
         result = SpinJSON.loads(raw_result)
@@ -1974,23 +1966,10 @@ class User:
             self.facebook_likes = result
             if self.active_session:
                 self.active_session.player.user_facebook_likes = self.facebook_likes
-        elif dest == 'currency':
-            # default in case of failure
-            self.facebook_currency = {'user_currency': 'Facebook Credits', 'currency_exchange': 1, 'currency_exchange_inverse': 1, 'currency_offset': 1}
-            self.fb_is_eligible_promo = False
-            if self.active_session:
-                self.active_session.player.facebook_permissions = []
 
-            if type(result) is dict:
-                if 'currency' in result:
-                    self.facebook_currency = result['currency']
-                if 'is_eligible_promo' in result:
-                    self.fb_is_eligible_promo = bool(result['is_eligible_promo'])
-                if 'permissions' in result and self.active_session:
-                    self.active_session.player.facebook_permissions = result['permissions']['data'][0].keys()
-
-        if (self.facebook_profile != None) and (self.facebook_friends != None) and (self.facebook_likes != None) and (self.facebook_currency != None):
+        if (self.facebook_profile != None) and (self.facebook_friends != None) and (self.facebook_likes != None):
             self.retrieve_facebook_info_complete(None)
+
         end_time = time.time()
         admin_stats.record_latency('AsyncHTTP(facebook_profile/friends/likes)', end_time-start_time)
 
@@ -2007,7 +1986,13 @@ class User:
         #log.msg(('User %d\'s Facebook friends: ' % self.user_id)+repr(self.facebook_friends))
         #log.msg(('User %d\'s Facebook likes: ' % self.user_id)+repr(self.facebook_likes))
 
-        # update full and first name
+        # set safe defaults in case of failure
+        self.facebook_currency = {'user_currency': 'Facebook Credits', 'currency_exchange': 1, 'currency_exchange_inverse': 1, 'currency_offset': 1}
+        self.fb_is_eligible_promo = False
+        if self.active_session:
+            self.active_session.player.facebook_permissions = []
+
+        # pull vital fields out of the cached facebook_profile
         if self.facebook_profile:
             if 'name' in self.facebook_profile:
                 self.facebook_name = self.facebook_profile['name']
@@ -2015,6 +2000,15 @@ class User:
                 self.facebook_first_name = self.facebook_profile['first_name']
             else:
                 self.facebook_first_name = self.facebook_name.split(' ')[0]
+
+            if 'currency' in self.facebook_profile:
+                self.facebook_currency = self.facebook_profile['currency']
+            if 'third_party_id' in self.facebook_profile:
+                self.facebook_third_party_id = self.facebook_profile['third_party_id']
+            if 'is_eligible_promo' in self.facebook_profile:
+                self.fb_is_eligible_promo = bool(self.facebook_profile['is_eligible_promo'])
+            if 'permissions' in self.facebook_profile and self.active_session:
+                self.active_session.player.facebook_permissions = self.facebook_profile['permissions']['data'][0].keys()
         else:
             self.facebook_name = '(Facebook API error)'
             self.facebook_first_name = 'Unknown(fbapierr)'
@@ -2030,6 +2024,9 @@ class User:
             self.populate_friends_who_play(retmsg)
 
             retmsg.append(["FACEBOOK_CURRENCY_UPDATE", self.facebook_currency])
+
+            if self.facebook_third_party_id:
+                retmsg.append(["FACEBOOK_THIRD_PARTY_ID_UPDATE", self.facebook_third_party_id])
 
             if self.active_session:
                 player = self.active_session.player
@@ -20877,6 +20874,8 @@ class GAMEAPI(resource.Resource):
 
         if session.user.frame_platform == 'fb':
             retmsg.append(["FACEBOOK_CURRENCY_UPDATE", session.user.facebook_currency])
+            if session.user.facebook_third_party_id:
+                retmsg.append(["FACEBOOK_THIRD_PARTY_ID_UPDATE", session.user.facebook_third_party_id])
 
         # note: sends both SQUADS_UPDATE and PLAYER_ARMY_UPDATE
         session.player.ping_squads_and_send_update(session, retmsg, originator=session.player.user_id, reason='SERVER_HELLO')
