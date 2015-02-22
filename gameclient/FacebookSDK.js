@@ -25,4 +25,12 @@ window.fbAsyncInit = function() {
     js.src = "//connect.facebook.net/en_US/" + ((spin_facebook_api_versions && !spin_facebook_api_versions['jssdk']) ? "all.js" : "sdk.js");
     d.getElementsByTagName("head")[0].appendChild(js);
 }(document));
+
+// TrialPay SDK
+(function(d){
+    var js, id = "trialpay-jssdk"; if (d.getElementById(id)) {return;}
+    js = d.createElement("script"); js.id = id; js.async = true;
+    js.src = "//s-assets.tp-cdn.com/static3/js/api/payment_overlay.js";
+    d.getElementsByTagName("body")[0].appendChild(js);
+}(document));
 </script>

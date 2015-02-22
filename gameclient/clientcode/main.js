@@ -9527,7 +9527,7 @@ function init_desktop_dialogs() {
         dialog.widgets['battle_history_button'].onclick = function(w) { invoke_battle_history_dialog(session.user_id, -1, '', -1, w); };
         dialog.widgets['battle_history_jewel'].ondraw = update_notification_jewel;
 
-        dialog.widgets['trialpay_button'].onclick = Store.earn_fbcredits_with_offers;
+        dialog.widgets['trialpay_button'].onclick = function(w) { Store.trialpay_invoke(); };
         dialog.widgets['trialpay_button'].show = enable_control_buttons && ((player.tutorial_state === "COMPLETE") && player.get_abtest_value('T015_offer_wall_t4', 'enable', 0));
         dialog.widgets['alliances_button'].show = enable_control_buttons && ((player.tutorial_state === "COMPLETE") && player.get_any_abtest_value('enable_alliances', gamedata['client']['enable_alliances']));
         dialog.widgets['alliances_button'].onclick = invoke_alliance_dialog;
@@ -40459,61 +40459,48 @@ Store.redeem_fb_gift_card = function(success_cb, fail_cb) {
     metric_event('4320_redeem_fb_gift_card_prompt', {});
 };
 
-Store.earn_fbcredits_with_offers = function() {
+Store.trialpay_available = function() {
+    return (spin_frame_platform == 'fb') &&
+        spin_trialpay_vendor_id &&
+        player.facebook_third_party_id &&
+        SPay.trialpay_available();
+};
 
-    var order_complete = function(data) {
-
-        Store.order_cleanup_cb = false;
-
-        var props = {'Billing Description': 'earn_credits_with_offers'};
-
-        // Facebook does NOT apparently provide any info on whether it succeeded or failed...
-
-        console.log('earn_credits_with_offers result:');
-        console.log(data);
-        metric_event('4311_earn_credits_with_offers_result_unknown', props);
-
-        if(!('order_id' in data)) {
-            var msg = 'unknown error';
-            if('error_code' in data && 'error_message' in data) {
-                msg = 'error: '+data['error_code']+' '+data['error_message'];
-            } else if('status' in data) {
-                msg = 'status: '+data['status'];
-            }
-            props['method'] = msg;
-            //console.log('MORE CREDITS PROBLEM: '+msg);
-            //metric_event('4309_earn_credits_with_offers_failure', props);
-        } else {
-            var msg = '';
-            if('order_id' in data) {
-                msg = 'order_id: '+data['order_id'];
-                props['order_id'] = data['order_id'];
-            }
-            //console.log('MORE CREDITS SUCCESSFUL: '+data);
-            //metric_event('4310_earn_credits_with_offers_success', props);
-        }
-
-        // recheck credit balance
-        send_to_server.func(["PING_CREDITS"]);
-    };
-
+Store.trialpay_invoke = function() {
+    metric_event('4510_trialpay_invoked', {'purchase_ui_event': true});
     if(spin_facebook_enabled) {
-        try {
-            SPay.earn_credits_with_offers(order_complete);
-        } catch(e) {
-            log_exception(e, 'earn_credits_with_offers');
-            metric_event('4301_earn_credits_with_offers_api_error', {'method':'earn_credits_with_offers'});
-            return;
-        }
+        var proxyserver = spin_server_host+(parseInt(spin_server_http_port,10)!=80 ? ':'+spin_server_http_port : '');
+        SPay.trialpay_invoke(spin_app_id,
+                             spin_trialpay_vendor_id,
+                             // callback URL
+                             'http://'+proxyserver+'/TRIALPAYAPI',
+                             // currency URL
+                             'http://'+proxyserver+'/OGPAPI?type='+gamedata['game_id']+'_gamebucks', // note: MF would require a special hack
+                             player.facebook_third_party_id,
+                             Store.trialpay_callback);
 
         // set the cleanup-pending flag AFTER giving enough time for Facebook's dialog to block the UI
         window.setTimeout(function() { Store.order_cleanup_cb = function() {}; }, 2000);
-
     } else {
-        console.log('Store.earn_fbcredits_with_offers()');
+        console.log('Store.trialpay_invoke()');
     }
+};
 
-    metric_event('4300_earn_credits_with_offers_prompt', {});
+/** @param {string} result
+    @param {Object=} data */
+Store.trialpay_callback = function(result, data) {
+    Store.order_cleanup_cb = false;
+
+    if(result == 'open') {
+        metric_event('4511_trialpay_opened', {'purchase_ui_event': true});
+    } else if(result == 'close') {
+        metric_event('4512_trialpay_closed', {'purchase_ui_event': true});
+    } else if(result == 'complete') {
+        metric_event('4513_trialpay_completed', {'purchase_ui_event': true,
+                                                 'completions': data['completions'],
+                                                 'gamebucks': data['vc_amount']});
+        send_to_server.func(["PING_CREDITS"]); // may not be necessary, but just in case.
+    }
 };
 
 // install a new dialog as a child of the current dialog (or at toplevel, if no UI is up)

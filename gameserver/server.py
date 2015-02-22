@@ -13690,6 +13690,7 @@ class Store:
                 if session.player.last_payer_promo > session.user.last_login_time:
                     # if a payer promo was offered during this login, assume the gamebucks were awarded by claiming it
                     session.increment_player_metric('payer_promo_gamebucks_earned', bucks)
+                    props['method'] = 'payer_promo'
                     metric_event_coded(session.user.user_id, '4501_payer_promo_claimed', props.copy())
                 metric_event_coded(session.user.user_id, '4590_promo_gamebucks_earned', props.copy())
 

@@ -15,6 +15,7 @@ var spin_page_url;
 var spin_game_container_url;
 var spin_app_namespace;
 var spin_app_id;
+var spin_trialpay_vendor_id;
 var spin_http_origin;
 var spin_server_protocol;
 var spin_server_host;
@@ -89,6 +90,13 @@ var kongregate = {
     },
     "services": {
         "showInvitationBox": function() {}
+    }
+};
+
+// TrialPay API
+var TRIALPAY = {
+    "fb": {
+        "show_overlay": function() {}
     }
 };
 

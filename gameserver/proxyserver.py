@@ -1448,6 +1448,7 @@ class GameProxy(proxy.ReverseProxyResource):
             # might need to add a $GAME_REFERER$ here
             '$APP_NAMESPACE$': SpinConfig.config['facebook_app_namespace'],
             '$APP_ID$': SpinConfig.config.get('facebook_app_id',''),
+            '$TRIALPAY_VENDOR_ID$': SpinConfig.config.get('trialpay_vendor_id',''),
             '$HTTP_ORIGIN$': ("'"+http_origin+"'") if http_origin else 'null',
             '$SERVER_PROTOCOL$': visitor.server_protocol,
             '$SERVER_HOST$': visitor.server_host,

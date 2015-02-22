@@ -52,13 +52,59 @@ SPay.redeem_fb_gift_card = function(callback) {
     SPFB.ui({'method':'pay', 'action':'redeem'}, callback);
 };
 
-SPay.earn_credits_with_offers = function(callback) {
-    SPFB.ui({'method':'pay', 'action':'earn_credits'}, callback);
-};
-
 SPay.offer_payer_promo = function(currency_url, callback) {
     SPFB.ui({'method':'fbpromotion', 'display': 'popup',
              //'package_name': 'zero_promo',
              'quantity': 300,
              'product': currency_url}, callback);
 };
+
+// TrialPay API - see http://help.trialpay.com/facebook/offer-wall/
+
+SPay.trialpay_available = function() {
+    // client also needs to check frame_platform == 'fb' and facebook_third_party_id exists
+    if(typeof TRIALPAY === 'undefined') { return false; }
+    return true;
+};
+
+/** Annoying global callback needed for TrialPay API
+    @type {function(string,Object=)|null} */
+SPay.trialpay_user_cb = null;
+
+SPay.trialpay_on_open = function() { SPay.trialpay_user_cb('open'); };
+SPay.trialpay_on_close = function() { SPay.trialpay_user_cb('close'); };
+SPay.trialpay_on_transact = function(result) {
+    if(result['completions'] > 0 && result['vc_amount'] > 0) {
+        SPay.trialpay_user_cb('complete', result);
+    }
+};
+
+/** @param {string} app_id
+    @param {string} vendor_id
+    @param {string} callback_url
+    @param {string} currency_url
+    @param {string} third_party_id
+    @param {function(string,Object=)} user_cb */
+SPay.trialpay_invoke = function(app_id, vendor_id, callback_url, currency_url, third_party_id, user_cb) {
+    if(SPay.trialpay_user_cb && SPay.trialpay_user_cb !== user_cb) {
+        throw Error('user_cb already set to something else');
+    }
+    SPay.trialpay_user_cb = user_cb;
+
+    TRIALPAY.fb.show_overlay(app_id,
+                             'fbdirect',
+                             {'tp_vendor_id': vendor_id,
+                              'callback_url': callback_url,
+                              'currency_url': currency_url,
+                              'sid': third_party_id,
+                              // Terrible API - it requires the *name* of a callback function!
+                              'onOpen': 'SPay.trialpay_on_open',
+                              'onTransact': 'SPay.trialpay_on_transact',
+                              'onClose': 'SPay.trialpay_on_close'
+                             });
+};
+
+// make sure compiler does not mangle these
+goog.exportSymbol('SPay.trialpay_on_open', SPay.trialpay_on_open);
+goog.exportSymbol('SPay.trialpay_on_transact', SPay.trialpay_on_transact);
+goog.exportSymbol('SPay.trialpay_on_close', SPay.trialpay_on_close);
