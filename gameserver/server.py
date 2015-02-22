@@ -14141,6 +14141,9 @@ class TRIALPAYAPI(resource.Resource):
         if their_hash != our_hash:
             gamesite.exception_log.event(server_time, 'TRIALPAYAPI hash mismatch: theirs %s ours %s body %r' % (their_hash, our_hash, request_body))
 
+        # confirm Facebook App ID matches
+        assert str(request.args['app_id'][0]) == SpinConfig.config['facebook_app_id']
+
         gamebucks_amount = int(request.args['reward_amount'][0])
 
         # find session
