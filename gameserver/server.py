@@ -12601,6 +12601,9 @@ class Store:
             # charge at least as much as the gamebucks are worth in credits
             # OLD fbcredits method
             return max(1, int(math.ceil(spellarg / float(gamedata['store']['gamebucks_per_fbcredit'])))), p_currency
+        elif formula == 'fb_inapp_currency_gamebucks':
+            p_currency = 'gamebucks'
+            return spellarg, p_currency
         elif formula == 'fb_inapp_currency_fbpayments':
             # NEW fbpayments method
             p_currency = sale_currency
@@ -13044,6 +13047,14 @@ class Store:
     def kgcredits_to_dollars(cls, kg_credits_amount):
         return 0.07 * kg_credits_amount
 
+    # convert promotional gamebucks amount to US Dollar receipts
+    # note: only used for platform offers that pay out in gamebucks, NOT for in-game purchases
+    @classmethod
+    def promo_gamebucks_to_dollars(cls, gamebucks):
+        fb_credits_amount = gamebucks / float(gamedata['store']['gamebucks_per_fbcredit'])
+        return 0.07 * fb_credits_amount
+
+
     @classmethod
     def format_ui_string(cls, session, spellname, spellarg, spell, s):
         if spell.get('price_formula',None) == 'gamebucks_topup':
@@ -13153,16 +13164,18 @@ class Store:
 
     @classmethod
     def execute_credit_order(cls, order_id, gameapi, request, buyer, receiver, currency, credits_amount, my_data):
-        assert currency in ('fbcredits', 'kgcredits')
+        assert currency in ('fbcredits', 'kgcredits', 'gamebucks')
+        # note that gamebucks here is only used for platform offers that pay out in gamebucks, NOT in-game purchases
 
         session = None
+        tag = None
 
         # check for in-app currency order (see https://developers.facebook.com/docs/payments/app_currency_orders/)
-        # this path ALSO supports TrialPay
         if 'modified' in my_data:
             assert currency == 'fbcredits'
             m = my_data['modified']
-            gamesite.exception_log.event(server_time, ('in-app currency order (FB buyer %s): ' % buyer) + repr(my_data))
+            if 0:
+                gamesite.exception_log.event(server_time, ('in-app currency order (FB buyer %s): ' % buyer) + repr(my_data))
             assert m['credits_amount'] == credits_amount
             assert str(m['product']) == str(OGPAPI_instance.get_object_endpoint({'type':OGPAPI.object_type('gamebucks')}))
             assert m['product_amount'] <= gamedata['store']['gamebucks_per_fbcredit'] * m['credits_amount']
@@ -13174,26 +13187,38 @@ class Store:
                     break
             if session is None: raise Exception(('session not found for in-app currency order! (FB buyer %s)' % buyer)+repr(my_data))
             unit_id = 0
-            spellname = 'FB_TRIALPAY_GAMEBUCKS' if m.get('trialpay',False) else 'FB_PROMO_GAMEBUCKS'
+            spellname = 'FB_PROMO_GAMEBUCKS'
             spellarg = m['product_amount']
-            tag = ''
+            network_id = session.user.facebook_id
+            dollar_amount = Store.fbcredits_to_dollars(credits_amount)
+
+        # TrialPay order
+        elif my_data.get('spellname') == 'FB_TRIALPAY_GAMEBUCKS':
+            assert currency == 'gamebucks'
+            assert my_data['currency_url'] == str(OGPAPI_instance.get_object_endpoint({'type':OGPAPI.object_type('gamebucks')}))
+            session = session_table[my_data['session_id']]
+            unit_id = 0
+            spellname = 'FB_TRIALPAY_GAMEBUCKS'
+            spellarg = credits_amount
+            network_id = session.user.facebook_id
+            dollar_amount = Store.promo_gamebucks_to_dollars(credits_amount)
+
         else:
             session = session_table[my_data['session_id']]
             unit_id = my_data['unit_id']
             spellname = my_data['spellname']
             spellarg = my_data.get('spellarg', None)
             tag = my_data.get('tag', None)
+            network_id = {'fbcredits':session.user.facebook_id, 'kgcredits':session.user.kg_id}[currency]
+            dollar_amount = {'fbcredits':Store.fbcredits_to_dollars, 'kgcredits':Store.kgcredits_to_dollars}[currency](credits_amount)
 
         server_time_according_to_client = my_data.get('server_time_according_to_client', None)
 
         assert session
         assert (not session.logout_in_progress)
 
-        network_id = {'fbcredits':session.user.facebook_id, 'kgcredits':session.user.kg_id}[currency]
         if network_id != receiver:
             gamesite.exception_log.event(server_time, 'execute_order: strange, receiver is mismatched (%s %s)' % (network_id, receiver))
-
-        dollar_amount = {'fbcredits':Store.fbcredits_to_dollars, 'kgcredits':Store.kgcredits_to_dollars}[currency](credits_amount)
 
         price_description, detail_props = Store.execute_order(gameapi, request, session, session.deferred_messages,
                                                               currency, credits_amount,
@@ -14129,16 +14154,13 @@ class TRIALPAYAPI(resource.Resource):
             raise Exception('session not found for TRIALPAYAPI order (user_id %d)' % user_id)
 
         if gamebucks_amount > 0:
-            # sort of a hack - this uses the fbcredits promo path
-            credits_amount = float(gamebucks_amount) / gamedata['store']['gamebucks_per_fbcredit']
-
+            # we (ab)use the credit order path here to share all of its metrics output
             Store.execute_credit_order(request.args['oid'][0], self.gameapi, request, session.user.facebook_id, session.user.facebook_id,
-                                       'fbcredits', credits_amount,
-                                       # emulate an FB payer promo order
-                                       {'modified': {'trialpay': 1,
-                                                     'credits_amount': credits_amount,
-                                                     'product': str(request.args['currency_url'][0]),
-                                                     'product_amount': gamebucks_amount}})
+                                       'gamebucks', gamebucks_amount,
+                                       # awkward syntax here
+                                       {'spellname': 'FB_TRIALPAY_GAMEBUCKS',
+                                        'session_id': session.session_id,
+                                        'currency_url': str(request.args['currency_url'][0])})
 
             # do not return HTTP response until player state is fully flushed
             def complete_settlement(request, session):

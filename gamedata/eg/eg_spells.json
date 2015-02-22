@@ -144,7 +144,7 @@
 
     // special SKU to represent in-app currency purchases
     "FB_PROMO_GAMEBUCKS": {  "paid": 1, "currency": "fbcredits", "price_formula": "fb_inapp_currency_fbcredits" }, // old Credits API
-    "FB_TRIALPAY_GAMEBUCKS": {  "paid": 1, "currency": "fbcredits", "price_formula": "fb_inapp_currency_fbcredits" }, // TrialPay API
+    "FB_TRIALPAY_GAMEBUCKS": {  "paid": 1, "currency": "gamebucks", "price_formula": "fb_inapp_currency_gamebucks" }, // TrialPay API
     "FB_GAMEBUCKS_PAYMENT": {  "paid": 1, "currency": "fbpayments:*", "price_formula": "fb_inapp_currency_fbpayments" }, // new Payments API
 
     "BUY_GAMEBUCKS_TOPUP": { "ui_name": "%GAMEBUCKS_QUANTITY %GAMEBUCKS_NAME",
