@@ -6839,8 +6839,12 @@
                      "array_offset_4up": [155,0]
                    },
 
+            "trialpay_button": { "show": 0, "kind": "ActionButton", "xy": [19,380], "dimensions": [150,28], "bg_image": "action_button_resizable", "bg_image_resizable": 1,
+                                 "text_color": [0,0,0,1], "text_size": 13, "text_style": "bold",
+                                 "ui_name": "Earn FREE %s" },
+
             "redeem_gift_card_warning": { "show": 0, "kind": "TextField", "text_size": 13, "text_color": [0.75,0.75,0.75,1],
-                                          "xy":[44,380], "dimensions":[480,32], "text_hjustify": "left",
+                                          "xy":[44,380], "dimensions":[496,32], "text_hjustify": "right",
                                           "ui_name": "Bonus %s not available with use of Facebook Gift Cards" },
 
             "redeem_gift_card_icon": { "show": 0, "kind": "StaticImage", "xy":[558,380], "dimensions":[32,32], "asset": "facebook_icon"},

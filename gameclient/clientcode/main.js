@@ -35093,6 +35093,12 @@ function invoke_buy_gamebucks_dialog23(ver, reason, amount, order) {
         dialog.widgets['redeem_gift_card_button'].onclick = function(w) { Store.redeem_fb_gift_card( function() { change_selection(null); }, null); };
     }
 
+    if(Store.trialpay_available() && player.get_any_abtest_value('enable_trialpay', eval_cond_or_literal(gamedata['store']['enable_trialpay']||false, player, null))) {
+        dialog.widgets['trialpay_button'].show = true;
+        dialog.widgets['trialpay_button'].str = dialog.data['widgets']['trialpay_button']['ui_name'].replace('%s', gamedata['store']['gamebucks_ui_name']);
+        dialog.widgets['trialpay_button'].onclick = function(w) { Store.trialpay_invoke(); };
+    }
+
     var go_away = function(w) {
         metric_event('4410_buy_gamebucks_dialog_close', {'gui_version': w.parent.user_data['ver'], 'purchase_ui_event': true, 'client_time': Math.floor(client_time)});
         close_parent_dialog(w);
