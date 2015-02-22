@@ -177,7 +177,7 @@ if __name__ == '__main__':
 
                     if descr.startswith("BUY_GAMEBUCKS_"):
                         keyvals.append(('gamebucks', sign * int(descr.split('_')[2])))
-                    elif descr.startswith("FB_GAMEBUCKS_PAYMENT,"):
+                    elif descr.startswith("FB_GAMEBUCKS_PAYMENT,") or descr.startswith("FB_TRIALPAY_GAMEBUCKS,"):
                         keyvals.append(('gamebucks', sign * int(descr.split(',')[1])))
                     else:
                         pass # just go by the description for other spells
