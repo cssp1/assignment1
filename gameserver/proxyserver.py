@@ -1802,6 +1802,13 @@ class GameProxy(proxy.ReverseProxyResource):
             if not session: raise Exception('cannot find session for CREDITAPI call: '+repr(order_details))
             return self.render_via_proxy(session.gameserver_fwd, request)
 
+        elif self.path == '/TRIALPAYAPI':
+            order_info = request.args['order_info'][0]
+            user_id = int(order_info)
+            session = self.session_emulate(db_client.session_get_by_user_id(user_id, reason=self.path))
+            if not session: raise Exception('cannot find session for TRIALPAYAPI call: '+repr(request))
+            return self.render_via_proxy(session.gameserver_fwd, request)
+
         elif self.path == '/METRICSAPI':
             SpinHTTP.set_access_control_headers(request)
             request.setHeader('Content-Type', 'image/gif')
@@ -1936,7 +1943,7 @@ class GameProxy(proxy.ReverseProxyResource):
                 ret = self.render_ROOT(request, frame_platform = 'fb')
             elif self.path == '/KGROOT':
                 ret = self.render_ROOT(request, frame_platform = 'kg')
-            elif self.path in ('/GAMEAPI', '/CREDITAPI', '/KGAPI', '/CONTROLAPI', '/METRICSAPI', '/ADMIN/', '/PING', '/OGPAPI', '/FBRTAPI'):
+            elif self.path in ('/GAMEAPI', '/CREDITAPI', '/TRIALPAYAPI', '/KGAPI', '/CONTROLAPI', '/METRICSAPI', '/ADMIN/', '/PING', '/OGPAPI', '/FBRTAPI'):
                 ret = self.render_API(request)
             else:
                 ret = str('error')
@@ -2236,7 +2243,7 @@ class ProxyRoot(TwistedNoResource):
                 self.static_resources[srcfile] = UncachedJSFile('../gameclient/'+srcfile)
 
         self.proxied_resources = {}
-        for chnam in ('', 'KGROOT', 'GAMEAPI', 'METRICSAPI', 'CREDITAPI', 'KGAPI', 'CONTROLAPI', 'ADMIN', 'OGPAPI', 'FBRTAPI', 'PING'):
+        for chnam in ('', 'KGROOT', 'GAMEAPI', 'METRICSAPI', 'CREDITAPI', 'TRIALPAYAPI', 'KGAPI', 'CONTROLAPI', 'ADMIN', 'OGPAPI', 'FBRTAPI', 'PING'):
             res = GameProxy('/'+chnam)
 
             # configure auth on canvas page itself (OPTIONAL now, only for demoing game outside of company)

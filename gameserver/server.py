@@ -24,7 +24,7 @@ if sys.platform == 'linux2':
 
 from twisted.python import log
 from twisted.internet import reactor, task, defer, protocol
-from twisted.web import server, resource
+from twisted.web import server, resource, http
 import twisted.web.error
 
 # handle different Twisted versions that moved NoResource around
@@ -13158,6 +13158,7 @@ class Store:
         session = None
 
         # check for in-app currency order (see https://developers.facebook.com/docs/payments/app_currency_orders/)
+        # this path ALSO supports TrialPay
         if 'modified' in my_data:
             assert currency == 'fbcredits'
             m = my_data['modified']
@@ -13173,7 +13174,7 @@ class Store:
                     break
             if session is None: raise Exception(('session not found for in-app currency order! (FB buyer %s)' % buyer)+repr(my_data))
             unit_id = 0
-            spellname = 'FB_PROMO_GAMEBUCKS'
+            spellname = 'FB_TRIALPAY_GAMEBUCKS' if m.get('trialpay',False) else 'FB_PROMO_GAMEBUCKS'
             spellarg = m['product_amount']
             tag = ''
         else:
@@ -13655,9 +13656,9 @@ class Store:
             session.increment_player_metric('resource_boosts_purchased', 1)
             session.increment_player_metric(record_spend_type+'_spent_on_resource_boosts', record_amount)
 
-        elif spellname.startswith("BUY_GAMEBUCKS_") or spellname in ("FB_PROMO_GAMEBUCKS", "FB_GAMEBUCKS_PAYMENT"):
+        elif spellname.startswith("BUY_GAMEBUCKS_") or spellname in ("FB_PROMO_GAMEBUCKS", "FB_TRIALPAY_GAMEBUCKS", "FB_GAMEBUCKS_PAYMENT"):
             spell = gamedata['spells'][spellname]
-            if spellname in ("FB_PROMO_GAMEBUCKS", "FB_GAMEBUCKS_PAYMENT", "BUY_GAMEBUCKS_TOPUP"):
+            if spellname in ("FB_PROMO_GAMEBUCKS", "FB_TRIALPAY_GAMEBUCKS", "FB_GAMEBUCKS_PAYMENT", "BUY_GAMEBUCKS_TOPUP"):
                 bucks = int(spellarg)
             else:
                 bucks = spell['quantity']
@@ -13681,7 +13682,7 @@ class Store:
             session.increment_player_metric('gamebucks_purchased', bucks)
             session.increment_player_metric(record_spend_type+'_spent_on_gamebucks', record_amount)
 
-            if spellname in ("FB_PROMO_GAMEBUCKS", "FB_GAMEBUCKS_PAYMENT"):
+            if spellname in ("FB_PROMO_GAMEBUCKS", "FB_TRIALPAY_GAMEBUCKS", "FB_GAMEBUCKS_PAYMENT"):
                 session.increment_player_metric('promo_gamebucks_earned', bucks)
                 props = {'amount_added':bucks,
                          'sku': spellname,
@@ -13690,7 +13691,6 @@ class Store:
                 if session.player.last_payer_promo > session.user.last_login_time:
                     # if a payer promo was offered during this login, assume the gamebucks were awarded by claiming it
                     session.increment_player_metric('payer_promo_gamebucks_earned', bucks)
-                    props['method'] = 'payer_promo'
                     metric_event_coded(session.user.user_id, '4501_payer_promo_claimed', props.copy())
                 metric_event_coded(session.user.user_id, '4590_promo_gamebucks_earned', props.copy())
 
@@ -14083,6 +14083,75 @@ class KGAPI(resource.Resource):
             raise Exception('unhandled "event" ' + request_data['event'])
 
         return SpinJSON.dumps(retmsg)
+
+# TrialPay API endpoint - see http://help.trialpay.com/facebook/offer-wall/
+
+class TRIALPAYAPI(resource.Resource):
+    isLeaf = True
+    def __init__(self, gameapi):
+        resource.Resource.__init__(self)
+        self.gameapi = gameapi
+    def render_GET(self, request):
+        return self.render_POST(request)
+    def render_POST(self, request):
+        try:
+            start_time = time.time()
+            ret = self.handle_request(request)
+            end_time = time.time()
+            admin_stats.record_latency('TRIALPAYAPI', end_time-start_time)
+            return ret
+        except Exception:
+            text = traceback.format_exc()
+            gamesite.exception_log.event(server_time, 'TRIALPAYAPI Exception: '+text)
+        request.setResponseCode(http.BAD_REQUEST)
+        return 'spinpunch error'
+
+    def handle_request(self, request):
+        SpinHTTP.set_access_control_headers(request)
+
+        # verify hash
+        their_hash = SpinHTTP.get_twisted_header(request, 'TrialPay-HMAC-MD5')
+        our_hash = hmac.new(str(SpinConfig.config['trialpay_notification_key']), msg=str(request.body), digestmod=hashlib.md5).digest()
+        if their_hash != our_hash:
+            gamesite.exception_log.event(server_time, 'TRIALPAYAPI hash mismatch: theirs %s ours %s body %r' % (their_hash, our_hash, request.body))
+
+        gamebucks_amount = int(request.args['reward_amount'][0])
+
+        # find session
+        user_id = int(request.args['order_info'][0])
+        session = None
+        for s in session_table.itervalues():
+            if s.user.user_id == user_id:
+                session = s
+                break
+        if not session:
+            raise Exception('session not found for TRIALPAYAPI order (user_id %d)' % user_id)
+
+        if gamebucks_amount > 0:
+            # sort of a hack - this uses the fbcredits promo path
+            credits_amount = float(gamebucks_amount) / gamedata['store']['gamebucks_per_fbcredit']
+
+            Store.execute_credit_order(request.args['oid'][0], self.gameapi, request, session.user.facebook_id, session.user.facebook_id,
+                                       'fbcredits', credits_amount,
+                                       # emulate an FB payer promo order
+                                       {'modified': {'trialpay': 1,
+                                                     'credits_amount': credits_amount,
+                                                     'product': str(request.args['currency_url'][0]),
+                                                     'product_amount': gamebucks_amount}})
+
+            # do not return HTTP response until player state is fully flushed
+            def complete_settlement(request, session):
+                # send mtime/spend update to player cache so upcache will pick it up immediately
+                gamesite.pcache_client.player_cache_update(session.user.user_id,
+                                                           {'last_mtime': server_time,
+                                                            'money_spent': session.player.history.get('money_spent',0.0)}, reason = 'purchase')
+                request.write('1')
+                request.finish()
+
+            player_table.store_async(session.player, functools.partial(complete_settlement, request, session), True, 'TRIALPAYAPI')
+            return server.NOT_DONE_YET
+
+        return str('1')
 
 # handler for game client API calls
 class GAMEAPI(resource.Resource):
@@ -25651,6 +25720,7 @@ def do_main(pidfile, do_ai_setup, do_daemonize, cmdline_config):
 
     root.putChild("GAMEAPI",gameapi)
     root.putChild("CREDITAPI",CREDITAPI(gameapi))
+    root.putChild("TRIALPAYAPI",TRIALPAYAPI(gameapi))
     root.putChild("KGAPI",KGAPI(gameapi))
     root.putChild("METRICSAPI",METRICSAPI(gameapi))
     root.putChild("CONTROLAPI",controlapi)

@@ -40467,7 +40467,7 @@ Store.trialpay_available = function() {
 };
 
 Store.trialpay_invoke = function() {
-    metric_event('4510_trialpay_invoked', {'purchase_ui_event': true});
+    metric_event('4510_trialpay_invoked', {'purchase_ui_event': true, 'client_time':client_time});
     if(spin_facebook_enabled) {
         var proxyserver = spin_server_host+(parseInt(spin_server_http_port,10)!=80 ? ':'+spin_server_http_port : '');
         SPay.trialpay_invoke(spin_app_id,
@@ -40477,6 +40477,7 @@ Store.trialpay_invoke = function() {
                              // currency URL
                              'http://'+proxyserver+'/OGPAPI?type='+gamedata['game_id']+'_gamebucks', // note: MF would require a special hack
                              player.facebook_third_party_id,
+                             session.user_id.toString(), // send user ID as order_info
                              Store.trialpay_callback);
 
         // set the cleanup-pending flag AFTER giving enough time for Facebook's dialog to block the UI
@@ -40492,11 +40493,11 @@ Store.trialpay_callback = function(result, data) {
     Store.order_cleanup_cb = false;
 
     if(result == 'open') {
-        metric_event('4511_trialpay_opened', {'purchase_ui_event': true});
+        metric_event('4511_trialpay_opened', {'purchase_ui_event': true, 'client_time':client_time});
     } else if(result == 'close') {
-        metric_event('4512_trialpay_closed', {'purchase_ui_event': true});
+        metric_event('4512_trialpay_closed', {'purchase_ui_event': true, 'client_time':client_time});
     } else if(result == 'complete') {
-        metric_event('4513_trialpay_completed', {'purchase_ui_event': true,
+        metric_event('4513_trialpay_completed', {'purchase_ui_event': true, 'client_time':client_time,
                                                  'completions': data['completions'],
                                                  'gamebucks': data['vc_amount']});
         send_to_server.func(["PING_CREDITS"]); // may not be necessary, but just in case.

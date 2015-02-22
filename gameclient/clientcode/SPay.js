@@ -84,8 +84,9 @@ SPay.trialpay_on_transact = function(result) {
     @param {string} callback_url
     @param {string} currency_url
     @param {string} third_party_id
+    @param {string} order_info
     @param {function(string,Object=)} user_cb */
-SPay.trialpay_invoke = function(app_id, vendor_id, callback_url, currency_url, third_party_id, user_cb) {
+SPay.trialpay_invoke = function(app_id, vendor_id, callback_url, currency_url, third_party_id, order_info, user_cb) {
     if(SPay.trialpay_user_cb && SPay.trialpay_user_cb !== user_cb) {
         throw Error('user_cb already set to something else');
     }
@@ -97,6 +98,7 @@ SPay.trialpay_invoke = function(app_id, vendor_id, callback_url, currency_url, t
                               'callback_url': callback_url,
                               'currency_url': currency_url,
                               'sid': third_party_id,
+                              'order_info': order_info,
                               // Terrible API - it requires the *name* of a callback function!
                               'onOpen': 'SPay.trialpay_on_open',
                               'onTransact': 'SPay.trialpay_on_transact',
