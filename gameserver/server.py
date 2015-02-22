@@ -6,7 +6,7 @@
 
 # main game server
 
-import sys, os, time, base64, hashlib, urllib, urlparse, random, string, glob, traceback, signal, re
+import sys, os, time, base64, hmac, hashlib, urllib, urlparse, random, string, glob, traceback, signal, re
 import socket
 import functools
 import math
@@ -14108,12 +14108,13 @@ class TRIALPAYAPI(resource.Resource):
 
     def handle_request(self, request):
         SpinHTTP.set_access_control_headers(request)
+        request_body = request.content.read()
 
         # verify hash
         their_hash = SpinHTTP.get_twisted_header(request, 'TrialPay-HMAC-MD5')
-        our_hash = hmac.new(str(SpinConfig.config['trialpay_notification_key']), msg=str(request.body), digestmod=hashlib.md5).digest()
+        our_hash = hmac.new(str(SpinConfig.config['trialpay_notification_key']), msg=str(request_body), digestmod=hashlib.md5).hexdigest()
         if their_hash != our_hash:
-            gamesite.exception_log.event(server_time, 'TRIALPAYAPI hash mismatch: theirs %s ours %s body %r' % (their_hash, our_hash, request.body))
+            gamesite.exception_log.event(server_time, 'TRIALPAYAPI hash mismatch: theirs %s ours %s body %r' % (their_hash, our_hash, request_body))
 
         gamebucks_amount = int(request.args['reward_amount'][0])
 
