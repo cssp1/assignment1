@@ -17473,7 +17473,7 @@ function do_harvest(all) {
         }
     }
 
-    if(full.length >= num_resources) {
+    if(num_resources > 0 && full.length >= num_resources) {
         // only prevent collection when ALL affected resource storages are full
         doit = false;
     }
