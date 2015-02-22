@@ -7,8 +7,10 @@ DB=tr_upcache
 SAVE_DIR=/media/ephemeral0a/backup-scratch
 S3_PATH="spinpunch-backups/analytics"
 
-S3_KEYFILE=${HOME}/.ssh/`echo $HOSTNAME | cut -d. -f1`-awssecret
 TARFILE=`date +%Y%m%d`-${DB}.mysql.gz
+S3_KEYFILE=${HOME}/.ssh/`echo $HOSTNAME | cut -d. -f1`-awssecret
+export AWS_ACCESS_KEY_ID=`head -n1 ${S3_KEYFILE}`
+export AWS_SECRET_ACCESS_KEY=`head -n2 ${S3_KEYFILE} | tail -n1`
 ERROR=0
 
 cd $GAME_DIR/gameserver
@@ -19,7 +21,7 @@ if [[ $? != 0 ]]; then
     exit $?
 fi
 
-$GAME_DIR/aws/aws --secrets-file=${S3_KEYFILE} --md5 put "${S3_PATH}/${TARFILE}" "${SAVE_DIR}/${TARFILE}"
+/usr/bin/env aws s3 cp --quiet "${SAVE_DIR}/${TARFILE}" "s3://${S3_PATH}/${TARFILE}" 
 if [[ $? != 0 ]]; then
     echo "S3 upload error!"
     ERROR=1
