@@ -7,14 +7,15 @@ goog.provide('ShakeSynth');
 // Synthesize shaky animation channel based on real power spectrum
 // based on Dan's animation work
 
-// global namespace
+/** @const */
 ShakeSynth = {
     SAMPLES: 256,
     AXES: 3,
     DATASCALE: 24.0/2589.0
 };
 
-/** @constructor */
+/** @constructor
+    @struct */
 ShakeSynth.Shake = function(seed) {
     this.seed = seed;
     this.speed = 5.3;

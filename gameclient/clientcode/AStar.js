@@ -80,8 +80,8 @@ AStar.BlockChecker;
 AStar.PathChecker;
 
 /** @constructor
- * @param {Array.<number>} pos
- */
+    @struct
+*/
 AStar.AStarCell = function(pos) {
     this.pos = pos;
     this.block_count = 0; // count of obstacles overlapping this point
@@ -137,8 +137,9 @@ AStar.AStarCell.prototype.get = function(serial) {
 // 2D MAP - 2D GRID OF CELLS AND BLOCKAGE INFO
 
 /** @constructor
-  * @param {Array.<number>} size [x,y] size
-  * @param {function(Array.<number>): boolean|null} terrain_func optional, return true if terrain is blocked at this location */
+    @struct
+    @param {Array.<number>} size [x,y] size
+    @param {function(Array.<number>): boolean|null} terrain_func optional, return true if terrain is blocked at this location */
 AStar.AStarMap = function (size, terrain_func) {
     this.size = size;
     this.terrain_func = terrain_func;
@@ -260,11 +261,12 @@ AStar.AStarMap.prototype.for_each_cell = function(func) {
 // RECTANGULAR MAP
 
 /** @constructor
- * @extends AStar.AStarMap
- * @param {Array.<number>} size [x,y] size
- * @param {function(Array.<number>): boolean|null} terrain_func optional, return true if terrain is blocked at this location
- * @param {boolean} allow_diagonal_passage if true, allow travel along "thin" Bresenham paths with diagonal moves
- */
+    @struct
+    @extends AStar.AStarMap
+    @param {Array.<number>} size [x,y] size
+    @param {function(Array.<number>): boolean|null} terrain_func optional, return true if terrain is blocked at this location
+    @param {boolean} allow_diagonal_passage if true, allow travel along "thin" Bresenham paths with diagonal moves
+*/
 AStar.AStarRectMap = function (size, terrain_func, allow_diagonal_passage) {
     goog.base(this, size, terrain_func);
     this.allow_diagonal_passage = allow_diagonal_passage;
@@ -545,6 +547,7 @@ AStar.AStarRectMap.prototype.smooth_path = function(path) {
 // HEX MAP
 
 /** @constructor
+    @struct
     @extends AStar.AStarMap */
 AStar.AStarHexMap = function (size, terrain_func) {
     goog.base(this, size, terrain_func);
@@ -620,8 +623,9 @@ AStar.AStarHexMap.prototype.unblock_hex_maybe = function(xy, blocker) {
 // is an unblocked path between them. Blocked cells get "region number" -1.
 
 /** @constructor
- * @param {AStar.AStarMap} map
- */
+    @struct
+    @param {AStar.AStarMap} map
+*/
 AStar.Connectivity = function(map) {
     if(!(map instanceof AStar.AStarRectMap)) { throw Error('Connectivity only implemented for RectMap'); }
 
@@ -702,6 +706,7 @@ AStar.Connectivity.prototype.debug_draw = function() {
 // SEARCH CONTEXT
 
 /** @constructor
+    @struct
     @param {AStar.AStarMap} map
     @param {{heuristic_name:(string|undefined),
              iter_limit:(number|undefined),
@@ -760,7 +765,7 @@ AStar.AStarContext.prototype.search = function(start_pos, end_pos, path_checker)
 
     // note: assume that all nodes pushed onto the openHeap already have been initialized via get()
     // sort by node.f
-    var openHeap = new BinaryHeap();
+    var openHeap = new BinaryHeap.BinaryHeap();
 
     openHeap.push(start, start.get(this.serial).f);
 
@@ -902,8 +907,9 @@ AStar.AStarContext.prototype.search = function(start_pos, end_pos, path_checker)
 };
 
 /** Cached wrapper for AStarContext that memoizes previous queries and optionally caches connectivity.
- * @constructor
- * @extends AStar.AStarContext */
+    @constructor
+    @struct
+    @extends AStar.AStarContext */
 AStar.CachedAStarContext = function(map, options) {
     goog.base(this, map, options);
     this.cache_generation = -1;

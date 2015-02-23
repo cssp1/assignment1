@@ -98,7 +98,7 @@ GameArt.ChannelGovernor = function(max_chan) {
     this.max_chan = max_chan;
     this.cur = 0;
     // keep track of completion times of currently-playing sounds
-    this.completion = new BinaryHeap();
+    this.completion = new BinaryHeap.BinaryHeap();
 };
 
 // try to get permission to play an audio clip, passing in starting and ending client_times
@@ -228,7 +228,7 @@ GameArt.init = function(time, canvas, ctx, art_json, dl_callback, audio_driver_n
     }
 
     // sort download requests by priority
-    GameArt.dl_heap = new BinaryHeap();
+    GameArt.dl_heap = new BinaryHeap.BinaryHeap();
     for(var name in GameArt.file_list) {
         var entry = GameArt.file_list[name];
 

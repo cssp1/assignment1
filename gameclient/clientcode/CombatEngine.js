@@ -25,7 +25,16 @@ CombatEngine.Pos;
     @typedef {Array.<CombatEngine.Pos>} */
 CombatEngine.Pos2D;
 
-/** @constructor */
+/** @typedef {number} */
+CombatEngine.TickCount;
+
+///** @constructor
+//    @struct */ // XXXXXX convert from time
+//CombatEngine.TickCount = function(count) { this.count = count; };
+//CombatEngine.TickCount.prototype.get = function() { return this.count; };
+
+/** @constructor
+    @struct */
 CombatEngine.CombatEngine = function() {
     /** list of queued damage effects that should be applied at later times (possible optimization: use a priority queue)
         @type {Array.<CombatEngine.DamageEffect>} */
@@ -35,6 +44,7 @@ CombatEngine.CombatEngine = function() {
 // DamageEffects
 
 /** @constructor
+    @struct
     @param {number} time XXXXXX this should be a tick count!
     @param {GameObject|null} source
     @param {CombatEngine.Integer} amount
@@ -46,9 +56,11 @@ CombatEngine.DamageEffect = function(time, source, amount, vs_table) {
     this.amount = amount;
     this.vs_table = vs_table;
 }
+CombatEngine.DamageEffect.prototype.apply = goog.abstractMethod;
 
 /** KillDamageEffect removes the object directly WITHOUT running on-death spells
     @constructor
+    @struct
     @extends CombatEngine.DamageEffect
     @param {number} time XXXXXX this should be a tick count!
     @param {GameObject|null} source
@@ -77,6 +89,7 @@ CombatEngine.KillDamageEffect.prototype.apply = function() {
 };
 
 /** @constructor
+    @struct
     @extends CombatEngine.DamageEffect
     @param {number} time XXXXXX this should be a tick count!
     @param {GameObject|null} source
@@ -98,6 +111,7 @@ CombatEngine.TargetedDamageEffect.prototype.apply = function() {
 };
 
 /** @constructor
+    @struct
     @extends CombatEngine.DamageEffect
     @param {number} time XXXXXX this should be a tick count!
     @param {GameObject|null} source
@@ -132,6 +146,7 @@ CombatEngine.TargetedAuraEffect.prototype.apply = function() {
 };
 
 /** @constructor
+    @struct
     @extends CombatEngine.DamageEffect
     @param {number} time XXXXXX this should be a tick count!
     @param {GameObject|null} source
@@ -185,6 +200,7 @@ CombatEngine.AreaDamageEffect.prototype.apply = function() {
 };
 
 /** @constructor
+    @struct
     @extends CombatEngine.DamageEffect
     @param {number} time XXXXXX this should be a tick count!
     @param {GameObject|null} source

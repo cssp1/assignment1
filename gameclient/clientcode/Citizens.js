@@ -18,12 +18,13 @@ goog.require('goog.array');
 goog.require('goog.object');
 
 /** State for one displayed citizen
- * @constructor
- * @param {Citizens.Context} context
- * @param {string} obj_id
- * @param {Object} spec
- * @param {number} level
- * @param {number} time_offset */
+    @constructor
+    @struct
+    @param {Citizens.Context} context
+    @param {string} obj_id
+    @param {Object} spec
+    @param {number} level
+    @param {number} time_offset */
 Citizens.Citizen = function(context, obj_id, spec, level, time_offset) {
     this.context = context;
     this.obj_id = obj_id;
@@ -163,8 +164,9 @@ Citizens.Citizen.prototype.get_random_pos_from = function(src) {
 //
 
 /** @constructor
- * @param {Base} base is the session.viewing_base
- * @param {AStar.CachedAStarContext} astar_context is the map for pathfinding */
+    @struct
+    @param {Base} base is the session.viewing_base
+    @param {AStar.CachedAStarContext} astar_context is the map for pathfinding */
 Citizens.Context = function(base, astar_context) {
     this.base = base;
     this.astar_context = astar_context;
@@ -174,11 +176,12 @@ Citizens.Context = function(base, astar_context) {
 };
 
 /** Just a data structure for passing input to Context.update()
- * @constructor
- * @param {string} obj_id
- * @param {string} specname
- * @param {number} level
- * @param {number} hp_ratio */
+    @constructor
+    @struct
+    @param {string} obj_id
+    @param {string} specname
+    @param {number} level
+    @param {number} hp_ratio */
 Citizens.UnitData = function(obj_id, specname, level, hp_ratio) {
     this.obj_id = obj_id; this.specname = specname; this.level = level; this.hp_ratio = hp_ratio;
 };

@@ -60,6 +60,7 @@ var spin_loading_screen_data;
 var spin_loading_screen_mode;
 var spin_init_messages;
 var add_demographics;
+/** @dict */
 var gamedata; // from gamedata.js
 var gameclient_build_date; // from compiled-client.js.date
 

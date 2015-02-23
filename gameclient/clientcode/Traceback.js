@@ -4,7 +4,6 @@
  */
 
 goog.provide('Traceback');
-Traceback = {};
 
 // Domain Public by Eric Wendelin http://eriwen.com/ (2008)
 //                  Luke Smith http://lucassmith.name/ (2008)

@@ -6,24 +6,24 @@ goog.provide('BinaryHeap');
 
 // SP3RDPARTY : BinaryHeap.js : CC-by License
 
-/** @constructor */
-var BinaryHeap = function() {
+/** @constructor
+    @struct */
+BinaryHeap.BinaryHeap = function() {
   this.content = [];
 };
 
-BinaryHeap.prototype = {
-  push: function(element, score) {
+BinaryHeap.BinaryHeap.prototype.push = function(element, score) {
     // Add the new element to the end of the array.
     element.heapscore = score;
     this.content.push(element);
     // Allow it to sink down.
     this.sinkDown(this.content.length - 1);
-  },
+};
 
-  // return first element, but do not remove it from the heap
-  peek: function() { return this.content[0]; },
+// return first element, but do not remove it from the heap
+BinaryHeap.BinaryHeap.prototype.peek = function() { return this.content[0]; };
 
-  pop: function() {
+BinaryHeap.BinaryHeap.prototype.pop = function() {
     // Store the first element so we can return it later.
     var result = this.content[0];
     // Get the element at the end of the array.
@@ -35,9 +35,9 @@ BinaryHeap.prototype = {
       this.bubbleUp(0);
     }
     return result;
-  },
-  remove: function(node) {
+};
 
+BinaryHeap.BinaryHeap.prototype.remove = function(node) {
     var i = this.content.indexOf(node);
 
     // When it is found, the process seen in 'pop' is repeated
@@ -50,13 +50,11 @@ BinaryHeap.prototype = {
       else
         this.bubbleUp(i);
     }
-  },
-
-  size: function() {
+};
+BinaryHeap.BinaryHeap.prototype.size = function() {
     return this.content.length;
-  },
-
-  rescoreElement: function(node, newscore) {
+};
+BinaryHeap.BinaryHeap.prototype.rescoreElement = function(node, newscore) {
       node.heapscore = newscore;
       for(var n = 0; n < this.content.length; n++) {
           if(this.content[n] === node) {
@@ -68,8 +66,9 @@ BinaryHeap.prototype = {
       } else {
           this.sinkDown(n);
       }
-  },
-  sinkDown: function(n) {
+};
+
+BinaryHeap.BinaryHeap.prototype.sinkDown = function(n) {
     // Fetch the element that has to be sunk.
     var element = this.content[n];
     // When at 0, an element can not sink any further.
@@ -89,9 +88,9 @@ BinaryHeap.prototype = {
         break;
       }
     }
-  },
+};
 
-  bubbleUp: function(n) {
+BinaryHeap.BinaryHeap.prototype.bubbleUp = function(n) {
     // Look up the target element and its score.
     var length = this.content.length,
         element = this.content[n],
@@ -131,12 +130,11 @@ BinaryHeap.prototype = {
         break;
       }
     }
-  }
 };
 
 /*
   test code:
-        var heap = new BinaryHeap(function(x){return x.val;});
+        var heap = new BinaryHeap.BinaryHeap(function(x){return x.val;});
         var vals = [10, 3, 4, 8, 2, 2.5, 9, 7, 1, 2, 6, 5];
         var a = [];
         for(var i = 0; i < vals.length; i++) {
