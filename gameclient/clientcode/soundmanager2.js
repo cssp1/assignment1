@@ -2882,15 +2882,11 @@ function SoundManager(smURL, smID) {
 
     };
 
-    this._onmetadata = function(oMDProps, oMDData) {
-
       /**
        * internal: flash 9 + NetStream (MovieStar/RTMP-only) feature
        * RTMP may include song title, MovieStar content may include encoding info
-       *
-       * @param {array} oMDProps (names)
-       * @param {array} oMDData (values)
        */
+    this._onmetadata = function(oMDProps, oMDData) {
 
       _s._wD('SMSound._onmetadata(): "' + this.sID + '" metadata received.');
 
@@ -2907,15 +2903,11 @@ function SoundManager(smURL, smID) {
 
         };
 
-    this._onid3 = function(oID3Props, oID3Data) {
-
       /**
        * internal: flash 8 + flash 9 ID3 feature
        * may include artist, song title etc.
-       *
-       * @param {array} oID3Props (names)
-       * @param {array} oID3Data (values)
        */
+    this._onid3 = function(oID3Props, oID3Data) {
 
       _s._wD('SMSound._onid3(): "' + this.sID + '" ID3 data received.');
 

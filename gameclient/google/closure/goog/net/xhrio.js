@@ -478,7 +478,8 @@ goog.net.XhrIo.prototype.send = function(url, opt_method, opt_content,
   try {
     goog.log.fine(this.logger_, this.formatMsg_('Opening Xhr'));
     this.inOpen_ = true;
-    this.xhr_.open(method, url, true);  // Always async!
+    var url2 = /** @type {string} */ (url); // DJM/SpinPunch
+    this.xhr_.open(method, url2, true);  // Always async!
     this.inOpen_ = false;
   } catch (err) {
     goog.log.fine(this.logger_,

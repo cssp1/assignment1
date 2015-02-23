@@ -75,8 +75,8 @@ if(typeof Touch === 'object') {
 //
 
 // for debug message printing use console.log()
-if (!window.console) console = {};
-console.log = console.log || function(){};
+if(!window.console) { window.console = /** @type {!Console} */ ({}); };
+if(!window.console.log) { window.console.log = function(){}; };
 
 function get_query_string(name) {
     var query = window.location.search;

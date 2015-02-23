@@ -22,6 +22,14 @@ OPT_FLAGS :=
 
 ifneq (${TYPECHECK},)
     CHECK_FLAGS += --compiler_flags=--jscomp_warning=checkTypes
+    CHECK_FLAGS += --compiler_flags=--jscomp_warning=undefinedNames
+    CHECK_FLAGS += --compiler_flags=--jscomp_warning=undefinedVars
+    CHECK_FLAGS += --compiler_flags=--jscomp_warning=const
+    CHECK_FLAGS += --compiler_flags=--jscomp_warning=constantProperty
+    CHECK_FLAGS += --compiler_flags=--jscomp_warning=invalidCasts
+    CHECK_FLAGS += --compiler_flags=--jscomp_warning=missingProperties
+    CHECK_FLAGS += --compiler_flags=--jscomp_warning=strictModuleDepCheck
+    CHECK_FLAGS += --compiler_flags=--jscomp_warning=suspiciousCode
     CHECK_FLAGS += --compiler_flags=--jscomp_off=reportUnknownTypes # Closure itself is not clean for this one
     # custom SpinPunch option that shuts up complaints about argument count mismatches
     # (no longer used, as our code is now clean for it)
@@ -64,9 +72,9 @@ compiled-client.js: clientcode/*.js
 		--compiler_flags='--js=google/closure/goog/deps.js' \
 		--compiler_flags='--compilation_level=ADVANCED_OPTIMIZATIONS' \
 		--compiler_flags='--externs=clientcode/externs.js' \
-		--compiler_flags='--create_name_map_files' \
+		--compiler_flags='--create_renaming_reports' \
 		${CHECK_FLAGS} ${OPT_FLAGS} \
-		--output_file=$@ || (rm -f $@ *.out; false) # clean up on failure
+		--output_file=$@ || (rm -f $@ *.out *.date; false) # clean up on failure
 	@echo "var gameclient_build_date = \"${BUILD_DATE}\";" >> $@
 	@echo "${BUILD_DATE}" > $@.date
 	@mv _props_map.out $@_props_map.out

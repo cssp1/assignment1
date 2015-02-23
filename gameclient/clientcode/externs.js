@@ -623,3 +623,11 @@ Event.prototype.pointerType = function() {};
 Event.prototype.MSPOINTER_TYPE_TOUCH = function() {};
 Event.prototype.MSPOINTER_TYPE_MOUSE = function() {};
 Event.prototype.MSPOINTER_TYPE_PEN = function() {};
+
+// Fix old Google Closure Library incompatibility with more recent Closure Compilers
+
+/** @typedef {XMLHttpRequest} */
+var GearsHttpRequest;
+
+/** @typedef {Blob} */
+var GearsBlob;
