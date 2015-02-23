@@ -35,6 +35,7 @@ goog.require('SPWebsocket');
 goog.require('SPVideoWidget');
 goog.require('ItemDisplay');
 goog.require('Dripper');
+goog.require('CombatEngine');
 goog.require('Showcase');
 goog.require('TurretHeadDialog');
 goog.require('QuestBar');
@@ -780,7 +781,7 @@ Aura.prototype.apply = function(obj) {
             var n_ticks = Math.floor(apply_interval/TICK_INTERVAL + 0.5);
             if(n_ticks <= 1 || (((client_tick - this.start_tick) % n_ticks) == 0)) {
                 var dmg = Math.max(1, Math.floor(this.strength*apply_interval));
-                damage_effect_queue.push(new TargetedDamageEffect(client_time, this.source, obj, dmg, effect['damage_vs'] || this.vs_table));
+                session.combat_engine.damage_effect_queue.push(new CombatEngine.TargetedDamageEffect(client_time, this.source, obj, dmg, effect['damage_vs'] || this.vs_table));
             }
         } else if(code === 'projectile_speed_reduced') {
             obj.combat_stats.projectile_speed *= (1 - this.strength);
@@ -1571,13 +1572,13 @@ GameObject.prototype.cast_client_spell = function(spell_name, spell, target, loc
             if(spell['kills_self']) {
                 // Detonator droid/landmine
                 // queue BEFORE other damage so it's listed in this order in the battle log
-                damage_effect_queue.push(new KillDamageEffect(client_time + (spell['kills_self_delay']||0), this, this));
+                session.combat_engine.damage_effect_queue.push(new CombatEngine.KillDamageEffect(client_time + (spell['kills_self_delay']||0), this, this));
             }
 
             if(spell['impact_auras']) {
                 for (var i = 0; i < spell['impact_auras'].length; i++) {
                     var imp_aura = spell['impact_auras'][i];
-                    var effect = new AreaAuraEffect(client_time, this, impact_pos,
+                    var effect = new CombatEngine.AreaAuraEffect(client_time, this, impact_pos,
                                                     ('targets_ground' in spell ? spell['targets_ground'] : 1),
                                                     ('targets_air' in spell ? spell['targets_air'] : 1),
                                                     radius, radius_rect,
@@ -1588,18 +1589,18 @@ GameObject.prototype.cast_client_spell = function(spell_name, spell, target, loc
                                                     this.get_leveled_quantity(imp_aura['range'] || 0),
                                                     spell['damage_vs'] || {}, imp_aura['duration_vs'] || {},
                                                     spell['always_friendly_fire'] || false);
-                    damage_effect_queue.push(effect);
+                    session.combat_engine.damage_effect_queue.push(effect);
                 }
             }
 
-            var effect = new AreaDamageEffect(client_time, this, impact_pos,
+            var effect = new CombatEngine.AreaDamageEffect(client_time, this, impact_pos,
                                               ('targets_ground' in spell ? spell['targets_ground'] : 1),
                                               ('targets_air' in spell ? spell['targets_air'] : 1) || this.combat_stats.anti_air,
                                               radius,
                                               this.get_leveled_quantity(spell['splash_falloff'] || 'linear'),
                                               damage, spell['damage_vs'] || {},
                                               spell['always_friendly_fire'] || false);
-            damage_effect_queue.push(effect);
+            session.combat_engine.damage_effect_queue.push(effect);
 
             var vfx = spell['visual_effect'] || spell['impact_visual_effect'] || null;
             if(vfx) {
@@ -1688,20 +1689,16 @@ GameObject.prototype.speak = function(name) {
     GameArt.assets[this.spec[field]].states['normal'].audio.play(client_time);
 };
 
-// global list of queued damage effects that should be applied at later times
-// (for later efficiency, it should be a priority queue indexed by time)
-var damage_effect_queue = [];
-
 function apply_queued_damage_effects() {
-    for(var i = 0; i < damage_effect_queue.length; i++) {
-        var effect = damage_effect_queue[i];
+    for(var i = 0; i < session.combat_engine.damage_effect_queue.length; i++) {
+        var effect = session.combat_engine.damage_effect_queue[i];
         if(client_time >= effect.time) {
-            damage_effect_queue.splice(i,1);
+            session.combat_engine.damage_effect_queue.splice(i,1);
             effect.apply();
         }
     }
 
-    if(damage_effect_queue.length <= 0 && session.no_more_units) {
+    if(session.combat_engine.damage_effect_queue.length <= 0 && session.no_more_units) {
         session.no_more_units = false;
         session.set_battle_outcome_dirty();
     }
@@ -1787,7 +1784,6 @@ function hurt_object(target, damage, vs_table, source) {
         throw Error('hurt_object called on dead object');
     }
     //console.log('hurt_object '+target.spec['name']+' from '+(source?source.spec['name']:'null'));
-    //console.log(damage_effect_queue);
 
     // save for metrics use, because destroy_object() sets id to -1
     var original_target_id = target.id;
@@ -2129,7 +2125,7 @@ function calculate_battle_outcome() {
         }
 
         // check for inbound missiles and damage over time effects
-        if(defeat && damage_effect_queue.length > 0) {
+        if(defeat && session.combat_engine.damage_effect_queue.length > 0) {
             defeat = false;
             session.no_more_units = true;
         }
@@ -2159,194 +2155,6 @@ function remove_all_barriers() {
 function upgrade_all_barriers() {
     for_all_objects_of_type('barrier', function(obj) { Store.place_user_currency_order(obj.id, 'UPGRADE_FOR_MONEY', null, null, null); });
 }
-
-/** @constructor */
-function DamageEffect(time, source, amount, vs_table) {
-    this.time = time;
-    this.source = source;
-    this.amount = amount;
-    this.vs_table = vs_table;
-}
-
-/** KillDamageEffect removes the object directly WITHOUT running on-death spells
- * @constructor
- * @extends DamageEffect
- */
-function KillDamageEffect(time, source, target_obj) {
-    goog.base(this, time, source, 0, null);
-    this.target_obj = target_obj;
-}
-goog.inherits(KillDamageEffect, DamageEffect);
-KillDamageEffect.prototype.apply = function() {
-    // ensure the destroy_object message is sent only once, but do allow it to be sent even if target_obj.hp == 0
-    if(!this.target_obj.id || (this.target_obj.id === -1)) { return; }
-
-    if(this.target_obj.is_mobile()) {
-        if((this.target_obj === this.source) && ('suicide_explosion_effect' in this.target_obj.spec)) {
-            // leave no debris
-        } else {
-            create_debris(this.target_obj, this.target_obj.interpolate_pos());
-        }
-        send_and_destroy_object(this.target_obj, this.source);
-    } else if(this.target_obj.is_building()) {
-        this.target_obj.hp = 1;
-        hurt_object(this.target_obj, 999, {}, this.source);
-    }
-};
-
-/**
- * @constructor
- * @extends DamageEffect
- */
-function TargetedDamageEffect(time, source, target_obj, amount, vs_table) {
-    goog.base(this, time, source, amount, vs_table);
-    this.target_obj = target_obj;
-}
-goog.inherits(TargetedDamageEffect, DamageEffect);
-TargetedDamageEffect.prototype.apply = function() {
-    if(this.target_obj.is_destroyed()) {
-        // target is already dead
-        return;
-    }
-    hurt_object(this.target_obj, this.amount, this.vs_table, this.source);
-};
-
-/**
- * @constructor
- * @extends DamageEffect
- */
-function TargetedAuraEffect(time, source, target_obj, amount, aura_name, aura_duration, aura_range, vs_table, duration_vs_table) {
-    goog.base(this, time, source, amount, vs_table);
-    this.target_obj = target_obj;
-    this.aura_name = aura_name;
-    this.aura_duration = aura_duration;
-    this.aura_range = aura_range;
-    this.duration_vs_table = duration_vs_table;
-}
-goog.inherits(TargetedAuraEffect, DamageEffect);
-TargetedAuraEffect.prototype.apply = function() {
-    if(this.target_obj.is_destroyed()) {
-        // target is already dead
-        return;
-    }
-    if(this.amount != 0) {
-        var duration = this.aura_duration * get_damage_modifier(this.duration_vs_table, this.target_obj);
-        if(duration > 0) {
-            this.target_obj.create_aura(this.source, this.aura_name, this.amount, duration, this.aura_range, this.vs_table);
-        }
-    }
-};
-
-/**
- * @constructor
- * @extends DamageEffect
- */
-function AreaDamageEffect(time, source, target_location, hit_ground, hit_air, radius, falloff, amount, vs_table, allow_ff) {
-    goog.base(this, time, source, amount, vs_table);
-    this.target_location = target_location;
-    this.hit_ground = hit_ground;
-    this.hit_air = hit_air;
-    this.radius = radius;
-    this.falloff = falloff;
-    this.allow_ff = allow_ff;
-}
-goog.inherits(AreaDamageEffect, DamageEffect);
-AreaDamageEffect.prototype.apply = function() {
-    // hurt all objects within radius
-    var obj_list = query_objects_within_distance(this.target_location, this.radius,
-                                                 { exclude_invul: true,
-                                                   exclude_flying: !this.hit_air,
-                                                   flying_only: (this.hit_air && !this.hit_ground) });
-    for(var i = 0; i < obj_list.length; i++) {
-        var obj = obj_list[i][0], dist = obj_list[i][1], pos = obj_list[i][2];
-        if(obj.is_destroyed()) { continue; }
-        if(!this.allow_ff && obj.team === this.source.team) { continue; }
-        if(obj.spec['immune_to_splash']) { continue; }
-
-        var falloff;
-        if(this.falloff == 'linear') {
-            // fall off the damage amount as 1/r
-            falloff = clamp(1.0-(dist/this.radius), 0, 1);
-        } else if(this.falloff == 'constant') {
-            falloff = 1;
-        } else {
-            console.log('unhandled falloff type '+this.falloff);
-        }
-
-        var amt = this.amount * falloff;
-        if(amt != 0) {
-            hurt_object(obj, amt, this.vs_table, this.source);
-        }
-    }
-};
-
-/**
- * @constructor
- * @extends DamageEffect
- */
-function AreaAuraEffect(time, source, target_location, hit_ground, hit_air, radius, radius_rect, falloff, amount, aura_name, aura_duration, aura_range, vs_table, duration_vs_table, allow_ff) {
-    goog.base(this, time, source, amount, vs_table);
-    this.target_location = target_location;
-    this.hit_ground = hit_ground;
-    this.hit_air = hit_air;
-    this.radius = radius;
-    this.radius_rect = radius_rect;
-    this.falloff = falloff;
-    this.aura_name = aura_name;
-    this.aura_duration = aura_duration;
-    this.aura_range = aura_range;
-    this.duration_vs_table = duration_vs_table;
-    this.allow_ff = allow_ff;
-}
-goog.inherits(AreaAuraEffect, DamageEffect);
-AreaAuraEffect.prototype.apply = function() {
-    var query_r;
-    if(this.radius_rect) {
-        // query the max possible distance away a unit could be and still be within the rectangle
-        var a = this.radius_rect[0]/2, b = this.radius_rect[1]/2;
-        query_r = Math.sqrt(a*a+b*b);
-    } else {
-        // query the circular effect radius
-        query_r = this.radius;
-    }
-
-    // apply aura to all objects within radius
-    var obj_list = query_objects_within_distance(this.target_location, query_r,
-                                                 { exclude_invul: true,
-                                                   exclude_flying: !this.hit_air,
-                                                   flying_only: (this.hit_air && !this.hit_ground) });
-    for(var i = 0; i < obj_list.length; i++) {
-        var obj = obj_list[i][0], dist = obj_list[i][1], pos = obj_list[i][2];
-        if(obj.is_destroyed()) { continue; }
-        if(!this.allow_ff && obj.team === this.source.team) { continue; }
-        if(obj.spec['immune_to_splash']) { continue; }
-
-        if(this.radius_rect) {
-            // skip objects that are outside the radius_rect rectangle centered on target_location
-            var d = vec_sub(pos, this.target_location);
-            var a = this.radius_rect[0]/2, b = this.radius_rect[1]/2;
-            if(d[0] < -a || d[0] > a || d[1] < -b || d[1] > b) { continue; }
-        }
-
-        var falloff;
-        if(this.falloff == 'linear' && !this.radius_rect) {
-            // fall off the damage amount as 1/r
-            falloff = clamp(1.0-(dist/this.radius), 0, 1);
-        } else if(this.falloff == 'constant') {
-            falloff = 1;
-        } else {
-            console.log('unhandled falloff type '+this.falloff);
-        }
-
-        var amt = this.amount * falloff;
-        if(amt != 0) {
-            var duration = this.aura_duration * get_damage_modifier(this.duration_vs_table, obj);
-            if(duration > 0) {
-                obj.create_aura(this.source, this.aura_name, amt, duration, this.aura_range, this.vs_table);
-            }
-        }
-    }
-};
 
 GameObject.prototype.run_control = function() {
     if(this.control_cooldown > 0) {
@@ -2772,10 +2580,10 @@ function do_fire_projectile(my_source, my_id, my_spec_name, my_level, my_team, m
         if(spell['impact_auras']) {
             for (var i = 0; i < spell['impact_auras'].length; i++) {
                 var imp_aura = spell['impact_auras'][i];
-                effects.push(new AreaAuraEffect(hit_time+postfire_delay, my_source, target_pos,
+                effects.push(new CombatEngine.AreaAuraEffect(hit_time+postfire_delay, my_source, target_pos,
                                                 ('splash_to_ground' in spell ? spell['splash_to_ground'] : false) || !(target_height > 0),
                                                 ('splash_to_air' in spell ? spell['splash_to_air'] : false) || (target_height > 0),
-                                                radius, null,
+                                                radius, false,
                                                 get_leveled_quantity(spell['splash_falloff'] || 'linear', my_level),
                                                 get_leveled_quantity(imp_aura['strength'] || 1, my_level),
                                                 get_leveled_quantity(imp_aura['spec'], my_level),
@@ -2789,7 +2597,7 @@ function do_fire_projectile(my_source, my_id, my_spec_name, my_level, my_team, m
 
         // splash damage
         if(damage != 0) {
-            effects.push(new AreaDamageEffect(hit_time+postfire_delay, my_source, target_pos,
+            effects.push(new CombatEngine.AreaDamageEffect(hit_time+postfire_delay, my_source, target_pos,
                                               ('splash_to_ground' in spell ? spell['splash_to_ground'] : false) || !(target_height > 0),
                                               ('splash_to_air' in spell ? spell['splash_to_air'] : false) || (target_height > 0),
                                               radius,
@@ -2804,7 +2612,7 @@ function do_fire_projectile(my_source, my_id, my_spec_name, my_level, my_team, m
             if(spell['impact_auras']) {
                 for (var i = 0; i < spell['impact_auras'].length; i++) {
                     var imp_aura = spell['impact_auras'][i];
-                    effects.push(new TargetedAuraEffect(hit_time+postfire_delay, my_source, target,
+                    effects.push(new CombatEngine.TargetedAuraEffect(hit_time+postfire_delay, my_source, target,
                                                         get_leveled_quantity(imp_aura['strength'] || 1, my_level),
                                                         get_leveled_quantity(imp_aura['spec'], my_level),
                                                         get_leveled_quantity(imp_aura['duration'] || 1, my_level),
@@ -2815,13 +2623,13 @@ function do_fire_projectile(my_source, my_id, my_spec_name, my_level, my_team, m
             }
 
             if(damage != 0) {
-                effects.push(new TargetedDamageEffect(hit_time+postfire_delay, my_source, target, damage, damage_vs));
+                effects.push(new CombatEngine.TargetedDamageEffect(hit_time+postfire_delay, my_source, target, damage, damage_vs));
             }
         }
     }
 
     for(var i = 0; i < effects.length; i++) {
-        damage_effect_queue.push(effects[i]);
+        session.combat_engine.damage_effect_queue.push(effects[i]);
     }
 
     if(miss && COMBAT_DEBUG) {
@@ -2880,7 +2688,7 @@ GameObject.prototype.fire_projectile = function(fire_time, force_hit_time, spell
 
     if(spell['kills_self']) {
         // special for Detonator Droids - kill self
-        damage_effect_queue.push(new KillDamageEffect(fire_time + (spell['kills_self_delay']||0), this, this));
+        session.combat_engine.damage_effect_queue.push(new CombatEngine.KillDamageEffect(fire_time + (spell['kills_self_delay']||0), this, this));
     }
 
     var hit_time = do_fire_projectile(this, this.id, this.spec['name'],
@@ -4753,6 +4561,9 @@ session.manufacture_overflow_warned = false; // whether we have already shown th
 session.quarry_harvest_sync_marker = Synchronizer.INIT; // synchronizer used for showing Loading... while harvesting quarries
 session.deployable_squads = [];
 session.defending_squads = [];
+
+/** @type {CombatEngine.CombatEngine|null} */
+session.combat_engine = null;
 
 // pre/post_deploy_units are dictionaries of "army_unit" structures, indexed by obj_id
 // {'123456': {'obj_id': '123456', 'spec': 'asdf', 'level': 1},
@@ -41295,7 +41106,7 @@ function handle_server_message(data) {
             PlayerCache.update(session.viewing_user_id, viewing_trophy_data);
         }
 
-        damage_effect_queue = [];
+        session.combat_engine = new CombatEngine.CombatEngine();
 
         // set physics properties
         SPFX.global_gravity = (('gravity' in session.viewing_base.base_climate_data) ? session.viewing_base.base_climate_data['gravity'] : 1);
