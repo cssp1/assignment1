@@ -15,8 +15,7 @@ import MySQLdb
 time_now = int(time.time())
 DETAIL_LEN = 64 # truncate long "method" and "reason" args
 client_trouble_schema = {
-    'fields': [('_id', 'CHAR(24) NOT NULL PRIMARY KEY'),
-               ('time', 'INT8 NOT NULL'),
+    'fields': [('time', 'INT8 NOT NULL'),
                ('event_name', 'VARCHAR(128) NOT NULL'),
                ('user_id', 'INT4'),
                ('frame_platform', 'CHAR(2)'),
@@ -86,7 +85,7 @@ if __name__ == '__main__':
 
     # find most recent already-converted action
     start_time = -1
-    end_time = time_now - 60  # skip entries too close to "now" to ensure all events for a given second have all arrived
+    end_time = time_now - 600  # skip entries too close to "now" to ensure all events for a given second have all arrived
 
     cur.execute("SELECT time FROM "+sql_util.sym(client_trouble_table)+" ORDER BY time DESC LIMIT 1")
     rows = cur.fetchall()
@@ -113,8 +112,7 @@ if __name__ == '__main__':
             elif country:
                 country_tier = str(SpinConfig.country_tier_map.get(country,4))
 
-            keyvals = [('_id',row['_id']),
-                       ('time',row['time']),
+            keyvals = [('time',row['time']),
                        ('event_name',row['event_name']),
                        ('country',country),
                        ('country_tier',country_tier)]
