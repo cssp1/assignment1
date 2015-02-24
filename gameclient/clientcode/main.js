@@ -2630,7 +2630,7 @@ function do_fire_projectile(my_source, my_id, my_spec_name, my_level, my_team, m
                     effects.push(new CombatEngine.TargetedAuraEffect(absolute_time_to_tick(hit_time+postfire_delay), my_source, target,
                                                         get_leveled_quantity(imp_aura['strength'] || 1, my_level),
                                                         get_leveled_quantity(imp_aura['spec'], my_level),
-                                                        get_leveled_quantity(imp_aura['duration'] || 1, my_level),
+                                                        relative_time_to_tick(get_leveled_quantity(imp_aura['duration'] || 1, my_level)),
                                                         get_leveled_quantity(imp_aura['range'] || 0, my_level),
                                                         damage_vs, imp_aura['duration_vs'] || {}
                                                        ));
