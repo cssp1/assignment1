@@ -14,6 +14,7 @@ goog.provide('Citizens');
 
 goog.require('SPFX');
 goog.require('AStar');
+goog.require('GameData');
 goog.require('goog.array');
 goog.require('goog.object');
 
@@ -22,7 +23,7 @@ goog.require('goog.object');
     @struct
     @param {Citizens.Context} context
     @param {string} obj_id
-    @param {Object} spec
+    @param {GameData.UnitSpec} spec
     @param {number} level
     @param {number} time_offset */
 Citizens.Citizen = function(context, obj_id, spec, level, time_offset) {
@@ -46,20 +47,20 @@ Citizens.Citizen.prototype.dispose = function() {
     this.next_update_time = -1; // stop updating the motion path
 };
 
-// XXXXXX the "citizens_astar" option is work-in-progress. May consume excessive CPU and get units stuck inside things.
+// XXX the "citizens_astar" option is work-in-progress. May consume excessive CPU and get units stuck inside things.
 
 Citizens.Citizen.prototype.update = function() {
     if(this.next_update_time < 0 || client_time < this.next_update_time) { return; }
     this.next_update_time = client_time + (gamedata['client']['citizens_update_interval'] || 5.0);
     var path = this.get_new_path();
     if(!this.fx) {
-        var instance_data = {'spec': this.spec['name'], 'level': this.level};
+        var instance_data = {'spec': this.spec.name, 'level': this.level};
         if(gamedata['client']['citizens_astar']) {
             instance_data['dest'] = path[path.length-1];
         } else {
             instance_data['path'] = path;
         }
-        this.fx = new SPFX.PhantomUnit(path[0], this.spec['flying'] ? this.spec['altitude'] : 0, [1, 0, 1], client_time,
+        this.fx = new SPFX.PhantomUnit(path[0], this.spec.flying ? this.spec.altitude : 0, [1, 0, 1], client_time,
                                        {'duration': -1, 'end_at_dest': false,
                                         'maxvel':0.5 // move more slowly than normal to look less "hurried"
                                        }, instance_data);
@@ -200,8 +201,8 @@ Citizens.Context.prototype.update = function(army) {
     var spawn_time_offset = 0;
     var seen = {};
     goog.array.forEach(army, function(data) {
-        var spec = gamedata['units'][data.specname];
-        if(get_leveled_quantity(spec['max_hp'], data.level) <= 0 || data.hp_ratio > 0) {
+        var spec = new GameData.UnitSpec(gamedata['units'][data.specname]);
+        if(GameData.get_leveled_quantity(spec.max_hp, data.level) <= 0 || data.hp_ratio > 0) {
             // unit is alive
             seen[data.obj_id] = true;
             if(data.obj_id in this.by_id) {
