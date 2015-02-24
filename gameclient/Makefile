@@ -73,6 +73,7 @@ compiled-client.js: clientcode/*.js
 		--compiler_flags='--compilation_level=ADVANCED_OPTIMIZATIONS' \
 		--compiler_flags='--externs=clientcode/externs.js' \
 		--compiler_flags='--create_renaming_reports' \
+		--compiler_flags='--language_in=ECMASCRIPT5' \
 		${CHECK_FLAGS} ${OPT_FLAGS} \
 		--output_file=$@ || (rm -f $@ *.out *.date; false) # clean up on failure
 	@echo "var gameclient_build_date = \"${BUILD_DATE}\";" >> $@
