@@ -30,10 +30,6 @@ ifneq (${TYPECHECK},)
     CHECK_FLAGS += --compiler_flags=--jscomp_warning=missingProperties
     CHECK_FLAGS += --compiler_flags=--jscomp_warning=strictModuleDepCheck
     CHECK_FLAGS += --compiler_flags=--jscomp_warning=suspiciousCode
-    CHECK_FLAGS += --compiler_flags=--jscomp_off=reportUnknownTypes # Closure itself is not clean for this one
-    # custom SpinPunch option that shuts up complaints about argument count mismatches
-    # (no longer used, as our code is now clean for it)
-    #CHECK_FLAGS += --compiler_flags=--jscomp_off=checkTypesArgumentCount
 else
     CHECK_FLAGS += --compiler_flags=--jscomp_off=checkTypes
 endif
@@ -48,7 +44,7 @@ ifneq (${OPTIMIZE},)
     OPT_FLAGS += --compiler_flags=--use_types_for_optimization
 endif
 
-.PHONY: clean dep all
+.PHONY: clean dep all check
 
 all: dep compiled-client.js
 	@true
@@ -64,13 +60,14 @@ generated-deps.js: clientcode/*.js
 	@echo "goog.require('SPINPUNCHGAME');" >> $@
 
 compiled-client.js: clientcode/*.js
-        # --compiler_flags='--create_name_map_files'
 	@google/closure/bin/build/closurebuilder.py \
 		--root='google' --root='clientcode' \
 		--namespace='SPINPUNCHGAME' \
-		--output_mode=compiled --compiler_jar=google/compiler.jar \
+		--output_mode=compiled \
+		--compiler_jar=google/compiler.jar \
 		--compiler_flags='--js=google/closure/goog/deps.js' \
 		--compiler_flags='--compilation_level=ADVANCED_OPTIMIZATIONS' \
+		--compiler_flags='--jscomp_off=reportUnknownTypes' \
 		--compiler_flags='--externs=clientcode/externs.js' \
 		--compiler_flags='--create_renaming_reports' \
 		--compiler_flags='--language_in=ECMASCRIPT5' \
@@ -80,3 +77,24 @@ compiled-client.js: clientcode/*.js
 	@echo "${BUILD_DATE}" > $@.date
 	@mv _props_map.out $@_props_map.out
 	@mv _vars_map.out $@_vars_map.out
+
+check: clientcode/*.js
+# Compile our code with reportUnknownTypes enabled to call out anything that's not typed.
+# The main game code is not clean for this, but we can start to insist on strong typing in a subset of it.
+# (neither is the Closure library, so we insert a lot of @suppress{reportUnknownTypes} there)
+	@google/closure/bin/build/closurebuilder.py \
+		--root='google'	--root='clientcode' \
+		--compiler_flags='--externs=clientcode/externs.js' \
+		--compiler_flags='--js=google/closure/goog/deps.js' \
+		--input='clientcode/GameData.js' \
+		--input='clientcode/CombatEngine.js' \
+		--output_mode=compiled \
+		--compiler_jar=google/compiler.jar \
+		--compiler_flags='--compilation_level=ADVANCED_OPTIMIZATIONS' \
+		--compiler_flags='--jscomp_warning=reportUnknownTypes' \
+		--compiler_flags='--summary_detail_level=2' \
+		--compiler_flags='--warning_level=VERBOSE' \
+		--compiler_flags='--language_in=ECMASCRIPT5' \
+		--output_file=/dev/null \
+		${CHECK_FLAGS} ${OPT_FLAGS}
+
