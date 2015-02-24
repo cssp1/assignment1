@@ -14,6 +14,7 @@
 
 /**
  * @fileoverview Utilities for string manipulation.
+ * @suppress {reportUnknownTypes} DJM/SpinPunch
  */
 
 

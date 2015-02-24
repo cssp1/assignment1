@@ -15,6 +15,7 @@
 /**
  * @fileoverview Utilities for manipulating arrays.
  *
+ * @suppress {reportUnknownTypes} DJM/SpinPunch
  */
 
 

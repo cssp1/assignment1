@@ -14,6 +14,7 @@
 
 /**
  * @fileoverview Utilities for manipulating objects/maps/hashes.
+ * @suppress {reportUnknownTypes} DJM/SpinPunch
  */
 
 goog.provide('goog.object');

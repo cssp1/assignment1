@@ -14,6 +14,7 @@
 
 /**
  * @fileoverview Bootstrap for the Google JS Library (Closure).
+ * @suppress {reportUnknownTypes,es5Strict} DJM/SpinPunch
  *
  * In uncompiled mode base.js will write out Closure's deps file, unless the
  * global <code>CLOSURE_NO_DEPS</code> is set to true.  This allows projects to

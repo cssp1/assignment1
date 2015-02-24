@@ -1,0 +1,64 @@
+This disables some Closure compiler type warnings inside the Closure library code.
+
+diff --git a/gameclient/google/closure/goog/net/xhrio.js b/gameclient/google/closure/goog/net/xhrio.js
+index 20d53c2..6c6aa68 100644
+--- a/gameclient/google/closure/goog/net/xhrio.js
++++ b/gameclient/google/closure/goog/net/xhrio.js
+@@ -478,7 +478,8 @@ goog.net.XhrIo.prototype.send = function(url, opt_method, opt_content,
+   try {
+     goog.log.fine(this.logger_, this.formatMsg_('Opening Xhr'));
+     this.inOpen_ = true;
+-    this.xhr_.open(method, url, true);  // Always async!
++    var url2 = /** @type {string} */ (url); // DJM/SpinPunch
++    this.xhr_.open(method, url2, true);  // Always async!
+     this.inOpen_ = false;
+   } catch (err) {
+     goog.log.fine(this.logger_,
+diff --git a/gameclient/google/closure/goog/array/array.js b/gameclient/google/closure/goog/array/array.js
+index 928c791..5cce337 100644
+--- a/gameclient/google/closure/goog/array/array.js
++++ b/gameclient/google/closure/goog/array/array.js
+@@ -15,6 +15,7 @@
+ /**
+  * @fileoverview Utilities for manipulating arrays.
+  *
++ * @suppress {reportUnknownTypes} DJM/SpinPunch
+  */
+ 
+ 
+diff --git a/gameclient/google/closure/goog/base.js b/gameclient/google/closure/goog/base.js
+index 19ea91e..2ef83f4 100644
+--- a/gameclient/google/closure/goog/base.js
++++ b/gameclient/google/closure/goog/base.js
+@@ -14,6 +14,7 @@
+ 
+ /**
+  * @fileoverview Bootstrap for the Google JS Library (Closure).
++ * @suppress {reportUnknownTypes,es5Strict} DJM/SpinPunch
+  *
+  * In uncompiled mode base.js will write out Closure's deps file, unless the
+  * global <code>CLOSURE_NO_DEPS</code> is set to true.  This allows projects to
+diff --git a/gameclient/google/closure/goog/object/object.js b/gameclient/google/closure/goog/object/object.js
+index fa5c08a..05f9d2f 100644
+--- a/gameclient/google/closure/goog/object/object.js
++++ b/gameclient/google/closure/goog/object/object.js
+@@ -14,6 +14,7 @@
+ 
+ /**
+  * @fileoverview Utilities for manipulating objects/maps/hashes.
++ * @suppress {reportUnknownTypes} DJM/SpinPunch
+  */
+ 
+ goog.provide('goog.object');
+diff --git a/gameclient/google/closure/goog/string/string.js b/gameclient/google/closure/goog/string/string.js
+index dcfdffb..329aae3 100644
+--- a/gameclient/google/closure/goog/string/string.js
++++ b/gameclient/google/closure/goog/string/string.js
+@@ -14,6 +14,7 @@
+ 
+ /**
+  * @fileoverview Utilities for string manipulation.
++ * @suppress {reportUnknownTypes} DJM/SpinPunch
+  */
+ 
+ 
