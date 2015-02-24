@@ -42805,7 +42805,8 @@ function handle_server_message(data) {
     } else if(msg == "PUSH_GAMEDATA") {
         var new_gamedata_str = data[1];
         var new_abtests = data[2];
-        var new_gamedata = JSON.parse(new_gamedata_str); // eval('('+new_gamedata_str+')');
+
+        var new_gamedata = /** @type {Object.<string,?>} */ (JSON.parse(new_gamedata_str)); // eval('('+new_gamedata_str+')');
         /*
         console.log('HERE 0');
         console.log(new_gamedata);
