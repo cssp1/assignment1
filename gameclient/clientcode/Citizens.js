@@ -202,7 +202,7 @@ Citizens.Context.prototype.update = function(army) {
     var seen = {};
     goog.array.forEach(army, function(data) {
         var spec = new GameData.UnitSpec(gamedata['units'][data.specname]);
-        if(GameData.get_leveled_quantity(spec.max_hp, data.level) <= 0 || data.hp_ratio > 0) {
+        if(GameData.get_leveled_number(spec.max_hp, data.level) <= 0 || data.hp_ratio > 0) {
             // unit is alive
             seen[data.obj_id] = true;
             if(data.obj_id in this.by_id) {

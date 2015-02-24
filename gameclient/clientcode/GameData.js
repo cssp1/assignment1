@@ -6,16 +6,14 @@ goog.provide('GameData');
 
 // experimental - wrap parts of gamedata in type-safe wrappers
 
-goog.require('goog.array');
-goog.require('goog.object');
-
 /** @typedef {Object.<string,*>} */
 GameData.RawSpec;
 
-/** @param {T|Array.<T>} qty
+// templates don't really work with reportUnknownTypes, so we can't use them here.
+
+/** @param {*} qty
     @param {number} level
-    @return {T}
-    @template T */
+    @return {*} */
 GameData.get_leveled_quantity = function(qty, level) {
     if((typeof qty) == 'undefined') {
         throw Error('get_leveled_quantity of undefined');
@@ -34,9 +32,19 @@ GameData.get_leveled_quantity = function(qty, level) {
     }
 };
 
+/** @param {number|Array.<number>} qty
+    @param {number} level
+    @return {number} */
+GameData.get_leveled_number = function(qty, level) {
+    var x = GameData.get_leveled_quantity(qty, level);
+    if(typeof x !== 'number') { throw Error('expected number but got '+qty); }
+    return x;
+};
+
 /** @constructor @struct
     @param {GameData.RawSpec} spec */
 GameData.UnitSpec = function(spec) {
+    /** @private */
     this.spec = spec;
 };
 
@@ -58,6 +66,7 @@ GameData.UnitSpec.prototype = {
 /** @constructor @struct
     @param {GameData.RawSpec} spec */
 GameData.WeaponSpell = function(spec) {
+    /** @private */
     this.spec = spec;
 };
 
@@ -70,10 +79,9 @@ GameData.WeaponSpell.prototype = {
     get damage() { return /** @type {number|Array.<number>} */ (this.spec['damage'] || 0); }
 };
 
-
+/** @param {string} spellname */
 GameData.TestFunc = function(spellname) {
-    /** @type {!GameData.WeaponSpell} */
-    var ws = new GameData.WeaponSpell(gamedata['spells'][spellname]);
+    var ws = new GameData.WeaponSpell(/** @type {GameData.RawSpec} */ (gamedata['spells'][spellname]));
     console.log(ws.damage);
     console.log(ws.applies_aura);
 };
