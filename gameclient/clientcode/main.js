@@ -441,6 +441,7 @@ var canvas_is_fullscreen = false;
 var server_time = 0, server_time_offset = 0;
 
 // client_time is the client-side clock. It will usually be monotonically increasing (assuming the browser/OS works that way).
+/** @type {number} */
 var client_time = 0;
 
 var last_clock_update_time = 0;
@@ -1591,7 +1592,9 @@ GameObject.prototype.cast_client_spell = function(spell_name, spell, target, loc
             if(spell['kills_self']) {
                 // Detonator droid/landmine
                 // queue BEFORE other damage so it's listed in this order in the battle log
-                session.combat_engine.damage_effect_queue.push(new CombatEngine.KillDamageEffect(client_time + (spell['kills_self_delay']||0), this, this));
+                var death_time = CombatEngine.TickCount.add(session.combat_engine.cur_tick,
+                                                            relative_time_to_tick(/** @type {number} */ (spell['kills_self_delay']||0)));
+                session.combat_engine.damage_effect_queue.push(new CombatEngine.KillDamageEffect(death_time, this, this));
             }
 
             if(spell['impact_auras']) {
@@ -2700,7 +2703,8 @@ GameObject.prototype.fire_projectile = function(fire_time, force_hit_time, spell
 
     if(spell['kills_self']) {
         // special for Detonator Droids - kill self
-        session.combat_engine.damage_effect_queue.push(new CombatEngine.KillDamageEffect(fire_time + (spell['kills_self_delay']||0), this, this));
+        var death_time = absolute_time_to_tick(fire_time + /** @type {number} */ (spell['kills_self_delay']||0));
+        session.combat_engine.damage_effect_queue.push(new CombatEngine.KillDamageEffect(death_time, this, this));
     }
 
     var hit_time = do_fire_projectile(this, this.id, this.spec['name'],
