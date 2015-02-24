@@ -13,6 +13,7 @@ YUMPACKAGES+=" sendmail-cf patch fail2ban screen pinentry"
 YUMPACKAGES+=" gcc git autoconf automake libtool"
 YUMPACKAGES+=" postgresql postgresql-devel python-psycopg2" # note: client only
 YUMPACKAGES+=" mongodb-org-shell mongodb-org-tools" # note: client only
+YUMPACKAGES+=" java-1.8.0-openjdk-headless" # Google Closure Compiler now requires at least Java 7
 
 echo "SETUP(remote): Installing additional packages..."
 sudo yum -y -q install $YUMPACKAGES

@@ -9,6 +9,7 @@ YUMPACKAGES+=" libxml2 libxml2-devel gcc"
 YUMPACKAGES+=" sendmail-cf patch fail2ban screen"
 YUMPACKAGES+=" mysql MySQL-python" # note: MySQL server + client + python libs
 YUMPACKAGES+=" postgresql python-psycopg2" # note: Postgres client + python libs only
+YUMPACKAGES+=" java-1.8.0-openjdk-headless" # Google Closure Compiler now requires at least Java 7
 
 echo "SETUP(remote): Installing additional packages..."
 sudo yum -y -q install $YUMPACKAGES

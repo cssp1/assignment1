@@ -8,6 +8,7 @@ YUMPACKAGES+=" python-imaging python-imaging-devel numpy"
 YUMPACKAGES+=" libxml2 libxml2-devel"
 YUMPACKAGES+=" sendmail-cf patch screen fail2ban"
 YUMPACKAGES+=" postgresql python-psycopg2" # note: client only
+YUMPACKAGES+=" java-1.8.0-openjdk-headless" # Google Closure Compiler now requires at least Java 7
 
 echo "SETUP(remote): Installing additional packages..."
 sudo yum -y -q install $YUMPACKAGES
