@@ -2514,11 +2514,11 @@ function do_fire_projectile(my_source, my_id, my_spec_name, my_level, my_team, m
         if(target && target.is_mobile() && gamedata['client']['unit_draw_scatter']) {
             impact_pos = vec_mad(impact_pos, gamedata['client']['unit_draw_scatter'], target.draw_offset);
         }
-        var shot_v = vec_sub(impact_pos, my_pos);
+        var my_shot_v = vec_sub(impact_pos, my_pos);
 
         // if lead is enabled for a non-splash weapon, apply it to the graphical effect
         if(use_lead > 0 && !lead_applied && target && target.is_mobile() && (target.vel[0] != 0 || target.vel[1] != 0)) {
-            var lead_shot_time = apply_target_lead(vec_mad(shot_v, prefire_delay+postfire_delay, target.vel), target.vel, speed);
+            var lead_shot_time = apply_target_lead(vec_mad(my_shot_v, prefire_delay+postfire_delay, target.vel), target.vel, speed);
             if(lead_shot_time >= 0) {
                 impact_time = (muzzle_time + prefire_delay + lead_shot_time);
                 impact_pos = vec_mad(impact_pos, (lead_shot_time + prefire_delay + postfire_delay) * use_lead, target.vel);
@@ -2554,8 +2554,8 @@ function do_fire_projectile(my_source, my_id, my_spec_name, my_level, my_team, m
 
         // instance properties passed to vfx system
         var vfx_props = {};
-        if(shot_v[0] != 0 || shot_v[1] != 0) {
-            vfx_props['heading'] = Math.atan2(shot_v[1], shot_v[0]);
+        if(my_shot_v[0] != 0 || my_shot_v[1] != 0) {
+            vfx_props['heading'] = Math.atan2(my_shot_v[1], my_shot_v[0]);
         }
 
         if(my_source.is_mobile()) {
@@ -2582,7 +2582,7 @@ function do_fire_projectile(my_source, my_id, my_spec_name, my_level, my_team, m
         // only apply muzzle flash on first copy
         if(muzzle_vfx && (i == 0)) {
             SPFX.add_visual_effect(my_pos, my_height,
-                                   v3_normalized([shot_v[0], 0, shot_v[1]]),
+                                   v3_normalized([my_shot_v[0], 0, my_shot_v[1]]),
                                    muzzle_time,
                                    muzzle_vfx, true, vfx_props);
         }
@@ -3410,10 +3410,10 @@ GameObject.prototype.run_ai = function() {
                     // unexpectedly change combat AI behavior in old
                     // games, so optionally use the old behavior.
                     var bad_long_range_targeting = !gamedata['enable_prioritized_long_range_targeting'];
-                    var targeting_result = this.ai_pick_target(auto_spell, auto_spell_level, aggro_radius, bad_long_range_targeting, 'enemies_far');
+                    var long_range_targeting_result = this.ai_pick_target(auto_spell, auto_spell_level, aggro_radius, bad_long_range_targeting, 'enemies_far');
 
-                    if(targeting_result && targeting_result.target) {
-                        this.ai_pursue_target(auto_spell, auto_spell_level, targeting_result);
+                    if(long_range_targeting_result && long_range_targeting_result.target) {
+                        this.ai_pursue_target(auto_spell, auto_spell_level, long_range_targeting_result);
                     } else if(this.ai_dest) {
                         // leash back to "home" location
                         this.ai_move_towards(this.ai_dest, null, 'leash');
@@ -10076,7 +10076,6 @@ function update_enemy_resource_bars(dialog) {
             dialog.widgets['resource_bar_'+res+'_prog'].progress = Math.min(1, disp/starting[res]);
         }
         if(('resource_bar_'+res in dialog.widgets) && dialog.widgets['resource_bar_'+res].tooltip) {
-            var resdata = gamedata['resources'][res];
             dialog.widgets['resource_bar_'+res].tooltip.str = dialog.data['widgets']['resource_bar_'+res]['ui_tooltip'].replace('%RES', resdata['ui_name']);
         }
     }
@@ -12341,7 +12340,7 @@ function inventory_item_is_usable_in_combat(spec, session) {
             if(pred['predicate'] == target) {
                 return true;
             } else if(pred['predicate'] == 'NOT') {
-                ret = has_predicate(pred['subpredicates'][0], target);
+                var ret = has_predicate(pred['subpredicates'][0], target);
                 if(ret !== null) { return !ret; } // negate the child predicate
             } else if('subpredicates' in pred) {
                 var ret = null;
@@ -13666,7 +13665,7 @@ function invoke_you_were_attacked_dialog(recent_attacks) {
     for(var i = 0; i < recent_attacks.length; i++) {
         var a = recent_attacks[i];
         lost_units += a['lost_units'];
-        for(res in gamedata['resources']) {
+        for(var res in gamedata['resources']) {
             if('lost_'+res in a) {
                 lost_res[res] = (lost_res[res]||0) + a['lost_'+res];
             }
@@ -14441,8 +14440,7 @@ function invoke_level_up_dialog() {
     //dialog.widgets['description'].str = gamedata['player_xp']['level_up_text'];
 
     // display reward consequent
-    var reward_cons = null;
-    var level_up_rewards = player.get_any_abtest_value('level_up_reward', gamedata['player_xp']['level_up_reward']);
+    var level_up_rewards = player.get_any_abtest_value('level_up_reward', gamedata['player_xp']['level_up_reward'] || []);
     var reward_cons = level_up_rewards[Math.min(next_level, level_up_rewards.length-1)];
 
     if(reward_cons && reward_cons['consequent'] == 'GIVE_LOOT') {
@@ -17183,7 +17181,6 @@ function invoke_ai_attack_warning_dialog(text) {
     var attacker_name = session.incoming_attacker_name;
 
     if(template === 'ai_attack_warning_dialog') {
-        var attacker_name = session.incoming_attacker_name;
         dialog.widgets['description'].str = gamedata['tutorial']['ai_attack_begin']['ui_warning'].replace('%d',
                                                                                                           pretty_print_time(session.incoming_attack_time - server_time)).replace('%s', attacker_name);
 
@@ -17924,7 +17921,7 @@ function invoke_generic_context_menu(xy, buttons, dialog_name, special_buttons) 
     // center the dialog horizontally on xy, and shift it upwards so
     // that the first button is directly underneath the cursor
     var default_button = ('default_button' in dialog.data ? dialog.widgets[dialog.data['default_button']] : dialog.widgets['button0']);
-    var xy = vec_add(xy, [-Math.floor(dialog.wh[0]/2),Math.floor(-(default_button.xy[1] + default_button.wh[1]/2 + 7))]);
+    xy = vec_add(xy, [-Math.floor(dialog.wh[0]/2),Math.floor(-(default_button.xy[1] + default_button.wh[1]/2 + 7))]);
     xy = vec_sub(xy, dialog.get_absolute_xy());
 
     // resize dialog to fit the proper number of buttons
@@ -18326,7 +18323,7 @@ Region.prototype.check_map_integrity = function(where) {
 
     this.occupancy.for_each_cell((function (_this) { return function(cell) {
         if(cell.block_count != (cell.blockers ? cell.blockers.length : 0)) {
-            report_err('cell block_count '+cell.block_count.toString()+' does not match blockers.length '+cell.blockers.length.toString(), cell, feature);
+            report_err('cell block_count '+cell.block_count.toString()+' does not match blockers.length '+cell.blockers.length.toString(), cell, null);
         }
         if(cell.blockers) {
             for(var b = 0; b < cell.blockers.length; b++) {
@@ -20462,8 +20459,8 @@ function update_loot_dialog(dialog) {
             dialog.widgets['store_all_button'].state = 'disabled';
         }
     } else {
-        dialog.widgets['store_all_button'].onclick = function(w) {
-            var _dialog = w.parent;
+        dialog.widgets['store_all_button'].onclick = function(clicked_widget) {
+            var _dialog = clicked_widget.parent;
             _dialog.user_data['pending'] = -1;
             _dialog.widgets['glow'].show = true;
             _dialog.widgets['glow'].reset_fx();
@@ -22404,7 +22401,6 @@ function update_battle_history_dialog(dialog) {
             dialog.widgets['row_revenge_button'+row].show = false;
         } else if(session.region && session.region.data && session.region.data['storage'] == 'nosql' && session.region.map_enabled()) {
             dialog.widgets['row_revenge_button'+row].show = false;
-            var info = PlayerCache.query_sync(user_id);
             if(info && info['home_region'] == session.region.data['id'] && info['home_base_loc']) {
                 dialog.widgets['row_revenge_button'+row].show = true;
                 dialog.widgets['row_revenge_button'+row].state = 'normal';
@@ -23205,8 +23201,8 @@ function leaderboard_change_page(dialog, period, mode, chapter, page) {
                 dialog.widgets['leaderboard_loading'].show = false;
             }
             for(var ch in dialog.user_data['friend_data']) {
-                for(var period in dialog.user_data['friend_data'][ch]) {
-                    dialog.user_data['friend_data'][ch][period] = (id_list.length > 0 ? 'PENDING' : []);
+                for(var p in dialog.user_data['friend_data'][ch]) {
+                    dialog.user_data['friend_data'][ch][p] = (id_list.length > 0 ? 'PENDING' : []);
                 }
             }
         } else if(dialog.user_data['friend_data'][chapter][period] === 'PENDING') {
@@ -23550,8 +23546,8 @@ function player_info_statistics_tab_select(dialog, new_loc) {
 
     // CURRENT LOC
     selector[0] = selector[0].concat(SPText.cstring_to_ablocks_bbcode(dialog.data['widgets']['selector']['ui_separator'])[0]);
-    var ui_current = dialog.data['widgets']['selector']['ui_name_current'].replace('%scope', gamedata['strings']['leaderboard']['periods'][dialog.user_data['time_scope']]['name']);
-    var is_selected = (dialog.user_data['time_displayed'] == dialog.user_data['time_cur']);
+    ui_current = dialog.data['widgets']['selector']['ui_name_current'].replace('%scope', gamedata['strings']['leaderboard']['periods'][dialog.user_data['time_scope']]['name']);
+    is_selected = (dialog.user_data['time_displayed'] == dialog.user_data['time_cur']);
     ui_current = dialog.data['widgets']['selector'][(is_selected ? 'ui_format_selected' : 'ui_format_unselected')].replace('%thing', ui_current);
     selector[0] = selector[0].concat(SPText.cstring_to_ablocks_bbcode(ui_current, {onclick:
                                                                                    (function(_dialog) { return function() {
@@ -23561,7 +23557,7 @@ function player_info_statistics_tab_select(dialog, new_loc) {
     for(var time_loc = dialog.user_data['time_cur'] - 1; time_loc >= dialog.user_data['time_limit']; time_loc -= 1) {
         selector[0] = selector[0].concat(SPText.cstring_to_ablocks_bbcode(dialog.data['widgets']['selector']['ui_separator'])[0]);
         var ui_prev = dialog.data['widgets']['selector']['ui_name_prev'].replace('%scope', gamedata['strings']['leaderboard']['periods'][dialog.user_data['time_scope']]['name']).replace('%loc', (time_loc + (dialog.user_data['time_scope'] == 'season' ? (gamedata['matchmaking']['season_ui_offset']||0) : 0)).toFixed(0));
-        var is_selected = (dialog.user_data['time_displayed'] == time_loc);
+        is_selected = (dialog.user_data['time_displayed'] == time_loc);
         ui_prev = dialog.data['widgets']['selector'][(is_selected ? 'ui_format_selected' : 'ui_format_unselected')].replace('%thing', ui_prev);
         selector[0] = selector[0].concat(SPText.cstring_to_ablocks_bbcode(ui_prev, {onclick:
                                                                                     (function(_dialog, _time_loc) { return function() {
@@ -24744,7 +24740,6 @@ function alliance_list_change_tab(dialog, newtab, info_id) {
             d.user_data['rows_per_page'] = d.data['widgets']['players']['array'][1];
             d.user_data['rowdata'] = []; // this holds the player ID list
             d.user_data['point_stat'] = null;
-            var event = player.current_alliance_stat_tournament_event();
             if(event) {
                 d.user_data['event'] = event;
                 d.user_data['event_end_time'] = player.current_alliance_stat_tournament()['end_time'];
@@ -26392,9 +26387,9 @@ function update_player_info_dialog_scores(dialog) {
         if(scores[i]['field'] == point_stat && ('absolute' in scores[i])) {
             point_count = scores[i]['absolute'];
             if(!event) { // legacy
-                var trophy_type = player.current_trophy_type();
-                if(trophy_type) {
-                    point_count = display_trophy_count(point_count, trophy_type);
+                var cur_trophy_type = player.current_trophy_type();
+                if(cur_trophy_type) {
+                    point_count = display_trophy_count(point_count, cur_trophy_type);
                 }
             }
         }
@@ -28320,8 +28315,8 @@ function update_repair_control(dialog) {
             }
         }
     }
-    for(var box = 0; box < NBOXES; box++) {
-        dialog.widgets['queue_counter'+box.toString()].str = counters[box].toString();
+    for(var b = 0; b < NBOXES; b++) {
+        dialog.widgets['queue_counter'+b.toString()].str = counters[b].toString();
     }
 
     // collect and sort list of all mobile units to display
@@ -29348,8 +29343,8 @@ function update_manufacture_dialog(dialog) {
         }
     }
 
-    for(var box = 0; box < 4; box++) {
-        dialog.widgets['queue_counter'+box.toString()].str = counters[box].toString();
+    for(var b = 0; b < 4; b++) {
+        dialog.widgets['queue_counter'+b.toString()].str = counters[b].toString();
     }
 
     // fill in price display and "finish" button callback
@@ -34002,8 +33997,8 @@ function update_settings_dialog(dialog) {
         var cur_value = get_preference_setting(dialog.user_data['preferences'], data['name']);
         for(var c = 0; c < 2; c++) {
             var choice = data['choices'][c];
-            var enabled = (cur_value == choice['preference_val']);
-            dialog.widgets['choice'+c+','+row].state = enabled ? 'active' : 'normal';
+            var choice_selected = (cur_value == choice['preference_val']);
+            dialog.widgets['choice'+c+','+row].state = (choice_selected ? 'active' : 'normal');
         }
     }
 }
@@ -35719,9 +35714,9 @@ function invoke_new_store_category(catdata, parent_catdata, scroll_to_sku_name, 
                 tip_item['expire_time'] = skudata['melt_time'];
             }
 
-            var ui_name = ItemDisplay.get_inventory_item_stack_prefix(spec, stack) + ItemDisplay.get_inventory_item_ui_name(spec);
+            var fallback_name = ItemDisplay.get_inventory_item_stack_prefix(spec, stack) + ItemDisplay.get_inventory_item_ui_name(spec);
 
-            d.widgets['name'].set_text_with_linebreaking(('ui_name' in skudata ? skudata['ui_name'] : ui_name));
+            d.widgets['name'].set_text_with_linebreaking(('ui_name' in skudata ? skudata['ui_name'] : fallback_name));
             ItemDisplay.set_inventory_item_asset(d.widgets['icon'], spec);
             ItemDisplay.set_inventory_item_stack(d.widgets['icon_stack'], spec, tip_item);
         } else if('name' in skudata) {
@@ -36703,25 +36698,7 @@ function build_dialog_scroll(dialog, page) {
                 var unlocked = true;
                 var helper = null;
 
-                function paragraphize(text, line_len) {
-                    var words = text.split(' ');
-                    var ret = '';
-                    var c = 0;
-                    for(var i = 0; i < words.length; i++) {
-                        ret += words[i];
-                        if(i < words.length-1) {
-                            if(c >= line_len) {
-                                ret += '\n'; c = 0;
-                            } else {
-                                ret += ' '; c += 1;
-                            }
-                        }
-                    }
-                    return ret;
-                };
-                //tooltip_text.push(paragraphize(spec['ui_description'].split('.')[0]+'.\n',6));
-
-                tooltip_text.push(paragraphize(spec['ui_description'],6));
+                tooltip_text.push(SPUI.break_lines(spec['ui_description'],SPUI.desktop_font, [300,0])[0]);
                 tooltip_text.push('');
 
                 // hack for tutorial
@@ -36813,7 +36790,7 @@ function build_dialog_scroll(dialog, page) {
                     }
 
                     // minimum resource amounts
-                    var min_quant, player_quant;
+                    var min_quant;
                     var res_needed = {};
                     for(var res in gamedata['resources']) {
                         var resdata = gamedata['resources'][res];
@@ -37728,7 +37705,7 @@ function update_upgrade_dialog(dialog) {
         dialog.widgets['cost_time'].str = null;
 
     } else {
-        var cost, widget;
+        var cost;
 
         for(var res in gamedata['resources']) {
             var resdata = gamedata['resources'][res];
@@ -38188,8 +38165,8 @@ function update_upgrade_dialog(dialog) {
     // shift damage_vs icons over to make room for mod display
     if(tech && player.get_any_abtest_value('enable_mod_techs', gamedata['enable_mod_techs'])) {
         for(var i = 0; i < dialog.data['widgets']['damage_vs']['array'][0]; i++) {
-            var widget = dialog.widgets['damage_vs'+i.toString()];
-            widget.xy[0] = dialog.data['widgets']['damage_vs']['xy'][0] + i*dialog.data['widgets']['damage_vs']['array_offset'][0] + dialog.data['widgets']['icon']['mod_shift'][0];
+            var w = dialog.widgets['damage_vs'+i.toString()];
+            w.xy[0] = dialog.data['widgets']['damage_vs']['xy'][0] + i*dialog.data['widgets']['damage_vs']['array_offset'][0] + dialog.data['widgets']['icon']['mod_shift'][0];
         }
         dialog.widgets['damage_vs_label'].xy = vec_add(dialog.data['widgets']['damage_vs_label']['xy'], dialog.data['widgets']['icon']['mod_shift']);
     }
@@ -38735,7 +38712,7 @@ Store.display_user_currency_amount = function(price, format) {
         var divisor = player.get_any_abtest_value('gamebucks_display_divisor', gamedata['store']['gamebucks_display_divisor']);
         if(!format) { format = 'normal'; }
         var key = 'gamebucks_display_ui_'+format;
-        var format = player.get_any_abtest_value(key, gamedata['store'][key]);
+        var template = player.get_any_abtest_value(key, gamedata['store'][key]);
         var num;
         if(divisor == 1) {
             num = pretty_print_number(price);
@@ -38747,7 +38724,7 @@ Store.display_user_currency_amount = function(price, format) {
                 num += '.' + frac.toString();
             }
         }
-        return format.replace('%s', num);
+        return template.replace('%s', num);
     } else { // fbcredits
         var ret = pretty_print_number(price);
         if(format && format == 'full') {
@@ -40987,13 +40964,13 @@ function handle_server_message(data) {
         var alliance_id = data[1], affected_user = data[2], success = data[3], tag = data[4];
         if(success) {
             GameArt.assets["success_playful_22"].states['normal'].audio.play(client_time);
-            var msg = gamedata['strings']['alliance_'+{'ALLIANCE_INVITE_RESULT':'invite',
-                                                       'ALLIANCE_KICK_RESULT':'kick',
-                                                       'ALLIANCE_PROMOTE_RESULT':'promote'}[msg]+'_finish'];
+            var ui_msg = gamedata['strings']['alliance_'+{'ALLIANCE_INVITE_RESULT':'invite',
+                                                          'ALLIANCE_KICK_RESULT':'kick',
+                                                          'ALLIANCE_PROMOTE_RESULT':'promote'}[msg]+'_finish'];
             var player_props = PlayerCache.query_sync(affected_user);
             var name = PlayerCache.get_ui_name(player_props);
-            invoke_child_message_dialog(msg['ui_title'],
-                                        msg['ui_description'].replace('%s', name),
+            invoke_child_message_dialog(ui_msg['ui_title'],
+                                        ui_msg['ui_description'].replace('%s', name),
                                         {'dialog': 'message_dialog_big'});
         }
         AllianceCache.receive_invite_or_kick_result(tag, success);
@@ -41676,8 +41653,8 @@ function handle_server_message(data) {
                 selection.ui.widgets['glow'].reset_fx();
                 // make little rising text
                 var framenum = slot - (selection.ui.user_data['attach_page']*selection.ui.data['widgets']['attach_frame']['array'][0]);
-                var msg = gamedata['strings']['combat_messages'][(fungible ? "collected" : "added_to_warehouse")];
-                ItemDisplay.add_inventory_item_effect(selection.ui.widgets['attach_frame'+framenum.toString()], msg, [1,1,0.3,1]);
+                var ui_msg = gamedata['strings']['combat_messages'][(fungible ? "collected" : "added_to_warehouse")];
+                ItemDisplay.add_inventory_item_effect(selection.ui.widgets['attach_frame'+framenum.toString()], ui_msg, [1,1,0.3,1]);
             }
             var old_page = selection.ui.user_data['attach_page'];
             // reset state of mail dialog
@@ -43805,9 +43782,9 @@ function do_on_mouseup(e) {
                     if(units.length > 0) { player.record_feature_use('double_click_select'); }
 
                     if(e.shiftKey) {
-                        for(var i = 0; i < units.length; i++) {
-                           add_unit_to_selection(units[i]);
-                        }
+                        goog.array.forEach(units, function(u) {
+                            add_unit_to_selection(u);
+                        });
                     } else {
                         selection.multi = units;
                         if(!selection.unit && units.length > 0) { selection.unit = units[0]; }
@@ -43836,11 +43813,11 @@ function do_on_mouseup(e) {
                     if(found.spec['name'] === gamedata['tutorial'][player.tutorial_state]['unit_type']) {
                         advance_tutorial();
                     } else {
-                        for(var i = 0; i < selection.multi.length; i++) {
-                            if(selection.multi[i].spec['name'] === gamedata['tutorial'][player.tutorial_state]['unit_type']) {
+                        goog.array.forEach(selection.multi, function(unit) {
+                            if(unit.spec['name'] === gamedata['tutorial'][player.tutorial_state]['unit_type']) {
                                 advance_tutorial();
                             }
-                        }
+                        });
                     }
                 }
 
@@ -44502,7 +44479,7 @@ function do_on_mousedown(e) {
     if(gamedata['unit_deploy_style'] == 'drip' && selection.spellname === "DEPLOY_UNITS") {
         APMCounter.record_action();
 
-        function deployment_dripper_callback(mouse_xy) {
+        var deployment_dripper_callback = function(mouse_xy) {
             var ji = screen_to_ortho(mouse_xy);
             if(!session.viewing_base.is_deployment_location_valid(ji)) {
                 return;
@@ -44593,9 +44570,9 @@ function unit_command_patrol(j, i) {
     unit_command_move(j, i, true, true);
 
     do_unit_command_patrol(selection.unit);
-    for(var i = 0; i < selection.multi.length; i++) {
-        do_unit_command_patrol(selection.multi[i]);
-    }
+    goog.array.forEach(selection.multi, function(obj) {
+        do_unit_command_patrol(obj);
+    });
 }
 
 function do_unit_command_make_aggressive(unit) {
@@ -46512,12 +46489,14 @@ function draw_building_or_inert(obj, powerfac) {
         // use normal version as alternate, if available
         icon_alternates.push([icon, 'normal']);
 
+        var icon_name;
+
         if('destroyed_asset' in obj.spec) {
             icon_name = obj.spec['destroyed_asset'];
         } else {
             // use generic crater asset
             var size_str = obj.spec['gridsize'][0].toString()+'x'+obj.spec['gridsize'][1].toString();
-            var icon_name = 'building_crater_'+size_str;
+            icon_name = 'building_crater_'+size_str;
         }
 
         if(!(icon_name in GameArt.assets)) {
