@@ -35387,28 +35387,20 @@ function invoke_new_store_dialog() {
     dialog.modal = true;
     dialog.auto_center();
     dialog.widgets['close_button'].onclick = close_parent_dialog;
-    var CATEGORIES = [];
+    dialog.user_data['categories'] = [];
 
     for(var i = 0; i < gamedata['store']['catalog'].length; i++) {
         var cat = gamedata['store']['catalog'][i];
         if('activation' in cat && !read_predicate(cat['activation']).is_satisfied(player,null)) { continue; }
-        CATEGORIES.push(cat);
+        dialog.user_data['categories'].push(cat);
     }
-
-    var slen = CATEGORIES.length.toString();
-    if(!(slen in dialog_data['positions'])) {
-        throw Error('unhandled number of store categories: '+slen);
-    }
-    var POSITIONS = dialog_data['positions'][slen];
 
     var i = 0, grid_x = 0, grid_y = 0;
-    for(; i < Math.min(dialog.data['widgets']['cat']['array'][0]*dialog.data['widgets']['cat']['array'][1], CATEGORIES.length); i++) {
-        var cat = CATEGORIES[i];
+    for(; i < Math.min(dialog.data['widgets']['cat']['array'][0]*dialog.data['widgets']['cat']['array'][1], dialog.user_data['categories'].length); i++) {
+        var cat = dialog.user_data['categories'][i];
         var d = dialog.widgets['cat'+grid_x.toString()+','+grid_y.toString()];
         d.show = true;
         d.user_data['category'] = cat;
-        d.xy = vec_copy(POSITIONS[i]);
-        d.user_data['base_xy'] = [d.xy[0], d.xy[1]];
         d.widgets['icon'].asset = cat['icon'];
         d.widgets['label'].str =  cat['ui_name'];
         d.widgets['bg'].onclick = function(w) {
@@ -35434,7 +35426,38 @@ function invoke_new_store_dialog() {
         grid_y += 1;
     }
 
+    dialog.ondraw = update_new_store;
     return dialog;
+}
+
+function update_new_store(dialog) {
+    // how big can we be?
+    var new_width = canvas_width - 2*dialog.data['margin'][0];
+    new_width = clamp(new_width, dialog.data['dimensions'][0], dialog.data['max_dimensions'][0]);
+    dialog.wh = [new_width, dialog.data['dimensions'][1]];
+    dialog.on_resize(); // reset centering
+    dialog.apply_layout(); // adjust miscellaneous widgets
+
+    // lay out category labels
+    var slen = dialog.user_data['categories'].length.toString();
+    if(!(slen in dialog.data['positions'])) {
+        throw Error('unhandled number of store categories: '+slen);
+    }
+    var POSITIONS = dialog.data['positions'][slen];
+    var i = 0, grid_x = 0, grid_y = 0;
+
+    for(; i < Math.min(dialog.data['widgets']['cat']['array'][0]*dialog.data['widgets']['cat']['array'][1], dialog.user_data['categories'].length); i++) {
+        var cat = dialog.user_data['categories'][i];
+        var d = dialog.widgets['cat'+grid_x.toString()+','+grid_y.toString()];
+        // set position, correcting for resizing
+        d.xy = vec_add(POSITIONS[i], vec_floor(vec_scale(0.5, vec_sub(dialog.widgets['sunken'].wh, dialog.data['widgets']['sunken']['dimensions']))));
+        d.user_data['base_xy'] = [d.xy[0], d.xy[1]];
+        grid_x += 1;
+        if(grid_x >= dialog.data['widgets']['cat']['array'][0]) {
+            grid_x = 0;
+            grid_y += 1;
+        }
+    }
 }
 
 function update_new_store_category_label(d) {
@@ -35491,11 +35514,15 @@ function new_store_allow_sku(skudata) {
 }
 
 /** @param {Object} catdata
-    @param {(Array.<Object>|null)=} parent_catdata
-    @param {string=} scroll_to_sku_name */
-function invoke_new_store_category(catdata, parent_catdata, scroll_to_sku_name) {
-    // parent_catdata (optional, can be null) is a list of the catdatas on the hierarchical path to this category
-    // scroll_to_sku_name (optional, can be null) is the "name" string of a spell, item, or subcategory to scroll to upon opening the category
+    @param {(Array.<{cat:Object, sku_name:(string|null|undefined), pos:(number|null|undefined)}>|null)=} parent_catdata
+        this is a list of the catdatas on the hierarchical path to this category
+        PLUS either a sku name or literal scroll position to scroll to when stepping back up the hierarchy
+    @param {string|null=} scroll_to_sku_name - "name" string of a spell, item, or subcategory to scroll to upon opening the category. null to ignore.
+    @param {number|null=} scroll_to_pos - explicit initial scroll position. Overrides scroll_to_sku_name. null to ignore.
+*/
+function invoke_new_store_category(catdata, parent_catdata, scroll_to_sku_name, scroll_to_pos) {
+    scroll_to_sku_name = scroll_to_sku_name || null;
+    scroll_to_pos = (typeof scroll_to_pos == 'undefined' ? null : scroll_to_pos);
 
     var dialog_data = gamedata['dialogs']['new_store_category'];
     var dialog = new SPUI.Dialog(dialog_data);
@@ -35542,8 +35569,8 @@ function invoke_new_store_category(catdata, parent_catdata, scroll_to_sku_name) 
     var ui_name = '';
     if(parent_catdata) {
         goog.array.forEach(parent_catdata, function(data, idx) {
-            if(data['ui_name']) { // toplevel catalog does not have a ui_name
-                ui_name = ui_name + (idx != 0 ? ' :: ' : '') + data['ui_name'];
+            if(data.cat['ui_name']) { // toplevel catalog does not have a ui_name
+                ui_name = ui_name + (idx != 0 ? ' :: ' : '') + data.cat['ui_name'];
             }
         });
     }
@@ -35554,9 +35581,10 @@ function invoke_new_store_category(catdata, parent_catdata, scroll_to_sku_name) 
     dialog.widgets['back_button'].onclick = function(w) {
         var parent_catdata = w.parent.user_data['parent_catdata'];
         close_parent_dialog(w);
-        if(parent_catdata && parent_catdata.length > 0 && parent_catdata[0]['ui_name']) { // note: toplevel catalog does not have a ui_name
+        if(parent_catdata && parent_catdata.length > 0 && parent_catdata[0].cat['ui_name']) { // note: toplevel catalog does not have a ui_name
             // invoke parent category
-            invoke_new_store_category(parent_catdata[parent_catdata.length-1], (parent_catdata.length > 1 ? parent_catdata.slice(0, parent_catdata.length-1) : null));
+            invoke_new_store_category(parent_catdata[parent_catdata.length-1].cat, (parent_catdata.length > 1 ? parent_catdata.slice(0, parent_catdata.length-1) : null),
+                                      parent_catdata[parent_catdata.length-1].sku_name || null, parent_catdata[parent_catdata.length-1].pos || null);
         } else {
             // go back to top level
             invoke_new_store_dialog();
@@ -35571,69 +35599,36 @@ function invoke_new_store_category(catdata, parent_catdata, scroll_to_sku_name) 
 
     dialog.widgets['resource_bar_fbcredits_button'].onclick = Store.get_balance_plus_cb();
 
-    var initial_scroll = null; // null for no scrolling (0 indicates scrolling to the first SKU)
-    if(scroll_to_sku_name) {
-        initial_scroll = goog.array.findIndex(skulist, function(entry) {
+    dialog.user_data['open_time'] = client_time;
+
+    // the index of a SKU to show in the center as soon as the dialog opens
+    // null for no scrolling (0 means "center first SKU")
+    dialog.user_data['initial_scroll'] = null;
+    dialog.user_data['initial_scroll_exact'] = false;
+    if(scroll_to_pos !== null) {
+        // convert from pixels to SKU index units
+        dialog.user_data['initial_scroll'] = scroll_to_pos / dialog.data['widgets']['sku']['array_offset'][0];
+        dialog.user_data['initial_scroll_exact'] = true;
+    } else if(scroll_to_sku_name) {
+        dialog.user_data['initial_scroll'] = goog.array.findIndex(skulist, function(entry) {
             return ((('name' in entry) && entry['name'] === scroll_to_sku_name) ||
                     (('item' in entry) && entry['item'] === scroll_to_sku_name) ||
                     (('spell' in entry) && entry['spell'] === scroll_to_sku_name));
         });
-        if(initial_scroll < 0) {
-            initial_scroll = null;
+        if(dialog.user_data['initial_scroll'] < 0) {
+            dialog.user_data['initial_scroll'] = null;
             console.log("invoke_new_store_category(): did not find scroll_to_sku_name: "+scroll_to_sku_name);
-        } else {
-            // The dialog's "scroll position" is the SKU under the
-            // leftmost edge of the window, so we actually want to
-            // scroll LEFT of the target SKU in order for it to land
-            // in the center of the 3-up window.
-            initial_scroll -= 1; // XXX this will have to change if we ever switch to a non-3up layout
         }
     }
+    dialog.user_data['scroll_pos'] = dialog.user_data['scroll_goal'] = 0;
+    dialog.user_data['scrolled'] = false;
 
-    dialog.user_data['scroll_limits'] = [0, skulist.length * dialog.data['widgets']['sku']['array_offset'][0] - dialog.widgets['sunken'].wh[0] + dialog.data['widgets']['sku']['xy'][0] + 3];
-    if(initial_scroll !== null) {
-        dialog.user_data['scroll_goal'] = Math.min(Math.max(initial_scroll * dialog.data['widgets']['sku']['array_offset'][0], dialog.user_data['scroll_limits'][0]), dialog.user_data['scroll_limits'][1]);
-    } else {
-        dialog.user_data['scroll_goal'] = 0;
-    }
-    dialog.user_data['scroll_pos'] = dialog.user_data['scroll_goal'];
-    dialog.user_data['open_time'] = client_time;
-    dialog.user_data['scrolled'] = (initial_scroll !== null);
-
-    // special-case centering
-    var fixed = 0;
-    if(skulist.length == 3) {
-        fixed = -11;
-    } else if(skulist.length == 2) {
-        fixed = -115;
-    } else if(skulist.length == 1) {
-        fixed = -215;
-    }
-
-    if(fixed != 0) {
-        dialog.user_data['scroll_pos'] = dialog.user_data['scroll_goal'] = dialog.user_data['scroll_limits'][0] = dialog.user_data['scroll_limits'][1] = fixed;
-    }
-
-    var scroller = function(incr) { return function(w) {
-        var dialog = w.parent;
-        dialog.user_data['scroll_goal'] = clamp(dialog.user_data['scroll_goal']+dialog.data['widgets']['sku']['array_offset'][0]*incr,
-                                                dialog.user_data['scroll_limits'][0], dialog.user_data['scroll_limits'][1]);
-        dialog.widgets['scroll_left'].state = (dialog.user_data['scroll_goal'] <= dialog.user_data['scroll_limits'][0] ? 'disabled' : 'normal');
-        dialog.widgets['scroll_right'].state = (dialog.user_data['scroll_goal'] >= dialog.user_data['scroll_limits'][1] ? 'disabled' : 'normal');
-        if(incr > 0) { dialog.user_data['scrolled'] = true; }
-    }; };
-    dialog.widgets['scroll_left'].onclick = scroller(-1);
-    dialog.widgets['scroll_right'].onclick = scroller(1);
+    dialog.widgets['scroll_left'].onclick = function (w) { new_store_category_scroll(w.parent, -1); };
+    dialog.widgets['scroll_right'].onclick = function (w) { new_store_category_scroll(w.parent, 1); };
     dialog.widgets['scroll_left_jewel'].ondraw =
         dialog.widgets['scroll_right_jewel'].ondraw = update_notification_jewel;
     dialog.widgets['scroll_left_jewel'].user_data['count'] =
         dialog.widgets['scroll_right_jewel'].user_data['count'] = 0;
-
-    dialog.widgets['scroll_left'].show = dialog.widgets['scroll_right'].show =
-        (skulist.length * dialog.data['widgets']['sku']['array_offset'][0] >= dialog.widgets['sunken'].wh[0]);
-
-    dialog.widgets['scroll_left_jewel'].show = dialog.widgets['scroll_right_jewel'].show =
-        dialog.widgets['scroll_left'].show && player.get_any_abtest_value('enable_store_jewel', gamedata['store']['enable_store_jewel']);
 
     var default_sku_index = -1;
     var default_sku_priority = -1;
@@ -35657,7 +35652,7 @@ function invoke_new_store_category(catdata, parent_catdata, scroll_to_sku_name) 
         d.user_data['catpath'] = [];
         if(parent_catdata) {
             goog.array.forEach(parent_catdata, function(data) {
-                d.user_data['catpath'].push(data['name']);
+                d.user_data['catpath'].push(data.cat['name']);
             });
         }
         d.user_data['catpath'].push(catdata['name']);
@@ -35806,8 +35801,6 @@ function invoke_new_store_category(catdata, parent_catdata, scroll_to_sku_name) 
 
         d.ondraw = update_new_store_sku;
         d.ondraw(d);
-        d.clip_to = [dialog.widgets['sunken'].xy[0], dialog.widgets['sunken'].xy[1],
-                     dialog.widgets['sunken'].wh[0], dialog.widgets['sunken'].wh[1]];
     }
 
     if(default_sku_index >= 0) {
@@ -35826,9 +35819,67 @@ function invoke_new_store_category(catdata, parent_catdata, scroll_to_sku_name) 
     return dialog;
 }
 
+// recalculate scroll limits and goal. incr +/- 1 to go left and right, 0 to just recalculate in place.
+function new_store_category_scroll(dialog, incr) {
+    var skulist = dialog.user_data['skulist'];
+
+    // how much horizontal space do we need for ALL SKUs?
+    var extent = skulist.length * dialog.data['widgets']['sku']['array_offset'][0] + dialog.data['widgets']['sku']['xy'][0] + 3;
+
+    if(extent > dialog.widgets['sunken'].wh[0]) {
+        // we have more SKUs than space
+        dialog.user_data['scroll_limits'] = [0, Math.max(0, extent - dialog.widgets['sunken'].wh[0])];
+
+        // correct the initial_scroll index to put that SKU in the center, not at the left edge
+        if(dialog.user_data['initial_scroll'] !== null && !dialog.user_data['initial_scroll_exact']) {
+            // add/subtract as necessary to center this SKU
+            dialog.user_data['initial_scroll'] = dialog.user_data['initial_scroll'] - Math.floor((dialog.widgets['sunken'].wh[0]/dialog.data['widgets']['sku']['array_offset'][0])/2 - 0.5);
+        }
+    } else {
+        // we have more space than SKUs - just center everything
+        var left_edge = Math.floor((dialog.widgets['sunken'].wh[0] - extent)/2);
+        dialog.user_data['scroll_limits'] = [-left_edge, -left_edge];
+        dialog.user_data['initial_scroll'] = null; // no need to scroll anywhere
+    }
+
+    // note: this part only runs on the very first call after the dialog opens
+    if(dialog.user_data['initial_scroll'] !== null) {
+        var initial_scroll = dialog.user_data['initial_scroll'];
+        dialog.user_data['initial_scroll'] = null;
+        dialog.user_data['scrolled'] = true;
+        // immediately snap scroll position
+        dialog.user_data['scroll_pos'] = dialog.user_data['scroll_goal'] = clamp(initial_scroll * dialog.data['widgets']['sku']['array_offset'][0],
+                                                                                 dialog.user_data['scroll_limits'][0], dialog.user_data['scroll_limits'][1]);
+    }
+
+    if(incr != 0) { // move left or right
+        dialog.user_data['scroll_goal'] = dialog.user_data['scroll_goal']+dialog.data['widgets']['sku']['array_offset'][0]*incr;
+        dialog.user_data['scrolled'] = true;
+    }
+
+    // ensure goal is in bounds
+    dialog.user_data['scroll_goal'] = clamp(dialog.user_data['scroll_goal'], dialog.user_data['scroll_limits'][0], dialog.user_data['scroll_limits'][1]);
+
+    // set button clickability
+    dialog.widgets['scroll_left'].state = (dialog.user_data['scroll_goal'] <= dialog.user_data['scroll_limits'][0] ? 'disabled' : 'normal');
+    dialog.widgets['scroll_right'].state = (dialog.user_data['scroll_goal'] >= dialog.user_data['scroll_limits'][1] ? 'disabled' : 'normal');
+};
+
 function update_new_store_category(dialog) {
     update_resource_bars(dialog, false, false, true);
     var skulist = dialog.user_data['skulist'];
+
+    // first resize the dialog itself, then worry about scrolling calculations
+
+    // how big can we be?
+    var new_width = canvas_width - 2*dialog.data['margin'][0];
+    new_width = clamp(new_width, dialog.data['dimensions'][0], dialog.data['max_dimensions'][0]);
+    dialog.wh = [new_width, dialog.data['dimensions'][1]];
+    dialog.on_resize(); // reset centering
+    dialog.apply_layout(); // adjust miscellaneous widgets
+
+    // perform scroll limit/goal calculations without moving left or right
+    new_store_category_scroll(dialog, 0);
 
     if(!dialog.user_data['scrolled'] &&
        ((client_time - dialog.user_data['open_time']) < gamedata['store']['store_scroll_flash_time']) &&
@@ -35838,23 +35889,42 @@ function update_new_store_category(dialog) {
         }
     }
 
-    if(dialog.user_data['scroll_pos'] != dialog.user_data['scroll_goal']) {
+    // adjust smooth scrolling position
+    if(dialog.user_data['scroll_limits'][0] == dialog.user_data['scroll_limits'][1]) {
+        // if window is wider than needed to show all SKUs, just snap to the centered position
+        dialog.user_data['scroll_pos'] = dialog.user_data['scroll_limits'][0];
+    } else if(dialog.user_data['scroll_pos'] != dialog.user_data['scroll_goal']) {
+        // exponential movement
         var delta = dialog.user_data['scroll_goal'] - dialog.user_data['scroll_pos'];
         var sign = (delta > 0 ? 1 : -1);
-        dialog.user_data['scroll_pos'] += sign * Math.floor(0.15 * Math.abs(delta) + 0.5);
+        dialog.user_data['scroll_pos'] += sign * Math.floor(0.20 * Math.abs(delta) + 0.5);
     }
+
+    dialog.widgets['scroll_left'].show = dialog.widgets['scroll_right'].show =
+        (skulist.length * dialog.data['widgets']['sku']['array_offset'][0] >= dialog.widgets['sunken'].wh[0]);
+
+    dialog.widgets['scroll_left_jewel'].show = dialog.widgets['scroll_right_jewel'].show =
+        dialog.widgets['scroll_left'].show && player.get_any_abtest_value('enable_store_jewel', gamedata['store']['enable_store_jewel']);
 
     var left_jewels = 0, right_jewels = 0; // count number of jeweled SKUs to the left and right of the window
 
+    // adjust child SKU dialogs
     for(var i = 0; i < skulist.length; i++) {
         var w = dialog.widgets['sku'+i.toString()];
         var skudata = w.user_data['skudata'];
-        if(!new_store_allow_sku(skudata)) {
+
+        if(!new_store_allow_sku(skudata)) { // a predicate changed, or something else made it want to disappear
             w.show = false;
             continue;
         }
+
+        // left/right scrolling
         w.user_data['base_xy'][0] = i*dialog.data['widgets']['sku']['array_offset'][0] - dialog.user_data['scroll_pos'] + dialog.data['widgets']['sku']['xy'][0];
         w.user_data['base_xy'][1] = dialog.data['widgets']['sku']['xy'][1];
+
+        // set clipping
+        w.clip_to = [dialog.widgets['sunken'].xy[0], dialog.widgets['sunken'].xy[1],
+                     dialog.widgets['sunken'].wh[0], dialog.widgets['sunken'].wh[1]];
 
         if(('jewel' in skudata) && read_predicate(skudata['jewel']).is_satisfied(player, null)) {
             if(w.user_data['base_xy'][0] + 0.66*w.wh[0] < 0) { left_jewels += 1; }
@@ -35864,7 +35934,6 @@ function update_new_store_category(dialog) {
 
     dialog.widgets['scroll_left_jewel'].user_data['count'] = left_jewels;
     dialog.widgets['scroll_right_jewel'].user_data['count'] = right_jewels;
-
 }
 
 function update_new_store_sku(d) {
@@ -36195,8 +36264,10 @@ function update_new_store_sku(d) {
         d.widgets['bg'].onclick = function(w) {
             var d = w.parent;
             var child_catdata = d.user_data['skudata'];
-            var new_parent_catdata = (d.parent.user_data['parent_catdata'] || []).concat([d.parent.user_data['catdata']]);
+            // this saves the scroll_goal so that hitting the "Back" button brings you to the exact spot you were before you clicked this
+            var new_parent_catdata = (d.parent.user_data['parent_catdata'] || []).concat([{cat:d.parent.user_data['catdata'], pos:d.parent.user_data['scroll_goal']}]);
             close_parent_dialog(w.parent);
+            // don't specify anything to scroll toward, just leave it at the default
             invoke_new_store_category(child_catdata, new_parent_catdata);
         };
     } else if(price >= 0 && !pending) {
@@ -36303,9 +36374,7 @@ function invoke_store(purpose, path) {
             }
         }
         if(i < skulist.length) {
-            store.user_data['scroll_goal'] = store.user_data['scroll_pos'] =
-                clamp(i * store.data['widgets']['sku']['array_offset'][0],
-                      store.user_data['scroll_limits'][0], store.user_data['scroll_limits'][1]);
+            store.user_data['initial_scroll'] = i;
         }
     } else if(purpose == 'barriers' || purpose == 'special_items' || purpose == 'specials' || purpose == 'defenses') {
         var i;
@@ -36330,7 +36399,7 @@ function invoke_store(purpose, path) {
             } else {
                 // drill down
                 if(!('skus' in catdata)) { break; }
-                parent_catdata.push(catdata);
+                parent_catdata.push({cat:catdata, sku_name:cur});
                 catdata = goog.array.find(catdata['skus'], function(entry) {
                     return entry['name'] == cur;
                 });

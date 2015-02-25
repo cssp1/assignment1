@@ -4415,9 +4415,9 @@
     },
 
     "new_store_dialog": {
-        "bg_image": "",
         "clip_children": 0,
-        "dimensions": [670,423],
+        "dimensions": [670,423], "max_dimensions":[9999,423],
+        "margin": [100,0], // minimum number of pixels to leave between left edge of canvas and left edge of this dialog
         "positions": {
             // xy positions of the cat widgets for various numbers of categories
             "2": [[105,146],[365,146]],
@@ -4433,17 +4433,22 @@
                             "outline_color": [0,0,0,0], "outline_width": 1 },
 
             "glow": { "show": 0, "sound": "success_playful_22", "kind":"StaticImage","xy":[-30,-30],"dimensions":[730,483],"bg_image_resizable":1,"asset":"dialog_glow_resizable",
-                      "composite_mode": "lighter", "fade":1, "duration": 1.4, "fade_peak": 0.2, "delay": -0.2},
+                      "composite_mode": "lighter", "fade":1, "duration": 1.4, "fade_peak": 0.2, "delay": -0.2,
+                      "layout": {"hresizable": 1, "hjustify": "left"}},
 
-            "bg": { "kind": "StaticImage", "xy": [0,0], "dimensions": [670,423], "asset": "dialog_resizable", "bg_image_resizable": 1 },
+            "bg": { "kind": "StaticImage", "xy": [0,0], "dimensions": [670,423], "asset": "dialog_resizable", "bg_image_resizable": 1,
+                    "layout": {"hresizable": 1, "hjustify": "left"}},
 
-            "close_button": { "kind": "ActionButton", "xy": [623,22], "dimensions": [24,24], "bg_image": "close_button_big", "push_bg_image": 1 },
+            "close_button": { "kind": "ActionButton", "xy": [623,22], "dimensions": [24,24], "bg_image": "close_button_big", "push_bg_image": 1,
+                              "layout": {"hjustify": "right"}},
 
             "title_bold": { "kind": "TextField", "xy": [118,13], "dimensions": [434, 40], "text_size": 30, "text_style": "bold",
-                            "text_hjustify": "center", "text_vjustify": "center", "ui_name": "Store" },
+                            "text_hjustify": "center", "text_vjustify": "center", "ui_name": "Store",
+                            "layout": {"hjustify": "center"}},
 
             "sunken": {"kind": "StaticImage", "xy":[28,66], "dimensions":[614,348], "asset": "dialog_sunken_white_resizable", "bg_image_resizable": 1,
-                       "alpha": 0.8 },
+                       "alpha": 0.8,
+                       "layout": {"hresizable": 1, "hjustify": "left"}},
 
             "cat": { "kind": "Dialog", "xy": [40,146], "dialog": "new_store_category_label",
                      "array": [3,2], "array_offset": [197,175] }
@@ -4452,7 +4457,6 @@
 
     // sub-dialog used for major categories in the new Store
     "new_store_category_label": {
-        "bg_image": "",
         "dimensions": [200,178],
         "widgets": {
             "bg": {"kind": "ActionButton", "xy":[0,0], "dimensions":[200,178], "bg_image": "dialog_blackplate", "bg_image_resizable": 1,
@@ -4490,31 +4494,34 @@
 
     "new_store_category": {
         "clip_children": 0,
-        "dimensions": [670,423],
+        "dimensions": [670,423], "max_dimensions":[9999,423],
+        "margin": [100,0], // minimum number of pixels to leave between left edge of canvas and left edge of this dialog
         "default_button": "default_button",
         "widgets": {
             "bg_blanker": { "kind": "SolidRect", "xy": [-1000,-36], "dimensions": [2670,495], "color":[0.01,0.01,0.01,1],
                             "outline_color": [0,0,0,0], "outline_width": 1 },
 
             "glow": { "show": 0, "sound": "success_playful_22", "kind":"StaticImage","xy":[-30,-30],"dimensions":[730,483],"bg_image_resizable":1,"asset":"dialog_glow_resizable",
-                      "composite_mode": "lighter", "fade":1, "duration": 1.4, "fade_peak": 0.2, "delay": -0.2},
+                      "composite_mode": "lighter", "fade":1, "duration": 1.4, "fade_peak": 0.2, "delay": -0.2,
+                      "layout": {"hresizable": 1, "hjustify": "left"}},
 
-            "bg": { "kind": "StaticImage", "xy": [0,0], "dimensions": [670,423], "asset": "dialog_resizable", "bg_image_resizable": 1 },
+            "bg": { "kind": "StaticImage", "xy": [0,0], "dimensions": [670,423], "asset": "dialog_resizable", "bg_image_resizable": 1,
+                    "layout": {"hresizable": 1, "hjustify": "left"}},
 
-            "close_button": { "kind": "ActionButton", "xy": [623,22], "dimensions": [24,24], "bg_image": "close_button_big", "push_bg_image": 1 },
+            "close_button": { "kind": "ActionButton", "xy": [623,22], "dimensions": [24,24], "bg_image": "close_button_big", "push_bg_image": 1,
+                              "layout": {"hjustify": "right"}},
 
             "back_button_bg": { "kind": "StaticImage", "xy": [19,17], "dimensions": [77,35], "asset": "dialog_sunken_gray_resizable", "bg_image_resizable": 1 },
             "back_button": { "kind": "ActionButton", "xy": [19,17], "dimensions": [77,35], "bg_image": "back_button_big", "bg_image_offset": [17,7],
                              "push_bg_image": 1 },
             "back_button_shine": { "kind": "StaticImage", "xy": [20,19], "dimensions": [62,13], "asset": "button_shine" },
 
-
             "title_bold": { "kind": "TextField", "xy": [118,13], "dimensions": [434, 40], "text_size": 30, "text_style": "bold",
-                            "text_hjustify": "center", "text_vjustify": "center", "ui_name": "%s" },
+                            "text_hjustify": "center", "text_vjustify": "center", "ui_name": "%s",
+                            "layout": {"hjustify": "center"}},
 
-            "sunken": {"kind": "StaticImage", "xy":[8,66], "dimensions":[654,298], "asset": "dialog_sunken_white_resizable", "bg_image_resizable": 1,
-                       "alpha": 0.8
-                      },
+            "sunken": {"kind": "StaticImage", "xy":[8,66], "dimensions":[654,298], "asset": "dialog_sunken_white_resizable", "bg_image_resizable": 1, "alpha": 0.8,
+                       "layout": {"hresizable": 1, "hjustify": "left"}},
 
             "sku": { "kind": "Dialog", "xy": [9,72], "dialog": "new_store_sku",
                      "array": [0,1], // these are created dynamically in JavaScript
@@ -4523,7 +4530,8 @@
             "resource_bar_water_glow": { "show": 0, "kind": "StaticImage", "xy": [-83,344], "dimensions": [307,98], "asset": "resource_bar_glow", "alpha": 0 },
             "resource_bar_iron_glow": { "show": 0, "kind": "StaticImage", "xy": [49,344], "dimensions": [307,98], "asset": "resource_bar_glow", "alpha": 0 },
             "resource_bar_res3_glow": { "show": 0, "kind": "StaticImage", "xy": [181,344], "dimensions": [307,98], "asset": "resource_bar_glow", "alpha": 0 },
-            "resource_bar_fbcredits_glow": { "show": 0, "kind": "StaticImage", "xy": [445,344], "dimensions": [307,98], "asset": "resource_bar_glow", "alpha": 0 },
+            "resource_bar_fbcredits_glow": { "show": 0, "kind": "StaticImage", "xy": [445,344], "dimensions": [307,98], "asset": "resource_bar_glow", "alpha": 0,
+                                             "layout": {"hjustify": "right"}},
 
             "resource_bar_water": { "kind": "StaticImage", "xy": [10,377], "dimensions": [122,32], "asset": "dialog_sunken_resizable", "bg_image_resizable": 1,
                                     "ui_tooltip": "%RES in %STORAGES1",
@@ -4562,30 +4570,40 @@
                                      "ui_tooltip": "%s1 in Warehouse%expire\n\n%s2: used to purchase certain\nspecial items and upgrades.",
                                      "ui_tooltip_expire": "\nExpire in %s - spend quickly!",
                                      "tooltip_delay": 0,
-                                     "fixed_tooltip_offset": [406, 427] },
-            "resource_bar_tokens_icon": { "show":0, "kind": "StaticImage", "xy": [410,382], "dimensions": [21,21], "asset": "resource_icon_iron" },
-            "resource_bar_tokens_expire_icon": { "show": 0, "kind": "StaticImage", "xy":[508,387], "dimensions":[13,13], "asset": "pacman_icon" },
+                                     "fixed_tooltip_offset": [406, 427],
+                                     "layout": {"hjustify": "right"}},
+            "resource_bar_tokens_icon": { "show":0, "kind": "StaticImage", "xy": [410,382], "dimensions": [21,21], "asset": "resource_icon_iron",
+                                          "layout": {"hjustify": "right"}},
+            "resource_bar_tokens_expire_icon": { "show": 0, "kind": "StaticImage", "xy":[508,387], "dimensions":[13,13], "asset": "pacman_icon",
+                                                 "layout": {"hjustify": "right"}},
             "resource_bar_tokens_amount": { "show":0, "kind": "TextField", "xy": [433,382], "dimensions": [83,21],
-                                            "text_size": 13, "drop_shadow": 1, "text_style": "thick" },
+                                            "text_size": 13, "drop_shadow": 1, "text_style": "thick",
+                                            "layout": {"hjustify": "right"}},
 
             "resource_bar_fbcredits": { "kind": "StaticImage", "xy": [538,377], "dimensions": [122,32], "asset": "dialog_sunken_gray_resizable", "bg_image_resizable": 1,
                                         "ui_tooltip": "",
                                         "tooltip_delay": 0,
-                                        "fixed_tooltip_offset": [538, 427] },
-            "resource_bar_fbcredits_icon": { "kind": "StaticImage", "xy": [542,382], "dimensions": [21,21], "asset": "resource_icon_iron" },
+                                        "fixed_tooltip_offset": [538, 427],
+                                        "layout": {"hjustify": "right"}},
+            "resource_bar_fbcredits_icon": { "kind": "StaticImage", "xy": [542,382], "dimensions": [21,21], "asset": "resource_icon_iron",
+                                             "layout": {"hjustify": "right"}},
             // note: make the entire bar a virtual "button" so the click area is generously large
             "resource_bar_fbcredits_button": { "kind": "ActionButton", "xy": [538,377], "dimensions": [122,32],
-                                               "bg_image_offset": [96,6], "bg_image": "resource_bar_add_button" },
+                                               "bg_image_offset": [96,6], "bg_image": "resource_bar_add_button",
+                                               "layout": {"hjustify": "right"}},
             "resource_bar_fbcredits_amount": { "kind": "TextField", "xy": [565,382], "dimensions": [73,21],
-                                               "text_size": 13, "drop_shadow": 1, "text_style": "thick" },
+                                               "text_size": 13, "drop_shadow": 1, "text_style": "thick",
+                                               "layout": {"hjustify": "right"}},
 
             "scroll_left": { "kind": "ActionButton", "xy": [-55,105], "dimensions": [57,200], "bg_image_offset": [20,50],
                              "bg_image": "dialog_scroll_arrow_left", "push_bg_image": 1 },
             "scroll_left_jewel": { "kind": "Dialog", "xy": [-40,170], "dimensions": [17,14], "dialog": "notification_jewel" },
 
             "scroll_right": { "kind": "ActionButton", "xy": [665,105], "dimensions": [57,200], "bg_image_offset": [20,50],
-                              "bg_image": "dialog_scroll_arrow_right", "push_bg_image": 1 },
-            "scroll_right_jewel": { "kind": "Dialog", "xy": [696,170], "dimensions": [17,14], "dialog": "notification_jewel" },
+                              "bg_image": "dialog_scroll_arrow_right", "push_bg_image": 1,
+                              "layout": {"hjustify": "right"}},
+            "scroll_right_jewel": { "kind": "Dialog", "xy": [696,170], "dimensions": [17,14], "dialog": "notification_jewel",
+                                    "layout": {"hjustify": "right"}},
 
             // virtual button for detecting Enter presses
             "default_button": { "kind": "ActionButton", "xy": [0,0], "dimensions": [0,0] }
@@ -7148,6 +7166,7 @@
     "showcase": {
         "dimensions": [766,471],
         "default_button": "ok_button",
+        "clip_children": 0,
         "widgets": {
             "flash": { "show": 0, "kind":"StaticImage","xy":[-16,-16],"dimensions":[798,503],"asset":"dialog_glow_thin_resizable", "bg_image_resizable":1, "composite_mode": "lighter", "alpha": 0.5, "fade":1, "fade_peak": 0.1, "delay": 0, "duration": 1.0},
             "glow": { "show": 0, "sound": "success_sound_exploding_glass_01", "kind":"StaticImage","xy":[-30,-30],"dimensions":[826,531], "asset":"dialog_glow_resizable", "bg_image_resizable": 1, "composite_mode": "lighter", "fade":1, "duration": 3, "fade_peak": 0.1, "delay": 0},
