@@ -33632,6 +33632,15 @@ player.get_absolute_time = function() {
     return cur_time;
 };
 
+// these are caches derived from immutable (after A/B test patching) gamedata
+// for speeding up searches for events
+
+/** @type {?Array.<Object>} */
+player.event_list_cache = null;
+
+/** Speed up lookups of events by name
+    @type {?Object.<string, Array.<Object>>} */
+player.event_list_cache_index = null;
 
 /** @param {string} event_kind
     @param {string|null} event_name
@@ -33645,7 +33654,25 @@ player.get_event = function(event_kind, event_name, ref_time, ignore_activation)
     }
     if(player.isolate_pvp && (event_kind.indexOf('trophy') != -1)) { return null; }
 
-    var event_list = gamedata['event_schedule'].concat(player.get_any_abtest_value('event_schedule', []));
+    if(player.event_list_cache === null) {
+        player.event_list_cache = gamedata['event_schedule'].concat(player.get_any_abtest_value('event_schedule', []));
+        player.event_list_cache_index = {};
+        goog.array.forEach(player.event_list_cache, function(entry) {
+            var name = entry['name'];
+            if(!(name in player.event_list_cache_index)) {
+                player.event_list_cache_index[name] = [];
+            }
+            player.event_list_cache_index[name].push(entry);
+        });
+    }
+
+    var event_list;
+    if(event_name) { // restrict lookups to events with matching name
+        event_list = player.event_list_cache_index[event_name] || [];
+    } else {
+        event_list = player.event_list_cache;
+    }
+
     for(var i = 0; i < event_list.length; i++) {
         var entry = event_list[i];
         var data = gamedata['events'][entry['name']] || null;
@@ -33661,14 +33688,6 @@ player.get_event = function(event_kind, event_name, ref_time, ignore_activation)
         return entry;
     }
 
-    /* XXX no more regional events
-    if(session.region && session.region.data) {
-        var regional_event = session.region.data['regional_event'] || null;
-        if(regional_event == event_name) {
-            return gamedata['events'][regional_event];
-        }
-    }
-    */
     return null;
 };
 
@@ -39169,11 +39188,11 @@ function can_cast_spell(unit_id, spellname, spellarg) {
 }
 
 function sku_match(skudata, player, specname, stack, melt_time, melt_duration, tm, ignore_error) {
+    if(!('item' in skudata) || skudata['item'] !== specname) { return false; }
     if(!('price' in skudata)) { return false; }
     if(melt_time > 0 && tm >= melt_time) { return false; }
     if(('start_time' in skudata) && (tm < skudata['start_time'])) { return false; }
     if(('expire_time' in skudata) && (tm >= skudata['expire_time'])) { return false; }
-    if(!('item' in skudata) || skudata['item'] !== specname) { return false; }
     var skustack = ('stack' in skudata ? skudata['stack'] : 1);
     if(skustack !== stack) { return false; }
     var skumelt = ('melt_time' in skudata ? skudata['melt_time'] : -1);
@@ -39202,8 +39221,8 @@ Store.buy_item_find_skudata = function(spellarg, player, ignore_error) {
         cat = goog.array.find(catlist, function (entry) {
             return (entry['name'] && entry['name'] === catpath[i] &&
                     (!('activation' in entry) || read_predicate(entry['activation']).is_satisfied(player,null)) &&
-                    (!('start_time' in entry) || entry['start_time'] < player.get_absolute_time()) &&
-                    (!('expire_time' in entry) || entry['expire_time'] >= player.get_absolute_time()));
+                    (!('start_time' in entry) || entry['start_time'] < tm) &&
+                    (!('expire_time' in entry) || entry['expire_time'] >= tm));
         });
         if(!cat) { return null; }
         catlist = cat['skus'] || [];
@@ -39211,8 +39230,7 @@ Store.buy_item_find_skudata = function(spellarg, player, ignore_error) {
     if(!cat) { return null; }
 
     var ret = null, pr = -1;
-    for(var i = 0; i < cat['skus'].length; i++) {
-        var skudata = cat['skus'][i];
+    goog.array.forEach(cat['skus'], function(skudata) {
         if(sku_match(skudata, player, specname, stack, melt_time, melt_dur, tm, ignore_error)) {
             if(pr < 0 || skudata['price'] < pr) {
                 // use lowest price, in case there are multiple matches
@@ -39220,7 +39238,7 @@ Store.buy_item_find_skudata = function(spellarg, player, ignore_error) {
                 pr = skudata['price'];
             }
         }
-    }
+    });
 
     // also look in extra_store_specials
     if(catpath[0] === 'specials') {

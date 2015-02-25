@@ -4429,7 +4429,7 @@
                   [40,236],[237,236],[434,236]]
         },
         "widgets": {
-            "bg_blanker": { "kind": "SolidRect", "xy": [-1000,-36], "dimensions": [2670,495], "color":[0.01,0.01,0.01,1],
+            "bg_blanker": { "kind": "SolidRect", "xy": [-1000,-36], "dimensions": [4670,495], "color":[0.01,0.01,0.01,1],
                             "outline_color": [0,0,0,0], "outline_width": 1 },
 
             "glow": { "show": 0, "sound": "success_playful_22", "kind":"StaticImage","xy":[-30,-30],"dimensions":[730,483],"bg_image_resizable":1,"asset":"dialog_glow_resizable",
@@ -4498,7 +4498,7 @@
         "margin": [100,0], // minimum number of pixels to leave between left edge of canvas and left edge of this dialog
         "default_button": "default_button",
         "widgets": {
-            "bg_blanker": { "kind": "SolidRect", "xy": [-1000,-36], "dimensions": [2670,495], "color":[0.01,0.01,0.01,1],
+            "bg_blanker": { "kind": "SolidRect", "xy": [-1000,-36], "dimensions": [4670,495], "color":[0.01,0.01,0.01,1],
                             "outline_color": [0,0,0,0], "outline_width": 1 },
 
             "glow": { "show": 0, "sound": "success_playful_22", "kind":"StaticImage","xy":[-30,-30],"dimensions":[730,483],"bg_image_resizable":1,"asset":"dialog_glow_resizable",
