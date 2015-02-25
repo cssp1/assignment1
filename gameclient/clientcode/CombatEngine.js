@@ -4,12 +4,7 @@ goog.provide('CombatEngine');
 // Use of this source code is governed by an MIT-style license that can be
 // found in the LICENSE file.
 
-goog.require('goog.array');
-goog.require('goog.object');
-
 // numeric types - eventually will need to become fixed-point
-
-CombatEngine.assert_defined = function(x) { if(typeof x === 'undefined') { throw Error('undefined value'); } };
 
 /** Scaling coefficient, like a damage_vs coefficient
     Assumed to be small, like 0-100, but need fractional precision
@@ -18,6 +13,7 @@ CombatEngine.Coeff;
 
 /** @typedef {number} */
 CombatEngine.Integer;
+/** @param {number} num */
 CombatEngine.assert_integer = function(num) { if(num != (num|0)) { throw Error('non-integer '+num.toString()); } };
 
 /** 1D object position
@@ -32,7 +28,6 @@ CombatEngine.Pos2D;
     @struct
     @param {number} count */
 CombatEngine.TickCount = function(count) {
-    CombatEngine.assert_defined(count);
     CombatEngine.assert_integer(count);
     this.count = count;
 };
@@ -53,27 +48,33 @@ CombatEngine.TickCount.prototype.copy = function() { return new CombatEngine.Tic
 CombatEngine.TickCount.scale = function(s, a) { return new CombatEngine.TickCount(Math.floor(s*a.count+0.5)); };
 
 /** @param {!CombatEngine.TickCount} a
-    @param {!CombatEngine.TickCount} b */
+    @param {!CombatEngine.TickCount} b
+    @return {boolean} */
 CombatEngine.TickCount.gte = function(a, b) { return a.count >= b.count; };
 
 /** @param {!CombatEngine.TickCount} a
-    @param {!CombatEngine.TickCount} b */
+    @param {!CombatEngine.TickCount} b
+    @return {boolean} */
 CombatEngine.TickCount.gt = function(a, b) { return a.count > b.count; };
 
 /** @param {!CombatEngine.TickCount} a
-    @param {!CombatEngine.TickCount} b */
+    @param {!CombatEngine.TickCount} b
+    @return {boolean} */
 CombatEngine.TickCount.lt = function(a, b) { return a.count < b.count; };
 
 /** @param {!CombatEngine.TickCount} a
-    @param {!CombatEngine.TickCount} b */
+    @param {!CombatEngine.TickCount} b
+    @return {boolean} */
 CombatEngine.TickCount.lte = function(a, b) { return a.count <= b.count; };
 
 /** @param {!CombatEngine.TickCount} a
-    @param {!CombatEngine.TickCount} b */
+    @param {!CombatEngine.TickCount} b
+    @return {!CombatEngine.TickCount} */
 CombatEngine.TickCount.add = function(a, b) { return new CombatEngine.TickCount(a.count+b.count); };
 
 /** @param {!CombatEngine.TickCount} a
-    @param {!CombatEngine.TickCount} b */
+    @param {!CombatEngine.TickCount} b
+    @return {!CombatEngine.TickCount} */
 CombatEngine.TickCount.max = function(a, b) { return new CombatEngine.TickCount(Math.max(a.count, b.count)); };
 
 
@@ -84,20 +85,8 @@ CombatEngine.CombatEngine = function() {
     this.cur_tick = new CombatEngine.TickCount(0);
 
     /** list of queued damage effects that should be applied at later times (possible optimization: use a priority queue)
-        @type {Array.<CombatEngine.DamageEffect>} */
+        @type {Array.<!CombatEngine.DamageEffect>} */
     this.damage_effect_queue = [];
-};
-
-/** @return {boolean} true if more are pending */
-CombatEngine.CombatEngine.prototype.apply_queued_damage_effects = function() {
-    for(var i = 0; i < this.damage_effect_queue.length; i++) {
-        var effect = this.damage_effect_queue[i];
-        if(CombatEngine.TickCount.gte(this.cur_tick, effect.tick)) {
-            this.damage_effect_queue.splice(i,1);
-            effect.apply();
-        }
-    }
-    return this.damage_effect_queue.length > 0;
 };
 
 // DamageEffects
@@ -116,6 +105,20 @@ CombatEngine.DamageEffect = function(tick, source, amount, vs_table) {
     this.vs_table = vs_table;
 }
 CombatEngine.DamageEffect.prototype.apply = goog.abstractMethod;
+
+
+/** @return {boolean} true if more are pending */
+CombatEngine.CombatEngine.prototype.apply_queued_damage_effects = function() {
+    for(var i = 0; i < this.damage_effect_queue.length; i++) {
+        var effect = this.damage_effect_queue[i];
+        if(CombatEngine.TickCount.gte(this.cur_tick, effect.tick)) {
+            this.damage_effect_queue.splice(i,1);
+            effect.apply();
+        }
+    }
+    return this.damage_effect_queue.length > 0;
+};
+
 
 /** KillDamageEffect removes the object directly WITHOUT running on-death spells
     @constructor
