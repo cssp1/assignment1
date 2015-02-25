@@ -1104,7 +1104,7 @@ GameArt.make_tinted_image = function(img, origin, wh, tint, saturation, mask_img
             var con_mask = osc_mask.getContext('2d');
             con_mask.drawImage(mask_img, 0, 0);
             var data_mask = con_mask.getImageData(0, 0, wh[0], wh[1]);
-            var pixels_mask = data_mask.data;
+            pixels_mask = data_mask.data;
         }
 
         for(var i = 0; i < pixels.length; i += 4) {

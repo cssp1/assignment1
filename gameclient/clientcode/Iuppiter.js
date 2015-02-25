@@ -94,7 +94,7 @@ Iuppiter.bytes_to_string = function(input) {
  *
  * Please note it depends on toByteArray utility function.
  *
- * @param {Array} sstart The byte array that you want to compress.
+ * @param {Array.<number>} sstart The byte array that you want to compress.
  * @return {Array} Compressed byte array.
  */
 
@@ -175,7 +175,7 @@ Iuppiter.compress = function(sstart) {
  * usr/src/uts/common/os/compress.c
  * It is licensed under CDDL.
  *
- * @param {Array} sstart The byte array that you want to compress.
+ * @param {Array.<number>} sstart The byte array that you want to compress.
  * @return {Array} Decompressed byte array.
  */
 Iuppiter.decompress = function(sstart) {
@@ -223,8 +223,11 @@ Iuppiter.decompress = function(sstart) {
 };
 
 // convenience functions that work with JavaScript strings.
-
+/** @param {string} s
+    @return {Array} */
 Iuppiter.compress_string = function(s) { return Iuppiter.compress(Iuppiter.string_to_bytes(s)); };
+/** @param {Array} s
+    @return {string} */
 Iuppiter.decompress_string = function(s) { return Iuppiter.bytes_to_string(Iuppiter.decompress(s)); };
 
 /*

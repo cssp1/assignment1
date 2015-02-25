@@ -2010,11 +2010,11 @@ SPUI.ActionButton = function(data) {
     }
 
     if('dripper' in data) {
-        function make_dripper_cb(widget) {
+        var make_dripper_cb = function(widget) {
             return function() {
                 widget.onclick(widget);
             };
-        }
+        };
         this.dripper_cb = make_dripper_cb(this);
         this.dripper_rate = data['dripper']['rate'] || 1.5;
         this.dripper_delay = data['dripper']['delay'] || 0;

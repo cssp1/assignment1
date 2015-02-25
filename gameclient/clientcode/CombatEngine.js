@@ -4,6 +4,10 @@ goog.provide('CombatEngine');
 // Use of this source code is governed by an MIT-style license that can be
 // found in the LICENSE file.
 
+/** @fileoverview
+    @suppress {reportUnknownTypes} XXXXXX we are not typesafe yet
+*/
+
 // numeric types - eventually will need to become fixed-point
 
 /** Scaling coefficient, like a damage_vs coefficient

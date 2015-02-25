@@ -5853,9 +5853,9 @@ player.get_any_abtest_value = function(key, default_value) {
         if(test_name in gamedata['abtests']) {
             var data = gamedata['abtests'][test_name];
             if(data['active'] && group in data['groups']) {
-                var group = data['groups'][group];
-                if(key in group) {
-                    return group[key];
+                var group_data = data['groups'][group];
+                if(key in group_data) {
+                    return group_data[key];
                 }
             }
         }

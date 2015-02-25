@@ -1750,15 +1750,15 @@ RegionMap.RegionMap.prototype.draw_feature_influence = function(roi, feature, in
 
         var radius = params['radius'];
         var alpha = params['alpha'];
-        var color = params['color'];
+        var color_str = params['color'];
 
         alpha *= influence_alpha;
         alpha = Math.max(alpha, params['min_alpha'] || 0);
 
         if(alpha > 0) {
             var grad = SPUI.ctx.createRadialGradient(0, 0, 0, 0, 0, radius);
-            grad.addColorStop('0.0', color+alpha.toString()+')');
-            grad.addColorStop('1.0', color+'0.0)');
+            grad.addColorStop('0.0', color_str+alpha.toString()+')');
+            grad.addColorStop('1.0', color_str+'0.0)');
             SPUI.ctx.save();
             SPUI.ctx.fillStyle = grad;
             SPUI.ctx.transform(1, 0, 0, 1,

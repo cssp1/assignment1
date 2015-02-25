@@ -25,12 +25,15 @@ ShakeSynth.Shake = function(seed) {
     this.end_freq = 15;
 
     // XXX pretend we're seeding the random number generator here
+    /** @type {Array.<Array.<number>>} */
     this.phases = [];
-    for(var a = 0; a < ShakeSynth.AXES; a++) {
-        this.phases.push([]);
-        for(var i = 0; i < ShakeSynth.SAMPLES; i++) {
-            this.phases[a].push(2*Math.PI*Math.random());
+    for(var i = 0; i < ShakeSynth.SAMPLES; i++) {
+        /** @type {Array.<number>} */
+        var p = [];
+        for(var a = 0; a < ShakeSynth.AXES; a++) {
+            p.push(2*Math.PI*Math.random());
         }
+        this.phases.push(p);
     }
 };
 
@@ -40,11 +43,12 @@ ShakeSynth.Shake.prototype.evaluate = function(t) {
     var start = Math.min(Math.max(this.start_freq, 0), ShakeSynth.SAMPLES-1);
     var end = Math.min(Math.max(this.end_freq, 0), ShakeSynth.SAMPLES-1);
     var x = (this.speed*t + this.offset) * ShakeSynth.DATASCALE;
+    /** @type {Array.<number>} */
     var ret = [];
     for(var a = 0; a < ShakeSynth.AXES; a++) {
         ret.push(0.0);
         for(var j = start; j < end; j++) {
-            ret[a] += ShakeSynth.noise_spectrum[j] * Math.cos(x * 2.0 * Math.PI * j + this.phases[a][j]);
+            ret[a] += ShakeSynth.noise_spectrum[j] * Math.cos(x * 2.0 * Math.PI * j + this.phases[j][a]);
         }
     }
     return ret;

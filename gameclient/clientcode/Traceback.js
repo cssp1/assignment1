@@ -1,6 +1,6 @@
 /**
  * @fileoverview
- * @suppress {missingProperties,reportUnknownTypes,es5Strict}
+ * @suppress {missingProperties,reportUnknownTypes,es5Strict,undefinedNames}
  */
 
 goog.provide('Traceback');
@@ -234,7 +234,7 @@ Traceback.printStackTrace.implementation.prototype = {
 
     // Safari, IE, and others
     other: function(curr) {
-        var ANON = '{anonymous}', fnRE = new RegExp('function\\s*([\\w\\-$]+)?\\s*\\(','i'), stack = [], fn, args, maxStackSize = 10;
+        var ANON = '{anonymous}', fnRE = new RegExp('function\\s*([\\w\\-$]+)?\\s*\\(','i'), stack = [], args, maxStackSize = 10;
         while (curr && stack.length < maxStackSize) {
             var fn;
             var m = curr.toString().match(fnRE);

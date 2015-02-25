@@ -40,16 +40,15 @@ Congrats.item = function(ui_name, text_before, text_after, start, end) {
 Congrats.cc_upgrade = function(cc, level) {
     var ret = [];
     var line = [];
-    var spec = cc.spec;
 
     var sep = new SPText.ABlock('\n', Congrats.props.normal);
 
-    if('provides_space' in spec) {
+    if('provides_space' in cc.spec) {
         ret.push([[new SPText.ABlock(gamedata['strings']['cc_upgrade_congrats']['unit_space']['ui_name'].toUpperCase(), Congrats.props.bold)]]);
         ret.push([Congrats.item(gamedata['strings']['cc_upgrade_congrats']['unit_space']['ui_name'],
                                 gamedata['strings']['cc_upgrade_congrats']['unit_space']['ui_before'],
                                 gamedata['strings']['cc_upgrade_congrats']['unit_space']['ui_after'],
-                                spec['provides_space'][level-2], spec['provides_space'][level-1])]);
+                                cc.spec['provides_space'][level-2], cc.spec['provides_space'][level-1])]);
     }
 
     ret.push([[sep]]);

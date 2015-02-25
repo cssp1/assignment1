@@ -720,7 +720,7 @@ SPFX.Projectile.prototype.draw_beam = function() {
 
     var fade = 1;
     if(this.fade_time > 0) {
-        var fade = 1 - (SPFX.time - this.launch_time) / this.fade_time;
+        fade = 1 - (SPFX.time - this.launch_time) / this.fade_time;
         if(fade <= 0) {
             return;
         }

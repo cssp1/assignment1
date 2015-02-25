@@ -285,7 +285,7 @@ Showcase.apply_showcase_hacks = function(dialog, hack) {
         // this will be a list of [{"level": N, "item": {"spec": ...}}, ... ]
         var progression_item_list = eval_cond_or_literal(hack['progression_reward_items'], player, null) || [];
 
-        function flatten_loot(loot) {
+        var flatten_loot = function(loot) {
             if('spec' in loot) {
                 return [loot];
             } else if('multi' in loot) {
@@ -307,11 +307,11 @@ Showcase.apply_showcase_hacks = function(dialog, hack) {
             } else {
                 throw Error('invalid entry in progression_reward_items' + JSON.stringify(loot));
             }
-        }
+        };
 
         // returns an array of the form [min, max] where min and max represent the minimum and maximum
         // number of items that will drop from a given loot table
-        function get_loot_drop_count(loot) {
+        var get_loot_drop_count = function(loot) {
             if('spec' in loot) {
                 return [1, 1];
             } else if('multi' in loot) {
@@ -345,7 +345,7 @@ Showcase.apply_showcase_hacks = function(dialog, hack) {
             } else {
                 throw Error('invalid entry in progression_reward_items' + JSON.stringify(loot));
             }
-        }
+        };
 
         // simplify each entry in progression_item_list so that entry['item'] is either
         // a single item or an array of items that may drop on that level
