@@ -1344,7 +1344,7 @@
                       "ui_tooltip_unmet": "Requires %s", "ui_tooltip_requires_res": "Requires %d %res",
                       "ui_tooltip_requires_power": "Requires %d more power\n(repair/build/upgrade %POWERPLANTS)",
                       "array": [4,2], "array_offset": [160, 150] },
-            "grid_label": { "kind": "TextField", "xy": [61,86], "dimensions": [129,29], "text_size": 13, "text_style": "thick", "text_hjustify": "left",
+            "grid_label": { "kind": "TextField", "xy": [60,86], "dimensions": [129,29], "text_size": 13, "text_style": "thick", "text_hjustify": "left",
                             "drop_shadow": 1,
                             "array": [4,2], "array_offset": [160, 150] },
             "grid_status": { "kind": "TextField", "xy": [65,168], "dimensions": [129,44], "text_size": 12, "text_hjustify": "right", "text_vjustify": "bottom",
