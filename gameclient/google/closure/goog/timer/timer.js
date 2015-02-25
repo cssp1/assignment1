@@ -15,6 +15,7 @@
 /**
  * @fileoverview A timer class to which other classes and objects can
  * listen on.  This is only an abstraction above setInterval.
+ * @suppress {reportUnknownTypes} DJM/SpinPunch
  *
  * @see ../demos/timers.html
  */

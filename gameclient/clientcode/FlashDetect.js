@@ -3,6 +3,11 @@ goog.provide('FlashDetect');
 // Flash Detect library - http://featureblend.com/javascript-flash-detection-library.html
 
 /**
+ * @fileoverview
+ * @suppress {reportUnknownTypes} DJM/SpinPunch
+ */
+
+/**
  * Copyright (c) 2007, Carl S. Yestrau
  * All rights reserved.
  *

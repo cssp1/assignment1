@@ -14,6 +14,7 @@
 
 /**
  * @fileoverview Logging and debugging utilities.
+ * @suppress {reportUnknownTypes,es5Strict} DJM/SpinPunch
  *
  * @see ../demos/debug.html
  */

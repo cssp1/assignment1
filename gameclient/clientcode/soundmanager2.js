@@ -1,6 +1,6 @@
 /**
- * @fileoverview SpinPunch - turn off Closure warnings for this file
- * @suppress {checkTypes|reportUnknownTypes}
+ * @fileoverview
+ * @suppress {checkTypes,reportUnknownTypes,es5Strict} DJM/SpinPunch
  */
 
 goog.provide('spin_SoundManager2');
@@ -1303,7 +1303,6 @@ function SoundManager(smURL, smID) {
    * ------------------------------------
    *
    * @param {?} oOptions Sound options (id and url are required attributes)
-   * @return {SMSound} The new SMSound object
    */
 
   SMSound = function(oOptions) {
@@ -2214,7 +2213,6 @@ function SoundManager(smURL, smID) {
      *
      * @param {number} nPosition The position to clear callback(s) for
      * @param {?} oMethod Optional: Identify one callback to be removed when multiple listeners exist for one position
-     * @return {SMSound} The SMSound object
      */
 
     this.clearOnPosition = function(nPosition, oMethod) {

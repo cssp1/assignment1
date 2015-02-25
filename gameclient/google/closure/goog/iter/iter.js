@@ -15,6 +15,7 @@
 /**
  * @fileoverview Python style iteration utilities.
  * @author arv@google.com (Erik Arvidsson)
+ * @suppress {reportUnknownTypes} DJM/SpinPunch
  */
 
 

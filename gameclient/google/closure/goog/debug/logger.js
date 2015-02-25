@@ -16,6 +16,7 @@
  * @fileoverview Definition of the Logger class. Please minimize dependencies
  * this file has on other closure classes as any dependency it takes won't be
  * able to use the logging infrastructure.
+ * @suppress {reportUnknownTypes,es5Strict} DJM/SpinPunch
  *
  * @see ../demos/debug.html
  */

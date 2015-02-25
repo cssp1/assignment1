@@ -14,6 +14,7 @@
 
 /**
  * @fileoverview Generics method for collection-like classes and objects.
+ * @suppress {reportUnknownTypes} DJM/SpinPunch
  *
  * @author arv@google.com (Erik Arvidsson)
  *

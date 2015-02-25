@@ -14,6 +14,7 @@
 
 /**
  * @fileoverview Low level handling of XMLHttpRequest.
+ * @suppress {reportUnknownTypes} DJM/SpinPunch
  * @author arv@google.com (Erik Arvidsson)
  * @author dbk@google.com (David Barrett-Kahn)
  */

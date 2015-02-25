@@ -14,6 +14,7 @@
 
 /**
  * @fileoverview Datastructure: Set.
+ * @suppress {reportUnknownTypes} DJM/SpinPunch
  *
  * @author arv@google.com (Erik Arvidsson)
  * @author pallosp@google.com (Peter Pallos)

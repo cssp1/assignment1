@@ -14,6 +14,7 @@
 
 /**
  * @fileoverview Namespace with crypto related helper functions.
+ * @suppress {reportUnknownTypes} DJM/SpinPunch
  */
 
 goog.provide('goog.crypt');

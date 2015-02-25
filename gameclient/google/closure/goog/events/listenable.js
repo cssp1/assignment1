@@ -14,6 +14,7 @@
 
 /**
  * @fileoverview An interface for a listenable JavaScript object.
+ * @suppress {reportUnknownTypes} DJM/SpinPunch
  */
 
 goog.provide('goog.events.Listenable');

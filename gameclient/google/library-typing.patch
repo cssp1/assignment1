@@ -1,10 +1,191 @@
-This disables some Closure compiler type warnings inside the Closure library code.
-
-diff --git a/gameclient/google/closure/goog/net/xhrio.js b/gameclient/google/closure/goog/net/xhrio.js
-index 20d53c2..6c6aa68 100644
---- a/gameclient/google/closure/goog/net/xhrio.js
-+++ b/gameclient/google/closure/goog/net/xhrio.js
-@@ -478,7 +478,8 @@ goog.net.XhrIo.prototype.send = function(url, opt_method, opt_content,
+diff -ruN /Users/dmaas/Downloads/goog/array/array.js closure/goog/array/array.js
+--- /Users/dmaas/Downloads/goog/array/array.js	2015-02-24 23:52:56.000000000 -0800
++++ closure/goog/array/array.js	2015-02-24 23:53:05.000000000 -0800
+@@ -15,6 +15,7 @@
+ /**
+  * @fileoverview Utilities for manipulating arrays.
+  *
++ * @suppress {reportUnknownTypes} DJM/SpinPunch
+  */
+ 
+ 
+diff -ruN /Users/dmaas/Downloads/goog/base.js closure/goog/base.js
+--- /Users/dmaas/Downloads/goog/base.js	2015-02-24 23:52:56.000000000 -0800
++++ closure/goog/base.js	2015-02-24 23:53:05.000000000 -0800
+@@ -14,6 +14,7 @@
+ 
+ /**
+  * @fileoverview Bootstrap for the Google JS Library (Closure).
++ * @suppress {reportUnknownTypes,es5Strict} DJM/SpinPunch
+  *
+  * In uncompiled mode base.js will write out Closure's deps file, unless the
+  * global <code>CLOSURE_NO_DEPS</code> is set to true.  This allows projects to
+diff -ruN /Users/dmaas/Downloads/goog/crypt/base64.js closure/goog/crypt/base64.js
+--- /Users/dmaas/Downloads/goog/crypt/base64.js	2015-02-24 23:52:56.000000000 -0800
++++ closure/goog/crypt/base64.js	2015-02-24 23:54:37.000000000 -0800
+@@ -16,6 +16,7 @@
+  * @fileoverview Base64 en/decoding. Not much to say here except that we
+  * work with decoded values in arrays of bytes. By "byte" I mean a number
+  * in [0, 255].
++ * @suppress {reportUnknownTypes} DJM/SpinPunch
+  *
+  * @author doughtie@google.com (Gavin Doughtie)
+  * @author fschneider@google.com (Fritz Schneider)
+diff -ruN /Users/dmaas/Downloads/goog/crypt/crypt.js closure/goog/crypt/crypt.js
+--- /Users/dmaas/Downloads/goog/crypt/crypt.js	2015-02-24 23:52:56.000000000 -0800
++++ closure/goog/crypt/crypt.js	2015-02-24 23:54:47.000000000 -0800
+@@ -14,6 +14,7 @@
+ 
+ /**
+  * @fileoverview Namespace with crypto related helper functions.
++ * @suppress {reportUnknownTypes} DJM/SpinPunch
+  */
+ 
+ goog.provide('goog.crypt');
+diff -ruN /Users/dmaas/Downloads/goog/debug/debug.js closure/goog/debug/debug.js
+--- /Users/dmaas/Downloads/goog/debug/debug.js	2015-02-24 23:52:56.000000000 -0800
++++ closure/goog/debug/debug.js	2015-02-24 23:59:11.000000000 -0800
+@@ -14,6 +14,7 @@
+ 
+ /**
+  * @fileoverview Logging and debugging utilities.
++ * @suppress {reportUnknownTypes,es5Strict} DJM/SpinPunch
+  *
+  * @see ../demos/debug.html
+  */
+diff -ruN /Users/dmaas/Downloads/goog/debug/logbuffer.js closure/goog/debug/logbuffer.js
+--- /Users/dmaas/Downloads/goog/debug/logbuffer.js	2015-02-24 23:52:56.000000000 -0800
++++ closure/goog/debug/logbuffer.js	2015-02-24 23:55:08.000000000 -0800
+@@ -20,6 +20,7 @@
+  * log records and expect that they are not overwriten at a later point.
+  *
+  * @author agrieve@google.com (Andrew Grieve)
++ * @suppress {reportUnknownTypes} DJM/SpinPunch
+  */
+ 
+ goog.provide('goog.debug.LogBuffer');
+diff -ruN /Users/dmaas/Downloads/goog/debug/logger.js closure/goog/debug/logger.js
+--- /Users/dmaas/Downloads/goog/debug/logger.js	2015-02-24 23:52:56.000000000 -0800
++++ closure/goog/debug/logger.js	2015-02-24 23:59:31.000000000 -0800
+@@ -16,6 +16,7 @@
+  * @fileoverview Definition of the Logger class. Please minimize dependencies
+  * this file has on other closure classes as any dependency it takes won't be
+  * able to use the logging infrastructure.
++ * @suppress {reportUnknownTypes,es5Strict} DJM/SpinPunch
+  *
+  * @see ../demos/debug.html
+  */
+diff -ruN /Users/dmaas/Downloads/goog/disposable/disposable.js closure/goog/disposable/disposable.js
+--- /Users/dmaas/Downloads/goog/disposable/disposable.js	2015-02-24 23:52:56.000000000 -0800
++++ closure/goog/disposable/disposable.js	2015-02-24 23:55:17.000000000 -0800
+@@ -16,6 +16,7 @@
+  * @fileoverview Implements the disposable interface. The dispose method is used
+  * to clean up references and resources.
+  * @author arv@google.com (Erik Arvidsson)
++ * @suppress {reportUnknownTypes} DJM/SpinPunch
+  */
+ 
+ 
+diff -ruN /Users/dmaas/Downloads/goog/events/browserevent.js closure/goog/events/browserevent.js
+--- /Users/dmaas/Downloads/goog/events/browserevent.js	2015-02-24 23:52:56.000000000 -0800
++++ closure/goog/events/browserevent.js	2015-02-24 23:55:27.000000000 -0800
+@@ -14,6 +14,7 @@
+ 
+ /**
+  * @fileoverview A patched, standardized event object for browser events.
++ * @suppress {reportUnknownTypes} DJM/SpinPunch
+  *
+  * <pre>
+  * The patched event object contains the following members:
+diff -ruN /Users/dmaas/Downloads/goog/events/browserfeature.js closure/goog/events/browserfeature.js
+--- /Users/dmaas/Downloads/goog/events/browserfeature.js	2015-02-24 23:52:56.000000000 -0800
++++ closure/goog/events/browserfeature.js	2015-02-24 23:55:32.000000000 -0800
+@@ -14,6 +14,7 @@
+ 
+ /**
+  * @fileoverview Browser capability checks for the events package.
++ * @suppress {reportUnknownTypes} DJM/SpinPunch
+  *
+  */
+ 
+diff -ruN /Users/dmaas/Downloads/goog/events/events.js closure/goog/events/events.js
+--- /Users/dmaas/Downloads/goog/events/events.js	2015-02-24 23:52:56.000000000 -0800
++++ closure/goog/events/events.js	2015-02-24 23:55:38.000000000 -0800
+@@ -17,6 +17,7 @@
+  * targets and custom JavaScript event targets
+  * ({@code goog.events.Listenable}). This provides an abstraction
+  * over browsers' event systems.
++ * @suppress {reportUnknownTypes} DJM/SpinPunch
+  *
+  * It also provides a simulation of W3C event model's capture phase in
+  * Internet Explorer (IE 8 and below). Caveat: the simulation does not
+diff -ruN /Users/dmaas/Downloads/goog/events/eventtarget.js closure/goog/events/eventtarget.js
+--- /Users/dmaas/Downloads/goog/events/eventtarget.js	2015-02-24 23:52:56.000000000 -0800
++++ closure/goog/events/eventtarget.js	2015-02-24 23:55:48.000000000 -0800
+@@ -16,6 +16,7 @@
+  * @fileoverview A disposable implementation of a custom
+  * listenable/event target. See also: documentation for
+  * {@code goog.events.Listenable}.
++ * @suppress {reportUnknownTypes} DJM/SpinPunch
+  *
+  * @author arv@google.com (Erik Arvidsson) [Original implementation]
+  * @author pupius@google.com (Daniel Pupius) [Port to use goog.events]
+diff -ruN /Users/dmaas/Downloads/goog/events/listenable.js closure/goog/events/listenable.js
+--- /Users/dmaas/Downloads/goog/events/listenable.js	2015-02-24 23:52:56.000000000 -0800
++++ closure/goog/events/listenable.js	2015-02-24 23:55:57.000000000 -0800
+@@ -14,6 +14,7 @@
+ 
+ /**
+  * @fileoverview An interface for a listenable JavaScript object.
++ * @suppress {reportUnknownTypes} DJM/SpinPunch
+  */
+ 
+ goog.provide('goog.events.Listenable');
+diff -ruN /Users/dmaas/Downloads/goog/events/listenermap.js closure/goog/events/listenermap.js
+--- /Users/dmaas/Downloads/goog/events/listenermap.js	2015-02-24 23:52:56.000000000 -0800
++++ closure/goog/events/listenermap.js	2015-02-24 23:56:05.000000000 -0800
+@@ -16,6 +16,7 @@
+  * @fileoverview A map of listeners that provides utility functions to
+  * deal with listeners on an event target. Used by
+  * {@code goog.events.EventTarget}.
++ * @suppress {reportUnknownTypes} DJM/SpinPunch
+  *
+  * WARNING: Do not use this class from outside goog.events package.
+  *
+diff -ruN /Users/dmaas/Downloads/goog/iter/iter.js closure/goog/iter/iter.js
+--- /Users/dmaas/Downloads/goog/iter/iter.js	2015-02-24 23:52:56.000000000 -0800
++++ closure/goog/iter/iter.js	2015-02-24 23:56:14.000000000 -0800
+@@ -15,6 +15,7 @@
+ /**
+  * @fileoverview Python style iteration utilities.
+  * @author arv@google.com (Erik Arvidsson)
++ * @suppress {reportUnknownTypes} DJM/SpinPunch
+  */
+ 
+ 
+diff -ruN /Users/dmaas/Downloads/goog/json/json.js closure/goog/json/json.js
+--- /Users/dmaas/Downloads/goog/json/json.js	2015-02-24 23:52:56.000000000 -0800
++++ closure/goog/json/json.js	2015-02-24 23:56:28.000000000 -0800
+@@ -15,6 +15,7 @@
+ /**
+  * @fileoverview JSON utility functions.
+  * @author arv@google.com (Erik Arvidsson)
++ * @suppress {reportUnknownTypes} DJM/SpinPunch
+  */
+ 
+ 
+diff -ruN /Users/dmaas/Downloads/goog/net/xhrio.js closure/goog/net/xhrio.js
+--- /Users/dmaas/Downloads/goog/net/xhrio.js	2015-02-24 23:52:56.000000000 -0800
++++ closure/goog/net/xhrio.js	2015-02-24 23:56:51.000000000 -0800
+@@ -14,6 +14,7 @@
+ 
+ /**
+  * @fileoverview Wrapper class for handling XmlHttpRequests.
++ * @suppress {reportUnknownTypes} DJM/SpinPunch
+  *
+  * One off requests can be sent through goog.net.XhrIo.send() or an
+  * instance can be created to send multiple requests.  Each request uses its
+@@ -478,7 +479,8 @@
    try {
      goog.log.fine(this.logger_, this.formatMsg_('Opening Xhr'));
      this.inOpen_ = true;
@@ -14,34 +195,20 @@ index 20d53c2..6c6aa68 100644
      this.inOpen_ = false;
    } catch (err) {
      goog.log.fine(this.logger_,
-diff --git a/gameclient/google/closure/goog/array/array.js b/gameclient/google/closure/goog/array/array.js
-index 928c791..5cce337 100644
---- a/gameclient/google/closure/goog/array/array.js
-+++ b/gameclient/google/closure/goog/array/array.js
-@@ -15,6 +15,7 @@
- /**
-  * @fileoverview Utilities for manipulating arrays.
-  *
-+ * @suppress {reportUnknownTypes} DJM/SpinPunch
-  */
- 
- 
-diff --git a/gameclient/google/closure/goog/base.js b/gameclient/google/closure/goog/base.js
-index 19ea91e..2ef83f4 100644
---- a/gameclient/google/closure/goog/base.js
-+++ b/gameclient/google/closure/goog/base.js
+diff -ruN /Users/dmaas/Downloads/goog/net/xmlhttp.js closure/goog/net/xmlhttp.js
+--- /Users/dmaas/Downloads/goog/net/xmlhttp.js	2015-02-24 23:52:56.000000000 -0800
++++ closure/goog/net/xmlhttp.js	2015-02-24 23:56:59.000000000 -0800
 @@ -14,6 +14,7 @@
  
  /**
-  * @fileoverview Bootstrap for the Google JS Library (Closure).
-+ * @suppress {reportUnknownTypes,es5Strict} DJM/SpinPunch
-  *
-  * In uncompiled mode base.js will write out Closure's deps file, unless the
-  * global <code>CLOSURE_NO_DEPS</code> is set to true.  This allows projects to
-diff --git a/gameclient/google/closure/goog/object/object.js b/gameclient/google/closure/goog/object/object.js
-index fa5c08a..05f9d2f 100644
---- a/gameclient/google/closure/goog/object/object.js
-+++ b/gameclient/google/closure/goog/object/object.js
+  * @fileoverview Low level handling of XMLHttpRequest.
++ * @suppress {reportUnknownTypes} DJM/SpinPunch
+  * @author arv@google.com (Erik Arvidsson)
+  * @author dbk@google.com (David Barrett-Kahn)
+  */
+diff -ruN /Users/dmaas/Downloads/goog/object/object.js closure/goog/object/object.js
+--- /Users/dmaas/Downloads/goog/object/object.js	2015-02-24 23:52:56.000000000 -0800
++++ closure/goog/object/object.js	2015-02-24 23:53:05.000000000 -0800
 @@ -14,6 +14,7 @@
  
  /**
@@ -50,10 +217,20 @@ index fa5c08a..05f9d2f 100644
   */
  
  goog.provide('goog.object');
-diff --git a/gameclient/google/closure/goog/string/string.js b/gameclient/google/closure/goog/string/string.js
-index dcfdffb..329aae3 100644
---- a/gameclient/google/closure/goog/string/string.js
-+++ b/gameclient/google/closure/goog/string/string.js
+diff -ruN /Users/dmaas/Downloads/goog/reflect/reflect.js closure/goog/reflect/reflect.js
+--- /Users/dmaas/Downloads/goog/reflect/reflect.js	2015-02-24 23:52:56.000000000 -0800
++++ closure/goog/reflect/reflect.js	2015-02-24 23:57:10.000000000 -0800
+@@ -14,6 +14,7 @@
+ 
+ /**
+  * @fileoverview Useful compiler idioms.
++ * @suppress {reportUnknownTypes} DJM/SpinPunch
+  *
+  */
+ 
+diff -ruN /Users/dmaas/Downloads/goog/string/string.js closure/goog/string/string.js
+--- /Users/dmaas/Downloads/goog/string/string.js	2015-02-24 23:52:56.000000000 -0800
++++ closure/goog/string/string.js	2015-02-24 23:53:05.000000000 -0800
 @@ -14,6 +14,7 @@
  
  /**
@@ -62,3 +239,69 @@ index dcfdffb..329aae3 100644
   */
  
  
+diff -ruN /Users/dmaas/Downloads/goog/structs/map.js closure/goog/structs/map.js
+--- /Users/dmaas/Downloads/goog/structs/map.js	2015-02-24 23:52:56.000000000 -0800
++++ closure/goog/structs/map.js	2015-02-24 23:57:29.000000000 -0800
+@@ -14,6 +14,7 @@
+ 
+ /**
+  * @fileoverview Datastructure: Hash Map.
++ * @suppress {reportUnknownTypes} DJM/SpinPunch
+  *
+  * @author arv@google.com (Erik Arvidsson)
+  * @author jonp@google.com (Jon Perlow) Optimized for IE6
+diff -ruN /Users/dmaas/Downloads/goog/structs/set.js closure/goog/structs/set.js
+--- /Users/dmaas/Downloads/goog/structs/set.js	2015-02-24 23:52:56.000000000 -0800
++++ closure/goog/structs/set.js	2015-02-24 23:57:38.000000000 -0800
+@@ -14,6 +14,7 @@
+ 
+ /**
+  * @fileoverview Datastructure: Set.
++ * @suppress {reportUnknownTypes} DJM/SpinPunch
+  *
+  * @author arv@google.com (Erik Arvidsson)
+  * @author pallosp@google.com (Peter Pallos)
+diff -ruN /Users/dmaas/Downloads/goog/structs/structs.js closure/goog/structs/structs.js
+--- /Users/dmaas/Downloads/goog/structs/structs.js	2015-02-24 23:52:56.000000000 -0800
++++ closure/goog/structs/structs.js	2015-02-24 23:57:47.000000000 -0800
+@@ -14,6 +14,7 @@
+ 
+ /**
+  * @fileoverview Generics method for collection-like classes and objects.
++ * @suppress {reportUnknownTypes} DJM/SpinPunch
+  *
+  * @author arv@google.com (Erik Arvidsson)
+  *
+diff -ruN /Users/dmaas/Downloads/goog/timer/timer.js closure/goog/timer/timer.js
+--- /Users/dmaas/Downloads/goog/timer/timer.js	2015-02-24 23:52:56.000000000 -0800
++++ closure/goog/timer/timer.js	2015-02-24 23:57:56.000000000 -0800
+@@ -15,6 +15,7 @@
+ /**
+  * @fileoverview A timer class to which other classes and objects can
+  * listen on.  This is only an abstraction above setInterval.
++ * @suppress {reportUnknownTypes} DJM/SpinPunch
+  *
+  * @see ../demos/timers.html
+  */
+diff -ruN /Users/dmaas/Downloads/goog/uri/utils.js closure/goog/uri/utils.js
+--- /Users/dmaas/Downloads/goog/uri/utils.js	2015-02-24 23:52:57.000000000 -0800
++++ closure/goog/uri/utils.js	2015-02-24 23:58:06.000000000 -0800
+@@ -14,6 +14,7 @@
+ 
+ /**
+  * @fileoverview Simple utilities for dealing with URI strings.
++ * @suppress {reportUnknownTypes} DJM/SpinPunch
+  *
+  * This is intended to be a lightweight alternative to constructing goog.Uri
+  * objects.  Whereas goog.Uri adds several kilobytes to the binary regardless
+diff -ruN /Users/dmaas/Downloads/goog/useragent/useragent.js closure/goog/useragent/useragent.js
+--- /Users/dmaas/Downloads/goog/useragent/useragent.js	2015-02-24 23:52:57.000000000 -0800
++++ closure/goog/useragent/useragent.js	2015-02-24 23:58:21.000000000 -0800
+@@ -14,6 +14,7 @@
+ 
+ /**
+  * @fileoverview Rendering engine detection.
++ * @suppress {reportUnknownTypes} DJM/SpinPunch
+  * @see <a href="http://www.useragentstring.com/">User agent strings</a>
+  * For information on the browser brand (such as Safari versus Chrome), see
+  * goog.userAgent.product.

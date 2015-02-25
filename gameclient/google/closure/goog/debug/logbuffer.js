@@ -20,6 +20,7 @@
  * log records and expect that they are not overwriten at a later point.
  *
  * @author agrieve@google.com (Andrew Grieve)
+ * @suppress {reportUnknownTypes} DJM/SpinPunch
  */
 
 goog.provide('goog.debug.LogBuffer');

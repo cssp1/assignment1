@@ -14,6 +14,7 @@
 
 /**
  * @fileoverview Browser capability checks for the events package.
+ * @suppress {reportUnknownTypes} DJM/SpinPunch
  *
  */
 

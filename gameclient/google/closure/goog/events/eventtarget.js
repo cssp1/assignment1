@@ -16,6 +16,7 @@
  * @fileoverview A disposable implementation of a custom
  * listenable/event target. See also: documentation for
  * {@code goog.events.Listenable}.
+ * @suppress {reportUnknownTypes} DJM/SpinPunch
  *
  * @author arv@google.com (Erik Arvidsson) [Original implementation]
  * @author pupius@google.com (Daniel Pupius) [Port to use goog.events]

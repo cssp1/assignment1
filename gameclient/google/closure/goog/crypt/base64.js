@@ -16,6 +16,7 @@
  * @fileoverview Base64 en/decoding. Not much to say here except that we
  * work with decoded values in arrays of bytes. By "byte" I mean a number
  * in [0, 255].
+ * @suppress {reportUnknownTypes} DJM/SpinPunch
  *
  * @author doughtie@google.com (Gavin Doughtie)
  * @author fschneider@google.com (Fritz Schneider)

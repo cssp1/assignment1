@@ -14,6 +14,7 @@
 
 /**
  * @fileoverview Useful compiler idioms.
+ * @suppress {reportUnknownTypes} DJM/SpinPunch
  *
  */
 

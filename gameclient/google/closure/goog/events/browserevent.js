@@ -14,6 +14,7 @@
 
 /**
  * @fileoverview A patched, standardized event object for browser events.
+ * @suppress {reportUnknownTypes} DJM/SpinPunch
  *
  * <pre>
  * The patched event object contains the following members:

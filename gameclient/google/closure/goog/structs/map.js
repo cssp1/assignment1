@@ -14,6 +14,7 @@
 
 /**
  * @fileoverview Datastructure: Hash Map.
+ * @suppress {reportUnknownTypes} DJM/SpinPunch
  *
  * @author arv@google.com (Erik Arvidsson)
  * @author jonp@google.com (Jon Perlow) Optimized for IE6

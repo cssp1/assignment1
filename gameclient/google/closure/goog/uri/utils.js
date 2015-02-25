@@ -14,6 +14,7 @@
 
 /**
  * @fileoverview Simple utilities for dealing with URI strings.
+ * @suppress {reportUnknownTypes} DJM/SpinPunch
  *
  * This is intended to be a lightweight alternative to constructing goog.Uri
  * objects.  Whereas goog.Uri adds several kilobytes to the binary regardless

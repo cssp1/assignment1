@@ -17,6 +17,7 @@
  * targets and custom JavaScript event targets
  * ({@code goog.events.Listenable}). This provides an abstraction
  * over browsers' event systems.
+ * @suppress {reportUnknownTypes} DJM/SpinPunch
  *
  * It also provides a simulation of W3C event model's capture phase in
  * Internet Explorer (IE 8 and below). Caveat: the simulation does not

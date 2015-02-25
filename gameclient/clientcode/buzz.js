@@ -1,5 +1,10 @@
 goog.provide('buzz');
 
+/**
+ * @fileoverview
+ * @suppress {reportUnknownTypes} DJM/SpinPunch
+ */
+
 // ----------------------------------------------------------------------------
 // Buzz, a Javascript HTML5 Audio library
 // v 1.0.x beta

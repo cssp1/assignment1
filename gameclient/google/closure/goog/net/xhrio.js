@@ -14,6 +14,7 @@
 
 /**
  * @fileoverview Wrapper class for handling XmlHttpRequests.
+ * @suppress {reportUnknownTypes} DJM/SpinPunch
  *
  * One off requests can be sent through goog.net.XhrIo.send() or an
  * instance can be created to send multiple requests.  Each request uses its
