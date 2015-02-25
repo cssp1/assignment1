@@ -9916,7 +9916,7 @@ function update_portrait_trophy_widgets(dialog, who) {
             var d = _invoke_alliance_dialog();
             if(d) { alliance_list_change_tab(d, 'top'); }
         }
-    } else if(read_predicate(gamedata['strings']['leaderboard']['categories']['trophies_pvp']['show_if']).is_satisfied(player,null)) {
+    } else if(read_predicate(gamedata['strings']['leaderboard']['categories']['trophies_pvp']['leaderboard_show_if']).is_satisfied(player,null)) {
         trophy_cb = function(w) {
             change_selection_ui(null);
             invoke_leaderboard(gamedata['matchmaking']['ladder_point_frequency'], 'all', 'trophies_pvp');
