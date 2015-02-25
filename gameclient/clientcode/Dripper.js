@@ -4,6 +4,10 @@ goog.provide('Dripper');
 // Use of this source code is governed by an MIT-style license that can be
 // found in the LICENSE file.
 
+/** @fileoverview
+    @suppress {reportUnknownTypes} XXX we are not typesafe yet
+*/
+
 // This is a little utility for making GUI buttons that you hold down
 // and then emit a stream of increasingly-fast events as it continues
 // to be held down. Mainly, unit deployment in SG.

@@ -1,13 +1,18 @@
-goog.require('goog.array');
+goog.provide('Predicates');
 
 // Copyright (c) 2015 SpinPunch. All rights reserved.
 // Use of this source code is governed by an MIT-style license that can be
 // found in the LICENSE file.
 
-goog.provide('Predicates');
+/** @fileoverview
+    @suppress {reportUnknownTypes} XXX we are not typesafe yet
+*/
+
+goog.require('goog.array');
 
 // depends on Player stuff from clientcode.js
-// note: this is functionally identical to the server's Predicates.py
+// note: this is functionally identical to the server's Predicates.py,
+// except for a handful of client-only predicates that are for GUI stuff.
 
 /** @constructor */
 function Predicate(data) {

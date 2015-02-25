@@ -1,13 +1,18 @@
 goog.provide('Congrats');
-goog.require('Predicates');
-goog.require('SPText');
 
 // Copyright (c) 2015 SpinPunch. All rights reserved.
 // Use of this source code is governed by an MIT-style license that can be
 // found in the LICENSE file.
 
+/** @fileoverview
+    @suppress {reportUnknownTypes} XXX we are not typesafe yet
+*/
+
 // generates nicely-formatted SPText for upgrade congraulations M&Ms
 // uses pretty_print_number from main.js
+
+goog.require('Predicates');
+goog.require('SPText');
 
 var Congrats = {
     color_neutral: 'rgba(200,200,200,1)',

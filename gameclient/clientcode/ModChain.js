@@ -4,6 +4,10 @@ goog.provide('ModChain');
 // Use of this source code is governed by an MIT-style license that can be
 // found in the LICENSE file.
 
+/** @fileoverview
+    @suppress {reportUnknownTypes} XXX we are not typesafe yet
+*/
+
 goog.require('goog.array');
 goog.require('goog.object');
 

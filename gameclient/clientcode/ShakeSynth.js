@@ -15,7 +15,8 @@ ShakeSynth = {
 };
 
 /** @constructor
-    @struct */
+    @struct
+    @param {number} seed */
 ShakeSynth.Shake = function(seed) {
     this.seed = seed;
     this.speed = 5.3;
@@ -33,6 +34,8 @@ ShakeSynth.Shake = function(seed) {
     }
 };
 
+/** @param {number} t
+    @return {Array.<number>} */
 ShakeSynth.Shake.prototype.evaluate = function(t) {
     var start = Math.min(Math.max(this.start_freq, 0), ShakeSynth.SAMPLES-1);
     var end = Math.min(Math.max(this.end_freq, 0), ShakeSynth.SAMPLES-1);

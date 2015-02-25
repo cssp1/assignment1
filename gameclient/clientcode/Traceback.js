@@ -1,6 +1,6 @@
 /**
  * @fileoverview
- * @suppress {missingProperties}
+ * @suppress {missingProperties,reportUnknownTypes,es5Strict}
  */
 
 goog.provide('Traceback');

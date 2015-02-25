@@ -1,7 +1,15 @@
 goog.provide('QuestBar');
 
+// Copyright (c) 2015 SpinPunch. All rights reserved.
+// Use of this source code is governed by an MIT-style license that can be
+// found in the LICENSE file.
+
 // vertical bar that shows icons for each active or claimable quest
 // tightly coupled to main.js, sorry!
+
+/** @fileoverview
+    @suppress {reportUnknownTypes} XXX we are not typesafe yet
+*/
 
 QuestBar.init = function() {
     if(!('quest_bar' in desktop_dialogs)) {

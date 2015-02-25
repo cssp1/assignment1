@@ -1,5 +1,9 @@
 goog.provide('BinaryHeap');
 
+/** @fileoverview
+    @suppress {reportUnknownTypes} XXX we are not typesafe yet
+*/
+
 // from http://eloquentjavascript.net/1st_edition/appendix2.html
 // via https://github.com/bgrins/javascript-astar
 // License: http://creativecommons.org/licenses/by/3.0/

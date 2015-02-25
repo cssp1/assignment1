@@ -4,6 +4,10 @@ goog.provide('TeamMapAccelerator');
 // Use of this source code is governed by an MIT-style license that can be
 // found in the LICENSE file.
 
+/** @fileoverview
+    @suppress {reportUnknownTypes} XXX we are not typesafe yet
+*/
+
 // Very simple acceleration data structure for map queries that just groups objects by team.
 
 /** @constructor

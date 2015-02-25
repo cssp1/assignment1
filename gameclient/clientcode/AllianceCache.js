@@ -1,14 +1,18 @@
 goog.provide('AllianceCache');
 
-goog.require('goog.object');
-goog.require('SPHTTP');
-
 // Copyright (c) 2015 SpinPunch. All rights reserved.
 // Use of this source code is governed by an MIT-style license that can be
 // found in the LICENSE file.
 
+/** @fileoverview
+    @suppress {reportUnknownTypes} XXX we are not typesafe yet
+*/
+
 // client-side alliance info cache
 // this is a central respository for things we know about alliances
+
+goog.require('goog.object');
+goog.require('SPHTTP');
 
 // imports from main.js: send_to_server
 

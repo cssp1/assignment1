@@ -1,12 +1,16 @@
 goog.provide('Consequents');
 
-// for Logic only
-goog.require('Predicates');
-goog.require('GameArt'); // for client graphics
-
 // Copyright (c) 2015 SpinPunch. All rights reserved.
 // Use of this source code is governed by an MIT-style license that can be
 // found in the LICENSE file.
+
+/** @fileoverview
+    @suppress {reportUnknownTypes} XXX we are not typesafe yet
+*/
+
+// for Logic only
+goog.require('Predicates');
+goog.require('GameArt'); // for client graphics
 
 // depends on global player/selection stuff from clientcode.js
 // note: this parallel's Consequents.py on the server side, but

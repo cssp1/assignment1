@@ -7,10 +7,11 @@ goog.provide('PortraitCache');
 // cache of HTML Image objects representing Facebook portraits, to
 // minimize number of instantiated objects.
 
-var PortraitCache = {
-    images: {}
-};
+/** @type {Object.<string, HTMLImageElement>} */
+PortraitCache.images = {};
 
+/** @param {string} url
+    @return {HTMLImageElement} */
 PortraitCache.get_raw_image = function(url) {
     if(!(url in PortraitCache.images)) {
         var image = new Image();

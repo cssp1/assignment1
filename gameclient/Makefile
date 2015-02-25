@@ -80,14 +80,14 @@ compiled-client.js: clientcode/*.js
 
 check: clientcode/*.js
 # Compile our code with reportUnknownTypes enabled to call out anything that's not typed.
-# The main game code is not clean for this, but we can start to insist on strong typing in a subset of it.
-# (neither is the Closure library, so we insert a lot of @suppress{reportUnknownTypes} there)
+# A lot of our code is not clean for this, but we can start to insist on strong typing in a subset of it.
+# (neither is the Closure library and other third-party code, so we insert a lot of @suppress{reportUnknownTypes} there)
+
 	@google/closure/bin/build/closurebuilder.py \
 		--root='google'	--root='clientcode' \
 		--compiler_flags='--externs=clientcode/externs.js' \
 		--compiler_flags='--js=google/closure/goog/deps.js' \
-		--input='clientcode/GameData.js' \
-		--input='clientcode/CombatEngine.js' \
+		--input='clientcode/main.js' \
 		--output_mode=compiled \
 		--compiler_jar=google/compiler.jar \
 		--compiler_flags='--compilation_level=ADVANCED_OPTIMIZATIONS' \
@@ -98,3 +98,5 @@ check: clientcode/*.js
 		--output_file=/dev/null \
 		${CHECK_FLAGS} ${OPT_FLAGS}
 
+# To find SpinPunch code that is not type-safe yet:
+# grep reportUnknownTypes.*XXX clientcode/*.js

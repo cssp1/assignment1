@@ -4,6 +4,10 @@ goog.provide('VoxelMapAccelerator');
 // Use of this source code is governed by an MIT-style license that can be
 // found in the LICENSE file.
 
+/** @fileoverview
+    @suppress {reportUnknownTypes} XXX we are not typesafe yet
+*/
+
 // Sparse 2D voxel grid data structure for accelerating the common case of map queries for unit combat AI.
 // i.e. querying for other units within a circle of a certain radius.
 // This gets rebuilt each combat sim step in run_unit_ticks().

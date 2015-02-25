@@ -4,6 +4,10 @@ goog.provide('SPFB');
 // Use of this source code is governed by an MIT-style license that can be
 // found in the LICENSE file.
 
+/** @fileoverview
+    @suppress {reportUnknownTypes} XXX we are not typesafe yet
+*/
+
 // this is a wrapper around the Facebook SDK's "FB" function that
 // detects cases where Facebook's JavaScript code failed to load asynchronously
 

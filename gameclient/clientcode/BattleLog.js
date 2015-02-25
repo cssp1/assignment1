@@ -1,15 +1,20 @@
 goog.provide('BattleLog');
-goog.require('goog.array');
-goog.require('SPUI'); // for SPUI.Color
-goog.require('SPText');
-goog.require('ItemDisplay');
 
 // Copyright (c) 2015 SpinPunch. All rights reserved.
 // Use of this source code is governed by an MIT-style license that can be
 // found in the LICENSE file.
 
+/** @fileoverview
+    @suppress {reportUnknownTypes} XXX we are not typesafe yet
+*/
+
 // battle log parser
 // converts array of raw metrics to SPText
+
+goog.require('goog.array');
+goog.require('SPUI'); // for SPUI.Color
+goog.require('SPText');
+goog.require('ItemDisplay');
 
 var BattleLog = {};
 

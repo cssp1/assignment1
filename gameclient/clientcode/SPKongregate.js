@@ -4,6 +4,10 @@ goog.provide('SPKongregate');
 // Use of this source code is governed by an MIT-style license that can be
 // found in the LICENSE file.
 
+/** @fileoverview
+    @suppress {reportUnknownTypes} XXX we are not typesafe yet
+*/
+
 // this is a wrapper around Kongregate's SDK that
 // detects cases whereit failed to load asynchronously
 

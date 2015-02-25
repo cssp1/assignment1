@@ -4,6 +4,10 @@ goog.provide('ItemDisplay');
 // Use of this source code is governed by an MIT-style license that can be
 // found in the LICENSE file.
 
+/** @fileoverview
+    @suppress {reportUnknownTypes} XXX we are not typesafe yet
+*/
+
 // library that supports the "item_widget" dialog, which is how we
 // display items with stack counts, clickable frames, etc.
 

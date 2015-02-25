@@ -4,6 +4,10 @@ goog.provide('FBSendRequests');
 // Use of this source code is governed by an MIT-style license that can be
 // found in the LICENSE file.
 
+/** @fileoverview
+    @suppress {reportUnknownTypes} XXX we are not typesafe yet
+*/
+
 // Facebook Friend Request Dialog
 
 // this references a ton of stuff from main.js. It's not a self-contained module.

@@ -2,6 +2,10 @@ goog.provide('lz4');
 
 // https://github.com/pierrec/node-lz4/blob/master/lib/decoder-js.js
 
+/** @fileoverview
+    @suppress {reportUnknownTypes} XXX we are not typesafe yet
+*/
+
 // Copyright (c) 2012 Pierre Curto
 
 // Permission is hereby granted, free of charge, to any person obtaining a copy

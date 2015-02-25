@@ -1,10 +1,8 @@
 goog.provide('AStar');
 
-goog.require('goog.array');
-goog.require('goog.object');
-goog.require('BinaryHeap');
+/** @fileoverview
+    @suppress {reportUnknownTypes} XXX we are not typesafe yet
 
-/*
   A* Pathfinding
 
   (Very heavily) modified from http://github.com/bgrins/javascript-astar
@@ -31,6 +29,10 @@ goog.require('BinaryHeap');
 */
 
 // SP3RDPARTY : javascript-astar : MIT License
+
+goog.require('goog.array');
+goog.require('goog.object');
+goog.require('BinaryHeap');
 
 /** @const */
 var AStar = {

@@ -1,13 +1,18 @@
 goog.provide('GameArt');
+
+// Copyright (c) 2015 SpinPunch. All rights reserved.
+// Use of this source code is governed by an MIT-style license that can be
+// found in the LICENSE file.
+
+/** @fileoverview
+    @suppress {reportUnknownTypes} XXX we are not typesafe yet
+*/
+
 goog.require('goog.array');
 goog.require('goog.string');
 goog.require('SPAudio');
 goog.require('BinaryHeap');
 goog.require('FlashDetect');
-
-// Copyright (c) 2015 SpinPunch. All rights reserved.
-// Use of this source code is governed by an MIT-style license that can be
-// found in the LICENSE file.
 
 // references metric_event from main.js
 

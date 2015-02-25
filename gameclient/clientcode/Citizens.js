@@ -4,6 +4,13 @@ goog.provide('Citizens');
 // Use of this source code is governed by an MIT-style license that can be
 // found in the LICENSE file.
 
+/** @fileoverview
+    @suppress {reportUnknownTypes} XXX we are not typesafe yet
+*/
+
+// generates nicely-formatted SPText for upgrade congraulations M&Ms
+// uses pretty_print_number from main.js
+
 // Random army units walking around your base
 
 // This is intended to couple only loosely with the GameObjects in
