@@ -4,6 +4,8 @@ goog.provide('CombatEngine');
 // Use of this source code is governed by an MIT-style license that can be
 // found in the LICENSE file.
 
+goog.require('GameTypes');
+
 // numeric types - eventually will need to become fixed-point
 
 /** Scaling coefficient, like a damage_vs coefficient
@@ -266,15 +268,17 @@ goog.inherits(CombatEngine.AreaDamageEffect, CombatEngine.DamageEffect);
 
 CombatEngine.AreaDamageEffect.prototype.apply = function() {
     // hurt all objects within radius
-    var obj_list = query_objects_within_distance(this.target_location, this.radius, // XXXXXX calls into main
+    var obj_list = query_objects_within_distance(this.target_location, this.radius,
                                                  { exclude_invul: true,
                                                    exclude_flying: !this.hit_air,
                                                    flying_only: (this.hit_air && !this.hit_ground) });
-    for(var i = 0; i < obj_list.length; i++) {
-        var obj = obj_list[i][0], dist = obj_list[i][1], pos = obj_list[i][2];
-        if(obj.is_destroyed()) { continue; }
-        if(!this.allow_ff && obj.team === this.source.team) { continue; }
-        if(obj.spec['immune_to_splash']) { continue; }
+    goog.array.forEach(obj_list, function(result) {
+        var obj = result.obj;
+        var dist = result.dist;
+        var pos = result.pos;
+        if(obj.is_destroyed()) { return; }
+        if(!this.allow_ff && obj.team === this.source.team) { return; }
+        if(obj.spec['immune_to_splash']) { return; }
 
         /** @type {!CombatEngine.Pos} */
         var falloff;
@@ -291,7 +295,7 @@ CombatEngine.AreaDamageEffect.prototype.apply = function() {
         if(amt != 0) {
             hurt_object(obj, amt, this.vs_table, this.source);  // XXXXXX calls into main
         }
-    }
+    }, this);
 };
 
 /** @constructor
@@ -342,27 +346,22 @@ CombatEngine.AreaAuraEffect.prototype.apply = function() {
     }
 
     // apply aura to all objects within radius
-    var obj_list = query_objects_within_distance(this.target_location, query_r, // XXXXXX calls into main
+    var obj_list = query_objects_within_distance(this.target_location, query_r,
                                                  { exclude_invul: true,
                                                    exclude_flying: !this.hit_air,
                                                    flying_only: (this.hit_air && !this.hit_ground) });
-    for(var i = 0; i < obj_list.length; i++) {
-        /** @type {!GameObject} */
-        var obj = obj_list[i][0];
-        /** @type {!CombatEngine.Pos} */
-        var dist = obj_list[i][1];
-        /** @type {!CombatEngine.Pos2D} */
-        var pos = obj_list[i][2];
+    goog.array.forEach(obj_list, function(result) {
+        var obj = result.obj, dist = result.dist, pos = result.pos;
 
-        if(obj.is_destroyed()) { continue; }
-        if(!this.allow_ff && obj.team === this.source.team) { continue; }
-        if(obj.spec['immune_to_splash']) { continue; }
+        if(obj.is_destroyed()) { return; }
+        if(!this.allow_ff && obj.team === this.source.team) { return; }
+        if(obj.spec['immune_to_splash']) { return; }
 
         if(this.radius_rect) {
             // skip objects that are outside the radius_rect rectangle centered on target_location
             var d = CombatEngine.Pos2D.sub(pos, this.target_location);
             var a = this.radius_rect[0]/2, b = this.radius_rect[1]/2;
-            if(d[0] < -a || d[0] > a || d[1] < -b || d[1] > b) { continue; }
+            if(d[0] < -a || d[0] > a || d[1] < -b || d[1] > b) { return; }
         }
 
         /** @type {!CombatEngine.Coeff} */
@@ -383,5 +382,5 @@ CombatEngine.AreaAuraEffect.prototype.apply = function() {
                 obj.create_aura(this.source, this.aura_name, amt, duration, this.aura_range, this.vs_table);
             }
         }
-    }
+    }, this);
 };

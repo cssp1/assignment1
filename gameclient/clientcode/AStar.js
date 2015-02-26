@@ -43,9 +43,9 @@ var AStar = {
 // DISTANCE HEURISTICS
 // See list of heuristics: http://theory.stanford.edu/~amitp/GameProgramming/Heuristics.html
 
-/** @param {Array.<number>} start_pos
-  * @param {Array.<number>} cur_pos
-  * @param {Array.<number>} end_pos */
+/** @param {!Array.<number>} start_pos
+  * @param {!Array.<number>} cur_pos
+  * @param {!Array.<number>} end_pos */
 AStar.heuristic_manhattan = function(start_pos, cur_pos, end_pos) {
     // Manhattan distance
     var dx1 = Math.abs(end_pos[0] - cur_pos[0]);
@@ -53,9 +53,9 @@ AStar.heuristic_manhattan = function(start_pos, cur_pos, end_pos) {
     return dx1 + dy1;
 };
 
-/** @param {Array.<number>} start_pos
-  * @param {Array.<number>} cur_pos
-  * @param {Array.<number>} end_pos */
+/** @param {!Array.<number>} start_pos
+  * @param {!Array.<number>} cur_pos
+  * @param {!Array.<number>} end_pos */
 AStar.heuristic_euclidean = function(start_pos, cur_pos, end_pos) {
     // Euclidean distance with cross-product tie-breaker
     // tends to make "cleaner" paths and visit fewer cells, but tests a little slower than manhattan
@@ -78,7 +78,7 @@ AStar.BlockChecker;
 /** Function to evaluate the blockage of a cell when reached via a specific path.
  *  Note that path dependence may invalidate the A* algorithm.
  *  The second parameter is the array of coordinates along the path, excluding starting point, including ending point.
- * @typedef {function(AStar.AStarCell, Array.<Array.<number>>): boolean | null} */
+ * @typedef {function(AStar.AStarCell, !Array.<!Array.<number>>): boolean | null} */
 AStar.PathChecker;
 
 /** @constructor
@@ -88,7 +88,7 @@ AStar.AStarCell = function(pos) {
     this.pos = pos;
     this.block_count = 0; // count of obstacles overlapping this point
 
-    /** @type {Array|null} list of references to obstacles that are blocking here */
+    /** @type {?Array} list of references to obstacles that are blocking here */
     this.blockers = null; // optional - only used by hex map right now
 
     this.heapscore = 0; // for insertion into BinaryHeap
@@ -140,8 +140,8 @@ AStar.AStarCell.prototype.get = function(serial) {
 
 /** @constructor
     @struct
-    @param {Array.<number>} size [x,y] size
-    @param {function(Array.<number>): boolean|null} terrain_func optional, return true if terrain is blocked at this location */
+    @param {!Array.<number>} size [x,y] size
+    @param {function(!Array.<number>): boolean|null} terrain_func optional, return true if terrain is blocked at this location */
 AStar.AStarMap = function (size, terrain_func) {
     this.size = size;
     this.terrain_func = terrain_func;
@@ -187,7 +187,7 @@ AStar.AStarMap.prototype.cleanup = function() {
 }
 
 /** Return a cell no matter what.
-  * @param {Array.<number>} xy */
+  * @param {!Array.<number>} xy */
 AStar.AStarMap.prototype.cell = function(xy) {
     if(!this.map[xy[1]]) {
         this.map[xy[1]] = Array(this.size[0]);
@@ -203,14 +203,14 @@ AStar.AStarMap.prototype.cell = function(xy) {
     return this.map[xy[1]][xy[0]];
 };
 
-/** @param {Array.<number>} xy */
+/** @param {!Array.<number>} xy */
 AStar.AStarMap.prototype.free_cell = function(xy) {
     this.needs_cleanup = true;
     return;
 };
 
 /** Return a cell that can potentially be used for pathing
- * @param {Array.<number>} xy
+ * @param {!Array.<number>} xy
  * @param {AStar.BlockChecker} checker
  * @return {?AStar.AStarCell} */
 AStar.AStarMap.prototype.cell_if_unblocked = function(xy, checker) {
@@ -224,7 +224,7 @@ AStar.AStarMap.prototype.cell_if_unblocked = function(xy, checker) {
     return null;
 };
 
-/** @param {Array.<number>} xy
+/** @param {!Array.<number>} xy
  * @param {AStar.BlockChecker=} checker
  * @return {boolean} */
 AStar.AStarMap.prototype.is_blocked = function(xy, checker) {
@@ -242,7 +242,7 @@ AStar.AStarMap.prototype.num_neighbors = goog.abstractMethod;
 
 /** @param {AStar.AStarCell} node
  * @param {AStar.BlockChecker} checker
- * @param {Array.<AStar.AStarCell>} ret */
+ * @param {!Array.<AStar.AStarCell>} ret */
 AStar.AStarMap.prototype.get_unblocked_neighbors = goog.abstractMethod;
 
 /** Iterate through all allocated cells, whether blocked or not. Used for integrity checking/debugging only.
@@ -265,8 +265,8 @@ AStar.AStarMap.prototype.for_each_cell = function(func) {
 /** @constructor
     @struct
     @extends AStar.AStarMap
-    @param {Array.<number>} size [x,y] size
-    @param {function(Array.<number>): boolean|null} terrain_func optional, return true if terrain is blocked at this location
+    @param {!Array.<number>} size [x,y] size
+    @param {function(!Array.<number>): boolean|null} terrain_func optional, return true if terrain is blocked at this location
     @param {boolean} allow_diagonal_passage if true, allow travel along "thin" Bresenham paths with diagonal moves
 */
 AStar.AStarRectMap = function (size, terrain_func, allow_diagonal_passage) {
@@ -289,8 +289,8 @@ AStar.AStarRectMap.prototype.get_unblocked_neighbors = function(node, checker, r
 };
 
 /** update collision-detection data structure
- * @param {Array.<number>} xy upper-left corner of area to affect
- * @param {Array.<number>} wh width and height (blockage is closed on the left and open on the right, i.e. [x,x+w-1] are the blocked cells, with x+w unblocked)
+ * @param {!Array.<number>} xy upper-left corner of area to affect
+ * @param {!Array.<number>} wh width and height (blockage is closed on the left and open on the right, i.e. [x,x+w-1] are the blocked cells, with x+w unblocked)
  * @param {number} value +1 to block, -1 to unblock
  */
 AStar.AStarRectMap.prototype.block_map = function(xy, wh, value) {
@@ -316,9 +316,9 @@ AStar.AStarRectMap.prototype.block_map = function(xy, wh, value) {
 };
 
 /** Return the list of [x,y] coordinates along a path from start to end, inclusive.
- * @param {Array.<number>} start
- * @param {Array.<number>} end
- * @returns {Array.<Array.<number>>} */
+ * @param {!Array.<number>} start
+ * @param {!Array.<number>} end
+ * @returns {!Array.<!Array.<number>>} */
 AStar.AStarRectMap.prototype.get_linear_path = function(start, end) {
     if(this.allow_diagonal_passage) {
         return this.get_bresenham_path(vec_floor(start), vec_floor(end));
@@ -329,9 +329,9 @@ AStar.AStarRectMap.prototype.get_linear_path = function(start, end) {
 
 /** Bresenham's version - this allows diagonal movement, and only works on integer coordinates
  * @private
- * @param {Array.<number>} start
- * @param {Array.<number>} end
- * @returns {Array.<Array.<number>>} */
+ * @param {!Array.<number>} start
+ * @param {!Array.<number>} end
+ * @returns {!Array.<!Array.<number>>} */
 AStar.AStarRectMap.prototype.get_bresenham_path = function(start, end) {
     var dx = Math.abs(end[0]-start[0]), dy = Math.abs(end[1]-start[1]);
     var sx = (start[0] < end[0] ? 1 : -1), sy = (start[1] < end[1] ? 1 : -1);
@@ -360,9 +360,9 @@ AStar.AStarRectMap.prototype.get_bresenham_path = function(start, end) {
 /** Only horizontal or vertical movement allowed (no diagonal moves).
  *  Accepts continuous coordinates as input, and returns non-quantized grid cells.
  * @private
- * @param {Array.<number>} start
- * @param {Array.<number>} end
- * @returns {Array.<Array.<number>>} */
+ * @param {!Array.<number>} start
+ * @param {!Array.<number>} end
+ * @returns {!Array.<!Array.<number>>} */
 AStar.AStarRectMap.prototype.get_voxel_path = function(start, end) {
     // see http://www.cse.yorku.ca/~amana/research/grid.pdf
 
@@ -410,8 +410,8 @@ AStar.AStarRectMap.prototype.get_voxel_path = function(start, end) {
 };
 
 /** Return whether a straight-line path from xy coordinates 'start' to 'end' is free of collisions
- * @param {Array.<number>} start
- * @param {Array.<number>} end
+ * @param {!Array.<number>} start
+ * @param {!Array.<number>} end
  * @returns {boolean} */
 AStar.AStarRectMap.prototype.linear_path_is_clear = function(start, end) {
     if(this.allow_diagonal_passage) {
@@ -424,8 +424,8 @@ AStar.AStarRectMap.prototype.linear_path_is_clear = function(start, end) {
 /** Bresenham's version - this allows diagonal movement, and only works on integer coordinates.
  *  Also, for compatibility with legacy games, this does NOT check the final endpoint cell.
  * @private
- * @param {Array.<number>} start
- * @param {Array.<number>} end
+ * @param {!Array.<number>} start
+ * @param {!Array.<number>} end
  * @returns {boolean} */
 AStar.AStarRectMap.prototype.bresenham_path_is_clear = function(start, end) {
     // Bresenham's algorithm
@@ -457,8 +457,8 @@ AStar.AStarRectMap.prototype.bresenham_path_is_clear = function(start, end) {
 /** Only horizontal or vertical movement allowed (no diagonal moves).
  *  Accepts continuous coordinates as input.
  * @private
- * @param {Array.<number>} start
- * @param {Array.<number>} end
+ * @param {!Array.<number>} start
+ * @param {!Array.<number>} end
  * @returns {boolean} */
 AStar.AStarRectMap.prototype.voxel_path_is_clear = function(start, end) {
     // see http://www.cse.yorku.ca/~amana/research/grid.pdf
@@ -510,7 +510,7 @@ AStar.AStarRectMap.prototype.voxel_path_is_clear = function(start, end) {
 /** smooth a "manhattan-aliased" path by removing as many nodes as
  * possible without creating any collisions
  * note: modifies 'path' destructively
- * @param {Array.<Array.<number>>} path
+ * @param {!Array.<!Array.<number>>} path
  */
 AStar.AStarRectMap.prototype.smooth_path = function(path) {
     if(path.length < 2) { return path; }
@@ -573,7 +573,7 @@ AStar.AStarHexMap.prototype.get_unblocked_neighbors = function(node, checker, re
 };
 
 /** block/unblock individual hexes
-    @param {Array.<number>} xy
+    @param {!Array.<number>} xy
     @param {number} value +1 to block, -1 to unblock
     @param {!Object} blocker reference to thing that is blocking here
 */
@@ -607,7 +607,7 @@ AStar.AStarHexMap.prototype.block_hex = function(xy, value, blocker) {
 };
 
 /** unblock a hex, but only if "blocker" is currently blocking it
-    @param {Array.<number>} xy
+    @param {!Array.<number>} xy
     @param {!Object} blocker reference to thing that is blocking here
 */
 AStar.AStarHexMap.prototype.unblock_hex_maybe = function(xy, blocker) {
@@ -631,10 +631,10 @@ AStar.AStarHexMap.prototype.unblock_hex_maybe = function(xy, blocker) {
 AStar.Connectivity = function(map) {
     if(!(map instanceof AStar.AStarRectMap)) { throw Error('Connectivity only implemented for RectMap'); }
 
-    /** @type {Array.<number>} */
+    /** @type {!Array.<number>} */
     this.size = [map.size[0], map.size[1]];
 
-    /** @type {Array.<number>} */
+    /** @type {!Array.<number>} */
     this.flood = new Array(this.size[0]*this.size[1]);
 
     // use a flood-fill algorithm to assign region numbersj
@@ -751,10 +751,10 @@ AStar.AStarContext.prototype.debug_draw = function(ctx) {
 };
 
 /** Main A* search function
-  * @param {Array.<number>} start_pos
-  * @param {Array.<number>} end_pos
+  * @param {!Array.<number>} start_pos
+  * @param {!Array.<number>} end_pos
   * @param {AStar.PathChecker=} path_checker
-  * @return {Array.<Array.<number>>}
+  * @return {!Array.<!Array.<number>>}
   */
 AStar.AStarContext.prototype.search = function(start_pos, end_pos, path_checker) {
     path_checker = path_checker || null;
@@ -780,7 +780,7 @@ AStar.AStarContext.prototype.search = function(start_pos, end_pos, path_checker)
     var best_h = 9999999999;
 
     // preallocate for speed
-    /** @type {Array.<AStar.AStarCell>} */
+    /** @type {!Array.<AStar.AStarCell>} */
     var neighbors = Array(this.map.num_neighbors());
 
     while(openHeap.size() > 0 && iter < AStar.ASTAR_MAX_ITER) {
@@ -952,8 +952,8 @@ AStar.CachedAStarContext.prototype.debug_dump = function() {
 };
 
 /**
- * @param {Array.<number>} start_pos
- * @param {Array.<number>} end_pos
+ * @param {!Array.<number>} start_pos
+ * @param {!Array.<number>} end_pos
  * @param {number} ring_size
  */
 AStar.CachedAStarContext.prototype.cache_key = function(start_pos, end_pos, ring_size) {
@@ -962,10 +962,10 @@ AStar.CachedAStarContext.prototype.cache_key = function(start_pos, end_pos, ring
 
 /** Cached wrapper around A* search function
  * @override
- * @param {Array.<number>} start_pos
- * @param {Array.<number>} end_pos
+ * @param {!Array.<number>} start_pos
+ * @param {!Array.<number>} end_pos
  * @param {AStar.PathChecker=} path_checker
- * @return {Array.<Array.<number>>}
+ * @return {!Array.<!Array.<number>>}
  */
 AStar.CachedAStarContext.prototype.search = function(start_pos, end_pos, path_checker) {
     if(path_checker) { throw Error('checkers not supported in CachedAStarContext'); }
@@ -982,7 +982,7 @@ AStar.CachedAStarContext.prototype.search = function(start_pos, end_pos, path_ch
     var start_region = (this.connectivity ? this.connectivity.region_num(start_pos) : 0);
     var end_region = (this.connectivity ? this.connectivity.region_num(end_pos) : 0);
 
-    /** @type {Array.<Array.<number>>} */
+    /** @type {!Array.<!Array.<number>>} */
     var ret;
 
     if(start_region < 0 || start_region != end_region) {
@@ -998,10 +998,10 @@ AStar.CachedAStarContext.prototype.search = function(start_pos, end_pos, path_ch
 };
 
 /** Search towards a point in an expanding ring of up to 'ring_size' map cells
-  * @param {Array.<number>} start_pos
-  * @param {Array.<number>} end_pos
+  * @param {!Array.<number>} start_pos
+  * @param {!Array.<number>} end_pos
   * @param {number} ring_size
-  * @return {Array.<Array.<number>>}
+  * @return {!Array.<!Array.<number>>}
   */
 AStar.CachedAStarContext.prototype.ring_search = function(start_pos, end_pos, ring_size) {
     if(ring_size < 1) { throw Error('ring_size < 1'); }
@@ -1023,7 +1023,7 @@ AStar.CachedAStarContext.prototype.ring_search = function(start_pos, end_pos, ri
 
     var start_region = (this.connectivity ? this.connectivity.region_num(start_pos) : 0);
 
-    /** @type {Array.<Array.<number>>|null} */
+    /** @type {!Array.<!Array.<number>>|null} */
     var ret = null;
 
     if(start_region < 0) {

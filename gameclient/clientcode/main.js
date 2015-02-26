@@ -26,6 +26,7 @@ goog.require('BattleLog');
 goog.require('ChatFilter');
 goog.require('Congrats');
 goog.require('GameArt');
+goog.require('GameTypes');
 goog.require('SPUI');
 goog.require('SPText');
 goog.require('SPHTTP');
@@ -196,7 +197,9 @@ function vec_dot(a,b) { return a[0]*b[0]+a[1]*b[1]; }
 function vec_length2(v) { return v[0]*v[0]+v[1]*v[1]; }
 function vec_length(v) { return Math.sqrt(v[0]*v[0]+v[1]*v[1]); }
 
-
+/** @param {!Array.<number>} a
+    @param {!Array.<number>} b
+    @return {number} */
 function vec_distance(a, b) {
     var dx = b[0] - a[0], dy = b[1] - a[1];
     return Math.sqrt(dx*dx + dy*dy);
@@ -763,10 +766,7 @@ Aura.prototype.apply = function(obj) {
                                                          gamedata['map']['range_conversion'] * this.range,
                                                          { only_team: obj.team, mobile_only: true });
             for(var i = 0; i < obj_list.length; i++) {
-                /** @type {!GameObject} */
-                var o = obj_list[i][0];
-                var dist = obj_list[i][1];
-                var pos = obj_list[i][2];
+                var o = obj_list[i].obj;
                 o.create_aura(obj, 'defense_boosted', this.strength, new CombatEngine.TickCount(1), 0);
             }
         } else if(code === 'damage_booster') {
@@ -775,10 +775,7 @@ Aura.prototype.apply = function(obj) {
                                                          gamedata['map']['range_conversion'] * this.range,
                                                          { only_team: obj.team, mobile_only: true });
             for(var i = 0; i < obj_list.length; i++) {
-                /** @type {!GameObject} */
-                var o2 = obj_list[i][0];
-                var dist = obj_list[i][1];
-                var pos = obj_list[i][2];
+                var o2 = obj_list[i].obj;
                 o2.create_aura(obj, 'damage_boosted', this.strength, new CombatEngine.TickCount(1), 0);
             }
         } else if(code === 'stunned') {
@@ -1389,16 +1386,23 @@ GameObject.prototype.update_facing = function() {
         }
     }
 };
+/** @return {boolean} */
 GameObject.prototype.is_building = function() { return (this.spec['kind'] === 'building'); };
 /** @return {boolean} */
 GameObject.prototype.is_mobile = function() { return (this.spec['kind'] === 'mobile'); };
+/** @return {boolean} */
 GameObject.prototype.is_flying = function() { return false; };
+/** @return {boolean} */
 GameObject.prototype.is_inert = function() { return (this.spec['kind'] === 'inert'); };
+/** @return {boolean} */
 GameObject.prototype.is_blocker = function() { return false; };
+/** @return {!Array.<number>} */
 GameObject.prototype.raw_pos = function() { return [this.x, this.y]; };
 /** @return {!Array.<number>} */
 GameObject.prototype.interpolate_pos = function() { return [this.x, this.y]; };
+/** @return {!Array.<number>} */
 GameObject.prototype.interpolate_pos_for_draw = function() { return this.interpolate_pos(); };
+/** @return {boolean} */
 GameObject.prototype.is_invisible = function() { return false; };
 
 // return [[x,y], depth] for sprite drawing on game field
@@ -1409,17 +1413,21 @@ GameObject.prototype.calc_draw_pos = function() {
 };
 GameObject.prototype.update_draw_pos = function() { this.draw_pos_cache = this.calc_draw_pos(); };
 
+/** @return {boolean} */
 GameObject.prototype.is_indestructible = function() {
     return (this.max_hp === 0);
 };
+/** @return {boolean} */
 GameObject.prototype.is_damaged = function() {
     if(this.max_hp === 0) { return false; } // indestructible object
     return (this.hp < this.max_hp);
 };
+/** @return {boolean} */
 GameObject.prototype.is_destroyed = function() {
     if(this.max_hp === 0) { return false; } // indestructible object
     return (this.hp === 0) || (this.id === GameObject.DEAD_ID);
 };
+/** @return {boolean} */
 GameObject.prototype.is_under_construction = function() {
     return false;
 };
@@ -1467,7 +1475,7 @@ function get_next_level_with_stat_increase(spec, statname, cur_level) {
     return next_level_that_gains_stat;
 }
 
-// return radius of "hitbox" - nonzero only for objects that cause collisions
+/** @return {number} radius of "hitbox" - nonzero only for objects that cause collisions */
 GameObject.prototype.hit_radius = function() { return 0; };
 
 GameObject.prototype.get_auto_spell = function() { return null; }; // for inerts etc
@@ -2351,14 +2359,14 @@ function apply_target_lead(P, target_vel, speed) {
     @param {number} my_level
     @param {TeamId} my_team
     @param {Object} my_stats
-    @param {Array.<number>} my_pos
+    @param {!Array.<number>} my_pos
     @param {number} my_height
     @param {Array.<number>} my_muzzle_pos
     @param {number} fire_time
     @param {number} force_hit_time
     @param {Object} spell
     @param {GameObject|null} target
-    @param {Array.<number>} target_pos
+    @param {?Array.<number>} target_pos
     @param {number} target_height
     @param {boolean} fizzle
 */
@@ -2917,10 +2925,10 @@ GameObject.prototype.ai_pick_target_classic = function(auto_spell, auto_spell_le
     var min_path_end = null; // best target requires movement towards this point to reach firing range
 
     for(var i = 0; i < obj_list.length; i++) {
-        var obj = obj_list[i][0], dist = obj_list[i][1], pos = obj_list[i][2];
-        var override_priority = (obj_list[i].length >= 4 ? obj_list[i][3] : null); // this is set for "blocker" objects
-        var override_path_end = (obj_list[i].length >= 5 ? obj_list[i][4] : null); // this is set for "blocker" objects
-        var debug_orig_target = (obj_list[i].length >= 6 ? obj_list[i][5] : null); // this is set for "blocker" objects
+        var obj = obj_list[i].obj, dist = obj_list[i].dist, pos = obj_list[i].pos;
+        var override_priority = obj_list[i].override_priority || null; // this is set for "blocker" objects
+        var override_path_end = obj_list[i].override_path_end || null; // this is set for "blocker" objects
+        var debug_orig_target = obj_list[i].debug_orig_target || null; // this is set for "blocker" objects
 
         var path_end = (override_path_end || null);
 
@@ -3022,13 +3030,15 @@ GameObject.prototype.ai_pick_target_classic = function(auto_spell, auto_spell_le
                     if(!accessible && ('blocker' in priority_table)) { // no cell within shooting range of the target is accessible by a fully clear path
                         // try to identify a barrier along the way, and promote it up near the target's priority
                         var temp = this.ai_pick_target_find_blocker(cur_cell, dest_cell, target_team, obj, auto_spell_range);
-                        var blocker = temp.blocker, blocker_path_end = temp.blocker_path_end;
-
-                        if(blocker) {
+                        if(temp) {
+                            var blocker = temp.blocker, blocker_path_end = temp.blocker_path_end;
                             // found something in the way that we can smash!
                             // append it to the list of objects to examine, with priority set to *our main target's* priority, scaled by 'blocker'
                             if(verbose) { console.log("    BLOCKER "+blocker.spec['name']+ ' at '+vec_print(blocker.raw_pos())+' prio '+(priority * priority_table['blocker']).toString()); }
-                            obj_list.push([blocker, vec_distance(my_pos, blocker.raw_pos()) - blocker.hit_radius(), blocker.raw_pos(), priority * priority_table['blocker'], blocker_path_end, obj]);
+                            obj_list.push(new GameTypes.GameObjectQueryResult(blocker, vec_distance(my_pos, blocker.raw_pos()) - blocker.hit_radius(), blocker.raw_pos(),
+                                                                    priority * priority_table['blocker'],
+                                                                    blocker_path_end,
+                                                                    obj));
                         }
                     }
                 }
@@ -3074,12 +3084,12 @@ GameObject.prototype.ai_pick_target_classic = function(auto_spell, auto_spell_le
 /** This function is called from the target-picking code when a target object is not accessibly by any clear path.
     It tries to find the best blocking object to break to clear the way. (note: regular buildings can also count
     as "blockers", it doesn't have to be a barrier).
-    @param {Array.<number>} cur_cell - where we are now
-    @param {Array.<number>} dest_cell - where we want to go (might be blocked)
+    @param {!Array.<number>} cur_cell - where we are now
+    @param {!Array.<number>} dest_cell - where we want to go (might be blocked)
     @param {string} target_team - limit candidate objects to those on this team
     @param {GameObject} obj - the actual target we're trying to reach
     @param {number} auto_spell_range - our weapon range
-    @return {{blocker: (GameObject|null), blocker_path_end: (Array.<number>|null)}} - the blocking object, and the nearby cell coordinates from which we can hit it */
+    @return {{blocker:!GameObject, blocker_path_end: !Array.<number>}|null} - the blocking object, and the nearby cell coordinates from which we can hit it */
 // XXX should be a member of Mobile, not GameObject
 GameObject.prototype.ai_pick_target_find_blocker = function(cur_cell, dest_cell, target_team, obj, auto_spell_range) {
     var blocker = null;
@@ -3138,7 +3148,7 @@ GameObject.prototype.ai_pick_target_find_blocker = function(cur_cell, dest_cell,
         }
         if(blocker) { break; } // stop - any other objects would be further along the path and thus further away
     }
-    return {blocker:blocker, blocker_path_end:blocker_path_end};
+    return (blocker && blocker_path_end) ? {blocker:blocker, blocker_path_end:blocker_path_end} : null;
 };
 
 // AI-level function - set control state to stop
@@ -3584,6 +3594,7 @@ MapBlockingGameObject.prototype.block_map_at = function(x,y,incr) {
 MapBlockingGameObject.prototype.block_map = function(incr) {
     this.block_map_at(this.x, this.y, incr);
 };
+/** @override */
 MapBlockingGameObject.prototype.hit_radius = function() {
     // approximation - multiply by sqrt(2) for the diagonal
     var rad = 1.414 * 0.5 * Math.max(this.spec['unit_collision_gridsize'][0],
@@ -6715,7 +6726,7 @@ function map_query_stats() {
 // flying_only = only return flying mobile units
 // exclude_invisible_to = ignore objects that are not visible to this team
 
-/** @param {Array} loc
+/** @param {!Array.<number>} loc
  *  @param {number} dist
  *  @param {{nearest_only:(boolean|undefined),
  *           tag:(string|undefined),
@@ -6730,6 +6741,7 @@ function map_query_stats() {
  *           exclude_flying:(boolean|undefined),
  *           flying_only:(boolean|undefined),
  *           exclude_invisible_to:(string|null|undefined)}} params
+ * @return {!Array.<!GameTypes.GameObjectQueryResult>}
  */
 function query_objects_within_distance(loc, dist, params) {
     if(dist <= 0) {
@@ -6739,6 +6751,7 @@ function query_objects_within_distance(loc, dist, params) {
         throw Error('include_destroyed not supported'); // since they are not added to the accelerators
     }
 
+    /** @type {!Array.<!GameTypes.GameObjectQueryResult>} */
     var ret = [];
     var neardist = 99999999;
     var nearest = null; // obj/dist/pos tuple representing nearest object
@@ -6797,10 +6810,10 @@ function query_objects_within_distance(loc, dist, params) {
 
                     // note: it is OK to use the quantized combat-sim position of the unit here, as long as this is only called
                     // from combat-sim step functions
-                    var xy = temp.raw_pos(); // temp.interpolate_pos();
+                    var xy = temp.raw_pos();
                     var temp_dist = vec_distance(loc, xy) - temp.hit_radius();
                     if(temp_dist < dist) {
-                        var r = [temp,temp_dist,xy];
+                        var r = new GameTypes.GameObjectQueryResult(temp, temp_dist, xy);
                         ret.push(r);
                         if(temp_dist < neardist) {
                             nearest = r;
@@ -6817,7 +6830,7 @@ function query_objects_within_distance(loc, dist, params) {
         var objlist = team_map_accel.objects_on_team(filter);
         if(objlist) {
             for(var i = 0, len = objlist.length; i < len; i++) {
-                var temp = objlist[i];
+                temp = objlist[i];
                 if(params.ignore_object && temp === params.ignore_object) { continue; }
                 if(params.only_team && params.only_team !== temp.team) { continue; }
                 if(params.exclude_barriers && temp.spec['name'] === 'barrier') { continue; }
@@ -6835,10 +6848,10 @@ function query_objects_within_distance(loc, dist, params) {
                 var xy = temp.raw_pos(); // temp.interpolate_pos();
                 var temp_dist = vec_distance(loc, xy) - temp.hit_radius();
                 if(temp_dist < dist) {
-                    var r = [temp,temp_dist,xy];
-                    ret.push(r);
+                    var r2 = new GameTypes.GameObjectQueryResult(temp, temp_dist, xy);
+                    ret.push(r2);
                     if(temp_dist < neardist) {
-                        nearest = r;
+                        nearest = r2;
                         neardist = temp_dist;
                     }
                 }
@@ -6853,7 +6866,7 @@ function query_objects_within_distance(loc, dist, params) {
     }
 
     if(params.nearest_only) {
-        return (!!nearest ? [nearest] : []);
+        return (!!nearest ? [/** @type {!GameTypes.GameObjectQueryResult} */ (nearest)] : []);
     } else {
         return ret;
     }
@@ -7151,20 +7164,20 @@ function Mobile() {
     // seconds we send updates using OBJECT_COMBAT_UPDATES telling the
     // server roughly where the object is.
 
-    /** @type {Array.<number>} */
+    /** @type {!Array.<number>} */
     this.pos = [-1,-1]; // position at end of last computed tick
     /** @type {Array.<number>} */
     this.vel = [0,0];     // velocity at end of last computed tick
-    /** @type {Array.<number>} */
+    /** @type {!Array.<number>} */
     this.next_pos = [-1,-1]; // position at beginning of next tick
 
     /** @type {number} altitude above ground, if flying */
     this.altitude = 0;
 
-    /** @type {Array.<number>} */
+    /** @type {?Array.<number>} */
     this.dest = [-1,-1]; // final movement destination
 
-    /** @type {Array.<Array.<number>>} */
+    /** @type {!Array.<!Array.<number>>} */
     this.path = []; // list of xy coords along A* path
     this.path_valid = false; // whether the A* path can be re-used
     this.path_new = false; // whether the A* path was just re-computed (for debugging only)
@@ -7445,7 +7458,8 @@ Mobile.prototype.new_order = function(neword, replace) {
     this.state_dirty |= obj_state_flags.ORDERS;
 };
 
-// quantized location as of last combat tick
+/** quantized location as of last combat tick
+    @override */
 Mobile.prototype.raw_pos = function() { return this.pos; };
 
 // interpolated location at current client_time
@@ -7524,9 +7538,9 @@ Mobile.prototype.run_ai = function() {
                                                     });
 
         for(var n = 0; n < objlist.length; n++) {
-            if(objlist[n][0] === this) { continue; }
-            var dist = objlist[n][1];
-            var loc = objlist[n][2];
+            if(objlist[n].obj === this) { continue; }
+            var dist = objlist[n].dist;
+            var loc = objlist[n].pos;
             var direction;
             if(dist < POSITION_EPSILON) {
                 direction = vec_normalized([-1+2*Math.random(), -1+2*Math.random()]);
@@ -7599,6 +7613,7 @@ Mobile.prototype.run_control = function() {
 
     } else if(this.control_state === control_states.CONTROL_MOVING) {
         var maxvel = this.combat_stats.maxvel; // this.get_leveled_quantity(this.spec['maxvel']);
+        if(this.dest === null) { throw Error('dest must be non-null here'); }
 
         // update pos
         if(this.next_pos[0] != this.pos[0] || this.next_pos[1] != this.pos[1]) {
