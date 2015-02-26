@@ -2332,6 +2332,7 @@ function apply_target_lead(P, target_vel, speed) {
     @param {Object} my_stats
     @param {Array.<number>} my_pos
     @param {number} my_height
+    @param {Array.<number>} my_muzzle_pos
     @param {number} fire_time
     @param {number} force_hit_time
     @param {Object} spell
@@ -2340,7 +2341,7 @@ function apply_target_lead(P, target_vel, speed) {
     @param {number} target_height
     @param {boolean} fizzle
 */
-function do_fire_projectile(my_source, my_id, my_spec_name, my_level, my_team, my_stats, my_pos, my_height, fire_time, force_hit_time, spell, target, target_pos, target_height, fizzle) {
+function do_fire_projectile(my_source, my_id, my_spec_name, my_level, my_team, my_stats, my_pos, my_height, my_muzzle_pos, fire_time, force_hit_time, spell, target, target_pos, target_height, fizzle) {
     var max_range = gamedata['map']['range_conversion'] * get_leveled_quantity(spell['range'], my_level) * (my_stats ? my_stats.weapon_range : 1);
     var eff_range = ('effective_range' in spell ? (gamedata['map']['range_conversion'] * get_leveled_quantity(spell['effective_range'], my_level) * (my_stats ? my_stats.effective_weapon_range : 1)) : max_range);
     var shot_v = vec_sub(target_pos, my_pos);
@@ -2474,6 +2475,7 @@ function do_fire_projectile(my_source, my_id, my_spec_name, my_level, my_team, m
     var miss = 0; // nonzero if the shot is a miss
     var accuracy = get_leveled_quantity(spell['accuracy'] || 1, my_level) * (my_stats ? my_stats.accuracy : 1);
     if(shot_length > eff_range) { // degrade accuracy linearly between eff_range and max_range
+        //console.log("MISS! "+shot_length.toString()+" eff "+eff_range.toString());
         accuracy *= 1 - (shot_length-eff_range)/(max_range-eff_range);
     }
     if(accuracy < 1) {
@@ -2534,7 +2536,7 @@ function do_fire_projectile(my_source, my_id, my_spec_name, my_level, my_team, m
 
         // visual projectile effect
         if(color !== null) {
-            SPFX.add(new SPFX.Projectile(my_pos, my_height,
+            SPFX.add(new SPFX.Projectile(my_muzzle_pos, my_height,
                                          impact_pos, impact_height,
                                          muzzle_time+prefire_delay, impact_time,
                                          shot_height, color, (exhaust ? exhaust : null),
@@ -2588,7 +2590,7 @@ function do_fire_projectile(my_source, my_id, my_spec_name, my_level, my_team, m
 
         // only apply muzzle flash on first copy
         if(muzzle_vfx && (i == 0)) {
-            SPFX.add_visual_effect(my_pos, my_height,
+            SPFX.add_visual_effect(my_muzzle_pos, my_height,
                                    v3_normalized([my_shot_v[0], 0, my_shot_v[1]]),
                                    muzzle_time,
                                    muzzle_vfx, true, vfx_props);
@@ -2699,14 +2701,17 @@ function do_fire_projectile(my_source, my_id, my_spec_name, my_level, my_team, m
 GameObject.prototype.fire_projectile = function(fire_time, force_hit_time, spell, spell_level, target, target_pos, target_height) {
     var my_pos = this.interpolate_pos();
     var my_height = (this.is_flying() ? this.altitude : 0);
+    var my_muzzle_pos = my_pos;
 
     // compute bullet origin in map coordinates
-    // ouch - note that this affects the combat-engine firing position!
+    // note: this is only for visual effect, the combat-engine firing position is always unit origin,
+    // to avoid pathfinding issues wiht facing
+
     if('muzzle_offset' in this.spec) {
         var facing = this.interpolate_facing();
         // note: convert muzzle_offset from model coordinates (+z north) to map coordinates (-z north)
         var offset = v3_rotate_by_facing(facing, v3_mul([1,1,-1], this.spec['muzzle_offset']));
-        my_pos = vec_add(my_pos, [offset[0], offset[2]]);
+        my_muzzle_pos = vec_add(my_muzzle_pos, [offset[0], offset[2]]);
         my_height += this.spec['muzzle_offset'][1];
     } else if('muzzle_height' in this.spec) {
         my_height += this.spec['muzzle_height'];
@@ -2721,7 +2726,7 @@ GameObject.prototype.fire_projectile = function(fire_time, force_hit_time, spell
 
     var hit_time = do_fire_projectile(this, this.id, this.spec['name'],
                                       spell_level,
-                                      this.team, this.combat_stats, my_pos, my_height, fire_time, force_hit_time, spell, target, target_pos, target_height, false);
+                                      this.team, this.combat_stats, my_pos, my_height, my_muzzle_pos, fire_time, force_hit_time, spell, target, target_pos, target_height, false);
 };
 
 
@@ -41764,7 +41769,7 @@ function handle_server_message(data) {
                             }
 
                             // missile effect
-                            var hit_time = do_fire_projectile(player.virtual_units["PLAYER"], '0', 'PLAYER', 1, 'player', null, launch_loc, launch_height, client_time, -1, spell, null, target_loc, target_height, (interceptor!=null));
+                            var hit_time = do_fire_projectile(player.virtual_units["PLAYER"], '0', 'PLAYER', 1, 'player', null, launch_loc, launch_height, launch_loc, client_time, -1, spell, null, target_loc, target_height, (interceptor!=null));
 
                             if(interceptor) {
                                 // intecepting shot effect
