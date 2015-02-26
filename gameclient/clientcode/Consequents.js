@@ -198,7 +198,7 @@ function RepairAllConsequent(data) { // client-side only, kind of hacky
 }
 goog.inherits(RepairAllConsequent, Consequent);
 RepairAllConsequent.prototype.execute = function(state) {
-    Store.place_user_currency_order(0, "REPAIR_ALL_FOR_MONEY", session.viewing_base.base_id);
+    Store.place_user_currency_order(GameObject.VIRTUAL_ID, "REPAIR_ALL_FOR_MONEY", session.viewing_base.base_id);
 };
 
 /** @constructor

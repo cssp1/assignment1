@@ -1459,7 +1459,7 @@ SPFX.PhantomUnit = function(pos, altitude, orient, time, data, instance_data) {
     this.end_at_dest = (('end_at_dest' in data) ? data['end_at_dest'] : true);
 
     this.obj = new Mobile();
-    this.obj.id = -1;
+    this.obj.id = GameObject.DEAD_ID;
     this.obj.spec = gamedata['units']['spec' in instance_data ? instance_data['spec'] : data['spec']];
     this.obj.x = pos[0]; this.obj.y = pos[1];
     this.obj.hp = this.obj.max_hp = 0;

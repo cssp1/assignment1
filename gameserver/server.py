@@ -4974,6 +4974,11 @@ class Aura (object):
         for aura in to_remove: aura_list.remove(aura)
 
 class GameObject:
+    VIRTUAL_ID = 'VIRTUAL' # stand-in obj_id for "virtual" units
+    # note that the client also has a DEAD_ID (='DEAD') for dead units,
+    # but that corresponds to a unit that simply doesn't exist server-side,
+    # so the server does not have an explicit DEAD_ID.
+
     def __init__(self, obj_id, spec, owner, x, y, hp, level, build_finish_time_XXX_unused, auras):
         self.obj_id = obj_id # unique primary key value (for regional NoSQL database, and client/server wire protocol)
 
@@ -12824,7 +12829,7 @@ class Store:
         elif (formula == 'upgrade') or (formula == 'research') or (formula == 'craft_gamebucks'):
             unit = None
 
-            if unit_id == 0 and session.player.is_cheater and formula == 'research':
+            if unit_id == GameObject.VIRTUAL_ID and session.player.is_cheater and formula == 'research':
                 pass
             else:
                 if not session.has_object(unit_id):
@@ -16741,7 +16746,7 @@ class GAMEAPI(resource.Resource):
         return success_ret
 
     def ping_object(self, session, retmsg, id, base):
-        if id == 0:
+        if id == GameObject.VIRTUAL_ID:
             # just ping player resources
             retmsg.append(["PLAYER_STATE_UPDATE", session.player.resources.calc_snapshot().serialize()])
         else:
@@ -23524,8 +23529,12 @@ class GAMEAPI(resource.Resource):
             id, spellname, spellargs = arg[1], arg[2], arg[3:]
 
             # XXX need to check that object is actually capable of casting 'spellname'
-
-            if id != 0:
+            if id == GameObject.VIRTUAL_ID:
+                # virtual object
+                object = None
+            elif id == 0:
+                raise Exception('bad legacy virtual object id 0 for %s' % spellname)
+            else:
                 # possible race condition due to unserialized AJAX
                 if not session.has_object(id):
                     if gamedata['server'].get('log_combat_race_conditions', False):
@@ -23535,9 +23544,6 @@ class GAMEAPI(resource.Resource):
 
                 object = session.get_object(id)
                 assert (object.owner is session.player) or (session.player.is_cheater)
-            else:
-                # virtual object
-                object = None
 
             if spellname == "SPEEDUP_FOR_FREE":
                 self.do_speedup_for_free(session, retmsg, object)

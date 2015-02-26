@@ -987,16 +987,25 @@ var obj_state_flags = {
     ALL: 255
 };
 
+/** @typedef {string} */
+var GameObjectId = {};
+
+/** @typedef {string} */
+var TeamId = {};
+
 /** @constructor */
 function GameObject() {
-    this.id = -1; // -1 if the object is "dead" or otherwise not part of the game world
+    /** @type {GameObjectId} */
+    this.id = 'DEAD'; // = DEAD_ID if the object is "dead" or otherwise not part of the game world
+
     /** @type {Object} */
     this.spec = null;
     this.x = -1;
     this.y = -1;
     this.hp = -1;
     this.max_hp = -1;
-    this.team = null;
+    /** @type {TeamId} */
+    this.team = 'invalid';
     this.level = -1;
     this.equipment = null;
 
@@ -1067,6 +1076,13 @@ function GameObject() {
     /** @type {SPFX.Effect|null} */
     this.permanent_effect = null;
 }
+
+/** @const
+    @type {GameObjectId} */
+GameObject.DEAD_ID = 'DEAD';
+/** @const
+    @type {GameObjectId} */
+GameObject.VIRTUAL_ID = 'VIRTUAL';
 
 // pull raw combat stats from gamedata and initialize non-gamedata values
 
@@ -1228,7 +1244,7 @@ function reset_specs() {
 }
 
 GameObject.prototype.receive_state = function(data, init, is_deploying) {
-    this.id = data.shift();
+    this.id = /** @type {string} */ (data.shift());
     var specname = data.shift();
     this.spec = get_spec(specname);
 
@@ -1374,11 +1390,13 @@ GameObject.prototype.update_facing = function() {
     }
 };
 GameObject.prototype.is_building = function() { return (this.spec['kind'] === 'building'); };
+/** @return {boolean} */
 GameObject.prototype.is_mobile = function() { return (this.spec['kind'] === 'mobile'); };
 GameObject.prototype.is_flying = function() { return false; };
 GameObject.prototype.is_inert = function() { return (this.spec['kind'] === 'inert'); };
 GameObject.prototype.is_blocker = function() { return false; };
 GameObject.prototype.raw_pos = function() { return [this.x, this.y]; };
+/** @return {!Array.<number>} */
 GameObject.prototype.interpolate_pos = function() { return [this.x, this.y]; };
 GameObject.prototype.interpolate_pos_for_draw = function() { return this.interpolate_pos(); };
 GameObject.prototype.is_invisible = function() { return false; };
@@ -1400,7 +1418,7 @@ GameObject.prototype.is_damaged = function() {
 };
 GameObject.prototype.is_destroyed = function() {
     if(this.max_hp === 0) { return false; } // indestructible object
-    return (this.hp === 0) || (this.id === -1);
+    return (this.hp === 0) || (this.id === GameObject.DEAD_ID);
 };
 GameObject.prototype.is_under_construction = function() {
     return false;
@@ -1778,7 +1796,10 @@ function persist_debris() {
     }
 }
 
-// modify damage by vs_table coefficients
+/** Modify damage by vs_table coefficients
+    @param {Object.<string,number>} vs_table
+    @param {GameObject} target
+    @return {CombatEngine.Coeff} */
 function get_damage_modifier(vs_table, target) {
     var damage_mod = 1;
     if(vs_table) {
@@ -1805,7 +1826,7 @@ function get_damage_modifier(vs_table, target) {
 };
 
 function hurt_object(target, damage, vs_table, source) {
-    if(target.id === -1) {
+    if(target.id === GameObject.DEAD_ID) {
         throw Error('hurt_object called on dead object');
     }
     //console.log('hurt_object '+target.spec['name']+' from '+(source?source.spec['name']:'null'));
@@ -2325,10 +2346,10 @@ function apply_target_lead(P, target_vel, speed) {
 }
 
 /** @param {GameObject} my_source
-    @param {string} my_id
+    @param {GameObjectId} my_id
     @param {string} my_spec_name
     @param {number} my_level
-    @param {string} my_team
+    @param {TeamId} my_team
     @param {Object} my_stats
     @param {Array.<number>} my_pos
     @param {number} my_height
@@ -4208,11 +4229,11 @@ ObjectCollection.prototype.has_object = function(id) { return (id in this.object
 ObjectCollection.prototype.get_object = function(id) { return this.objects[id]; };
 ObjectCollection.prototype.rem_object = function(obj) {
     delete this.objects[obj.id];
-    obj.id = -1;
+    obj.id = GameObject.DEAD_ID;
 };
 ObjectCollection.prototype.clear = function() {
     for(var id in this.objects) {
-        this.objects[id].id = -1;
+        this.objects[id].id = GameObject.DEAD_ID;
     }
     this.objects = {};
 };
@@ -6156,7 +6177,7 @@ EquipSlotAddress.prototype.equals = function(other) {
     @constructor
     @struct
     @extends EquipSlotAddress
-    @param {string} obj_id
+    @param {GameObjectId} obj_id
     @param {string} slot_type
     @param {number} slot_index */
 var BuildingEquipSlotAddress = function(obj_id, slot_type, slot_index) {
@@ -6698,7 +6719,7 @@ function map_query_stats() {
  *  @param {number} dist
  *  @param {{nearest_only:(boolean|undefined),
  *           tag:(string|undefined),
- *           only_team:(string|undefined),
+ *           only_team:(string|null|undefined),
  *           ignore_object:(Object|undefined),
  *           exclude_barriers:(boolean|undefined),
  *           exclude_invul:(boolean|undefined),
@@ -6708,7 +6729,7 @@ function map_query_stats() {
  *           mobile_only:(boolean|undefined),
  *           exclude_flying:(boolean|undefined),
  *           flying_only:(boolean|undefined),
- *           exclude_invisible_to:(string|undefined)}} params
+ *           exclude_invisible_to:(string|null|undefined)}} params
  */
 function query_objects_within_distance(loc, dist, params) {
     if(dist <= 0) {
@@ -7928,7 +7949,7 @@ function remove_object(obj) {
 
 // for level-editing only
 function send_and_remove_object(obj) {
-    if(obj.id && obj.id !== -1) {
+    if(obj.id && obj.id !== GameObject.DEAD_ID) {
         send_to_server.func(["REMOVE_OBJECT", obj.id]);
         remove_object(obj);
     }
@@ -7953,7 +7974,7 @@ function destroy_object(obj) {
                     delete player.my_army[obj.id];
                 }
             }
-        } else if(session.home_base /*&& session.attack_finish_time > server_time*/ && obj.team == 'enemy' && obj.id !== -1 /*&& (obj.id.indexOf('TEMP')!=0)*/ ) {
+        } else if(session.home_base /*&& session.attack_finish_time > server_time*/ && obj.team == 'enemy' && obj.id !== GameObject.DEAD_ID /*&& (obj.id.indexOf('TEMP')!=0)*/ ) {
             session.incoming_attack_units_destroyed += 1;
         }
     }
@@ -7963,8 +7984,8 @@ function destroy_object(obj) {
 
 // pack up what we know about the object that got a killing blow on another object
 function get_killer_info(killer) {
-    if(killer && killer.id !== 0) {
-        // note: killer.id = 0 for the virtual "player" unit, i.e. tactical missiles and such
+    if(killer && killer.id !== GameObject.VIRTUAL_ID) {
+        // note: killer.id = 'VIRTUAL' for the virtual "player" unit, i.e. tactical missiles and such
         var ret = {'team': killer.team,
                    'spec': killer.spec['name'],
                    'level': killer.level,
@@ -9189,7 +9210,7 @@ SPINPUNCHGAME.init = function() {
 
     // add virtual units
     for(var name in gamedata["virtual_units"]) {
-        player.virtual_units[name] = { spec: gamedata["virtual_units"][name], id: 0, team: 'player', stats: {},
+        player.virtual_units[name] = { spec: gamedata["virtual_units"][name], id: GameObject.VIRTUAL_ID, team: 'player', stats: {},
                                        is_mobile: function() { return 0; },
                                        is_building: function() { return 0; },
                                        is_destroyed: function() { return 0; }
@@ -12492,7 +12513,7 @@ function update_combat_item_bar(dialog) {
                                 } else {
                                     temp_arg = spellarg;
                                 }
-                                can_activate = can_cast_spell(0, spellname, temp_arg);
+                                can_activate = can_cast_spell(GameObject.VIRTUAL_ID, spellname, temp_arg);
                             } else if('consequent' in use) {
                                 can_activate = true;
                             } else {
@@ -12822,7 +12843,7 @@ function do_build(ji) {
             if(selection.item) {
                 inventory_send_request(selection.item, selection.slot, "INVENTORY_USE", [ji], false);
             } else {
-                send_to_server.func(["CAST_SPELL", 0,
+                send_to_server.func(["CAST_SPELL", GameObject.VIRTUAL_ID,
                                      selection.spellname,
                                      selection.spellkind,
                                      ji]);
@@ -12873,7 +12894,7 @@ function do_build(ji) {
             }
         }
     } else if(player.is_cheater && selection.spellkind in gamedata['inert']) {
-        send_to_server.func(["CAST_SPELL", 0, selection.spellname, selection.spellkind, ji]);
+        send_to_server.func(["CAST_SPELL", GameObject.VIRTUAL_ID, selection.spellname, selection.spellkind, ji]);
     } else {
         throw Error('unhandled BUILD spellkind '+selection.spellkind.toString());
     }
@@ -13003,7 +13024,7 @@ function unit_deployment_latency_high() { return (-2*server_time_offset) > gamed
 /** @param {Array.<number>} ji
     @param {Array.<Object>} objs_to_deploy (list of values in same format as values of session.pre_deploy_units) */
 function do_deploy(ji, objs_to_deploy) {
-    send_to_server.func(["CAST_SPELL", 0, "DEPLOY_UNITS", ji, objs_to_deploy]);
+    send_to_server.func(["CAST_SPELL", GameObject.VIRTUAL_ID, "DEPLOY_UNITS", ji, objs_to_deploy]);
 
     if(1) {
         // for the visual effect, just grab the first unit's spec
@@ -13137,7 +13158,7 @@ function invoke_cheat_menu() {
     layout.add(new SPUI.Text("Developer Tools"));
 
     var closure = function(spellname) { return function() {
-        send_to_server.func(["CAST_SPELL", 0, spellname]);
+        send_to_server.func(["CAST_SPELL", GameObject.VIRTUAL_ID, spellname]);
         change_selection(null);
     }; };
 
@@ -13145,7 +13166,7 @@ function invoke_cheat_menu() {
     layout.add(new SPUI.Button("Toggle Edit Mode", function() {
         change_selection_ui(null);
         player.is_cheater = !player.is_cheater;
-        send_to_server.func(["CAST_SPELL", 0, "CHEAT_REMOVE_LIMITS", player.is_cheater]);
+        send_to_server.func(["CAST_SPELL", GameObject.VIRTUAL_ID, "CHEAT_REMOVE_LIMITS", player.is_cheater]);
     }));
 
     layout.add(new SPUI.Button("Save AI base to /var/tmp", function() {
@@ -13160,14 +13181,14 @@ function invoke_cheat_menu() {
     if(player.is_cheater) {
         layout.add(new SPUI.Button("Remove All Barriers", function() { remove_all_barriers(); change_selection(null); }));
         layout.add(new SPUI.Button("Upgrade All Barriers", function() { upgrade_all_barriers(); change_selection(null); }));
-        layout.add(new SPUI.Button("Give 10,000 Gamebucks", function() { change_selection_ui(null); send_to_server.func(["CAST_SPELL", 0, "CHEAT_GIVE_GAMEBUCKS", 10000]); }));
-        layout.add(new SPUI.Button("Drain Resources", function() { change_selection_ui(null); send_to_server.func(["CAST_SPELL", 0, "CHEAT_DRAIN_RESOURCES"]); }));
+        layout.add(new SPUI.Button("Give 10,000 Gamebucks", function() { change_selection_ui(null); send_to_server.func(["CAST_SPELL", GameObject.VIRTUAL_ID, "CHEAT_GIVE_GAMEBUCKS", 10000]); }));
+        layout.add(new SPUI.Button("Drain Resources", function() { change_selection_ui(null); send_to_server.func(["CAST_SPELL", GameObject.VIRTUAL_ID, "CHEAT_DRAIN_RESOURCES"]); }));
         layout.add(new SPUI.Button("Clear Cooldowns/Auras", function() {
             change_selection_ui(null);
-            send_to_server.func(["CAST_SPELL", 0, "CHEAT_CLEAR_COOLDOWNS"]);
-            send_to_server.func(["CAST_SPELL", 0, "CHEAT_CLEAR_PLAYER_AURAS"]);
+            send_to_server.func(["CAST_SPELL", GameObject.VIRTUAL_ID, "CHEAT_CLEAR_COOLDOWNS"]);
+            send_to_server.func(["CAST_SPELL", GameObject.VIRTUAL_ID, "CHEAT_CLEAR_PLAYER_AURAS"]);
         }));
-        layout.add(new SPUI.Button("Get Donated Units", function() { change_selection_ui(null); send_to_server.func(["CAST_SPELL", 0, "CHEAT_GET_DONATED_UNITS"]); }));
+        layout.add(new SPUI.Button("Get Donated Units", function() { change_selection_ui(null); send_to_server.func(["CAST_SPELL", GameObject.VIRTUAL_ID, "CHEAT_GET_DONATED_UNITS"]); }));
     }
     //layout.add(new SPUI.Button("Clear Hostile Units", function() { destroy_all_enemies(); change_selection(null); }));
     //layout.add(new SPUI.Button("Earn Credits Offerwall", Store.earn_fbcredits_with_offers));
@@ -13186,7 +13207,7 @@ function invoke_cheat_menu() {
                                      'ok_button_ui_name': msg['ui_button'],
                                      //'dialog': 'message_dialog_big',
                                      'on_ok': function() {
-                                         send_to_server.func(["CAST_SPELL", 0, "CHEAT_RESET_GAME"]);
+                                         send_to_server.func(["CAST_SPELL", GameObject.VIRTUAL_ID, "CHEAT_RESET_GAME"]);
                                          inject_lag = 0;
                                          SPINPUNCHGAME.shutdown();
                                          // force refresh
@@ -13202,12 +13223,12 @@ function invoke_cheat_menu() {
 };
 
 function give_me_item(item) {
-    send_to_server.func(["CAST_SPELL", 0, "CHEAT_GIVE_ITEMS", item]);
+    send_to_server.func(["CAST_SPELL", GameObject.VIRTUAL_ID, "CHEAT_GIVE_ITEMS", item]);
 }
 
 function manipulate_ai_base(base, spellname, ui_name) {
     if(visit_base_pending) { return; }
-    send_to_server.func(["CAST_SPELL", 0, spellname, base]);
+    send_to_server.func(["CAST_SPELL", GameObject.VIRTUAL_ID, spellname, base]);
     visit_base_pending = true;
     if(!loading_base_dialog_timer) {
         var dialog = invoke_loading_base_dialog('loading_base_dialog');
@@ -13851,7 +13872,7 @@ function init_dialog_repair_buttons(dialog, base_damage) {
         var dialog = w.parent;
         close_parent_dialog(w);
 
-        send_to_server.func(["CAST_SPELL", 0, "REPAIR", session.viewing_base.base_id]);
+        send_to_server.func(["CAST_SPELL", GameObject.VIRTUAL_ID, "REPAIR", session.viewing_base.base_id]);
 
         for(var id in session.cur_objects.objects) {
             var obj = session.cur_objects.objects[id];
@@ -13876,7 +13897,7 @@ function init_dialog_repair_buttons(dialog, base_damage) {
                 dialog.widgets['repair_instant_button'].onclick = function(w) {
                 // manually send REPAIR followed by SPEEDUP_FOR_FREE on each damaged building
                 close_parent_dialog(w);
-                send_to_server.func(["CAST_SPELL", 0, "REPAIR", session.viewing_base.base_id]);
+                send_to_server.func(["CAST_SPELL", GameObject.VIRTUAL_ID, "REPAIR", session.viewing_base.base_id]);
 
                 for(var id in session.cur_objects.objects) {
                     var obj = session.cur_objects.objects[id];
@@ -13894,7 +13915,7 @@ function init_dialog_repair_buttons(dialog, base_damage) {
                 dialog.widgets['repair_instant_button'].onclick = function(w) {
                     var dialog = w.parent;
 
-                    if(Store.place_user_currency_order(0, "REPAIR_ALL_FOR_MONEY",
+                    if(Store.place_user_currency_order(GameObject.VIRTUAL_ID, "REPAIR_ALL_FOR_MONEY",
                                                        session.viewing_base.base_id,
                                                        (function (_w) { return function() {
                                                            close_parent_dialog(_w);
@@ -14076,7 +14097,7 @@ function invoke_recycle_dialog(obj) {
                 }
             }
         } else {
-            if(_obj.id && _obj.id !== -1) { // check obj.id rather than is_destroyed() because you CAN recycle destroyed units
+            if(_obj.id && _obj.id !== GameObject.DEAD_ID) { // check obj.id rather than is_destroyed() because you CAN recycle destroyed units
                 send_to_server.func(["RECYCLE_UNIT", _obj.id]);
                 unit_repair_sync_marker = synchronizer.request_sync();
                 // snoop update into my_army
@@ -14159,7 +14180,7 @@ function invoke_buy_resources_dialog(amounts, continuation) {
 
     var closure = function(w) {
         var dialog = w.parent;
-        if(Store.place_user_currency_order(0, "BUY_RESOURCES_TOPUP", dialog.user_data['amounts'],
+        if(Store.place_user_currency_order(GameObject.VIRTUAL_ID, "BUY_RESOURCES_TOPUP", dialog.user_data['amounts'],
                                            (function (_dialog) { return function() {
                                                var cb = _dialog.user_data['continuation'] || null;
                                                close_dialog(_dialog);
@@ -15102,7 +15123,7 @@ function update_attack_button_dialog(dialog) {
                     if(player.tutorial_state === 'click_attack') { advance_tutorial(); }
 
                     // send an empty deployment request to get the write lock
-                    send_to_server.func(["CAST_SPELL", 0, "DEPLOY_UNITS", [0,0], {}]);
+                    send_to_server.func(["CAST_SPELL", GameObject.VIRTUAL_ID, "DEPLOY_UNITS", [0,0], {}]);
 
                     // turn on combat item bar
                     if(!session.home_base) {
@@ -15345,7 +15366,7 @@ function tutorial_step(clear_nonmodal_ui) {
     } else if(data['kind'] === 'defensive_cannon_complete') {
         // no UI
     } else if(data['kind'] === 'ai_attack') {
-        send_to_server.func(["CAST_SPELL", 0, "TUTORIAL_AI_ATTACK"]);
+        send_to_server.func(["CAST_SPELL", GameObject.VIRTUAL_ID, "TUTORIAL_AI_ATTACK"]);
         //player.tutorial_state = data['next'];
     } else if(data['kind'] === 'ai_attack_end') {
         make_tutorial_arrow_for_button('ai_attack_finish_dialog', 'ok_button', 'up');
@@ -15918,7 +15939,7 @@ function tutorial_step_repair_message(data) {
     var closure = (function (next) { return function() {
         var cc = find_object_by_type(gamedata['townhall']);
         if(!cc) { throw Error('townhall not found!'); }
-        send_to_server.func(["CAST_SPELL", 0, "REPAIR", session.viewing_base.base_id]);
+        send_to_server.func(["CAST_SPELL", GameObject.VIRTUAL_ID, "REPAIR", session.viewing_base.base_id]);
         player.tutorial_state = next;
         if(!cc.is_damaged()) {
             // if player somehow repaired already, skip the wait_for_repairs step
@@ -16213,7 +16234,7 @@ function invoke_insufficient_resources_for_repair_message(cost, squad_id) {
 
     // continuation callback to start squad repair
     var cbmaker = function (_squad_id) { return function() {
-        send_to_server.func(["CAST_SPELL", 0, "SQUAD_REPAIR_QUEUE", _squad_id]);
+        send_to_server.func(["CAST_SPELL", GameObject.VIRTUAL_ID, "SQUAD_REPAIR_QUEUE", _squad_id]);
     }; };
 
     if(player.squads_enabled() && (squad_id || squad_id===0) && player.squads && (squad_id.toString() in player.squads)) {
@@ -16504,7 +16525,7 @@ function invoke_flash_offer(data) {
     // make sure the offer can take effect
     var spellname = sku['effect']['spellname'];
     var spellarg = sku['effect']['spellarg'];
-    if(!can_cast_spell(0, spellname, spellarg)) {
+    if(!can_cast_spell(GameObject.VIRTUAL_ID, spellname, spellarg)) {
         console.log('cannot accept flash offer! '+data['name']);
         return;
     }
@@ -16524,7 +16545,7 @@ function invoke_flash_offer(data) {
         return function(w) {
             var dialog = w.parent;
 
-            if(Store.place_user_currency_order(0, sku_name, null, function() { change_selection(null); })) {
+            if(Store.place_user_currency_order(GameObject.VIRTUAL_ID, sku_name, null, function() { change_selection(null); })) {
                 dialog.widgets['ok_button'].str = dialog.data['widgets']['ok_button']['ui_name_pending'];
                 dialog.widgets['ok_button'].state = 'disabled'; dialog.widgets['price_display'].onclick = null;
             }
@@ -16543,7 +16564,7 @@ function invoke_flash_offer(data) {
 }
 
 function test_flash_offer(offer) {
-    send_to_server.func(["CAST_SPELL", 0, "CHEAT_EXECUTE_CONSEQUENT", {'consequent':'FLASH_OFFER','offer':offer}]);
+    send_to_server.func(["CAST_SPELL", GameObject.VIRTUAL_ID, "CHEAT_EXECUTE_CONSEQUENT", {'consequent':'FLASH_OFFER','offer':offer}]);
 }
 
 function invoke_battle_end_dialog(battle_type, battle_base, battle_opponent_user_id, battle_opponent_fbid, battle_opponent_level, battle_opponent_friend,
@@ -17333,7 +17354,7 @@ function do_harvest(all) {
 
     if(doit) {
         if(all) {
-            send_to_server.func(["CAST_SPELL", 0, "HARVEST_ALL2"]);
+            send_to_server.func(["CAST_SPELL", GameObject.VIRTUAL_ID, "HARVEST_ALL2"]);
 
             // set sync marker on all harvesters
             var marker = synchronizer.request_sync();
@@ -17481,7 +17502,7 @@ function add_migrate_turret_heads_button(buttons) {
                                      'cancel_button': true,
                                      'ok_button_ui_name': _spell['ui_button'],
                                      'on_ok': function() {
-                                         send_to_server.func(["CAST_SPELL", 0, "MIGRATE_TURRET_HEADS"]);
+                                         send_to_server.func(["CAST_SPELL", GameObject.VIRTUAL_ID, "MIGRATE_TURRET_HEADS"]);
                                          invoke_ui_locker();
                                      } });
     }; })(spell)));
@@ -19262,7 +19283,7 @@ function invoke_change_region_offer_dialog() {
         dialog.widgets['price_display'].onclick = function(w) {
             change_selection_ui(null);
             var order_cb = function(override_spellarg) {
-                if(Store.place_order(Store.get_user_currency(), 0, 'CHANGE_REGION_INSTANTLY', override_spellarg, null)) {
+                if(Store.place_order(Store.get_user_currency(), GameObject.VIRTUAL_ID, 'CHANGE_REGION_INSTANTLY', override_spellarg, null)) {
                     player.cooldown_client_trigger(gamedata['spells']['CHANGE_REGION']['cooldown_name'], gamedata['spells']['CHANGE_REGION']['cooldown']);
                     return true;
                 }
@@ -20597,7 +20618,7 @@ function update_inventory_dialog(dialog) {
                                     } else {
                                         temp_arg = spellarg;
                                     }
-                                    can_activate = can_cast_spell(0, spellname, temp_arg);
+                                    can_activate = can_cast_spell(GameObject.VIRTUAL_ID, spellname, temp_arg);
                                 } else if('consequent' in use) {
                                     can_activate = true;
                                 } else {
@@ -20669,7 +20690,7 @@ function update_inventory_dialog(dialog) {
                                             temp_arg = spellarg;
                                         }
                                         var can_cast_detailed = (_item['pending'] ? [false, gamedata['strings']['inventory']['pending'], null] :
-                                                                 can_cast_spell_detailed(0, spellname, temp_arg));
+                                                                 can_cast_spell_detailed(GameObject.VIRTUAL_ID, spellname, temp_arg));
                                         if(!can_cast_detailed[0] && can_cast_detailed[2]) {
                                             // cannot cast
                                             var helper = get_requirements_help(can_cast_detailed[2][0], can_cast_detailed[2][1], can_cast_detailed[2][2] || null);
@@ -20825,7 +20846,7 @@ function invoke_inventory_context(inv_dialog, parent_widget, slot, item, show_dr
                         temp_arg = spellarg;
                     }
                     can_cast_detailed = (item['pending'] ? [false, gamedata['strings']['inventory']['pending'], null] :
-                                         can_cast_spell_detailed(0, spellname, temp_arg));
+                                         can_cast_spell_detailed(GameObject.VIRTUAL_ID, spellname, temp_arg));
                 } else if('consequent' in use) {
                     can_cast_detailed = [true,null,null];
                 }
@@ -22230,7 +22251,7 @@ function invoke_lottery_more_dialog(scanner) {
         // in order to be robust against unreliable Facebook credit
         // order callbacks, detect the purchase by checking scanner.contents. Ugly :(
         dialog.user_data['last_contents'] = dialog.user_data['scanner'].contents;
-        Store.place_user_currency_order(0, 'BUY_LOTTERY_TICKET', null, null);
+        Store.place_user_currency_order(GameObject.VIRTUAL_ID, 'BUY_LOTTERY_TICKET', null, null);
         w.str = dialog.data['widgets']['buy_buton']['ui_name_pending'];
         w.state = 'disabled';
     };
@@ -22261,7 +22282,7 @@ function invoke_abtest_dialog() {
     }
     dialog.widgets['ok_button'].onclick = function(w) {
         var data = w.parent.user_data['abtests'];
-        send_to_server.func(["CAST_SPELL", 0, "CHEAT_MODIFY_ABTESTS", data]);
+        send_to_server.func(["CAST_SPELL", GameObject.VIRTUAL_ID, "CHEAT_MODIFY_ABTESTS", data]);
         // force reload
         SPINPUNCHGAME.shutdown();
 
@@ -26502,7 +26523,7 @@ function update_player_info_dialog_blockstate(dialog) {
 
     // gag buttons
     if(player.is_chat_mod && user_id != session.user_id) {
-        var mutecb = function(_uid, cmd) { return function() { send_to_server.func(["CAST_SPELL", 0, cmd, _uid]);
+        var mutecb = function(_uid, cmd) { return function() { send_to_server.func(["CAST_SPELL", GameObject.VIRTUAL_ID, cmd, _uid]);
                                                                change_selection(null); }; };
         dialog.widgets['dev_mute_button'].onclick = mutecb(user_id, "CHAT_GAG");
         dialog.widgets['dev_unmute_button'].onclick = mutecb(user_id, "CHAT_UNGAG");
@@ -26898,7 +26919,7 @@ function update_create_squad_tile(d) {
         squad_control_block(_dialog);
         var cur_squads = goog.object.getCount(player.squads)-1;
         var ui_name = gamedata['strings']['icao_alphabet'][(cur_squads+1) % 26].toUpperCase();
-        send_to_server.func(["CAST_SPELL", 0, "SQUAD_CREATE", ui_name]);
+        send_to_server.func(["CAST_SPELL", GameObject.VIRTUAL_ID, "SQUAD_CREATE", ui_name]);
     });
 }
 
@@ -26934,7 +26955,7 @@ function make_squad_tile(dialog, squad_data, ij, dlg_mode) {
 
             var delete_func = (function (__d, __dialog) { return function() {
                 squad_control_block(__dialog);
-                send_to_server.func(["CAST_SPELL", 0, "SQUAD_DELETE", __d.user_data['squad_id']]);
+                send_to_server.func(["CAST_SPELL", GameObject.VIRTUAL_ID, "SQUAD_DELETE", __d.user_data['squad_id']]);
             }; })(_d, _dialog);
 
             squad_delete_confirm(_d.user_data['squad_id'], delete_func);
@@ -27002,7 +27023,7 @@ function make_squad_tile(dialog, squad_data, ij, dlg_mode) {
                             }
                             // perform deployment
                             player.squads[squad_id.toString()]['pending'] = true;
-                            send_to_server.func(["CAST_SPELL", 0, "SQUAD_ENTER_MAP", squad_id, deploy_at]);
+                            send_to_server.func(["CAST_SPELL", GameObject.VIRTUAL_ID, "SQUAD_ENTER_MAP", squad_id, deploy_at]);
                             // queue movement
                             player.squad_set_client_data(squad_id, 'squad_orders', {'move': to_loc});
 
@@ -27364,7 +27385,7 @@ player.squad_halt = function(squad_id) {
     if(!player.squad_is_moving(squad_id)) { throw Error('squad_halt but squad '+squad_id.toString()+' is not moving'); }
     var squad_data = player.squads[squad_id.toString()];
     squad_data['pending'] = true;
-    send_to_server.func(["CAST_SPELL", 0, "SQUAD_STEP", squad_id, null]);
+    send_to_server.func(["CAST_SPELL", GameObject.VIRTUAL_ID, "SQUAD_STEP", squad_id, null]);
     player.squad_clear_client_data(squad_id); // erase current movement orders
     player.squad_set_client_data(squad_id, 'halt_pending', true); // wait for squad to stop before issuing new orders
 };
@@ -27372,7 +27393,7 @@ player.squad_move = function(squad_id, path) {
     if(player.squad_is_moving(squad_id)) { throw Error('squad_move but squad '+squad_id.toString()+' is still moving'); }
     if(!path || path.length < 1) { throw Error('squad_move with invalid path'); }
     var squad_data = player.squads[squad_id.toString()];
-    send_to_server.func(["CAST_SPELL", 0, "SQUAD_STEP", squad_id, path]);
+    send_to_server.func(["CAST_SPELL", GameObject.VIRTUAL_ID, "SQUAD_STEP", squad_id, path]);
     player.squad_clear_client_data(squad_id); // erase current movement orders
     player.squad_set_client_data(squad_id, 'move_pending', squad_data['map_loc']); // wait for squad to move before issuing new orders - remember original loc
 
@@ -27437,7 +27458,7 @@ player.advance_squads = function() {
                 if(hex_distance(squad_data['map_loc'], player.home_base_loc) <= 1 &&
                    !squad_data['pending']) {
                     squad_data['pending'] = true;
-                    send_to_server.func(["CAST_SPELL", 0, "SQUAD_EXIT_MAP", squad_data['id']]);
+                    send_to_server.func(["CAST_SPELL", GameObject.VIRTUAL_ID, "SQUAD_EXIT_MAP", squad_data['id']]);
                     player.squad_clear_client_data(squad_data['id']);
                 }
             }
@@ -27626,7 +27647,7 @@ function update_squad_tile(dialog) {
         dialog.widgets['cancel_button'].onclick = function (w) {
             var _dialog = w.parent;
             squad_control_block(_dialog.parent);
-            send_to_server.func(["CAST_SPELL", 0, "SQUAD_REPAIR_CANCEL", _dialog.user_data['squad_id']]);
+            send_to_server.func(["CAST_SPELL", GameObject.VIRTUAL_ID, "SQUAD_REPAIR_CANCEL", _dialog.user_data['squad_id']]);
             unit_repair_sync_marker = synchronizer.request_sync();
         };
         dialog.widgets['cancel_button'].state = (repair_in_sync ? 'normal' : 'disabled');
@@ -27639,7 +27660,7 @@ function update_squad_tile(dialog) {
         dialog.widgets['price_display'].tooltip.str = (!repair_in_sync ? null : Store.display_user_currency_price_tooltip(price));
         if(price >= 0) {
             dialog.widgets['finish_button'].onclick = function() {
-                if(Store.place_user_currency_order(0, "UNIT_REPAIR_SPEEDUP_FOR_MONEY", null, null)) {
+                if(Store.place_user_currency_order(GameObject.VIRTUAL_ID, "UNIT_REPAIR_SPEEDUP_FOR_MONEY", null, null)) {
                     unit_repair_sync_marker = synchronizer.request_sync();
                     invoke_ui_locker(unit_repair_sync_marker);
                 }
@@ -27683,7 +27704,7 @@ function update_squad_tile(dialog) {
         dialog.widgets['start_repair_button'].onclick = function(w) {
             var _dialog = w.parent;
             squad_control_block(_dialog.parent);
-            send_to_server.func(["CAST_SPELL", 0, "SQUAD_REPAIR_QUEUE", _dialog.user_data['squad_id']]);
+            send_to_server.func(["CAST_SPELL", GameObject.VIRTUAL_ID, "SQUAD_REPAIR_QUEUE", _dialog.user_data['squad_id']]);
             unit_repair_sync_marker = synchronizer.request_sync();
         };
     }
@@ -27718,14 +27739,14 @@ function invoke_squad_manage(squad_id) {
         dialog.widgets['name_input'].ontextready = function(w, str) {
             var _dialog = w.parent;
             if(!str) { w.str = _dialog.user_data['squad']['ui_name']; return; }
-            send_to_server.func(["CAST_SPELL", 0, "SQUAD_RENAME", _dialog.user_data['squad_id'], SPHTTP.wrap_string(str)]);
+            send_to_server.func(["CAST_SPELL", GameObject.VIRTUAL_ID, "SQUAD_RENAME", _dialog.user_data['squad_id'], SPHTTP.wrap_string(str)]);
             _dialog.user_data['name_changed'] = false;
         };
     }
     dialog.on_destroy = function(dialog) {
         // send out pending name change
         if(dialog.user_data['name_changed'] && dialog.widgets['name_input'].str && (dialog.user_data['squad_id'].toString() in player.squads)) {
-            send_to_server.func(["CAST_SPELL", 0, "SQUAD_RENAME", dialog.user_data['squad_id'], SPHTTP.wrap_string(dialog.widgets['name_input'].str)]);
+            send_to_server.func(["CAST_SPELL", GameObject.VIRTUAL_ID, "SQUAD_RENAME", dialog.user_data['squad_id'], SPHTTP.wrap_string(dialog.widgets['name_input'].str)]);
         }
     };
 
@@ -27738,7 +27759,7 @@ function invoke_squad_manage(squad_id) {
             if(maybe_squad_control && maybe_squad_control.user_data && maybe_squad_control.user_data['dialog'] == 'squad_control') {
                 squad_control_block(maybe_squad_control);
             }
-            send_to_server.func(["CAST_SPELL", 0, "SQUAD_DELETE", __squad_data['id']]);
+            send_to_server.func(["CAST_SPELL", GameObject.VIRTUAL_ID, "SQUAD_DELETE", __squad_data['id']]);
         }; })(_dialog, _squad_data);
 
         squad_delete_confirm(_squad_data['id'], delete_func);
@@ -27992,7 +28013,7 @@ function update_squad_manage(dialog) {
                         return;
                     }
                     if(obj) {
-                        send_to_server.func(["CAST_SPELL", 0, "SQUAD_ASSIGN_UNIT", _squad_id, obj['obj_id']]);
+                        send_to_server.func(["CAST_SPELL", GameObject.VIRTUAL_ID, "SQUAD_ASSIGN_UNIT", _squad_id, obj['obj_id']]);
                         unit_repair_sync_marker = synchronizer.request_sync();
                         obj['pending'] = 1;
                     }
@@ -28041,7 +28062,7 @@ function update_squad_manage(dialog) {
                         invoke_child_message_dialog(s['ui_title'], s['ui_name']);
                         return;
                     }
-                    send_to_server.func(["CAST_SPELL", 0, "SQUAD_UNASSIGN_UNIT", _squad_id, _obj['obj_id']]);
+                    send_to_server.func(["CAST_SPELL", GameObject.VIRTUAL_ID, "SQUAD_UNASSIGN_UNIT", _squad_id, _obj['obj_id']]);
                     unit_repair_sync_marker = synchronizer.request_sync();
                 _obj['pending'] = 1;
                 }; })(dialog.user_data['squad_id'], obj)
@@ -28588,7 +28609,7 @@ function update_repair_control(dialog) {
     } else if(price > 0) {
         dialog.widgets['finish_button'].state = (!in_sync ? 'disabled': 'normal');
         dialog.widgets['finish_button'].onclick = function() {
-            if(Store.place_user_currency_order(0, "UNIT_REPAIR_SPEEDUP_FOR_MONEY", null, null)) {
+            if(Store.place_user_currency_order(GameObject.VIRTUAL_ID, "UNIT_REPAIR_SPEEDUP_FOR_MONEY", null, null)) {
                 unit_repair_sync_marker = synchronizer.request_sync();
                 invoke_ui_locker(unit_repair_sync_marker);
             }
@@ -29121,7 +29142,7 @@ function update_manufacture_dialog(dialog) {
 
                 if(player.is_cheater) {
                     var props = {}; props[spec_name] = 1;
-                    send_to_server.func(["CAST_SPELL", 0, "CHEAT_SPAWN_UNITS", props]);
+                    send_to_server.func(["CAST_SPELL", GameObject.VIRTUAL_ID, "CHEAT_SPAWN_UNITS", props]);
 
                 } else if(builder && unlock_level > 0) {
 
@@ -30917,7 +30938,7 @@ function update_fishing_dialog(dialog) {
 
     if(!player.cooldown_active('fish_slate_assigned')) {
         if(!player.cooldown_active('fish_slate_assign_pending')) {
-            send_to_server.func(["CAST_SPELL", 0, "FISH_SLATE_ASSIGN"]);
+            send_to_server.func(["CAST_SPELL", GameObject.VIRTUAL_ID, "FISH_SLATE_ASSIGN"]);
             player.cooldown_client_trigger('fish_slate_assign_pending', 999);
         }
         dialog.widgets['topbar_text'].str = dialog.data['widgets']['topbar_text']['ui_name_pending'];
@@ -32472,7 +32493,7 @@ function update_map_dialog(dialog) {
     if(dialog.user_data['chapter'] === 'hitlist') {
         if(!player.cooldown_active('hitlist_assigned')) {
             if(!player.cooldown_active('hitlist_assign_pending')) {
-                send_to_server.func(["CAST_SPELL", 0, "HITLIST_ASSIGN"]);
+                send_to_server.func(["CAST_SPELL", GameObject.VIRTUAL_ID, "HITLIST_ASSIGN"]);
                 player.cooldown_client_trigger('hitlist_assign_pending', 999);
             }
             show_loading = true;
@@ -34654,7 +34675,7 @@ function buy_gamebucks_dialog_select(dialog, num) {
             display_currency = payment_currency.split(':')[1];
         }
 
-        var payment_price = Store.get_price(payment_currency, 0, spell, (spell['price_formula'] == 'gamebucks_topup' ? topup_bucks : null), false);
+        var payment_price = Store.get_price(payment_currency, GameObject.VIRTUAL_ID, spell, (spell['price_formula'] == 'gamebucks_topup' ? topup_bucks : null), false);
 
         dialog.widgets['radio'+i].state = (i === num ? 'active' : 'normal');
         dialog.widgets['radio'+i].onclick =
@@ -34744,7 +34765,7 @@ function buy_gamebucks_dialog_select(dialog, num) {
     if(SPay.api == 'fbpayments') { display_currency = payment_currency.split(':')[1]; }
     var alloy_qty = (spell['price_formula'] == 'gamebucks_topup' ? topup_bucks : spell['quantity']);
     var spellarg = (spell['price_formula'] == 'gamebucks_topup' ? topup_bucks : null);
-    var payment_price = Store.get_price(payment_currency, 0, spell, spellarg, false);
+    var payment_price = Store.get_price(payment_currency, GameObject.VIRTUAL_ID, spell, spellarg, false);
 
     // PRICE
     dialog.widgets['price_display'].bg_image = player.get_any_abtest_value('price_display_asset', gamedata['store']['price_display_asset']);
@@ -34807,7 +34828,7 @@ function buy_gamebucks_dialog_select(dialog, num) {
                         __dialog.user_data['pending'] = false;
                     }; })(_dialog);
                 }
-                Store.place_order(__payment_currency, 0, _spname, _spellarg, _credits_cb, _credits_props);
+                Store.place_order(__payment_currency, GameObject.VIRTUAL_ID, _spname, _spellarg, _credits_cb, _credits_props);
             }; })(dialog, _payment_currency, spname, spellarg, credits_cb, credits_props);
 
             if(gift_order) {
@@ -35087,7 +35108,7 @@ function update_buy_gamebucks_sku2(dialog) {
         if(payment_currency.indexOf('fbpayments:') != 0) { throw Error('bad payment_currency '+payment_currency); }
         display_currency = payment_currency.split(':')[1];
     }
-    var payment_price = Store.get_price(payment_currency, 0, spell, spellarg, false);
+    var payment_price = Store.get_price(payment_currency, GameObject.VIRTUAL_ID, spell, spellarg, false);
 
     goog.array.forEach(['name','name2'], function(wname) {
         if(wname in dialog.widgets) {
@@ -35257,7 +35278,7 @@ function update_buy_gamebucks_sku2(dialog) {
                         __dialog.parent.user_data['pending'] = false;
                     }; })(_dialog);
                 }
-                Store.place_order(__payment_currency, 0, _spname, _spellarg, _credits_cb, _credits_props);
+                Store.place_order(__payment_currency, GameObject.VIRTUAL_ID, _spname, _spellarg, _credits_cb, _credits_props);
             }; })(dialog, _payment_currency, spname, spellarg, credits_cb, credits_props);
 
             if(gift_order) {
@@ -36004,10 +36025,10 @@ function update_new_store_sku(d) {
             }
         }
 
-        price = Store.get_price(sale_currency, 0, spell, null);
+        price = Store.get_price(sale_currency, GameObject.VIRTUAL_ID, spell, null);
         if(price < 0) {
             // try to display a price even though spell is unavailable
-            shown_price = Store.get_price(sale_currency, 0, spell, null, true);
+            shown_price = Store.get_price(sale_currency, GameObject.VIRTUAL_ID, spell, null, true);
         } else {
             shown_price = price;
         }
@@ -36097,10 +36118,10 @@ function update_new_store_sku(d) {
         if('price_currency' in skudata) { sale_currency = skudata['price_currency']; }
 
         if('price' in skudata) {
-            price = Store.get_price(sale_currency, 0, gamedata['spells']["BUY_ITEM"], arg);
+            price = Store.get_price(sale_currency, GameObject.VIRTUAL_ID, gamedata['spells']["BUY_ITEM"], arg);
             if(price < 0) {
                 // try to display a price even though item is unavailable
-                shown_price = Store.get_price(sale_currency, 0, gamedata['spells']["BUY_ITEM"], arg, true);
+                shown_price = Store.get_price(sale_currency, GameObject.VIRTUAL_ID, gamedata['spells']["BUY_ITEM"], arg, true);
             } else {
                 shown_price = price;
             }
@@ -36335,7 +36356,7 @@ function update_new_store_sku(d) {
 
             // function to place the order, with a parameter for a spellarg that might come from further pre-order GUI
             var order_cb = (function (_d, _order_currency, _order_spell, _order_spellarg, _cleanup_cb) { return function(override_spellarg) {
-                var placed = Store.place_order(_order_currency, 0, _order_spell,
+                var placed = Store.place_order(_order_currency, GameObject.VIRTUAL_ID, _order_spell,
                                                (override_spellarg ? override_spellarg : _order_spellarg),
                                                _cleanup_cb, {'no_clear':true});
                 if(placed) {
@@ -38481,7 +38502,7 @@ function update_upgrade_dialog(dialog) {
                         var builder = dialog.user_data['builder'], techname = dialog.user_data['techname'];
 
                         if(builder || player.is_cheater) {
-                            if(Store.place_user_currency_order(builder ? builder.id : 0, "RESEARCH_FOR_MONEY", techname, cleanup_cb)) {
+                            if(Store.place_user_currency_order(builder ? builder.id : GameObject.VIRTUAL_ID, "RESEARCH_FOR_MONEY", techname, cleanup_cb)) {
                                 invoke_ui_locker(builder ? builder.request_sync() : synchronizer.request_sync());
                             }
                         }
@@ -38840,7 +38861,7 @@ Store.get_user_currency_price = function(unit_id, spell, spellarg) {
 // main pricing entry point
 // this MUST match Store.get_price in server.py, or else there will be trouble!!!
 /** @param {string} sale_currency
-    @param {number} unit_id
+    @param {GameObjectId} unit_id
     @param {Object} spell
     @param {?} spellarg
     @param {boolean=} ignore_error */
@@ -38879,6 +38900,9 @@ Store.get_price = function(sale_currency, unit_id, spell, spellarg, ignore_error
 
 // return whether or not it is possible to cast this (server-side) spell
 // the _detailed() version returns [can_cast, ui_reason, and a list of up to 3 args [x,y,z] that will be passed to get_requirements_help(x,y,z) to make a Valentina helper]
+/** @param {GameObjectId} unit_id
+    @param {string} spellname
+    @param {*} spellarg */
 function can_cast_spell_detailed(unit_id, spellname, spellarg) {
     var spell = gamedata['spells'][spellname];
 
@@ -39177,6 +39201,9 @@ function can_cast_spell_detailed(unit_id, spellname, spellarg) {
     return [true,null,null];
 }
 
+/** @param {GameObjectId} unit_id
+    @param {string} spellname
+    @param {*} spellarg */
 function can_cast_spell(unit_id, spellname, spellarg) {
     var ret = can_cast_spell_detailed(unit_id, spellname, spellarg);
     return ret[0];
@@ -39821,7 +39848,7 @@ Store.force_order_cleanup = function() {
 // NOTE: cb is a UI cleanup callback that will be called ONLY for gamebucks purchases, not for FB credits purchases!
 // FB credits purchases always have to kill the entire UI because the FB script callback is unreliable
 
-/** @param {number} unit_id
+/** @param {GameObjectId} unit_id
     @param {string} spellname
     @param {?} spellarg
     @param {function(boolean)|null=} cb (called with true for success or false for failure)
@@ -39831,7 +39858,7 @@ Store.place_user_currency_order = function(unit_id, spellname, spellarg, cb, pro
 };
 
 /** @param {string} currency
-    @param {number} unit_id
+    @param {GameObjectId} unit_id
     @param {string} spellname
     @param {?} spellarg
     @param {function(boolean)|null=} cb (called with true for success or false for failure)
@@ -45502,11 +45529,13 @@ function do_draw() {
                 });
 
                 // draw selection
-                if(selection.unit && selection.unit.id && selection.unit.id !== -1) {
+                if(selection.unit && selection.unit.id &&
+                   selection.unit.id !== GameObject.DEAD_ID && selection.unit.id !== GameObject.VIRTUAL_ID) {
                     draw_selection_highlight(selection.unit);
                 }
                 for(var i = 0; i < selection.multi.length; i++) {
-                    if(selection.multi[i] !== selection.unit && selection.multi[i].id && selection.multi[i].id !== -1) {
+                    if(selection.multi[i] !== selection.unit && selection.multi[i].id &&
+                       selection.multi[i].id !== GameObject.DEAD_ID && selection.multi[i].id !== GameObject.VIRTUAL_ID) {
                         draw_selection_highlight(selection.multi[i]);
                     }
                 }

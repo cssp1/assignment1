@@ -4,10 +4,6 @@ goog.provide('CombatEngine');
 // Use of this source code is governed by an MIT-style license that can be
 // found in the LICENSE file.
 
-/** @fileoverview
-    @suppress {reportUnknownTypes} XXXXXX we are not typesafe yet
-*/
-
 // numeric types - eventually will need to become fixed-point
 
 /** Scaling coefficient, like a damage_vs coefficient
@@ -23,10 +19,33 @@ CombatEngine.assert_integer = function(num) { if(num != (num|0)) { throw Error('
 /** 1D object position
     @typedef {number} */
 CombatEngine.Pos;
+CombatEngine.Pos = {};
+
+/** @param {!CombatEngine.Pos} x
+    @param {!CombatEngine.Pos} lo
+    @param {!CombatEngine.Pos} hi
+    @return {!CombatEngine.Pos} */
+CombatEngine.Pos.clamp = function(x, lo, hi) {
+    if(x < lo) {
+        return lo;
+    } else if(x > hi) {
+        return hi;
+    } else {
+        return x;
+    }
+};
 
 /** 2D object location
     @typedef {Array.<CombatEngine.Pos>} */
 CombatEngine.Pos2D;
+CombatEngine.Pos2D = {};
+
+/** @param {!CombatEngine.Pos2D} a
+    @param {!CombatEngine.Pos2D} b
+    @return {!CombatEngine.Pos2D} */
+CombatEngine.Pos2D.sub = function(a, b) {
+    return [a[0]-b[0], a[1]-b[1]];
+};
 
 /** @constructor
     @struct
@@ -38,7 +57,9 @@ CombatEngine.TickCount = function(count) {
 CombatEngine.TickCount.infinity = new CombatEngine.TickCount(-1);
 /** @return {number} */
 CombatEngine.TickCount.prototype.get = function() { return this.count; };
+/** @return {boolean} */
 CombatEngine.TickCount.prototype.is_infinite = function() { return this.count < 0; };
+/** @return {boolean} */
 CombatEngine.TickCount.prototype.is_nonzero = function() { return this.count != 0; };
 
 CombatEngine.TickCount.prototype.inc = function() { this.count++; };
@@ -100,7 +121,7 @@ CombatEngine.CombatEngine = function() {
     @param {!CombatEngine.TickCount} tick
     @param {number} client_time_hack - until SPFX can think in terms of ticks, have to use client_time instead of tick count for applicaiton
     @param {GameObject|null} source
-    @param {CombatEngine.Integer} amount
+    @param {!CombatEngine.Integer} amount
     @param {Object.<string,CombatEngine.Coeff>} vs_table
 */
 CombatEngine.DamageEffect = function(tick, client_time_hack, source, amount, vs_table) {
@@ -143,7 +164,7 @@ CombatEngine.KillDamageEffect = function(tick, client_time_hack, source, target_
 goog.inherits(CombatEngine.KillDamageEffect, CombatEngine.DamageEffect);
 CombatEngine.KillDamageEffect.prototype.apply = function() {
     // ensure the destroy_object message is sent only once, but do allow it to be sent even if target_obj.hp == 0
-    if(!this.target_obj.id || (this.target_obj.id === -1)) { return; }
+    if(!this.target_obj.id || (this.target_obj.id === GameObject.DEAD_ID)) { return; }
 
     if(this.target_obj.is_mobile()) {
         if((this.target_obj === this.source) && ('suicide_explosion_effect' in this.target_obj.spec)) {
@@ -165,7 +186,7 @@ CombatEngine.KillDamageEffect.prototype.apply = function() {
     @param {number} client_time_hack
     @param {GameObject|null} source
     @param {GameObject} target_obj
-    @param {CombatEngine.Integer} amount
+    @param {!CombatEngine.Integer} amount
     @param {Object.<string,CombatEngine.Coeff>} vs_table
 */
 CombatEngine.TargetedDamageEffect = function(tick, client_time_hack, source, target_obj, amount, vs_table) {
@@ -188,10 +209,10 @@ CombatEngine.TargetedDamageEffect.prototype.apply = function() {
     @param {number} client_time_hack
     @param {GameObject|null} source
     @param {GameObject} target_obj
-    @param {CombatEngine.Integer} amount
+    @param {!CombatEngine.Integer} amount
     @param {string} aura_name
     @param {!CombatEngine.TickCount} aura_duration
-    @param {CombatEngine.Pos} aura_range
+    @param {!CombatEngine.Pos} aura_range
     @param {Object.<string,CombatEngine.Coeff>} vs_table
     @param {Object.<string,CombatEngine.Coeff>} duration_vs_table
 */
@@ -223,12 +244,12 @@ CombatEngine.TargetedAuraEffect.prototype.apply = function() {
     @param {!CombatEngine.TickCount} tick
     @param {number} client_time_hack
     @param {GameObject|null} source
-    @param {CombatEngine.Pos2D} target_location
+    @param {!CombatEngine.Pos2D} target_location
     @param {boolean} hit_ground
     @param {boolean} hit_air
-    @param {CombatEngine.Pos} radius
+    @param {!CombatEngine.Pos} radius
     @param {string} falloff XXXXXX make into an enum
-    @param {CombatEngine.Integer} amount
+    @param {!CombatEngine.Integer} amount
     @param {Object.<string,CombatEngine.Coeff>} vs_table
     @param {boolean} allow_ff - allow friendly fire
 */
@@ -255,10 +276,11 @@ CombatEngine.AreaDamageEffect.prototype.apply = function() {
         if(!this.allow_ff && obj.team === this.source.team) { continue; }
         if(obj.spec['immune_to_splash']) { continue; }
 
+        /** @type {!CombatEngine.Pos} */
         var falloff;
         if(this.falloff == 'linear') {
             // fall off the damage amount as 1/r
-            falloff = clamp(1.0-(dist/this.radius), 0, 1);
+            falloff = CombatEngine.Pos.clamp(1.0-(dist/this.radius), 0, 1);
         } else if(this.falloff == 'constant') {
             falloff = 1;
         } else {
@@ -278,16 +300,16 @@ CombatEngine.AreaDamageEffect.prototype.apply = function() {
     @param {!CombatEngine.TickCount} tick
     @param {number} client_time_hack
     @param {GameObject|null} source
-    @param {CombatEngine.Pos2D} target_location
+    @param {!CombatEngine.Pos2D} target_location
     @param {boolean} hit_ground
     @param {boolean} hit_air
-    @param {CombatEngine.Pos} radius
+    @param {!CombatEngine.Pos} radius
     @param {boolean} radius_rect - use rectangular rather than circular coverage
     @param {string} falloff XXXXXX make into an enum
-    @param {CombatEngine.Integer} amount
+    @param {!CombatEngine.Integer} amount
     @param {string} aura_name
     @param {!CombatEngine.TickCount} aura_duration
-    @param {CombatEngine.Pos} aura_range
+    @param {!CombatEngine.Pos} aura_range
     @param {Object.<string,CombatEngine.Coeff>} vs_table
     @param {Object.<string,CombatEngine.Coeff>} duration_vs_table
     @param {boolean} allow_ff - allow friendly fire
@@ -327,23 +349,27 @@ CombatEngine.AreaAuraEffect.prototype.apply = function() {
     for(var i = 0; i < obj_list.length; i++) {
         /** @type {!GameObject} */
         var obj = obj_list[i][0];
+        /** @type {!CombatEngine.Pos} */
         var dist = obj_list[i][1];
+        /** @type {!CombatEngine.Pos2D} */
         var pos = obj_list[i][2];
+
         if(obj.is_destroyed()) { continue; }
         if(!this.allow_ff && obj.team === this.source.team) { continue; }
         if(obj.spec['immune_to_splash']) { continue; }
 
         if(this.radius_rect) {
             // skip objects that are outside the radius_rect rectangle centered on target_location
-            var d = vec_sub(pos, this.target_location);
+            var d = CombatEngine.Pos2D.sub(pos, this.target_location);
             var a = this.radius_rect[0]/2, b = this.radius_rect[1]/2;
             if(d[0] < -a || d[0] > a || d[1] < -b || d[1] > b) { continue; }
         }
 
+        /** @type {!CombatEngine.Coeff} */
         var falloff;
         if(this.falloff == 'linear' && !this.radius_rect) {
             // fall off the damage amount as 1/r
-            falloff = clamp(1.0-(dist/this.radius), 0, 1);
+            falloff = CombatEngine.Pos.clamp(1.0-(dist/this.radius), 0, 1);
         } else if(this.falloff == 'constant') {
             falloff = 1;
         } else {
