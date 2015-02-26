@@ -131,11 +131,19 @@ function clamp(x,a,b) {
 
 function log10(x) { return Math.log(x)/Math.log(10.0); }
 
+/** @param {!Array.<number>} v
+    @return {!Array.<number>} */
 function vec_copy(v) { return [v[0], v[1]]; }
 
+/** @param {!Array.<number>} v
+    @param {!Array.<number>} w
+    @return {!Array.<number>} */
 function vec_add(v, w) {
     return [v[0]+w[0],v[1]+w[1]];
 }
+/** @param {!Array.<number>} v
+    @param {!Array.<number>} w
+    @return {!Array.<number>} */
 function vec_mul(v, w) {
     return [v[0]*w[0], v[1]*w[1]];
 }
@@ -143,11 +151,18 @@ function vec_div(v, w) {
     return [v[0]/w[0], v[1]/w[1]];
 }
 function vec_max(v, w) { return [Math.max(v[0],w[0]), Math.max(v[1],w[1])]; }
+
+/** @param {!Array.<number>} v
+    @return {!Array.<number>} */
 function vec_floor(v) { return [Math.floor(v[0]), Math.floor(v[1])]; }
+
 function vec_mod(v, n) { return [v[0]%n, v[1]%n]; }
 function v3_add(v, w) { return [v[0]+w[0], v[1]+w[1], v[2]+w[2]]; }
 function v3_sub(v, w) { return [v[0]-w[0], v[1]-w[1], v[2]-w[2]]; }
 
+/** @param {!Array.<number>} v
+    @param {!Array.<number>} w
+    @return {!Array.<number>} */
 function vec_sub(v, w) {
     return [v[0]-w[0],v[1]-w[1]];
 }
@@ -227,6 +242,12 @@ function vec_equals_integer(v, w) {
         return true;
     }
     return false;
+}
+
+/** @param {!Array.<!Array.<number>>} ls
+    @return {!Array.<!Array.<number>>} */
+function vec_list_reversed(ls) {
+    return ls.reverse();
 }
 
 function vec_print(v) { return v[0].toString()+','+v[1].toString(); };
@@ -1673,8 +1694,10 @@ GameObject.prototype.cast_client_spell = function(spell_name, spell, target, loc
                 if(dist > range) {
                     return false;
                 }
+                this.fire_projectile(client_time, -1, spell, this.level, target, location, 0); // use object level for the spell
+            } else {
+                throw Error('projectile_attack with no location from '+this.spec['name']);
             }
-            this.fire_projectile(client_time, -1, spell, this.level, target, location, 0); // use object level for the spell
         }
     }
 
@@ -2366,7 +2389,7 @@ function apply_target_lead(P, target_vel, speed) {
     @param {number} force_hit_time
     @param {Object} spell
     @param {GameObject|null} target
-    @param {?Array.<number>} target_pos
+    @param {!Array.<number>} target_pos
     @param {number} target_height
     @param {boolean} fizzle
 */
@@ -2725,7 +2748,7 @@ function do_fire_projectile(my_source, my_id, my_spec_name, my_level, my_team, m
     @param {Object} spell
     @param {number} spell_level
     @param {GameObject|null} target
-    @param {Array.<number>} target_pos
+    @param {!Array.<number>} target_pos
     @param {number} target_height */
 GameObject.prototype.fire_projectile = function(fire_time, force_hit_time, spell, spell_level, target, target_pos, target_height) {
     var my_pos = this.interpolate_pos();
@@ -7647,6 +7670,8 @@ Mobile.prototype.run_control = function() {
             // follow A* path
             var path_next; // coordinates of next cell in movement path
 
+            /* placate Closure compiler */ path_next = this.pos;
+
             // compute A* path
             var ncells = session.viewing_base.ncells();
             var cur_cell = [clamp(Math.floor(this.pos[0]),0,ncells[0]-1),
@@ -7656,6 +7681,7 @@ Mobile.prototype.run_control = function() {
             playfield_check_pos(dest_cell, 'dest_cell');
             if((cur_cell[0] == dest_cell[0]) && (cur_cell[1] == dest_cell[1])) {
                 // rover is same cell as final destination, no need to compute path
+                if(!this.dest) { throw Error('this.dest is null'); }
                 path_next = this.dest;
                 playfield_check_path([this.pos,path_next], 'copy_from_this.dest');
             } else {
@@ -8127,21 +8153,29 @@ function gameart_onload() {
 
 
 // convert orthographic cell index to pixel coordinate of top (northwest) corner of cell
+/** @param {!Array.<number>} ji
+    @return {!Array.<number>} */
 function ortho_to_playfield(ji) {
     // rotate to diamond pixel grid
     var x = (cellsize[0]*ji[0] - cellsize[0]*ji[1])/2;
     var y = (cellsize[1]*ji[0] + cellsize[1]*ji[1])/2;
     return [x,y];
 }
+/** @param {!Array.<number>} p
+    @return {!Array.<number>} */
 function playfield_to_screen(p) {
     // shift view so that view_pos puts center grid cell at middle of canvas
     var ncells = (session.viewing_base ? session.viewing_base.ncells() : [0,0]);
     return vec_add(vec_scale(view_zoom, vec_sub(p, view_pos)),
                    [canvas_width_half, canvas_height_half - view_zoom*cellsize[1]*ncells[1]/2]);
 }
+/** @param {!Array.<number>} ji
+    @return {!Array.<number>} */
 function ortho_to_screen(ji) {
     return playfield_to_screen(ortho_to_playfield(ji));
 }
+/** @param {!Array.<number>} ji
+    @return {!Array.<number>} */
 function ortho_to_draw(ji) {
     if(view_is_zoomed()) {
         return ortho_to_playfield(ji);
@@ -8149,6 +8183,8 @@ function ortho_to_draw(ji) {
         return ortho_to_screen(ji);
     }
 }
+/** @param {!Array.<number>} ji
+    @return {!Array.<number>} */
 function ortho_to_draw_vector(ji) {
     if(view_is_zoomed()) {
         return ortho_to_playfield_vector(ji);
@@ -8156,12 +8192,15 @@ function ortho_to_draw_vector(ji) {
         return ortho_to_screen_vector(ji);
     }
 }
-
+/** @param {!Array.<number>} j_height_i
+    @return {!Array.<number>} */
 function ortho_to_screen_3d(j_height_i) {
     var xy = ortho_to_screen([j_height_i[0], j_height_i[2]]);
     xy[1] += j_height_i[1] * -15 * view_zoom;
     return xy;
 }
+/** @param {!Array.<number>} j_height_i
+    @return {!Array.<number>} */
 function ortho_to_draw_3d(j_height_i) {
     var xy = ortho_to_draw([j_height_i[0], j_height_i[2]]);
     xy[1] += j_height_i[1] * -15;
@@ -8169,11 +8208,15 @@ function ortho_to_draw_3d(j_height_i) {
 }
 
 // transform a vector (not a point) from orthographic cell coordinates to playfield coordinates
+/** @param {!Array.<number>} ji
+    @return {!Array.<number>} */
 function ortho_to_playfield_vector(ji) {
     var x = (cellsize[0]*ji[0] - cellsize[0]*ji[1])/2;
     var y = (cellsize[1]*ji[0] + cellsize[1]*ji[1])/2;
     return [x,y];
 };
+/** @param {!Array.<number>} ji
+    @return {!Array.<number>} */
 function ortho_to_screen_vector(ji) {
     var p = ortho_to_playfield_vector(ji);
     if(view_is_zoomed()) {
@@ -8184,15 +8227,21 @@ function ortho_to_screen_vector(ji) {
 
 // return depth corresponding to an orthographic cell position
 // higher values are closer to the "camera"
+/** @param {!Array.<number>} ji
+    @return {number} */
 function ortho_to_depth(ji) {
     return ji[0] + ji[1];
 }
 
+/** @param {!Array.<number>} xy
+    @return {!Array.<number>} */
 function screen_to_playfield(xy) {
     // undo view window shift
     var ncells = session.viewing_base.ncells(); // let's try to catch errors where base is null
     return vec_add(view_pos, vec_scale(1/view_zoom, vec_sub(xy, [canvas_width_half, canvas_height_half - view_zoom*cellsize[1]*ncells[1]/2])));
 }
+/** @param {!Array.<number>} xy
+    @return {!Array.<number>} */
 function playfield_to_ortho(xy) {
     // rotate to orthogonal grid
     var j = xy[0]/(cellsize[0]) + xy[1]/(cellsize[1]);
@@ -8200,6 +8249,8 @@ function playfield_to_ortho(xy) {
     // quantize
     return vec_floor([j,i]);
 }
+/** @param {!Array.<number>} xy
+    @return {!Array.<number>} */
 function screen_to_ortho(xy) {
     return playfield_to_ortho(screen_to_playfield(xy));
 }
@@ -17952,7 +18003,7 @@ function ContextMenuButton(ui_name, onclick, state, ui_tooltip) {
     this.ui_tooltip = ui_tooltip || null;
 };
 
-/** @param {Array.<number>} xy position at which to pop up (screen coordinates)
+/** @param {!Array.<number>} xy position at which to pop up (screen coordinates)
     @param {Array.<ContextMenuButton>} buttons
     @param {string=} dialog_name from gamedata['dialogs']
     @param {Object.<string, Array.<ContextMenuButton> >=} special_buttons that go in a separately-named widget array, e.g. for turret heads
@@ -21066,6 +21117,8 @@ function invoke_inventory_context(inv_dialog, parent_widget, slot, item, show_dr
         start_pos = [dialog.widgets['buttonbg'].xy[0], 0];
         final_pos = [dialog.widgets['bgrect'].wh[0], 0];
         dialog.wh[0] = (show_dropdown ? (dialog.widgets['bgrect'].wh[0] + dialog.widgets['buttonbg'].wh[0]) : dialog.widgets['bgrect'].wh[0]);
+    } else {
+        throw Error('bad anim_dir '+anim_dir.toString());
     }
     dialog.widgets['buttonbg'].xy = final_pos;
 

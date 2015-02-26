@@ -1506,7 +1506,7 @@ SPFX.PhantomUnit.prototype.dispose = function() {
 };
 
 /** set new motion path directly - totally bypasses A*
- * @param {Array.<Array.<number>>} new_path */
+ * @param {!Array.<!Array.<number>>} new_path */
 SPFX.PhantomUnit.prototype.set_path = function(new_path) {
     this.obj.pos = this.obj.next_pos = vec_copy(new_path[0]);
     this.obj.dest = this.obj.ai_dest = vec_copy(new_path[new_path.length-1]);

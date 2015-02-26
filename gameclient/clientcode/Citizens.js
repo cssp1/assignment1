@@ -86,7 +86,7 @@ Citizens.Citizen.prototype.update = function() {
 };
 
 /** make up a new motion path
- * @return {Array.<Array.<number>>} */
+ * @return {!Array.<!Array.<number>>} */
 Citizens.Citizen.prototype.get_new_path = function() {
     var start_pos, end_pos;
     if(this.fx) {

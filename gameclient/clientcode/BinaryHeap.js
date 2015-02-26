@@ -27,6 +27,7 @@ BinaryHeap.BinaryHeap.prototype.push = function(element, score) {
 // return first element, but do not remove it from the heap
 BinaryHeap.BinaryHeap.prototype.peek = function() { return this.content[0]; };
 
+/** @return {?} */
 BinaryHeap.BinaryHeap.prototype.pop = function() {
     // Store the first element so we can return it later.
     var result = this.content[0];
@@ -55,9 +56,12 @@ BinaryHeap.BinaryHeap.prototype.remove = function(node) {
         this.bubbleUp(i);
     }
 };
+
+/** @return {number} */
 BinaryHeap.BinaryHeap.prototype.size = function() {
     return this.content.length;
 };
+
 BinaryHeap.BinaryHeap.prototype.rescoreElement = function(node, newscore) {
       node.heapscore = newscore;
       for(var n = 0; n < this.content.length; n++) {

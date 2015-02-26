@@ -1,8 +1,6 @@
 goog.provide('AStar');
 
-/** @fileoverview
-    @suppress {reportUnknownTypes} XXX we are not typesafe yet
-
+/**
   A* Pathfinding
 
   (Very heavily) modified from http://github.com/bgrins/javascript-astar
@@ -44,8 +42,9 @@ var AStar = {
 // See list of heuristics: http://theory.stanford.edu/~amitp/GameProgramming/Heuristics.html
 
 /** @param {!Array.<number>} start_pos
-  * @param {!Array.<number>} cur_pos
-  * @param {!Array.<number>} end_pos */
+    @param {!Array.<number>} cur_pos
+    @param {!Array.<number>} end_pos
+    @return {number} */
 AStar.heuristic_manhattan = function(start_pos, cur_pos, end_pos) {
     // Manhattan distance
     var dx1 = Math.abs(end_pos[0] - cur_pos[0]);
@@ -54,8 +53,9 @@ AStar.heuristic_manhattan = function(start_pos, cur_pos, end_pos) {
 };
 
 /** @param {!Array.<number>} start_pos
-  * @param {!Array.<number>} cur_pos
-  * @param {!Array.<number>} end_pos */
+    @param {!Array.<number>} cur_pos
+    @param {!Array.<number>} end_pos
+    @return {number} */
 AStar.heuristic_euclidean = function(start_pos, cur_pos, end_pos) {
     // Euclidean distance with cross-product tie-breaker
     // tends to make "cleaner" paths and visit fewer cells, but tests a little slower than manhattan
@@ -83,6 +83,7 @@ AStar.PathChecker;
 
 /** @constructor
     @struct
+    @param {!Array.<number>} pos
 */
 AStar.AStarCell = function(pos) {
     this.pos = pos;
@@ -102,10 +103,12 @@ AStar.AStarCell = function(pos) {
     this.h = 0;
     this.visited = false;
     this.closed = false;
+
+    /** @type {?AStar.AStarCell} */
     this.parent = null;
 };
 
-// return true only if there is no data at all for this cell, meaning it can be deallocated
+/** @return {boolean} true only if there is no data at all for this cell, meaning it can be deallocated */
 AStar.AStarCell.prototype.is_empty = function() { return this.block_count <= 0; }
 
 AStar.AStarCell.prototype.block = function() { this.block_count += 1; }
@@ -148,7 +151,8 @@ AStar.AStarMap = function (size, terrain_func) {
     this.needs_cleanup = false;
     this.generation = 0; // version number that increments with every mutation
     this.n_alloc = 0;
-    /** @private */
+    /** @private
+        @type {!Array.<?Array.<?AStar.AStarCell>>} */
     this.map = Array(size[1]); // columns of lazily-allocated rows of lazily-allocated AStarCells
     this.clear();
 
@@ -187,7 +191,8 @@ AStar.AStarMap.prototype.cleanup = function() {
 }
 
 /** Return a cell no matter what.
-  * @param {!Array.<number>} xy */
+    @param {!Array.<number>} xy
+    @return {!AStar.AStarCell} */
 AStar.AStarMap.prototype.cell = function(xy) {
     if(!this.map[xy[1]]) {
         this.map[xy[1]] = Array(this.size[0]);
@@ -200,13 +205,14 @@ AStar.AStarMap.prototype.cell = function(xy) {
         this.n_alloc += 1;
         this.needs_cleanup = true;
     }
-    return this.map[xy[1]][xy[0]];
+
+    // Closure isn't smart enough to figure out this will never be null
+    return /** @type {!AStar.AStarCell} */ (this.map[xy[1]][xy[0]]);
 };
 
 /** @param {!Array.<number>} xy */
 AStar.AStarMap.prototype.free_cell = function(xy) {
     this.needs_cleanup = true;
-    return;
 };
 
 /** Return a cell that can potentially be used for pathing
@@ -233,11 +239,12 @@ AStar.AStarMap.prototype.is_blocked = function(xy, checker) {
         if(this.terrain_func && this.terrain_func(xy)) { return true; }
         if(!this.map[xy[1]]) { return false; }
         var c = this.map[xy[1]][xy[0]];
-        return c && c.is_blocked(checker);
+        return (!!c) && c.is_blocked(checker);
     }
     return true;
 };
 
+/** @return {number} */
 AStar.AStarMap.prototype.num_neighbors = goog.abstractMethod;
 
 /** @param {AStar.AStarCell} node
@@ -275,10 +282,14 @@ AStar.AStarRectMap = function (size, terrain_func, allow_diagonal_passage) {
 };
 goog.inherits(AStar.AStarRectMap, AStar.AStarMap);
 
-/** @override */
+/** @override
+    @return {number} */
 AStar.AStarRectMap.prototype.num_neighbors = function() { return 4; };
 
-/** @override */
+/** @override
+    @param {AStar.AStarCell} node
+    @param {AStar.BlockChecker} checker
+    @param {!Array.<AStar.AStarCell>} ret */
 AStar.AStarRectMap.prototype.get_unblocked_neighbors = function(node, checker, ret) {
     var x = node.pos[0];
     var y = node.pos[1];
@@ -336,6 +347,7 @@ AStar.AStarRectMap.prototype.get_bresenham_path = function(start, end) {
     var dx = Math.abs(end[0]-start[0]), dy = Math.abs(end[1]-start[1]);
     var sx = (start[0] < end[0] ? 1 : -1), sy = (start[1] < end[1] ? 1 : -1);
     var err = dx - dy;
+    /** @type {!Array.<number>} */
     var cur = [start[0], start[1]];
     var ret = [];
     var iter = 0;
@@ -367,10 +379,14 @@ AStar.AStarRectMap.prototype.get_voxel_path = function(start, end) {
     // see http://www.cse.yorku.ca/~amana/research/grid.pdf
 
     var dir = vec_sub(end, start);
+    /** @type {!Array.<number>} */
     var step = [(start[0] < end[0] ? 1 : -1),
                 (start[1] < end[1] ? 1 : -1)];
+    /** @type {!Array.<number>} */
     var delta = [0.0,0.0];
+    /** @type {!Array.<number>} */
     var tmax = [0.0,0.0];
+
     for(var i = 0; i < 2; i++) {
         if(dir[i] > 0) {
             tmax[i] = (Math.floor(start[i]+1) - start[i])/dir[i];
@@ -432,6 +448,8 @@ AStar.AStarRectMap.prototype.bresenham_path_is_clear = function(start, end) {
     var dx = Math.abs(end[0]-start[0]), dy = Math.abs(end[1]-start[1]);
     var sx = (start[0] < end[0] ? 1 : -1), sy = (start[1] < end[1] ? 1 : -1);
     var err = dx - dy;
+
+    /** @type {!Array.<number>} */
     var cur = [start[0], start[1]];
     var iter = 0;
     while(!(cur[0] == end[0] && cur[1] == end[1])) {
@@ -463,10 +481,17 @@ AStar.AStarRectMap.prototype.bresenham_path_is_clear = function(start, end) {
 AStar.AStarRectMap.prototype.voxel_path_is_clear = function(start, end) {
     // see http://www.cse.yorku.ca/~amana/research/grid.pdf
     var dir = vec_sub(end, start);
+
+    /** @type {!Array.<number>} */
     var step = [(start[0] < end[0] ? 1 : -1),
                 (start[1] < end[1] ? 1 : -1)];
+
+    /** @type {!Array.<number>} */
     var delta = [0,0];
+
+    /** @type {!Array.<number>} */
     var tmax = [0,0];
+
     for(var i = 0; i < 2; i++) {
         if(dir[i] > 0) {
             tmax[i] = (Math.floor(start[i]+1) - start[i])/dir[i];
@@ -480,6 +505,7 @@ AStar.AStarRectMap.prototype.voxel_path_is_clear = function(start, end) {
         }
     }
 
+    /** @type {!Array.<number>} */
     var cur = vec_copy(start);
     var iter = 0;
     while(!(Math.floor(cur[0]) == Math.floor(end[0]) && Math.floor(cur[1]) == Math.floor(end[1]))) {
@@ -550,16 +576,22 @@ AStar.AStarRectMap.prototype.smooth_path = function(path) {
 
 /** @constructor
     @struct
-    @extends AStar.AStarMap */
+    @extends AStar.AStarMap
+    @param {!Array.<number>} size
+    @param {function(!Array.<number>): boolean|null} terrain_func optional, return true if terrain is blocked at this location */
 AStar.AStarHexMap = function (size, terrain_func) {
     goog.base(this, size, terrain_func);
 };
 goog.inherits(AStar.AStarHexMap, AStar.AStarMap);
 
-/** @override */
+/** @override
+    @return {number} */
 AStar.AStarHexMap.prototype.num_neighbors = function() { return 6; };
 
-/** @override */
+/** @override
+    @param {AStar.AStarCell} node
+    @param {AStar.BlockChecker} checker
+    @param {!Array.<AStar.AStarCell>} ret */
 AStar.AStarHexMap.prototype.get_unblocked_neighbors = function(node, checker, ret) {
     var x = node.pos[0], y = node.pos[1];
     var odd = (y%2) > 0;
@@ -626,8 +658,7 @@ AStar.AStarHexMap.prototype.unblock_hex_maybe = function(xy, blocker) {
 
 /** @constructor
     @struct
-    @param {AStar.AStarMap} map
-*/
+    @param {AStar.AStarMap} map */
 AStar.Connectivity = function(map) {
     if(!(map instanceof AStar.AStarRectMap)) { throw Error('Connectivity only implemented for RectMap'); }
 
@@ -650,7 +681,10 @@ AStar.Connectivity = function(map) {
                 continue;
             }
             val += 1;
+
+            /** @type {!Array.<!Array.<number>>} */
             var q = [[x,y]];
+
             while(q.length > 0) {
                 var p = q.pop();
                 if(typeof(this.flood[p[1]*this.size[1]+p[0]]) != 'undefined') {
@@ -685,18 +719,22 @@ AStar.Connectivity = function(map) {
     }
 };
 
+/** @param {!Array.<number>} pos
+    @return {number} */
 AStar.Connectivity.prototype.region_num = function(pos) {
     return this.flood[pos[1]*this.size[1]+pos[0]];
 };
 
-AStar.Connectivity.prototype.debug_draw = function() {
+/** @param {CanvasRenderingContext2D} ctx */
+AStar.Connectivity.prototype.debug_draw = function(ctx) {
     ctx.save();
     for(var y = 0; y < this.size[1]; y++) {
         for(var x = 0; x < this.size[0]; x++) {
             var val = this.flood[y*this.size[1]+x];
             if(val < 0) { continue; }
             var col = (val*0.20);
-            var col_str = new SPUI.Color(col,col,col,1).str();
+            var col_s = ((255*col) & 0xFF).toString();
+            var col_str = 'rgba('+col_s+','+col_s+','+col_s+',1)';
             ctx.fillStyle = col_str;
             var xy = ortho_to_draw([x+0.5,y+0.5]);
             ctx.fillRect(xy[0], xy[1], 4, 4);
@@ -707,13 +745,15 @@ AStar.Connectivity.prototype.debug_draw = function() {
 
 // SEARCH CONTEXT
 
+/** @typedef {{heuristic_name:(string|undefined),
+               iter_limit:(number|undefined),
+               use_connectivity:(boolean|undefined)}} */
+AStar.AStarContextOptions;
+
 /** @constructor
     @struct
     @param {AStar.AStarMap} map
-    @param {{heuristic_name:(string|undefined),
-             iter_limit:(number|undefined),
-             use_connectivity:(boolean|undefined)
-    }} options */
+    @param {AStar.AStarContextOptions} options */
 AStar.AStarContext = function(map, options) {
     this.options = options;
 
@@ -721,7 +761,9 @@ AStar.AStarContext = function(map, options) {
     this.serial = 1;
     this.map = map;
     this.iter_limit = options.iter_limit || -1;
-    // "scene graph" for debug drawing
+
+    /** "scene graph" for debug drawing
+        @type {!Array.<{pos: !Array.<number>, col:string}>} */
     this.debug_scene = [];
 
     var heuristic_name = options.heuristic_name || 'manhattan';
@@ -738,16 +780,29 @@ AStar.AStarContext.prototype.debug_clear = function() {
     this.debug_scene = [];
 };
 
+/** @param {CanvasRenderingContext2D} ctx */
 AStar.AStarContext.prototype.debug_draw = function(ctx) {
     // draw dots on the landscape
     ctx.save();
     goog.array.forEach(this.debug_scene, function(item) {
-        var pos = item[0], col_str = item[1];
+        var pos = item.pos, col_str = item.col;
         var xy = ortho_to_draw(vec_add(pos, [0.5,0.5]));
         ctx.fillStyle = col_str;
         ctx.fillRect(xy[0], xy[1], 4, 4);
     });
     ctx.restore();
+};
+
+/** wrap a path_checker into a version that is_blocked() can call with only the current cell as the argument
+    @param {AStar.PathChecker} path_checker
+    @param {!Array.<!Array.<number>>} cur_path
+    @return {AStar.BlockChecker} */
+AStar.AStarContext.path_checker_to_cell_checker = function(path_checker, cur_path) {
+    /** @type {AStar.BlockChecker} */
+    var ret = function(cell) {
+        return path_checker(cell, cur_path.concat(cell.pos));
+    };
+    return ret;
 };
 
 /** Main A* search function
@@ -777,10 +832,10 @@ AStar.AStarContext.prototype.search = function(start_pos, end_pos, path_checker)
     // return a partial path in case all complete paths are blocked
     /** @type {AStar.AStarCell} */
     var best_node = null;
-    var best_h = 9999999999;
+    var best_h = Infinity;
 
     // preallocate for speed
-    /** @type {!Array.<AStar.AStarCell>} */
+    /** @type {!Array.<!AStar.AStarCell>} */
     var neighbors = Array(this.map.num_neighbors());
 
     while(openHeap.size() > 0 && iter < AStar.ASTAR_MAX_ITER) {
@@ -801,13 +856,15 @@ AStar.AStarContext.prototype.search = function(start_pos, end_pos, path_checker)
         */
 
         // Grab the lowest f(x) to process next.  Heap keeps this sorted for us.
+        /** @type {!AStar.AStarCell} */
         var currentNode = openHeap.pop();
 
         // accumulate dots to draw into the scene graph
         if(PLAYFIELD_DEBUG) {
             var col = (iter % 10) / 10;
-            var col_str = new SPUI.Color(col,col,col,1).str();
-            this.debug_scene.push([currentNode.pos, col_str]);
+            var col_s = ((255*col) & 0xFF).toString();
+            var col_str = 'rgba('+col_s+','+col_s+','+col_s+',1)';
+            this.debug_scene.push({pos: currentNode.pos, col: col_str});
         }
 
         // End case -- result has been found, return the traced path
@@ -816,13 +873,14 @@ AStar.AStarContext.prototype.search = function(start_pos, end_pos, path_checker)
                 console.log('AStar.search DONE at ' + currentNode.pos[0].toString()+','+currentNode.pos[1].toString()+' iter '+iter.toString());
             }
             var curr = currentNode;
-            var ret = [];
+
+            var end_ret = [];
 
             while(curr.parent != null) {
-                ret.push(curr.pos);
+                end_ret.push(curr.pos);
                 curr = curr.parent;
             }
-            return ret.reverse();
+            return vec_list_reversed(end_ret);
         }
 
         // Normal case -- move currentNode from open to closed, process each of its neighbors
@@ -836,8 +894,8 @@ AStar.AStarContext.prototype.search = function(start_pos, end_pos, path_checker)
             for(var c = currentNode; c.parent != null; c = c.parent) {
                 cur_path.push(c.pos);
             }
-            cur_path = cur_path.reverse();
-            cell_checker = (function (_path_checker, _cur_path) { return function(cell) { return _path_checker(cell, _cur_path.concat(cell.pos)); }; })(path_checker, cur_path);
+            cur_path = vec_list_reversed(cur_path);
+            cell_checker = AStar.AStarContext.path_checker_to_cell_checker(path_checker, cur_path);
         }
 
         // get references to neighbor cells
@@ -895,7 +953,7 @@ AStar.AStarContext.prototype.search = function(start_pos, end_pos, path_checker)
             ret.push(curr.pos);
             curr = curr.parent;
         }
-        ret = ret.reverse();
+        ret = vec_list_reversed(ret);
     }
     if(AStar.ASTAR_DEBUG && iter >= (0.25*this.map.size[0]*this.map.size[1])) {
         var msg = 'pathological AStar query from '+start_pos[0].toString()+','+start_pos[1].toString()+' to '+end_pos[0].toString()+','+end_pos[1].toString()+' iter '+iter.toString()
@@ -911,7 +969,10 @@ AStar.AStarContext.prototype.search = function(start_pos, end_pos, path_checker)
 /** Cached wrapper for AStarContext that memoizes previous queries and optionally caches connectivity.
     @constructor
     @struct
-    @extends AStar.AStarContext */
+    @extends AStar.AStarContext
+    @param {AStar.AStarMap} map
+    @param {AStar.AStarContextOptions} options
+*/
 AStar.CachedAStarContext = function(map, options) {
     goog.base(this, map, options);
     this.cache_generation = -1;
@@ -940,9 +1001,11 @@ AStar.CachedAStarContext.prototype.ensure_connectivity = function() {
         this.connectivity = new AStar.Connectivity(this.map);
     }
 };
+
+/** @param {CanvasRenderingContext2D} ctx */
 AStar.CachedAStarContext.prototype.debug_draw = function(ctx) {
     if(0 && this.connectivity) {
-        this.connectivity.debug_draw();
+        this.connectivity.debug_draw(ctx);
     } else {
         return goog.base(this, 'debug_draw', ctx);
     }
@@ -955,6 +1018,7 @@ AStar.CachedAStarContext.prototype.debug_dump = function() {
  * @param {!Array.<number>} start_pos
  * @param {!Array.<number>} end_pos
  * @param {number} ring_size
+ * @return {string}
  */
 AStar.CachedAStarContext.prototype.cache_key = function(start_pos, end_pos, ring_size) {
     return (start_pos[0].toFixed(0)+','+start_pos[1].toFixed(0)+':'+end_pos[0].toFixed(0)+','+end_pos[1].toFixed(0)+','+ring_size.toFixed(0));
@@ -1030,6 +1094,7 @@ AStar.CachedAStarContext.prototype.ring_search = function(start_pos, end_pos, ri
         ret = []; // search from inside blocked area
     } else {
         for(var r = 1; r <= ring_size; r++) {
+            /** @type {!Array.<!Array.<number>>} */
             var points = [];
 
             // iterate on the ring of radius r
