@@ -796,7 +796,7 @@ Aura.prototype.apply = function(obj) {
             var n_ticks = Math.floor(apply_interval/TICK_INTERVAL + 0.5);
             if(n_ticks <= 1 || (((session.combat_engine.cur_tick.get() - this.start_tick.get()) % n_ticks) == 0)) {
                 var dmg = Math.max(1, Math.floor(this.strength*apply_interval));
-                session.combat_engine.damage_effect_queue.push(new CombatEngine.TargetedDamageEffect(session.combat_engine.cur_tick.copy(), this.source, obj, dmg, effect['damage_vs'] || this.vs_table));
+                session.combat_engine.damage_effect_queue.push(new CombatEngine.TargetedDamageEffect(session.combat_engine.cur_tick.copy(), client_time, this.source, obj, dmg, effect['damage_vs'] || this.vs_table));
             }
         } else if(code === 'projectile_speed_reduced') {
             obj.combat_stats.projectile_speed *= (1 - this.strength);
@@ -1596,15 +1596,16 @@ GameObject.prototype.cast_client_spell = function(spell_name, spell, target, loc
             if(spell['kills_self']) {
                 // Detonator droid/landmine
                 // queue BEFORE other damage so it's listed in this order in the battle log
-                var death_time = CombatEngine.TickCount.add(session.combat_engine.cur_tick,
+                var death_client_time = client_time + (spell['kills_self_delay']||0);
+                var death_tick = CombatEngine.TickCount.add(session.combat_engine.cur_tick,
                                                             relative_time_to_tick(/** @type {number} */ (spell['kills_self_delay']||0)));
-                session.combat_engine.damage_effect_queue.push(new CombatEngine.KillDamageEffect(death_time, this, this));
+                session.combat_engine.damage_effect_queue.push(new CombatEngine.KillDamageEffect(death_tick, death_client_time, this, this));
             }
 
             if(spell['impact_auras']) {
                 for (var i = 0; i < spell['impact_auras'].length; i++) {
                     var imp_aura = spell['impact_auras'][i];
-                    var effect = new CombatEngine.AreaAuraEffect(session.combat_engine.cur_tick.copy(), this, impact_pos,
+                    var effect = new CombatEngine.AreaAuraEffect(session.combat_engine.cur_tick.copy(), client_time, this, impact_pos,
                                                     ('targets_ground' in spell ? spell['targets_ground'] : 1),
                                                     ('targets_air' in spell ? spell['targets_air'] : 1),
                                                     radius, radius_rect,
@@ -1619,7 +1620,7 @@ GameObject.prototype.cast_client_spell = function(spell_name, spell, target, loc
                 }
             }
 
-            var effect = new CombatEngine.AreaDamageEffect(session.combat_engine.cur_tick.copy(), this, impact_pos,
+            var effect = new CombatEngine.AreaDamageEffect(session.combat_engine.cur_tick.copy(), client_time, this, impact_pos,
                                               ('targets_ground' in spell ? spell['targets_ground'] : 1),
                                               ('targets_air' in spell ? spell['targets_air'] : 1) || this.combat_stats.anti_air,
                                               radius,
@@ -2599,7 +2600,7 @@ function do_fire_projectile(my_source, my_id, my_spec_name, my_level, my_team, m
         if(spell['impact_auras']) {
             for (var i = 0; i < spell['impact_auras'].length; i++) {
                 var imp_aura = spell['impact_auras'][i];
-                effects.push(new CombatEngine.AreaAuraEffect(absolute_time_to_tick(hit_time+postfire_delay), my_source, target_pos,
+                effects.push(new CombatEngine.AreaAuraEffect(absolute_time_to_tick(hit_time+postfire_delay), hit_time+postfire_delay, my_source, target_pos,
                                                 ('splash_to_ground' in spell ? spell['splash_to_ground'] : false) || !(target_height > 0),
                                                 ('splash_to_air' in spell ? spell['splash_to_air'] : false) || (target_height > 0),
                                                 radius, false,
@@ -2616,7 +2617,7 @@ function do_fire_projectile(my_source, my_id, my_spec_name, my_level, my_team, m
 
         // splash damage
         if(damage != 0) {
-            effects.push(new CombatEngine.AreaDamageEffect(absolute_time_to_tick(hit_time+postfire_delay), my_source, target_pos,
+            effects.push(new CombatEngine.AreaDamageEffect(absolute_time_to_tick(hit_time+postfire_delay), hit_time+postfire_delay, my_source, target_pos,
                                               ('splash_to_ground' in spell ? spell['splash_to_ground'] : false) || !(target_height > 0),
                                               ('splash_to_air' in spell ? spell['splash_to_air'] : false) || (target_height > 0),
                                               radius,
@@ -2631,7 +2632,7 @@ function do_fire_projectile(my_source, my_id, my_spec_name, my_level, my_team, m
             if(spell['impact_auras']) {
                 for (var i = 0; i < spell['impact_auras'].length; i++) {
                     var imp_aura = spell['impact_auras'][i];
-                    effects.push(new CombatEngine.TargetedAuraEffect(absolute_time_to_tick(hit_time+postfire_delay), my_source, target,
+                    effects.push(new CombatEngine.TargetedAuraEffect(absolute_time_to_tick(hit_time+postfire_delay), hit_time+postfire_delay, my_source, target,
                                                         get_leveled_quantity(imp_aura['strength'] || 1, my_level),
                                                         get_leveled_quantity(imp_aura['spec'], my_level),
                                                         relative_time_to_tick(get_leveled_quantity(imp_aura['duration'] || 1, my_level)),
@@ -2642,7 +2643,7 @@ function do_fire_projectile(my_source, my_id, my_spec_name, my_level, my_team, m
             }
 
             if(damage != 0) {
-                effects.push(new CombatEngine.TargetedDamageEffect(absolute_time_to_tick(hit_time+postfire_delay), my_source, target, damage, damage_vs));
+                effects.push(new CombatEngine.TargetedDamageEffect(absolute_time_to_tick(hit_time+postfire_delay), hit_time+postfire_delay, my_source, target, damage, damage_vs));
             }
         }
     }
@@ -2707,8 +2708,9 @@ GameObject.prototype.fire_projectile = function(fire_time, force_hit_time, spell
 
     if(spell['kills_self']) {
         // special for Detonator Droids - kill self
-        var death_time = absolute_time_to_tick(fire_time + /** @type {number} */ (spell['kills_self_delay']||0));
-        session.combat_engine.damage_effect_queue.push(new CombatEngine.KillDamageEffect(death_time, this, this));
+        var death_client_time = client_time + (spell['kills_self_delay']||0);
+        var death_tick = absolute_time_to_tick(fire_time + /** @type {number} */ (spell['kills_self_delay']||0));
+        session.combat_engine.damage_effect_queue.push(new CombatEngine.KillDamageEffect(death_tick, death_client_time, this, this));
     }
 
     var hit_time = do_fire_projectile(this, this.id, this.spec['name'],
