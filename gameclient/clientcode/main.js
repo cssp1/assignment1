@@ -1174,6 +1174,8 @@ GameObject.prototype.update_stats = function() {
 };
 
 // Return true if the ability identified by 'key' (usually spell name) is able to be used
+/** @param {string} key
+    @return {boolean} */
 GameObject.prototype.get_cooldown = function(key) {
     if(key in this.cooldowns && CombatEngine.TickCount.lte(session.combat_engine.cur_tick, this.cooldowns[key].expire_tick)) {
         // old timer is still active
@@ -1182,6 +1184,9 @@ GameObject.prototype.get_cooldown = function(key) {
         return true;
     }
 };
+/** @param {string} key
+    @param {!CombatEngine.TickCount} start
+    @param {!CombatEngine.TickCount} expire */
 GameObject.prototype.set_cooldown = function(key, start, expire) {
     this.cooldowns[key] = { start_tick: start, expire_tick: expire };
 };
@@ -1655,7 +1660,7 @@ GameObject.prototype.cast_client_spell = function(spell_name, spell, target, loc
         }
         var cd_ticks = Math.floor(cd_seconds/TICK_INTERVAL);
         visual_cooldown = client_time + (cd_ticks+1)*TICK_INTERVAL;
-        this.set_cooldown(spell_name, session.combat_engine.cur_tick.get(), session.combat_engine.cur_tick.get() + cd_ticks);
+        this.set_cooldown(spell_name, session.combat_engine.cur_tick.copy(), CombatEngine.TickCount.add(session.combat_engine.cur_tick, new CombatEngine.TickCount(cd_ticks)));
     }
 
     if(global_spell_icon && global_spell_icon.unit === this) {
@@ -2247,7 +2252,8 @@ GameObject.prototype.run_control = function() {
                 // trigger non-auto-attack cooldown
                 if(!this.get_cooldown(spell['cooldown_name'])) { return; }
                 var cd_ticks = Math.floor(get_leveled_quantity(spell['cooldown'], spell_level)/TICK_INTERVAL);
-                this.set_cooldown(spell['cooldown_name'], session.combat_engine.cur_tick.get(), session.combat_engine.cur_tick.get() + cd_ticks);
+                this.set_cooldown(spell['cooldown_name'], session.combat_engine.cur_tick.copy(),
+                                  CombatEngine.TickCount.add(session.combat_engine.cur_tick, new CombatEngine.TickCount(cd_ticks)));
             }
 
             var target_pos, target_height;
