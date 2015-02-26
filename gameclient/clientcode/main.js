@@ -33671,6 +33671,7 @@ player.get_event = function(event_kind, event_name, ref_time, ignore_activation)
     } else {
         event_list = player.event_list_cache;
     }
+    if(!event_list) { throw Error('bad event_list'); }
 
     for(var i = 0; i < event_list.length; i++) {
         var entry = event_list[i];
