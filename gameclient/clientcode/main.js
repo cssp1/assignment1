@@ -1781,7 +1781,7 @@ function apply_queued_damage_effects() {
 function create_debris(target, pos) {
     // add client-side debris effect
     var inert_specname;
-    if('destroyed_insert' in target.spec) {
+    if('destroyed_inert' in target.spec) {
         inert_specname = target.spec['destroyed_inert']; // can be null
     } else {
         inert_specname = gamedata['default_debris_inert'];
