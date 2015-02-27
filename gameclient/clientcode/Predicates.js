@@ -336,6 +336,19 @@ BuildingQuantityPredicate.prototype.do_ui_describe = function(player) {
     ret = ret.replace('%d ', qty_string);
     return ret;
 };
+BuildingQuantityPredicate.prototype.ui_progress = function(player, qdata) {
+    var ret = gamedata['strings']['predicates'][this.kind]['ui_progress'];
+    var howmany = 0;
+    for(var id in session.cur_objects.objects) {
+        var obj = session.cur_objects.objects[id];
+        if(obj.spec['name'] === this.building_type && (this.under_construction_ok || !obj.is_under_construction()) && obj.team === 'player') {
+            howmany += 1;
+        }
+    }
+    ret = ret.replace('%d1', howmany.toString());
+    ret = ret.replace('%d2', this.trigger_qty.toString());
+    return ret;
+};
 BuildingQuantityPredicate.prototype.do_ui_help = function(player) {
     var building_spec = gamedata['buildings'][this.building_type];
     // do not return help for hidden buildings
