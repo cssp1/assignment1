@@ -40281,7 +40281,7 @@ Store.place_fbpayments_order = function(fbpayments_currency, price, unit_id, spe
     if(spellarg) {
         descr += ','+spellarg;
     }
-    if(unit_id) {
+    if(unit_id && unit_id != GameObject.VIRTUAL_ID) {
         var object = session.cur_objects.objects[unit_id];
         descr += ','+object.spec['name'];
     }
