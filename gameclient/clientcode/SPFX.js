@@ -10,40 +10,64 @@ goog.provide('SPFX');
 
 goog.require('goog.array');
 goog.require('goog.object');
+goog.require('GameTypes');
 goog.require('GameArt');
 goog.require('SPUI');
 goog.require('ShakeSynth');
 
-// note: we implicitly "import" some coordinate transform functions from main.js
-// (should probably be moved into some kind of GameMap library)
-
 // all coordinates here are in game map cell units (not quantized, fractions OK)
 
 // global namespace
-SPFX = {
-    canvas: null,
-    ctx: null,
-    time: 0,
-    last_id: 0,
-    detail: 1,
-    global_gravity: 1,
-    global_ground_plane: 0,
 
-    // XXX hack to fake z-ordering - there are three "layers"
-    current_under: {}, // underneath units/buildings
-    current_phantoms: {}, // phantom units/buildings managed by SPFX
-    current_over: {}, // on top of units/buildings, below UI
-    current_ui: {}, // on top of UI
-    fields: {}, // force fields
+/** @type {?CanvasRenderingContext2D} */
+SPFX.ctx = null;
 
-    shake_impulses: [] // list of [t, amplitude, falloff]
-};
+/** @type {number} */
+SPFX.time = 0;
 
+/** @type {!GameTypes.TickCount} */
+SPFX.tick = new GameTypes.TickCount(0);
+
+SPFX.last_id = 0;
+SPFX.detail = 1;
+SPFX.global_gravity = 1;
+SPFX.global_ground_plane = 0;
+
+// XXX hack to fake z-ordering - there are three "layers" of effects
+
+/** @type {Object.<string,!SPFX.FXObject>} */
+SPFX.current_under = {}; // underneath units/buildings
+
+/** @type {Object.<string,!SPFX.FXObject>} */
+SPFX.current_phantoms = {}; // phantom units/buildings managed by SPFX
+
+/** @type {Object.<string,!SPFX.FXObject>} */
+SPFX.current_over = {}; // on top of units/buildings, below UI
+
+/** @type {Object.<string,!SPFX.FXObject>} */
+SPFX.current_ui = {}; // on top of UI
+
+/** @type {Object.<string,!SPFX.Field>} */
+SPFX.fields = {}; // force fields
+
+/** @typedef {{time: (number|null|undefined), tick: (GameTypes.TickCount|null|undefined),
+               amplitude: number, falloff: number}} */
+SPFX.ShakeImpulse;
+
+/** @type {Array.<!SPFX.ShakeImpulse>} */
+SPFX.shake_impulses = [];
+
+/** @type {?ShakeSynth.Shake} */
+SPFX.shake_synth = null;
+
+SPFX.shake_origin_time = -1;
 
 // SPFX
 
-SPFX.init = function(canvas, ctx, use_low_gfx, use_high_gfx) {
-    SPFX.canvas = canvas;
+/** @param {!CanvasRenderingContext2D} ctx
+    @param {boolean} use_low_gfx
+    @param {boolean} use_high_gfx */
+SPFX.init = function(ctx, use_low_gfx, use_high_gfx) {
     SPFX.ctx = ctx;
     SPFX.time = 0;
     SPFX.last_id = 0;
@@ -138,9 +162,9 @@ SPFX.get_phantom_objects = function() {
 };
 
 SPFX.get_camera_shake = function() {
-    if(!SPFX.shake_impulses) { return [0,0,0]; }
+    if(SPFX.shake_impulses.length < 1) { return [0,0,0]; }
 
-    if(SPFX.shake_impulses.length < 1) {
+    if(SPFX.shake_origin_time < 0) {
         SPFX.shake_origin_time = SPFX.time + 10.0*Math.random();
     }
 
@@ -148,13 +172,13 @@ SPFX.get_camera_shake = function() {
     var total_amp = 0.0;
     for(var i = 0; i < SPFX.shake_impulses.length; i++) {
         var imp = SPFX.shake_impulses[i];
-        if(SPFX.time < imp[0]) { continue; }
-        var exponent = (SPFX.time-imp[0])/imp[2];
-        if(exponent > 4.0) {
+        if(SPFX.time < imp.time) { continue; } // too early
+        var exponent = (SPFX.time-imp.time)/imp.falloff;
+        if(exponent > 4.0) { // too late, no longer needed
             SPFX.shake_impulses.splice(i, 1);
             continue;
         }
-        total_amp += imp[1] * Math.exp(-exponent);
+        total_amp += imp.amplitude * Math.exp(-exponent);
     }
     if(Math.abs(total_amp) >= 0.0001) {
         var v = SPFX.shake_synth.evaluate(24.0*(SPFX.time-SPFX.shake_origin_time));
@@ -164,7 +188,7 @@ SPFX.get_camera_shake = function() {
 };
 
 SPFX.shake_camera = function(start_time, amp, falloff) {
-    SPFX.shake_impulses.push([start_time, amp, falloff]);
+    SPFX.shake_impulses.push({time:start_time, amplitude:amp, falloff:falloff});
 };
 
 /** @constructor */
@@ -559,9 +583,9 @@ SPFX.Particles.prototype.draw = function() {
             SPFX.ctx.beginPath();
         } else if(this.draw_mode == 'circles') {
             var grad = SPFX.ctx.createRadialGradient(0, 0, 0, 0, 0, this.line_width);
-            grad.addColorStop('0.0', this.color.str());
+            grad.addColorStop(0.0, this.color.str());
             var transp = new SPUI.Color(this.color.r, this.color.g, this.color.b, 0.0);
-            grad.addColorStop('1.0', transp.str());
+            grad.addColorStop(1.0, transp.str());
             SPFX.ctx.fillStyle = grad;
         }
 
@@ -1429,9 +1453,9 @@ SPFX.Shockwave.prototype.draw = function() {
     SPFX.set_composite_mode(this.composite_mode);
 
     var grad = SPFX.ctx.createRadialGradient(0, 0, 0, 0, 0, rad);
-    grad.addColorStop((1 - this.thickness*0.9).toString(), this.center_color.str());
-    grad.addColorStop((1 - this.thickness*0.15).toString(), this.edge_color.str());
-    grad.addColorStop('1.0', this.center_color.str());
+    grad.addColorStop((1 - this.thickness*0.9), this.center_color.str());
+    grad.addColorStop((1 - this.thickness*0.15), this.edge_color.str());
+    grad.addColorStop(1.0, this.center_color.str());
 
     SPFX.ctx.fillStyle = grad;
     SPFX.ctx.transform(1, 0, 0, 0.5, xy[0], xy[1]);

@@ -40914,7 +40914,7 @@ function handle_server_message(data) {
 
         GameArt.init(client_time, canvas, ctx, gamedata['art'], gameart_onload, audio_driver, use_low_gfx, use_lazy_art, player.get_any_abtest_value('enable_pixel_manipulation_in_low_gfx', gamedata['client']['enable_pixel_manipulation_in_low_gfx']));
 
-        SPFX.init(canvas, ctx, use_low_gfx, use_high_gfx);
+        SPFX.init(ctx, use_low_gfx, use_high_gfx);
 
         if('sound_volume' in player.preferences) {
             GameArt.sound_volume = player.preferences['sound_volume'];
