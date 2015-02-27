@@ -9302,7 +9302,8 @@ SPINPUNCHGAME.init = function() {
         console.log('blacklisting audio on Opera');
     }
 
-    SPUI.time = SPFX.time = client_time = (new Date()).getTime()/1000;
+    SPUI.time = client_time = (new Date()).getTime()/1000;
+    SPFX.set_time(client_time, new GameTypes.TickCount(0));
     ctx.font = SPUI.desktop_font.str();
 
     // set up permanent UI elements
@@ -40753,7 +40754,9 @@ function recv_message_bundle(serial, clock, messages, kind) {
         // reset server_time_offset
         server_time_offset = clock - (new Date()).getTime()/1000;
         update_client_and_server_time();
-        SPUI.time = client_time; SPFX.time = client_time;
+        SPUI.time = client_time;
+        SPFX.set_time(client_time, (session.combat_engine ? session.combat_engine.cur_tick : new GameTypes.TickCount(0)));
+
         GameArt.sync_time(client_time);
     }
 
@@ -45198,7 +45201,8 @@ function force_draw() {
 function draw() {
     // update world time
     update_client_and_server_time();
-    SPUI.time = client_time; SPFX.time = client_time;
+    SPUI.time = client_time;
+    SPFX.set_time(client_time, (session.combat_engine ? session.combat_engine.cur_tick : new GameTypes.TickCount(0)));
     GameArt.sync_time(client_time);
 
     //console.log('frame at '+client_time+' last_draw_time '+last_draw_time);

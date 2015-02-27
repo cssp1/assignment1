@@ -22,10 +22,12 @@ goog.require('ShakeSynth');
 /** @type {?CanvasRenderingContext2D} */
 SPFX.ctx = null;
 
-/** @type {number} */
+/** @type {number}
+    @private */
 SPFX.time = 0;
 
-/** @type {!GameTypes.TickCount} */
+/** @type {!GameTypes.TickCount}
+    @private */
 SPFX.tick = new GameTypes.TickCount(0);
 
 SPFX.last_id = 0;
@@ -87,6 +89,13 @@ SPFX.init = function(ctx, use_low_gfx, use_high_gfx) {
 
     SPFX.shake_synth = new ShakeSynth.Shake(0);
     SPFX.shake_origin_time = SPFX.time;
+};
+
+/** @param {number} time
+    @param {!GameTypes.TickCount} tick */
+SPFX.set_time = function(time, tick) {
+    SPFX.time = time;
+    SPFX.tick = tick.copy();
 };
 
 // only allow non-default compositing modes when detail > 1
