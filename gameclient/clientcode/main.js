@@ -1055,8 +1055,6 @@ function GameObject() {
     this.last_speak_sound = null; // client-side state to prevent sound FX spam
     this.last_speak_time = -1;
 
-    this.feedback_pending = false; // mouse-click feedback pending
-
     // combat stats - pulled from gamedata but modified by auras
     this.combat_stats = {};
 
@@ -7873,11 +7871,6 @@ Mobile.prototype.run_control = function() {
 
             if(PLAYFIELD_DEBUG >= 2 && this === last_created_object) { console.log(this.spec['name']+' pos '+this.pos[0].toString()+','+this.pos[1].toString()+' path_next '+path_next[0].toString()+','+path_next[1].toString()+' dist '+dist.toString()+' move_dist '+move_dist.toString()+' next_pos '+this.next_pos[0].toString()+','+this.next_pos[1].toString()); }
 
-        }
-
-        if(this.feedback_pending) {
-            this.feedback_pending = false;
-            //unit_path_feedback(this);
         }
 
         if('movement_effect' in this.spec) {
@@ -44753,7 +44746,6 @@ function unit_command_move(j, i, use_amove, add_waypoint) {
     my_order['aggressive'] = !!aggressive;
 
     selection.unit.new_order(my_order, !add_waypoint);
-    selection.unit.feedback_pending = true;
 
     if(selection.multi.length > 0) {
         // formation movement referenced against selection.unit
@@ -44789,7 +44781,6 @@ function unit_command_move(j, i, use_amove, add_waypoint) {
             form_order['aggressive'] = !!form_aggressive;
 
             selection.multi[n].new_order(form_order, !add_waypoint);
-            selection.multi[n].feedback_pending = true;
         }
     }
 
@@ -47894,18 +47885,6 @@ function draw_bar(xy, w, h, prog, prog2, colors, throb_speed) {
     ctx.lineWidth = 1; // (h >= 6 ? 2 : 1);
     ctx.strokeStyle = colors['outline'];
     ctx.strokeRect(xy[0], xy[1], w, h);
-};
-
-function unit_path_feedback(unit) {
-    if(!unit.is_mobile() || unit.path.length < 1) { return; }
-    var waypoints = [];
-    waypoints.push(unit.interpolate_pos());
-    for(var i = 0; i < unit.path.length; i++) {
-        var pos = unit.path[i];
-        waypoints.push([pos[0]+0.5,pos[1]+0.5]);
-    }
-    var fx = new SPFX.UnitPath(waypoints, [0.15,1,0.15,0.8], client_time, client_time + 0.6);
-    SPFX.add_under(fx);
 };
 
 function draw_debug_astar_paths() {

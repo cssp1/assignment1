@@ -1353,34 +1353,6 @@ SPFX.FeedbackEffect.prototype.draw = function() {
 /** @constructor
   * @extends SPFX.FeedbackEffect
   */
-SPFX.UnitPath = function(waypoints, col, start_time, end_time) {
-    goog.base(this, col, start_time, end_time);
-    this.waypoints = waypoints;
-}
-goog.inherits(SPFX.UnitPath, SPFX.FeedbackEffect);
-SPFX.UnitPath.prototype.do_draw = function() {
-    if(this.waypoints.length < 2) { return; }
-    SPFX.ctx.save();
-    SPFX.ctx.strokeStyle = this.color.str();
-    SPFX.ctx.lineWidth = 1;
-    SPFX.ctx.beginPath();
-    var xy = ortho_to_draw(this.waypoints[0]);
-    SPFX.ctx.moveTo(Math.floor(xy[0]), Math.floor(xy[1]));
-    for(var i = 1; i < this.waypoints.length; i++) {
-        xy = ortho_to_draw(this.waypoints[i]);
-        SPFX.ctx.lineTo(Math.floor(xy[0]), Math.floor(xy[1]));
-    }
-
-    SPFX.ctx.transform(1, 0, 0, 0.5, Math.floor(xy[0]), Math.floor(xy[1]));
-    SPFX.ctx.arc(0, 0, 6, 0, 2*Math.PI, false);
-
-    SPFX.ctx.stroke();
-    SPFX.ctx.restore();
-};
-
-/** @constructor
-  * @extends SPFX.FeedbackEffect
-  */
 SPFX.ClickFeedback = function(pos, col, start_time, end_time) {
     goog.base(this, col, start_time, end_time);
     this.pos = [Math.floor(pos[0]), Math.floor(pos[1])];
