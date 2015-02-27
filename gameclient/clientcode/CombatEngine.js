@@ -13,11 +13,6 @@ goog.require('GameTypes');
     @typedef {number} */
 CombatEngine.Coeff;
 
-/** @typedef {number} */
-CombatEngine.Integer;
-/** @param {number} num */
-CombatEngine.assert_integer = function(num) { if(num != (num|0)) { throw Error('non-integer '+num.toString()); } };
-
 /** 1D object position
     @typedef {number} */
 CombatEngine.Pos;
@@ -50,66 +45,10 @@ CombatEngine.Pos2D.sub = function(a, b) {
 };
 
 /** @constructor
-    @struct
-    @param {number} count */
-CombatEngine.TickCount = function(count) {
-    CombatEngine.assert_integer(count);
-    this.count = count;
-};
-CombatEngine.TickCount.infinity = new CombatEngine.TickCount(-1);
-/** @return {number} */
-CombatEngine.TickCount.prototype.get = function() { return this.count; };
-/** @return {boolean} */
-CombatEngine.TickCount.prototype.is_infinite = function() { return this.count < 0; };
-/** @return {boolean} */
-CombatEngine.TickCount.prototype.is_nonzero = function() { return this.count != 0; };
-
-CombatEngine.TickCount.prototype.inc = function() { this.count++; };
-
-/** @return {!CombatEngine.TickCount} */
-CombatEngine.TickCount.prototype.copy = function() { return new CombatEngine.TickCount(this.count); };
-
-/** @param {!CombatEngine.Coeff} s
-    @param {!CombatEngine.TickCount} a
-    @return {!CombatEngine.TickCount} */
-CombatEngine.TickCount.scale = function(s, a) { return new CombatEngine.TickCount(Math.floor(s*a.count+0.5)); };
-
-/** @param {!CombatEngine.TickCount} a
-    @param {!CombatEngine.TickCount} b
-    @return {boolean} */
-CombatEngine.TickCount.gte = function(a, b) { return a.count >= b.count; };
-
-/** @param {!CombatEngine.TickCount} a
-    @param {!CombatEngine.TickCount} b
-    @return {boolean} */
-CombatEngine.TickCount.gt = function(a, b) { return a.count > b.count; };
-
-/** @param {!CombatEngine.TickCount} a
-    @param {!CombatEngine.TickCount} b
-    @return {boolean} */
-CombatEngine.TickCount.lt = function(a, b) { return a.count < b.count; };
-
-/** @param {!CombatEngine.TickCount} a
-    @param {!CombatEngine.TickCount} b
-    @return {boolean} */
-CombatEngine.TickCount.lte = function(a, b) { return a.count <= b.count; };
-
-/** @param {!CombatEngine.TickCount} a
-    @param {!CombatEngine.TickCount} b
-    @return {!CombatEngine.TickCount} */
-CombatEngine.TickCount.add = function(a, b) { return new CombatEngine.TickCount(a.count+b.count); };
-
-/** @param {!CombatEngine.TickCount} a
-    @param {!CombatEngine.TickCount} b
-    @return {!CombatEngine.TickCount} */
-CombatEngine.TickCount.max = function(a, b) { return new CombatEngine.TickCount(Math.max(a.count, b.count)); };
-
-
-/** @constructor
     @struct */
 CombatEngine.CombatEngine = function() {
-    /** @type {!CombatEngine.TickCount} */
-    this.cur_tick = new CombatEngine.TickCount(0);
+    /** @type {!GameTypes.TickCount} */
+    this.cur_tick = new GameTypes.TickCount(0);
 
     /** list of queued damage effects that should be applied at later times (possible optimization: use a priority queue)
         @type {Array.<!CombatEngine.DamageEffect>} */
@@ -120,10 +59,10 @@ CombatEngine.CombatEngine = function() {
 
 /** @constructor
     @struct
-    @param {!CombatEngine.TickCount} tick
+    @param {!GameTypes.TickCount} tick
     @param {number} client_time_hack - until SPFX can think in terms of ticks, have to use client_time instead of tick count for applicaiton
     @param {GameObject|null} source
-    @param {!CombatEngine.Integer} amount
+    @param {!GameTypes.Integer} amount
     @param {Object.<string,CombatEngine.Coeff>} vs_table
 */
 CombatEngine.DamageEffect = function(tick, client_time_hack, source, amount, vs_table) {
@@ -141,7 +80,7 @@ CombatEngine.CombatEngine.prototype.apply_queued_damage_effects = function() {
     for(var i = 0; i < this.damage_effect_queue.length; i++) {
         var effect = this.damage_effect_queue[i];
         if(client_time >= effect.client_time_hack) {
-        //if(CombatEngine.TickCount.gte(this.cur_tick, effect.tick)) {
+        //if(GameTypes.TickCount.gte(this.cur_tick, effect.tick)) {
             this.damage_effect_queue.splice(i,1);
             effect.apply();
         }
@@ -154,7 +93,7 @@ CombatEngine.CombatEngine.prototype.apply_queued_damage_effects = function() {
     @constructor
     @struct
     @extends CombatEngine.DamageEffect
-    @param {!CombatEngine.TickCount} tick
+    @param {!GameTypes.TickCount} tick
     @param {number} client_time_hack
     @param {GameObject|null} source
     @param {GameObject} target_obj
@@ -184,11 +123,11 @@ CombatEngine.KillDamageEffect.prototype.apply = function() {
 /** @constructor
     @struct
     @extends CombatEngine.DamageEffect
-    @param {!CombatEngine.TickCount} tick
+    @param {!GameTypes.TickCount} tick
     @param {number} client_time_hack
     @param {GameObject|null} source
     @param {GameObject} target_obj
-    @param {!CombatEngine.Integer} amount
+    @param {!GameTypes.Integer} amount
     @param {Object.<string,CombatEngine.Coeff>} vs_table
 */
 CombatEngine.TargetedDamageEffect = function(tick, client_time_hack, source, target_obj, amount, vs_table) {
@@ -207,13 +146,13 @@ CombatEngine.TargetedDamageEffect.prototype.apply = function() {
 /** @constructor
     @struct
     @extends CombatEngine.DamageEffect
-    @param {!CombatEngine.TickCount} tick
+    @param {!GameTypes.TickCount} tick
     @param {number} client_time_hack
     @param {GameObject|null} source
     @param {GameObject} target_obj
-    @param {!CombatEngine.Integer} amount
+    @param {!GameTypes.Integer} amount
     @param {string} aura_name
-    @param {!CombatEngine.TickCount} aura_duration
+    @param {!GameTypes.TickCount} aura_duration
     @param {!CombatEngine.Pos} aura_range
     @param {Object.<string,CombatEngine.Coeff>} vs_table
     @param {Object.<string,CombatEngine.Coeff>} duration_vs_table
@@ -233,7 +172,7 @@ CombatEngine.TargetedAuraEffect.prototype.apply = function() {
         return;
     }
     if(this.amount != 0) {
-        var duration = CombatEngine.TickCount.scale(get_damage_modifier(this.duration_vs_table, this.target_obj), this.aura_duration);
+        var duration = GameTypes.TickCount.scale(get_damage_modifier(this.duration_vs_table, this.target_obj), this.aura_duration);
         if(duration.is_nonzero()) {
             this.target_obj.create_aura(this.source, this.aura_name, this.amount, duration, this.aura_range, this.vs_table);
         }
@@ -243,7 +182,7 @@ CombatEngine.TargetedAuraEffect.prototype.apply = function() {
 /** @constructor
     @struct
     @extends CombatEngine.DamageEffect
-    @param {!CombatEngine.TickCount} tick
+    @param {!GameTypes.TickCount} tick
     @param {number} client_time_hack
     @param {GameObject|null} source
     @param {!CombatEngine.Pos2D} target_location
@@ -251,7 +190,7 @@ CombatEngine.TargetedAuraEffect.prototype.apply = function() {
     @param {boolean} hit_air
     @param {!CombatEngine.Pos} radius
     @param {string} falloff XXXXXX make into an enum
-    @param {!CombatEngine.Integer} amount
+    @param {!GameTypes.Integer} amount
     @param {Object.<string,CombatEngine.Coeff>} vs_table
     @param {boolean} allow_ff - allow friendly fire
 */
@@ -301,7 +240,7 @@ CombatEngine.AreaDamageEffect.prototype.apply = function() {
 /** @constructor
     @struct
     @extends CombatEngine.DamageEffect
-    @param {!CombatEngine.TickCount} tick
+    @param {!GameTypes.TickCount} tick
     @param {number} client_time_hack
     @param {GameObject|null} source
     @param {!CombatEngine.Pos2D} target_location
@@ -310,9 +249,9 @@ CombatEngine.AreaDamageEffect.prototype.apply = function() {
     @param {!CombatEngine.Pos} radius
     @param {boolean} radius_rect - use rectangular rather than circular coverage
     @param {string} falloff XXXXXX make into an enum
-    @param {!CombatEngine.Integer} amount
+    @param {!GameTypes.Integer} amount
     @param {string} aura_name
-    @param {!CombatEngine.TickCount} aura_duration
+    @param {!GameTypes.TickCount} aura_duration
     @param {!CombatEngine.Pos} aura_range
     @param {Object.<string,CombatEngine.Coeff>} vs_table
     @param {Object.<string,CombatEngine.Coeff>} duration_vs_table
@@ -377,7 +316,7 @@ CombatEngine.AreaAuraEffect.prototype.apply = function() {
 
         var amt = this.amount * falloff;
         if(amt != 0) {
-            var duration = CombatEngine.TickCount.scale(get_damage_modifier(this.duration_vs_table, obj), this.aura_duration);
+            var duration = GameTypes.TickCount.scale(get_damage_modifier(this.duration_vs_table, obj), this.aura_duration);
             if(duration.is_nonzero()) {
                 obj.create_aura(this.source, this.aura_name, amt, duration, this.aura_range, this.vs_table);
             }

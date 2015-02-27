@@ -722,8 +722,8 @@ function force_scroll_eval() {
     @param {Object} spec
     @param {?} strength
     @param {number} range
-    @param {!CombatEngine.TickCount} start_tick
-    @param {!CombatEngine.TickCount} expire_tick
+    @param {!GameTypes.TickCount} start_tick
+    @param {!GameTypes.TickCount} expire_tick
     @param {Object|null=} vs_table
 */
 function Aura(source, spec, strength, range, start_tick, expire_tick, vs_table) {
@@ -731,9 +731,9 @@ function Aura(source, spec, strength, range, start_tick, expire_tick, vs_table) 
     this.spec = spec;
     this.strength = strength;
     this.range = range;
-    /** @type {!CombatEngine.TickCount} */
+    /** @type {!GameTypes.TickCount} */
     this.start_tick = start_tick;
-    /** @type {!CombatEngine.TickCount} */
+    /** @type {!GameTypes.TickCount} */
     this.expire_tick = expire_tick;
     this.stacks = 1;
     this.vs_table = vs_table || null;
@@ -788,7 +788,7 @@ Aura.prototype.apply = function(obj) {
                                                          { only_team: obj.team, mobile_only: true });
             for(var i = 0; i < obj_list.length; i++) {
                 var o = obj_list[i].obj;
-                o.create_aura(obj, 'defense_boosted', this.strength, new CombatEngine.TickCount(1), 0);
+                o.create_aura(obj, 'defense_boosted', this.strength, new GameTypes.TickCount(1), 0);
             }
         } else if(code === 'damage_booster') {
             // apply the damage_boosted aura to this and nearby units
@@ -797,7 +797,7 @@ Aura.prototype.apply = function(obj) {
                                                          { only_team: obj.team, mobile_only: true });
             for(var i = 0; i < obj_list.length; i++) {
                 var o2 = obj_list[i].obj;
-                o2.create_aura(obj, 'damage_boosted', this.strength, new CombatEngine.TickCount(1), 0);
+                o2.create_aura(obj, 'damage_boosted', this.strength, new GameTypes.TickCount(1), 0);
             }
         } else if(code === 'stunned') {
             obj.combat_stats.stunned += this.strength;
@@ -1191,7 +1191,7 @@ GameObject.prototype.modify_stats_by_modstats_table = function(table) {
 GameObject.prototype.update_and_apply_auras = function() {
     for(var i = 0; i < this.auras.length; i++) {
         var a = this.auras[i];
-        if(!a.expire_tick.is_infinite() && CombatEngine.TickCount.gt(session.combat_engine.cur_tick, a.expire_tick)) {
+        if(!a.expire_tick.is_infinite() && GameTypes.TickCount.gt(session.combat_engine.cur_tick, a.expire_tick)) {
             this.auras.splice(i,1);
             a.end(this);
             continue;
@@ -1211,7 +1211,7 @@ GameObject.prototype.update_stats = function() {
 /** @param {string} key
     @return {boolean} */
 GameObject.prototype.get_cooldown = function(key) {
-    if(key in this.cooldowns && CombatEngine.TickCount.lte(session.combat_engine.cur_tick, this.cooldowns[key].expire_tick)) {
+    if(key in this.cooldowns && GameTypes.TickCount.lte(session.combat_engine.cur_tick, this.cooldowns[key].expire_tick)) {
         // old timer is still active
         return false;
     } else {
@@ -1219,8 +1219,8 @@ GameObject.prototype.get_cooldown = function(key) {
     }
 };
 /** @param {string} key
-    @param {!CombatEngine.TickCount} start
-    @param {!CombatEngine.TickCount} expire */
+    @param {!GameTypes.TickCount} start
+    @param {!GameTypes.TickCount} expire */
 GameObject.prototype.set_cooldown = function(key, start, expire) {
     this.cooldowns[key] = { start_tick: start, expire_tick: expire };
 };
@@ -1229,7 +1229,7 @@ GameObject.prototype.receive_auras_update = function(alist) {
     // remove all permanent and expired auras
     for(var i = 0; i < this.auras.length; i++) {
         var a = this.auras[i];
-        if(a.expire_tick.is_infinite() || CombatEngine.TickCount.gt(session.combat_engine.cur_tick, a.expire_tick)) {
+        if(a.expire_tick.is_infinite() || GameTypes.TickCount.gt(session.combat_engine.cur_tick, a.expire_tick)) {
             this.auras.splice(i,1);
             a.end(this);
             continue;
@@ -1240,7 +1240,7 @@ GameObject.prototype.receive_auras_update = function(alist) {
     for(var i = 0; i < alist.length; i++) {
         var data = alist[i];
         this.create_aura(null, data['name'], data['strength'],
-                         ('duration' in data? relative_time_to_tick(data['duration']) : CombatEngine.TickCount.infinity),
+                         ('duration' in data? relative_time_to_tick(data['duration']) : GameTypes.TickCount.infinity),
                          ('range' in data? data['range'] : -1));
     }
 };
@@ -1624,7 +1624,7 @@ GameObject.prototype.cast_client_spell = function(spell_name, spell, target, loc
         var strength = this.get_leveled_quantity(spell['aura_strength'] || 1);
         var duration = this.get_leveled_quantity(spell['aura_duration'] || -1);
         var range = this.get_leveled_quantity(spell['aura_range'] || 0);
-        this.create_aura(null, aura_name, strength, (duration < 0 ? CombatEngine.TickCount.infinity : relative_time_to_tick(duration)), range);
+        this.create_aura(null, aura_name, strength, (duration < 0 ? GameTypes.TickCount.infinity : relative_time_to_tick(duration)), range);
     }
 
     if('code' in spell) {
@@ -1649,7 +1649,7 @@ GameObject.prototype.cast_client_spell = function(spell_name, spell, target, loc
                 // Detonator droid/landmine
                 // queue BEFORE other damage so it's listed in this order in the battle log
                 var death_client_time = client_time + (spell['kills_self_delay']||0);
-                var death_tick = CombatEngine.TickCount.add(session.combat_engine.cur_tick,
+                var death_tick = GameTypes.TickCount.add(session.combat_engine.cur_tick,
                                                             relative_time_to_tick(/** @type {number} */ (spell['kills_self_delay']||0)));
                 session.combat_engine.damage_effect_queue.push(new CombatEngine.KillDamageEffect(death_tick, death_client_time, this, this));
             }
@@ -1709,7 +1709,7 @@ GameObject.prototype.cast_client_spell = function(spell_name, spell, target, loc
         }
         var cd_ticks = Math.floor(cd_seconds/TICK_INTERVAL);
         visual_cooldown = client_time + (cd_ticks+1)*TICK_INTERVAL;
-        this.set_cooldown(spell_name, session.combat_engine.cur_tick.copy(), CombatEngine.TickCount.add(session.combat_engine.cur_tick, new CombatEngine.TickCount(cd_ticks)));
+        this.set_cooldown(spell_name, session.combat_engine.cur_tick.copy(), GameTypes.TickCount.add(session.combat_engine.cur_tick, new GameTypes.TickCount(cd_ticks)));
     }
 
     if(global_spell_icon && global_spell_icon.unit === this) {
@@ -1723,16 +1723,16 @@ GameObject.prototype.cast_client_spell = function(spell_name, spell, target, loc
 /** @param {GameObject|null} creator
     @param {string} aura_name
     @param {?} strength
-    @param {!CombatEngine.TickCount} duration
+    @param {!GameTypes.TickCount} duration
     @param {number} range
     @param {Object=} vs_table */
 GameObject.prototype.create_aura = function(creator, aura_name, strength, duration, range, vs_table) {
     var aura_spec = gamedata['auras'][aura_name];
     var end_tick;
     if(duration.is_infinite()) {
-        end_tick = CombatEngine.TickCount.infinity; // infinite
+        end_tick = GameTypes.TickCount.infinity; // infinite
     } else {
-        end_tick = CombatEngine.TickCount.add(session.combat_engine.cur_tick, duration);
+        end_tick = GameTypes.TickCount.add(session.combat_engine.cur_tick, duration);
     }
 
     var i;
@@ -1746,7 +1746,7 @@ GameObject.prototype.create_aura = function(creator, aura_name, strength, durati
                 this.auras[i].start_tick = session.combat_engine.cur_tick.copy();
                 this.auras[i].source = creator;
                 if(!this.auras[i].expire_tick.is_infinite()) {
-                    this.auras[i].expire_tick = CombatEngine.TickCount.max(this.auras[i].expire_tick, end_tick);
+                    this.auras[i].expire_tick = GameTypes.TickCount.max(this.auras[i].expire_tick, end_tick);
                 }
                 break;
             }
@@ -2305,7 +2305,7 @@ GameObject.prototype.run_control = function() {
                 if(!this.get_cooldown(spell['cooldown_name'])) { return; }
                 var cd_ticks = Math.floor(get_leveled_quantity(spell['cooldown'], spell_level)/TICK_INTERVAL);
                 this.set_cooldown(spell['cooldown_name'], session.combat_engine.cur_tick.copy(),
-                                  CombatEngine.TickCount.add(session.combat_engine.cur_tick, new CombatEngine.TickCount(cd_ticks)));
+                                  GameTypes.TickCount.add(session.combat_engine.cur_tick, new GameTypes.TickCount(cd_ticks)));
             }
 
             var target_pos, target_height;
@@ -7003,15 +7003,15 @@ var last_tick_time = 0; // client_time at which last unit simulation tick was ru
 
 // temporary bridge until entire combat engine is converted to ticks
 /** @param {number} t
-    @return {!CombatEngine.TickCount} */
+    @return {!GameTypes.TickCount} */
 function absolute_time_to_tick(t) {
     var delta = t - client_time;
-    return new CombatEngine.TickCount(session.combat_engine.cur_tick.get() + Math.floor(delta/TICK_INTERVAL + 0.5));
+    return new GameTypes.TickCount(session.combat_engine.cur_tick.get() + Math.floor(delta/TICK_INTERVAL + 0.5));
 };
 /** @param {number} t
-    @return {!CombatEngine.TickCount} */
+    @return {!GameTypes.TickCount} */
 function relative_time_to_tick(t) {
-    return new CombatEngine.TickCount(Math.floor(t/TICK_INTERVAL + 0.5));
+    return new GameTypes.TickCount(Math.floor(t/TICK_INTERVAL + 0.5));
 };
 
 var player_combat_time_scale = 1.0; // additional time scaling applied by playfield speed bar controls
@@ -47452,11 +47452,11 @@ function draw_aura(xy, indicator_xy, aura) {
 
 /** @param {Array.<number>} xy
     @param {string} color
-    @param {!CombatEngine.TickCount} start_tick
-    @param {!CombatEngine.TickCount} end_tick */
+    @param {!GameTypes.TickCount} start_tick
+    @param {!GameTypes.TickCount} end_tick */
 function draw_clock(xy, color, start_tick, end_tick) {
-    if(CombatEngine.TickCount.lt(session.combat_engine.cur_tick, start_tick) ||
-       CombatEngine.TickCount.gt(session.combat_engine.cur_tick, end_tick)) { return; }
+    if(GameTypes.TickCount.lt(session.combat_engine.cur_tick, start_tick) ||
+       GameTypes.TickCount.gt(session.combat_engine.cur_tick, end_tick)) { return; }
     var client_tick_smooth = session.combat_engine.cur_tick.get() + (client_time - last_tick_time)/(TICK_INTERVAL/combat_time_scale());
     var progress;
     if(end_tick.get() - start_tick.get() > 1.5/TICK_INTERVAL) {
