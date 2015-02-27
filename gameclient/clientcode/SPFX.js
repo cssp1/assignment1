@@ -30,6 +30,17 @@ SPFX.time = 0;
     @private */
 SPFX.tick = new GameTypes.TickCount(0);
 
+/** Some effects want to fire at specific client_times and others want
+ to fire at specific combat ticks. This type encapsulates both cases.
+ @constructor
+ @struct
+ @param {number|null} time
+ @param {GameTypes.TickCount|null} tick */
+SPFX.When = function(time, tick) {
+    this.time = time;
+    this.tick = (tick ? tick.copy() : null);
+};
+
 SPFX.last_id = 0;
 SPFX.detail = 1;
 SPFX.global_gravity = 1;
@@ -37,16 +48,16 @@ SPFX.global_ground_plane = 0;
 
 // XXX hack to fake z-ordering - there are three "layers" of effects
 
-/** @type {Object.<string,!SPFX.FXObject>} */
+/** @type {Object.<string,!SPFX.Effect>} */
 SPFX.current_under = {}; // underneath units/buildings
 
-/** @type {Object.<string,!SPFX.FXObject>} */
+/** @type {Object.<string,!SPFX.PhantomUnit>} */
 SPFX.current_phantoms = {}; // phantom units/buildings managed by SPFX
 
-/** @type {Object.<string,!SPFX.FXObject>} */
+/** @type {Object.<string,!SPFX.Effect>} */
 SPFX.current_over = {}; // on top of units/buildings, below UI
 
-/** @type {Object.<string,!SPFX.FXObject>} */
+/** @type {Object.<string,!SPFX.Effect>} */
 SPFX.current_ui = {}; // on top of UI
 
 /** @type {Object.<string,!SPFX.Field>} */
@@ -97,6 +108,40 @@ SPFX.set_time = function(time, tick) {
     SPFX.time = time;
     SPFX.tick = tick.copy();
 };
+
+/** @param {!SPFX.When} t
+    @return {boolean} */
+SPFX.time_lt = function(t) {
+    if(t.tick) {
+        return GameTypes.TickCount.lt(SPFX.tick, t.tick);
+    } else {
+        return SPFX.time < t.time;
+    }
+};
+
+/** @param {!SPFX.When} t
+    @return {boolean} */
+SPFX.time_gte = function(t) { return !SPFX.time_lt(t); };
+
+/** @param {!SPFX.When} start
+    @param {!SPFX.When} end
+    @return {number} */
+SPFX.time_lerp = function(start, end) {
+    var s, e, cur;
+    if(start.tick) {
+        s = start.tick.get();
+        if(!end.tick) { throw Error('mixed When types'); }
+        e = end.tick.get();
+        cur = SPFX.tick.get(); // XXX this will produce non-smooth results, need to fix
+    } else {
+        s = start.time;
+        if(end.tick) { throw Error('mixed When types'); }
+        e = end.time;
+        cur = SPFX.time;
+    }
+    return (cur - s) / (e - s);
+};
+
 
 // only allow non-default compositing modes when detail > 1
 SPFX.set_composite_mode = function(mode) {
@@ -200,7 +245,8 @@ SPFX.shake_camera = function(start_time, amp, falloff) {
     SPFX.shake_impulses.push({time:start_time, amplitude:amp, falloff:falloff});
 };
 
-/** @constructor */
+/** @constructor
+    @struct */
 SPFX.FXObject = function() {};
 /** Repositions this object in the game world. Useful when attaching effects to a moving object.
     @param {Array.<number>} xyz
@@ -210,9 +256,11 @@ SPFX.FXObject.prototype.reposition = function(xyz, rotation) {};
 SPFX.FXObject.prototype.dispose = function() {};
 
 /** @constructor
-    @extends SPFX.FXObject */
-SPFX.Field = function() {
+    @extends SPFX.FXObject
+    @param {?string=} charge */
+SPFX.Field = function(charge) {
     goog.base(this);
+    this.charge = charge;
 };
 goog.inherits(SPFX.Field, SPFX.FXObject);
 
@@ -222,11 +270,10 @@ SPFX.Field.prototype.eval_field = function(pos, vel) {};
 /** @constructor
     @extends SPFX.Field */
 SPFX.MagnetField = function(pos, orient, time, data, instance_data) {
-    goog.base(this);
+    goog.base(this, data['charge'] || null);
     this.pos = pos; // note: in 3D here
     this.strength = data['strength'] || 10.0;
     this.strength_3d = data['strength_3d'] || [1,1,1];
-    this.charge = data['charge'] || null;
     this.falloff = data['falloff'] || 0;
     this.falloff_rim = data['falloff_rim'] || 0;
 };
@@ -250,8 +297,7 @@ SPFX.MagnetField.prototype.reposition = function(xyz, rotation) {
 /** @constructor
     @extends SPFX.Field */
 SPFX.DragField = function(pos, orient, time, data, instance_data) {
-    goog.base(this);
-    this.charge = data['charge'] || null;
+    goog.base(this, data['charge'] || null);
     this.strength = data['strength'] || 1.0;
 };
 goog.inherits(SPFX.DragField, SPFX.Field);
@@ -264,6 +310,7 @@ SPFX.DragField.prototype.eval_field = function(pos, vel) {
 // Effect
 
 /** @constructor
+    @struct
     @extends SPFX.FXObject */
 SPFX.Effect = function(data) {
     goog.base(this);
@@ -1336,31 +1383,41 @@ SPFX.CombatText.prototype.draw = function() {
     SPFX.ctx.restore();
 };
 
-// Unit movement/attack feedback
-/** @constructor
-  * @extends SPFX.Effect
-  */
+/** Unit movement/attack feedback
+    @constructor
+    @struct
+    @extends SPFX.Effect
+    @param {!Array.<number>} col
+    @param {number} start_time
+    @param {number} end_time
+*/
 SPFX.FeedbackEffect = function(col, start_time, end_time) {
     goog.base(this, null);
     this.base_col = col;
     this.color = new SPUI.Color(col[0], col[1], col[2], col[3]);
-    this.start_time = start_time;
-    this.end_time = end_time;
+    this.start = new SPFX.When(start_time, null);
+    this.end = new SPFX.When(end_time, null);
 };
 goog.inherits(SPFX.FeedbackEffect, SPFX.Effect);
+SPFX.FeedbackEffect.prototype.do_draw = goog.abstractMethod;
 SPFX.FeedbackEffect.prototype.draw = function() {
-    if(SPFX.time < this.start_time) { return; }
-    if(SPFX.time > this.end_time) {
+    if(SPFX.time_lt(this.start)) { return; }
+    if(SPFX.time_gte(this.end)) {
         SPFX.remove(this);
         return;
     }
-    var fade = ((SPFX.time - this.start_time) / (this.end_time - this.start_time));
+    var fade = SPFX.time_lerp(this.start, this.end);
     this.color.a = this.base_col[3] * (1 - fade*fade);
     this.do_draw();
 };
 
 /** @constructor
-  * @extends SPFX.FeedbackEffect
+    @struct
+    @extends SPFX.FeedbackEffect
+    @param {!Array.<number>} pos
+    @param {!Array.<number>} col
+    @param {number} start_time
+    @param {number} end_time
   */
 SPFX.ClickFeedback = function(pos, col, start_time, end_time) {
     goog.base(this, col, start_time, end_time);
@@ -1368,7 +1425,7 @@ SPFX.ClickFeedback = function(pos, col, start_time, end_time) {
 };
 goog.inherits(SPFX.ClickFeedback, SPFX.FeedbackEffect);
 SPFX.ClickFeedback.prototype.do_draw = function() {
-    var radius = 20.0 * ((SPFX.time - this.start_time) / (this.end_time - this.start_time));
+    var radius = 20.0 * SPFX.time_lerp(this.start, this.end);
 
     SPFX.ctx.save();
     SPFX.ctx.strokeStyle = this.color.str();
