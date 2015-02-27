@@ -137,7 +137,7 @@ RegionMap.DeployCursor.prototype.on_mouseup = function(cell, button) {
             player.squad_move(this.squad_id, [cell]);
         } else {
             squad_data['pending'] = true;
-            send_to_server.func(["CAST_SPELL", 0, "SQUAD_ENTER_MAP", this.squad_id, cell]);
+            send_to_server.func(["CAST_SPELL", GameObject.VIRTUAL_ID, "SQUAD_ENTER_MAP", this.squad_id, cell]);
         }
         this.map.cursor = null;
         return true;

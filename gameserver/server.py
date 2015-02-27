@@ -13034,7 +13034,7 @@ class Store:
                     s = str(spellarg)
                 descr += ','+s
 
-            if unit_id:
+            if unit_id and unit_id != GameObject.VIRTUAL_ID:
                 object = session.get_object(unit_id)
                 descr += ','+object.spec.name
 
