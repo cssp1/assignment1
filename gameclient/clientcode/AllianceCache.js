@@ -161,13 +161,13 @@ AllianceCache.send_create = function (props, callback) {
     var tag = AllianceCache.install_receiver(callback);
     var wire_props = AllianceCache.encode_props(props);
     wire_props['tag'] = tag;
-    send_to_server.func(["CAST_SPELL", 0, "ALLIANCE_CREATE", wire_props]);
+    send_to_server.func(["CAST_SPELL", GameObject.VIRTUAL_ID, "ALLIANCE_CREATE", wire_props]);
 };
 AllianceCache.send_modify = function (props, callback) {
     var tag = AllianceCache.install_receiver(callback);
     var wire_props = AllianceCache.encode_props(props);
     wire_props['tag'] = tag;
-    send_to_server.func(["CAST_SPELL", 0, "ALLIANCE_MODIFY", wire_props]);
+    send_to_server.func(["CAST_SPELL", GameObject.VIRTUAL_ID, "ALLIANCE_MODIFY", wire_props]);
 };
 AllianceCache.send_invite = function (alliance_id, user_id, callback) {
     var tag = AllianceCache.install_receiver(callback);
