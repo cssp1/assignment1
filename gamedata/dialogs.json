@@ -2273,7 +2273,7 @@
                                      "outline_color": [0.5,0.5,0.5,1], "outline_width": 1 },
 
             "in_production_icon": { "kind": "ActionButton", "xy": [289,272], "dimensions": [112,100],
-                                    "bg_image_offset": [0,8], "bg_image_justify": "center", "bg_image": "", "state": "normal", "rotating": 1 },
+                                    "bg_image_offset": [0,16], "bg_image_justify": "center", "bg_image": "", "state": "normal", "rotating": 1 },
             "in_production_progress": { "kind": "ProgressBar", "xy": [296,275], "dimensions": [81, 6],
                                         "full_color": [0.189,0.710,0.905,1],
                                         "empty_color": [0.3,0.3,0.3,1] },
@@ -6430,7 +6430,7 @@
 
             "in_production_bg": { "kind": "StaticImage", "xy":[45,293], "dimensions":[116,100], "bg_image_resizable": 1, "asset": "dialog_sunken_resizable"},
             "in_production_icon": { "kind": "ActionButton", "xy": [47,293], "dimensions": [112,100],
-                                    "bg_image_offset": [0,8], "bg_image_justify": "center", "bg_image": "", "state": "normal", "rotating": 1 },
+                                    "bg_image_offset": [0,24], "bg_image_justify": "center", "bg_image": "", "state": "normal", "rotating": 1 },
             "in_production_time": { "kind": "TextField", "xy": [52,373], "dimensions": [103,17], "text_size": 13,
                                     "text_hjustify": "left", "text_style": "bold", "ui_name": "" },
             "in_production_wrench": { "kind": "StaticImage", "xy": [132,364], "dimensions": [24,24], "asset": "repair_wrench_green", "rocking": 1 },

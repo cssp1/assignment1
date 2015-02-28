@@ -6092,6 +6092,9 @@ player.can_resurrect_unit = function(obj) {
     return get_unit_stat(player.stattab, obj.spec['name'], 'resurrection', RESURRECT_NEVER) >= RESURRECT_AND_REPAIR_WITH_TECH;
 };
 
+/** @param {Object} spec - note: the spec itself, not the specname
+    @param {number} hp
+    @return {boolean} */
 player.can_repair_unit_of_spec = function(spec, hp) {
     if(hp > 0) { return true; }
     var ability = (spec['resurrectable'] ? ((gamedata['resurrect_requires_tech'] && !spec['resurrectable_without_tech']) ? RESURRECT_AND_REPAIR_WITH_TECH : RESURRECT_AND_REPAIR_ALWAYS) : RESURRECT_NEVER);
@@ -13917,8 +13920,25 @@ function init_dialog_repair_buttons(dialog, base_damage) {
                 any_unit_damage = true;
                 var obj_cost = obj.cost_to_repair(player);
                 for(var res in obj_cost) {
-                    if(res == 'time') { continue; }
+                    if(res == 'time' || obj_cost[res] == 0) { continue; }
                     cost_res[res] = (cost_res[res]||0) + obj_cost[res];
+                }
+            }
+        }
+        if(('enable_defending_units' in gamedata) && !gamedata['enable_defending_units']) {
+            // also check army for repair candidates
+            for(var id in player.my_army) {
+                var unit = player.my_army[id];
+                if((unit['squad_id']||0) == SQUAD_IDS.BASE_DEFENDERS) {
+                    var curmax = army_unit_hp(unit);
+                    if(curmax[0]<curmax[1] && !army_unit_is_under_repair(unit['obj_id']) && player.can_repair_unit_of_spec(gamedata['units'][unit['spec']], curmax[0])) {
+                        any_unit_damage = true;
+                        var obj_cost = mobile_cost_to_repair(gamedata['units'][unit['spec']], unit['level']||1, curmax[0], curmax[1], player);
+                        for(var res in obj_cost) {
+                            if(res == 'time' || obj_cost[res] == 0) { continue; }
+                            cost_res[res] = (cost_res[res]||0) + obj_cost[res];
+                        }
+                    }
                 }
             }
         }
@@ -13944,6 +13964,19 @@ function init_dialog_repair_buttons(dialog, base_damage) {
                 obj.repair_finish_time = server_time + repair_time;
                 obj.update_all_actions(server_time);
             }
+        }
+        if(('enable_defending_units' in gamedata) && !gamedata['enable_defending_units']) {
+            // also check army for repair candidates
+            for(var id in player.my_army) {
+                var unit = player.my_army[id];
+                if((unit['squad_id']||0) == SQUAD_IDS.BASE_DEFENDERS) {
+                    var curmax = army_unit_hp(unit);
+                    if(curmax[0]<curmax[1] && !army_unit_is_under_repair(unit['obj_id']) && player.can_repair_unit_of_spec(gamedata['units'][unit['spec']], curmax[0])) {
+                        send_to_server.func(["UNIT_REPAIR_QUEUE", unit['obj_id']]);
+                    }
+                }
+            }
+            unit_repair_sync_marker = synchronizer.request_sync();
         }
     };
 
@@ -14038,6 +14071,19 @@ function do_invoke_repair_dialog() {
         }
     }
 
+    if(('enable_defending_units' in gamedata) && !gamedata['enable_defending_units']) {
+        // also check army for repair candidates
+        for(var id in player.my_army) {
+            var unit = player.my_army[id];
+            if((unit['squad_id']||0) == SQUAD_IDS.BASE_DEFENDERS) {
+                var curmax = army_unit_hp(unit);
+                if(curmax[0]<curmax[1] && !army_unit_is_under_repair(unit['obj_id']) && player.can_repair_unit_of_spec(gamedata['units'][unit['spec']], curmax[0])) {
+                    units += 1;
+                }
+            }
+        }
+    }
+
     var txt = '';
     if(buildings > 0) {
         txt += buildings.toString()+' '+gamedata['strings']['object_kinds']['buildings'][((buildings!=1)?'plural':'singular')].toLowerCase();
@@ -14102,6 +14148,19 @@ function invoke_repair_dialog_conditional() {
             if(obj.is_mobile() && obj.is_damaged() && !obj.is_under_repair() && obj.team === 'player' && !session.is_quarry() && player.can_repair_unit(obj)) {
                 needs_rep = true;
                 break;
+            }
+        }
+        if(('enable_defending_units' in gamedata) && !gamedata['enable_defending_units']) {
+            // also check army for repair candidates
+            for(var id in player.my_army) {
+                var unit = player.my_army[id];
+                if((unit['squad_id']||0) == SQUAD_IDS.BASE_DEFENDERS) {
+                    var curmax = army_unit_hp(unit);
+                    if(curmax[0]<curmax[1] && !army_unit_is_under_repair(unit['obj_id']) && player.can_repair_unit_of_spec(gamedata['units'][unit['spec']], curmax[0])) {
+                        needs_rep = true;
+                        break;
+                    }
+                }
             }
         }
     }
@@ -27142,24 +27201,27 @@ function army_unit_repair_state(obj) {
 }
 
 // used for sorting units in squad displays
+function army_unit_compare_specnames(a,b) {
+    // sort by max health then space consumption
+    var aspec = gamedata['units'][a], bspec = gamedata['units'][b];
+    var amax = get_leveled_quantity(aspec['max_hp'],1);
+    var bmax = get_leveled_quantity(bspec['max_hp'],1);
+    if(amax < bmax) { return 1; }
+    if(amax > bmax) { return -1; }
+    var aspace = get_leveled_quantity(aspec['consumes_space'],1);
+    var bspace = get_leveled_quantity(bspec['consumes_space'],1);
+    if(aspace < bspace) { return 1; }
+    if(aspace > bspace) { return -1; }
+    return 0;
+}
 function army_unit_compare(a,b) {
-    // sort by "coolness" then health
-    var aspc = get_leveled_quantity(gamedata['units'][a['spec']]['consumes_space'],1);
-    var bspc = get_leveled_quantity(gamedata['units'][b['spec']]['consumes_space'],1);
-    if(aspc < bspc) { return 1; }
-    if(aspc > bspc) { return -1; }
+    var cmp = army_unit_compare_specnames(a['spec'], b['spec']);
+    if(cmp != 0) { return cmp; }
+    // use current health ratio to break ties
     var acurmax = army_unit_hp(a), aratio = acurmax[0]/Math.max(acurmax[1],1);
     var bcurmax = army_unit_hp(b), bratio = bcurmax[0]/Math.max(bcurmax[1],1);
     if(aratio < bratio) { return 1; }
     if(aratio > bratio) { return -1; }
-    return 0;
-}
-function army_unit_compare_specnames(a,b) {
-    // sort by "coolness"
-    var aspc = get_leveled_quantity(gamedata['units'][a]['consumes_space'],1);
-    var bspc = get_leveled_quantity(gamedata['units'][b]['consumes_space'],1);
-    if(aspc < bspc) { return 1; }
-    if(aspc > bspc) { return -1; }
     return 0;
 }
 
@@ -28308,6 +28370,18 @@ function receive_unit_repair_update(data) {
     unit_repair_ping_sent = false;
 }
 
+/** @param {!GameObjectId} obj_id
+    @return {boolean} */
+function army_unit_is_under_repair(obj_id) {
+    for(var i = 0; i < player.unit_repair_queue.length; i++) {
+        var item = player.unit_repair_queue[i];
+        if(item['obj_id'] == obj_id) {
+            return true;
+        }
+    }
+    return false;
+};
+
 function update_repair_control(dialog) {
 
     dialog.widgets['squad_radio_base_defenders'].state = (dialog.user_data['squad_id'] == SQUAD_IDS.BASE_DEFENDERS ? 'active' : 'normal');
@@ -28322,18 +28396,18 @@ function update_repair_control(dialog) {
     dialog.widgets['in_production_icon'].show =
         dialog.widgets['in_production_time'].show =
         dialog.widgets['in_production_wrench'].show =
-        dialog.widgets['in_production_health'].show = !player.squads_enabled() && (player.unit_repair_queue.length > 0 && player.unit_repair_queue[0]['obj_id'] in session.cur_objects.objects);
+        dialog.widgets['in_production_health'].show = !player.squads_enabled() && (player.unit_repair_queue.length > 0 && (player.unit_repair_queue[0]['obj_id'] in session.cur_objects.objects || player.unit_repair_queue[0]['obj_id'] in player.my_army));
     dialog.widgets['in_production_cancel'].show = (dialog.widgets['in_production_icon'].show && gamedata['unit_repair_can_cancel'] && !player.squads_enabled());
 
     if(player.unit_repair_queue.length > 0) {
         var item = player.unit_repair_queue[0];
         var orig_hp = item['original_hp'];
         var cur_hp = null, max_hp = null;
+        var obj_spec, obj_level;
         if(item['obj_id'] in session.cur_objects.objects) {
             var obj = session.cur_objects.objects[item['obj_id']];
-            dialog.widgets['in_production_icon'].bg_image = obj.get_leveled_quantity(obj.spec['art_asset']);
-            dialog.widgets['in_production_icon'].alpha = (obj.spec['cloaked'] ? gamedata['client']['cloaked_opacity'] : 1);
-
+            obj_spec = obj.spec;
+            obj_level = obj.level;
             dialog.widgets['in_production_time'].str = pretty_print_time(item['finish_time'] - server_time);
             dialog.widgets['in_production_cancel'].onclick = (function (id) { return function() {
                 send_to_server.func(["UNIT_REPAIR_CANCEL", id]);
@@ -28342,8 +28416,13 @@ function update_repair_control(dialog) {
             cur_hp = obj.hp; max_hp = obj.max_hp;
         } else if(item['obj_id'] in player.my_army) {
             var obj = player.my_army[item['obj_id']];
+            obj_spec = gamedata['units'][obj['spec']];
+            obj_level = obj['level']||1;
             var cur_max_hp = army_unit_hp(obj); cur_hp = cur_max_hp[0]; max_hp = cur_max_hp[1];
         }
+
+        dialog.widgets['in_production_icon'].bg_image = get_leveled_quantity(obj_spec['art_asset'], obj_level);
+        dialog.widgets['in_production_icon'].alpha = (obj_spec['cloaked'] ? gamedata['client']['cloaked_opacity'] : 1);
 
         // estimate current HP value
         var progress = 1.0 - (item['finish_time'] - server_time)/(item['finish_time']-item['start_time']);
@@ -28381,27 +28460,37 @@ function update_repair_control(dialog) {
     var kind = null;
     for(var i = 1; i < player.unit_repair_queue.length; i++) {
         var item = player.unit_repair_queue[i];
-        if(!(item['obj_id'] in session.cur_objects.objects)) { continue; }
-        var obj = session.cur_objects.objects[item['obj_id']];
+        var obj_spec, obj_level;
+
+        if(item['obj_id'] in session.cur_objects.objects) {
+            var obj = session.cur_objects.objects[item['obj_id']];
+            obj_spec = obj.spec; obj_level = obj.level;
+        } else if(item['obj_id'] in player.my_army) {
+            var unit = player.my_army[item['obj_id']];
+            obj_spec = gamedata['units'][unit['spec']]; obj_level = unit['level']||1;
+        } else {
+            continue;
+        }
+
         for(var res in gamedata['resources']) {
             if(res in item) {
                 total_res[res] = (total_res[res]||0) + item[res];
             }
         }
-        if(obj.spec['name'] != kind) {
+        if(obj_spec['name'] != kind) {
             // start new box
             box += 1;
             if(box < NBOXES) {
                 counters[box] = 1;
-                kind = obj.spec['name'];
+                kind = obj_spec['name'];
                 dialog.widgets['queue'+box.toString()].show = !player.squads_enabled();
-                dialog.widgets['queue'+box.toString()].bg_image = obj.get_leveled_quantity(obj.spec['art_asset']);
-                dialog.widgets['queue'+box.toString()].alpha = (obj.spec['cloaked'] ? gamedata['client']['cloaked_opacity'] : 1);
+                dialog.widgets['queue'+box.toString()].bg_image = get_leveled_quantity(obj_spec['art_asset'], obj_level);
+                dialog.widgets['queue'+box.toString()].alpha = (obj_spec['cloaked'] ? gamedata['client']['cloaked_opacity'] : 1);
                 dialog.widgets['queue_counter_bg'+box.toString()].show =
                     dialog.widgets['queue_counter'+box.toString()].show = !player.squads_enabled();
                 dialog.widgets['queue_cancel'+box.toString()].show = gamedata['unit_repair_can_cancel'] && !player.squads_enabled();
-                dialog.widgets['queue_cancel'+box.toString()].onclick = (function (id) { return function() {
-                    send_to_server.func(["UNIT_REPAIR_CANCEL", id]);
+                dialog.widgets['queue_cancel'+box.toString()].onclick = (function (_id) { return function() {
+                    send_to_server.func(["UNIT_REPAIR_CANCEL", _id]);
                     unit_repair_sync_marker = synchronizer.request_sync();
                 }; })(item['obj_id']);
             }
@@ -28467,9 +28556,14 @@ function update_repair_control(dialog) {
             if(player.squads_enabled() || ('enable_defending_units' in gamedata && !gamedata['enable_defending_units'])) {
                 spec = gamedata['units'][obj['spec']]; level = obj['level'] || 1; obj_id = obj['obj_id'];
                 var cur_max_hp = army_unit_hp(obj); hp = cur_max_hp[0]; max_hp = cur_max_hp[1];
-                repair_progress = hp / Math.max(max_hp,1); is_under_repair = false;
+                repair_progress = hp / Math.max(max_hp,1);
                 if(player.squads_enabled()) {
+                    is_under_repair = false;
                     allow_repair = false;
+                } else {
+                    is_under_repair = army_unit_is_under_repair(obj['obj_id']);
+                    allow_repair = (hp < max_hp) && !is_under_repair;
+                    if(allow_repair) { any_need_repair = true; }
                 }
             } else {
                 spec = obj.spec; level = obj.level; obj_id = obj.id;
@@ -28505,7 +28599,23 @@ function update_repair_control(dialog) {
                 alpha = 0.75*clamp((client_time - dialog.widgets['grid'+coord].mouse_enter_time)/0.15, 0, 1); // fade in
                 dialog.widgets['grid_repair'+coord].onclick = (function (_obj, _coord) { return function(w) {
                     w.parent.widgets['grid'+_coord].tooltip.onleave();
-                    var cost = _obj.cost_to_repair(player);
+
+                    var cost, tech_alert = null, server_param;
+                    if(player.squads_enabled() || ('enable_defending_units' in gamedata && !gamedata['enable_defending_units'])) {
+                        server_param = _obj['obj_id'];
+                        var curmax = army_unit_hp(_obj);
+                        cost = mobile_cost_to_repair(gamedata['units'][_obj['spec']], _obj['level']||1, curmax[0], curmax[1], player);
+                        if(!player.can_repair_unit_of_spec(gamedata['units'][_obj['spec']], curmax[0])) {
+                            tech_alert = _obj['spec'];
+                        }
+                    } else {
+                        server_param = _obj.id;
+                        cost = _obj.cost_to_repair(player);
+                        if(!player.can_repair_unit(_obj)) {
+                            tech_alert = _obj.spec['name'];
+                        }
+                    }
+
                     var ls = [];
 
                     for(var res in gamedata['resources']) {
@@ -28520,12 +28630,12 @@ function update_repair_control(dialog) {
                         return;
                     }
 
-                    if(!player.can_repair_unit(_obj)) {
-                        var helper = get_requirements_help('tech_for_repair', _obj.spec['name']);
+                    if(tech_alert) {
+                        var helper = get_requirements_help('tech_for_repair', tech_alert);
                         if(helper) { helper(); }
                         return;
                     }
-                    send_to_server.func(["UNIT_REPAIR_QUEUE", _obj.id]);
+                    send_to_server.func(["UNIT_REPAIR_QUEUE", server_param]);
                     unit_repair_sync_marker = synchronizer.request_sync();
                 }; })(obj, coord);
                 dialog.widgets['grid_recycle'+coord].onclick = (function (_obj, _coord) { return function(w) {
@@ -28587,17 +28697,36 @@ function update_repair_control(dialog) {
 
     dialog.widgets['add_all_button'].onclick = function() {
         var to_repair = [];
-        for(var id in session.cur_objects.objects) {
-            var obj = session.cur_objects.objects[id];
 
-            if(obj.team === 'player' && obj.is_mobile() && obj.is_damaged() && !obj.is_under_repair() ) {
-                to_repair.push(obj);
+        if(player.squads_enabled() || ('enable_defending_units' in gamedata && !gamedata['enable_defending_units'])) {
+            for(var id in player.my_army) {
+                var obj = player.my_army[id];
+                var spec = gamedata['units'][obj['spec']]; var level = obj['level'] || 1;  var obj_id = obj['obj_id'];
+                var cur_max_hp = army_unit_hp(obj); hp = cur_max_hp[0]; max_hp = cur_max_hp[1];
+                if(hp < max_hp && !army_unit_is_under_repair(obj_id)) {
+                    to_repair.push(obj);
+                }
+            }
+        } else {
+            for(var id in session.cur_objects.objects) {
+                var obj = session.cur_objects.objects[id];
+                if(obj.team === 'player' && obj.is_mobile() && obj.is_damaged() && !obj.is_under_repair() ) {
+                    to_repair.push(obj);
+                }
             }
         }
 
         // add quickest units first
         var compare_by_reptime = (function(_player) { return function(a, b) {
-            var acost = a.cost_to_repair(_player), bcost = b.cost_to_repair(_player);
+            var acost, bcost;
+            if(player.squads_enabled() || ('enable_defending_units' in gamedata && !gamedata['enable_defending_units'])) {
+                var acurmax = army_unit_hp(a), bcurmax = army_unit_hp(b);
+                acost = mobile_cost_to_repair(gamedata['units'][a['spec']], a['level']||1, acurmax[0], acurmax[1], _player);
+                bcost = mobile_cost_to_repair(gamedata['units'][b['spec']], b['level']||1, bcurmax[0], bcurmax[1], _player);
+            } else {
+                acost = a.cost_to_repair(_player);
+                bcost = b.cost_to_repair(_player);
+            }
             var aq = acost['time'], bq = bcost['time'];
             if(aq > bq) { return 1; }
             if(aq < bq) { return -1; }
@@ -28611,24 +28740,45 @@ function update_repair_control(dialog) {
 
         for(var i = 0; i < to_repair.length; i++) {
             var obj = to_repair[i];
-            if(!player.can_repair_unit(obj)) {
-                tech_alert = obj.spec['name'];
-                continue;
-            }
 
-            var cost = obj.cost_to_repair(player);
-            for(var resname in gamedata['resources']) {
-                total_cost[resname] = (total_cost[resname]||0) + cost[resname];
-                if(player.resource_state[resname][1] < total_cost[resname]) {
-                    enough_res = false; // but keep going
+            if(player.squads_enabled() || ('enable_defending_units' in gamedata && !gamedata['enable_defending_units'])) {
+                var curmax = army_unit_hp(obj);
+                if(!player.can_repair_unit_of_spec(gamedata['units'][obj['spec']], curmax[0])) {
+                    tech_alert = obj['spec'];
+                    continue;
+                }
+                var cost = mobile_cost_to_repair(gamedata['units'][obj['spec']], obj['level']||1, curmax[0], curmax[1], player);
+                for(var resname in gamedata['resources']) {
+                    total_cost[resname] = (total_cost[resname]||0) + cost[resname];
+                    if(player.resource_state[resname][1] < total_cost[resname]) {
+                        enough_res = false; // but keep going
+                    }
+                }
+
+                if(enough_res) {
+                    send_to_server.func(["UNIT_REPAIR_QUEUE", obj['obj_id']]);
+                }
+            } else {
+                if(!player.can_repair_unit(obj)) {
+                    tech_alert = obj.spec['name'];
+                    continue;
+                }
+
+                var cost = obj.cost_to_repair(player);
+                for(var resname in gamedata['resources']) {
+                    total_cost[resname] = (total_cost[resname]||0) + cost[resname];
+                    if(player.resource_state[resname][1] < total_cost[resname]) {
+                        enough_res = false; // but keep going
+                    }
+                }
+
+                if(enough_res) {
+                    send_to_server.func(["UNIT_REPAIR_QUEUE", obj.id]);
                 }
             }
-
-            if(enough_res) {
-                send_to_server.func(["UNIT_REPAIR_QUEUE", obj.id]);
-                unit_repair_sync_marker = synchronizer.request_sync();
-            }
         }
+
+        unit_repair_sync_marker = synchronizer.request_sync();
 
         if(!enough_res) {
             invoke_insufficient_resources_for_repair_message(total_cost);
@@ -28641,7 +28791,12 @@ function update_repair_control(dialog) {
     // res/time display at bottom
     for(var res in gamedata['resources']) {
         if('requirements_'+res+'_value' in dialog.widgets) {
-            dialog.widgets['requirements_'+res+'_value'].str = pretty_print_number(total_res[res] || 0);
+            var amount = total_res[res] || 0;
+            dialog.widgets['requirements_'+res+'_value'].show =
+                dialog.widgets['requirements_'+res+'_icon'].show = (amount > 0);
+            if(amount > 0) {
+                dialog.widgets['requirements_'+res+'_value'].str = pretty_print_number(amount);
+            }
         }
     }
 
@@ -29584,13 +29739,19 @@ function update_manufacture_dialog(dialog) {
         }
 
         var cost_space = get_leveled_quantity(spec['consumes_space'], level);
-        dialog.widgets['requirements_space_value'].str = pretty_print_number(cost_space);
-        dialog.widgets['requirements_space_value'].tooltip.str = dialog.data['widgets']['requirements_space_value']['ui_tooltip'].replace('%TOTAL_SPACE_BUILDING', gamedata['buildings'][total_space_building()]['ui_name']);
-        dialog.widgets['requirements_space_value'].text_color = (available_space >= cost_space ? SPUI.good_text_color : SPUI.error_text_color);
-        if(available_space < cost_space) {
-            var helper = get_requirements_help('unit_space', cost_space - available_space);
-            dialog.widgets['resource_space_button'].show = !!helper;
-            dialog.widgets['resource_space_button'].onclick = helper;
+        dialog.widgets['requirements_space_value'].show =
+            dialog.widgets['requirements_space_icon'].show = (cost_space > 0);
+        if(cost_space > 0) {
+            dialog.widgets['requirements_space_value'].str = pretty_print_number(cost_space);
+            dialog.widgets['requirements_space_value'].tooltip.str = dialog.data['widgets']['requirements_space_value']['ui_tooltip'].replace('%TOTAL_SPACE_BUILDING', gamedata['buildings'][total_space_building()]['ui_name']);
+            dialog.widgets['requirements_space_value'].text_color = (available_space >= cost_space ? SPUI.good_text_color : SPUI.error_text_color);
+            if(available_space < cost_space) {
+                var helper = get_requirements_help('unit_space', cost_space - available_space);
+                dialog.widgets['resource_space_button'].show = !!helper;
+                dialog.widgets['resource_space_button'].onclick = helper;
+            } else {
+                dialog.widgets['resource_space_button'].show = false;
+            }
         } else {
             dialog.widgets['resource_space_button'].show = false;
         }
@@ -39577,7 +39738,7 @@ Store.get_base_price = function(unit_id, spell, spellarg, ignore_error) {
             // note: ignore repair queue, but sum unit times before applying formula
             var total_rep_time = 0;
 
-            if(player.squads_enabled()) {
+            if(player.squads_enabled() || ('enable_defending_units' in gamedata && !gamedata['enable_defending_units'])) {
                 goog.object.forEach(player.my_army, function(obj) {
                     var squad_id = obj['squad_id'] || 0;
 
