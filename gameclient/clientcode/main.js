@@ -32,6 +32,7 @@ goog.require('SPText');
 goog.require('SPHTTP');
 goog.require('SPFX');
 goog.require('SPFB');
+goog.require('FBShare');
 goog.require('FBInviteFriends');
 goog.require('FBSendRequests');
 goog.require('SPay');
@@ -5110,6 +5111,7 @@ function enable_muffins() {
     player.enable_muffins = !player.enable_muffins;
 };
 
+/** @return {boolean} */
 player.is_developer = function() { return player.developer; };
 
 player.has_facebook_permissions = function(scope) {
@@ -14435,12 +14437,6 @@ function invoke_gift_received_dialog(fbid, userid, name, loot) {
 function invoke_say_thanks(recipient_fb_id, recipient_user_id, recipient_fb_name, loot) {
     var viral = get_facebook_viral('say_thanks');
     if(!viral) { return; }
-    if(!spin_facebook_enabled) { console.log('invoke_say_thanks'); return; }
-    call_with_facebook_permissions('publish_actions', (function (_viral, _recipient_fb_id, _recipient_user_id, _recipient_fb_name, _loot) {
-        return function() { invoke_say_thanks_with_permissions(_viral, _recipient_fb_id, _recipient_user_id, _recipient_fb_name, _loot); }; })(viral, recipient_fb_id, recipient_user_id, recipient_fb_name, loot));
-}
-
-function invoke_say_thanks_with_permissions(viral, recipient_fb_id, recipient_user_id, recipient_fb_name, loot) {
     var loot_text = '';
     for(var res in gamedata['resources']) {
         if((res in loot) && loot[res] > 0) {
@@ -14451,45 +14447,12 @@ function invoke_say_thanks_with_permissions(viral, recipient_fb_id, recipient_us
         loot_text += viral['ui_generic_loot'];
     }
 
-    var cb = (function (_recipient_user_id, _recipient_fb_id, _loot_text) { return function(response) {
-        if(!response) {
-            // user cancelled
-            return true;
-        }
-        if('post_id' in response) {
-            if(LOTS_OF_METRICS) {
-                metric_event('4090_say_thanks_post_completed',
-                             {'recipient_fb_id':_recipient_fb_id,
-                              'recipient_user_id':_recipient_user_id,
-                              'facebook_post_id':response['post_id']});
-            }
-            if(gamedata['enable_fb_open_graph'] &&
-               (!gamedata['fb_open_graph']['developer_only'] || player.is_developer()) &&
-               gamedata['fb_open_graph']['thank']['enable']) {
-                SPFB.api('/me/'+spin_app_namespace+':thank', 'post', {'profile': _recipient_fb_id, 'loot': _loot_text}); // say thanks
-            }
-        }
-        return true;
-    }; })(recipient_user_id, recipient_fb_id, loot_text);
-
-    if(LOTS_OF_METRICS) {
-        metric_event('4080_say_thanks_post_attempted', {'recipient_fb_id':recipient_fb_id, 'recipient_user_id':recipient_user_id});
-    }
-
-    var link_url = 'http://apps.facebook.com/'+spin_app_namespace+'/';
-    // add acquisition tracking info
-    link_url += '?spin_ref=feed_thanks&spin_ref_user_id='+session.user_id.toString()+'&spin_gift_id=1111'; // XXX
-
-    SPFB.ui({'method':'feed', // say thanks
-             'message':viral['ui_post_message'].replace('%THANKEE', recipient_fb_name),
-             'name':viral['ui_post_headline'].replace('%LOOT', loot_text),
-             //'caption':viral['ui_post_text'].replace('%THANKEE', recipient_fb_name), // obsolete
-             'description':gamedata['virals']['ui_post_description'],
-             'link':link_url,
-             'picture': gamedata['virals']['common_image_path'] + (('image' in viral) ? viral['image'] : gamedata['virals']['default_image']),
-             'ref':'feed_thanks',
-             'show_error': !spin_secure_mode
-            }, cb);
+    FBShare.invoke({link: 'http://apps.facebook.com/'+spin_app_namespace+'/?spin_ref=feed_thanks&spin_ref_user_id='+session.user_id.toString()+'&spin_gift_id=1111',
+                    message:viral['ui_post_message'].replace('%THANKEE', recipient_fb_name),
+                    name:viral['ui_post_headline'].replace('%LOOT', loot_text),
+                    description:gamedata['virals']['ui_post_description'],
+                    picture: gamedata['virals']['common_image_path'] + (('image' in viral) ? viral['image'] : gamedata['virals']['default_image']),
+                    ref:'feed_thanks'});
 };
 
 function invoke_invite_friends_dialog(reason) {
@@ -14717,12 +14680,6 @@ function get_facebook_viral(vname) {
 function invoke_facebook_viral(vname, props) {
     var viral = get_facebook_viral(vname);
     if(!viral) { return; }
-    if(!spin_facebook_enabled) { console.log('invoke_facebook_viral: '+vname); return; }
-    call_with_facebook_permissions('publish_actions', (function (_vname, _viral, _props) { return function() { invoke_facebook_viral_with_permissions(_vname, _viral, _props); }; })(vname, viral, props));
-};
-
-function invoke_facebook_viral_with_permissions(vname, viral, props) {
-    metric_event('7270_feed_post_attempted', {'method':vname});
 
     var link_url = 'http://apps.facebook.com/'+spin_app_namespace+'/';
 
@@ -14734,80 +14691,24 @@ function invoke_facebook_viral_with_permissions(vname, viral, props) {
     var post_headline = viral_string_subst(viral['ui_post_headline'], props);
     var post_text = viral_string_subst(viral['ui_post_text'], props);
 
-    var params = {'method':'feed',
-                  'name': post_headline,
-                  //'caption': post_text, // obsolete
-                  'link': link_url,
-                  'description': viral_string_subst(gamedata['virals']['ui_post_description'], props),
-                  'picture': gamedata['virals']['common_image_path'] + (('image' in viral) ? viral['image'] : gamedata['virals']['default_image']),
-                  'ref': 'sp_game_viral', // can't use full ref_type here, there's a 15-char limit
-                  'show_error': !spin_secure_mode
-                 };
-
-    if(!spin_facebook_enabled) { console.log('FACEBOOK FEED POST: '); console.log(params); return; }
-
-    var cb = (function (_vname) { return function(response) {
-        if(!response) {
-            // user cancelled
-            return true;
-        }
-        if('post_id' in response) {
-            metric_event('7271_feed_post_completed',
-                         {'method': _vname,
-                          'facebook_post_id':response['post_id']});
-            player.record_client_history('virals_sent', 1);
-            player.record_client_history('viral:'+_vname+':sent', 1);
-        }
-        return true;
-    }; })(vname);
-
-    SPFB.ui(params, cb); // generic viral
+    FBShare.invoke({name: post_headline,
+                    link: link_url,
+                    description: viral_string_subst(gamedata['virals']['ui_post_description'], props),
+                    picture: gamedata['virals']['common_image_path'] + (('image' in viral) ? viral['image'] : gamedata['virals']['default_image']),
+                    'ref': 'sp_game_viral' // can't use full ref_type here, there's a 15-char limit
+                   });
 }
 
 function invoke_leaderboard_brag(rank, pct, ui_reason) {
     var viral = get_facebook_viral('leaderboard_brag');
     if(!viral) { return; }
-    if(!spin_facebook_enabled) { console.log('invoke_leaderboard_brag: '+ui_reason); return; }
-    call_with_facebook_permissions('publish_actions', (function (_viral, _rank, _pct, _ui_reason) { return function() { invoke_leaderboard_brag_with_permissions(_viral, _rank, _pct, _ui_reason); }; })(viral, rank, pct, ui_reason));
-}
-
-function invoke_leaderboard_brag_with_permissions(viral, rank, pct, ui_reason) {
-    var cb = (function () { return function(response) {
-        if(!response) {
-            // user cancelled
-            return true;
-        }
-        if('post_id' in response) {
-            metric_event('7230_leaderboard_brag_post_completed',
-                         {'facebook_post_id':response['post_id']});
-        }
-        return true;
-    }; })();
-
-    metric_event('7220_leaderboard_brag_post_attempted', {});
 
     var ui_rank = percentile_ui_status(rank+1, pct, true);
-    var link_url = 'http://apps.facebook.com/'+spin_app_namespace+'/';
-    // add acquisition tracking info
-    link_url += '?spin_ref=feed_leaderboard_brag&spin_ref_user_id='+session.user_id.toString();
 
-    var props = {'method':'feed',
-                 'name':viral['ui_post_headline'].replace('%PLAYER',player.facebook_name).replace('%RANK',ui_rank).replace('%REASON',ui_reason),
-                 'link':link_url,
-                 // needs to be permanent because it goes on FB feeds
-                 'picture': gamedata['virals']['common_image_path'] + (('image' in viral) ? viral['image'] : gamedata['virals']['default_image']),
-                 'ref':'leaderboard',
-                 'show_error': !spin_secure_mode
-                };
-
-    // do not show "superior to 100.0%" if rank is not actually #1
-    if(rank != 0) {
-        pct = Math.min(pct, 0.999);
-    }
-    var superior_to = (100.0*pct).toFixed(1);
-    // props['caption'] = viral['ui_post_text'].replace('%PCT',superior_to); // obsolete
-
-    SPFB.ui(props, cb); // leaderboard brag
+    FBShare.invoke({name: viral['ui_post_headline'].replace('%PLAYER',player.facebook_name).replace('%RANK',ui_rank).replace('%REASON',ui_reason),
+                    link: 'http://apps.facebook.com/'+spin_app_namespace+'/?spin_ref=feed_leaderboard_brag&spin_ref_user_id='+session.user_id.toString(),
+                    picture: gamedata['virals']['common_image_path'] + (('image' in viral) ? viral['image'] : gamedata['virals']['default_image']),
+                    ref: 'leaderboard'});
 }
 
 function invoke_facebook_message_dialog(recipient_fbid, recipient_uid) {
@@ -23905,7 +23806,7 @@ function player_info_statistics_tab_receive(dialog, data, status_code, query_gen
 }
 
 function player_info_statistics_tab_setup_share_button(dialog) {
-    if(spin_frame_platform != 'fb' ||
+    if(spin_frame_platform != 'fb' || !gamedata['virals']['stats_share'] ||
        !player.get_any_abtest_value('enable_player_info_statistics_share_button',
                                     gamedata['client']['enable_player_info_statistics_share_button'])) {
         return;
@@ -23913,32 +23814,17 @@ function player_info_statistics_tab_setup_share_button(dialog) {
     dialog.widgets['share_button'].show = true;
     dialog.widgets['share_button'].onclick = function(w) {
         var dialog = w.parent;
+        var viral = gamedata['virals']['stats_share'];
         var val = {'user_id': dialog.user_data['user_id'],
                    'preselect': {'time': [dialog.user_data['time_displayed'] == -1 ? 'ALL' : dialog.user_data['time_scope'],
                                           dialog.user_data['time_displayed']]}};
         var url = 'https://apps.facebook.com/'+spin_app_namespace+'/';
         url += '?spin_campaign=feed_stats_share&spin_ref=feed_stats_share&spin_ref_user_id='+session.user_id.toString();
         url += '&player_info_statistics='+encodeURIComponent(JSON.stringify(val));
-        if(!spin_facebook_enabled) { console.log('player_info_statistics_tab_share_button: '+url); return; }
-
-        call_with_facebook_permissions('publish_actions', (function (_url) { return function() {
-            var viral = gamedata['virals']['stats_share'];
-            var props = {'method':'feed',
-                         'name':viral['ui_post_headline'],
-                         'link':_url,
-                         'picture': gamedata['virals']['common_image_path'] + gamedata['virals']['default_image'],
-                         'ref':'stats_share', // 15-char limit
-                         'show_error': !spin_secure_mode
-                        };
-            metric_event('7270_feed_post_attempted', {'method':'stats_share'});
-
-            SPFB.ui(props, function(response) { // statistics share
-                if(!response) { return; } // cancelled
-                if('post_id' in response) {
-                   metric_event('7271_feed_post_completed', {'method':'stats_share', 'facebook_post_id':response['post_id']});
-                } });
-
-        }; }(url)));
+        FBShare.invoke({link: url,
+                        name:viral['ui_post_headline'],
+                        ref:'stats_share', // 15-char limit
+                       });
     };
 }
 
@@ -24295,28 +24181,6 @@ function call_with_facebook_permissions(scope, cb) {
 function invoke_achievement_brag(ach) {
     var viral = get_facebook_viral('achievement_brag');
     if(!viral) { return; }
-    if(!spin_facebook_enabled) { console.log('invoke_achievement_brag: '+ach['name']); return; }
-    call_with_facebook_permissions('publish_actions', (function (_ach, _viral) { return function() { invoke_achievement_brag_with_permissions(_ach, _viral); }; })(ach, viral));
-}
-
-function invoke_achievement_brag_with_permissions(ach, viral) {
-    var cb = (function () { return function(response) {
-        if(!response) {
-            // user cancelled
-            return true;
-        }
-        if('post_id' in response) {
-            metric_event('7290_achievement_brag_post_completed',
-                         {'facebook_post_id':response['post_id']});
-        }
-        return true;
-    }; })();
-
-    metric_event('7280_achievement_brag_post_attempted', {'name': ach['name']});
-
-    var link_url = 'http://apps.facebook.com/'+spin_app_namespace+'/';
-    // add acquisition tracking info
-    link_url += '?spin_ref=achievement_brag&spin_ref_user_id='+session.user_id.toString();
 
     var picture_url;
     if(('fb_open_graph' in ach) && ('s3_image' in ach['fb_open_graph'])) {
@@ -24325,17 +24189,10 @@ function invoke_achievement_brag_with_permissions(ach, viral) {
         picture_url = gamedata['virals']['common_image_path'] + (('image' in viral) ? viral['image'] : gamedata['virals']['default_image']);
     }
 
-    var props = {'method':'feed',
-                 'name':viral['ui_post_headline'].replace('%PLAYER',player.facebook_name).replace('%ACHIEVEMENT',ach['ui_name']),
-                 'link':link_url,
-                 'picture': picture_url,
-                 'ref':'cheeve',
-                 'show_error': !spin_secure_mode
-                };
-
-    // props['caption'] = ach['ui_description']; // obsolete
-
-    SPFB.ui(props, cb); // achievement brag
+    FBShare.invoke({name: viral['ui_post_headline'].replace('%PLAYER',player.facebook_name).replace('%ACHIEVEMENT',ach['ui_name']),
+                    link: 'http://apps.facebook.com/'+spin_app_namespace+'/?spin_ref=cheeve&spin_ref_user_id='+session.user_id.toString(),
+                    picture: picture_url,
+                    ref:'cheeve'});
 }
 
 function animate_notify_achievements(dialog) {

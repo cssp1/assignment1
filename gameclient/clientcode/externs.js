@@ -40,12 +40,14 @@ var spin_session_id;
 var spin_session_time;
 var spin_session_signature;
 var spin_session_data;
+/** @type {boolean} */
 var spin_secure_mode;
 var spin_kissmetrics_enabled;
 var spin_frame_platform;
 var spin_social_id;
 var spin_kongregate_enabled;
 var spin_kongregate_user;
+/** @type {boolean} */
 var spin_facebook_enabled;
 var spin_facebook_user;
 var spin_facebook_signed_request;
