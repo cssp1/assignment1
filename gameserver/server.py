@@ -13138,7 +13138,7 @@ class Store:
         session_id = str(order_info['session_id'])
         session = session_table[session_id]
         assert (not session.logout_in_progress)
-        unit_id = int(order_info['unit_id'])
+        unit_id = order_info['unit_id']
         spellname = order_info['spellname']
         spellarg = order_info.get('spellarg', None)
         client_price = order_info['client_price']
@@ -13222,7 +13222,7 @@ class Store:
                     session = s
                     break
             if session is None: raise Exception(('session not found for in-app currency order! (FB buyer %s)' % buyer)+repr(my_data))
-            unit_id = 0
+            unit_id = GameObject.VIRTUAL_ID
             spellname = 'FB_PROMO_GAMEBUCKS'
             spellarg = m['product_amount']
             network_id = session.user.facebook_id
@@ -13233,7 +13233,7 @@ class Store:
             assert currency == 'gamebucks'
             assert my_data['currency_url'] == str(OGPAPI_instance.get_object_endpoint({'type':OGPAPI.object_type('gamebucks')}))
             session = session_table[my_data['session_id']]
-            unit_id = 0
+            unit_id = GameObject.VIRTUAL_ID
             spellname = 'FB_TRIALPAY_GAMEBUCKS'
             spellarg = credits_amount
             network_id = session.user.facebook_id
@@ -13953,7 +13953,7 @@ class CREDITAPI(resource.Resource):
 
             # shouldn't depend on these
             user_id = session.user.user_id if session else 0
-            unit_id = 0
+            unit_id = GameObject.VIRTUAL_ID
             spellarg = None
 
             price_description = []
@@ -19428,7 +19428,7 @@ class GAMEAPI(resource.Resource):
                                 payment_data = { 'id': payment_id,
                                                  'request_id': request_id,
                                                  'synthesized': 1,
-                                                 'unit_id': 0,
+                                                 'unit_id': GameObject.VIRTUAL_ID,
                                                  'spellname': spellname,
                                                  'spellarg': spellarg,
                                                  'client_price': client_price, 'client_currency': client_currency,

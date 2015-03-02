@@ -39640,7 +39640,7 @@ Store.get_base_price = function(unit_id, spell, spellarg, ignore_error) {
 
     } else if(formula === 'upgrade' || formula === 'research' || formula === 'craft_gamebucks') {
         var unit = null;
-        if(unit_id == 0 && player.is_cheater && formula === 'research') {
+        if(unit_id == GameObject.VIRTUAL_ID && player.is_cheater && formula === 'research') {
 
         } else {
             unit = session.cur_objects.objects[unit_id];
@@ -40064,7 +40064,7 @@ Store.place_fbcredits_order = function(price, unit_id, spellname, spellarg, on_f
     if(spellarg) {
         descr += ','+spellarg;
     }
-    if(unit_id) {
+    if(unit_id && unit_id != GameObject.VIRTUAL_ID) {
         var object = session.cur_objects.objects[unit_id];
         descr += ','+object.spec['name'];
     }
@@ -40185,7 +40185,7 @@ Store.place_kgcredits_order = function(price, unit_id, spellname, spellarg, on_f
     if(spellarg) {
         descr += ','+spellarg;
     }
-    if(unit_id) {
+    if(unit_id && unit_id != GameObject.VIRTUAL_ID) {
         var object = session.cur_objects.objects[unit_id];
         descr += ','+object.spec['name'];
     }
