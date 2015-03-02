@@ -12015,9 +12015,9 @@ class OGPAPI(resource.Resource):
                 #my_ui_description = 'For '+category
 
             elif type == OGPAPI.object_type('literal'):
-                my_ui_name = str(request.args['ui_name'][0])
+                my_ui_name = request.args['ui_name'][0].decode('utf-8')
                 if ('ui_description' in request.args):
-                    my_ui_description = str(request.args['ui_description'][0])
+                    my_ui_description = request.args['ui_description'][0].decode('utf-8')
                 else:
                     my_ui_description = SpinConfig.config['proxyserver'].get('fbexternalhit_description', '')
                 my_spin_ref = str(request.args['spin_ref'][0])
@@ -12037,12 +12037,12 @@ class OGPAPI(resource.Resource):
             ret += '<meta property="og:type"   content="%s" />\n' % (my_og_type if my_og_type else '%s:%s' % (ns, type))
             #ret += '<meta property="og:url"    content="http://apps.facebook.com/%s?spin_campaign=open_graph" />\n' % (SpinConfig.config['facebook_app_namespace'])
             ret += '<meta property="og:url"    content="%s" />\n' % my_url
-            ret += '<meta property="og:title"  content="%s" />\n' % my_ui_name
+            ret += u'<meta property="og:title"  content="'+my_ui_name+u'" />\n'
 
             if my_ui_description:
-                ret += '<meta property="og:description"  content="%s" />\n' % my_ui_description
+                ret += u'<meta property="og:description"  content="'+my_ui_description+u'" />\n'
             if my_ui_determiner is not None:
-                ret += '<meta property="og:determiner"  content="%s" />\n' % my_ui_determiner
+                ret += u'<meta property="og:determiner"  content="'+my_ui_determiner+u'" />\n'
 
             if not image_url:
                 # add image file, either from in-game art asset (200x200px minimum!),
@@ -12081,7 +12081,7 @@ class OGPAPI(resource.Resource):
                 game_qs += '&'+urllib.urlencode(my_spin_link_qs)
             ret += '</head>\n<body onload="top.location.href = \'//apps.facebook.com/%s/?%s\';"></body>\n</html>' % \
                    (SpinConfig.config['facebook_app_namespace'], game_qs)
-            return str(ret)
+            return ret.encode('utf-8')
 
         except Exception:
             gamesite.exception_log.event(server_time, 'OGPAPI Exception: '+traceback.format_exc()+'while handling request '+repr(request)+' args '+repr(request.args))
