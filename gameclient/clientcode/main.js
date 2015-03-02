@@ -16403,6 +16403,8 @@ function invoke_child_speedup_dialog(kind) {
 // (for the error you get when attempting an action that requires the
 // foreman to be free, and the foreman isn't free)
 function do_invoke_speedup_dialog(kind) {
+    if(!selection.unit) { throw Error('nothing selected'); }
+
     var dialog_data = gamedata['dialogs']['speedup_dialog'];
     var dialog = new SPUI.Dialog(dialog_data);
     dialog.user_data['dialog'] = 'speedup_dialog';
@@ -28407,6 +28409,7 @@ function update_repair_control(dialog) {
         if(item['obj_id'] in session.cur_objects.objects) {
             var obj = session.cur_objects.objects[item['obj_id']];
             obj_spec = obj.spec;
+            if(!obj_spec) { throw Error('bad obj.spec in cur_objects for '+item['obj_id']); }
             obj_level = obj.level;
             dialog.widgets['in_production_time'].str = pretty_print_time(item['finish_time'] - server_time);
             dialog.widgets['in_production_cancel'].onclick = (function (id) { return function() {
@@ -28417,6 +28420,7 @@ function update_repair_control(dialog) {
         } else if(item['obj_id'] in player.my_army) {
             var obj = player.my_army[item['obj_id']];
             obj_spec = gamedata['units'][obj['spec']];
+            if(!obj_spec) { throw Error('bad obj.spec in my_army for '+item['obj_id']); }
             obj_level = obj['level']||1;
             var cur_max_hp = army_unit_hp(obj); cur_hp = cur_max_hp[0]; max_hp = cur_max_hp[1];
         }
@@ -43996,7 +44000,7 @@ function do_on_mouseup(e) {
 
     var found = find_object_at_screen_pixel(xy, ji, false);
 
-    if(selection.spellname === "AMOVE_UNIT" || selection.spellname === "PATROL_UNIT") {
+    if(selection.unit && (selection.spellname === "AMOVE_UNIT" || selection.spellname === "PATROL_UNIT")) {
         if(selection.spellname === "AMOVE_UNIT") {
             player.record_feature_use('unit_attack_command');
             var add_waypoint = !!e.shiftKey;
