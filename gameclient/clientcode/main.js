@@ -42652,8 +42652,13 @@ function handle_server_message(data) {
                         req['cur_space'] = req['max_space'];
                         var node = req['node'];
                         if(node) {
-                            var text = SPText.cstring_to_ablocks_bbcode(gamedata['strings']['unit_donation_chat']['other']['stale'].replace('%recipient',req['recipient_name']));
-                            tab.widgets['output'].revise_text(node, text);
+                            var new_template = gamedata['strings']['unit_donation_chat']['other']['stale'];
+                            if(new_template) {
+                                var text = SPText.cstring_to_ablocks_bbcode(new_template.replace('%recipient',req['recipient_name']));
+                                tab.widgets['output'].revise_text(node, text);
+                            } else {
+                                tab.widgets['output'].remove_text(node); // the destroy() callback will remove it from tab.user_data['unit_donation_requests']
+                            }
                         }
                     }
                 }

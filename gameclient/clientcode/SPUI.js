@@ -3271,6 +3271,13 @@ SPUI.ScrollingTextField.prototype.revise_text = function(node, text) {
     this.update_text();
     return node;
 };
+SPUI.ScrollingTextField.prototype.remove_text = function(node) {
+    if(!node.prev || !node.next) { throw Error('remove_text on bad node '+node.toString()); }
+    node.prev.next = node.next;
+    node.next.prev = node.prev;
+    node.destroy();
+    this.update_text();
+};
 SPUI.ScrollingTextField.prototype.revise_all_text = function(mutator) {
     for(var node = this.head.next; node != this.head; node = node.next) {
         node.text = mutator(node.text, node.user_data);
