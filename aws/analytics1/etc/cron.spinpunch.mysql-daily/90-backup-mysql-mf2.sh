@@ -21,7 +21,7 @@ if [[ $? != 0 ]]; then
     exit $?
 fi
 
-/usr/bin/env aws s3 cp --quiet "${SAVE_DIR}/${TARFILE}" "s3://${S3_PATH}/${TARFILE}" 
+/usr/bin/env aws s3 cp --quiet "${SAVE_DIR}/${TARFILE}" "s3://${S3_PATH}/${TARFILE}"
 if [[ $? != 0 ]]; then
     echo "S3 upload error!"
     ERROR=1

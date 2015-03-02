@@ -2251,8 +2251,8 @@
             "resource_res3_button": { "show": 0, "kind": "ActionButton", "xy": [578,162], "dimensions": [22,20], "bg_image": "resource_bar_add_button" },
             "requirements_res3_icon": { "show": 0, "kind": "StaticImage", "xy": [608,161], "dimensions": [21,21], "asset": "resource_icon_res3" },
             "requirements_res3_value": { "show": 0, "kind": "TextField", "xy": [639,161], "dimensions": [53,21], "text_size": 13, "text_hjustify": "left", "ui_name": "xxx,xxx,xxx",
-                                          "ui_tooltip": "%RES required to %VERB this unit", "tooltip_delay": 0, "fixed_tooltip_offset": [524, 193]
-                                        },
+                                         "ui_tooltip": "%RES required to %VERB this unit", "tooltip_delay": 0, "fixed_tooltip_offset": [524, 193]
+                                       },
 
             "resource_space_button": { "kind": "ActionButton", "xy": [578,187], "dimensions": [22,20], "bg_image": "resource_bar_add_button", "show": 0 },
             "requirements_space_icon": { "kind": "StaticImage", "xy": [608,186], "dimensions": [21,21], "asset": "resource_icon_cpu" },
