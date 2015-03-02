@@ -11866,10 +11866,11 @@ class OGPAPI(resource.Resource):
 
     @classmethod
     def object_type(cls, name):
-         if name == 'gamebucks' and SpinConfig.game() == 'mf':
-              # backwards-compatibility hack
-              name = 'alloy'
-         return SpinConfig.game()+'_'+name
+        if name == 'literal': return name
+        if name == 'gamebucks' and SpinConfig.game() == 'mf':
+            # backwards-compatibility hack
+            name = 'alloy'
+        return SpinConfig.game()+'_'+name
 
     def get_object_endpoint(self, params, override_host = None):
         port = SpinConfig.config['proxyserver']['external_http_port']
@@ -11891,10 +11892,13 @@ class OGPAPI(resource.Resource):
             # image_url > art_asset_file > art_asset_s3
             image_url = None
             art_asset_file = None
-            art_asset_s3 = 'blaster_painting_big.jpg'
+            art_asset_s3 = None
             my_extra_prefix = ''
             my_og_type = None
             my_url = None
+            my_spin_ref = None
+            my_spin_ref_user_id = None
+            my_spin_link_qs = None
             my_ui_name = None
             my_ui_description = None
             my_ui_determiner = None
@@ -12010,6 +12014,20 @@ class OGPAPI(resource.Resource):
                 my_url = self.get_object_endpoint(dict([(key, val[0]) for key, val in request.args.iteritems()]))
                 #my_ui_description = 'For '+category
 
+            elif type == OGPAPI.object_type('literal'):
+                my_ui_name = str(request.args['ui_name'][0])
+                if ('ui_description' in request.args):
+                    my_ui_description = str(request.args['ui_description'][0])
+                else:
+                    my_ui_description = SpinConfig.config['proxyserver'].get('fbexternalhit_description', '')
+                my_spin_ref = str(request.args['spin_ref'][0])
+                if ('spin_ref_user_id' in request.args):
+                    my_spin_ref_user_id = str(request.args['spin_ref_user_id'][0])
+                if ('spin_link_qs' in request.args):
+                    my_spin_link_qs = SpinJSON.loads(request.args['spin_link_qs'][0])
+                    assert my_spin_link_qs.__class__ is dict
+                my_url = self.get_object_endpoint(dict([(key, val[0]) for key, val in request.args.iteritems()]))
+
             else:
                 raise Exception('unknown type "%s"' % type)
 
@@ -12020,6 +12038,7 @@ class OGPAPI(resource.Resource):
             #ret += '<meta property="og:url"    content="http://apps.facebook.com/%s?spin_campaign=open_graph" />\n' % (SpinConfig.config['facebook_app_namespace'])
             ret += '<meta property="og:url"    content="%s" />\n' % my_url
             ret += '<meta property="og:title"  content="%s" />\n' % my_ui_name
+
             if my_ui_description:
                 ret += '<meta property="og:description"  content="%s" />\n' % my_ui_description
             if my_ui_determiner is not None:
@@ -12028,7 +12047,10 @@ class OGPAPI(resource.Resource):
             if not image_url:
                 # add image file, either from in-game art asset (200x200px minimum!),
                 # or use a generic default Mars Frontier image if none is specified
-                if art_asset_file:
+
+                if ('image_url' in request.args): # allow client-provided fallback
+                    image_url = str(request.args['image_url'][0])
+                elif art_asset_file:
                     if 'art_cdn_path' in SpinConfig.config['proxyserver']:
                         art_server = SpinConfig.config['proxyserver']['art_cdn_path']
                     else:
@@ -12036,9 +12058,10 @@ class OGPAPI(resource.Resource):
                         art_server = '%s:%d/' %  (SpinConfig.config['proxyserver'].get('external_host', gamesite.config.game_host),
                                                   SpinConfig.config['proxyserver']['external_http_port'])
                     image_url = 'http://%s%s' % (art_server, art_asset_file)
-                else:
-                    assert art_asset_s3
+                elif art_asset_s3:
                     image_url = 'http://s3.amazonaws.com/'+gamedata['public_s3_bucket']+'/facebook_assets/%s' % art_asset_s3
+                else:
+                    image_url = SpinConfig.config['proxyserver'].get('fbexternalhit_image', '')
 
             ret += '<meta property="og:image"  content="%s" />\n' % image_url
 
@@ -12047,9 +12070,17 @@ class OGPAPI(resource.Resource):
             for key, val in extra_raw_props:
                 ret += '<meta property="%s"  content="%s" />\n' % (key, str(val))
 
+            if not my_spin_ref:
+                my_spin_ref = 'open_graph_'+type
+
             # add JavaScript code to redirect end-user browser hits (not Facebook back-end Open Graph hits) to the game
-            ret += '</head>\n<body onload="top.location.href = \'//apps.facebook.com/%s/?spin_campaign=open_graph_%s\';"></body>\n</html>' % \
-                   (SpinConfig.config['facebook_app_namespace'], type)
+            game_qs = 'spin_ref='+my_spin_ref
+            if my_spin_ref_user_id:
+                game_qs += '&spin_ref_user_id='+my_spin_ref_user_id
+            if my_spin_link_qs:
+                game_qs += '&'+urllib.urlencode(my_spin_link_qs)
+            ret += '</head>\n<body onload="top.location.href = \'//apps.facebook.com/%s/?%s\';"></body>\n</html>' % \
+                   (SpinConfig.config['facebook_app_namespace'], game_qs)
             return str(ret)
 
         except Exception:

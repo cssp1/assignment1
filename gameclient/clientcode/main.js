@@ -8098,6 +8098,20 @@ function proxy_gameapi_url() {
     return spin_server_protocol+spin_server_host+":"+spin_server_port+"/GAMEAPI";
 }
 
+/** Construct a URL to the server's OGPAPI (Open Graph endpoint)
+    @param {Object.<string,string>} props - properties to attach. Only "type" is required.
+    @return {string} */
+function ogpapi_url(props) {
+    var proxyserver = spin_server_host+(parseInt(spin_server_http_port,10)!=80 ? ':'+spin_server_http_port : '');
+    var url = 'http://'+proxyserver+'/OGPAPI';
+    var i = 0;
+    for(var k in props) {
+        url += (i == 0 ? '?' : '&') + k + '=' + encodeURIComponent(props[k]);
+        i += 1;
+    }
+    return url;
+}
+
 function send_proxy_keepalive() {
     console.log('send_proxy_keepalive()');
     var resp = function(event) {
@@ -14447,8 +14461,7 @@ function invoke_say_thanks(recipient_fb_id, recipient_user_id, recipient_fb_name
         loot_text += viral['ui_generic_loot'];
     }
 
-    FBShare.invoke({link: 'http://apps.facebook.com/'+spin_app_namespace+'/?spin_ref=feed_thanks&spin_ref_user_id='+session.user_id.toString()+'&spin_gift_id=1111',
-                    message:viral['ui_post_message'].replace('%THANKEE', recipient_fb_name),
+    FBShare.invoke({message:viral['ui_post_message'].replace('%THANKEE', recipient_fb_name),
                     name:viral['ui_post_headline'].replace('%LOOT', loot_text),
                     description:gamedata['virals']['ui_post_description'],
                     picture: gamedata['virals']['common_image_path'] + (('image' in viral) ? viral['image'] : gamedata['virals']['default_image']),
@@ -14681,21 +14694,10 @@ function invoke_facebook_viral(vname, props) {
     var viral = get_facebook_viral(vname);
     if(!viral) { return; }
 
-    var link_url = 'http://apps.facebook.com/'+spin_app_namespace+'/';
-
-    // add acquisition tracking info
-    var ref_type = 'viral_' + vname;
-
-    link_url += '?spin_ref=' + ref_type + '&spin_ref_user_id='+session.user_id.toString();
-
-    var post_headline = viral_string_subst(viral['ui_post_headline'], props);
-    var post_text = viral_string_subst(viral['ui_post_text'], props);
-
-    FBShare.invoke({name: post_headline,
-                    link: link_url,
+    FBShare.invoke({name: viral_string_subst(viral['ui_post_headline'], props),
                     description: viral_string_subst(gamedata['virals']['ui_post_description'], props),
                     picture: gamedata['virals']['common_image_path'] + (('image' in viral) ? viral['image'] : gamedata['virals']['default_image']),
-                    'ref': 'sp_game_viral' // can't use full ref_type here, there's a 15-char limit
+                    ref: 'sp_game_viral' // can't use full ref_type here, there's a 15-char limit
                    });
 }
 
@@ -14706,7 +14708,6 @@ function invoke_leaderboard_brag(rank, pct, ui_reason) {
     var ui_rank = percentile_ui_status(rank+1, pct, true);
 
     FBShare.invoke({name: viral['ui_post_headline'].replace('%PLAYER',player.facebook_name).replace('%RANK',ui_rank).replace('%REASON',ui_reason),
-                    link: 'http://apps.facebook.com/'+spin_app_namespace+'/?spin_ref=feed_leaderboard_brag&spin_ref_user_id='+session.user_id.toString(),
                     picture: gamedata['virals']['common_image_path'] + (('image' in viral) ? viral['image'] : gamedata['virals']['default_image']),
                     ref: 'leaderboard'});
 }
@@ -23818,12 +23819,9 @@ function player_info_statistics_tab_setup_share_button(dialog) {
         var val = {'user_id': dialog.user_data['user_id'],
                    'preselect': {'time': [dialog.user_data['time_displayed'] == -1 ? 'ALL' : dialog.user_data['time_scope'],
                                           dialog.user_data['time_displayed']]}};
-        var url = 'https://apps.facebook.com/'+spin_app_namespace+'/';
-        url += '?spin_campaign=feed_stats_share&spin_ref=feed_stats_share&spin_ref_user_id='+session.user_id.toString();
-        url += '&player_info_statistics='+encodeURIComponent(JSON.stringify(val));
-        FBShare.invoke({link: url,
-                        name:viral['ui_post_headline'],
-                        ref:'stats_share', // 15-char limit
+        FBShare.invoke({link_qs: {'player_info_statistics': encodeURIComponent(JSON.stringify(val))},
+                        name: viral['ui_post_headline'],
+                        ref: 'stats_share', // 15-char limit
                        });
     };
 }
@@ -24190,7 +24188,6 @@ function invoke_achievement_brag(ach) {
     }
 
     FBShare.invoke({name: viral['ui_post_headline'].replace('%PLAYER',player.facebook_name).replace('%ACHIEVEMENT',ach['ui_name']),
-                    link: 'http://apps.facebook.com/'+spin_app_namespace+'/?spin_ref=cheeve&spin_ref_user_id='+session.user_id.toString(),
                     picture: picture_url,
                     ref:'cheeve'});
 }
@@ -40302,7 +40299,7 @@ Store.place_fbpayments_order = function(fbpayments_currency, price, unit_id, spe
         descr += ','+object.spec['name'];
     }
 
-    var product_url = 'http://'+spin_server_host+(parseInt(spin_server_http_port,10)!=80 ? ":"+spin_server_http_port : "")+"/OGPAPI?spellname="+spellname+"&type="+gamedata['game_id']+"_sku";
+    var product_url = ogpapi_url({'spellname':spellname, 'type':gamedata['game_id']+'_sku'});
     var quantity = 1;
 
     Store.fbpayments_order_serial += 1;
@@ -40513,7 +40510,7 @@ Store.trialpay_invoke = function() {
                              // callback URL
                              'http://'+proxyserver+'/TRIALPAYAPI',
                              // currency URL
-                             'http://'+proxyserver+'/OGPAPI?type='+gamedata['game_id']+'_gamebucks', // note: MF would require a special hack
+                             ogpapi_url({'type':gamedata['game_id']+'_gamebucks'}), // note: MF would require a special hack
                              player.facebook_third_party_id,
                              session.user_id.toString(), // send user ID as order_info
                              Store.trialpay_callback);
