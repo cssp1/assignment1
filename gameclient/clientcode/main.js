@@ -37934,7 +37934,12 @@ function update_upgrade_dialog(dialog) {
             if(gamedata['show_armor_in_ui']) { feature_list.push('armor'); }
             feature_list = feature_list.concat(get_weapon_spell_features2(spec, get_auto_spell_for_unit(player, spec)));
             feature_list.push('maxvel');
-            feature_list.push('consumes_space');
+            if(get_leveled_quantity(spec['consumes_space']||0, 1) > 0) {
+                feature_list.push('consumes_space');
+            }
+            if(get_leveled_quantity(spec['limit']||0, 1) > 0) {
+                feature_list.push('limit');
+            }
             if('on_destroy' in spec) { feature_list.push('on_destroy'); }
         } else if('associated_item' in tech) {
             var item_spec = ItemDisplay.get_inventory_item_spec(get_leveled_quantity(tech['associated_item'], Math.min(new_level, max_level)));
