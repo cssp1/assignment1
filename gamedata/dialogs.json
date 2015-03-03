@@ -6410,7 +6410,7 @@
             "grid": { "array": [10,2], "array_offset": [63,70], "kind": "StaticImage", "state": "icon", "xy": [58,89], "dimensions": [57,58], "bg_image_offset": [0,-9], "bg_image_justify": "center", "asset": "", "ui_tooltip": "", "tooltip_delay": 0, "fixed_tooltip_offset": [53,155] },
             "grid_health": { "array": [10,2], "array_offset": [63,70], "kind": "ProgressBar", "xy": [61, 135], "dimensions": [48, 6],
                              "full_color": [0.41,0.57,0.160,1], "empty_color": [0.3,0.3,0.3,1] },
-            "grid_wrench": { "array": [10,2], "array_offset": [63,70], "kind": "StaticImage", "xy": [84,114], "dimensions": [24,24], "asset_active": "repair_wrench_green", "asset_queued": "repair_wrench_gray" },
+            "grid_wrench": { "array": [10,2], "array_offset": [63,70], "kind": "StaticImage", "xy": [86,105], "dimensions": [24,24], "asset_active": "repair_wrench_green", "asset_queued": "repair_wrench_gray" },
             "grid_skull": { "array": [10,2], "array_offset": [63,70], "kind": "StaticImage", "xy": [84,114], "dimensions": [22,25], "asset": "repair_skull" },
 
             "grid_repair": {  "array": [10,2], "array_offset": [63,70], "kind": "ActionButton", "xy": [56,82], "dimensions": [58,60], "bg_image": "repair_mouseover", "push_bg_image": 1 },
