@@ -28255,7 +28255,7 @@ function update_repair_control(dialog) {
         dialog.widgets['in_production_health'].show = !player.squads_enabled() && (player.unit_repair_queue.length > 0 && (player.unit_repair_queue[0]['obj_id'] in session.cur_objects.objects || player.unit_repair_queue[0]['obj_id'] in player.my_army));
     dialog.widgets['in_production_cancel'].show = (dialog.widgets['in_production_icon'].show && gamedata['unit_repair_can_cancel'] && !player.squads_enabled());
 
-    if(player.unit_repair_queue.length > 0) {
+    if(dialog.widgets['in_production_icon'].show) {
         var item = player.unit_repair_queue[0];
         var orig_hp = item['original_hp'];
         var cur_hp = null, max_hp = null;
