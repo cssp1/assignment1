@@ -23819,7 +23819,7 @@ function player_info_statistics_tab_setup_share_button(dialog) {
         var val = {'user_id': dialog.user_data['user_id'],
                    'preselect': {'time': [dialog.user_data['time_displayed'] == -1 ? 'ALL' : dialog.user_data['time_scope'],
                                           dialog.user_data['time_displayed']]}};
-        FBShare.invoke({link_qs: {'player_info_statistics': encodeURIComponent(JSON.stringify(val))},
+        FBShare.invoke({link_qs: {'player_info_statistics': JSON.stringify(val)},
                         name: viral['ui_post_headline'],
                         ref: 'stats_share', // 15-char limit
                        });

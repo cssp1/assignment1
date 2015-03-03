@@ -38,9 +38,13 @@ FBShare.invoke_feed = function(p_options) {
             var url = 'https://apps.facebook.com/'+spin_app_namespace+'/?spin_ref='+options.ref+'&spin_ref_user_id='+spin_user_id.toString();
             if(options.link_qs) {
                 for(var k in options.link_qs) {
-                    url += '&'+k+'='+options.link_qs[k];
+                    url += '&'+k+'='+encodeURIComponent(options.link_qs[k]);
                 }
             }
+            if(player.is_developer()) {
+                console.log(url);
+            }
+
             SPFB.ui({'method': 'feed',
                      'name': options.name || null,
                      'message': options.message || null,
