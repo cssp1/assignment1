@@ -14230,6 +14230,7 @@ function invoke_recycle_dialog(obj) {
                 if(_obj['obj_id'] in session.cur_objects.objects) {
                     remove_object(session.cur_objects.objects[_obj['obj_id']]);
                 }
+                session.clear_building_idle_state_caches();
             }
         } else {
             if(_obj.id && _obj.id !== GameObject.DEAD_ID) { // check obj.id rather than is_destroyed() because you CAN recycle destroyed units
@@ -14241,6 +14242,7 @@ function invoke_recycle_dialog(obj) {
                     session.lazy_update_citizens();
                 }
                 remove_object(_obj);
+                session.clear_building_idle_state_caches();
             }
         }
     }; })(obj);
@@ -46337,8 +46339,31 @@ Building.prototype.get_idle_state_legacy = function() {
             if(fullness >= 1) { draw_idle_icon = 'full'; }
         }
     } else if(this.is_factory() && !this.is_manufacturing()) {
-        var space_usage = player.get_army_space_usage_by_squad();
-        if(space_usage['ALL'] < 0.9*player.stattab['total_space']) { draw_idle_icon = 'manufacture'; }
+        // do not show icon if all units this building can manufacture have a quantity limit and are already in the army
+        var all_limited = true;
+        var count_by_specname = null;
+        for(var uspecname in gamedata['units']) {
+            var uspec = gamedata['units'][uspecname];
+            if(uspec['manufacture_category'] == this.spec['manufacture_category']) {
+                if(!uspec['limit']) {
+                    all_limited = false;
+                    break;
+                } else {
+                    if(count_by_specname === null) {
+                        count_by_specname = player.get_army_unit_count_by_specname();
+                    }
+                    if((count_by_specname[uspecname]||0) < uspec['limit']) {
+                        all_limited = false;
+                        break;
+                    }
+                }
+            }
+        }
+        if(!all_limited) {
+            var cur_count = player.get_army_unit_count_by_specname();
+            var space_usage = player.get_army_space_usage_by_squad();
+            if(space_usage['ALL'] < 0.9*player.stattab['total_space']) { draw_idle_icon = 'manufacture'; }
+        }
     } else if(this.is_researcher()) {
         if(!this.is_researching()) { draw_idle_icon = 'research'; }
     } else if(this.is_crafter()) {
@@ -46458,33 +46483,55 @@ Building.prototype.get_idle_state_advanced = function() {
             if(fullness >= 1) { draw_idle_icon = 'full'; }
         }
     } else if(this.is_factory() && !this.is_manufacturing()) {
-        var space_usage = player.get_army_space_usage_by_squad();
-        if(space_usage['ALL'] < player.stattab['total_space']) {
-            for(var specname in gamedata['units']) {
-                var spec = gamedata['units'][specname];
-                if(spec['manufacture_category'] == this.spec['manufacture_category']) {
-                    var level = unit_unlock_level(specname);
-                    if(level > 0) {
-                        var pred_ok = true;
-                        for(var pred in {'requires':1,'activation':1,'show_if':1}) {
-                            if(pred in spec && !read_predicate(get_leveled_quantity(spec[pred], level)).is_satisfied(player, null)) {
-                                pred_ok = false;
-                                break;
-                            }
-                        }
-                        if(pred_ok && player.stattab['total_space'] >= space_usage['ALL'] + get_leveled_quantity(spec['consumes_space'],level)) {
-                            var res_ok = true;
-                            for(var res in gamedata['resources']) {
-                                if(player.resource_state[res][1] < get_leveled_quantity(spec['build_cost_'+res] || 0, level)) {
-                                    // cannot manufacture
-                                    res_ok = false;
+        // do not show icon if all units this building can manufacture have a quantity limit and are already in the army
+        var all_limited = true;
+        var count_by_specname = null;
+        for(var uspecname in gamedata['units']) {
+            var uspec = gamedata['units'][uspecname];
+            if(uspec['manufacture_category'] == this.spec['manufacture_category']) {
+                if(!uspec['limit']) {
+                    all_limited = false;
+                    break;
+                } else {
+                    if(count_by_specname === null) {
+                        count_by_specname = player.get_army_unit_count_by_specname();
+                    }
+                    if((count_by_specname[uspecname]||0) < uspec['limit']) {
+                        all_limited = false;
+                        break;
+                    }
+                }
+            }
+        }
+        if(!all_limited) {
+            var space_usage = player.get_army_space_usage_by_squad();
+            if(space_usage['ALL'] < player.stattab['total_space']) {
+                for(var specname in gamedata['units']) {
+                    var spec = gamedata['units'][specname];
+                    if(spec['manufacture_category'] == this.spec['manufacture_category']) {
+                        var level = unit_unlock_level(specname);
+                        if(level > 0) {
+                            var pred_ok = true;
+                            for(var pred in {'requires':1,'activation':1,'show_if':1}) {
+                                if(pred in spec && !read_predicate(get_leveled_quantity(spec[pred], level)).is_satisfied(player, null)) {
+                                    pred_ok = false;
                                     break;
                                 }
                             }
-                            if(res_ok) { // can make at least one unit
-                                // detect human units by looking for a walk cycle in units.json
-                                draw_idle_icon = (spec['walk_period'] ? 'train_advanced' : 'manufacture_advanced');
-                                break;
+                            if(pred_ok && player.stattab['total_space'] >= space_usage['ALL'] + get_leveled_quantity(spec['consumes_space'],level)) {
+                                var res_ok = true;
+                                for(var res in gamedata['resources']) {
+                                    if(player.resource_state[res][1] < get_leveled_quantity(spec['build_cost_'+res] || 0, level)) {
+                                        // cannot manufacture
+                                        res_ok = false;
+                                        break;
+                                    }
+                                }
+                                if(res_ok) { // can make at least one unit
+                                    // detect human units by looking for a walk cycle in units.json
+                                    draw_idle_icon = (spec['walk_period'] ? 'train_advanced' : 'manufacture_advanced');
+                                    break;
+                                }
                             }
                         }
                     }
