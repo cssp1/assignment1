@@ -3082,7 +3082,8 @@ def main(args):
         error |= check_cond_chain(gamedata['store']['payments_api'], reason = 'store.payments_api')
 
     for name, data in gamedata['strings']['idle_buildings'].iteritems():
-        error |= require_art_asset(data['icon'], 'strings:idle_buildings:'+name+':icon')
+        if data.get('icon',None):
+            error |= require_art_asset(data['icon'], 'strings:idle_buildings:'+name+':icon')
 
     if type(gamedata['continent_assignment']) is list:
         continent_list = [val for pred, val in gamedata['continent_assignment']]

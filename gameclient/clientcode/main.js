@@ -41187,6 +41187,7 @@ function handle_server_message(data) {
                 }
             }
         }
+        session.clear_building_idle_state_caches();
 
     } else if(msg == "SESSION_CHANGE") {
 
@@ -47185,27 +47186,43 @@ function draw_building_or_inert(obj, powerfac) {
        player.tutorial_state == "COMPLETE" && get_preference_setting(player.preferences, 'show_idle_buildings') &&
        read_predicate({'predicate':'LIBRARY', 'name': ('show_idle_buildings' in gamedata['predicate_library'] ? 'show_idle_buildings' : 'extended_tutorial_complete')}).is_satisfied(player,null)) {
         var idle = obj.get_idle_state();
-        if(idle) {
-            if(idle['can_upgrade']) {
-                var eoffset_map = obj.spec['equip_icon_offset'] || vec_mul(gamedata['client']['default_equip_icon_offset'], vec_scale(0.5, obj.spec['gridsize']));
-                var eoffset = ortho_to_draw_vector(eoffset_map);
-                var img = GameArt.assets[gamedata['strings']['idle_buildings']['upgrade_advanced']['icon']].states['normal'];
+        if(idle && idle['can_upgrade']) {
+            // draw "can upgrade" arrow, based on equip icon position
+            var img = GameArt.assets[gamedata['strings']['idle_buildings']['upgrade_advanced']['icon']].states['normal'];
 
-                var sz = (obj.spec['unit_collision_gridsize']||obj.spec['gridsize']);
-                var pos = vec_floor(vec_add(xy, ortho_to_draw_vector(vec_mul(sz, gamedata['strings']['idle_buildings']['upgrade_advanced']['icon_delta']))));
-                var text_edge = draw_centered_text_with_shadow(ctx, gamedata['strings']['idle_buildings']['upgrade_advanced']['ui_name_short'], pos);
-                img.draw_topleft(vec_add(text_edge, vec_scale(-1, gamedata['strings']['idle_buildings']['upgrade_advanced']['text_offset'])), 0, 0);
+            var uoffset;
+            if('level_flag_offset' in obj.spec) {
+                uoffset = obj.spec['level_flag_offset'];
+            } else {
+                uoffset = vec_add(vec_scale(0.5, obj.spec['gridsize']),
+                                  gamedata['strings']['idle_buildings']['upgrade_advanced']['default_icon_offset']);
             }
-            if(idle['state']) {
-                if(!(idle['state'] in gamedata['strings']['idle_buildings'])) { throw Error('unknown building idle state '+idle['state']); }
-                var text_ctr = vec_add(xy, [0, -Math.floor(0.75*default_text_height)]);
-                var text_str = gamedata['strings']['idle_buildings'][idle['state']]['ui_name'];
+            var pos = vec_floor(vec_add(xy, ortho_to_draw_vector(uoffset)));
+
+            if(gamedata['strings']['idle_buildings']['upgrade_advanced']['ui_name_short']) {
+                pos = draw_centered_text_with_shadow(ctx, gamedata['strings']['idle_buildings']['upgrade_advanced']['ui_name_short'], pos);
+                pos = vec_add(pos, vec_scale(-1, gamedata['strings']['idle_buildings']['upgrade_advanced']['text_offset']));
+            }
+
+            img.draw(pos, 0, client_time);
+        }
+        if(idle && idle['state']) {
+            // draw idle state
+            if(!(idle['state'] in gamedata['strings']['idle_buildings'])) { throw Error('unknown building idle state '+idle['state']); }
+            var icon_name = gamedata['strings']['idle_buildings'][idle['state']]['icon'];
+            if(!(icon_name in GameArt.assets)) { throw Error('invalid draw_idle_icon '+icon_name); }
+            var icon_sprite = GameArt.assets[icon_name].states['normal'];
+
+            var icon_pos = vec_add(xy, [0, -Math.floor(0.75*default_text_height + icon_sprite.wh[1]/2)]);
+
+            var text_str = gamedata['strings']['idle_buildings'][idle['state']]['ui_name'] || null;
+            if(text_str) {
                 if(idle['s_replace']) { text_str = text_str.replace('%s', idle['s_replace']); }
-                var text_edge = draw_centered_text_with_shadow(ctx, text_str, text_ctr);
-                var icon_name = gamedata['strings']['idle_buildings'][idle['state']]['icon'];
-                if(!(icon_name in GameArt.assets)) { throw Error('invalid draw_idle_icon '+icon_name); }
-                GameArt.assets[icon_name].states['normal'].draw(vec_add(text_edge, [-19,-5]), 0, client_time);
+                var text_edge = draw_centered_text_with_shadow(ctx, text_str, icon_pos);
+                icon_pos = vec_add(text_edge, [-25,-3]);
             }
+
+            icon_sprite.draw(icon_pos, 0, client_time);
         }
     }
 
