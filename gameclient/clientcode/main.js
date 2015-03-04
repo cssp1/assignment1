@@ -32537,6 +32537,7 @@ function invoke_map_dialog(force_page) {
     if(page != 'computers' && force_page) {
         page = 'computers';
     }
+    if(!(((page||'')+'_button') in dialog.widgets)) { throw Error('button not found for page '+(page ? page.toString() : 'null/undefined')); }
     dialog.widgets[page+'_button'].onclick(dialog.widgets[page+'_button']);
     if(force_page && dialog.user_data['chapter'] != force_page && dialog.widgets[force_page+'_button'].show) {
         dialog.widgets[force_page+'_button'].onclick(dialog.widgets[force_page+'_button']);
