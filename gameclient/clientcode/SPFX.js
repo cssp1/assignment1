@@ -1481,10 +1481,9 @@ SPFX.Shockwave.prototype.draw = function() {
         rad = Math.floor(t * this.speed);
         opacity = 1-u;
     } else {
-        rad = Math.floor((this.end_time-this.start_time - t)*(-this.speed));
+        rad = Math.max(1, Math.floor((this.end_time-this.start_time - t)*(-this.speed)));
         opacity = u;
     }
-
 
     SPFX.ctx.save();
     SPFX.ctx.globalAlpha = opacity;
