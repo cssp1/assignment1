@@ -86,7 +86,7 @@ def calc_max_storage_for_resource(gamedata, res):
 
     for cc_level in xrange(1, len(gamedata['buildings'][gamedata['townhall']]['build_time'])+1):
         storage_spec = gamedata['buildings'][building_name]
-        num_storages = storage_spec['limit'][cc_level-1]
+        num_storages = storage_spec['limit'][cc_level-1] if type(storage_spec['limit']) is list else storage_spec['limit']
 
         storage_level = 1
         while storage_level < len(storage_spec['build_time']):
