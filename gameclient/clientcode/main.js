@@ -16732,6 +16732,7 @@ function test_fancy_victory_dialog(ai_id, kind, has_trophies, has_item_loot) { /
                                 'Test AI', 'victory',
                                 {'iron':12345, 'looted_uncapped_iron':12345,
                                  'water':5432, 'looted_uncapped_water':12345,
+                                 'res3':543, 'looted_uncapped_res3':543,
                                  'units_killed':units,
                                  'units_lost':units,
                                  'battle_stars':{'foo':1,'bar':2,'baz':3},

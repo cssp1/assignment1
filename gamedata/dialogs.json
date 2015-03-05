@@ -4269,7 +4269,7 @@
             "row_iron_icon": { "kind": "StaticImage", "xy": [145,190], "dimensions": [21,21], "asset": "resource_icon_iron" },
             "row_iron_amount": { "kind": "TextField", "xy": [175,190], "dimensions": [70,19],"text_size": 15, "text_style": "bold" },
             "row_res3_icon": { "show": 0, "kind": "StaticImage", "xy": [256,160], "dimensions": [21,21], "asset": "resource_icon_res3" },
-            "row_res3_amount": { "show": 0, "kind": "TextField", "xy": [286,160], "dimensions": [70,19],"text_size": 15, "text_style": "bold" },
+            "row_res3_amount": { "show": 0, "kind": "TextField", "xy": [286,160], "dimensions": [65,19],"text_size": 15, "text_style": "bold" },
 
             "you_spent":  { "show": 0, "kind": "TextField", "xy": [45,237], "dimensions": [187,21], "text_size": 16, "text_style": "bold",
                             "text_hjustify": "left", "ui_name": "Spend:" },
@@ -4289,10 +4289,10 @@
                               "text_hjustify": "left", "text_vjustify": "top",
                               "ui_name": "" },
 
-            "trophy_bg": { "show": 0, "kind": "SolidRect", "xy": [288,163], "dimensions": [135,42], "color": [0,0,0,0.4], "bevel": 3 },
-            "trophy_icon":  { "show": 0, "kind": "StaticImage", "xy": [295,169], "dimensions": [30,30], "asset": "trophy_30x30" },
-            "trophy_amount":  { "show": 0, "kind": "TextField", "xy": [338,174], "dimensions": [70,19], "text_size": 17, "text_style": "bold" },
-            "trophy_shine": { "show": 0, "alpha": 0.85, "kind": "StaticImage", "xy": [289,163], "dimensions": [62,13], "asset": "button_shine" },
+            "trophy_bg": { "show": 0, "kind": "SolidRect", "xy": [360,160], "dimensions": [125,42], "color": [0,0,0,0.4], "bevel": 3 },
+            "trophy_icon":  { "show": 0, "kind": "StaticImage", "xy": [365,166], "dimensions": [30,30], "asset": "trophy_30x30" },
+            "trophy_amount":  { "show": 0, "kind": "TextField", "xy": [402,171], "dimensions": [70,19], "text_size": 17, "text_style": "bold" },
+            "trophy_shine": { "show": 0, "alpha": 0.85, "kind": "StaticImage", "xy": [359,160], "dimensions": [62,13], "asset": "button_shine" },
 
             "trophy_expires": { "show": 0, "kind": "TextField", "xy": [288,417], "dimensions": [135, 17], "text_size": 13,
                                 "text_color": [1,0,0,1],
