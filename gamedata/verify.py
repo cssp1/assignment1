@@ -244,14 +244,16 @@ def check_mandatory_fields(specname, spec, kind):
                 error |= 1
                 print '%s %s level %d requires CC L%d but has %s cost of %d, which exceeds max storage capacity at that CC level of %d' % (kind, specname, lev, cc_requirement, res, cost, MAX_STORAGE[res][cc_requirement-1])
 
+    for snd in ('sound_click', 'sound_destination', 'sound_attack'):
+        if snd in spec:
+            error |= require_art_asset(spec[snd], specname+':'+snd)
+
     if kind == 'units':
         level_tech = spec['level_determined_by_tech']
         if level_tech not in gamedata['tech']:
             error |= 1
             print '%s:level_determined_by_tech refers to a tech that does not exist (%s)' % (specname, level_tech)
-        for snd in ('sound_click', 'sound_destination', 'sound_attack'):
-            if snd in spec:
-                error |= require_art_asset(spec[snd], specname+':'+snd)
+
         if gamedata['game_id'] != 'sg' and (not spec.get('resurrectable',False)) and (spec['name'] != 'repair_droid'):
             error |= 1
             print '%s is not resurrectable' % specname

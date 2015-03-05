@@ -17893,6 +17893,8 @@ function invoke_building_context_menu(mouse_xy) {
 
     if(buttons.length < 1) { return; }
 
+    selection.unit.speak('click');
+
     var dialog = invoke_generic_context_menu(mouse_xy, buttons, dialog_name, special_buttons);
 
     dialog.widgets['bg_close_button'].show = false;
