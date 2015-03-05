@@ -14169,21 +14169,25 @@ class TRIALPAYAPI(resource.Resource):
 
     def handle_request(self, request):
         SpinHTTP.set_access_control_headers(request)
-        request_body = request.content.read()
+        return self.handle_payment(request,
+                                   SpinHTTP.get_twisted_header(request, 'TrialPay-HMAC-MD5'),
+                                   request.args,
+                                   request.content.read())
+
+    def handle_payment(self, request, their_hash, request_args, request_body):
+        # note: request may be null if this is called asynchronously
+        # confirm Facebook App ID matches
+        assert str(request_args['app_id'][0]) == SpinConfig.config['facebook_app_id']
 
         # verify hash
-        their_hash = SpinHTTP.get_twisted_header(request, 'TrialPay-HMAC-MD5')
         our_hash = hmac.new(str(SpinConfig.config['trialpay_notification_key']), msg=str(request_body), digestmod=hashlib.md5).hexdigest()
         if their_hash != our_hash:
             gamesite.exception_log.event(server_time, 'TRIALPAYAPI hash mismatch: theirs %s ours %s body %r' % (their_hash, our_hash, request_body))
 
-        # confirm Facebook App ID matches
-        assert str(request.args['app_id'][0]) == SpinConfig.config['facebook_app_id']
-
-        gamebucks_amount = int(request.args['reward_amount'][0])
+        gamebucks_amount = int(request_args['reward_amount'][0])
 
         # find session
-        user_id = int(request.args['order_info'][0])
+        user_id = int(request_args['order_info'][0])
         session = None
         for s in session_table.itervalues():
             if s.user.user_id == user_id:
@@ -14194,12 +14198,12 @@ class TRIALPAYAPI(resource.Resource):
 
         if gamebucks_amount > 0:
             # we (ab)use the credit order path here to share all of its metrics output
-            Store.execute_credit_order(request.args['oid'][0], self.gameapi, request, session.user.facebook_id, session.user.facebook_id,
+            Store.execute_credit_order(request_args['oid'][0], self.gameapi, request, session.user.facebook_id, session.user.facebook_id,
                                        'gamebucks', gamebucks_amount,
                                        # awkward syntax here
                                        {'spellname': 'FB_TRIALPAY_GAMEBUCKS',
                                         'session_id': session.session_id,
-                                        'currency_url': str(request.args['currency_url'][0])})
+                                        'currency_url': str(request_args['currency_url'][0])})
 
             # do not return HTTP response until player state is fully flushed
             def complete_settlement(request, session):
@@ -14207,8 +14211,9 @@ class TRIALPAYAPI(resource.Resource):
                 gamesite.pcache_client.player_cache_update(session.user.user_id,
                                                            {'last_mtime': server_time,
                                                             'money_spent': session.player.history.get('money_spent',0.0)}, reason = 'purchase')
-                request.write('1')
-                request.finish()
+                if request:
+                    request.write('1')
+                    request.finish()
 
             player_table.store_async(session.player, functools.partial(complete_settlement, request, session), True, 'TRIALPAYAPI')
             return server.NOT_DONE_YET
@@ -19370,6 +19375,14 @@ class GAMEAPI(resource.Resource):
                     to_ack.append(msg['msg_id'])
                     session.increment_player_metric('donated_units_received', sum([item.get('stack',1) for item in units]), time_series = False)
                     metric_event_coded(session.player.user_id, '4160_unit_donation_received', {'units':units,'from':msg['from']})
+
+                elif msg['type'] == 'TRIALPAYAPI_payment':
+                    try:
+                        gamesite.trialpayapi.handle_payment(None, msg['their_hash'], msg['request_args'], msg['request_body'])
+                    except:
+                        gamesite.exception_log.event(server_time, 'TRIALPAYAPI_payment API fail on user %d payment %r:' % (session.user.user_id, request_args) + traceback.format_exc())
+                        pass
+                    to_ack.append(msg['msg_id'])
 
                 elif msg['type'] == 'FBRTAPI_payment':
                     try:
@@ -24667,7 +24680,7 @@ class GameSite(server.Site):
             self.affinities = json.get('affinities',['default'])
             self.start_state = json.get('start_state', 'ok')
 
-    def __init__(self, config, root, gameapi, controlapi):
+    def __init__(self, config, root, gameapi, controlapi, trialpayapi):
 
         # set this here because setup_test_user() references gamesite
         global gamesite
@@ -24680,6 +24693,8 @@ class GameSite(server.Site):
 
         self.config = config
         self.gameapi = gameapi
+        self.controlapi = controlapi
+        self.trialpayapi = trialpayapi
         self.player_table = player_table
         self.user_table = user_table
 
@@ -25780,10 +25795,11 @@ def do_main(pidfile, do_ai_setup, do_daemonize, cmdline_config):
 
     gameapi = GAMEAPI()
     controlapi = CONTROLAPI(gameapi)
+    trialpayapi = TRIALPAYAPI(gameapi)
 
     root.putChild("GAMEAPI",gameapi)
     root.putChild("CREDITAPI",CREDITAPI(gameapi))
-    root.putChild("TRIALPAYAPI",TRIALPAYAPI(gameapi))
+    root.putChild("TRIALPAYAPI",trialpayapi)
     root.putChild("KGAPI",KGAPI(gameapi))
     root.putChild("METRICSAPI",METRICSAPI(gameapi))
     root.putChild("CONTROLAPI",controlapi)
@@ -25796,7 +25812,7 @@ def do_main(pidfile, do_ai_setup, do_daemonize, cmdline_config):
     io_system_init(instance_config.get('io', {}).copy())
 
     global gamesite
-    gamesite = GameSite(config, root, gameapi, controlapi)
+    gamesite = GameSite(config, root, gameapi, controlapi, trialpayapi)
 
     # optional memory profiling using Dowser library
     if SpinConfig.config.get('enable_dowser', 0):

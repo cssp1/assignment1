@@ -1803,11 +1803,24 @@ class GameProxy(proxy.ReverseProxyResource):
             return self.render_via_proxy(session.gameserver_fwd, request)
 
         elif self.path == '/TRIALPAYAPI':
+            assert str(request.args['app_id'][0]) == SpinConfig.config['facebook_app_id']
             order_info = request.args['order_info'][0]
             user_id = int(order_info)
             session = self.session_emulate(db_client.session_get_by_user_id(user_id, reason=self.path))
-            if not session: raise Exception('cannot find session for TRIALPAYAPI call: '+repr(request))
-            return self.render_via_proxy(session.gameserver_fwd, request)
+            if session:
+                # synchronous path
+                return self.render_via_proxy(session.gameserver_fwd, request)
+            else:
+                # asynchronous path - queue message to be processed on next login
+                db_client.msg_send([{'to':[user_id],
+                                     'type':'TRIALPAYAPI_payment',
+                                     'time':proxy_time,
+                                     'expire_time': proxy_time + SpinConfig.config['proxyserver'].get('TRIALPAYAPI_payment_msg_duration', 30*24*60*60),
+                                     'their_hash': SpinHTTP.get_twisted_header(request, 'TrialPay-HMAC-MD5'),
+                                     'request_args': request.args,
+                                     'request_body': request.content.read()}])
+                # return success immediately
+                return str('1')
 
         elif self.path == '/METRICSAPI':
             SpinHTTP.set_access_control_headers(request)
