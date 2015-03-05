@@ -204,6 +204,7 @@ class GiveTrophiesConsequent(Consequent):
         Consequent.__init__(self, data)
         self.kind = data['trophy_kind']
         self.amount = data.get('amount', 0)
+        self.min_amount = data.get('min_amount', 0)
         self.amount_from_aura = data.get('amount_from_aura', None)
         self.method = data.get('method', '+')
         self.scale_by = data.get('scale_by', None)
@@ -224,6 +225,8 @@ class GiveTrophiesConsequent(Consequent):
             deployment_limit = session.player.stattab.get_player_stat('deployable_unit_space')
             if deployment_limit > 0:
                 amount = int(amount * (float(session.deployed_unit_space) / float(deployment_limit)) + 0.5)
+
+        amount = max(amount, self.min_amount)
 
         if amount != 0:
             sign = -1 if (self.method == '-') else 1

@@ -10753,7 +10753,7 @@ function update_combat_resource_bars(dialog) {
             dialog.widgets['trophies_victory_icon'].state =
             dialog.widgets['trophies_defeat_icon'].state = trophy_type;
         // figure out the trophy amounts to display
-        var max_win = 0, max_loss = 0, win_scale_by = null, loss_scale_by = null;;
+        var max_win = 0, max_loss = 0, min_win = 0, min_loss = 0, win_scale_by = null, loss_scale_by = null;;
         goog.array.forEach(player.player_auras, function(aura) {
             var spec = gamedata['auras'][aura['spec']];
             var cons = spec['on_battle_end_victory'] || spec['on_battle_end_defeat'] || null;
@@ -10763,9 +10763,11 @@ function update_combat_resource_bars(dialog) {
                 if(method == '+') {
                     max_win += stack;
                     win_scale_by = cons['scale_by'] || null;
+                    min_win = Math.max(min_win, cons['min_amount'] || 0);
                 } else {
                     max_loss += stack;
                     loss_scale_by = cons['scale_by'] || null;
+                    min_loss = Math.max(min_loss, cons['min_amount'] || 0);
                 }
             }
         });
@@ -10792,12 +10794,14 @@ function update_combat_resource_bars(dialog) {
                     var base_damage = desktop_dialogs['combat_damage_bar'].user_data['base_damage'];
                     current = Math.floor(current * base_damage + 0.5);
                 }
+                current = Math.max(current, min_win);
             } else {
                 current = max_loss;
                 if(loss_scale_by = 'deployed_unit_space') {
                     var deployment_limit = get_player_stat(player.stattab, 'deployable_unit_space');
                     current = Math.floor(current * session.deployed_unit_space / (1.0*deployment_limit) + 0.5);
                 }
+                current = Math.max(current, min_loss);
                 current *= -1; // show loss as negative
             }
             dialog.widgets['trophies_current_amount'].str = display_trophy_count(current, trophy_type).toFixed(0);
