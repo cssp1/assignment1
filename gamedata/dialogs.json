@@ -637,14 +637,14 @@
                                   "asset": "tooltip_bg", "bg_image_resizable": 1,
                                   "show": 0 },
 
-            "skip_tutorial_bg": { "kind": "StaticImage", "xy": [357,31], "dimensions": [407,28], "asset": "dialog_sunken_resizable", "bg_image_resizable": 1, "alpha": 1 },
-            "skip_tutorial_prog": { "kind": "ProgressBar", "xy": [361, 35], "dimensions": [374, 20], "flash_color": [1,1,1,1],
+            "skip_tutorial_bg": { "kind": "StaticImage", "xy": [357,30], "dimensions": [407,28], "asset": "dialog_sunken_resizable", "bg_image_resizable": 1, "alpha": 1 },
+            "skip_tutorial_prog": { "kind": "ProgressBar", "xy": [361, 34], "dimensions": [374, 20], "flash_color": [1,1,1,1],
                                     "full_color": [0.0,0.33,0.66,1], "empty_color": [0.015,0.015,0.015,1], "outline_width": 2, "alpha": 0.5,
                                     "outline_color": [0.015,0.015,0.015,1] },
-            "skip_tutorial_label": { "kind": "TextField", "xy": [357,31], "dimensions": [406,28], "text_size": 13, "text_style": "bold", "drop_shadow": 1,
+            "skip_tutorial_label": { "kind": "TextField", "xy": [357,30], "dimensions": [406,28], "text_size": 13, "text_style": "bold", "drop_shadow": 1,
                                      //"text_color": [1,1,0,1],
                                      "text_hjustify": "center", "ui_name": "%s: %d1 of %d2" },
-            "skip_tutorial_button": { "kind": "ActionButton", "xy": [737,33], "dimensions": [23,23],
+            "skip_tutorial_button": { "kind": "ActionButton", "xy": [737,32], "dimensions": [23,23],
                                       "bg_image": "speedup_button", "push_bg_image": 1, "ui_tooltip": "Skip Tutorial Missions", "tooltip_delay": 0 },
 
             "quest_tracker_title": { "kind": "ActionButton", "xy": [607,41], "dimensions": [113,15], "text_size": 13, "text_style": "thick", "drop_shadow": 1, "text_color": [1,0.88,0,1],  "text_hjustify": "center",
