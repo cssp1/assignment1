@@ -22009,13 +22009,16 @@ function update_unit_donation_dialog(dialog) {
     if(source == 'session') {
         for(var id in session.cur_objects.objects) {
             var obj = session.cur_objects.objects[id];
-            if(obj.is_mobile() && (obj.team === 'player') && (obj.hp >= obj.max_hp)) {
+            if(obj.is_mobile() && (obj.team === 'player') && (obj.hp >= obj.max_hp) &&
+               (!('donatable' in obj.spec) || obj.spec['donatable'])) {
                 available_unit_list.push({obj_id: obj.id, spec: obj.spec['name'], level:obj.level});
             }
         }
     } else if(source == 'army') {
         goog.object.forEach(player.my_army, function(unit) {
-            if(!('hp_ratio' in unit) || unit['hp_ratio'] >= 1 &&
+            var spec = gamedata['units'][unit['spec']];
+            if((!('hp_ratio' in unit) || unit['hp_ratio'] >= 1) &&
+               (!('donatable' in spec) || spec['donatable']) &&
                !SQUAD_IDS.is_mobile_squad_id(unit['squad_id']||0)) {
                 available_unit_list.push({obj_id: unit['obj_id'], spec: unit['spec'], level: ('level' in unit ? unit['level'] : 1)});
             }

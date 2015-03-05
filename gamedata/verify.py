@@ -225,6 +225,10 @@ def check_mandatory_fields(specname, spec, kind):
             error |= 1
             print '%s %s "%s" array length (%d) does not match max level (%d - as determined by length of %s array)' % (kind, specname, check_field, len(spec[check_field]), max_level, GameDataUtil.MAX_LEVEL_FIELD[kind])
 
+    if 'consumes_space' in spec and spec['consumes_space'] == 0:
+        if spec.get('donatable',True):
+            error |= 1; print '%s %s consumes_space 0 but is donatable - probably not correct' % (kind, specname)
+
     if 'provides_limited_equipped' in spec:
         for provides_name, provides_array in spec['provides_limited_equipped'].iteritems():
             if type(provides_array) is list and len(provides_array) != max_level:

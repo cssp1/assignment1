@@ -4612,6 +4612,7 @@ class GameObjectSpec(Spec):
         ["consumable", False],
         ["resurrectable", False],
         ["resurrectable_without_tech", False],
+        ["donatable", True],
         ["developer_only", 0],
         ["always_free_speedup", False],
         ["no_free_speedup", False],
@@ -24515,6 +24516,7 @@ class GAMEAPI(resource.Resource):
                     for id in unit_ids:
                         unit = session.player.get_object_by_obj_id(id, fail_missing = False)
                         if (not unit) or (unit.owner is not session.player) or (not unit.is_mobile()) or \
+                           (not unit.spec.donatable) or \
                            (unit.hp < unit.max_hp) or \
                            SQUAD_IDS.is_mobile_squad_id(unit.squad_id or 0) or \
                            (unit.get_leveled_quantity(unit.spec.consumes_space) > object.get_leveled_quantity(object.spec.max_individual_donation_space)):
