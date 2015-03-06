@@ -2689,6 +2689,11 @@
             "reward_water_amount": { "kind": "TextField", "xy": [459,271], "dimensions": [86,22],"text_size": 13, "text_style": "thick",
                                      "ui_tooltip": "", "tooltip_delay": 0, "fixed_tooltip_offset": [490,303] },
 
+            "reward_res3_icon": { "show": 0, "kind": "StaticImage", "xy": [557,272], "dimensions": [21,21], "asset": "resource_icon_res3",
+                                  "ui_tooltip": "", "tooltip_delay": 0, "fixed_tooltip_offset": [490,303] },
+            "reward_res3_amount": { "show": 0, "kind": "TextField", "xy": [579,271], "dimensions": [86,22],"text_size": 13, "text_style": "thick",
+                                    "ui_tooltip": "", "tooltip_delay": 0, "fixed_tooltip_offset": [490,303] },
+
             "reward_iron_icon": { "kind": "StaticImage", "xy": [437,296], "dimensions": [21,21], "asset": "resource_icon_iron",
                                   "ui_tooltip": "", "tooltip_delay": 0, "fixed_tooltip_offset": [490,327] },
             "reward_iron_amount": { "kind": "TextField", "xy": [459,295], "dimensions": [86,22],"text_size": 13, "text_style": "thick",
