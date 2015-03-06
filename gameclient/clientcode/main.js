@@ -12259,7 +12259,7 @@ function update_desktop_dialogs() {
                 var home_qty = player.count_donated_units();
                 var consumes_space = (gamedata['donated_units_take_space'] ? player.donated_units_space() : 0);
                 if(consumes_space) { throw Error('this case not handled'); }
-                var can_deploy = (deploy_qty < home_qty);
+                var can_deploy;
 
                 // set up callbacks
                 var add_donated_units = function() {
@@ -12286,6 +12286,7 @@ function update_desktop_dialogs() {
                 d.show = true;
 
                 if(gamedata['unit_deploy_style'] == 'drip') {
+                    can_deploy = true;
 
                     var init_deployer = (function(_add_donated_units) { return function() {
                         if(selection.ui && selection.ui.user_data && selection.ui.user_data['cursor'] == 'DeployUICursor') { return; }
@@ -12318,6 +12319,7 @@ function update_desktop_dialogs() {
                     }; })(init_deployer);
 
                 } else {
+                    can_deploy = (deploy_qty < home_qty);
                     d.widgets['bg'].tooltip.str = gamedata['auras']['donated_units']['ui_description'] + '\n' + player.donated_units_description('\n');
                     d.widgets['unit'].bg_image = player.donated_units_icon();
                     d.widgets['unit'].state = 'normal';
