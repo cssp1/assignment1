@@ -19381,7 +19381,7 @@ class GAMEAPI(resource.Resource):
                     try:
                         gamesite.trialpayapi.handle_payment(None, msg['their_hash'], msg['request_args'], msg['request_body'])
                     except:
-                        gamesite.exception_log.event(server_time, 'TRIALPAYAPI_payment API fail on user %d payment %r:' % (session.user.user_id, request_args) + traceback.format_exc())
+                        gamesite.exception_log.event(server_time, 'TRIALPAYAPI_payment API fail on user %d payment %r:' % (session.user.user_id, msg.get('request_args')) + traceback.format_exc())
                         pass
                     to_ack.append(msg['msg_id'])
 
