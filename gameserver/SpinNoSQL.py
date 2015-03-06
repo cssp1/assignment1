@@ -822,26 +822,30 @@ class NoSQLClient (object):
     def player_cache_update(self, user_id, props, reason = None, overwrite = False):
         return self.instrument('player_cache_update(%s)'%reason, self._player_cache_update, (user_id,props,overwrite))
     def _player_cache_update(self, user_id, props, overwrite):
-        if 'last_mtime' not in props: props['last_mtime'] = self.time
-        if 'user_id' in props: del props['user_id']
+        to_set = {}
+        to_unset = {}
 
         for k, v in props.iteritems():
-            # temp - check for old score updates that should go to the player_scores table instead
-            # assert not self.SCORE_RE.match(k)
+            if k == 'user_id': continue
+            if v is None:
+                to_unset[k] = 1
+            else:
+                # coerce all booleans to ints for uniformity and ladder query syntax
+                if type(v) is bool:
+                    v = int(v)
+                to_set[k] = v
 
-            # coerce all booleans to ints for uniformity and ladder query syntax
-            if type(v) is bool: v = int(v)
+        if 'last_mtime' not in to_set:
+            to_set['last_mtime'] = self.time
 
         if overwrite:
-            # I'm not sure it's possible to update a document to a specific set of new fields atomically while also using a specific _id :(
-            # this option is only used for offline maintenance scripts, so it's not a huge deal.
-            # XXX ^ this can be fixed using .save()
-            self.player_cache().remove({'_id':user_id})
-            props['_id'] = user_id
-            self.player_cache().insert(props)
+            to_set['_id'] = user_id
+            self.player_cache().save(to_set)
             return True
         else:
-            return self.player_cache().update({'_id':user_id}, {'$set':props}, upsert=True, multi=False)['n'] > 0
+            return self.player_cache().update({'_id':user_id},
+                                              {'$set': to_set, '$unset': to_unset},
+                                              upsert=True, multi=False)['n'] > 0
 
     def player_cache_lookup_batch(self, user_id_list, fields = None, reason = None):
         return self.instrument('player_cache_lookup_batch(%s)'%reason, self._player_cache_lookup_batch, (user_id_list, fields))
