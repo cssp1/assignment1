@@ -843,8 +843,12 @@ class NoSQLClient (object):
             self.player_cache().save(to_set)
             return True
         else:
-            return self.player_cache().update({'_id':user_id},
-                                              {'$set': to_set, '$unset': to_unset},
+            param = {}
+            if to_set:
+                param['$set'] = to_set
+            if to_unset:
+                param['$unset'] = to_unset
+            return self.player_cache().update({'_id':user_id}, param,
                                               upsert=True, multi=False)['n'] > 0
 
     def player_cache_lookup_batch(self, user_id_list, fields = None, reason = None):
