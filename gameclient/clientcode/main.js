@@ -40528,7 +40528,10 @@ Store.trialpay_invoke = function() {
                              // callback URL
                              'http://'+proxyserver+'/TRIALPAYAPI',
                              // currency URL
-                             ogpapi_url({'type':gamedata['game_id']+'_gamebucks'}), // note: MF would require a special hack
+                             ogpapi_url({
+                                 // note: MF requires a special case for legacy compatibility
+                                 'type': (gamedata['game_id'] == 'mf' ? 'mf_alloy' : gamedata['game_id']+'_gamebucks')
+                             }),
                              player.facebook_third_party_id,
                              session.user_id.toString(), // send user ID as order_info
                              Store.trialpay_callback);
