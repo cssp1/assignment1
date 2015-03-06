@@ -13200,11 +13200,10 @@ class Store:
     # throws exceptions to indicate order errors
 
     @classmethod
-    def execute_credit_order(cls, order_id, gameapi, request, buyer, receiver, currency, credits_amount, my_data):
+    def execute_credit_order(cls, order_id, gameapi, request, session, buyer, receiver, currency, credits_amount, my_data):
         assert currency in ('fbcredits', 'kgcredits', 'gamebucks')
         # note that gamebucks here is only used for platform offers that pay out in gamebucks, NOT in-game purchases
 
-        session = None
         tag = None
 
         # check for in-app currency order (see https://developers.facebook.com/docs/payments/app_currency_orders/)
@@ -13218,10 +13217,11 @@ class Store:
             assert m['product_amount'] <= gamedata['store']['gamebucks_per_fbcredit'] * m['credits_amount']
 
             # note: we have to find the session manually, because this request comes from Facebook without passing through the client!
-            for s in session_table.itervalues():
-                if s.user.facebook_id == buyer:
-                    session = s
-                    break
+            if session is None:
+                for s in session_table.itervalues():
+                    if s.user.facebook_id == buyer:
+                        session = s
+                        break
             if session is None: raise Exception(('session not found for in-app currency order! (FB buyer %s)' % buyer)+repr(my_data))
             unit_id = GameObject.VIRTUAL_ID
             spellname = 'FB_PROMO_GAMEBUCKS'
@@ -13231,9 +13231,9 @@ class Store:
 
         # TrialPay order
         elif my_data.get('spellname') == 'FB_TRIALPAY_GAMEBUCKS':
+            assert session
             assert currency == 'gamebucks'
             assert my_data['currency_url'] == str(OGPAPI_instance.get_object_endpoint({'type':OGPAPI.object_type('gamebucks')}))
-            session = session_table[my_data['session_id']]
             unit_id = GameObject.VIRTUAL_ID
             spellname = 'FB_TRIALPAY_GAMEBUCKS'
             spellarg = credits_amount
@@ -13241,7 +13241,8 @@ class Store:
             dollar_amount = Store.promo_gamebucks_to_dollars(credits_amount)
 
         else:
-            session = session_table[my_data['session_id']]
+            if session is None:
+                session = session_table[my_data['session_id']]
             unit_id = my_data['unit_id']
             spellname = my_data['spellname']
             spellarg = my_data.get('spellarg', None)
@@ -13997,7 +13998,7 @@ class CREDITAPI(resource.Resource):
 
                 if status == 'placed':
                     # okay to actually give the stuff here
-                    session = Store.execute_credit_order(order_id, self.gameapi, request, buyer, receiver, 'fbcredits', fb_credits_amount, SpinFacebook.order_data_decode(order_details['items'][0]['data']))
+                    session = Store.execute_credit_order(order_id, self.gameapi, request, None, buyer, receiver, 'fbcredits', fb_credits_amount, SpinFacebook.order_data_decode(order_details['items'][0]['data']))
 
                     if not session: raise Exception('execute_credit_order() returned no session')
 
@@ -14121,7 +14122,7 @@ class KGAPI(resource.Resource):
             retmsg['status'] = 'canceled' # first set this in case of failure
 
             # okay to actually give the stuff here
-            session = Store.execute_credit_order(order_id, self.gameapi, request,
+            session = Store.execute_credit_order(order_id, self.gameapi, request, None,
                                                  str(request_data['buyer_id']),
                                                  str(request_data['recipient_id']),
                                                  'kgcredits', order_info['client_price'], # must trust this?
@@ -14198,7 +14199,7 @@ class TRIALPAYAPI(resource.Resource):
 
         if gamebucks_amount > 0:
             # we (ab)use the credit order path here to share all of its metrics output
-            Store.execute_credit_order(request_args['oid'][0], self.gameapi, request, session.user.facebook_id, session.user.facebook_id,
+            Store.execute_credit_order(request_args['oid'][0], self.gameapi, request, session, session.user.facebook_id, session.user.facebook_id,
                                        'gamebucks', gamebucks_amount,
                                        # awkward syntax here
                                        {'spellname': 'FB_TRIALPAY_GAMEBUCKS',
@@ -21803,7 +21804,7 @@ class GAMEAPI(resource.Resource):
                 print 'SIMULATED ORDER', item
                 try:
                     network_id = {'fbcredits':session.user.facebook_id, 'kgcredits':session.user.kg_id}[currency]
-                    Store.execute_credit_order('0', self, request, network_id, network_id, currency, item['price'],
+                    Store.execute_credit_order('0', self, request, session, network_id, network_id, currency, item['price'],
                                                order_info if currency == 'kgcredits' else item['data'])
                 except:
                     text = traceback.format_exc()
