@@ -147,7 +147,7 @@ def do_action(path, method, args, spin_token_data, nosql_client):
             if method == 'lookup':
                 result = {'result':do_lookup(control_args)}
             elif method in ('give_item','send_message','chat_gag','chat_ungag','get_raw_player','ban','unban',
-                            'make_developer','unmake_developer','clear_lockout','clear_cooldown'):
+                            'make_developer','unmake_developer','chat_official','chat_unofficial','clear_lockout','clear_cooldown'):
                 result = do_CONTROLAPI(control_args)
             else:
                 raise Exception('unknown player method '+method)

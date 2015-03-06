@@ -6701,7 +6701,7 @@ class Player(AbstractPlayer):
         self.login_pardoned_until = -1
         self.banned_until = -1
         self.isolate_pvp = 0
-        self.chat_official = 0
+        self.chat_official = None
         self.possible_alt_accounts = {} # dictionary mapping str(user_id) -> # of logins recorded on same IP
         self.known_alt_accounts = {} # dictionary mapping str(user_id) -> {'logins':1234, 'attacks':1234}
         self.facebook_permissions = None

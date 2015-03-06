@@ -134,6 +134,21 @@ class HandleUnmakeDeveloper(Handler):
         if 'developer' in user: del user['developer']
         return ReturnValue(result = 'ok')
 
+class HandleChatOfficial(Handler):
+    def do_exec_online(self, session, retmsg):
+        session.player.chat_official = 1
+        return ReturnValue(result = 'ok')
+    def do_exec_offline(self, user, player):
+        player['chat_official'] = 1
+        return ReturnValue(result = 'ok')
+class HandleChatUnofficial(Handler):
+    def do_exec_online(self, session, retmsg):
+        session.player.chat_official = None
+        return ReturnValue(result = 'ok')
+    def do_exec_offline(self, user, player):
+        if 'chat_official' in player: del player['chat_official']
+        return ReturnValue(result = 'ok')
+
 class HandleClearCooldown(Handler):
     def do_exec_online(self, session, retmsg):
         if self.args['name'] == 'ALL':
@@ -239,6 +254,8 @@ methods = {
     'unban': HandleUnban,
     'make_developer': HandleMakeDeveloper,
     'unmake_developer': HandleUnmakeDeveloper,
+    'chat_official': HandleChatOfficial,
+    'chat_unofficial': HandleChatUnofficial,
     'clear_lockout': HandleClearLockout,
     'clear_cooldown': HandleClearCooldown,
     'chat_gag': HandleChatGag,

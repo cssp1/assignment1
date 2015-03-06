@@ -412,6 +412,8 @@ if __name__ == '__main__':
             print fmt % ('Player is a chat moderator', '')
         if user.get('developer',0):
             print fmt % ('DEVELOPER account', '')
+        if player.get('chat_official',0):
+            print fmt % ('CHAT OFFICIAL (blue text) account', '')
 
         if 'known_alt_accounts' in player and player['known_alt_accounts']:
             print fmt % ('Known alt accounts:', repr(player['known_alt_accounts']))

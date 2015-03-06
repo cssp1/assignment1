@@ -280,6 +280,18 @@ var method_unmake_developer = function() {
         send_request('player', 'unmake_developer', $.extend(ident, {'ui_reason':ui_reason}), function(result) { alert("Success!"); });
     }
 };
+var method_chat_official = function() {
+    var ident = get_ident();
+    if(ident) {
+        send_request('player', 'chat_official', $.extend(ident, {}), function(result) { alert("Success!"); });
+    }
+};
+var method_chat_unofficial = function() {
+    var ident = get_ident();
+    if(ident) {
+        send_request('player', 'chat_unofficial', $.extend(ident, {}), function(result) { alert("Success!"); });
+    }
+};
 var method_clear_lockout = function() {
     var ident = get_ident();
     var ui_reason = check_ui_reason($("#cooldown_reason")[0].value);
@@ -1206,10 +1218,12 @@ $(function() {
       <input type="text" id="ban_reason" style="width:500px;">
     </div>
     <div id="player_tools_developer">
-      Enables developer-only features and excludes this player from analytics.
-      <button onclick="method_make_developer()" class="spin_button">Make Developer</button>
-      <button onclick="method_unmake_developer()" class="spin_button">Unmake Developer</button>
-      <p>
+      &quot;Developer Flag&quot; enables developer-only features and excludes this player from analytics.<br>
+      <button onclick="method_make_developer()" class="spin_button" style="width:200px;">Developer Flag ON</button>
+      <button onclick="method_unmake_developer()" class="spin_button" style="width:200px;">Developer Flag OFF</button><p>
+      <button onclick="method_chat_official()" class="spin_button" style="width:200px;">Blue Chat Text ON</button>
+      <button onclick="method_chat_unofficial()" class="spin_button" style="width:200px;">Blue Chat Text OFF</button>
+    <p>
       Reason for this action:
       <br>
       <input type="text" id="make_developer_reason" style="width:500px;">
