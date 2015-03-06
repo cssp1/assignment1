@@ -14170,12 +14170,21 @@ class TRIALPAYAPI(resource.Resource):
 
     def handle_request(self, request):
         SpinHTTP.set_access_control_headers(request)
-        return self.handle_payment(request,
+        # find session
+        user_id = int(request.args['order_info'][0])
+        session = None
+        for s in session_table.itervalues():
+            if s.user.user_id == user_id:
+                session = s
+                break
+        if not session:
+            raise Exception('session not found for TRIALPAYAPI order (user_id %d)' % user_id)
+        return self.handle_payment(request, session,
                                    SpinHTTP.get_twisted_header(request, 'TrialPay-HMAC-MD5'),
                                    request.args,
                                    request.content.read())
 
-    def handle_payment(self, request, their_hash, request_args, request_body):
+    def handle_payment(self, request, session, their_hash, request_args, request_body):
         # note: request may be null if this is called asynchronously
         # confirm Facebook App ID matches
         assert str(request_args['app_id'][0]) == SpinConfig.config['facebook_app_id']
@@ -14186,16 +14195,6 @@ class TRIALPAYAPI(resource.Resource):
             gamesite.exception_log.event(server_time, 'TRIALPAYAPI hash mismatch: theirs %s ours %s body %r' % (their_hash, our_hash, request_body))
 
         gamebucks_amount = int(request_args['reward_amount'][0])
-
-        # find session
-        user_id = int(request_args['order_info'][0])
-        session = None
-        for s in session_table.itervalues():
-            if s.user.user_id == user_id:
-                session = s
-                break
-        if not session:
-            raise Exception('session not found for TRIALPAYAPI order (user_id %d)' % user_id)
 
         if gamebucks_amount > 0:
             # we (ab)use the credit order path here to share all of its metrics output
@@ -19379,7 +19378,7 @@ class GAMEAPI(resource.Resource):
 
                 elif msg['type'] == 'TRIALPAYAPI_payment':
                     try:
-                        gamesite.trialpayapi.handle_payment(None, msg['their_hash'], msg['request_args'], msg['request_body'])
+                        gamesite.trialpayapi.handle_payment(None, session, msg['their_hash'], msg['request_args'], msg['request_body'])
                     except:
                         gamesite.exception_log.event(server_time, 'TRIALPAYAPI_payment API fail on user %d payment %r:' % (session.user.user_id, msg.get('request_args')) + traceback.format_exc())
                         pass
