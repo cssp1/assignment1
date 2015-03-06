@@ -2362,6 +2362,10 @@ def check_quests(quests):
             error |= 1
             print 'quest %s has no rewards' % key
 
+        # this already happens in a bunch of quests, and we haven't done anything about it...
+#        if data.get('reward_xp',0) > 0 and data.get('reward_gamebucks',0) > 0:
+#            error |= 1; print 'quest %s gives both gamebucks and XP, which will overlap in the GUI' % key
+
         if ('reward_give_units' in data):
             error |= 1
             print 'quest %s has obsolete reward_give_units field, replace with reward_consequent:GIVE_LOOT' % key
@@ -2405,6 +2409,13 @@ def check_quests(quests):
                 else:
                     error |= 1
                     print 'quest %s GIVE_LOOT consequent is too complex for the GUI code to display' % key
+
+        if data.get('reward_res3',0) > 0 and \
+           ('reward_consequent' in data or
+            'reward_heal_all_units' in data or
+            'reward_give_units' in data or
+            'reward_heal_all_buildings' in data):
+            error |= 1; print 'quest %s gives both res3 and units/items/healing, which will overlap in the GUI' % key
 
         deplist = []
         if 'activation' in data:
