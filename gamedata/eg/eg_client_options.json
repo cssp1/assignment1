@@ -9,6 +9,8 @@
 // we want to favor pathing.
 "astar_iter_limit": { "pvp": 500, "pve": 10000 },
 
+"enable_upgrade_bar": 1,
+
 // show "Protection or Home" when applicable on battle history dialog.
 "battle_history_show_attackability": 1,
 "battle_history_time_column": 1, // display "Time" in separate column instead of part of "attacker" (must be enabled together with show_attackability)
