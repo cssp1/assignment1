@@ -12250,7 +12250,7 @@ function update_desktop_dialogs() {
             }
 
             // DONATED UNITS
-            if(player.unit_donation_enabled() && player.has_donated_units() &&
+            if(i < ROWS && player.unit_donation_enabled() && player.has_donated_units() &&
                !session.viewing_base.has_climate_unit_restrictions()) {
 
                 var specname = 'DONATED_UNITS';
@@ -12345,6 +12345,8 @@ function update_desktop_dialogs() {
 
                     }; })(specname, consumes_space);
                 }
+
+                any_can_deploy |= can_deploy;
 
                 i += 1;
             }
