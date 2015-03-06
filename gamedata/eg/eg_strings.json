@@ -227,7 +227,7 @@
         "alliance_tag": " [color=#ff8000][alliance=%alliance_id]\u005c[%alliance_tag\u005c][/alliance][/color]",
 
         // clickable map coordinates
-        "map_coords": "[color=#ffff00][map_coords=%region,%x,%y]%x,%y[/map_coords][/color]",
+        "map_coords": "[color=#ffff00][u][map_coords=%region,%x,%y]%x,%y[/map_coords][/u][/color]",
 
         // channel welcome messages
         "welcome": ":: [color=#00ff00]%sender_name: %body[/color] ::\n",
@@ -255,7 +255,7 @@
         "accepted_alliance_member": "[color=#00ff00][player=%target_id]%target_name joined the clan[/player][/color]",
 
         // a member earned an achievement
-        "earned_achievement": "[color=#00ff00][achievement=%sender_id:%achievement_id]%sender_name earned the achievement:\n [color=#ffff00]\u005c[%achievement_name\u005c][/color][/achievement][/color]",
+        "earned_achievement": "[color=#00ff00][achievement=%sender_id:%achievement_id]%sender_name earned the achievement:\n [color=#ffff00]\u005c[[u]%achievement_name[/u]\u005c][/color][/achievement][/color]",
 
         // a member left the alliance
         "left_alliance": "[color=#ff0000][player=%sender_id]%sender_name left the clan[/player][/color]",
