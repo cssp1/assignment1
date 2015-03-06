@@ -29,7 +29,7 @@ def is_stale(entry, cur_time, stale_days):
 
 def pruned_stale_entry(entry):
     new_entry = {}
-    for FIELD in ('ui_name', 'social_id', 'kg_avatar_url',
+    for FIELD in ('ui_name', 'real_name', 'social_id', 'kg_avatar_url',
                   'facebook_id', 'kg_id'
                   ):
         if FIELD in entry:

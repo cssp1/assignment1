@@ -925,12 +925,19 @@ class User:
                 return self.facebook_first_name
         return 'Unknown(userchat)'
 
-    def get_ui_name(self):
-        if self.alias: return self.alias
+    # player naming is documented here: https://sites.google.com/a/spinpunch.com/developers/code-formatting/special-topics/player-aliases
+
+    # return the "real" (platform-provided) name of the player
+    def get_real_name(self):
         if self.kg_username: return self.kg_username
         if self.facebook_first_name: return self.facebook_first_name
         if self.facebook_name: return self.facebook_name.split(' ')[0]
         return 'Unknown(user)'
+
+    # return the name that should be shown in the GUI (except chat) for this player
+    def get_ui_name(self):
+        if self.alias: return self.alias
+        return self.get_real_name()
 
     def get_ui_name_searchable(self):
         # get the name that should be referenced for case-insensitive searches (that want to use a case-sensitive index)
@@ -16099,6 +16106,7 @@ class GAMEAPI(resource.Resource):
         #base_damage, base_repair_time = player.my_home.report_base_damage_and_repair_time_for_ladder(player)
         ret =  {'user_id': user.user_id,
                 'ui_name': user.get_ui_name(),
+                'real_name': user.get_real_name(),
                 'player_level': player.resources.player_level,
                 'ladder_player': int(player.is_ladder_player()),
                 'pvp_player': int(player.is_pvp_player()),
@@ -16122,7 +16130,7 @@ class GAMEAPI(resource.Resource):
         # only allow retrieval of a few user-visible fields
         manual_fields = (fields is not None)
         if fields is None:
-            fields = ['user_id', 'player_level', 'social_id', 'ui_name', 'kg_avatar_url', 'last_defense_time', 'last_login_time',
+            fields = ['user_id', 'player_level', 'social_id', 'ui_name', 'real_name', 'kg_avatar_url', 'last_defense_time', 'last_login_time', # XXXXXX
                       'units_donated_cur_alliance', 'home_region', 'home_base_loc', 'ladder_player', 'pvp_player',
                       'LOCK_STATE', 'LOCK_OWNER', 'protection_end_time', 'base_damage', 'base_repair_time',
                       'facebook_id', 'kg_id',
@@ -21419,6 +21427,11 @@ class GAMEAPI(resource.Resource):
                        'ui_name': session.user.get_ui_name(),
                        'ui_name_searchable': session.user.get_ui_name_searchable()
                        }
+        real_name = session.user.get_real_name()
+        if real_name != cache_props['ui_name']:
+            cache_props['real_name'] = real_name
+        else:
+            cache_props['real_name'] = None # delete it because ui_name is all we need
 
         if session.user.social_id: cache_props['social_id'] = session.user.social_id
         if session.user.frame_platform: cache_props['frame_platform'] = session.user.frame_platform
