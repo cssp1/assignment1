@@ -46463,7 +46463,12 @@ Building.prototype.get_idle_state_advanced = function() {
             // check minimum resource amounts
             can_upgrade = true;
             for(var res in gamedata['resources']) {
-                if(player.resource_state[res][1] < get_leveled_quantity(this.spec['build_cost_'+res] || 0, this.level+1)) {
+                var cost = get_leveled_quantity(this.spec['build_cost_'+res] || 0, this.level+1);
+                if(cost < 0) {
+                    // Use Resources is not allowed - do not show arrow
+                    can_upgrade = false;
+                    break;
+                } else if(player.resource_state[res][1] < cost) {
                     // cannot upgrade
                     can_upgrade = false;
                     break;
