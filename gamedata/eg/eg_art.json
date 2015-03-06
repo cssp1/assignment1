@@ -1,6 +1,6 @@
 {
-    "spell_icon_frame": { "states": { "normal": { "images": ["art/ui/tr_inventory_elements36.png"], "origins": [0,250], "dimensions": [50,50] } } },
-    "spell_icon_glow_inner": { "states": { "normal": { "images": ["art/ui/tr_inventory_elements36.png"], "origins": [0,50], "dimensions": [50,50], "load_priority": 90 } } },
+    "spell_icon_frame": { "states": { "normal": { "images": ["art/ui/tr_inventory_elements37.png"], "origins": [0,250], "dimensions": [50,50] } } },
+    "spell_icon_glow_inner": { "states": { "normal": { "images": ["art/ui/tr_inventory_elements37.png"], "origins": [0,50], "dimensions": [50,50], "load_priority": 90 } } },
 
     "chat_gag_icon": { "states": { "normal": { "images": ["art/ui/tr_inventory_icons39.jpg"], "origins": [100,300], "dimensions": [50,50] } } },
     "chat_warn_icon": { "states": { "normal": { "images": ["art/ui/tr_inventory_icons39.jpg"], "origins": [150,300], "dimensions": [50,50] } } },
