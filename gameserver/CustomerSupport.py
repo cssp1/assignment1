@@ -119,6 +119,14 @@ class HandleClearLockout(Handler):
         player['last_lockout_end'] = self.time_now
         return ReturnValue(result = 'ok')
 
+class HandleClearAlias(Handler):
+    def do_exec_online(self, session, retmsg):
+        session.user.alias = None
+        return ReturnValue(result = 'ok')
+    def do_exec_offline(self, user, player):
+        if 'alias' in user: del user['alias']
+        return ReturnValue(result = 'ok')
+
 class HandleMakeDeveloper(Handler):
     def do_exec_online(self, session, retmsg):
         session.user.developer = session.player.developer = 1 # note: update Player as well as User
@@ -254,6 +262,7 @@ methods = {
     'unban': HandleUnban,
     'make_developer': HandleMakeDeveloper,
     'unmake_developer': HandleUnmakeDeveloper,
+    'clear_alias': HandleClearAlias,
     'chat_official': HandleChatOfficial,
     'chat_unofficial': HandleChatUnofficial,
     'clear_lockout': HandleClearLockout,

@@ -280,6 +280,13 @@ var method_unmake_developer = function() {
         send_request('player', 'unmake_developer', $.extend(ident, {'ui_reason':ui_reason}), function(result) { alert("Success!"); });
     }
 };
+var method_clear_alias = function() {
+    var ident = get_ident();
+    var ui_reason = check_ui_reason($("#chat_reason")[0].value);
+    if(ident && ui_reason) {
+        send_request('player', 'clear_alias', $.extend(ident, {'ui_reason':ui_reason}), function(result) { alert("Success!"); });
+    }
+};
 var method_chat_official = function() {
     var ident = get_ident();
     if(ident) {
@@ -1143,7 +1150,7 @@ $(function() {
   <ul>
     <li><a href="#player_tools_give_item" id="player_tools_give_item_header">Give Item</a></li>
     <li><a href="#player_tools_give_gamebucks" id="player_tools_give_gamebucks_header">Give $GAMEBUCKS_NAME$</a></li>
-    <li><a href="#player_tools_chat_gag" id="player_tools_chat_gag_header">Chat Mute</a></li>
+    <li><a href="#player_tools_chat_gag" id="player_tools_chat_gag_header">Chat Tools</a></li>
     <li><a href="#player_tools_send_message" id="player_tools_send_message_header">Send Message</a></li>
     <li><a href="#player_tools_clear_cooldown" id="player_tools_clear_cooldown_header">Cooldowns</a></li>
     <li><a href="#player_tools_ban" id="player_tools_ban_header">Ban</a></li>
@@ -1161,7 +1168,8 @@ $(function() {
       <button onclick="method_chat_ungag()" class="spin_button">Unmute</button>
       Duration: <input type="text" id="chat_gag_duration" name="chat_gag_duration" value="12"> Hours
       <button onclick="method_chat_gag($('#chat_gag_duration').spinner('value')*3600)" class="spin_button">Mute (Temporary)</button>
-      <button onclick="method_chat_gag(-1)" class="spin_button">Mute (Permanent)</button>
+      <button onclick="method_chat_gag(-1)" class="spin_button">Mute (Permanent)</button><p>
+      <button onclick="method_clear_alias()" class="spin_button">Clear Alias</button><p>
       <p>
       Reason for this action:
       <br>
