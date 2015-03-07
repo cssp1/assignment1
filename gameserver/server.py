@@ -16792,16 +16792,23 @@ class GAMEAPI(resource.Resource):
             new_alias = SpinHTTP.unwrap_string(new_alias)
             new_alias = new_alias.strip()
 
-            if not is_valid_alias(new_alias):
+            if not is_valid_alias(new_alias) or new_alias == session.user.alias:
                 retmsg.append(["ERROR", "ALIAS_BAD"])
                 return False
 
-            if True: # XXXXXX uniqueness check
+            # check uniqueness
+            old_alias = session.user.alias
+            old_name = session.user.get_ui_name()
+
+            if not gamesite.nosql_client.player_alias_claim(new_alias):
                 retmsg.append(["ERROR", "ALIAS_TAKEN"])
                 return False
+            if old_alias:
+                gamesite.nosql_client.player_alias_release(old_alias)
 
-            old_name = session.user.get_ui_name()
             session.user.alias = new_alias
+            # if the server crashes here, playerdb miight have the old alias, but only the new alias will be reserved in the DB
+
             retmsg.append(["PLAYER_ALIAS_UPDATE", session.user.alias])
             retmsg.append(["PLAYER_UI_NAME_UPDATE", session.user.get_ui_name()])
             if session.alliance_chat_channel:

@@ -120,6 +120,7 @@ class HandleClearLockout(Handler):
         return ReturnValue(result = 'ok')
 
 class HandleClearAlias(Handler):
+    # Note: this does NOT release it in the unique aliases database!
     def do_exec_online(self, session, retmsg):
         session.user.alias = None
         return ReturnValue(result = 'ok')

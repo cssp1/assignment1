@@ -168,6 +168,7 @@ class NoSQLClient (object):
         self.seen_dau = {}
         self.seen_player_cache = False
         self.seen_player_cache_indexes = set()
+        self.seen_player_aliases = False
         self.seen_facebook_ids = False
         self.seen_messages = False
         self.seen_regions = {}
@@ -720,6 +721,37 @@ class NoSQLClient (object):
             ret.append(row)
         ret.reverse() # oldest messages first
         return ret
+
+    ###### PLAYER ALIAS UNIQUE RESERVATIONS ######
+
+    def player_alias_table(self):
+        coll = self._table('player_aliases')
+        if not self.seen_player_aliases:
+            # we use the implied _id index
+            self.seen_player_aliases = True
+        return coll
+
+    def player_alias_release(self, alias, reason=''):
+        return self.instrument('player_alias_release(%s)'%reason, self._player_alias_release, (alias,))
+    def _player_alias_release(self, alias):
+        tbl = self.player_alias_table()
+        tbl.remove({'_id': alias})
+        return True
+
+    def player_alias_claim(self, alias, reason=''):
+        return self.instrument('player_alias_claim(%s)'%reason, self._player_alias_claim, (alias,))
+    def _player_alias_claim(self, alias):
+        tbl = self.player_alias_table()
+        try:
+            tbl.insert({'_id':alias})
+            return True
+        except pymongo.errors.DuplicateKeyError as e:
+            # E11000 duplicate key error
+            if e.code == 11000:
+                return False
+            else:
+                raise
+        # shouldn't get here
 
     ###### SOCIAL (FACEBOOK/KONGREGATE) ID MAP ######
 
@@ -2893,5 +2925,12 @@ if __name__ == '__main__':
 
         # test maintenance
         #client.do_maint(time_now, cur_season, cur_week)
+
+        # test player aliases
+        client.player_alias_table().drop(); client.seen_player_aliases = False
+        assert client.player_alias_claim('asdf')
+        assert not client.player_alias_claim('asdf')
+        assert client.player_alias_release('asdf')
+        assert client.player_alias_claim('asdf')
 
         print 'OK!'

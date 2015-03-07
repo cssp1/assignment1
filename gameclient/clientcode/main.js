@@ -19336,7 +19336,7 @@ function invoke_change_alias_dialog(callback, spellname) {
 function update_change_alias_dialog(dialog) {
     var ok = true;
     var s = dialog.widgets['input'].str;
-    if(s.length < 4 || s.length >= 24 /* || ChatFilter.is_bad(s) */) {
+    if(s.length < 4 || s.length >= 24 || s == player.alias /* || ChatFilter.is_bad(s) */) {
         ok = false;
     }
 
