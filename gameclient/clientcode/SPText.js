@@ -24,6 +24,15 @@ SPText.ABlock = function(str, props) {
     this.props = props;
 };
 
+
+/** One line of text is an array of ABlocks
+    @typedef {!Array.<!SPText.ABlock>} */
+SPText.ABlockLine;
+
+/** "Paragraphs" of text is an array of ABlockLines (i.e. an array of array of ABlocks)
+    @typedef {!Array.<!SPText.ABlockLine>} */
+SPText.ABlockParagraphs;
+
 // convert raw JavaScript string (possibly containing newlines) into
 // the array-of-arrays ABlock structure
 /** @param {string} str
