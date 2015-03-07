@@ -10,6 +10,7 @@ goog.provide('RegionMap');
 
 goog.require('SPUI');
 goog.require('GameArt');
+goog.require('PlayerInfoDialog');
 goog.require('goog.array');
 
 // note: this references some stuff from main.js (player.travel_state etc)
@@ -1079,7 +1080,7 @@ RegionMap.RegionMap.update_feature_popup_menu = function(dialog) {
         buttons.push([gamedata['strings']['regional_map']['get_info'],
                       (function (_mapwidget, _feature) { return function() {
                           _mapwidget.set_popup(null);
-                          invoke_player_info_dialog_unknown(_feature['base_landlord_id']);
+                          PlayerInfoDialog.invoke(_feature['base_landlord_id']);
                       }; })(mapwidget, feature), 'passive']);
 
     } else if(feature['base_type'] == 'squad') {
@@ -1096,7 +1097,7 @@ RegionMap.RegionMap.update_feature_popup_menu = function(dialog) {
         buttons.push([gamedata['strings']['regional_map']['get_info'],
                       (function (_mapwidget, _feature) { return function() {
                           _mapwidget.set_popup(null);
-                          invoke_player_info_dialog_unknown(_feature['base_landlord_id']);
+                          PlayerInfoDialog.invoke(_feature['base_landlord_id']);
                       }; })(mapwidget, feature), 'passive']);
 
     } else if(!player.is_cheater && feature['base_type'] == 'hive' && ('base_template' in feature) && (feature['base_template'] in gamedata['hives_client']['templates']) &&
@@ -1268,9 +1269,7 @@ RegionMap.RegionMap.update_feature_popup = function(dialog) {
                 ui.widgets['portrait_pending'].show = false;
                 ui.widgets['name'].str = mapwidget.pcache_to_name(info);
                 ui.widgets['portrait'].onclick = (function (_info) { return function(w) {
-                    invoke_player_info_dialog_unknown(_info['user_id'], _info['facebook_id'] || null,
-                                                      PlayerCache.get_ui_name(_info),
-                                                      _info['player_level'] || null);
+                    PlayerInfoDialog.invoke(_info['user_id']);
                 }; })(info);
             }
         }
