@@ -496,9 +496,7 @@ function OpenURLConsequent(data) {
 }
 goog.inherits(OpenURLConsequent, Consequent);
 OpenURLConsequent.prototype.execute = function(state) {
-    var handle = window.open(this.url, '_blank');
-    if(!handle) { return; } // blocked by browser?
-    handle.focus();
+    url_open_in_new_tab(this.url);
 };
 
 /** @constructor

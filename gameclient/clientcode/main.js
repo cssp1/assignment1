@@ -11146,8 +11146,7 @@ function get_event_evil_valentina_props(event_data) {
         var url = eval_cond_or_literal(event_data['info_url'], player, null);
         if(url) {
             info_action = (function (_url) { return function() {
-                var handle = window.open(_url, '_blank');
-                if(handle) { handle.focus(); }
+                url_open_in_new_tab(_url);
             }; })(url);
         }
     }
@@ -31260,8 +31259,7 @@ function missions_dialog_select_mission(dialog, row) {
         dialog.widgets['claim_button'].onclick = (function (q) { return function() {
             if('ui_accept_url' in q) {
                 // override default behavior with a URL open
-                var handle = window.open(q['ui_accept_url'], '_blank');
-                if(handle) { handle.focus(); }
+                url_open_in_new_tab(q['ui_accept_url']);
                 return;
             }
 
@@ -32314,8 +32312,7 @@ function update_daily_tip_pageable(dialog) {
             dialog.widgets['link_button'].tooltip.str = helper_tooltip;
             dialog.widgets['link_button'].onclick = (function (_url, _cons, _helper) { return function() {
                 if(_url) {
-                    var handle = window.open(_url, '_blank');
-                    if(handle) { handle.focus(); }
+                    url_open_in_new_tab(_url);
                 }
                 if(_cons) { change_selection_ui(null); read_consequent(_cons).execute(); }
                 if(_helper) { _helper(); }
@@ -32357,8 +32354,7 @@ function invoke_daily_tip(tipname, skip_notification_queue) {
             send_to_server.func(["DAILY_TIP_UNDERSTOOD", _name, _ack]);
             close_parent_dialog(widget);
             if(_url) {
-                var handle = window.open(_url, '_blank');
-                if(handle) { handle.focus(); }
+                url_open_in_new_tab(_url);
             }
             if(_cons) {
                 read_consequent(_cons).execute();
@@ -32393,8 +32389,7 @@ function invoke_daily_tip(tipname, skip_notification_queue) {
                 }
                 dialog.widgets['link_button'].onclick = (function (_url, _cons) { return function() {
                     if(_url) {
-                        var handle = window.open(_url, '_blank');
-                        if(handle) { handle.focus(); }
+                        url_open_in_new_tab(_url);
                     }
                     if(_cons) { change_selection_ui(null); read_consequent(_cons).execute(); }
                 }; })(url, cons);
@@ -32910,8 +32905,7 @@ function invoke_settings_dialog() {
         if('help_url' in data) {
             dialog.widgets['help'+row].show = true;
             dialog.widgets['help'+row].onclick = (function (_data) { return function(w) {
-                var handle = window.open(_data['help_url'], '_blank');
-                if(handle) { handle.focus(); }
+                url_open_in_new_tab(_data['help_url']);
             }; })(data);
         }
         row += 1;
@@ -32977,8 +32971,7 @@ function invoke_keyboard_shortcuts() {
     dialog.widgets['close_button'].onclick = function() { change_selection(null); };
     if(gamedata['strings']['keyboard_shortcuts_help_url']) {
         dialog.widgets['link_button'].onclick = (function (_url) { return function() {
-            var newWindow = window.open(_url, '_blank');
-            if(newWindow) { newWindow.focus(); }
+            url_open_in_new_tab(_url);
         }; })(gamedata['strings']['keyboard_shortcuts_help_url']);
     } else {
         dialog.widgets['link_button'].show = false;
@@ -33370,8 +33363,7 @@ function invoke_buy_gamebucks_dialog1(reason, amount, order) {
             dialog.widgets['info_button'].show = dialog.widgets['transition_msg_header'].show = dialog.widgets['transition_msg'].show = true;
             dialog.widgets['transition_msg'].set_text_with_linebreaking(dialog.data['widgets']['transition_msg']['ui_name_'+transition_msg]);
             dialog.widgets['info_button'].onclick = (function (_transition_msg) { return function(w) {
-                var handle = window.open(w.data['url_'+_transition_msg], '_blank');
-                if(handle) { handle.focus(); }
+                url_open_in_new_tab(w.data['url_'+_transition_msg]);
             }; })(transition_msg);
         }
     }
