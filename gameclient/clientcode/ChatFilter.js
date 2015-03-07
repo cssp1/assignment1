@@ -43,6 +43,10 @@ ChatFilter = {
         ChatFilter.bad_regex = new RegExp(pattern,config['options']);
     },
 
+    is_bad: function(s) {
+        return s.search(ChatFilter.bad_regex) != -1;
+    },
+
     censor: function(s) {
         return s.replace(ChatFilter.bad_regex, function(rep) {
             var asterisks = "";

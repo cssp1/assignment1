@@ -5094,6 +5094,7 @@ player.home_base_loc = null; // base_map_loc of player's home
 player.enable_muffins = false; // show extra-secret hidden developer features
 player.is_cheater = false; // allow breaking of unit space/building limits (NOT ON LIVE SERVER)
 player.ui_name = '(Unknown)';
+player.alias = null;
 player.facebook_name = '(Unknown)';
 player.facebook_currency = null;
 player.facebook_permissions = spin_facebook_login_permissions.split(',');
@@ -19301,6 +19302,47 @@ function update_map_ladder_pvp_dialog(dialog) {
     }
 }
 
+
+function invoke_change_alias_dialog(callback, spellname) {
+    var dialog = new SPUI.Dialog(gamedata['dialogs']['change_alias_dialog']);
+    dialog.user_data['dialog'] = 'change_alias_dialog';
+    dialog.user_data['spellname'] = spellname;
+    dialog.user_data['callback'] = callback;
+    install_child_dialog(dialog);
+    dialog.auto_center();
+    dialog.modal = true;
+    dialog.widgets['close_button'].onclick =
+    dialog.widgets['cancel_button'].onclick = close_parent_dialog;
+    dialog.widgets['input'].str = player.alias || '';
+    dialog.widgets['input'].disallowed_chars = ['\\', '/', ' ', '.', ':', ';', '+', '*', '(', ')', '<', '>', '[', ']', '{', '}', ',', '|', '"', "'",]; // keep in sync with server.py alias_disallowed_chars and errors.json ALIAS_BAD
+    var descr = gamedata['errors']['ALIAS_BAD']['ui_name'];
+    while(descr.indexOf('\n\n') >= 0) { // replace double line breaks with single
+        descr = descr.replace('\n\n', '\n');
+    }
+    dialog.widgets['description'].set_text_with_linebreaking(descr);
+    dialog.widgets['ok_button'].onclick = dialog.widgets['input'].ontextready = function(w) {
+        var dialog = w.parent;
+        var new_name = dialog.widgets['input'].str;
+        if(new_name && new_name.length >= 3) {
+            dialog.user_data['callback']([SPHTTP.wrap_string(new_name)]);
+            close_parent_dialog(w);
+        }
+    };
+    SPUI.set_keyboard_focus(dialog.widgets['input']);
+    dialog.ondraw = update_change_alias_dialog;
+    return dialog;
+}
+
+function update_change_alias_dialog(dialog) {
+    var ok = true;
+    var s = dialog.widgets['input'].str;
+    if(s.length < 4 || s.length >= 24 /* || ChatFilter.is_bad(s) */) {
+        ok = false;
+    }
+
+    dialog.widgets['ok_button'].state = (ok ? 'normal' : 'disabled');
+}
+
 function invoke_change_region_offer_dialog() {
     var dialog = new SPUI.Dialog(gamedata['dialogs']['change_region_offer_dialog']);
     dialog.user_data['dialog'] = 'change_region_offer_dialog';
@@ -21235,6 +21277,12 @@ function inventory_action(item, slot, action, trigger_gcd) {
                         return true;
                     } else if(spellname.indexOf("CHANGE_REGION_INSTANTLY") == 0) {
                         invoke_change_region_dialog((function (_item, _slot, _action, _trigger_gcd) { return function(spellarg) {
+                            inventory_send_request(_item, _slot, _action, spellarg, _trigger_gcd);
+                            return true;
+                        }; })(item, slot, action, trigger_gcd), spellname);
+                        return true;
+                    } else if(spellname === "CHANGE_ALIAS") {
+                        invoke_change_alias_dialog((function (_item, _slot, _action, _trigger_gcd) { return function(spellarg) {
                             inventory_send_request(_item, _slot, _action, spellarg, _trigger_gcd);
                             return true;
                         }; })(item, slot, action, trigger_gcd), spellname);
@@ -37843,7 +37891,7 @@ function can_cast_spell_detailed(unit_id, spellname, spellarg) {
         return [false, 'On Cooldown: '+pretty_print_time(to_go), null];
     }
 
-    if(spellname == "GIVE_UNITS_LIMIT_BREAK") {
+    if(spellname == "GIVE_UNITS_LIMIT_BREAK" || spellname == "CHANGE_ALIAS") {
         // always OK
     } else if(spellname == "SHOW_STORE" || spellname == "CLIENT_CONSEQUENT") {
         // always OK
@@ -39893,6 +39941,8 @@ function handle_server_message(data) {
         player.ui_name = data[1];
         var dlg = desktop_dialogs['desktop_top'];
         if(dlg && dlg.widgets['player_portrait']) { dlg.widgets['player_portrait'].invalidate(); } // reset avatar image
+    } else if(msg == "PLAYER_ALIAS_UPDATE") {
+        player.alias = data[1];
     } else if(msg == "PLAYER_CACHE_UPDATE") {
         PlayerCache.update_batch(data[1]);
     } else if(msg == "FACEBOOK_CURRENCY_UPDATE") {
@@ -41515,6 +41565,7 @@ function handle_server_message(data) {
                                  '%points_to_win': 'points_to_win',
                                  '%prev_alliance_id': 'prev_alliance_id',
                                  '%prev_alliance_name': 'prev_alliance_name',
+                                 '%old_name': 'old_name',
                                  '%region_name': 'region_name',
                                  '%item_name': 'item_name'
                                 }, function(sender_key, repl_key) {
@@ -42140,7 +42191,7 @@ function handle_server_message(data) {
             notification_queue.push(cb);
         } else if(name == "INSUFFICIENT_RESOURCES_TO_REPAIR") {
             invoke_insufficient_resources_for_repair_message(argument || {}, data[0] || null);
-        } else if(name.indexOf("CANNOT_CREATE_ALLIANCE")==0 || name == "ALLIANCES_OFFLINE" || name == "CANNOT_JOIN_ALLIANCE") {
+        } else if(name.indexOf("CANNOT_CREATE_ALLIANCE")==0 || name == "ALLIANCES_OFFLINE" || name == "CANNOT_JOIN_ALLIANCE" || name == "ALIAS_BAD" || name == "ALIAS_TAKEN") {
             invoke_child_message_dialog(display_title, display_string, {'dialog': 'message_dialog_big'});
         } else {
             user_log.msg('Error: '+display_string, new SPUI.Color(1,0,0,1));

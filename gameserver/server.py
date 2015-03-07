@@ -150,6 +150,7 @@ tag_chars_ext = name_chars_simple + \
 name_chars_ext = tag_chars_ext + \
                  [' ', "'"]
 descr_disallowed_chars = ['\n', '\t', '\r']
+alias_disallowed_chars = ['\n', '\t', '\r', '\\', '/', ' ', '.', ':', ';', '+', '*', '(', ')', '<', '>', '[', ']', '{', '}', ',', '|', '"', "'", '\0'] # keep in sync with main.js and errors.json ALIAS_BAD
 
 def is_valid_alliance_descr(name):
     if len(name) > 256: return False
@@ -176,6 +177,13 @@ def is_valid_alliance_tag(tag):
                 return False
         if chat_filter.is_bad(tag): return False
         if tag.lower() in gamedata['client']['chat_filter']['bad_words']: return False
+    return True
+
+def is_valid_alias(name):
+    if len(name) < 4 or len(name) > 24: return False
+    for c in name:
+        if c in alias_disallowed_chars: return False
+    if chat_filter.is_bad(name): return False
     return True
 
 # decorate the name of a history key with a suffix for the current PvP season
@@ -16777,6 +16785,30 @@ class GAMEAPI(resource.Resource):
             session.player.unit_repair_send(retmsg)
             if recalc_power:
                 session.power_changed(session.viewing_base, None, retmsg)
+
+        elif spellname == 'CHANGE_ALIAS':
+            new_alias = spellarg[0]
+            assert type(new_alias) in (str, unicode)
+            new_alias = SpinHTTP.unwrap_string(new_alias)
+            new_alias = new_alias.strip()
+
+            if not is_valid_alias(new_alias):
+                retmsg.append(["ERROR", "ALIAS_BAD"])
+                return False
+
+            if True: # XXXXXX uniqueness check
+                retmsg.append(["ERROR", "ALIAS_TAKEN"])
+                return False
+
+            old_name = session.user.get_ui_name()
+            session.user.alias = new_alias
+            retmsg.append(["PLAYER_ALIAS_UPDATE", session.user.alias])
+            retmsg.append(["PLAYER_UI_NAME_UPDATE", session.user.get_ui_name()])
+            if session.alliance_chat_channel:
+                session.do_chat_send(session.alliance_chat_channel,
+                                     'I have a new alias!',
+                                     bypass_gag = True, props = {'type':'changed_alias',
+                                                                 'old_name': old_name})
         else:
             raise Exception('unknown spell '+spellname)
 
@@ -21025,6 +21057,7 @@ class GAMEAPI(resource.Resource):
                        session.player.get_daily_banner(session, retmsg)
                        ])
         retmsg.append(["PLAYER_UI_NAME_UPDATE", session.user.get_ui_name()])
+        retmsg.append(["PLAYER_ALIAS_UPDATE", session.user.alias])
 
         if session.user.frame_platform == 'fb':
             retmsg.append(["FACEBOOK_CURRENCY_UPDATE", session.user.facebook_currency])
