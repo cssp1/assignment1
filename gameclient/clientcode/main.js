@@ -38523,7 +38523,7 @@ function update_upgrade_dialog(dialog) {
     var price;
     if(tech) {
         if(builder || player.is_cheater) {
-            price = Store.get_user_currency_price(builder ? builder.id : 0, gamedata['spells']['RESEARCH_FOR_MONEY'], techname);
+            price = Store.get_user_currency_price(builder ? builder.id : GameObject.VIRTUAL_ID, gamedata['spells']['RESEARCH_FOR_MONEY'], techname);
         } else {
             price = -1;
         }
