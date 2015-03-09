@@ -636,7 +636,6 @@ class UserTable:
               ('locale', str),
               ('frame_platform', str),
               ('social_id', str),
-              ('alias', None),
               ('facebook_id', str),
               ('facebook_profile', None),
               ('facebook_friends', None),
@@ -840,8 +839,6 @@ class User:
         self.frame_platform = None
         self.social_id = None
 
-        self.alias = None # always overrides ui_name of player
-
         # facebook_id and facebook_name are always guaranteed to be available (for Facebook players)
         # however, facebook_name will be set to '(waiting for Facebook)' until the API call completes
         self.facebook_id = None
@@ -918,8 +915,13 @@ class User:
         # that contains data from a future version of the server
         self.foreign_data = {}
 
-    def get_chat_name(self):
-        if self.alias: return self.alias
+
+    # for the various get_name() functions, Player must be passed in
+    # since we might want the alias/title to override the
+    # platform-provided name stored on the User object.
+
+    def get_chat_name(self, player):
+        if player.alias: return player.alias
         if self.kg_username: return self.kg_username
         if self.facebook_first_name:
             if self.facebook_name and len(self.facebook_name.split(' ')) >= 2:
@@ -943,13 +945,16 @@ class User:
         return 'Unknown(user)'
 
     # return the name that should be shown in the GUI (except chat) for this player
-    def get_ui_name(self):
-        if self.alias: return self.alias
+    def get_ui_name(self, player):
+        if player.alias: return player.alias
         return self.get_real_name()
 
-    def get_ui_name_searchable(self):
+    def get_ui_name_searchable(self, player):
         # get the name that should be referenced for case-insensitive searches (that want to use a case-sensitive index)
-        return self.get_ui_name().lower()
+        if player.alias:
+            # important: this should NOT include the name_title
+            return player.alias.lower()
+        return self.get_ui_name(player).lower()
 
     def chat_can_interact(self):
         if not self.active_session: return False
@@ -1287,7 +1292,7 @@ class User:
                 retmsg = self.active_session.deferred_messages
         if retmsg is not None:
             retmsg.append(["PLAYER_CACHE_UPDATE", [gamesite.gameapi.get_player_cache_props(self, session.player)]])
-            retmsg.append(["PLAYER_UI_NAME_UPDATE", self.get_ui_name()])
+            retmsg.append(["PLAYER_UI_NAME_UPDATE", self.get_ui_name(session.player)])
 
     # try to obtain the user's Facebook profile, friends and likes
     # this is cached in user_table; if the cache is empty or stale,
@@ -1521,7 +1526,7 @@ class User:
             gamesite.msg_client.msg_send([session.player.make_system_mail(gamedata['strings']['gift_order_refund_mail'],
                                                                           to_user_id = gift['recipient_user_id'],
                                                                           extra_props = {'gift_order_refund':original_gift_order, 'gamebucks': amount},
-                                                                          replacements = {'%SENDER': session.user.get_chat_name(),
+                                                                          replacements = {'%SENDER': session.user.get_chat_name(session.player),
                                                                                           '%PAYMENT_ID': payment_id,
                                                                                           '%QUANTITY': str(amount),
                                                                                           '%GAMEBUCKS_NAME': gamedata['store']['gamebucks_ui_name'],
@@ -2034,7 +2039,8 @@ class User:
 
         if retmsg is not None:
             retmsg.append(["FACEBOOK_NAME_UPDATE", self.facebook_name])
-            retmsg.append(["PLAYER_UI_NAME_UPDATE", self.get_ui_name()])
+            if self.active_session:
+                retmsg.append(["PLAYER_UI_NAME_UPDATE", self.get_ui_name(self.active_session.player)])
 
             self.populate_friends_who_play(retmsg)
 
@@ -2119,6 +2125,7 @@ class PlayerTable:
     PLAYER_RW_FIELDS = [
               ('generation', None, None),
               ('read_only', None, None),
+              ('alias', None, None),
               ('facebook_permissions', None, None), # needs to be in player rather than user because it is app-specific
               ('last_fb_notification_time', None, None),
               ('fbpayments_inflight', None, None),
@@ -3222,17 +3229,17 @@ class Session(object):
             gagged = (not self.user.chat_can_interact()) or self.player.stattab.get_player_stat('chat_gagged')
 
         sender_info = {'time':server_time,
-                       'chat_name': self.user.get_chat_name(),
-                       'facebook_id': self.user.facebook_id,
+                       'chat_name': self.user.get_chat_name(self.player),
                        'user_id': self.user.user_id,
                        # summary dimensions for SQL logging. should NOT be revealed to clients!
                        # prefix with '_' to remind us to filter this out.
                        '_sum': self.player.get_denormalized_summary_props('brief')
                        }
+        if self.user.facebook_id:
+            sender_info['facebook_id'] = self.user.facebook_id
 
         if props:
-            for k, v in props.iteritems():
-                sender_info[k] = v
+            sender_info.update(props)
 
         if self.alliance_id_cache >= 0:
             sender_info['alliance_id'] = self.alliance_id_cache
@@ -3664,7 +3671,7 @@ class Session(object):
         if not loot: return
 
         if reason == 'ai_base':
-            str_reason = 'AI %d (%s L%d)' % (self.viewing_player.user_id, self.viewing_user.get_ui_name(), self.viewing_player.resources.player_level)
+            str_reason = 'AI %d (%s L%d)' % (self.viewing_player.user_id, self.viewing_user.get_ui_name(self.viewing_player), self.viewing_player.resources.player_level)
         elif reason == 'ai_attack':
             str_reason = 'AI attack by %d' % self.incoming_attack_id
         elif reason == 'quest':
@@ -3689,7 +3696,7 @@ class Session(object):
             for item in loot:
                 player.inventory_log_event('5125_item_obtained', item['spec'], item.get('stack',1), item.get('expire_time',-1), reason=reason)
         elif reason == 'ai_base':
-            player.send_loot_mail(self.viewing_user.get_ui_name(), self.viewing_player.resources.player_level,
+            player.send_loot_mail(self.viewing_user.get_ui_name(self.viewing_player), self.viewing_player.resources.player_level,
                                   loot, retmsg, mail_template = mail_template)
         elif reason == 'ai_attack':
             ai_id = self.incoming_attack_id
@@ -6666,6 +6673,8 @@ class Player(AbstractPlayer):
 
         # this flag indicates that we have permission to write out updates to Player's state
         self.has_write_lock = True
+
+        self.alias = None
 
         # override of current_event time, for debugging purposes
         self.event_time_override = None
@@ -11594,12 +11603,13 @@ def spawn_tutorial_units(session, retmsg):
 def setup_test_user(facebook_id, user_id, ui_name):
     gamesite.exception_log.event(server_time, 'Setting up test user account...')
     user = User(user_id)
-    user.alias = user.facebook_name = ui_name
+    user.facebook_name = ui_name
     user.facebook_id = facebook_id
     #user_table.store_sync(user)
     user_table.store_async(user, lambda: None, False, 'setup_test_user')
 
     player = LivePlayer(user_id)
+    player.alias = ui_name
     init_game(player, 1)
     player.read_only = 0
     for obj in player.home_base_iter():
@@ -11637,12 +11647,13 @@ def setup_ai_base(strid, cb):
     gamesite.exception_log.event(server_time, 'Setting up AI %4d: %s L%d' % (int(strid), data['ui_name'], data['resources']['player_level']))
 
     user = User(int(strid))
-    user.alias = user.facebook_first_name = user.facebook_name = data['ui_name']
+    user.facebook_first_name = user.facebook_name = data['ui_name']
     user.facebook_id = -1 # XXX None
     user_table.store_async(user, lambda: None, False, 'setup_ai_bases')
 
     player = LivePlayer(user.user_id)
     player.read_only = 1
+    player.alias = data['ui_name']
     player.tutorial_state = "COMPLETE"
     player.resources.unpersist_state(data['resources'])
     player.my_home.deployment_buffer = data.get('deployment_buffer', 1)
@@ -11698,7 +11709,7 @@ def setup_ai_base(strid, cb):
     # populate cache entry
     gamesite.pcache_client.player_cache_update(user.user_id,
                                                {'player_level': player.resources.player_level,
-                                                'ui_name': user.alias, 'social_id': 'ai',
+                                                'ui_name': player.alias, 'social_id': 'ai',
                                                 'facebook_id': '-1', # XXX remove later
                                                 }, reason = 'setup_ai_base')
 
@@ -13793,10 +13804,10 @@ class Store:
                                                    'to': [recipient_user_id],
                                                    'expire_time': server_time + gamedata['server']['message_expire_time']['gift_order'],
                                                    'from_fbid': str(session.user.facebook_id),
-                                                   'from_name': unicode(session.user.get_chat_name()),
+                                                   'from_name': unicode(session.user.get_chat_name(session.player)),
                                                    'attachments': [{'spec':item_name, 'stack':gift_amount}],
-                                                   'subject': ui_data['ui_subject'].replace('%sender', session.user.get_chat_name()).replace('%GAMEBUCKS_NAME',gamedata['store']['gamebucks_ui_name']),
-                                                   'body': ui_data['ui_body'].replace('%sender', session.user.get_chat_name()).replace('%GAMEBUCKS_NAME',gamedata['store']['gamebucks_ui_name']).replace('%time', time.strftime('%H:%S', time.gmtime(server_time))).replace('%day', time.strftime('%d %b %Y', time.gmtime(server_time)))}])
+                                                   'subject': ui_data['ui_subject'].replace('%sender', session.user.get_chat_name(session.player)).replace('%GAMEBUCKS_NAME',gamedata['store']['gamebucks_ui_name']),
+                                                   'body': ui_data['ui_body'].replace('%sender', session.user.get_chat_name(session.player)).replace('%GAMEBUCKS_NAME',gamedata['store']['gamebucks_ui_name']).replace('%time', time.strftime('%H:%S', time.gmtime(server_time))).replace('%day', time.strftime('%d %b %Y', time.gmtime(server_time)))}])
                     session.player.resources.gain_gamebucks(-gift_amount, reason='gift_order')
                     total_gift_amount += gift_amount
                     entry['success'] = True
@@ -13810,7 +13821,7 @@ class Store:
                         session.player.do_send_fb_notification_to(session.user.facebook_id, notif_text, config, config['ref'])
                     config = gamedata['fb_notifications']['notifications'].get('you_got_gift_order',None)
                     if config:
-                        notif_text = config['ui_name'].replace('%GAMEBUCKS_AMOUNT', str(gift_amount)).replace('%SENDER', session.user.get_chat_name()).replace('%GAMEBUCKS_NAME',gamedata['store']['gamebucks_ui_name'])
+                        notif_text = config['ui_name'].replace('%GAMEBUCKS_AMOUNT', str(gift_amount)).replace('%SENDER', session.user.get_chat_name(session.player)).replace('%GAMEBUCKS_NAME',gamedata['store']['gamebucks_ui_name'])
                         session.player.do_send_fb_notification_to(entry['recipient_facebook_id'], notif_text, config, config['ref'])
 
                 retmsg.append(["YOU_SENT_GIFT_ORDER", gift_order])
@@ -14412,8 +14423,8 @@ class GAMEAPI(resource.Resource):
             session.viewing_player.run_battle_end_auras(defender_outcome, session, retmsg)
 
             # collect summary info that will be stored in both players' battle histories
-            attacker_name = session.user.get_ui_name()
-            defender_name = session.viewing_user.get_ui_name()
+            attacker_name = session.user.get_ui_name(session.player)
+            defender_name = session.viewing_user.get_ui_name(session.viewing_player)
             facebook_friends = (not session.viewing_player.is_ai()) and session.user.is_friends_with(session.viewing_user.social_id)
 
             summary = { 'time': session.attack_log.log_time,
@@ -14675,7 +14686,7 @@ class GAMEAPI(resource.Resource):
                         # Facebook says template functionality is going away, so stop using this
                         notif_attacker = '{'+str(session.user.facebook_id)+'}'
                     else:
-                        notif_attacker = session.user.get_ui_name()
+                        notif_attacker = session.user.get_ui_name(session.player)
 
                     notif_text = notif_text.replace('%ATTACKER', notif_attacker)
                     session.viewing_player.send_fb_notification(session.viewing_user, notif_text, config)
@@ -15031,7 +15042,7 @@ class GAMEAPI(resource.Resource):
                                 'starting_base_damage': session.starting_base_damage, # note, this will ignore repairs since the start of the session
                                 'defender_id': session.user.user_id,
                                 'defender_type': 'human',
-                                'defender_name': session.user.get_ui_name(),
+                                'defender_name': session.user.get_ui_name(session.player),
                                 'defender_facebook_id': session.user.facebook_id,
                                 'defender_social_id': session.user.social_id,
                                 'defender_level': session.player.resources.player_level,
@@ -15137,7 +15148,7 @@ class GAMEAPI(resource.Resource):
                                                    'type': 'i_attacked_you',
                                                    'expire_time': server_time + gamedata['server']['message_expire_time']['i_attacked_you'],
                                                    'from_fbid': str(summary['attacker_facebook_id']),
-                                                   'from_name': unicode(session.user.get_ui_name()),
+                                                   'from_name': unicode(session.user.get_ui_name(session.player)),
                                                    'summary': summary}])
 
                     if summary['base_type'] != 'home' and 'base_region' in summary:
@@ -15614,11 +15625,11 @@ class GAMEAPI(resource.Resource):
             if session.viewing_base.base_landlord_id == session.player.user_id and session.viewing_base.base_ui_name:
                 session.ui_name = session.viewing_base.base_ui_name
             elif session.viewing_base.base_type == 'quarry':
-                session.ui_name = session.viewing_user.get_ui_name() + "'s Quarry" # ui_name
+                session.ui_name = session.viewing_user.get_ui_name(session.viewing_player) + "'s Quarry" # ui_name
             elif session.viewing_base.base_type == 'squad':
-                session.ui_name = session.viewing_user.get_ui_name() + "'s "+gamedata['strings']['squads']['squad']
+                session.ui_name = session.viewing_user.get_ui_name(session.viewing_player) + "'s "+gamedata['strings']['squads']['squad']
             else:
-                session.ui_name = session.viewing_user.get_ui_name()
+                session.ui_name = session.viewing_user.get_ui_name(session.viewing_player)
 
             if session.viewing_player is session.player:
                 enemy_snapshot = player_snapshot
@@ -15650,7 +15661,7 @@ class GAMEAPI(resource.Resource):
                      'opponent_type':session.viewing_player.ai_or_human()
                      }
 
-            session.ui_name = session.viewing_user.get_ui_name()
+            session.ui_name = session.viewing_user.get_ui_name(session.viewing_player)
 
             # compute resource state for the adversary
             enemy_snapshot = session.viewing_player.resources.calc_snapshot()
@@ -16113,7 +16124,7 @@ class GAMEAPI(resource.Resource):
     def get_player_cache_props(self, user, player, alliance_id = None):
         #base_damage, base_repair_time = player.my_home.report_base_damage_and_repair_time_for_ladder(player)
         ret =  {'user_id': user.user_id,
-                'ui_name': user.get_ui_name(),
+                'ui_name': user.get_ui_name(player),
                 'real_name': user.get_real_name(),
                 'player_level': player.resources.player_level,
                 'ladder_player': int(player.is_ladder_player()),
@@ -16584,10 +16595,10 @@ class GAMEAPI(resource.Resource):
             msg_data = {'type':'mail',
                         'expire_time': message_expire_time,
                         'from': session.player.user_id,
-                        'from_name': msg['ui_from'].replace('%SENDER_NAME', session.user.get_ui_name()).replace('%SENDER_ROLE_NAME', sender_role_name).replace('%ALLIANCE_NAME', alliance_name),
+                        'from_name': msg['ui_from'].replace('%SENDER_NAME', session.user.get_ui_name(session.player)).replace('%SENDER_ROLE_NAME', sender_role_name).replace('%ALLIANCE_NAME', alliance_name),
                         'to': [target_id],
-                        'subject': msg['ui_subject'].replace('%SENDER_NAME', session.user.get_ui_name()),
-                        'body': msg['ui_body'].replace('%SENDER_NAME', session.user.get_ui_name()).replace('%SENDER_ROLE_NAME', sender_role_name).replace('%ALLIANCE_NAME', alliance_name).replace('%day', time.strftime('%d %b %Y', time.gmtime(server_time))).replace('%time', time.strftime('%H:%M', time.gmtime(server_time))),
+                        'subject': msg['ui_subject'].replace('%SENDER_NAME', session.user.get_ui_name(session.player)),
+                        'body': msg['ui_body'].replace('%SENDER_NAME', session.user.get_ui_name(session.player)).replace('%SENDER_ROLE_NAME', sender_role_name).replace('%ALLIANCE_NAME', alliance_name).replace('%day', time.strftime('%d %b %Y', time.gmtime(server_time))).replace('%time', time.strftime('%H:%M', time.gmtime(server_time))),
                         'attachments': loot
                         }
             for EXTRA in ('show_if', 'discard_if', 'receipt_duration'):
@@ -16792,13 +16803,13 @@ class GAMEAPI(resource.Resource):
             new_alias = SpinHTTP.unwrap_string(new_alias)
             new_alias = new_alias.strip()
 
-            if not is_valid_alias(new_alias) or new_alias == session.user.alias:
+            if not is_valid_alias(new_alias) or new_alias == session.player.alias:
                 retmsg.append(["ERROR", "ALIAS_BAD"])
                 return False
 
             # check uniqueness
-            old_alias = session.user.alias
-            old_name = session.user.get_ui_name()
+            old_alias = session.player.alias
+            old_name = session.user.get_ui_name(session.player)
 
             if not gamesite.nosql_client.player_alias_claim(new_alias):
                 retmsg.append(["ERROR", "ALIAS_TAKEN"])
@@ -16806,11 +16817,11 @@ class GAMEAPI(resource.Resource):
             if old_alias:
                 gamesite.nosql_client.player_alias_release(old_alias)
 
-            session.user.alias = new_alias
+            session.player.alias = new_alias
             # if the server crashes here, playerdb miight have the old alias, but only the new alias will be reserved in the DB
 
-            retmsg.append(["PLAYER_ALIAS_UPDATE", session.user.alias])
-            retmsg.append(["PLAYER_UI_NAME_UPDATE", session.user.get_ui_name()])
+            retmsg.append(["PLAYER_ALIAS_UPDATE", session.player.alias])
+            retmsg.append(["PLAYER_UI_NAME_UPDATE", session.user.get_ui_name(session.player)])
             if session.alliance_chat_channel:
                 session.do_chat_send(session.alliance_chat_channel,
                                      'I have a new alias!',
@@ -19178,7 +19189,7 @@ class GAMEAPI(resource.Resource):
                        'type': 'resource_gift',
                        'expire_time': server_time + gamedata['server']['message_expire_time']['resource_gift'],
                        'from_fbid': str(session.user.facebook_id),
-                       'from_name': unicode(session.user.get_ui_name()),
+                       'from_name': unicode(session.user.get_ui_name(session.player)),
                        'unique_per_sender': 'resource_gift'}
 
         # for bulletproof atomicity, wrap the code in a try: block and
@@ -19393,7 +19404,7 @@ class GAMEAPI(resource.Resource):
                         session.increment_player_metric('gamebucks_received_from_gift_orders', gift_amount)
                         config = gamedata['fb_notifications']['notifications'].get('your_gift_order_was_received',None)
                         if config:
-                            notif_text = config['ui_name'].replace('%GAMEBUCKS_AMOUNT', str(gift_amount)).replace('%RECEIVER', session.user.get_chat_name()).replace('%GAMEBUCKS_NAME',gamedata['store']['gamebucks_ui_name'])
+                            notif_text = config['ui_name'].replace('%GAMEBUCKS_AMOUNT', str(gift_amount)).replace('%RECEIVER', session.user.get_chat_name(session.player)).replace('%GAMEBUCKS_NAME',gamedata['store']['gamebucks_ui_name'])
                             session.player.do_send_fb_notification_to(msg['from_fbid'], notif_text, config, config['ref'])
 
                     gift_order_refund = msg.get('gift_order_refund', None)
@@ -21063,8 +21074,8 @@ class GAMEAPI(resource.Resource):
                        session.user.is_chat_mod(),
                        session.player.get_daily_banner(session, retmsg)
                        ])
-        retmsg.append(["PLAYER_UI_NAME_UPDATE", session.user.get_ui_name()])
-        retmsg.append(["PLAYER_ALIAS_UPDATE", session.user.alias])
+        retmsg.append(["PLAYER_UI_NAME_UPDATE", session.user.get_ui_name(session.player)])
+        retmsg.append(["PLAYER_ALIAS_UPDATE", session.player.alias])
 
         if session.user.frame_platform == 'fb':
             retmsg.append(["FACEBOOK_CURRENCY_UPDATE", session.user.facebook_currency])
@@ -21464,8 +21475,8 @@ class GAMEAPI(resource.Resource):
                        'last_login_ip': session.user.last_login_ip,
                        'last_mtime': server_time,
                        'money_spent': session.player.history.get('money_spent',0.0),
-                       'ui_name': session.user.get_ui_name(),
-                       'ui_name_searchable': session.user.get_ui_name_searchable()
+                       'ui_name': session.user.get_ui_name(session.player),
+                       'ui_name_searchable': session.user.get_ui_name_searchable(session.player)
                        }
         real_name = session.user.get_real_name()
         if real_name != cache_props['ui_name']:
@@ -22470,8 +22481,8 @@ class GAMEAPI(resource.Resource):
             user_ids = gamesite.nosql_client.player_cache_search(search_terms.lower(),
                                                                  limit = gamedata['search_player_list_limit'],
                                                                  match_mode = gamedata['search_player_match_mode'],
-                                                                 name_field = gamedata['search_player_name_field'], # reference "ui_name_searchable" lowercased name for fast case-insensitive queries
-                                                                 case_sensitive = True if (gamedata['search_player_name_field'] == 'ui_name_searchable') else False,
+                                                                 name_field = 'ui_name_searchable',
+                                                                 case_sensitive = True,
                                                                  reason = 'SEARCH_PLAYER_CACHE')
             pcache_data = self.do_query_player_cache(session, user_ids, reason = 'SEARCH_PLAYER_CACHE') if user_ids else []
             retmsg.append(["SEARCH_PLAYER_CACHE_RESULT", user_ids, pcache_data, tag])
@@ -22672,7 +22683,7 @@ class GAMEAPI(resource.Resource):
                     msg = gamedata['strings']['alliance_join_request_' + ('accepted' if accept else 'rejected') + '_mail']
                     gamesite.msg_client.msg_send([{'type':'mail',
                                                    'expire_time': server_time + gamedata['alliances']['invite_duration'],
-                                                   'from_name': msg['ui_from'].replace('%LEADER_NAME', session.user.get_chat_name()).replace('%LEADER_ROLE_NAME', my_role_info['ui_name']).replace('%ALLIANCE_NAME', alliance_display_name(info)),
+                                                   'from_name': msg['ui_from'].replace('%LEADER_NAME', session.user.get_chat_name(session.player)).replace('%LEADER_ROLE_NAME', my_role_info['ui_name']).replace('%ALLIANCE_NAME', alliance_display_name(info)),
                                                    'to': [invitee],
                                                    'subject': msg['ui_subject'],
                                                    'body': msg['ui_body'].replace('%ALLIANCE_NAME', alliance_display_name(info))
@@ -22734,10 +22745,10 @@ class GAMEAPI(resource.Resource):
                     msg = gamedata['strings']['alliance_invite_mail']
                     gamesite.msg_client.msg_send([{'type':'mail',
                                                    'expire_time': expire_time,
-                                                   'from_name': msg['ui_from'].replace('%LEADER_NAME', session.user.get_chat_name()).replace('%LEADER_ROLE_NAME', my_role_info['ui_name']).replace('%ALLIANCE_NAME', alliance_display_name(info)),
+                                                   'from_name': msg['ui_from'].replace('%LEADER_NAME', session.user.get_chat_name(session.player)).replace('%LEADER_ROLE_NAME', my_role_info['ui_name']).replace('%ALLIANCE_NAME', alliance_display_name(info)),
                                                    'to': [invitee],
                                                    'subject': msg['ui_subject'],
-                                                   'body': msg['ui_body'].replace('%LEADER_NAME', session.user.get_chat_name()).replace('%LEADER_ROLE_NAME', my_role_info['ui_name']).replace('%ALLIANCE_NAME', alliance_display_name(info))
+                                                   'body': msg['ui_body'].replace('%LEADER_NAME', session.user.get_chat_name(session.player)).replace('%LEADER_ROLE_NAME', my_role_info['ui_name']).replace('%ALLIANCE_NAME', alliance_display_name(info))
                                                    }])
 
             retmsg.append(["ALLIANCE_INVITE_RESULT", alliance_id, invitee, success, tag])
@@ -22775,10 +22786,10 @@ class GAMEAPI(resource.Resource):
                     msg = gamedata['strings']['alliance_kick_mail']
                     messages = [{'type':'mail',
                                  'expire_time': msg['duration'] if msg['duration'] < 0 else server_time + msg['duration'],
-                                 'from_name': msg['ui_from'].replace('%LEADER_NAME', session.user.get_chat_name()).replace('%LEADER_ROLE_NAME', my_role_info['ui_name']).replace('%ALLIANCE_NAME', alliance_display_name(info)),
+                                 'from_name': msg['ui_from'].replace('%LEADER_NAME', session.user.get_chat_name(session.player)).replace('%LEADER_ROLE_NAME', my_role_info['ui_name']).replace('%ALLIANCE_NAME', alliance_display_name(info)),
                                  'to': [kickee],
                                  'subject': msg['ui_subject'],
-                                 'body': msg['ui_body'].replace('%LEADER_NAME', session.user.get_chat_name()).replace('%LEADER_ROLE_NAME', my_role_info['ui_name']).replace('%ALLIANCE_NAME', alliance_display_name(info))
+                                 'body': msg['ui_body'].replace('%LEADER_NAME', session.user.get_chat_name(session.player)).replace('%LEADER_ROLE_NAME', my_role_info['ui_name']).replace('%ALLIANCE_NAME', alliance_display_name(info))
                                  },
                                 {'to': [kickee],
                                  'from': session.user.user_id,
@@ -22836,10 +22847,10 @@ class GAMEAPI(resource.Resource):
                 msg = gamedata['strings']['alliance_'+('promote' if new_role > old_role else 'demote')+'_mail']
                 gamesite.msg_client.msg_send([{'type':'mail',
                                                'expire_time': msg['duration'] if msg['duration'] < 0 else server_time + msg['duration'],
-                                               'from_name': msg['ui_from'].replace('%LEADER_NAME', session.user.get_chat_name()).replace('%LEADER_ROLE_NAME', my_role_info['ui_name']).replace('%ALLIANCE_NAME', alliance_display_name(info)),
+                                               'from_name': msg['ui_from'].replace('%LEADER_NAME', session.user.get_chat_name(session.player)).replace('%LEADER_ROLE_NAME', my_role_info['ui_name']).replace('%ALLIANCE_NAME', alliance_display_name(info)),
                                                'to': [promotee_id],
                                                'subject': msg['ui_subject'].replace('%NEW_ROLE_NAME', new_role_info['ui_name']),
-                                               'body': msg['ui_body'].replace('%LEADER_NAME', session.user.get_chat_name()).replace('%LEADER_ROLE_NAME', my_role_info['ui_name']).replace('%ALLIANCE_NAME', alliance_display_name(info)).replace('%NEW_ROLE_NAME', new_role_info['ui_name'])
+                                               'body': msg['ui_body'].replace('%LEADER_NAME', session.user.get_chat_name(session.player)).replace('%LEADER_ROLE_NAME', my_role_info['ui_name']).replace('%ALLIANCE_NAME', alliance_display_name(info)).replace('%NEW_ROLE_NAME', new_role_info['ui_name'])
                                                },
                                               {'type': 'alliance_role_changed',
                                                'to': [promotee_id],
@@ -22855,7 +22866,7 @@ class GAMEAPI(resource.Resource):
                 # send FB notifications XXXXXX need to rewrite this path so that it respects enable_fb_notifications preference
                 config = gamedata['fb_notifications']['notifications'].get('alliance_promoted' if new_role > old_role else 'alliance_demoted',None)
                 if config and ('facebook_id' in pcache_data):
-                    notif_text = config['ui_name'].replace('%ACTOR_NAME', session.user.get_chat_name()).replace('%ACTOR_ROLE', my_role_info['ui_name']).replace('%NEW_ROLE', new_role_info['ui_name']).replace('%ALLIANCE_NAME', alliance_display_name(info))
+                    notif_text = config['ui_name'].replace('%ACTOR_NAME', session.user.get_chat_name(session.player)).replace('%ACTOR_ROLE', my_role_info['ui_name']).replace('%NEW_ROLE', new_role_info['ui_name']).replace('%ALLIANCE_NAME', alliance_display_name(info))
                     session.player.do_send_fb_notification_to(pcache_data['facebook_id'], notif_text, config, config['ref'])
 
             retmsg.append(["ALLIANCE_PROMOTE_RESULT", alliance_id, promotee_id, success, tag])
@@ -24604,7 +24615,7 @@ class GAMEAPI(resource.Resource):
                                                        'attachments':attachments,
                                                        'from': session.player.user_id,
                                                        'from_fbid': session.user.facebook_id,
-                                                       'from_name': session.user.get_chat_name()}])
+                                                       'from_name': session.user.get_chat_name(session.player)}])
 
                         for unit in units:
                             if session.has_object(unit.obj_id):
@@ -25679,7 +25690,7 @@ class AdminResource(resource.Resource):
         for id, session in sorted(session_table.items(), key = sort_funcs[sort_by]):
             user = str(session.user.user_id)
             user_link = '<a href="http://apps.facebook.com/'+SpinConfig.config['facebook_app_namespace']+'/?visit_base='+user+'">'+user+'</a>'
-            name = session.user.get_ui_name()
+            name = session.user.get_ui_name(session.player)
             if session.user.facebook_id:
                 name = '<a href="http://www.facebook.com/'+session.user.facebook_id+'/">'+name+'</a>'
 

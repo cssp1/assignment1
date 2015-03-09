@@ -1402,6 +1402,16 @@ IsInAlliancePredicate.prototype.is_satisfied = function(player, qdata) {
 
 /** @constructor
   * @extends Predicate */
+function HasAliasPredicate(data) {
+    goog.base(this, data);
+}
+goog.inherits(HasAliasPredicate, Predicate);
+HasAliasPredicate.prototype.is_satisfied = function(player, qdata) {
+    return !!player.alias;
+};
+
+/** @constructor
+  * @extends Predicate */
 function LadderPlayerPredicate(data) {
     goog.base(this, data);
 }
@@ -1586,6 +1596,8 @@ function read_predicate(data) {
         return new LadderPlayerPredicate(data);
     } else if(kind === 'IS_IN_ALLIANCE') {
         return new IsInAlliancePredicate(data);
+    } else if(kind === 'HAS_ALIAS') {
+        return new HasAliasPredicate(data);
     } else if(kind === 'BASE_SIZE') {
         return new BaseSizePredicate(data);
     } else if(kind === 'HOME_REGION') {
