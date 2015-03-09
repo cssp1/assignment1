@@ -125,7 +125,7 @@ if __name__ == '__main__':
 
         cur.execute("DROP FUNCTION IF EXISTS iron_water_price") # obsolete
 
-        for res in ('iron', 'water'):
+        for res in gamedata['resources']:
             cur.execute("DROP FUNCTION IF EXISTS "+res+"_price")
             def get_parameter(p, resname):
                 ret = gamedata['store'][p]
@@ -151,6 +151,12 @@ if __name__ == '__main__':
                 raise Exception('unknown resource_price_formula '+formula)
             final = "CREATE FUNCTION "+res+"_price (amount INT8) RETURNS INT8 DETERMINISTIC RETURN IF(amount=0, 0, IF(amount>0,1,-1) * GREATEST(1, CEIL("+func+")))"
             cur.execute(final)
+
+        # some tables have res3 columns even if the game itself doesn't have res3.
+        # Create a dummy function to satisfy queries.
+        if 'res3' not in gamedata['resources']:
+            cur.execute("DROP FUNCTION IF EXISTS res3_price")
+            cur.execute("CREATE FUNCTION res3_price (amount INT8) RETURNS INT8 DETERMINISTIC RETURN 0")
 
         filterwarnings('error', category = MySQLdb.Warning)
         con.commit()

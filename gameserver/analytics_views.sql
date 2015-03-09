@@ -265,7 +265,7 @@ ORDER BY NULL;
 -- this makes accounting easier since we can freely sum negative and positive values
 
 
--- iron/water_price() are OBSOLETE - these are now updated dynamically in stats_to_sql.py because they depend on parameters in gamedata.store
+-- iron/water/res3_price() are OBSOLETE - these are now updated dynamically in stats_to_sql.py because they depend on parameters in gamedata.store
 -- convert an amount of iron/water to gamebucks using the in-game Store formula (note: non-linear!)
 
 -- DROP FUNCTION IF EXISTS iron_water_price;
@@ -277,13 +277,10 @@ ORDER BY NULL;
 -- CREATE FUNCTION water_price (amount INT)
 -- RETURNS INT DETERMINISTIC
 -- RETURN IF(amount=0, 0, IF(amount>0,1,-1) * IF(ABS(amount)<2, 1, GREATEST(1, CEIL(40.0*0.06*EXP(0.75*(LOG10(ABS(amount))-2.2*POW(LOG10(ABS(amount)),-1.25)))))));
-
--- convert an amount of third resource to gamebucks
--- eventually move this to stats_to_sql.py when we parameterize it properly
-DROP FUNCTION IF EXISTS res3_price;
-CREATE FUNCTION res3_price (amount INT)
-RETURNS INT DETERMINISTIC
-RETURN 1000*amount;
+-- DROP FUNCTION IF EXISTS res3_price;
+-- CREATE FUNCTION res3_price (amount INT)
+-- RETURNS INT DETERMINISTIC
+-- RETURN 1000*amount;
 
 -- time_price() - convert a number of seconds of speedup time to gamebucks
 -- OBSOLETE - updated dynamically in stats_to_sql.py because it depends on parameters in gamedata.store
