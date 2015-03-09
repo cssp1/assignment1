@@ -1036,14 +1036,14 @@ $(function() {
         // no ban or developer flag permission
         $('#player_tools_ban').remove();
         $('#player_tools_ban_header').remove();
-        $('#player_tools_developer').remove();
-        $('#player_tools_developer_header').remove();
     }
 
     if(spin_token_data['roles'].indexOf('PCHECK-WRITE') == -1) {
         // no write permission
         $('#mode_payment_tab').remove();
         $('#mode_payment').remove();
+        $('#player_tools_developer').remove();
+        $('#player_tools_developer_header').remove();
         $('#player_tools_give_item').remove();
         $('#player_tools_give_item_header').remove();
         $('#player_tools_give_gamebucks').remove();
