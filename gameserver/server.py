@@ -13882,6 +13882,12 @@ class Store:
             session.increment_player_metric('items_purchased', 1, time_series = False)
             session.increment_player_metric(record_spend_type+'_spent_on_items', record_amount)
 
+        elif spellname == "CHANGE_ALIAS":
+            if not gameapi.execute_spell(session, retmsg, spellname, spellarg, reason = 'purchased_alias_change'):
+                raise Exception('player %d %s(%s) purchase failure' % (session.player.user_id, spellname, repr(spellarg)))
+            session.increment_player_metric('alias_changes_purchased', 1)
+            session.player.send_history_update(retmsg)
+
         elif spellname == "BUY_LOTTERY_TICKET":
             scanner = session.player.find_lottery_building()
             assert scanner

@@ -35355,6 +35355,8 @@ function update_new_store_sku(d) {
             if(order_spell == "CHANGE_REGION" || order_spell.indexOf("CHANGE_REGION_INSTANTLY")==0) {
                 change_selection_ui(null); // don't want to do this, but the tooltips are unbearable
                 invoke_change_region_dialog(order_cb, order_spell);
+            } else if(order_spell == "CHANGE_ALIAS") {
+                invoke_change_alias_dialog(order_cb, order_spell);
             } else {
                 throw Error('unhandled order_spell '+order_spell.toString());
             }
