@@ -13884,7 +13884,11 @@ class Store:
 
         elif spellname == "CHANGE_ALIAS":
             if not gameapi.execute_spell(session, retmsg, spellname, spellarg, reason = 'purchased_alias_change'):
-                raise Exception('player %d %s(%s) purchase failure' % (session.player.user_id, spellname, repr(spellarg)))
+                try:
+                    err_arg = SpinHTTP.unwrap_string(spellarg[0])
+                except:
+                    err_arg = repr(spellarg)
+                raise Exception('player %d %s(%s) purchase failure' % (session.player.user_id, spellname, err_arg))
             session.increment_player_metric('alias_changes_purchased', 1)
             session.player.send_history_update(retmsg)
 
