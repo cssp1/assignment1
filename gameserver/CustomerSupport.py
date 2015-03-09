@@ -122,10 +122,10 @@ class HandleClearLockout(Handler):
 class HandleClearAlias(Handler):
     # Note: this does NOT release it in the unique aliases database!
     def do_exec_online(self, session, retmsg):
-        session.user.alias = None
+        session.player.alias = None
         return ReturnValue(result = 'ok')
     def do_exec_offline(self, user, player):
-        if 'alias' in user: del user['alias']
+        if 'alias' in player: del player['alias']
         return ReturnValue(result = 'ok')
 
 class HandleMakeDeveloper(Handler):
