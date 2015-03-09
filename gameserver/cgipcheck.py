@@ -61,7 +61,7 @@ def item_is_giveable(gamedata, spec):
     global boost_item_expr
     if not boost_item_expr:
         boost_item_expr = re.compile('boost_(%s)_([0-9]+)' % '|'.join(gamedata['resources'].keys()))
-    if spec['name'] in ('instant_repair', 'token', 'friendstone'): return True
+    if spec['name'] in ('instant_repair', 'token', 'friendstone', 'flask'): return True
     if spec['name'].startswith('home_base_relocator'): return True
     if spec['name'].endswith('_blueprint'): return True
     if 'time_warp' in spec['name']: return True
