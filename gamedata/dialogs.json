@@ -5714,9 +5714,12 @@
 
             "name_label": { "kind": "TextField", "xy": [58,79], "dimensions": [275, 17], "text_size": 13,
                             "text_color": [0.8,0.8,0.8,1],
-                            "text_hjustify": "left", "ui_name": "Name:" },
-            "name": { "kind": "TextField", "xy": [57,93], "dimensions": [275, 28], "text_size": 24, "text_style": "bold",
+                            "text_hjustify": "left", "ui_name": "Name:", "ui_name_alias": "Call Sign:" },
+            "name": { "kind": "TextField", "xy": [57,98], "dimensions": [275, 28], "text_size": 24, "text_style": "bold",
                       "text_hjustify": "left", "ui_name": "Loading..." },
+
+            "set_alias_button": { "kind": "ActionButton", "xy": [108,75], "dimensions": [24,24], "bg_image": "pencil_button", "push_bg_image": 1,
+                                  "tooltip_delay": 0, "ui_tooltip": "Choose Call Sign", "show": 0 },
 
             "friend_icon": { "kind": "FriendIcon", "xy": [100, 137], "dimensions": [50,73], "state": "normal" },
 
@@ -8343,23 +8346,23 @@
     },
 
     "change_alias_dialog": {
-        "dimensions": [360,270],
+        "dimensions": [360,350],
         "default_button": "ok_button",
         "widgets": {
-            "bg": {"kind": "StaticImage", "xy":[0,0], "dimensions":[360,270], "asset": "dialog_resizable", "bg_image_resizable":1 },
-            "sunken": {"kind": "StaticImage", "xy":[12,56], "dimensions":[335,200], "asset": "dialog_sunken_resizable", "bg_image_resizable":1 },
+            "bg": {"kind": "StaticImage", "xy":[0,0], "dimensions":[360,350], "asset": "dialog_resizable", "bg_image_resizable":1 },
+            "sunken": {"kind": "StaticImage", "xy":[12,56], "dimensions":[335,280], "asset": "dialog_sunken_resizable", "bg_image_resizable":1 },
 
             "title": { "kind": "TextField", "xy": [30,10], "dimensions": [221, 41], "text_size": 24, "text_style": "thick", "text_hjustify": "left", "ui_name": "Change Call Sign" },
-            "description": { "kind": "TextField", "xy": [34,81], "dimensions": [290, 41], "text_size": 13, "text_style": "thick", "text_hjustify": "left", "text_color": [0.8,0.8,0.8] },
+            "description": { "kind": "TextField", "xy": [34,71], "dimensions": [290, 41], "text_size": 13, "text_style": "thick", "text_hjustify": "left", "text_vjustify": "top", "text_color": [0.8,0.8,0.8] },
 
             "close_button": { "kind": "ActionButton", "xy": [330,1], "dimensions": [19,22], "bg_image": "close_button_small", "push_bg_image": 1 },
 
-            "input_bg": { "kind": "StaticImage", "xy": [30,167], "dimensions": [297,31], "asset": "dialog_sunken_white_resizable", "bg_image_resizable": 1 },
-            "input": { "kind": "TextInput", "xy": [36,168], "dimensions": [287,30], "text_size": 15, "text_hjustify": "left",
-                       "clip_to": [36,158,287,36], "max_chars": 24,
+            "input_bg": { "kind": "StaticImage", "xy": [30,247], "dimensions": [297,31], "asset": "dialog_sunken_white_resizable", "bg_image_resizable": 1 },
+            "input": { "kind": "TextInput", "xy": [38,248], "dimensions": [287,30], "text_size": 15, "text_hjustify": "left",
+                       "clip_to": [38,245,287,36], "max_chars": 24,
                        "text_color": [0,0,0,1], "blank_on_enter": false },
-            "cancel_button": { "kind": "ActionButton", "xy": [30,215], "dimensions": [134, 28], "bg_image": "menu_button_134px", "text_size": 13, "text_style": "bold", "ui_name": "Cancel"},
-            "ok_button": { "kind": "ActionButton", "xy": [195,215], "dimensions": [134, 28], "bg_image": "action_button_134px", "text_size": 13, "text_style": "bold", "ui_name": "Accept"}
+            "cancel_button": { "kind": "ActionButton", "xy": [30,295], "dimensions": [134, 28], "bg_image": "menu_button_134px", "text_size": 13, "text_style": "bold", "ui_name": "Cancel"},
+            "ok_button": { "kind": "ActionButton", "xy": [195,295], "dimensions": [134, 28], "bg_image": "action_button_134px", "text_size": 13, "text_style": "bold", "ui_name": "Accept"}
         }
     },
 

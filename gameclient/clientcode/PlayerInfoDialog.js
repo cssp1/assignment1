@@ -11,6 +11,7 @@ goog.provide('PlayerInfoDialog');
 */
 
 goog.require('SPUI');
+goog.require('SPHTTP');
 goog.require('SPText');
 goog.require('FBShare');
 goog.require('PlayerCache');
@@ -421,11 +422,9 @@ PlayerInfoDialog.invoke_profile_tab = function(parent) {
     var user_id = parent.user_data['user_id'];
     var knowledge = parent.user_data['info'];
 
+    var z_index = -1;
     if('tab' in parent.widgets) {
-        if(parent.widgets['tab'].user_data['dialog'] == 'player_info_profile_tab') {
-            // we're already up
-            return;
-        }
+        z_index = parent.get_z_index(parent.widgets['tab']);
         parent.remove(parent.widgets['tab']);
         delete parent.widgets['tab'];
     }
@@ -452,14 +451,51 @@ PlayerInfoDialog.invoke_profile_tab = function(parent) {
     dialog.user_data['scores'] = [];
     dialog.user_data['cache'] = null; // stores result of player cache query
     parent.widgets['tab'] = dialog;
-    parent.add(dialog);
+    if(z_index >= 0) {
+        parent.add_at_index(dialog, z_index);
+    } else {
+        parent.add(dialog);
+    }
 
     dialog.widgets['id_number'].str = user_id.toString();
 
     dialog.widgets['name'].str = PlayerCache.get_ui_name(knowledge);
     if('real_name' in knowledge && knowledge['real_name'] != dialog.widgets['name'].str) {
         dialog.widgets['name'].str += ' ('+knowledge['real_name']+')';
+        dialog.widgets['name_label'].str = dialog.data['widgets']['name_label']['ui_name_alias'];
+    } else {
+        dialog.widgets['name_label'].str = dialog.data['widgets']['name_label']['ui_name'];
     }
+
+    if(('SET_ALIAS' in gamedata['spells']) && user_id == session.user_id) {
+        var spell = gamedata['spells']['SET_ALIAS'];
+        if(!('show_if' in spell) || read_predicate(spell['show_if']).is_satisfied(player, null)) {
+            dialog.widgets['set_alias_button'].show = true;
+            var req = read_predicate(spell['requires'] || {'predicate':'ALWAYS_TRUE'});
+            if(req.is_satisfied(player, null)) {
+                dialog.widgets['set_alias_button'].onclick = function(w) {
+                    var parent = w.parent.parent;
+                    invoke_change_alias_dialog(
+                        (function (_parent) { return function(spellarg) {
+                            send_to_server.func(["SET_ALIAS", spellarg]);
+                            invoke_ui_locker(null,
+                                             // update when the response comes back
+                                             (function (__parent) { return function() {
+                                                 if(__parent.is_visible()) {
+                                                     PlayerInfoDialog.invoke_profile_tab(__parent);
+                                                 }
+                                             }; })(_parent)
+                                            );
+                        }; })(parent),
+                        'SET_ALIAS'
+                    );
+                };
+            } else {
+                dialog.widgets['set_alias_button'].show = false;
+            }
+        }
+    }
+
     dialog.widgets['level'].str = (knowledge['player_level'] ? knowledge['player_level'].toString() : '??');
     dialog.widgets['friend_icon'].set_user(user_id);
 

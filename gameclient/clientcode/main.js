@@ -19304,6 +19304,7 @@ function update_map_ladder_pvp_dialog(dialog) {
 
 
 function invoke_change_alias_dialog(callback, spellname) {
+    var spell = gamedata['spells'][spellname];
     var dialog = new SPUI.Dialog(gamedata['dialogs']['change_alias_dialog']);
     dialog.user_data['dialog'] = 'change_alias_dialog';
     dialog.user_data['spellname'] = spellname;
@@ -19312,13 +19313,16 @@ function invoke_change_alias_dialog(callback, spellname) {
     dialog.auto_center();
     dialog.modal = true;
     dialog.widgets['close_button'].onclick =
-    dialog.widgets['cancel_button'].onclick = close_parent_dialog;
+        dialog.widgets['cancel_button'].onclick = close_parent_dialog;
+    dialog.widgets['title'].str = spell['ui_name'];
     dialog.widgets['input'].str = player.alias || '';
     dialog.widgets['input'].disallowed_chars = ['\\', '/', ' ', '.', ':', ';', '+', '*', '(', ')', '<', '>', '[', ']', '{', '}', ',', '|', '"', "'",]; // keep in sync with server.py alias_disallowed_chars and errors.json ALIAS_BAD
-    var descr = gamedata['errors']['ALIAS_BAD']['ui_name'];
-    while(descr.indexOf('\n\n') >= 0) { // replace double line breaks with single
-        descr = descr.replace('\n\n', '\n');
+    var descr1 = spell['ui_description'];
+    var descr2 = gamedata['errors']['ALIAS_BAD']['ui_name'];
+    while(descr2.indexOf('\n\n') >= 0) { // replace double line breaks with single
+        descr2 = descr2.replace('\n\n', '\n');
     }
+    var descr = descr1 + '\n\n' + descr2;
     dialog.widgets['description'].set_text_with_linebreaking(descr);
     dialog.widgets['ok_button'].onclick = dialog.widgets['input'].ontextready = function(w) {
         var dialog = w.parent;

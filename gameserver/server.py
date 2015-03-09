@@ -16797,7 +16797,7 @@ class GAMEAPI(resource.Resource):
             if recalc_power:
                 session.power_changed(session.viewing_base, None, retmsg)
 
-        elif spellname == 'CHANGE_ALIAS':
+        elif spell.get('code') == 'change_alias':
             new_alias = spellarg[0]
             assert type(new_alias) in (str, unicode)
             new_alias = SpinHTTP.unwrap_string(new_alias)
@@ -16822,6 +16822,8 @@ class GAMEAPI(resource.Resource):
 
             retmsg.append(["PLAYER_ALIAS_UPDATE", session.player.alias])
             retmsg.append(["PLAYER_UI_NAME_UPDATE", session.user.get_ui_name(session.player)])
+            retmsg.append(["PLAYER_CACHE_UPDATE", [self.get_player_cache_props(session.user, session.player)]])
+
             if session.alliance_chat_channel:
                 session.do_chat_send(session.alliance_chat_channel,
                                      'I have a new alias!',
@@ -22313,6 +22315,13 @@ class GAMEAPI(resource.Resource):
 
         elif arg[0] == "CHANGE_REGION":
             self.execute_spell(session, retmsg, arg[0], [arg[1],arg[2]])
+
+        elif arg[0] == "SET_ALIAS":
+            spell = gamedata['spells'][arg[0]]
+            if spell.get('requires') and (not Predicates.read_predicate(spell['requires']).is_satisfied2(session, session.player, None)):
+                retmsg.append(["ERROR", "REQUIREMENTS_NOT_SATISFIED", spell['requires']])
+                return
+            self.execute_spell(session, retmsg, arg[0], arg[1])
 
         elif arg[0] == "TRAVEL_BEGIN":
             if session.has_attacked:
