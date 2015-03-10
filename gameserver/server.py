@@ -921,7 +921,7 @@ class User:
     # platform-provided name stored on the User object.
 
     def get_chat_name(self, player):
-        if player.alias: return player.alias
+        if player.alias: return player.get_titled_alias()
         if self.kg_username: return self.kg_username
         if self.facebook_first_name:
             if self.facebook_name and len(self.facebook_name.split(' ')) >= 2:
@@ -946,13 +946,13 @@ class User:
 
     # return the name that should be shown in the GUI (except chat) for this player
     def get_ui_name(self, player):
-        if player.alias: return player.alias
+        if player.alias: return player.get_titled_alias()
         return self.get_real_name()
 
     def get_ui_name_searchable(self, player):
         # get the name that should be referenced for case-insensitive searches (that want to use a case-sensitive index)
         if player.alias:
-            # important: this should NOT include the name_title
+            # important: this should NOT include the title
             return player.alias.lower()
         return self.get_ui_name(player).lower()
 
@@ -2126,6 +2126,8 @@ class PlayerTable:
               ('generation', None, None),
               ('read_only', None, None),
               ('alias', None, None),
+              ('title', None, None), # string value of current title to use
+              ('unlocked_titles', None, None), # dictionary of unlocked titles
               ('facebook_permissions', None, None), # needs to be in player rather than user because it is app-specific
               ('last_fb_notification_time', None, None),
               ('fbpayments_inflight', None, None),
@@ -6675,6 +6677,8 @@ class Player(AbstractPlayer):
         self.has_write_lock = True
 
         self.alias = None
+        self.title = None
+        self.unlocked_titles = None # dictionary of {'title':1}
 
         # override of current_event time, for debugging purposes
         self.event_time_override = None
@@ -6910,6 +6914,15 @@ class Player(AbstractPlayer):
             elif len(self.history['sessions']) >= 2: # final session is open
                 return self.history['sessions'][-2][1]
         return -1
+
+    def get_titled_alias(self):
+        assert self.alias
+        ret = self.alias
+        if self.title:
+            ret = self.title.replace('%s', self.alias)
+        elif gamedata.get('default_title'):
+            ret = gamedata['default_title'].replace('%s', self.alias)
+        return ret
 
     # temporary functions that skip the basedb indirection
     def home_base_iter(self): return self.my_home.iter_objects()

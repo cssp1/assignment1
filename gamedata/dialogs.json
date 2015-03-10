@@ -3121,7 +3121,7 @@
             "search_label": { "kind": "TextField", "xy": [46,77], "dimensions": [154, 28], "text_size": 15, "text_hjustify": "right", "text_style": "bold",
                               "ui_name": "Search Players:" },
             "search_instructions": { "kind": "TextField", "xy": [216,111], "dimensions": [302, 17], "text_hjustify": "left", "text_size": 13,
-                                     "ui_name": "Please type name or Player ID number of the player you want to find" },
+                                     "ui_name": "Type name (not including rank/title) or Player ID of the player you want to find." },
             "search_input_bg": { "kind": "StaticImage", "xy": [212,77], "dimensions": [300,28], "asset": "dialog_sunken_white_resizable", "bg_image_resizable": 1 },
             "search_input": { "kind": "TextInput", "xy": [218,77], "dimensions": [290,28], "text_size": 15, "text_hjustify": "left",
                               "clip_to": [218,67,290,36], "max_chars": 20,

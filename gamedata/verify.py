@@ -2643,6 +2643,12 @@ def check_dialog(name, data):
         error |= check_dialog_widget(name+':'+wname, wdata)
     return error
 
+def check_titles(data):
+    error = 0
+    if data['default_title'] not in data['titles']:
+        error |= 1; print 'default_title not in titles'
+    return error
+
 def check_climate(name, data):
     error = 0
     for ASSET in ('backdrop', 'backdrop_whole'):
@@ -3042,6 +3048,9 @@ def main(args):
 
     for name, data in gamedata['climates'].iteritems():
         error |= check_climate(name, data)
+
+    if 'titles' in gamedata:
+        error |= check_titles(gamedata)
 
     for s in ('buildings', 'units'):
         for name, data in gamedata[s].iteritems():
