@@ -38344,6 +38344,7 @@ Store.get_base_price = function(unit_id, spell, spellarg, ignore_error) {
         }
     } else if(formula.indexOf('grow_base_perimeter') === 0) {
         var to_level = parseInt(formula[formula.length-1],10);
+        if('currency' in spell) { p_currency = spell['currency']; }
         if(session.viewing_base.base_size >= to_level && !ignore_error) {
             return [-1, p_currency];
         }

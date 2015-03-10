@@ -12700,6 +12700,7 @@ class Store:
             if session.viewing_base.base_size >= to_level:
                 error_reason.append('player base is already grown to this size')
                 return -1, p_currency
+            if 'currency' in spell: p_currency = spell['currency']
             return spell['price'], p_currency
         elif formula == 'speedup' or formula == 'speedup_gamebucks':
 
@@ -13681,12 +13682,12 @@ class Store:
             session.increment_player_metric(record_spend_type+'_spent_on_barrier_upgrades', record_amount)
 
         elif spellname.startswith("GROW_BASE_PERIMETER"):
-            new_level = int(spellname[-1])
+            # accept any spellname of the form GROW_BASE_PERIMETERx_... where "x" is the new level to grow to
+            new_level = int(spellname.split('_')[2][-1])
             assert new_level >= 0 and new_level <= 1
             assert new_level > session.viewing_base.base_size
             session.viewing_base.base_size = new_level
             retmsg.append(["BASE_SIZE_UPDATE", session.viewing_base.base_size])
-            retmsg.append(["PLAYER_STATE_UPDATE", session.player.resources.calc_snapshot().serialize()])
             metric_event_coded(session.user.user_id, '5080_purchase_base_boundary_growth', {'level': new_level,
                                                                                             'currency': currency,
                                                                                             record_price_type: amount_willing_to_pay})
