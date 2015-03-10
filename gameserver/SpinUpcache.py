@@ -512,7 +512,6 @@ PURCHASE_CATEGORY_MAP = {'MAKE_DROIDS': 'manufacturing', # dummy entry for produ
                          'REPAIR_ALL_FOR_MONEY': 'repair',
                          'UNIT_REPAIR_SPEEDUP_FOR_MONEY': 'repair',
                          'UPGRADE_BARRIERS_LEVEL2': 'barriers', 'UPGRADE_BARRIERS_LEVEL3': 'barriers', 'UPGRADE_BARRIERS_LEVEL4': 'barriers',
-                         'GROW_BASE_PERIMETER1': 'grow_base',
                          'CHANGE_REGION_INSTANTLY': 'change_region',
                          'BUY_LOTTERY_TICKET': 'lottery',
                          'FREE_RANDOM_ITEM': 'free_items',
@@ -541,6 +540,8 @@ def classify_purchase(gamedata, descr):
         catname = 'gamebucks'
     elif cat.startswith('BUY_PROTECTION'):
         catname = 'protection'
+    elif cat.startswith('GROW_BASE_PERIMETER'):
+        catname = 'grow_base'
     elif cat == 'SPEEDUP_FOR_MONEY':
         # recategorize under what it was speeding up
         action = fields[2]
