@@ -6677,10 +6677,6 @@ class Player(AbstractPlayer):
         # this flag indicates that we have permission to write out updates to Player's state
         self.has_write_lock = True
 
-        self.alias = None
-        self.title = None
-        self.unlocked_titles = None # dictionary of {'title':1}
-
         # override of current_event time, for debugging purposes
         self.event_time_override = None
 
@@ -6760,6 +6756,10 @@ class Player(AbstractPlayer):
         self.achievements = {}
 
         self.tutorial_state = 'START'
+
+        self.alias = None
+        self.title = None
+        self.unlocked_titles = None # dictionary of {'title':1}
 
         # dictionary mapping tech name to tech level e.g. { "tank_production": 1 }
         self.tech = {}
