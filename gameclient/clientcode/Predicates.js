@@ -1409,6 +1409,7 @@ goog.inherits(HasAliasPredicate, Predicate);
 HasAliasPredicate.prototype.is_satisfied = function(player, qdata) {
     return !!player.alias;
 };
+HasAliasPredicate.prototype.do_ui_describe = function(player) { return gamedata['strings']['predicates'][this.kind]['ui_name']; };
 
 /** @constructor
   * @extends Predicate */

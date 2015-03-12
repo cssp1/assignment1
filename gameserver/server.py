@@ -16847,11 +16847,7 @@ class GAMEAPI(resource.Resource):
 
             session.player.alias = new_alias
             # if the server crashes here, playerdb might have the old alias, but only the new alias will be reserved in the DB
-
-            retmsg.append(["PLAYER_ALIAS_UPDATE", session.player.alias])
-            retmsg.append(["PLAYER_UI_NAME_UPDATE", session.user.get_ui_name(session.player)])
-            retmsg.append(["PLAYER_CACHE_UPDATE", [self.get_player_cache_props(session.user, session.player)]])
-
+            session.deferred_player_name_update = True
             if session.alliance_chat_channel:
                 session.do_chat_send(session.alliance_chat_channel,
                                      'I have a new alias!',
@@ -16862,8 +16858,15 @@ class GAMEAPI(resource.Resource):
             assert new_title in gamedata['titles']
             assert (session.player.unlocked_titles and (new_title in session.player.unlocked_titles)) or \
                    (new_title == gamedata['default_title'])
-            session.player.title = new_title
-            session.deferred_player_name_update = True
+            if session.player.title != new_title:
+                old_name = session.user.get_ui_name(session.player)
+                session.player.title = new_title
+                session.deferred_player_name_update = True
+                if session.alliance_chat_channel:
+                    session.do_chat_send(session.alliance_chat_channel,
+                                         'I have a new title!',
+                                         bypass_gag = True, props = {'type':'changed_title',
+                                                                     'old_name': old_name})
 
         else:
             raise Exception('unknown spell '+spellname)

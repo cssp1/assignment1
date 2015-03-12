@@ -19380,9 +19380,10 @@ function invoke_change_title_dialog(callback, spellname) {
     dialog.widgets['ok_button'].onclick = function(w) {
         var dialog = w.parent;
         var new_title = dialog.user_data['new_title'];
+        var cb = dialog.user_data['callback'];
+        close_parent_dialog(w);
         if(new_title && new_title != player.title) {
-            dialog.user_data['callback']([new_title]);
-            close_parent_dialog(w);
+            cb([new_title]);
         }
     };
     scrollable_dialog_change_page(dialog, dialog.user_data['page']);
