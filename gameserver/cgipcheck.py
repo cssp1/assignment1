@@ -63,6 +63,7 @@ def item_is_giveable(gamedata, spec):
         boost_item_expr = re.compile('boost_(%s)_([0-9]+)' % '|'.join(gamedata['resources'].keys()))
     if spec['name'] in ('instant_repair', 'token', 'friendstone', 'flask'): return True
     if spec['name'].startswith('home_base_relocator'): return True
+    if spec['name'].startswith('title_'): return True
     if spec['name'].endswith('_blueprint'): return True
     if 'time_warp' in spec['name']: return True
     match = boost_item_expr.search(spec['name'])
