@@ -5721,7 +5721,10 @@
             "set_alias_button": { "kind": "ActionButton", "xy": [108,75], "dimensions": [24,24], "bg_image": "pencil_button", "push_bg_image": 1,
                                   "tooltip_delay": 0, "ui_tooltip": "Choose Call Sign", "show": 0 },
 
-            "friend_icon": { "kind": "FriendIcon", "xy": [100, 137], "dimensions": [50,73], "state": "normal" },
+            "change_title_button": { "kind": "ActionButton", "xy": [58,132], "dimensions": [120,22], "bg_image_resizable": 1, "text_size": 13, "text_style": "bold",
+                                     "bg_image": "action_button_resizable", "show": 0 },
+
+            "friend_icon": { "kind": "FriendIcon", "xy": [94, 160], "dimensions": [50,73], "state": "normal" },
 
             "level_label": { "kind": "TextField", "xy": [188,136], "dimensions": [73, 14], "text_size": 13,
                              "text_color": [0.8,0.8,0.8,1],
@@ -8363,6 +8366,33 @@
                        "text_color": [0,0,0,1], "blank_on_enter": false },
             "cancel_button": { "kind": "ActionButton", "xy": [30,295], "dimensions": [134, 28], "bg_image": "menu_button_134px", "text_size": 13, "text_style": "bold", "ui_name": "Cancel"},
             "ok_button": { "kind": "ActionButton", "xy": [195,295], "dimensions": [134, 28], "bg_image": "action_button_134px", "text_size": 13, "text_style": "bold", "ui_name": "Accept"}
+        }
+    },
+
+    "change_title_dialog": {
+        "dimensions": [400,358],
+        "default_button": "ok_button",
+        "widgets": {
+            "bg": {"kind": "StaticImage", "xy":[0,0], "dimensions":[400,358], "asset": "dialog_resizable", "bg_image_resizable":1 },
+            "sunken": {"kind": "StaticImage", "xy":[33,56], "dimensions":[334,248], "asset": "dialog_sunken_resizable", "bg_image_resizable":1 },
+
+            "title": { "kind": "TextField", "xy": [50,10], "dimensions": [221, 41], "text_size": 24, "text_style": "thick", "text_hjustify": "left", "ui_name": "Change Call Sign" },
+            "description": { "kind": "TextField", "xy": [54,71], "dimensions": [290, 41], "text_size": 13, "text_style": "thick", "text_hjustify": "left", "text_vjustify": "top", "text_color": [0.8,0.8,0.8] },
+
+            "close_button": { "kind": "ActionButton", "xy": [370,1], "dimensions": [19,22], "bg_image": "close_button_small", "push_bg_image": 1 },
+
+            "choice": {"kind": "ActionButton", "xy":[50,116], "dimensions":[155,32],
+                       "bg_image": "radio_button", "push_bg_image": 1, "bg_image_offset": [5,7],
+                       "text_offset":[33,0], "text_size": 15, "text_style": "normal", "text_hjustify": "left",
+                       "ui_tooltip": "", "ui_tooltip_requires": "Requires: %s", "tooltip_delay": 0, "tooltip_color": [1,0,0],
+                       "array": [2,5], "array_offset": [160,32]},
+
+            "scroll_left": {"kind": "ActionButton", "xy": [6,135], "dimensions": [22,100], "bg_image": "dialog_scroll_arrow_left" },
+            "scroll_right": {"kind": "ActionButton", "xy": [373,135], "dimensions": [22,100], "bg_image": "dialog_scroll_arrow_right" },
+            "scroll_text": {"kind": "TextField", "xy": [33,275], "dimensions": [334,19], "text_size": 13, "text_hjustify": "center", "ui_name": "Showing %d1-%d2 of %d3", "text_color": [0.5,0.5,0.5,1]},
+
+            "cancel_button": { "kind": "ActionButton", "xy": [50,314], "dimensions": [134, 28], "bg_image": "menu_button_134px", "text_size": 13, "text_style": "bold", "ui_name": "Cancel"},
+            "ok_button": { "kind": "ActionButton", "xy": [215,314], "dimensions": [134, 28], "bg_image": "action_button_134px", "text_size": 13, "text_style": "bold", "ui_name": "Accept"}
         }
     },
 

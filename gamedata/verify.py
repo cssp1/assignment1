@@ -1324,7 +1324,7 @@ PREDICATE_TYPES = set(['AND', 'OR', 'NOT', 'ALWAYS_TRUE', 'ALWAYS_FALSE', 'TUTOR
                    'FACEBOOK_LIKES_CLIENT', 'PRICE_REGION', 'COUNTRY', 'COUNTRY_TIER', 'EVENT_TIME', 'ABSOLUTE_TIME', 'TIME_OF_DAY', 'BROWSER_NAME',
                    'BROWSER_OS', 'BROWSER_NAME', 'BROWSER_VERSION', 'SELECTED', 'UI_CLEAR', 'QUEST_CLAIMABLE', 'HOME_BASE', 'HAS_ATTACKED', 'HAS_DEPLOYED',
                    'PRE_DEPLOY_UNITS', 'DIALOG_OPEN', 'FOREMAN_IS_BUSY', 'INVENTORY', 'HAS_ITEM', 'HAS_ITEM_SET', 'HOME_REGION', 'REGION_PROPERTY', 'LADDER_PLAYER',
-                   'MAIL_ATTACHMENTS_WAITING', 'AURA_ACTIVE', 'AI_INSTANCE_GENERATION', 'USER_ID', 'LOGGED_IN_RECENTLY', 'PVP_AGGRESSED_RECENTLY', 'IS_IN_ALLIANCE', 'FRAME_PLATFORM', 'NEW_BIRTHDAY', 'HAS_ALIAS',
+                   'MAIL_ATTACHMENTS_WAITING', 'AURA_ACTIVE', 'AI_INSTANCE_GENERATION', 'USER_ID', 'LOGGED_IN_RECENTLY', 'PVP_AGGRESSED_RECENTLY', 'IS_IN_ALLIANCE', 'FRAME_PLATFORM', 'NEW_BIRTHDAY', 'HAS_ALIAS', 'HAS_TITLE',
                    'PURCHASED_RECENTLY', 'SESSION_LENGTH_TREND', 'ARMY_SIZE',
                    'VIEWING_BASE_DAMAGE', 'VIEWING_BASE_OBJECT_DESTROYED', 'BASE_SIZE'
                    ])
@@ -1465,6 +1465,9 @@ def check_predicate(pred, reason = '', context = None, context_data = None,
     elif pred['predicate'] == 'FACEBOOK_APP_NAMESPACE':
         if 'namespace' not in pred:
             error |= 1; print '%s: %s predicate missing a "namespace"' % (reason, pred['predicate'])
+    elif pred['predicate'] == 'HAS_TITLE':
+        if pred.get('name',None) not in gamedata['titles']:
+            error |= 1; print '%s: %s predicate name %r not found in gamedata.titles' % (reason, pred['predicate'], pred.get('name'))
     return error
 
 # check old-style "logic" blocks which are if/then/else compositions of predicates and consequents (used for quest tips)
@@ -1491,6 +1494,7 @@ CONSEQUENT_TYPES = set(['NULL', 'AND', 'RANDOM', 'IF', 'COND', 'LIBRARY',
                         'GIVE_UNITS', 'TAKE_UNITS', 'PRELOAD_ART_ASSET', 'HEAL_ALL_UNITS', 'HEAL_ALL_BUILDINGS',
                         'ENABLE_COMBAT_RESOURCE_BARS', 'ENABLE_DIALOG_COMPLETION', 'INVITE_FRIENDS_PROMPT', 'DISPLAY_DAILY_TIP', 'TAKE_ITEMS',
                         'CLEAR_NOTIFICATIONS', 'DEV_EDIT_MODE', 'GIVE_GAMEBUCKS', 'LOAD_AI_BASE', 'REPAIR_ALL', 'FPS_COUNTER',
+                        'UNLOCK_TITLE', 'CHANGE_TITLE'
                    ])
 
 def check_consequent(cons, reason = '', context = None, context_data = None):
@@ -1669,6 +1673,10 @@ def check_consequent(cons, reason = '', context = None, context_data = None):
     elif cons['consequent'] == 'INVOKE_MISSIONS_DIALOG':
         if ('select_mission' in cons) and (cons['select_mission'] not in gamedata['quests']):
             error |= 1; print '%s: select_mission "%s" not found' % (reason, cons['select_mission'])
+
+    elif cons['consequent'] in ('CHANGE_TITLE', 'UNLOCK_TITLE'):
+        if cons['name'] not in gamedata['titles']:
+            error |= 1; print '%s: invalid name "%s" not found in gamedata.titles' % (reason, cons['name'])
 
     elif cons['consequent'] in ['INVOKE_BLUEPRINT_CONGRATS', 'COOLDOWN_TRIGGER', 'COOLDOWN_RESET', 'SESSION_LOOT',
                                 'INVOKE_TOP_ALLIANCES_DIALOG', 'INVOKE_STORE_DIALOG', 'INVOKE_MAP_DIALOG', 'MESSAGE_BOX',
@@ -2647,6 +2655,10 @@ def check_titles(data):
     error = 0
     if data['default_title'] not in data['titles']:
         error |= 1; print 'default_title not in titles'
+    for name, title in data['titles'].iteritems():
+        for PRED in ('show_if', 'requires'):
+            if PRED in title:
+                error |= check_predicate(title[PRED], name+':'+PRED)
     return error
 
 def check_climate(name, data):

@@ -467,12 +467,13 @@ PlayerInfoDialog.invoke_profile_tab = function(parent) {
         dialog.widgets['name_label'].str = dialog.data['widgets']['name_label']['ui_name'];
     }
 
+    // set alias button
     if(('SET_ALIAS' in gamedata['spells']) && user_id == session.user_id) {
         var spell = gamedata['spells']['SET_ALIAS'];
         if(!('show_if' in spell) || read_predicate(spell['show_if']).is_satisfied(player, null)) {
-            dialog.widgets['set_alias_button'].show = true;
             var req = read_predicate(spell['requires'] || {'predicate':'ALWAYS_TRUE'});
             if(req.is_satisfied(player, null)) {
+                dialog.widgets['set_alias_button'].show = true;
                 dialog.widgets['set_alias_button'].onclick = function(w) {
                     var parent = w.parent.parent;
                     invoke_change_alias_dialog(
@@ -492,6 +493,37 @@ PlayerInfoDialog.invoke_profile_tab = function(parent) {
                 };
             } else {
                 dialog.widgets['set_alias_button'].show = false;
+            }
+        }
+    }
+
+    // change title button
+    if(('CHANGE_TITLE' in gamedata['spells']) && user_id == session.user_id) {
+        var spell = gamedata['spells']['CHANGE_TITLE'];
+        if(!('show_if' in spell) || read_predicate(spell['show_if']).is_satisfied(player, null)) {
+            var req = read_predicate(spell['requires'] || {'predicate':'ALWAYS_TRUE'});
+            if(req.is_satisfied(player, null)) {
+                dialog.widgets['change_title_button'].show = true;
+                dialog.widgets['change_title_button'].str = spell['ui_name'];
+                dialog.widgets['change_title_button'].onclick = function(w) {
+                    var parent = w.parent.parent;
+                    invoke_change_title_dialog(
+                        (function (_parent) { return function(spellarg) {
+                            send_to_server.func(["CHANGE_TITLE", spellarg]);
+                            invoke_ui_locker(null,
+                                             // update when the response comes back
+                                             (function (__parent) { return function() {
+                                                 if(__parent.is_visible()) {
+                                                     PlayerInfoDialog.invoke_profile_tab(__parent);
+                                                 }
+                                             }; })(_parent)
+                                            );
+                        }; })(parent),
+                        'CHANGE_TITLE'
+                    );
+                };
+            } else {
+                dialog.widgets['change_title_button'].show = false;
             }
         }
     }

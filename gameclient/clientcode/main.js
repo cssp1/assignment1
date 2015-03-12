@@ -5094,7 +5094,12 @@ player.home_base_loc = null; // base_map_loc of player's home
 player.enable_muffins = false; // show extra-secret hidden developer features
 player.is_cheater = false; // allow breaking of unit space/building limits (NOT ON LIVE SERVER)
 player.ui_name = '(Unknown)';
+/** @type {string|null} same as on server */
 player.alias = null;
+/** @type {string|null} same as on server */
+player.title = null;
+/** @type {Object.<string,?>|null} same as on server */
+player.unlocked_titles = null;
 player.facebook_name = '(Unknown)';
 player.facebook_currency = null;
 player.facebook_permissions = spin_facebook_login_permissions.split(',');
@@ -19345,6 +19350,68 @@ function update_change_alias_dialog(dialog) {
     }
 
     dialog.widgets['ok_button'].state = (ok ? 'normal' : 'disabled');
+}
+
+function invoke_change_title_dialog(callback, spellname) {
+    var spell = gamedata['spells'][spellname];
+    var dialog = new SPUI.Dialog(gamedata['dialogs']['change_title_dialog']);
+    dialog.user_data['dialog'] = 'change_title_dialog';
+    dialog.user_data['spellname'] = spellname;
+    dialog.user_data['callback'] = callback;
+    dialog.user_data['new_title'] = player.title || gamedata['default_title'];
+    dialog.user_data['page'] = -1;
+    dialog.user_data['rows_per_page'] = dialog.data['widgets']['choice']['array'][1];
+    dialog.user_data['cols_per_page'] = dialog.data['widgets']['choice']['array'][0];
+    dialog.user_data['rowfunc'] = change_title_rowfunc;
+    dialog.user_data['rowdata'] = []; // title names
+    goog.object.forEach(gamedata['titles'], function(data, name) {
+        if(!('show_if' in data) || read_predicate(data['show_if']).is_satisfied(player, null)) {
+            dialog.user_data['rowdata'].push(name);
+        }
+    });
+    install_child_dialog(dialog);
+    dialog.auto_center();
+    dialog.modal = true;
+    dialog.widgets['close_button'].onclick =
+        dialog.widgets['cancel_button'].onclick = close_parent_dialog;
+    dialog.widgets['title'].str = spell['ui_name'];
+    var descr = spell['ui_description'];
+    dialog.widgets['description'].set_text_with_linebreaking(descr);
+    dialog.widgets['ok_button'].onclick = function(w) {
+        var dialog = w.parent;
+        var new_title = dialog.user_data['new_title'];
+        if(new_title && new_title != player.title) {
+            dialog.user_data['callback']([new_title]);
+            close_parent_dialog(w);
+        }
+    };
+    scrollable_dialog_change_page(dialog, dialog.user_data['page']);
+    return dialog;
+}
+function change_title_rowfunc(dialog, row_col, rowdata) {
+    var wname = SPUI.get_array_widget_name('choice', dialog.data['widgets']['choice']['array'], row_col);
+    dialog.widgets[wname].show = !!rowdata;
+    if(rowdata) {
+        var name = rowdata;
+        var data = gamedata['titles'][rowdata];
+        dialog.widgets[wname].str = data['ui_name'];
+        var pred = read_predicate(data['requires'] || {'predicate':'ALWAYS_TRUE'});
+        if(pred.is_satisfied(player, null)) {
+            dialog.widgets[wname].state = (dialog.user_data['new_title'] == name ? 'active' : 'normal');
+            dialog.widgets[wname].text_color = SPUI.default_text_color;
+            dialog.widgets[wname].tooltip.str = null;
+            dialog.widgets[wname].onclick = (function (_name) { return function(w) {
+                var dialog = w.parent;
+                dialog.user_data['new_title'] = _name;
+                scrollable_dialog_change_page(dialog, dialog.user_data['page']);
+            }; })(name);
+        } else {
+            dialog.widgets[wname].state = 'disabled_clickable';
+            dialog.widgets[wname].text_color = SPUI.disabled_text_color;
+            dialog.widgets[wname].tooltip.str = dialog.data['widgets']['choice']['ui_tooltip_requires'].replace('%s', pred.ui_describe(player));
+            dialog.widgets[wname].onclick = pred.ui_help(player);
+        }
+    }
 }
 
 function invoke_change_region_offer_dialog() {
@@ -39950,6 +40017,9 @@ function handle_server_message(data) {
         if(dlg && dlg.widgets['player_portrait']) { dlg.widgets['player_portrait'].invalidate(); } // reset avatar image
     } else if(msg == "PLAYER_ALIAS_UPDATE") {
         player.alias = data[1];
+    } else if(msg == "PLAYER_TITLES_UPDATE") {
+        player.title = data[1];
+        player.unlocked_titles = data[2];
     } else if(msg == "PLAYER_CACHE_UPDATE") {
         PlayerCache.update_batch(data[1]);
     } else if(msg == "FACEBOOK_CURRENCY_UPDATE") {

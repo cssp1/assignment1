@@ -451,7 +451,27 @@ class MarkBirthdayConsequent(Consequent):
         player.history['birthday_' + self.tag] = max(player.history.get('birthday_' + self.tag, 0), time.gmtime(player.get_absolute_time()).tm_year)
         session.player.cooldown_trigger('birthday_' + self.tag, 31536000) # 365 days
 
+class UnlockTitleConsequent(Consequent):
+    def __init__(self, data):
+        Consequent.__init__(self, data)
+        self.name = data['name']
+    def execute(self, session, player, retmsg, context=None):
+        if player.unlocked_titles is None:
+            player.unlocked_titles = {}
+        player.unlocked_titles[self.name] = 1
+        session.deferred_player_name_update = True
+
+class ChangeTitleConsequent(Consequent):
+    def __init__(self, data):
+        Consequent.__init__(self, data)
+        self.name = data['name']
+    def execute(self, session, player, retmsg, context=None):
+        assert player.unlocked_titles and (self.name in player.unlocked_titles)
+        player.title = self.name
+        session.deferred_player_name_update = True
+
 class IfConsequent(Consequent):
+
     def __init__(self, data):
         Consequent.__init__(self, data)
         self.predicate = Predicates.read_predicate(data['if'])
@@ -532,6 +552,8 @@ def read_consequent(data):
     elif kind == 'FIND_AND_REPLACE_OBJECTS': return FindAndReplaceObjectsConsequent(data)
     elif kind == 'CHAT_SEND': return ChatSendConsequent(data)
     elif kind == 'MARK_BIRTHDAY': return MarkBirthdayConsequent(data)
+    elif kind == 'UNLOCK_TITLE': return UnlockTitleConsequent(data)
+    elif kind == 'CHANGE_TITLE': return ChangeTitleConsequent(data)
     elif kind == 'DISPLAY_DAILY_TIP': return DisplayDailyTipConsequent(data)
     elif kind == 'HEAL_ALL_UNITS': return HealAllUnitsConsequent(data)
     elif kind == 'HEAL_ALL_BUILDINGS': return HealAllBuildingsConsequent(data)

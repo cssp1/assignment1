@@ -1412,6 +1412,20 @@ HasAliasPredicate.prototype.is_satisfied = function(player, qdata) {
 
 /** @constructor
   * @extends Predicate */
+function HasTitlePredicate(data) {
+    goog.base(this, data);
+    this.name = data['name'];
+}
+goog.inherits(HasTitlePredicate, Predicate);
+HasTitlePredicate.prototype.is_satisfied = function(player, qdata) {
+    return (player.unlocked_titles && (this.name in player.unlocked_titles));
+};
+HasTitlePredicate.prototype.do_ui_describe = function(player) {
+    return gamedata['strings']['predicates'][this.kind]['ui_name'].replace('%s', gamedata['titles'][this.name]['ui_name']);
+};
+
+/** @constructor
+  * @extends Predicate */
 function LadderPlayerPredicate(data) {
     goog.base(this, data);
 }
@@ -1598,6 +1612,8 @@ function read_predicate(data) {
         return new IsInAlliancePredicate(data);
     } else if(kind === 'HAS_ALIAS') {
         return new HasAliasPredicate(data);
+    } else if(kind === 'HAS_TITLE') {
+        return new HasTitlePredicate(data);
     } else if(kind === 'BASE_SIZE') {
         return new BaseSizePredicate(data);
     } else if(kind === 'HOME_REGION') {

@@ -2846,6 +2846,7 @@ class Session(object):
         self.deferred_player_state_update = False
         self.deferred_donated_units_update = False
         self.deferred_object_state_updates = set()
+        self.deferred_player_name_update = False
 
         # prevent overlapping SPROBE_RUN requests
         self.sprobe_in_progress = False
@@ -6918,10 +6919,13 @@ class Player(AbstractPlayer):
     def get_titled_alias(self):
         assert self.alias
         ret = self.alias
-        if self.title:
-            ret = self.title.replace('%s', self.alias)
+        title_template = None
+        if self.title and gamedata['titles'] and (self.title in gamedata['titles']):
+            title_template = gamedata['titles'][self.title]['ui_template']
         elif gamedata.get('default_title'):
-            ret = gamedata['default_title'].replace('%s', self.alias)
+            title_template = gamedata['titles'][gamedata['default_title']]['ui_template']
+        if title_template:
+            ret = title_template.replace('%s', self.alias)
         return ret
 
     # temporary functions that skip the basedb indirection
@@ -16842,7 +16846,7 @@ class GAMEAPI(resource.Resource):
                 gamesite.nosql_client.player_alias_release(old_alias)
 
             session.player.alias = new_alias
-            # if the server crashes here, playerdb miight have the old alias, but only the new alias will be reserved in the DB
+            # if the server crashes here, playerdb might have the old alias, but only the new alias will be reserved in the DB
 
             retmsg.append(["PLAYER_ALIAS_UPDATE", session.player.alias])
             retmsg.append(["PLAYER_UI_NAME_UPDATE", session.user.get_ui_name(session.player)])
@@ -16853,6 +16857,14 @@ class GAMEAPI(resource.Resource):
                                      'I have a new alias!',
                                      bypass_gag = True, props = {'type':'changed_alias',
                                                                  'old_name': old_name})
+        elif spell.get('code') == 'change_title':
+            new_title = spellarg[0]
+            assert new_title in gamedata['titles']
+            assert (session.player.unlocked_titles and (new_title in session.player.unlocked_titles)) or \
+                   (new_title == gamedata['default_title'])
+            session.player.title = new_title
+            session.deferred_player_name_update = True
+
         else:
             raise Exception('unknown spell '+spellname)
 
@@ -20462,6 +20474,13 @@ class GAMEAPI(resource.Resource):
             session.deferred_donated_units_update = False
             retmsg.append(["DONATED_UNITS_UPDATE", session.player.donated_units])
 
+        if session.deferred_player_name_update:
+            session.deferred_player_name_update = False
+            retmsg.append(["PLAYER_UI_NAME_UPDATE", session.user.get_ui_name(session.player)])
+            retmsg.append(["PLAYER_ALIAS_UPDATE", session.player.alias])
+            retmsg.append(["PLAYER_TITLES_UPDATE", session.player.title, session.player.unlocked_titles])
+            retmsg.append(["PLAYER_CACHE_UPDATE", [self.get_player_cache_props(session.user, session.player)]])
+
         if gamesite.raw_log:
             client_str = 'sid %s' % pretty_print_session(session.session_id)
             log.msg(('to   client (%s:%d): ' % (client_str, session.outgoing_serial))+repr(retmsg))
@@ -21102,6 +21121,7 @@ class GAMEAPI(resource.Resource):
                        ])
         retmsg.append(["PLAYER_UI_NAME_UPDATE", session.user.get_ui_name(session.player)])
         retmsg.append(["PLAYER_ALIAS_UPDATE", session.player.alias])
+        retmsg.append(["PLAYER_TITLES_UPDATE", session.player.title, session.player.unlocked_titles])
 
         if session.user.frame_platform == 'fb':
             retmsg.append(["FACEBOOK_CURRENCY_UPDATE", session.user.facebook_currency])
@@ -22340,11 +22360,12 @@ class GAMEAPI(resource.Resource):
         elif arg[0] == "CHANGE_REGION":
             self.execute_spell(session, retmsg, arg[0], [arg[1],arg[2]])
 
-        elif arg[0] == "SET_ALIAS":
+        elif arg[0] == "SET_ALIAS" or arg[0] == "CHANGE_TITLE":
             spell = gamedata['spells'][arg[0]]
-            if spell.get('requires') and (not Predicates.read_predicate(spell['requires']).is_satisfied2(session, session.player, None)):
-                retmsg.append(["ERROR", "REQUIREMENTS_NOT_SATISFIED", spell['requires']])
-                return
+            for PRED in ('show_if', 'requires'):
+                if spell.get(PRED) and (not Predicates.read_predicate(spell[PRED]).is_satisfied2(session, session.player, None)):
+                    retmsg.append(["ERROR", "REQUIREMENTS_NOT_SATISFIED", spell[PRED]])
+                    return
             self.execute_spell(session, retmsg, arg[0], arg[1])
 
         elif arg[0] == "TRAVEL_BEGIN":

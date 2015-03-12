@@ -693,6 +693,13 @@ class HasAliasPredicate(Predicate):
     def is_satisfied2(self, session, player, qdata):
         return bool(player.alias)
 
+class HasTitlePredicate(Predicate):
+    def __init__(self, data):
+        Predicate.__init__(self, data)
+        self.name = data['name']
+    def is_satisfied2(self, session, player, qdata):
+        return player.unlocked_titles and (self.name in player.unlocked_titles)
+
 class NewBirthdayPredicate(Predicate):
     def __init__(self, data):
         Predicate.__init__(self, data)
@@ -887,6 +894,8 @@ def read_predicate(data):
         return HasItemSetPredicate(data)
     elif kind == 'NEW_BIRTHDAY':
         return NewBirthdayPredicate(data)
+    elif kind == 'HAS_TITLE':
+        return HasTitlePredicate(data)
     elif kind == 'HAS_ALIAS':
         return HasAliasPredicate(data)
     elif kind == 'LADDER_PLAYER':
