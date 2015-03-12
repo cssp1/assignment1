@@ -1703,6 +1703,9 @@
                                   "disabled": { "images": ["art/ui/radio_button.png"], "dimensions": [18,18], "origins": [0,18],
                                                 "load_priority": 98
                                               },
+                                  "disabled_clickable": { "images": ["art/ui/radio_button.png"], "dimensions": [18,18], "origins": [0,18],
+                                                          "load_priority": 98
+                                                        },
                                   "active": { "images": ["art/ui/radio_button.png"], "dimensions": [18,18], "origins": [0,0],
                                               "load_priority": 98,
                                               "audio": "art/soundfx/menu_click.$AUDIO_CODEC", "volume": 0.25
