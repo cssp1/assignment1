@@ -19319,9 +19319,18 @@ function invoke_change_alias_dialog(callback, spellname) {
     dialog.widgets['ok_button'].onclick = dialog.widgets['input'].ontextready = function(w) {
         var dialog = w.parent;
         var new_name = dialog.widgets['input'].str;
+        var cb = dialog.user_data['callback'];
+        var spell = gamedata['spells'][dialog.user_data['spellname']];
+
         if(new_name && new_name.length >= 3) {
-            dialog.user_data['callback']([SPHTTP.wrap_string(new_name)]);
-            close_parent_dialog(w);
+            var do_it = (function (_new_name, _cb) { return function() {
+                close_parent_dialog(w);
+                _cb([SPHTTP.wrap_string(_new_name)]);
+            }; })(new_name, cb);
+            console.log(spell);
+            invoke_child_message_dialog(spell['ui_name']+'?', spell['ui_confirm'].replace('%s', new_name),
+                                        {'cancel_button': true,
+                                         'on_ok': do_it});
         }
     };
     SPUI.set_keyboard_focus(dialog.widgets['input']);
