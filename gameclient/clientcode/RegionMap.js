@@ -1329,7 +1329,7 @@ RegionMap.RegionMap.update_feature_popup = function(dialog) {
 
         ui.widgets['qstat'].onclick =
             ui.widgets['qicon'].onclick =
-            ui.widgets['qsize'].onclick = function() { invoke_ingame_tip('map_quarries_tip', {force:true}); };
+            ui.widgets['qsize'].onclick = function() { invoke_ingame_tip('map_quarries_tip', {frequency:GameTipFrequency.ALWAYS}); };
 
     } else if(ftype == 'hive') {
         var s = '';

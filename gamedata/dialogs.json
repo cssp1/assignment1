@@ -58,6 +58,13 @@
             "close_button": { "show": 0,
                               "kind": "ActionButton", "xy": [463,1], "dimensions": [19,22], "bg_image": "close_button_small", "push_bg_image": 1 },
 
+            "ignore_button": { "kind": "ActionButton", "xy": [20,337], "dimensions": [233,26], "bg_image_offset": [0,4], "push_text": 0,
+                               "bg_image": "checkbox_button", "text_color": [0.5,0.5,0.5,1], "text_size": 13,
+                               "ui_name": "Don't show this message again",
+                               "text_offset": [24,0],
+                               "text_hjustify": "left", "text_vjustify": "center", "show": 0
+                             },
+
             "cancel_button": { "kind": "ActionButton", "xy": [200,336], "dimensions": [134,28], "show": 0, // off by default
                                "bg_image": "menu_button_134px", "text_color": [0,0,0,1], "text_size": 13, "text_style": "bold", "ui_name": "Cancel" },
 
@@ -87,7 +94,13 @@
             "description": { "kind": "TextField", "xy": [182,69], "dimensions": [277, 25], "text_size": 13, "text_style": "normal",
                              "text_hjustify": "left", "text_vjustify": "top", "ui_name": "" },
             "ok_button": { "kind": "ActionButton", "xy": [342,296], "dimensions": [134,28], "text_size": 13, "text_style": "bold",
-                           "bg_image": "action_button_134px", "text_color": [0,0,0,1], "ui_name": "Understood" }
+                           "bg_image": "action_button_134px", "text_color": [0,0,0,1], "ui_name": "Understood" },
+            "ignore_button": { "kind": "ActionButton", "xy": [175,297], "dimensions": [150,26], "bg_image_offset": [0,4], "push_text": 0,
+                               "bg_image": "checkbox_button", "text_color": [0.5,0.5,0.5,1], "text_size": 13,
+                               "ui_name": "Don't show again",
+                               "text_offset": [24,0],
+                               "text_hjustify": "left", "text_vjustify": "center", "show": 0
+                             }
         }
     },
 

@@ -12134,21 +12134,7 @@ function update_desktop_dialogs() {
                        (player.tutorial_state == "COMPLETE") &&
                        is_zombie) {
                         session.weak_zombie_warned = true;
-                        var dialog = invoke_ingame_tip('weak_zombie_tip', {force:true,
-                                                                           dialog:'message_dialog_weak_zombie',
-                                                                           dialog_options: {parentless:true}
-                                                                          });
-                        if(dialog) {
-                            SPUI.root.add(dialog);
-                            dialog.auto_center();
-                            console.log(dialog); console.log(dialog.widgets);
-                            var unit_ui_name = gamedata['units'][name]['ui_name'];
-                            dialog.widgets['title'].set_text_with_linebreaking(gamedata['strings']['weak_zombie_tip']['ui_title'].replace('%s', unit_ui_name));
-                            dialog.widgets['description'].set_text_with_linebreaking(gamedata['strings']['weak_zombie_tip']['ui_description'].replace('%s', unit_ui_name).replace('%one_minus_threshold', (100.0*(1.0-player.get_any_abtest_value('zombie_debuff_threshold', gamedata['zombie_debuff_threshold']))).toFixed(0)));
-                            dialog.widgets['ok_button'].onclick = close_parent_dialog;
-                            dialog.widgets['unit_icon'].show = dialog.widgets['unit_wrench_icon'].show = true;
-                            dialog.widgets['unit_icon'].asset = get_leveled_quantity(gamedata['units'][name]['art_asset'], 1);
-                        }
+                        invoke_weak_zombie_tip(name);
                     }
 
                     player.quest_tracked_dirty = true;
@@ -16716,12 +16702,11 @@ function invoke_battle_end_dialog(battle_type, battle_base, battle_opponent_user
         if(player.tutorial_state === 'battle_end_message') {
             advance_tutorial();
         }
+        var options = {frequency:GameTipFrequency.ALWAYS_UNLESS_IGNORED};
         if(_base.base_type == 'quarry' && outcome === 'victory') {
-            invoke_ingame_tip((session.region.data['storage'] == 'nosql') ? 'quarry_conquer_tip2_nosql' : 'quarry_conquer_tip2');
+            invoke_ingame_tip((session.region.data['storage'] == 'nosql') ? 'quarry_conquer_tip2_nosql' : 'quarry_conquer_tip2', options);
         } else if(_base.base_type == 'hive') {
-            var tipname = 'hive_battle_'+outcome+'_tip';
-            var options = {force:1};
-            invoke_ingame_tip(tipname, options);
+            invoke_ingame_tip('hive_battle_'+outcome+'_tip', options);
         }
     }; })(outcome, battle_base);
 
@@ -17104,11 +17089,12 @@ function invoke_fancy_victory_dialog(battle_type, battle_base, battle_opponent_u
             if(player.tutorial_state === 'battle_end_message') {
                 advance_tutorial();
             }
+            var options = {frequency: GameTipFrequency.ALWAYS_UNLESS_IGNORED};
             if(_base.base_type == 'quarry' && outcome === 'victory') {
-                invoke_ingame_tip((session.region.data['storage'] == 'nosql') ? 'quarry_conquer_tip2_nosql' : 'quarry_conquer_tip2');
+                invoke_ingame_tip((session.region.data['storage'] == 'nosql') ? 'quarry_conquer_tip2_nosql' : 'quarry_conquer_tip2', options);
             } else if(_base.base_type == 'hive') {
                 var tipname = 'hive_battle_'+outcome+'_tip';
-                var options = {force:1};
+
                 if(outcome === 'victory' && token_qty > 0) {
                     tipname += '_with_tokens';
                     options.replacements = {'%d': pretty_print_number(token_qty), '%s': token_spec['ui_name']};
@@ -20378,7 +20364,7 @@ function invoke_loot_dialog(msg) {
     dialog.modal = true;
 
     dialog.widgets['help_button'].onclick = function(w) {
-        invoke_ingame_tip_force('loot_help_tip');
+        invoke_ingame_tip('loot_help_tip', {frequency: GameTipFrequency.ALWAYS});
     };
 
     dialog.widgets['close_button'].onclick = function(w) {
@@ -21678,7 +21664,7 @@ function invoke_equip_chooser(inv_dialog, parent_widget, tech, unit, slot_type, 
 
     // if no applicable equipment is available, give a help dialog
     if(items.length < 1 && !equipped_now) {
-        invoke_ingame_tip('no_equipment_tip', {force:true});
+        invoke_ingame_tip('no_equipment_tip', {frequency: GameTipFrequency.ALWAYS});
         return null;
     }
 
@@ -31864,9 +31850,9 @@ function map_dialog_change_page(dialog, chapter, page) {
        ((player.history['attacks_launched_vs_human'] || 0) == 0) &&
        !map_dialog_rivals_warned) {
         map_dialog_rivals_warned = true;
-        invoke_ingame_tip('human_rivals_tip', {force:true});
+        invoke_ingame_tip('human_rivals_tip', {frequency: GameTipFrequency.ALWAYS_UNLESS_IGNORED});
     } else if(dialog.user_data['chapter'] === 'quarries') {
-        invoke_ingame_tip('map_quarries_tip');
+        invoke_ingame_tip('map_quarries_tip', {frequency: GameTipFrequency.ALWAYS_UNLESS_IGNORED});
     }
 
 
@@ -32106,7 +32092,7 @@ function map_dialog_change_page(dialog, chapter, page) {
 
                 dialog.widgets['row_qstat'+row].onclick =
                 dialog.widgets['row_qicon'+row].onclick =
-                    dialog.widgets['row_qsize'+row].onclick = function() { invoke_ingame_tip('map_quarries_tip', {force:true}); };
+                    dialog.widgets['row_qsize'+row].onclick = function() { invoke_ingame_tip('map_quarries_tip', {frequency: GameTipFrequency.ALWAYS}); };
 
                 dialog.widgets['row_progress'+row].show = false;
                 dialog.widgets['row_progress_str'+row].show = false;
@@ -32663,38 +32649,89 @@ function apply_dialog_hacks(dialog, _tip, consequent_context) {
     }
 }
 
-// these are not daily tips, but small one-time GUI messages that pop up for certain actions
-/** @param {string} name
-    @param {Object=} options */
+/** @enum {number} */
+var GameTipFrequency = {
+    ONCE_ONLY: 1, // only show one time, ever
+    ALWAYS: 2, // always show
+    ALWAYS_UNLESS_IGNORED: 3 // always show, unless player has set ignore: preference
+};
+
+/** These are not daily tips, but small one-time GUI messages that pop up for certain actions.
+    @param {string} name
+    @param {({frequency: (GameTipFrequency|undefined),
+              dialog_options: (Object|undefined),
+              replacements: (Object.<string,string>|undefined)}|null)=} options
+    @return {SPUI.Dialog|null} */
 function invoke_ingame_tip(name, options) {
-    if(!options) { options = {}; }
-    if(!player.check_feature_use(name) || options.force) {
-        player.record_feature_use(name);
-        var tip = gamedata['strings'][name];
+    if(!options) { options = {frequency:undefined, dialog_options:undefined, replacements:undefined}; }
 
-        var dialog_options = options.dialog_options || {};
-        dialog_options['dialog'] = options.dialog || 'message_dialog_big';
-        var descr = tip['ui_description'];
-        if(options.replacements) {
-            for(var k in options.replacements) {
-                descr = descr.replace(k, options.replacements[k]);
-            }
-        }
-        var dialog = invoke_child_message_dialog(tip['ui_title'], descr, dialog_options);
+    /** @type {!GameTipFrequency} */
+    var frequency = options.frequency || GameTipFrequency.ONCE_ONLY;
 
-        if(tip['unit_icon']) {
-            var spec = gamedata['units'][tip['unit_icon']] || gamedata['buildings'][tip['unit_icon']] || null;
-            if(spec) {
-                dialog.widgets['unit_icon'].show = true;
-                dialog.widgets['unit_icon'].asset = get_leveled_quantity(spec['art_asset'], 1);
-            }
-        }
-        return dialog;
+    if(frequency == GameTipFrequency.ONCE_ONLY && player.check_feature_use(name)) {
+        return null;
     }
-    return null;
+    /** @type {string|null} */
+    var ignore_key = null;
+    if(frequency == GameTipFrequency.ALWAYS_UNLESS_IGNORED) {
+        ignore_key = 'ignore_tip:'+name;
+        if(player.preferences[ignore_key]) {
+            return null;
+        }
+    }
+
+    player.record_feature_use(name);
+    var tip = gamedata['strings'][name];
+
+    var dialog_options = options.dialog_options || {};
+    dialog_options['dialog'] = options.dialog || 'message_dialog_big';
+    var descr = tip['ui_description'];
+    if(options.replacements) {
+        for(var k in options.replacements) {
+            descr = descr.replace(k, options.replacements[k]);
+        }
+    }
+    var dialog = invoke_child_message_dialog(tip['ui_title'], descr, dialog_options);
+
+    if(ignore_key) {
+        if('ignore_button' in dialog.widgets) {
+            dialog.widgets['ignore_button'].show = true;
+            dialog.widgets['ignore_button'].onclick = (function (_ignore_key) { return function(w) {
+                w.state = (w.state == 'active' ? 'normal' : 'active');
+                player.preferences[_ignore_key] = (w.state == 'active' ? 1 : 0);
+                send_to_server.func(["UPDATE_PREFERENCES", player.preferences]);
+            }; })(ignore_key);
+        } else {
+            throw Error('no ignore_button in '+dialog_options['dialog']);
+        }
+    }
+
+    if(tip['unit_icon']) {
+        var spec = gamedata['units'][tip['unit_icon']] || gamedata['buildings'][tip['unit_icon']] || null;
+        if(spec) {
+            dialog.widgets['unit_icon'].show = true;
+            dialog.widgets['unit_icon'].asset = get_leveled_quantity(spec['art_asset'], 1);
+        }
+    }
+    return dialog;
 }
 
-function invoke_ingame_tip_force(name) { return invoke_ingame_tip(name, {force:true}); }
+/** @param {string} name - specname of unit to talk about */
+function invoke_weak_zombie_tip(name) {
+    var dialog = invoke_ingame_tip('weak_zombie_tip', {frequency: GameTipFrequency.ALWAYS_UNLESS_IGNORED,
+                                                       dialog:'message_dialog_weak_zombie',
+                                                       dialog_options: {parentless:true}
+                                                      });
+    if(!dialog) { return; } // suppressed
+    SPUI.root.add(dialog);
+    dialog.auto_center();
+    var unit_ui_name = gamedata['units'][name]['ui_name'];
+    dialog.widgets['title'].set_text_with_linebreaking(gamedata['strings']['weak_zombie_tip']['ui_title'].replace('%s', unit_ui_name));
+    dialog.widgets['description'].set_text_with_linebreaking(gamedata['strings']['weak_zombie_tip']['ui_description'].replace('%s', unit_ui_name).replace('%one_minus_threshold', (100.0*(1.0-player.get_any_abtest_value('zombie_debuff_threshold', gamedata['zombie_debuff_threshold']))).toFixed(0)));
+    dialog.widgets['ok_button'].onclick = close_parent_dialog;
+    dialog.widgets['unit_icon'].show = dialog.widgets['unit_wrench_icon'].show = true;
+    dialog.widgets['unit_icon'].asset = get_leveled_quantity(gamedata['units'][name]['art_asset'], 1);
+}
 
 player.get_absolute_time = function() {
     var cur_time;
@@ -40509,7 +40546,7 @@ function handle_server_message(data) {
         if(!tip_shown && session.viewing_base.base_climate && session.viewing_base.base_climate != 'normal') {
             var tip_name = session.viewing_base.base_climate_data['show_tip'];
             if(tip_name && (tip_name in gamedata['strings'])) {
-                tip_shown = invoke_ingame_tip(tip_name);
+                tip_shown = invoke_ingame_tip(tip_name, {frequency: GameTipFrequency.ALWAYS_UNLESS_IGNORED});
             }
         }
 
@@ -40529,7 +40566,7 @@ function handle_server_message(data) {
             }
             for(var name in tips) {
                 // as soon as any tip is shown, stop.
-                if(invoke_ingame_tip(name)) {
+                if(invoke_ingame_tip(name, {frequency: GameTipFrequency.ONCE_ONLY})) {
                     tip_shown = true;
                     break;
                 }
@@ -41942,7 +41979,7 @@ function handle_server_message(data) {
     } else if(msg == "MANUFACTURE_OVERFLOW_TO_RESERVES") {
         if(!session.manufacture_overflow_warned && session.home_base && !session.has_attacked) {
             session.manufacture_overflow_warned = true;
-            notification_queue.push(function() { invoke_ingame_tip('manufacture_overflow_to_reserves_tip', {force:true, dialog:'message_dialog_big'}); });
+            notification_queue.push(function() { invoke_ingame_tip('manufacture_overflow_to_reserves_tip', {frequency: GameTipFrequency.ALWAYS_UNLESS_IGNORED}); });
         }
     } else if(msg == "GAMEBUCKS_ORDER_ACK") {
         var tag = data[1], success = data[2];
@@ -47078,7 +47115,6 @@ goog.exportSymbol('test_consequent', test_consequent);
 goog.exportSymbol('sprobe_run', sprobe_run);
 goog.exportSymbol('invoke_daily_tip', invoke_daily_tip);
 goog.exportSymbol('invoke_splash_message', invoke_splash_message);
-goog.exportSymbol('invoke_ingame_tip_force', invoke_ingame_tip_force);
 goog.exportSymbol('give_me_item', give_me_item);
 goog.exportSymbol('load_ai_base', load_ai_base);
 goog.exportSymbol('save_ai_base', save_ai_base);
