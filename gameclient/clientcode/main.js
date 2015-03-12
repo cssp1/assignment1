@@ -9575,14 +9575,6 @@ function init_desktop_dialogs() {
     desktop_dialogs['player_portrait_dialog'] = player_portrait_dialog;
     SPUI.root.add(player_portrait_dialog);
 
-    // attack button dialog
-    if(!session.home_base) {
-        var attack_button_dialog = new SPUI.Dialog(gamedata['dialogs']['attack_button_dialog']);
-        desktop_dialogs['attack_button_dialog'] = attack_button_dialog;
-        attack_button_dialog.ondraw = update_attack_button_dialog;
-        SPUI.root.add(attack_button_dialog);
-    }
-
     // aura bar
     // IMPORTANT - must be added AFTER player_portrait_dialog because its ondraw needs to read the portrait's position
     var aura_bar = new SPUI.Dialog(gamedata['dialogs']['aura_bar']);
@@ -9707,6 +9699,14 @@ function init_desktop_dialogs() {
             d.user_data['drip_unit'] = null; // which unit is currently selected
         }
         dialog.add(d); dialog.widgets['unit_deployment_bar'] = d;
+    }
+
+    // attack button dialog
+    if(!session.home_base) {
+        var attack_button_dialog = new SPUI.Dialog(gamedata['dialogs']['attack_button_dialog']);
+        desktop_dialogs['attack_button_dialog'] = attack_button_dialog;
+        attack_button_dialog.ondraw = update_attack_button_dialog;
+        SPUI.root.add(attack_button_dialog);
     }
 
     // chat frame

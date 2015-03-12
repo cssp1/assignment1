@@ -853,7 +853,7 @@
     "attack_button_dialog": {
         "dimensions": [152,56],
         "top_center_offset": [316,0], // offset relative to desktop_top_visitor position when placed at top_center
-        "bottom_left_offset": [15,-172], // offset relative to canvas lower-left corner when placed at bottom_left
+        "bottom_left_offset": [7,-80], // offset relative to canvas lower-left corner when placed at bottom_left
         "widgets": {
             "attack_button": { "kind": "ActionButton", "xy": [0,0], "dimensions": [152,56], "bg_image": "attack_button",
                                "ui_name": "Attack", "ui_tooltip": "Commence attack",
@@ -889,7 +889,7 @@
 
     "combat_resource_bars": {
         "dimensions": [142,202],
-        "xy": [10,150],
+        "xy": [10,140],
         "xy_no_damage": [10,110], // if combat_damage_bar placement is not top_left
         "widgets": {
             "resource_bar_water_glow": { "show": 0, "kind": "StaticImage", "xy": [-83,1], "dimensions": [307,98], "asset": "resource_bar_glow", "alpha": 0 },
@@ -945,7 +945,7 @@
 
     "combat_damage_bar": {
         "dimensions": [160,32],
-        "xy_top_left": [3,87],
+        "xy_top_left": [3,77],
         "xy_bottom_right": [-208,-208],
         "widgets": {
             "battle_stars_bg": { "show":0, "kind": "SolidRect", "xy": [0,0],"dimensions": [160,100], "color": [0.04,0.04,0.04,1],
@@ -7730,7 +7730,7 @@
 
     "combat_item_bar": {
         "dimensions": [60,240],
-        "xy": [5,364],
+        "xy": [10,346],
         "clip_children": 0,
         "widgets": {
             "bgrect": { "kind":"SolidRect", "xy":[0,0], "dimensions": [60,240], "color": [0.005,0.01,0.03,0.75], "bevel": 2 },
