@@ -1410,6 +1410,9 @@ HasAliasPredicate.prototype.is_satisfied = function(player, qdata) {
     return !!player.alias;
 };
 HasAliasPredicate.prototype.do_ui_describe = function(player) { return gamedata['strings']['predicates'][this.kind]['ui_name']; };
+HasAliasPredicate.prototype.do_ui_help = function(player) {
+    return {'noun': 'alias', 'verb': 'set' };
+};
 
 /** @constructor
   * @extends Predicate */

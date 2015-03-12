@@ -15707,6 +15707,7 @@ function update_tutorial_arrow_for_button(_dialog, _parent_path, _widget_name, _
             }
 
         } else if(parent_path.indexOf("_dialog") != -1 ||
+                  parent_path.indexOf("_tab") != -1 ||
                   parent_path.indexOf("context_menu") != -1 ||
                   parent_path.indexOf("tutorial") != -1) {
 
@@ -36480,6 +36481,22 @@ function get_requirements_help(kind, arg, options) {
         help_function = function() { invoke_squad_manage(SQUAD_IDS.BASE_DEFENDERS); }
     } else if(verb.indexOf('invite') == 0) {
         help_function = function() { invoke_invite_friends_dialog('get_requirements_help'); };
+    } else if(verb == 'set' && noun == 'alias') {
+        help_function = function() {
+            change_selection_ui(null);
+            PlayerInfoDialog.invoke(session.user_id, function(dialog) {
+                // XXX this doesn't work :(.
+                // If "child":0, then the quest_root is being cleared by something before it appears.
+                // If "child":1, it doesn't detect the profile tab dialog on first appearance.
+                if(0) {
+                    read_consequent({'consequent':'TUTORIAL_ARROW', 'child': 1,
+                                     'arrow_type':'button',
+                                     'direction':'down',
+                                     'dialog_name':'player_info_profile_tab',
+                                     'widget_name':'set_alias_button'}).execute();
+                }
+            });
+        };
     }
 
     if(options.short_circuit) {
