@@ -5737,7 +5737,7 @@
             "change_title_button": { "kind": "ActionButton", "xy": [58,132], "dimensions": [120,22], "bg_image_resizable": 1, "text_size": 13, "text_style": "bold",
                                      "bg_image": "action_button_resizable", "show": 0 },
 
-            "friend_icon": { "kind": "FriendIcon", "xy": [94, 160], "dimensions": [50,73], "state": "normal" },
+            "friend_icon": { "kind": "FriendIcon", "xy": [96, 160], "dimensions": [50,73], "state": "normal" },
 
             "level_label": { "kind": "TextField", "xy": [188,136], "dimensions": [73, 14], "text_size": 13,
                              "text_color": [0.8,0.8,0.8,1],
@@ -5755,23 +5755,23 @@
             "backup_trophy_spinner": { "kind": "StaticImage", "xy":[200,190], "dimensions":[16,16], "asset":"loading_spinner", "show": 0 },
 
             ///////////////////
-            "trophy_label": { "show": 0, "kind": "TextField", "xy": [62,227], "dimensions": [275, 17], "text_size": 13,
+            "trophy_label": { "show": 0, "kind": "TextField", "xy": [62,245], "dimensions": [275, 17], "text_size": 13,
                               "text_color": [0.8,0.8,0.8,1],
                               "text_hjustify": "left", "ui_name": ""
                             },
             //"trophy_bg": { "show": 0, "kind": "SolidRect", "xy": [59,220], "dimensions": [135,42], "color": [0,0,0,0.4], "bevel": 3 },
-            "trophy_bg": { "show": 0, "kind": "StaticImage", "xy": [59,220], "dimensions": [135,42], "bg_image_resizable": 1, "asset": "tooltip_bg",
+            "trophy_bg": { "show": 0, "kind": "StaticImage", "xy": [59,238], "dimensions": [128,40], "bg_image_resizable": 1, "asset": "tooltip_bg",
                            "ui_tooltip": "%type Points", "tooltip_delay": 0,
-                           "fixed_tooltip_offset": [66, 275]
+                           "fixed_tooltip_offset": [66, 293]
                          },
-            "trophy_icon":  { "show": 0, "kind": "StaticImage", "xy": [66,226], "dimensions": [30,30], "asset": "trophy_30x30",
+            "trophy_icon":  { "show": 0, "kind": "StaticImage", "xy": [66,243], "dimensions": [30,30], "asset": "trophy_30x30",
                               //"ui_tooltip": "", "tooltip_delay": 0,
-                              "fixed_tooltip_offset": [66, 275] },
-            "trophy_amount":  { "show": 0, "kind": "TextField", "xy": [102,230], "dimensions": [70,19],
+                              "fixed_tooltip_offset": [66, 293] },
+            "trophy_amount":  { "show": 0, "kind": "TextField", "xy": [102,248], "dimensions": [63,17],
                                 "text_color_plus": [1,1,1,1], "text_color_minus": [1,0,0,1],
                                 "text_size": 17, "text_style": "bold" },
-            "trophy_shine": { "show": 0, "alpha": 0.85, "kind": "StaticImage", "xy": [58,220], "dimensions": [62,13], "asset": "button_shine" },
-            "trophy_expires": { "show": 0, "kind": "TextField", "xy": [62,266], "dimensions": [275, 17], "text_size": 13,
+            "trophy_shine": { "show": 0, "alpha": 0.85, "kind": "StaticImage", "xy": [58,238], "dimensions": [62,13], "asset": "button_shine" },
+            "trophy_expires": { "show": 0, "kind": "TextField", "xy": [62,280], "dimensions": [275, 17], "text_size": 13,
                                 "text_color": [1,0,0,1],
                                 "text_hjustify": "left", "ui_name": "%expiry %s" },
 
