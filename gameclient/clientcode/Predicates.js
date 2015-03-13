@@ -45,7 +45,7 @@ Predicate.prototype.ui_describe_detail = function(player) {
     }
     // allow manual override of UI description
     if('ui_name' in this.data) {
-        return new PredicateUIDescription(this.data['ui_name']);
+        return new PredicateUIDescription(this.data['ui_name'], {already_obtained: this.data['ui_already_obtained']||false});
     }
     // allow override with an entirely different predicate
     if('help_predicate' in this.data) {

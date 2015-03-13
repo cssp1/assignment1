@@ -35220,12 +35220,12 @@ function update_new_store_sku(d) {
         }
 
         if(pred && (price < 0) && !pred.is_satisfied(player, null)) {
-            var req_text = pred.ui_describe(player);
-            if(req_text) {
+            var req_descr = pred.ui_describe_detail(player);
+            if(req_descr) {
                 buyable = true; // DO show hider
                 info_small = true;
                 info_col = 'error';
-                info_str = (('ui_name' in skudata['requires'] || ('ui_name_literal' in skudata['requires']) || ('ui_cooldown_name' in skudata['requires'])) ? req_text : d.data['widgets']['info']['ui_name_unmet'].replace('%s', req_text));
+                info_str = (('ui_name' in skudata['requires'] || ('ui_name_literal' in skudata['requires']) || req_descr.already_obtained || ('ui_cooldown_name' in skudata['requires'])) ? req_descr.descr : d.data['widgets']['info']['ui_name_unmet'].replace('%s', req_descr.descr));
                 helper = get_requirements_help(pred, null);
             }
         }
