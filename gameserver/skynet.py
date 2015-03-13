@@ -401,27 +401,23 @@ def lookalike_audience_create(db, ad_account_id, name, origin_audience_name, cou
     if description: props['description'] = description
     return _custom_audience_create(db, ad_account_id, props)
 
-def _custom_audience_add(audience_id, app_id_list, facebook_id_list):
-    if 1: # new upload API introduced by Facebook in the 2014 Oct 1 breaking changes
-        result = fb_api(SpinFacebook.versioned_graph_endpoint('customaudience', audience_id+'/users'),
-                        post_params = {'payload': SpinJSON.dumps({'schema':'UID', 'data': facebook_id_list, 'app_ids': app_id_list})})
-        print 'transmitted', result['num_received'], 'of which', result['num_invalid_entries'], 'were invalid'
-    else:
-        fb_api(SpinFacebook.versioned_graph_endpoint('customaudience', audience_id+'/users'),
-               post_params = {'users':SpinJSON.dumps([{'id':x} for x in facebook_id_list])})
-    return len(facebook_id_list)
+def _custom_audience_add(audience_id, app_id_facebook_id_list):
+    result = fb_api(SpinFacebook.versioned_graph_endpoint('customaudience', audience_id+'/users'),
+                    post_params = {'payload': SpinJSON.dumps({'schema':'UID', 'data': [x[1] for x in app_id_facebook_id_list], 'app_ids': [x[0] for x in app_id_facebook_id_list]})})
+    print 'transmitted', result['num_received'], 'of which', result['num_invalid_entries'], 'were invalid'
 
-def custom_audience_add(audience_id, app_id_list, facebook_id_list):
+
+def custom_audience_add(audience_id, app_id_facebook_id_list):
     limit = 5000 # 5000 with new /payload API
     added = 0
     batch = []
-    for fbid in facebook_id_list:
-        batch.append(fbid)
+    for app_fb_id in app_id_facebook_id_list:
+        batch.append(app_fb_id)
         if len(batch) >= limit:
-            added += _custom_audience_add(audience_id, app_id_list, batch)
+            added += _custom_audience_add(audience_id, batch)
             batch = []
     if batch:
-        added += _custom_audience_add(audience_id, app_id_list, batch)
+        added += _custom_audience_add(audience_id, batch)
     return added
 
 ADGROUP_FIELDS = 'name,campaign_id,created_time,failed_delivery_checks,adgroup_status,bid_type,bid_info'
@@ -505,6 +501,9 @@ def decode_bid_type(c):
         return c
     else:
         raise Exception('unknown bid type code '+repr(c))
+def encode_bid_type(t):
+    return 'ABSOLUTE_OCPM' if t.startswith('oCPM') else BID_TYPE_CODES[t]
+
 def adgroup_get_bid(adgroup):
     if ('max_bid' in adgroup) and (bid_type_equals(adgroup['bid_type'], 'CPC') or bid_type_equals(adgroup['bid_type'], 'CPM')):
         ret = adgroup['max_bid']
@@ -533,6 +532,40 @@ def adgroup_set_bid(adgroup, new_bid, o_bid_type = None):
 
 #        return {'bid_info':{str(BID_INFO_CODES[o_bid_type]):new_bid}}
         return {'bid_info':{o_bid_type:new_bid}}
+
+def adgroup_encode_bid(bid_type, bid, app_id, conversion_pixels):
+    ret = {}
+    if bid_type == 'CPA' or bid_type.startswith('oCPM'):
+        if bid_type == 'CPA' or bid_type == 'oCPM_INSTALL':
+            ret['conversion_specs'] = SpinJSON.dumps([{"action.type":["app_install"],"application":app_id}])
+            o_bid_type = 'ACTIONS'
+        elif bid_type == 'oCPM_CLICK':
+            o_bid_type = 'CLICKS'
+        else:
+            o_bid_type = 'ACTIONS'
+            event = '_'.join(bid_type.split('_')[1:])
+            assert event in conversion_pixels
+            ret['conversion_specs'] = SpinJSON.dumps([{"action.type":'offsite_conversion','offsite_pixel':int(conversion_pixels[event]['id'])}])
+    elif bid_type == 'CPC':
+        o_bid_type = 'CLICKS'
+    elif bid_type == 'CPM':
+        o_bid_type = 'IMPRESSIONS'
+    else:
+        raise Exception('unhandled bid_type '+bid_type)
+
+    bid_dic = adgroup_set_bid(ret, bid, o_bid_type = o_bid_type)
+    if 'max_bid' in bid_dic:
+        ret['max_bid'] = bid_dic['max_bid']
+    else:
+        ret['bid_info'] = SpinJSON.dumps(bid_dic['bid_info'])
+    return ret
+
+def adcampaign_update_bid(db, adcampaign, new_bid):
+    if not fb_api(SpinFacebook.versioned_graph_endpoint('adcampaign', adcampaign['id']),
+                  post_params = {'bid_info': SpinJSON.dumps(adgroup_set_bid(adcampaign, new_bid)['bid_info'])}):
+        return False
+    db.fb_adcampaigns.update({'_id':adcampaign['id']}, {'$set': adgroup_set_bid(adcampaign, new_bid)})
+    return True
 
 def adgroup_update_bid(db, adgroup, new_bid):
     if not fb_api(SpinFacebook.versioned_graph_endpoint('adgroup', adgroup['id']), post_params = adgroup_set_bid(adgroup, new_bid)):
@@ -1714,53 +1747,24 @@ def reachestimate_ensure_cached(db, ad_account_id, tgt_list):
             raise Exception('bad reachestimate result for: '+stgt)
         i += 1
 
-def adgroup_create_batch_element(db, campaign_id, campaign_name, creative_id, targeting, bid, tgt, name):
+def adgroup_create_batch_element(db, campaign_id, campaign_name, creative_id, tgt, name):
     game_id = tgt.get('game', 'tr')
     game_data = GAMES[game_id]
     conversion_pixels = game_data['conversion_pixels']
-    bid_type = tgt['bid_type']
 
     if ('version' in tgt) and (tgt['version']+'_') not in campaign_name and (not campaign_name.endswith(tgt['version'])):
         raise Exception('probable typo - ad version %s not present in campaign name %s' % (tgt['version'], campaign_name))
 
     adgroup = {'name': name,
                'campaign_id': campaign_id,
-               'bid_type': 'ABSOLUTE_OCPM' if bid_type.startswith('oCPM') else BID_TYPE_CODES[bid_type],
-               'targeting': SpinJSON.dumps(targeting),
                'creative': SpinJSON.dumps({'creative_id':creative_id}),
                'tracking_specs': SpinJSON.dumps([{'action.type':'offsite_conversion','offsite_pixel':int(pixel['id'])} for pixel in conversion_pixels.itervalues()]),
                'objective': 'PAGE_LIKES' if tgt.get('destination',None)=='app_page' else ('CANVAS_APP_ENGAGEMENT' if tgt.get('include_already_connected_to_game',False) else 'CANVAS_APP_INSTALLS'),
                'redownload':1,
                'fields': ADGROUP_FIELDS
                }
+    #adgroup.update(adgroup_encode_bid(tgt['bid_type'], bid, game_data['app_id'], conversion_pixels))
 
-    if bid_type == 'CPA' or bid_type.startswith('oCPM'):
-
-        if bid_type == 'CPA' or bid_type == 'oCPM_INSTALL':
-            adgroup['conversion_specs'] = SpinJSON.dumps([{"action.type":["app_install"],"application":game_data['app_id']}])
-            o_bid_type = 'ACTIONS'
-
-        elif bid_type == 'oCPM_CLICK':
-            o_bid_type = 'CLICKS'
-
-        else:
-            o_bid_type = 'ACTIONS'
-            event = '_'.join(bid_type.split('_')[1:])
-            assert event in conversion_pixels
-            adgroup['conversion_specs'] = SpinJSON.dumps([{"action.type":'offsite_conversion','offsite_pixel':int(conversion_pixels[event]['id'])}])
-
-    elif bid_type == 'CPC':
-        o_bid_type = 'CLICKS'
-    elif bid_type == 'CPM':
-        o_bid_type = 'IMPRESSIONS'
-    else:
-        raise Exception('unhandled bid_type '+bid_type)
-
-    bid_dic = adgroup_set_bid(adgroup, bid, o_bid_type = o_bid_type)
-    if 'max_bid' in bid_dic:
-        adgroup['max_bid'] = bid_dic['max_bid']
-    else:
-        adgroup['bid_info'] = SpinJSON.dumps(bid_dic['bid_info'])
     return adgroup
 
 def adgroup_create_batch(db, ad_account_id, arglist):
@@ -1813,16 +1817,22 @@ def adcampaigns_pull(db, ad_account_id):
     # with the flag include_deleted. Instead, you must make an HTTP GET call and specify the field campaign_status=['DELETED']
     [update_fields_by_id(db.fb_adcampaigns, mongo_enc(x)) for x in \
      fb_api(SpinFacebook.versioned_graph_endpoint('adcampaign', 'act_'+ad_account_id+'/adcampaigns'),
-            url_params = {'fields':'id,name,account_id,campaign_group_id,campaign_status,daily_budget,lifetime_budget',
+            url_params = {'fields':'id,name,account_id,campaign_group_id,campaign_status,daily_budget,lifetime_budget,targeting,bid_type,bid_info',
                           'campaign_status':SpinJSON.dumps(['ACTIVE','ARCHIVED','PAUSED'])},
             is_paged = True)]
 
 CAMPAIGN_STATUS_CODES = {'active':'ACTIVE', 'paused':'PAUSED', 'archived': 'ARCHIVED', 'deleted':'DELETED'}
 
-def adcampaign_make(db, name, ad_account_id, campaign_group_id):
+def adcampaign_make(db, name, ad_account_id, campaign_group_id, app_id, app_namespace, conversion_pixels, tgt, bid):
+    params = {'name':name, 'daily_budget':NEW_CAMPAIGN_BUDGET, 'campaign_status':CAMPAIGN_STATUS_CODES['active'],
+              'bid_type': encode_bid_type(tgt['bid_type']),
+              'promoted_object': SpinJSON.dumps({'application_id': app_id, 'object_store_url':'https://www.facebook.com/games/'+app_namespace}),
+              'targeting': SpinJSON.dumps(adgroup_targeting(db, tgt)),
+              'campaign_group_id': campaign_group_id, 'redownload':1}
+    params.update(adgroup_encode_bid(tgt['bid_type'], bid, app_id, conversion_pixels))
+
     result = fb_api(SpinFacebook.versioned_graph_endpoint('adcampaign', 'act_'+ad_account_id+'/adcampaigns'),
-                    post_params = {'name':name, 'daily_budget':NEW_CAMPAIGN_BUDGET, 'campaign_status':CAMPAIGN_STATUS_CODES['active'],
-                                   'campaign_group_id': campaign_group_id, 'redownload':1})
+                    post_params = params)
     if not result or ('id' not in result): return False
     campaign = result['data']['campaigns'][result['id']]
     if 'account_id' in campaign: campaign['account_id'] = str(campaign['account_id']) # FB sometimes returns these as numbers :P
@@ -2029,6 +2039,17 @@ def control_ad_campaign(db, spin_params, campaign_name, campaign_data, do_reache
     if not campaign_data.get('enable_ad_creation', True): enable_ad_creation = False
 
     ad_stgt_list = sorted(sum([get_ad_stgt_list(matrix, spin_params) for matrix in campaign_data['matrices']], []))
+    if not ad_stgt_list: return
+
+    # as of 2015, Facebook now requires all adgroups within a single adcampaign to share the same targeting
+    campaign_tgt = None
+    for ad_stgt in ad_stgt_list:
+        ad_tgt = reachestimate_tgt(decode_params(spin_params, ad_stgt))
+        if campaign_tgt is None:
+            campaign_tgt = ad_tgt
+        else:
+            if campaign_tgt != ad_tgt:
+                raise Exception('adgroup targeting mismatch within adcampaign: campaign:\n%r\nad:\n%r' % (campaign_tgt, ad_tgt))
 
     tgt_filter = decode_filter(spin_params, stgt_filter) if stgt_filter else None
 
@@ -2041,12 +2062,24 @@ def control_ad_campaign(db, spin_params, campaign_name, campaign_data, do_reache
     if len(fb_campaign_list) > 1:
         print "ERROR! More than one campaign for name", campaign_name, "- fix this manually!"
         return
-    elif len(fb_campaign_list) == 1:
-        fb_campaign = fb_campaign_list[0]
     else:
-        if enable_campaign_creation:
+        campaign_bid = compute_bid(db, spin_params, campaign_tgt, 100 * campaign_data.get('bid_shade',1), # convert dollars to cents
+                                   ad_account_id = game_data['ad_account_id'],
+                                   use_reachestimate = do_reachestimates and (('custom_audiences' not in campaign_tgt) or campaign_tgt['custom_audiences'][0].startswith('like-')))
+        if len(fb_campaign_list) == 1:
+            fb_campaign = fb_campaign_list[0]
+
+            # check bid on existing campaign
+            if enable_bid_updates and ('bid_info' in fb_campaign):
+                cur_bid = adgroup_get_bid(fb_campaign)
+                if campaign_bid >= 0 and cur_bid != campaign_bid and (abs(cur_bid-campaign_bid)/float(cur_bid) > 0.04): # ignore very small deltas
+                    print "    changing campaign bid from", cur_bid, "to", campaign_bid
+                    adcampaign_update_bid(db, fb_campaign, campaign_bid)
+
+        elif enable_campaign_creation:
             print "making campaign...",
-            fb_campaign = adcampaign_make(db, campaign_name, game_data['ad_account_id'], campaign_group_id)
+            fb_campaign = adcampaign_make(db, campaign_name, game_data['ad_account_id'], campaign_group_id, game_data['app_id'], game_data['namespace'],
+                                          game_data['conversion_pixels'], campaign_tgt, campaign_bid)
             if not fb_campaign:
                 print "skipping",
                 return
@@ -2062,7 +2095,7 @@ def control_ad_campaign(db, spin_params, campaign_name, campaign_data, do_reache
             return
 
     assert fb_campaign
-    print "ID", fb_campaign['id']
+    print "ID", fb_campaign['id'], 'CAMPAIGN BID', campaign_bid
 
     seen_ads = {}
     estimates_needed = []
@@ -2150,7 +2183,7 @@ def control_ad_campaign(db, spin_params, campaign_name, campaign_data, do_reache
 
             if enable_ad_creation or (not quiet):
                 if not enable_ad_creation: print 'NOT',
-                print 'creating new ad "%-80s BID %3d"' % (adgroup_name, new_bid)
+                print 'creating new ad "%-80s"' % (adgroup_name,)
 
             new_adcreative_arglist.append([campaign_name, campaign_data.get('spin_campaign', campaign_name), tgt, stgt])
             new_ad_params.append({'stgt':stgt, 'new_bid':new_bid, 'tactical_bid_shade': campaign_data.get('bid_shade',1), 'tgt':tgt, 'stgt':stgt, 'adgroup_name':adgroup_name})
@@ -2162,7 +2195,8 @@ def control_ad_campaign(db, spin_params, campaign_name, campaign_data, do_reache
                 params = new_ad_params[i]
                 creative = new_adcreatives[i]
                 assert creative
-                new_adgroup_arglist.append([fb_campaign['id'], fb_campaign['name'], creative['id'], adgroup_targeting(db, params['tgt']), params['new_bid'], params['tgt'], params['adgroup_name']])
+                new_adgroup_arglist.append([fb_campaign['id'], fb_campaign['name'], creative['id'], # params['new_bid'],
+                                            params['tgt'], params['adgroup_name']])
 
             new_adgroups = adgroup_create_batch(db, game_data['ad_account_id'], new_adgroup_arglist)
 
@@ -2711,7 +2745,7 @@ if __name__ == '__main__':
                     for line in fd.xreadlines():
                         yield line.strip()
 
-            n_added = custom_audience_add(audience_id, [GAMES[cmd_game_id]['app_id']], stream_ids(filenames))
+            n_added = custom_audience_add(audience_id, ((GAMES[cmd_game_id]['app_id'], fb_id) for fb_id in stream_ids(filenames)))
             print 'added', n_added, 'users'
 
     else:
