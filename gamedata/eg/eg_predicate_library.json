@@ -70,7 +70,8 @@
     // hide "evil Valentina" event character and event-related daily tips until this is satisfied
     "hide_event_info_until": {"predicate": "AND", "subpredicates": [
         // TOC level 2
-        { "predicate":"PLAYER_HISTORY", "key": "toc_level", "method": ">=", "value": 2 },
+        { "predicate":"PLAYER_HISTORY", "key": "toc_level", "method": ">=", "value": 2,
+          {"predicate": "BUILDING_LEVEL", "building_type":"toc", "trigger_level": 2 }},
 
         // must complete Red Pole AI
         { "predicate": "LIBRARY", "name": "ai_tutorial08_complete" }

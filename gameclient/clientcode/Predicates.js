@@ -20,26 +20,55 @@ function Predicate(data) {
     this.kind = data['predicate'];
 }
 
-// if predicate is unsatisfied, return a user-readable string explaining the completion goal
-// otherwise return null
-Predicate.prototype.ui_describe = function(player) {
-    if(this.is_satisfied(player, null)) {
-        return null;
-    } else {
-        // allow override with an entirely different predicate
-        if('help_predicate' in this.data) {
-            // note: use the do_ version here since we already know the predicate is false
-            return read_predicate(this.data['help_predicate']).do_ui_describe(player);
-        }
-        // allow manual override of UI description
-        if('ui_name' in this.data) {
-            return this.data['ui_name'];
-        }
-        return this.do_ui_describe(player);
-    }
+/** Encapsulates the info extracted for ui_describe() and variants
+    @constructor
+    @struct
+    @param {string} descr
+    @param {{already_obtained: (boolean|undefined)}=} options */
+function PredicateUIDescription(descr, options) {
+    this.descr = descr;
+    this.options = options || null;
+    this.already_obtained = (options && options.already_obtained) || false;
 };
 
+/** @private version of ui_describe for subclasses to override
+    @param {?} player
+    @return {PredicateUIDescription|null} - can be null if we don't want to alert the player about something (e.g. show_if is false)
+*/
+Predicate.prototype.do_ui_describe = goog.abstractMethod;
+
+/** If predicate is unsatisfied, return a PredicateUIDescription. Otherwise return null.
+    @return {PredicateUIDescription|null} */
+Predicate.prototype.ui_describe_detail = function(player) {
+    if(this.is_satisfied(player, null)) {
+        return null;
+    }
+    // allow manual override of UI description
+    if('ui_name' in this.data) {
+        return new PredicateUIDescription(this.data['ui_name']);
+    }
+    // allow override with an entirely different predicate
+    if('help_predicate' in this.data) {
+        // note: use the do_ version here since we already know the predicate is false
+        return read_predicate(this.data['help_predicate']).do_ui_describe(player);
+    }
+    return this.do_ui_describe(player);
+};
+
+/** If predicate is unsatisfied, return a user-readable string explaining the completion goal. Otherwise return null.
+    @return {string|null} */
+Predicate.prototype.ui_describe = function(player) {
+    var d = this.ui_describe_detail(player);
+    if(d) {
+        return d.descr;
+    }
+    return null;
+};
+
+/** @private version of ui_help() for subclasses to override */
 Predicate.prototype.do_ui_help = function(player) { return null; };
+
+/** Used by get_requirements_help() to query for actions the player could take to satisfy the predicate */
 Predicate.prototype.ui_help = function(player) {
     // allow override with an entirely different predicate
     if('help_predicate' in this.data) {
@@ -76,7 +105,7 @@ AlwaysTruePredicate.prototype.is_satisfied = function(player, qdata) { return tr
 function AlwaysFalsePredicate(data) { goog.base(this, data); }
 goog.inherits(AlwaysFalsePredicate, Predicate);
 AlwaysFalsePredicate.prototype.is_satisfied = function(player, qdata) { return false; };
-AlwaysFalsePredicate.prototype.do_ui_describe = function(player) { return gamedata['strings']['predicates'][this.kind]['ui_name']; };
+AlwaysFalsePredicate.prototype.do_ui_describe = function(player) { return new PredicateUIDescription(gamedata['strings']['predicates'][this.kind]['ui_name']); };
 
 /** @constructor
   * @extends Predicate */
@@ -110,12 +139,18 @@ AndPredicate.prototype.is_satisfied = function(player, qdata) {
     return true;
 };
 AndPredicate.prototype.do_ui_describe = function(player) {
-    var ret = [];
+    var descr_ls = [];
+    var opts = {};
     for(var i = 0; i < this.subpredicates.length; i++) {
-        var p = this.subpredicates[i].ui_describe(player);
-        if(p) { ret.push(p); }
+        var p = this.subpredicates[i].ui_describe_detail(player);
+        if(p) {
+            descr_ls.push(p.descr);
+            if(p.options) {
+                goog.object.extend(opts, p.options);
+            }
+        }
     }
-    return ret.join(',\n');
+    return new PredicateUIDescription(descr_ls.join(',\n'), opts);
 };
 AndPredicate.prototype.do_ui_help = function(player) {
     for(var i = 0; i < this.subpredicates.length; i++) {
@@ -149,12 +184,18 @@ OrPredicate.prototype.is_satisfied = function(player, qdata) {
     return false;
 };
 OrPredicate.prototype.do_ui_describe = function(player) {
-    var ret = [];
+    var descr_ls = [];
+    var opts = {};
     for(var i = 0; i < this.subpredicates.length; i++) {
-        var p = this.subpredicates[i].ui_describe(player);
-        if(p) { ret.push(p); }
+        var p = this.subpredicates[i].ui_describe_detail(player);
+        if(p) {
+            descr_ls.push(p.descr);
+            if(p.options) {
+                goog.object.extend(opts, p.options);
+            }
+        }
     }
-    return ret.join(' OR\n');
+    return new PredicateUIDescription(descr_ls.join(' OR\n'), opts);
 };
 OrPredicate.prototype.do_ui_help = function(player) {
     for(var i = 0; i < this.subpredicates.length; i++) {
@@ -185,8 +226,8 @@ NotPredicate.prototype.is_satisfied = function(player, qdata) {
     return !(this.subpredicates[0].is_satisfied(player, qdata));
 };
 NotPredicate.prototype.do_ui_describe = function(player) {
-    var sub = this.subpredicates[0].ui_describe(player);
-    return 'NOT '+ (sub ? sub.toString() : 'unknown');
+    var sub = this.subpredicates[0].ui_describe_detail(player);
+    return new PredicateUIDescription('NOT '+ (sub ? sub.descr : 'unknown'), (sub ? sub.options : {}));
 };
 NotPredicate.prototype.ui_expire_time = function(player) { return -1; }; // not sure on this one
 
@@ -210,7 +251,7 @@ AllBuildingsUndamagedPredicate.prototype.is_satisfied = function(player, qdata) 
     return true;
 };
 AllBuildingsUndamagedPredicate.prototype.do_ui_describe = function(player) {
-    return gamedata['strings']['predicates'][this.kind]['ui_name'];
+    return new PredicateUIDescription(gamedata['strings']['predicates'][this.kind]['ui_name']);
 };
 
 /** @constructor
@@ -231,7 +272,7 @@ ObjectUndamagedPredicate.prototype.is_satisfied = function(player, qdata) {
 };
 ObjectUndamagedPredicate.prototype.do_ui_describe = function(player) {
     var spec = gamedata['units'][this.spec_name] || gamedata['buildings'][this.spec_name];
-    return gamedata['strings']['predicates'][this.kind]['ui_name'].replace('%s', spec['ui_name']);
+    return new PredicateUIDescription(gamedata['strings']['predicates'][this.kind]['ui_name'].replace('%s', spec['ui_name']));
 };
 ObjectUndamagedPredicate.prototype.do_ui_help = function(player) {
     var obj = null;
@@ -266,7 +307,7 @@ ObjectUnbusyPredicate.prototype.is_satisfied = function(player, qdata) {
 };
 ObjectUnbusyPredicate.prototype.do_ui_describe = function(player) {
     var spec = gamedata['buildings'][this.spec_name];
-    return gamedata['strings']['predicates'][this.kind]['ui_name'].replace('%s', spec['ui_name']);
+    return new PredicateUIDescription(gamedata['strings']['predicates'][this.kind]['ui_name'].replace('%s', spec['ui_name']));
 };
 ObjectUnbusyPredicate.prototype.do_ui_help = function(player) {
     var obj = null;
@@ -334,7 +375,7 @@ BuildingQuantityPredicate.prototype.do_ui_describe = function(player) {
         qty_string = '';
     }
     ret = ret.replace('%d ', qty_string);
-    return ret;
+    return new PredicateUIDescription(ret);
 };
 BuildingQuantityPredicate.prototype.ui_progress = function(player, qdata) {
     var ret = gamedata['strings']['predicates'][this.kind]['ui_progress'];
@@ -419,7 +460,7 @@ BuildingLevelPredicate.prototype.do_ui_describe = function(player) {
     }
     ret = ret.replace('%s', this.building_spec['ui_name']);
     ret = ret.replace('%d', this.trigger_level.toString());
-    return ret;
+    return new PredicateUIDescription(ret);
 };
 BuildingLevelPredicate.prototype.do_ui_help = function(player) {
     // do not return help for hidden buildings
@@ -520,7 +561,7 @@ UnitQuantityPredicate.prototype.do_ui_describe = function(player) {
     var ret = gamedata['strings']['predicates'][this.kind]['ui_name'];
     ret = ret.replace('%s', this.unit_spec['ui_name']);
     ret = ret.replace('%d', this.trigger_qty.toString());
-    return ret;
+    return new PredicateUIDescription(ret);
 };
 
 /** @constructor
@@ -561,7 +602,7 @@ TechLevelPredicate.prototype.do_ui_describe = function(player) {
     var ret = gamedata['strings']['predicates'][this.kind]['ui_name'];
     ret = ret.replace('%s', spec['ui_name']);
     ret = ret.replace('%d', this.min_level.toString());
-    return ret;
+    return new PredicateUIDescription(ret);
 };
 TechLevelPredicate.prototype.do_ui_help = function(player) {
     var spec = gamedata['tech'][this.tech];
@@ -597,7 +638,7 @@ QuestCompletedPredicate.prototype.is_satisfied = function(player, qdata) {
 QuestCompletedPredicate.prototype.do_ui_describe = function(player) {
     var ret = gamedata['strings']['predicates'][this.kind]['ui_name'];
     ret = ret.replace('%s', this.quest['ui_name']);
-    return ret;
+    return new PredicateUIDescription(ret);
 };
 QuestCompletedPredicate.prototype.ui_expire_time = function(player) { return -1; }
 
@@ -620,7 +661,7 @@ AuraActivePredicate.prototype.is_satisfied = function(player, qdata) {
     return false;
 };
 AuraActivePredicate.prototype.do_ui_describe = function(player) {
-    return gamedata['strings']['predicates'][this.kind]['ui_name'].replace('%s', gamedata['auras'][this.aura_name]['ui_name']);
+    return new PredicateUIDescription(gamedata['strings']['predicates'][this.kind]['ui_name'].replace('%s', gamedata['auras'][this.aura_name]['ui_name']));
 };
 
 /** @constructor
@@ -633,7 +674,7 @@ function CooldownActivePredicate(data) {
 goog.inherits(CooldownActivePredicate, Predicate);
 CooldownActivePredicate.prototype.is_satisfied = function(player, qdata) { return player.cooldown_active(this.name, this.match_data); };
 CooldownActivePredicate.prototype.do_ui_describe = function(player) {
-    return gamedata['strings']['predicates'][this.kind]['ui_name'].replace('%s', this.name);
+    return new PredicateUIDescription(gamedata['strings']['predicates'][this.kind]['ui_name'].replace('%s', this.name));
 };
 
 /** @constructor
@@ -646,7 +687,7 @@ goog.inherits(CooldownInactivePredicate, Predicate);
 CooldownInactivePredicate.prototype.is_satisfied = function(player, qdata) { return !this.act_pred.is_satisfied(player, qdata); };
 CooldownInactivePredicate.prototype.do_ui_describe = function(player) {
     var template = ('ui_cooldown_name' in this.data ? this.data['ui_cooldown_name'] : gamedata['strings']['predicates'][this.kind]['ui_name']);
-    return template.replace('%s', this.act_pred.name).replace('%togo', pretty_print_time(player.cooldown_togo(this.act_pred.name)));
+    return new PredicateUIDescription(template.replace('%s', this.act_pred.name).replace('%togo', pretty_print_time(player.cooldown_togo(this.act_pred.name))));
 };
 
 /** @constructor
@@ -691,7 +732,7 @@ PlayerHistoryPredicate.prototype.do_ui_describe = function(player) {
     }
     ret = ret.replace('%s', this.ui_name_s);
     ret = ret.replace('%d', this.ui_name_d);
-    return ret;
+    return new PredicateUIDescription(ret);
 };
 PlayerHistoryPredicate.prototype.ui_progress = function(player, qdata) {
     var ret;
@@ -803,7 +844,7 @@ function LibraryPredicate(data) {
 }
 goog.inherits(LibraryPredicate, Predicate);
 LibraryPredicate.prototype.do_ui_describe = function(player) {
-    return this.pred.ui_describe(player);
+    return this.pred.ui_describe_detail(player);
 }
 LibraryPredicate.prototype.is_satisfied = function(player, qdata) {
     return this.pred.is_satisfied(player, qdata);
@@ -832,13 +873,13 @@ AIBaseActivePredicate.prototype.is_satisfied = function(player, qdata) {
 };
 AIBaseActivePredicate.prototype.do_ui_describe = function(player) {
     var base = gamedata['ai_bases_client']['bases'][this.user_id.toString()] || null;
-    if(!base) { return "Unknown AI base active"; }
+    if(!base) { return new PredicateUIDescription("Unknown AI base active"); }
     var pred = base['activation'] || null;
     if(pred) {
-        return read_predicate(pred).ui_describe(player);
+        return read_predicate(pred).ui_describe_detail(player);
     }
     var s = gamedata['strings']['predicates'][this.kind]['ui_name'];
-    return s.replace('%d', this.user_id.toString());
+    return new PredicateUIDescription(s.replace('%d', this.user_id.toString()));
 };
 
 /** @constructor
@@ -859,13 +900,13 @@ AIBaseShownPredicate.prototype.is_satisfied = function(player, qdata) {
 };
 AIBaseShownPredicate.prototype.do_ui_describe = function(player) {
     var base = gamedata['ai_bases_client']['bases'][this.user_id.toString()];
-    if(!base) { return false; }
+    if(!base) { return null; }
     var pred = ('show_if' in base ? base['show_if'] : ('activation' in base ? base['activation'] : null));
     if(pred) {
-        return read_predicate(pred).ui_describe(player);
+        return read_predicate(pred).ui_describe_detail(player);
     }
     var s = gamedata['strings']['predicates'][this.kind]['ui_name'];
-    return s.replace('%d', this.user_id.toString());
+    return new PredicateUIDescription(s.replace('%d', this.user_id.toString()));
 };
 
 /** @constructor
@@ -970,7 +1011,7 @@ AbsoluteTimePredicate.prototype.is_satisfied = function(player, qdata) {
 };
 AbsoluteTimePredicate.prototype.do_ui_describe = function(player) {
     var s = gamedata['strings']['predicates'][this.kind]['ui_name'];
-    return s.replace('%d1', this.range[0].toString()).replace('%d2',this.range[1].toString());
+    return new PredicateUIDescription(s.replace('%d1', this.range[0].toString()).replace('%d2',this.range[1].toString()));
 };
 AbsoluteTimePredicate.prototype.ui_expire_time = function(player) {
     return this.range[1];
@@ -992,7 +1033,7 @@ AccountCreationTimePredicate.prototype.is_satisfied = function(player, qdata) {
 };
 AccountCreationTimePredicate.prototype.do_ui_describe = function(player) {
     var s = gamedata['strings']['predicates'][this.kind]['ui_name'];
-    return s.replace('%d1', this.range[0].toString()).replace('%d2',this.range[1].toString());
+    return new PredicateUIDescription(s.replace('%d1', this.range[0].toString()).replace('%d2',this.range[1].toString()));
 };
 AccountCreationTimePredicate.prototype.ui_expire_time = function(player) { return -1; };
 
@@ -1149,7 +1190,9 @@ goog.inherits(HasAttackedPredicate, Predicate);
 HasAttackedPredicate.prototype.is_satisfied = function(player, qdata) {
     return session.has_attacked;
 };
-HasAttackedPredicate.prototype.do_ui_describe = function(player) { return gamedata['strings']['predicates'][this.kind]['ui_name']; };
+HasAttackedPredicate.prototype.do_ui_describe = function(player) {
+    return new PredicateUIDescription(gamedata['strings']['predicates'][this.kind]['ui_name']);
+};
 
 /** @constructor
   * @extends Predicate */
@@ -1177,7 +1220,9 @@ HasDeployedPredicate.prototype.is_satisfied = function(player, qdata) {
         return false;
     }
 };
-HasDeployedPredicate.prototype.do_ui_describe = function(player) { return gamedata['strings']['predicates'][this.kind]['ui_name']; };
+HasDeployedPredicate.prototype.do_ui_describe = function(player) {
+    return new PredicateUIDescription(gamedata['strings']['predicates'][this.kind]['ui_name']);
+};
 
 /** @constructor
   * @extends Predicate */
@@ -1409,7 +1454,9 @@ goog.inherits(HasAliasPredicate, Predicate);
 HasAliasPredicate.prototype.is_satisfied = function(player, qdata) {
     return !!player.alias;
 };
-HasAliasPredicate.prototype.do_ui_describe = function(player) { return gamedata['strings']['predicates'][this.kind]['ui_name']; };
+HasAliasPredicate.prototype.do_ui_describe = function(player) {
+    return new PredicateUIDescription(gamedata['strings']['predicates'][this.kind]['ui_name']);
+};
 HasAliasPredicate.prototype.do_ui_help = function(player) {
     return {'noun': 'alias', 'verb': 'set' };
 };
@@ -1425,7 +1472,7 @@ HasTitlePredicate.prototype.is_satisfied = function(player, qdata) {
     return (player.unlocked_titles && (this.name in player.unlocked_titles));
 };
 HasTitlePredicate.prototype.do_ui_describe = function(player) {
-    return gamedata['strings']['predicates'][this.kind]['ui_name'].replace('%s', gamedata['titles'][this.name]['ui_name']);
+    return new PredicateUIDescription(gamedata['strings']['predicates'][this.kind]['ui_name'].replace('%s', gamedata['titles'][this.name]['ui_name']));
 };
 
 /** @constructor
