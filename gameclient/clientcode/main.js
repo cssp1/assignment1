@@ -31500,6 +31500,8 @@ function invoke_map_dialog(force_page) {
     var page = map_dialog_get_default_page();
     if(page != 'computers' && force_page) {
         page = 'computers';
+    } else if(!page) {
+        page = 'computers';
     }
     if(!(((page||'')+'_button') in dialog.widgets)) { throw Error('button not found for page '+(page ? page.toString() : 'null/undefined')); }
     dialog.widgets[page+'_button'].onclick(dialog.widgets[page+'_button']);
