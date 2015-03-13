@@ -401,27 +401,27 @@ def lookalike_audience_create(db, ad_account_id, name, origin_audience_name, cou
     if description: props['description'] = description
     return _custom_audience_create(db, ad_account_id, props)
 
-def _custom_audience_add(audience_id, facebook_id_list):
+def _custom_audience_add(audience_id, app_id_list, facebook_id_list):
     if 1: # new upload API introduced by Facebook in the 2014 Oct 1 breaking changes
         result = fb_api(SpinFacebook.versioned_graph_endpoint('customaudience', audience_id+'/users'),
-                        post_params = {'payload': SpinJSON.dumps({'schema':'UID', 'data': facebook_id_list})})
+                        post_params = {'payload': SpinJSON.dumps({'schema':'UID', 'data': facebook_id_list, 'app_ids': app_id_list})})
         print 'transmitted', result['num_received'], 'of which', result['num_invalid_entries'], 'were invalid'
     else:
         fb_api(SpinFacebook.versioned_graph_endpoint('customaudience', audience_id+'/users'),
                post_params = {'users':SpinJSON.dumps([{'id':x} for x in facebook_id_list])})
     return len(facebook_id_list)
 
-def custom_audience_add(audience_id, facebook_id_list):
+def custom_audience_add(audience_id, app_id_list, facebook_id_list):
     limit = 5000 # 5000 with new /payload API
     added = 0
     batch = []
     for fbid in facebook_id_list:
         batch.append(fbid)
         if len(batch) >= limit:
-            added += _custom_audience_add(audience_id, batch)
+            added += _custom_audience_add(audience_id, app_id_list, batch)
             batch = []
     if batch:
-        added += _custom_audience_add(audience_id, batch)
+        added += _custom_audience_add(audience_id, app_id_list, batch)
     return added
 
 ADGROUP_FIELDS = 'name,campaign_id,created_time,failed_delivery_checks,adgroup_status,bid_type,bid_info'
@@ -2711,7 +2711,7 @@ if __name__ == '__main__':
                     for line in fd.xreadlines():
                         yield line.strip()
 
-            n_added = custom_audience_add(audience_id, stream_ids(filenames))
+            n_added = custom_audience_add(audience_id, [GAMES[cmd_game_id]['app_id']], stream_ids(filenames))
             print 'added', n_added, 'users'
 
     else:
