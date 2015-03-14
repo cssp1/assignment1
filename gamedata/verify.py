@@ -257,6 +257,11 @@ def check_mandatory_fields(specname, spec, kind):
         if level_tech not in gamedata['tech']:
             error |= 1
             print '%s:level_determined_by_tech refers to a tech that does not exist (%s)' % (specname, level_tech)
+        else:
+            if gamedata['tech'][level_tech].get('associated_unit') != spec['name']:
+                error |= 1; print 'tech:%s should have associated_unit %s' % (level_tech, spec['name'])
+        if level_tech != spec['name']+'_production':
+            error |= 1; print '%s:level_determined_by_tech is probably a typo' % (specname,)
 
         if gamedata['game_id'] != 'sg' and (not spec.get('resurrectable',False)) and (spec['name'] != 'repair_droid'):
             error |= 1
