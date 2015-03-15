@@ -112,6 +112,12 @@ if __name__ == '__main__':
             if row.get('reason',None) == 'player_request': # only include player-initiated changes
                 keyvals.append(('spec',row.get('new_region',None))) # stick the new region name in the 'spec' column
 
+        elif row['event_name'] = '4120_send_gift_completed':
+            if 'recipients' in row:
+                keyvals.append(('stack', len(row['recipients'])))
+            if 'reason' in row:
+                keyvals.append(('spec', row['reason']))
+
         elif row['event_name'] in ('7150_friendstone_generated',
                                    '7151_friendstone_opened_send_ui',
                                    '7153_friendstone_sent',

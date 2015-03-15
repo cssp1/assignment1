@@ -15,105 +15,26 @@ goog.provide('FBSendRequests');
 goog.require('SPUI');
 goog.require('SPFB');
 goog.require('PortraitCache');
+goog.require('goog.object');
 
-/** start the send-gift process (which uses the Facebook Requests API)
- * @param {(string|null)=} to_fbid Facebook ID of friend to auto-select (may be null)
- * @param {string=} reason for metrics purposes
+/** Start the send-gift process (which uses the Facebook Requests API)
+ * @param {(number|null)} to_user - user_id of a friend to auto-select (may be null)
+ * @param {string} reason for metrics purposes
  */
-FBSendRequests.invoke_send_gifts_dialog = function(to_fbid, reason) {
-    if((player.get_any_abtest_value('resource_gifts_fb_api_version', gamedata['resource_gifts_fb_api_version'] || 1) >= 2) &&
-       SPFB.api_version_number('apprequests') >= 2.0) {
-        return FBSendRequests.invoke_send_gifts_dialog_v2(to_fbid, reason);
-    } else {
-        return FBSendRequests.invoke_send_gifts_dialog_v1(to_fbid, reason);
+FBSendRequests.invoke_send_gifts_dialog = function(to_user, reason) {
+    if(SPFB.api_version_number('apprequests') < 2.0) {
+        throw Error('apprequests API must be v2.0+');
     }
-};
-
-// legacy pure-Facebook-API reuest dialog
-FBSendRequests.invoke_send_gifts_dialog_v1 = function(to_fbid, reason) {
-    reason = reason || null; // get rid of undefined reasons
-    var attempt_id = make_unique_id();
-    var viral = gamedata['virals']['send_gifts'];
-
-    to_fbid = null; // disable specific preselection since current Facebook API does not support it
-
-    var cb = (function (_attempt_id, _reason) { return function(response) {
-        var success = (response && !response['error_message']);
-        var metric_props = {'api':'apprequests', 'api_version': 1,
-                            'attempt_id': _attempt_id, 'method': _reason,
-                            'sum': player.get_denormalized_summary_props('brief')};
-        if(response && response['error_message']) { metric_props['message'] = response['error_message']; }
-        if(response && response['to']) { metric_props['batch'] = response['to'].length; }
-
-        metric_event((success ? '4104_send_gifts_fb_success' : '4105_send_gifts_fb_fail'), metric_props);
-
-        if(!response || response['error_message']) {
-            // user cancelled
-        } else {
-            var request_id = response['request'];
-            var fb_id_list = response['to'];
-
-            // mark recipients as non-giftable
-            for(var f = 0; f < player.friends.length; f++) {
-                var friend = player.friends[f];
-                for(var i = 0; i < fb_id_list.length; i++) {
-                    if(friend.get_facebook_id() == fb_id_list[i].toString()) {
-                        player.cooldown_client_trigger('send_gift:'+friend.user_id.toString(), gamedata['gift_interval']);
-                        break;
-                    }
-                }
-            }
-
-            send_to_server.func(["SEND_GIFTS", request_id, fb_id_list]);
-        }
-        return true;
-    }; })(attempt_id, reason);
-
-    var giftable_friends = goog.array.map(player.get_giftable_friend_info_list(), function(info) { return info['facebook_id']; });
-
-    if(giftable_friends.length < 1) {
-        var err = viral['ui_error_nofriends'];
-        invoke_message_dialog(err['ui_title'], err['ui_description']);
-        return;
-    }
-
-    var props = {};
-    if(to_fbid) { props['recipient_fb_id'] = to_fbid; }
-
-    metric_event('4103_send_gifts_fb_prompt',
-                 {'api': 'apprequests', 'api_version': 1,
-                  'attempt_id': attempt_id, 'method': reason,
-                  'sum': player.get_denormalized_summary_props('brief')});
-
-    var args = {'method':'apprequests',
-                'message': viral['ui_post_message'],
-                'action_type': viral['og_action_type'], 'object_id': viral['og_object_id'],
-                'data':'gift',
-                'title': viral['ui_title'],
-                'frictionlessRequests': true,
-                'show_error': !spin_secure_mode
-               };
-    if(to_fbid) {
-        // specify one recipient
-        args['to'] = to_fbid;
-    } else {
-        args['filters'] = [{'name': viral['ui_giftable_filter'], 'user_ids': giftable_friends}];
-    }
-
-    if(!spin_facebook_enabled) {
-        console.log('invoke_send_gifts_dialog('+(to_fbid ? to_fbid : 'null')+')');
-        cb({'request':'test', 'to':giftable_friends});
-    } else {
-        SPFB.ui(args, cb); // send gifts
-    }
+    return FBSendRequests.invoke_send_gifts_dialog_v2(to_user, reason);
 };
 
 FBSendRequests.FBSendRequestsDialogV2 = {};
 
-// new Multi-Friend-Selector request dialog
-FBSendRequests.invoke_send_gifts_dialog_v2 = function(to_fbid, reason) {
-    reason = reason || null; // get rid of undefined reasons
-
+/** Multi-Friend-Selector request dialog
+ * @param {(number|null)} to_user - user_id of a friend to auto-select (may be null)
+ * @param {string} reason for metrics purposes
+ */
+FBSendRequests.invoke_send_gifts_dialog_v2 = function(to_user, reason) {
     var dialog = new SPUI.Dialog(gamedata['dialogs']['fb_friend_selector']);
     dialog.user_data['dialog'] = 'fb_friend_selector';
     dialog.user_data['page'] = -1;
@@ -125,7 +46,7 @@ FBSendRequests.invoke_send_gifts_dialog_v2 = function(to_fbid, reason) {
     dialog.user_data['attempt_id'] = make_unique_id();
     dialog.user_data['instant'] = player.get_any_abtest_value('fb_send_gifts_v2_instant', gamedata['fb_send_gifts_v2_instant']) || 0;
     dialog.user_data['recipients'] = {}; // map from user_ids -> 1
-    dialog.user_data['preselect_fbid'] = to_fbid || null;
+    dialog.user_data['preselect_user_id'] = to_user;
 
     dialog.widgets['title'].str = dialog.data['widgets']['title']['ui_name_gift'];
 
@@ -139,11 +60,39 @@ FBSendRequests.invoke_send_gifts_dialog_v2 = function(to_fbid, reason) {
         var dialog = w.parent;
         var rowdata = dialog.user_data['rowdata'];
 
-        var recip_fbids = []; // list of facebook IDs
-        goog.object.forEach(dialog.user_data['recipients'], function(unused, user_id) {
+        var recipient_user_ids = goog.array.map(goog.object.getKeys(dialog.user_data['recipients']),
+                                                // this returns strings, so coerce back to integers
+                                                function(x) { return parseInt(x, 10); });
+
+        // for NON-Facebook recipients, send gifts immediately via the game server
+
+        // get list of non-Facebook recipient user IDs
+        var non_facebook_recipients = goog.array.filter(recipient_user_ids, function(user_id) {
             var info = goog.array.find(dialog.user_data['rowdata'], function(x) { return x['user_id'] == user_id; });
-            recip_fbids.push(info['facebook_id']);
+            return !(info['facebook_id']);
         });
+
+        if(non_facebook_recipients.length > 0) {
+            goog.array.forEach(non_facebook_recipients, function(user_id) {
+                player.cooldown_client_trigger('send_gift:'+user_id.toString(), gamedata['gift_interval']);
+            });
+            send_to_server.func(["SEND_GIFTS2", null, non_facebook_recipients]);
+        }
+
+        // for Facebook receipients, we have to break into batches of 50 and then invoke the Facebook API
+
+        // get list of {facebook_id:'0000', user_id:1234} for Facebook recipients
+        var fb_recipients = goog.array.filter(
+            // convert user_ids to Facebook IDs (or null)
+            goog.array.map(recipient_user_ids, function(user_id) {
+                var info = goog.array.find(dialog.user_data['rowdata'], function(x) { return x['user_id'] == user_id; });
+                if(info['facebook_id']) {
+                    return {facebook_id: info['facebook_id'], user_id: user_id};
+                }
+                return null;
+            }),
+            // filter out nulls
+            function (data) { return data !== null; });
 
         GameArt.assets["success_playful_22"].states['normal'].audio.play(client_time);
         close_parent_dialog(w);
@@ -151,19 +100,21 @@ FBSendRequests.invoke_send_gifts_dialog_v2 = function(to_fbid, reason) {
         var batches = [];
         // partition recipients into batches of <= 50 for FB API calls
         var batch = [];
-        for(var i = 0; i < recip_fbids.length; i++) {
-            batch.push(recip_fbids[i]);
+        goog.array.forEach(fb_recipients, function(r) {
+            batch.push(r);
             if(batch.length >= 50) {
                 batches.push(batch);
                 batch = [];
             }
-        }
+        });
         if(batch.length > 0) {
             batches.push(batch);
         }
 
         var do_send = function (_dialog, _batches, batch_num, _do_send) {
-            var to_string = _batches[batch_num].join(',');
+            // Facebook API wants a comma-separated list of the recipient Facebook IDs
+            var to_string = goog.array.map(_batches[batch_num], function(r) { return r.facebook_id; }).join(',');
+
             metric_event((_dialog.user_data['instant'] ? '4103_send_gifts_fb_prompt' : '4102_send_gifts_ingame_fb_prompt'),
                          {'api': 'apprequests', 'api_version': 2, 'attempt_id': _dialog.user_data['attempt_id'], 'method': _dialog.user_data['reason'], 'batch': _batches[batch_num].length,
                           'sum': player.get_denormalized_summary_props('brief')});
@@ -179,8 +130,7 @@ FBSendRequests.invoke_send_gifts_dialog_v2 = function(to_fbid, reason) {
                          };
 
             SPFB.ui(params, (function (__dialog, __batches, _batch_num, __do_send) { return function(response) {
-                console.log("FBSendRequests.FBSendRequestsDialogV2 response");
-                console.log(response);
+                //console.log("FBSendRequests.FBSendRequestsDialogV2 response"); console.log(response);
                 var do_next = true;
                 if(response && response['request']) {
                     // success: {'request': 'NNNNNNN', 'to': ['IDIDIDIDID',...]}
@@ -189,14 +139,15 @@ FBSendRequests.invoke_send_gifts_dialog_v2 = function(to_fbid, reason) {
                                                                     'sum': player.get_denormalized_summary_props('brief')});
 
                     if(response['to']) {
-                        // mark friends as non-giftable
+                        // send gifts to this subset
+                        var user_id_list = [];
                         goog.array.forEach(response['to'], function(fbid) {
-                            var friend = goog.array.find(player.friends, function(f) { return f.get_facebook_id() == fbid.toString(); });
-                            if(friend) {
-                                player.cooldown_client_trigger('send_gift:'+friend.user_id.toString(), gamedata['gift_interval']);
-                            }
+                            var user_id = goog.array.find(__batches[_batch_num], function(r) { return r.facebook_id.toString() == fbid.toString(); }).user_id;
+                            user_id_list.push(user_id);
+                            player.cooldown_client_trigger('send_gift:'+user_id.toString(), gamedata['gift_interval']);
                         });
-                        send_to_server.func(["SEND_GIFTS", response['request'].toString(), response['to']]);
+
+                        send_to_server.func(["SEND_GIFTS2", response['request'].toString(), user_id_list]);
                     }
                 } else {
                     // cancel: {'error_code': 4201, 'error_message': 'User canceled the Dialog flow'}
@@ -233,8 +184,8 @@ FBSendRequests.invoke_send_gifts_dialog_v2 = function(to_fbid, reason) {
     return dialog;
 };
 
-FBSendRequests.test_send_gifts_dialog_v2 = function(to_fbid) {
-    return FBSendRequests.invoke_send_gifts_dialog_v2(to_fbid, 'test');
+FBSendRequests.test_send_gifts_dialog_v2 = function(to_user) {
+    return FBSendRequests.invoke_send_gifts_dialog_v2(to_user, 'test');
 };
 
 // response is a list of PlayerCache info entries
@@ -254,9 +205,10 @@ FBSendRequests.FBSendRequestsDialogV2.receive_giftable_friends = function(dialog
 
         if(!dialog.user_data['instant']) { // sort alphabetically
             dialog.user_data['rowdata'].sort(function (a,b) {
-                if(a['ui_name'] < b['ui_name']) {
+                var aname = PlayerCache.get_ui_name(a), bname = PlayerCache.get_ui_name(b);
+                if(aname < bname) {
                     return -1;
-                } else if(a['ui_name'] > b['ui_name']) {
+                } else if(aname > bname) {
                     return 1;
                 } else if(a['user_id'] < b['user_id']) {
                     return -1;
@@ -269,9 +221,9 @@ FBSendRequests.FBSendRequestsDialogV2.receive_giftable_friends = function(dialog
         }
 
         var preselect_info = null;
-        if(dialog.user_data['preselect_fbid']) {
+        if(dialog.user_data['preselect_user_id']) {
             preselect_info = goog.array.find(dialog.user_data['rowdata'],
-                                             function(x) { return x['facebook_id'] == dialog.user_data['preselect_fbid']; });
+                                             function(x) { return x['user_id'] == dialog.user_data['preselect_user_id']; });
         }
         if(preselect_info) {
             dialog.user_data['recipients'][preselect_info['user_id']] = 1;

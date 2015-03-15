@@ -606,7 +606,7 @@ PlayerInfoDialog.invoke_profile_tab = function(parent) {
         if(spin_frame_platform == 'fb' && friend.get_facebook_id()) {
             dialog.widgets['gift_button'].show = true;
             dialog.widgets['gift_button'].state = friend.is_giftable() ? 'normal' : 'disabled';
-            dialog.widgets['gift_button'].onclick = (function (_fr) { return function() { change_selection(null); FBSendRequests.invoke_send_gifts_dialog(_fr.get_facebook_id()); }; })(friend);
+            dialog.widgets['gift_button'].onclick = (function (_uid) { return function() { change_selection(null); FBSendRequests.invoke_send_gifts_dialog(_uid, 'player_info_profile_tab'); }; })(user_id);
             dialog.widgets['gift_button'].tooltip.str = friend.is_giftable() ? null : dialog.data['widgets']['gift_button']['ui_tooltip_already_sent'];
         } else {
             dialog.widgets['gift_button'].show = false;

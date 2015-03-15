@@ -9857,9 +9857,9 @@ function scroll_friend_bar(dialog, page) {
                     dialog.widgets['gift_button'].state = 'normal';
                     dialog.widgets['gift_button'].tooltip.str = null;
                     dialog.widgets['gift_button'].onclick = function(w) {
-                        var fbid = w.parent.user_data['fbid'];
+                        var uid = w.parent.user_data['user_id'];
                         change_selection_ui(null);
-                        FBSendRequests.invoke_send_gifts_dialog(fbid);
+                        FBSendRequests.invoke_send_gifts_dialog(uid, 'friend_bar');
                     };
                 } else if(player.get_any_abtest_value('ungiftable_fallback_to_invite', gamedata['client']['ungiftable_fallback_to_invite'])) {
                     dialog.widgets['gift_button'].state = 'normal';
@@ -9868,7 +9868,7 @@ function scroll_friend_bar(dialog, page) {
                         change_selection_ui(null);
                         // ANY giftable friends?
                         if(player.get_giftable_friend_info_list().length > 0) {
-                            FBSendRequests.invoke_send_gifts_dialog(null);
+                            FBSendRequests.invoke_send_gifts_dialog(null, 'friend_bar_fallback');
                         } else {
                             var s = gamedata['errors']['NO_GIFTABLE_FRIENDS'];
                             invoke_child_message_dialog(s['ui_title'], s['ui_name'],
@@ -14406,7 +14406,7 @@ function invoke_idle_check_dialog(play_time) {
     //idle_check_state.timer = window.setTimeout(function() { SPINPUNCHGAME.shutdown(); }, 15000);
 }
 
-function invoke_gift_received_dialog(fbid, userid, name, loot) {
+function invoke_gift_received_dialog(userid, info, loot) {
     change_selection(null);
 
     var dialog_data = gamedata['dialogs']['gift_received_dialog'];
@@ -14419,14 +14419,10 @@ function invoke_gift_received_dialog(fbid, userid, name, loot) {
 
     dialog.widgets['close_button'].onclick = function() { change_selection(null); };
 
-    // try to figure out the friend's level
-    var level = -1;
-    for(var i = 0; i < player.friends.length; i++) {
-        if(player.friends[i].user_id === userid) {
-            level = player.friends[i].get_player_level();
-            break;
-        }
-    }
+    // try to figure out the friend's level and FBID
+    var sender_fbid = (info && info['facebook_id'] ? info['facebook_id'] : null);
+    var level = (info && info['player_level'] ? info['player_level'] : 1);
+    var name = (info ? PlayerCache.get_ui_name(info) : 'Unknown');
     dialog.widgets['friend_icon'].set_user(userid);
 
     var asset = null, amount = 0;
@@ -14440,11 +14436,11 @@ function invoke_gift_received_dialog(fbid, userid, name, loot) {
     if(asset) { dialog.widgets['resource_icon'].asset = asset; }
     if(amount) { dialog.widgets['resource_amount'].str = pretty_print_number(amount); }
 
-    if(get_facebook_viral('say_thanks')) {
+    if(get_facebook_viral('say_thanks') && sender_fbid) {
         dialog.widgets['say_thanks_button'].onclick = (function (a, b, c, d) { return function() {
             change_selection(null);
             invoke_say_thanks(a, b, c, d);
-        }; })(fbid, userid, name, loot);
+        }; })(sender_fbid, userid, name, loot);
     } else {
         dialog.widgets['say_thanks_button'].show = false;
     }
@@ -14452,7 +14448,7 @@ function invoke_gift_received_dialog(fbid, userid, name, loot) {
     dialog.widgets['send_button'].show = player.resource_gifts_enabled();
     dialog.widgets['send_button'].onclick = function() {
         change_selection(null);
-        FBSendRequests.invoke_send_gifts_dialog(null);
+        FBSendRequests.invoke_send_gifts_dialog(null, 'gift_received_dialog');
     };
 };
 
@@ -14517,7 +14513,7 @@ function invoke_gift_prompt_dialog(fbid, userid, name, loot) {
 
     dialog.widgets['send_button'].onclick = function() {
         change_selection(null);
-        FBSendRequests.invoke_send_gifts_dialog(null);
+        FBSendRequests.invoke_send_gifts_dialog(null, 'gift_prompt_dialog');
     };
 };
 
@@ -41135,15 +41131,14 @@ function handle_server_message(data) {
                                   ui_reason,
                                   {'dialog': 'message_dialog_big'});
         }; })(loot, ui_reason));
-    } else if(msg == "RECEIVED_GIFT") {
-        var sender_fb_id = data[1];
-        var sender_user_id = data[2];
-        var sender_ui_name = data[3];
-        var res = data[4];
+    } else if(msg == "RECEIVED_GIFT2") {
+        var sender_user_id = data[1];
+        var sender_info = data[2]; // could be stale, so don't enter into PlayerCache
+        var res = data[3];
 
-        var do_notify = (function(fb_id, user_id, name, loot) { return function() {
-            invoke_gift_received_dialog(fb_id, user_id, name, loot);
-        };})(sender_fb_id, sender_user_id, sender_ui_name, res);
+        var do_notify = (function(user_id, info, loot) { return function() {
+            invoke_gift_received_dialog(user_id, info, loot);
+        };})(sender_user_id, sender_info, res);
 
         if(player.resource_gifts_enabled()) { // note: do not show dialog if gifting is turned off
             notification_queue.push(do_notify);

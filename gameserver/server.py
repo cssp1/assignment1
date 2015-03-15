@@ -19222,52 +19222,38 @@ class GAMEAPI(resource.Resource):
             return
 
         request_id = arg[1]
-        recipient_fbid_list = arg[2]
+        recipient_user_id_list = arg[2]
 
-        recipient_user_id_list = gamesite.social_id_table.social_id_to_spinpunch_batch(['fb'+str(x) for x in recipient_fbid_list])
         db_message = { 'from': session.player.user_id,
                        'to': [], # will be filled in below
                        'type': 'resource_gift',
                        'expire_time': server_time + gamedata['server']['message_expire_time']['resource_gift'],
-                       'from_fbid': str(session.user.facebook_id),
-                       'from_name': unicode(session.user.get_ui_name(session.player)),
+                       'from_pcache': self.get_player_cache_props(session.user, session.player),
                        'unique_per_sender': 'resource_gift'}
 
-        # for bulletproof atomicity, wrap the code in a try: block and
-        # ensure that gifts are queued if and only if the cooldown triggers
+        for recipient_user_id in recipient_user_id_list:
+            if (not recipient_user_id) or recipient_user_id <= 0:
+                continue
 
-        try:
-            for i in xrange(len(recipient_fbid_list)):
-                fbid = recipient_fbid_list[i]
-                recipient_user_id = recipient_user_id_list[i]
+            # note: this is susceptible to client-side spoofing, sending invalid user_ids, or picking user_ids out of thin air!
 
-                if (not recipient_user_id) or recipient_user_id <= 0:
-                    if gamedata['server']['log_gifts']:
-                        gamesite.exception_log.event(server_time, 'ignoring gift sent from user %d to non-player fbid %s' % \
-                                                     (session.player.user_id, str(fbid)))
-                    continue
+            # check if we can still send a gift to this recipient today
+            if session.player.cooldown_active('send_gift:'+str(recipient_user_id)):
+                continue
 
-                # check if we can still send a gift to this recipient today
-                if session.player.cooldown_active('send_gift:'+str(recipient_user_id)):
-                    continue
+            db_message['to'].append(recipient_user_id)
 
-                db_message['to'].append(recipient_user_id)
+            # the gift will be successfully queued, now remember that we sent it so we can't send one again too quickly
+            session.player.cooldown_trigger('send_gift:'+str(recipient_user_id), gamedata['gift_interval'])
+            #session.user.create_fb_open_graph_action('sent_gift', {'profile': fbid})
 
-                # the gift will be successfully queued, now remember that we sent it so we can't send one again too quickly
-                session.player.cooldown_trigger('send_gift:'+str(recipient_user_id), gamedata['gift_interval'])
-
-                session.increment_player_metric('gifts_sent', 1, time_series = False, bucket = True)
-                if LOTS_OF_METRICS:
-                    metric_event_coded(session.user.user_id, '4120_send_gift_completed', {'recipient_fb_id':fbid, 'recipient_user_id':recipient_user_id, 'facebook_request_id':request_id})
-                session.user.create_fb_open_graph_action('sent_gift', {'profile': fbid})
-                if gamedata['server']['log_gifts']:
-                    gamesite.exception_log.event(server_time, 'GIFT SEND %d -> %d' % (session.user.user_id, recipient_user_id))
-
-        finally:
-            if len(db_message['to']) > 0:
-                gamesite.msg_client.msg_send([db_message])
-
-        session.player.send_history_update(retmsg)
+        if len(db_message['to']) > 0:
+            gamesite.msg_client.msg_send([db_message])
+            session.increment_player_metric('gifts_sent', len(db_message['to']), time_series = False, bucket = True)
+            props = {'recipients':db_message['to']}
+            if request_id: props['request_id'] = request_id
+            metric_event_coded(session.user.user_id, '4120_send_gift_completed', props)
+            session.deferred_history_update = True
 
     def do_receive_mail(self, session, retmsg, is_login = False, type_filter = None):
         ret = {
@@ -19321,8 +19307,6 @@ class GAMEAPI(resource.Resource):
                                                                                                           '%DAY': time.strftime('%d %b %Y', time_struct),
                                                                                                           '%TIME': time.strftime('%H:%S', time_struct)}))
                             ret['new_mail'] = True
-                            # ? retmsg.append(["RECEIVED_GIFT", msg.get('from_fbid','-1'), msg['from'], msg.get('from_name','Unknown'), template['attachments']])
-
 
                     else:
                         if not is_login: continue # only retrieve fungible resource gifts on login
@@ -19346,13 +19330,14 @@ class GAMEAPI(resource.Resource):
 
                         original_gift = gift # save uncapped amounts for the UI display
                         gift = session.player.resources.gain_res(gift, reason='received_gift')
+                        session.deferred_player_state_update = True
                         amount = sum(gift.itervalues(),0)
                         admin_stats.econ_flow_res(session.player, 'gifts', 'gifts', gift)
-                        retmsg.append(["RECEIVED_GIFT", msg.get('from_fbid','-1'), msg['from'], msg.get('from_name','Unknown'), original_gift])
+                        retmsg.append(["RECEIVED_GIFT2", msg['from'], msg.get('from_pcache',None), original_gift])
 
                     to_ack.append(msg['msg_id'])
                     session.increment_player_metric('gifts_received', 1, time_series = False, bucket = True)
-                    session.player.received_gifts.append({'time':server_time, 'from':msg['from'], 'from_fbid':msg['from_fbid'], 'amount':amount})
+                    session.player.received_gifts.append({'time':server_time, 'from':msg['from'], 'amount':amount})
                     gift_count += 1
                     gift_total += amount
 
@@ -22504,7 +22489,7 @@ class GAMEAPI(resource.Resource):
         elif arg[0] == "NEXT_AI_ATTACK_WAVE":
             session.deploy_ai_attack_wave(retmsg)
 
-        elif arg[0] == "SEND_GIFTS":
+        elif arg[0] == "SEND_GIFTS2":
             self.do_send_gifts(session, retmsg, arg)
 
         elif arg[0] == "LEVEL_ME_UP":
