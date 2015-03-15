@@ -180,7 +180,7 @@ def is_valid_alliance_tag(tag):
     return True
 
 def is_valid_alias(name):
-    if len(name) < 4 or len(name) > 24: return False
+    if len(name) < 4 or len(name) > 15: return False
     for c in name:
         if c in alias_disallowed_chars: return False
     if chat_filter.is_bad(name): return False

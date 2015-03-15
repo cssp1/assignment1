@@ -8375,7 +8375,7 @@
 
             "input_bg": { "kind": "StaticImage", "xy": [30,247], "dimensions": [297,31], "asset": "dialog_sunken_white_resizable", "bg_image_resizable": 1 },
             "input": { "kind": "TextInput", "xy": [38,248], "dimensions": [287,30], "text_size": 15, "text_hjustify": "left",
-                       "clip_to": [38,245,287,36], "max_chars": 24,
+                       "clip_to": [38,245,287,36], "max_chars": 15,
                        "text_color": [0,0,0,1], "blank_on_enter": false },
             "cancel_button": { "kind": "ActionButton", "xy": [30,295], "dimensions": [134, 28], "bg_image": "menu_button_134px", "text_size": 13, "text_style": "bold", "ui_name": "Cancel"},
             "ok_button": { "kind": "ActionButton", "xy": [195,295], "dimensions": [134, 28], "bg_image": "action_button_134px", "text_size": 13, "text_style": "bold", "ui_name": "Accept"}
