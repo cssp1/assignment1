@@ -25443,6 +25443,29 @@ function alliance_info_member_rowfunc(dialog, row, rowdata) {
                                                      null,
                                                      d.data['widgets']['manage_button']['ui_tooltip_info'])];
 
+                if(gamedata['gift_alliancemates']) {
+                    buttons.push(new ContextMenuButton(d.data['widgets']['manage_button']['ui_name_gift'],
+                                                       (function (_user_id) { return function(w) {
+
+                                                           player.get_giftable_friend_info_list_async((function (__user_id) { return function (ret) {
+                                                               if(ret.length > 0) {
+                                                                   FBSendRequests.invoke_send_gifts_dialog(__user_id, 'alliance_manage', ret);
+                                                               } else {
+                                                                   var s = gamedata['errors']['NO_GIFTABLE_FRIENDS'];
+                                                                   invoke_child_message_dialog(s['ui_title'], s['ui_name'],
+                                                                                               {'dialog': 'message_dialog_big',
+                                                                                                'ok_button_ui_name': s['ui_button'],
+                                                                                                'cancel_button': false,
+                                                                                                'on_ok': function() {
+                                                                                                    invoke_invite_friends_dialog('alliance_manage_ungiftable');
+                                                                                                }});
+                                                               }
+                                                           }; })(_user_id));
+
+                                                       }; })(user_id),
+                                                       null, d.data['widgets']['manage_button']['ui_tooltip_gift']));
+                }
+
                 // PROMOTE/DEMOTE
                 if(user_id != session.user_id && player.get_any_abtest_value('enable_alliance_role_gui', gamedata['client']['enable_alliance_role_gui'])) {
                     goog.array.forEach([{'name':'promote','incr':1},{'name':'demote','incr':-1}], function(action) {

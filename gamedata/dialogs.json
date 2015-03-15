@@ -2998,6 +2998,7 @@
                                // used for the context menu
                                "ui_tooltip_no_permission": "Your rank is too low to perform this action",
                                "ui_name_info": "Info", "ui_tooltip_info": "Show player info",
+                               "ui_name_gift": "Send Gift", "ui_tooltip_gift": "Send daily gift",
                                "ui_name_kick": "Kick", "ui_tooltip_kick": "Remove player",
                                "ui_name_promote": "Promote", "ui_tooltip_promote": "Raise player's rank",
                                "ui_name_demote": "Demote", "ui_tooltip_demote": "Lower player's rank"
