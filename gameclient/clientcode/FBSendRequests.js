@@ -14,18 +14,20 @@ goog.provide('FBSendRequests');
 
 goog.require('SPUI');
 goog.require('SPFB');
-goog.require('PortraitCache');
+goog.require('PlayerCache');
+goog.require('AllianceCache');
 goog.require('goog.object');
 
 /** Start the send-gift process (which uses the Facebook Requests API)
  * @param {(number|null)} to_user - user_id of a friend to auto-select (may be null)
  * @param {string} reason for metrics purposes
+ * @param {(!Array.<Object>|null)=} info_list - list of PlayerCache entries for giftable friends (if null, we will query)
  */
-FBSendRequests.invoke_send_gifts_dialog = function(to_user, reason) {
+FBSendRequests.invoke_send_gifts_dialog = function(to_user, reason, info_list) {
     if(SPFB.api_version_number('apprequests') < 2.0) {
         throw Error('apprequests API must be v2.0+');
     }
-    return FBSendRequests.invoke_send_gifts_dialog_v2(to_user, reason);
+    return FBSendRequests.invoke_send_gifts_dialog_v2(to_user, reason, info_list || null);
 };
 
 FBSendRequests.FBSendRequestsDialogV2 = {};
@@ -33,8 +35,9 @@ FBSendRequests.FBSendRequestsDialogV2 = {};
 /** Multi-Friend-Selector request dialog
  * @param {(number|null)} to_user - user_id of a friend to auto-select (may be null)
  * @param {string} reason for metrics purposes
+ * @param {(!Array.<Object>|null)} info_list - list of PlayerCache entries for giftable friends (if null, we will query)
  */
-FBSendRequests.invoke_send_gifts_dialog_v2 = function(to_user, reason) {
+FBSendRequests.invoke_send_gifts_dialog_v2 = function(to_user, reason, info_list) {
     var dialog = new SPUI.Dialog(gamedata['dialogs']['fb_friend_selector']);
     dialog.user_data['dialog'] = 'fb_friend_selector';
     dialog.user_data['page'] = -1;
@@ -180,12 +183,27 @@ FBSendRequests.invoke_send_gifts_dialog_v2 = function(to_user, reason) {
                                                        'method': reason,
                                                        'sum': player.get_denormalized_summary_props('brief')});
     }
-    FBSendRequests.FBSendRequestsDialogV2.receive_giftable_friends(dialog, player.get_giftable_friend_info_list());
+
+    // query for potential recipients
+    if(info_list !== null) {
+        // immediate
+        FBSendRequests.FBSendRequestsDialogV2.receive_giftable_friends(dialog, info_list);
+    } else {
+        // delayed
+
+        // the loading text/spinner is redundant with the ui_locker that the async query is going to show
+        dialog.widgets['loading_text'].show = dialog.widgets['loading_spinner'].show = false;
+
+        player.get_giftable_friend_info_list_async((function (_dialog) { return function(ret) {
+            FBSendRequests.FBSendRequestsDialogV2.receive_giftable_friends(_dialog, ret);
+        }; })(dialog));
+    }
+
     return dialog;
 };
 
 FBSendRequests.test_send_gifts_dialog_v2 = function(to_user) {
-    return FBSendRequests.invoke_send_gifts_dialog_v2(to_user, 'test');
+    return FBSendRequests.invoke_send_gifts_dialog_v2(to_user, 'test', null);
 };
 
 // response is a list of PlayerCache info entries

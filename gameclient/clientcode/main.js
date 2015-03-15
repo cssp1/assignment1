@@ -5759,21 +5759,53 @@ player.is_building_location_valid_detailed = function(ji, spec, myself, options)
     return [true,null];
 }
 
-// returns PlayerCache entries for each giftable friend
-player.get_giftable_friend_info_list = function() {
+// returns PlayerCache entries for each giftable friend (and possible alliancemate)
+// may go asynchronous, so uses a callback (guarantees GUI blockage though)
+player.get_giftable_friend_info_list_async = function(cb) {
     var giftable_friends = [];
     for(var i = 0; i < player.friends.length; i++) {
         var friend = player.friends[i];
-        if(!friend.is_giftable() || !friend.get_facebook_id()) {
+        if(!friend.is_giftable()) {
             continue;
         }
         // note: cannot rely on actual PlayerCache info entries being present in the cache,
         // since a clear() can get rid of them. Reconstruct a fake entry instead.
-        giftable_friends.push({'user_id': friend.user_id,
-                               'facebook_id': friend.get_facebook_id(),
-                               'ui_name': friend.get_ui_name()});
+        var props = {'user_id': friend.user_id,
+                     'ui_name': friend.get_ui_name()};
+        var fbid = friend.get_facebook_id();
+        if(fbid) {
+            props['facebook_id'] = fbid;
+        }
+        giftable_friends.push(props);
     }
-    return giftable_friends;
+
+    if(gamedata['gift_alliancemates'] && session.is_in_alliance()) {
+        // query alliance mates
+        var ui_locker_arr = [null]; // need to pass the UI locker dialog to the callback AFTER query is launched, so stuff it inside an array
+        AllianceCache.query_members(session.alliance_id, false, null, (function (_ui_locker_arr, _cb, _giftable_friends) { return function(info) {
+            close_dialog(_ui_locker_arr[0]);
+            if(info && info['members']) {
+                goog.array.forEach(info['members'], function(member_info) {
+                    var member_id = member_info['user_id'];
+                    // ignore yourself
+                    if(member_id == session.user_id) { return; }
+                    // ignore already-listed players
+                    if(goog.array.findIndex(_giftable_friends, function(info) { return info['user_id'] == member_id; }) >= 0) { return; }
+                    // ignore players on cooldown
+                    if(player.cooldown_active('send_gift:'+member_id.toString())) { return; }
+                    // ensure cached player info
+                    var player_info = PlayerCache.query_sync(member_id);
+                    if(player_info) {
+                        _giftable_friends.push(player_info);
+                    }
+                });
+            }
+            _cb(_giftable_friends);
+        }; })(ui_locker_arr, cb, giftable_friends));
+        ui_locker_arr[0] = invoke_ui_locker_until_closed(); // prevent GUI action while the query is in progress
+    } else {
+        cb(giftable_friends);
+    }
 };
 
 player.map_bookmark_create = function(region_id, ui_name, coords) {
@@ -9867,18 +9899,20 @@ function scroll_friend_bar(dialog, page) {
                     dialog.widgets['gift_button'].onclick = function(w) {
                         change_selection_ui(null);
                         // ANY giftable friends?
-                        if(player.get_giftable_friend_info_list().length > 0) {
-                            FBSendRequests.invoke_send_gifts_dialog(null, 'friend_bar_fallback');
-                        } else {
-                            var s = gamedata['errors']['NO_GIFTABLE_FRIENDS'];
-                            invoke_child_message_dialog(s['ui_title'], s['ui_name'],
-                                                        {'dialog': 'message_dialog_big',
-                                                         'ok_button_ui_name': s['ui_button'],
-                                                         'cancel_button': false,
-                                                         'on_ok': function() {
-                                                             invoke_invite_friends_dialog('ungiftable_fallback');
-                                                         }});
-                        }
+                        player.get_giftable_friend_info_list_async(function (ret) {
+                            if(ret.length > 0) {
+                                FBSendRequests.invoke_send_gifts_dialog(null, 'friend_bar_fallback', ret);
+                            } else {
+                                var s = gamedata['errors']['NO_GIFTABLE_FRIENDS'];
+                                invoke_child_message_dialog(s['ui_title'], s['ui_name'],
+                                                            {'dialog': 'message_dialog_big',
+                                                             'ok_button_ui_name': s['ui_button'],
+                                                             'cancel_button': false,
+                                                             'on_ok': function() {
+                                                                 invoke_invite_friends_dialog('ungiftable_fallback');
+                                                             }});
+                            }
+                        });
                     };
                 } else {
                     dialog.widgets['gift_button'].state = 'disabled';
@@ -14488,33 +14522,32 @@ function invoke_invite_friends_dialog(reason) {
     }
 }
 
-function invoke_gift_prompt_dialog(fbid, userid, name, loot) {
+function invoke_gift_prompt_dialog() {
     if(player.tutorial_state != "COMPLETE") { return; }
 
-    if(player.get_giftable_friend_info_list().length < 1) {
-        console.log('invoke_gift_prompt_dialog: no giftable friends');
-        return;
-    }
+    player.get_giftable_friend_info_list_async(function (ret) {
+        if(ret.length < 1) {
+            console.log('invoke_gift_prompt_dialog: no giftable friends');
+            return;
+        }
 
-    change_selection(null);
-    if(LOTS_OF_METRICS) {
-        metric_event('4100_send_gifts_popup_shown', {'sum': player.get_denormalized_summary_props('brief')});
-    }
-
-    var dialog_data = gamedata['dialogs']['gift_prompt_dialog'];
-    var dialog = new SPUI.Dialog(dialog_data);
-    dialog.user_data['dialog'] = 'gift_prompt_dialog';
-
-    change_selection_ui(dialog);
-    dialog.auto_center();
-    dialog.modal = true;
-
-    dialog.widgets['close_button'].onclick = function() { change_selection(null); };
-
-    dialog.widgets['send_button'].onclick = function() {
         change_selection(null);
-        FBSendRequests.invoke_send_gifts_dialog(null, 'gift_prompt_dialog');
-    };
+
+        var dialog_data = gamedata['dialogs']['gift_prompt_dialog'];
+        var dialog = new SPUI.Dialog(dialog_data);
+        dialog.user_data['dialog'] = 'gift_prompt_dialog';
+
+        change_selection_ui(dialog);
+        dialog.auto_center();
+        dialog.modal = true;
+
+        dialog.widgets['close_button'].onclick = close_parent_dialog;
+
+        dialog.widgets['send_button'].onclick = (function (_info_list) { return function(w) {
+            change_selection(null);
+            FBSendRequests.invoke_send_gifts_dialog(null, 'gift_prompt_dialog', _info_list);
+        }; })(ret);
+    });
 };
 
 function invoke_motd_dialog(motd) {
@@ -34401,6 +34434,13 @@ function update_ui_locker(dialog) {
     }
 }
 
+// this locker will stay up until you manually close it
+function invoke_ui_locker_until_closed() {
+    var dialog = invoke_ui_locker(-1);
+    dialog.ondraw = null;
+    return dialog;
+}
+
 function invoke_item_discovered(items, duration) {
     // skip if using fast modal looting
     if(loot_dialog_fast_anim) {
@@ -47119,6 +47159,7 @@ goog.exportSymbol('test_notify_achievements', test_notify_achievements);
 goog.exportSymbol('test_flash_offer', test_flash_offer);
 goog.exportSymbol('test_consequent', test_consequent);
 goog.exportSymbol('sprobe_run', sprobe_run);
+goog.exportSymbol('invoke_gift_prompt_dialog', invoke_gift_prompt_dialog);
 goog.exportSymbol('invoke_daily_tip', invoke_daily_tip);
 goog.exportSymbol('invoke_splash_message', invoke_splash_message);
 goog.exportSymbol('give_me_item', give_me_item);
