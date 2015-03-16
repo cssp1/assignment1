@@ -112,7 +112,7 @@ if __name__ == '__main__':
             if row.get('reason',None) == 'player_request': # only include player-initiated changes
                 keyvals.append(('spec',row.get('new_region',None))) # stick the new region name in the 'spec' column
 
-        elif row['event_name'] = '4120_send_gift_completed':
+        elif row['event_name'] == '4120_send_gift_completed':
             if 'recipients' in row:
                 keyvals.append(('stack', len(row['recipients'])))
             if 'reason' in row:
