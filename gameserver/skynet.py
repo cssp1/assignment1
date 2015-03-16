@@ -2397,6 +2397,7 @@ if __name__ == '__main__':
     stgt_filter = None
     group_by = None
     custom_audience = None
+    custom_audience_game_id = None
     origin_audience = None
     country = None
     bid = None
@@ -2418,7 +2419,7 @@ if __name__ == '__main__':
     opts, args = getopt.gnu_getopt(sys.argv[1:], 'g:', ['db=', 'game-id=', 'mode=', 'tactical=', 'image-file=', 'dry-run', 'min-clicks=', 'min-impressions=', 'max-frequency=',
                                                       'bid=', 'coeff=', 'adgroup-name=', 'campaign-name=', 'campaign-group-name=', 'stgt=', 'filter=', 'group-by=',
                                                       'use-analytics=', 'use-regexp-ltv', 'use-record=', 'date-range=', 'time-range=', 'output-format=', 'output-frequency=',
-                                                      'skip-reachestimates', 'enable-campaign-creation', 'disable-ad-creation', 'disable-bid-updates', 'custom-audience=', 'origin-audience=', 'country=', 'lookalike-type=', 'lookalike-ratio=',
+                                                      'skip-reachestimates', 'enable-campaign-creation', 'disable-ad-creation', 'disable-bid-updates', 'custom-audience=', 'custom-audience-game-id=', 'origin-audience=', 'country=', 'lookalike-type=', 'lookalike-ratio=',
                                                       'verbose', 'quiet'])
 
     for key, val in opts:
@@ -2441,6 +2442,7 @@ if __name__ == '__main__':
         elif key == '--campaign-name': campaign_name = val
         elif key == '--campaign-group-name': campaign_group_name = val
         elif key == '--custom-audience': custom_audience = val
+        elif key == '--custom-audience-game-id': custom_audience_game_id = val
         elif key == '--origin-audience': origin_audience = val
         elif key == '--country': country = val
         elif key == '--use-analytics': use_analytics = val if val else 'tr'
@@ -2722,6 +2724,8 @@ if __name__ == '__main__':
             print 'CREATED lookalike audience in account_id', GAMES[cmd_game_id]['ad_account_id'], 'from', origin_audience, 'in', country, custom_audience, "'id':", "'"+audience_id+"',"
 
     elif mode == 'custom-audience-add':
+        if not custom_audience_game_id:
+            raise Exception('need to specify a --custom-audience-game-id for the incoming FBID list')
         if not custom_audience and len(args) == 1 and args[0].startswith('audience-') and args[0].endswith('.txt.gz'):
             custom_audience = args[0].replace('audience-','').replace('.txt.gz', '')
         assert custom_audience
@@ -2748,7 +2752,7 @@ if __name__ == '__main__':
                     for line in fd.xreadlines():
                         yield line.strip()
 
-            n_added = custom_audience_add(audience_id, ((GAMES[cmd_game_id]['app_id'], fb_id) for fb_id in stream_ids(filenames)))
+            n_added = custom_audience_add(audience_id, ((GAMES[custom_audience_game_id]['app_id'], fb_id) for fb_id in stream_ids(filenames)))
             print 'added', n_added, 'users'
 
     else:
