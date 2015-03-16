@@ -613,6 +613,16 @@ PlayerInfoDialog.invoke_profile_tab = function(parent) {
         }
     }
 
+    // generally non-giftable players are not FB friends, so offer to find them for you
+    if(!dialog.widgets['gift_button'].show &&
+       player.get_any_abtest_value('enable_player_fbpage_button', gamedata['client']['enable_player_fbpage_button']) &&
+       knowledge['facebook_id']) {
+        dialog.widgets['fbpage_button'].show = true;
+        dialog.widgets['fbpage_button'].onclick = (function(_fbid) { return function(w) {
+            url_open_in_new_tab('https://www.facebook.com/'+_fbid.toString());
+        }; })(knowledge['facebook_id']);
+    }
+
     // set up scores display
     var header_ui_names = dialog.data['widgets']['leaderboard_header']['ui_names'];
     for(var i = 0; i < header_ui_names.length; i++) {
