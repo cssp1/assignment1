@@ -406,6 +406,8 @@ def _custom_audience_add(audience_id, app_id_facebook_id_list):
     result = fb_api(SpinFacebook.versioned_graph_endpoint('customaudience', audience_id+'/users'),
                     post_params = {'payload': SpinJSON.dumps({'schema':'UID', 'data': [x[1] for x in app_id_facebook_id_list], 'app_ids': app_id_list})})
     print 'transmitted', result['num_received'], 'of which', result['num_invalid_entries'], 'were invalid'
+    if verbose:
+        print result
     return result['num_received']
 
 def custom_audience_add(audience_id, app_id_facebook_id_list):
