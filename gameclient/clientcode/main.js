@@ -36708,6 +36708,9 @@ function get_weapon_spell_features2(spec, spell) {
     if(!is_melee_spell(spell)) {
         ret.push('weapon_range');
     }
+    if('min_range' in spell) {
+        ret.push('min_range');
+    }
     if('splash_range' in spell) {
         ret.push('splash_range');
     }

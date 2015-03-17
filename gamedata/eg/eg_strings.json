@@ -1354,6 +1354,7 @@
             "accuracy": { "ui_name": "Accuracy", "ui_tooltip": "Chance to hit a target within effective weapon range. Degrades at longer distances.", "display": "pct" },
             "rate_of_fire": { "ui_name": "Rate of Fire", "ui_tooltip": "Bonus to main weapon firing speed", "display": "pct" },
             "splash_range": { "ui_name": "Splash", "ui_tooltip": "Radius of explosion around point of impact.\nTargets far from the impact point take less damage.", "display": "integer" },
+            "min_range": { "ui_name": "Min Range", "ui_tooltip": "Cannot fire at enemies closer than this distance.", "display": "integer" },
 
             "ice_effects": { "ui_name": "Ice Shield", "ui_tooltip": "Reduces movement-slowing effect when in blizzard conditions", "display": "one_minus_pct" },
             "swamp_effects": { "ui_name": "Amphibious", "ui_tooltip": "Reduces movement-slowing effect when driving through swamps", "display": "one_minus_pct" },

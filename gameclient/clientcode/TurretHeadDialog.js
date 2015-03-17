@@ -676,7 +676,7 @@ TurretHeadDialog.set_stats_display = function(dialog, emplacement_obj, name, rel
                 var delta_sign = (detail.value - relative_detail.value >= 0 ? 1 : -1);
                 var is_worse = (detail.value < relative_detail.value);
                 var ui_stat = gamedata['strings']['modstats']['stats'][stat];
-                if(ui_stat['display'] == 'cooldown' || ui_stat['display'] == 'one_minus_pct') {
+                if(ui_stat['display'] == 'cooldown' || ui_stat['display'] == 'one_minus_pct' || stat == 'min_range') {
                     is_worse = !is_worse;
                 }
                 var ui_delta;

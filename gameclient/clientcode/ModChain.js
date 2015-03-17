@@ -351,7 +351,7 @@ ModChain.display_value_detailed = function(stat, modchain, spec, level, auto_spe
         var base_per_shot = base_dps * base_cooldown;
         modchain = ModChain.recompute_with_new_base_val(modchain, base_dps, level);
         extra = ui_data['ui_extra'].replace('%DPS', ModChain.display_value(modchain['val'], ui_data['display'], 'tooltip')).replace('%SHOT', ModChain.display_value(modchain['val']*base_cooldown, ui_data['display'], 'tooltip')).replace('%COOLDOWN', base_cooldown.toFixed(2));
-    } else if(goog.array.contains(['weapon_range','effective_weapon_range','splash_range','accuracy'], stat)) {
+    } else if(goog.array.contains(['weapon_range','effective_weapon_range','splash_range','min_range','accuracy'], stat)) {
         // special case for weapon stats other than damage
         show_base = true;
         // these stats correspond to spell parameters with slightly different names
