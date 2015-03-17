@@ -16853,6 +16853,8 @@ class GAMEAPI(resource.Resource):
                                      'I have a new alias!',
                                      bypass_gag = True, props = {'type':'changed_alias',
                                                                  'old_name': old_name})
+            self.send_player_cache_update(session, 'change_alias')
+
         elif spell.get('code') == 'change_title':
             new_title = spellarg[0]
             assert new_title in gamedata['titles']
@@ -16867,6 +16869,7 @@ class GAMEAPI(resource.Resource):
                                          'I have a new title!',
                                          bypass_gag = True, props = {'type':'changed_title',
                                                                      'old_name': old_name})
+                self.send_player_cache_update(session, 'change_title')
 
         else:
             raise Exception('unknown spell '+spellname)
@@ -21491,8 +21494,33 @@ class GAMEAPI(resource.Resource):
 
     # called AFTER playerdb is written
     def _log_out_postflush(self, session):
-
         #start_time = time.time()
+
+        if gamesite.sql_client:
+            alliance_id = gamesite.sql_client.get_users_alliance(session.user.user_id, reason = 'log_out_postflush')
+        else:
+            alliance_id = None
+
+        alliance_id = self.send_player_cache_update(session, 'log_out_postflush', alliance_id = alliance_id)
+
+        # update all leaderboard stats - legacy only (scores2 gets updated on the fly)
+        if not session.player.isolate_pvp:
+            session.player.publish_scores1(alliance_id = alliance_id, reason = 'log_out_postflush')
+
+        if session.player.is_on_map():
+            # update status of player's home base on map, and broadcast lock release
+            assert session.player_base_lock
+            gamesite.nosql_client.map_feature_lock_release(session.player.my_home.base_region, session.player.my_home.base_id, session.player.user_id,
+                                                           extra_props = {'protection_end_time': session.player.resources.protection_end_time}, reason = 'log_out')
+            session.player_base_lock = None
+
+        #end_time = time.time()
+        #admin_stats.record_latency('log_out_postflush', end_time-start_time)
+
+    def send_player_cache_update(self, session, reason,
+                                 # alliance update is optional. None is a possible value, so use special marker for skipping the update.
+                                 alliance_id = 'skip'):
+
         base_damage, base_repair_time = session.player.my_home.report_base_damage_and_repair_time_for_ladder(session.player)
 
         # update dbserver player cache
@@ -21535,29 +21563,13 @@ class GAMEAPI(resource.Resource):
         if 'units_donated_cur_alliance' in session.player.history:
             cache_props['units_donated_cur_alliance'] = session.player.history['units_donated_cur_alliance']
 
-        if gamesite.sql_client:
-            alliance_id = gamesite.sql_client.get_users_alliance(session.user.user_id, reason = 'log_out_postflush')
+        if alliance_id != 'skip': # might be None
             cache_props['alliance_id'] = alliance_id
-        else:
-            alliance_id = None
 
         if session.player.isolate_pvp:
             cache_props['isolate_pvp'] = 1
-        else:
-            # update all leaderboard stats - legacy only (scores2 gets updated on the fly)
-            session.player.publish_scores1(alliance_id = alliance_id, reason = 'log_out_postflush')
 
-        gamesite.pcache_client.player_cache_update(session.user.user_id, cache_props, reason = 'log_out_postflush')
-
-        if session.player.is_on_map():
-            # update status of player's home base on map, and broadcast lock release
-            assert session.player_base_lock
-            gamesite.nosql_client.map_feature_lock_release(session.player.my_home.base_region, session.player.my_home.base_id, session.player.user_id,
-                                                           extra_props = {'protection_end_time': session.player.resources.protection_end_time}, reason = 'log_out')
-            session.player_base_lock = None
-
-        #end_time = time.time()
-        #admin_stats.record_latency('log_out_postflush', end_time-start_time)
+        gamesite.pcache_client.player_cache_update(session.user.user_id, cache_props, reason = reason)
 
     # new asynchronous logout
     def log_out_async(self, session, method, cb, force = False):
