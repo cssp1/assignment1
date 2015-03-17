@@ -6920,7 +6920,7 @@ class Player(AbstractPlayer):
         assert self.alias
         ret = self.alias
         title_template = None
-        if self.title and gamedata['titles'] and (self.title in gamedata['titles']):
+        if self.title and gamedata.get('titles') and (self.title in gamedata['titles']):
             title_template = gamedata['titles'][self.title]['ui_template']
         elif gamedata.get('default_title'):
             title_template = gamedata['titles'][gamedata['default_title']]['ui_template']
