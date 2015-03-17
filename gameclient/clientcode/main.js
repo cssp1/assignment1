@@ -16227,7 +16227,7 @@ function invoke_child_message_dialog(title_text, body_text, props) {
         close_parent_dialog(w);
         if(_action) { _action(); }
     }; };
-    if('close_button' in dialog.widgets) { dialog.widgets['close_button'].onclick = make_go_away(null); }
+    if('close_button' in dialog.widgets) { dialog.widgets['close_button'].onclick = make_go_away(props['on_cancel'] || null); }
     if('cancel_button' in dialog.widgets) { dialog.widgets['cancel_button'].onclick = dialog.widgets['close_button'].onclick; }
 
     dialog.widgets['ok_button'].onclick = make_go_away(props['on_ok'] || null);
@@ -19330,6 +19330,7 @@ function invoke_change_alias_dialog(callback, spellname) {
     dialog.user_data['dialog'] = 'change_alias_dialog';
     dialog.user_data['spellname'] = spellname;
     dialog.user_data['callback'] = callback;
+    dialog.user_data['pending'] = false;
     install_child_dialog(dialog);
     dialog.auto_center();
     dialog.modal = true;
@@ -19351,14 +19352,16 @@ function invoke_change_alias_dialog(callback, spellname) {
         var cb = dialog.user_data['callback'];
         var spell = gamedata['spells'][dialog.user_data['spellname']];
 
-        if(new_name && new_name.length >= 3) {
+        if(!dialog.user_data['pending'] && new_name && new_name.length >= 3) {
             var do_it = (function (_new_name, _cb) { return function() {
                 close_parent_dialog(w);
                 _cb([SPHTTP.wrap_string(_new_name)]);
             }; })(new_name, cb);
-            console.log(spell);
+
+            dialog.user_data['pending'] = true; // prevent successive Enter presses from re-entering here
             invoke_child_message_dialog(spell['ui_name']+'?', spell['ui_confirm'].replace('%s', new_name),
                                         {'cancel_button': true,
+                                         'on_cancel': (function(_dialog) { return function() { dialog.user_data['pending'] = false; }; })(dialog),
                                          'on_ok': do_it});
         }
     };
