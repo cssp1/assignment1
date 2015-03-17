@@ -593,7 +593,7 @@ PlayerInfoDialog.invoke_profile_tab = function(parent) {
         });
     }; })(user_id);
 
-    if(knowledge['messageable'] && spin_frame_platform == 'fb' && knowledge['facebook_id']) { // XXXXXX nneed to search friend list
+    if(knowledge['messageable'] && spin_frame_platform == 'fb' && user_id != session.user_id && knowledge['facebook_id']) { // XXXXXX nneed to search friend list
         dialog.widgets['message_button'].show = true;
         dialog.widgets['message_button'].onclick = (function (_fbid, _uid) { return function() {
             change_selection(null);
@@ -601,20 +601,8 @@ PlayerInfoDialog.invoke_profile_tab = function(parent) {
         } })(knowledge['facebook_id'], user_id);
     }
 
-    if(player.resource_gifts_enabled() && knowledge['giftable'] && knowledge['friend_list_entry']) { // XXXXXX need to search friend list
-        var friend = knowledge['friend_list_entry'];
-        if(spin_frame_platform == 'fb' && friend.get_facebook_id()) {
-            dialog.widgets['gift_button'].show = true;
-            dialog.widgets['gift_button'].state = friend.is_giftable() ? 'normal' : 'disabled';
-            dialog.widgets['gift_button'].onclick = (function (_uid) { return function() { change_selection(null); FBSendRequests.invoke_send_gifts_dialog(_uid, 'player_info_profile_tab'); }; })(user_id);
-            dialog.widgets['gift_button'].tooltip.str = friend.is_giftable() ? null : dialog.data['widgets']['gift_button']['ui_tooltip_already_sent'];
-        } else {
-            dialog.widgets['gift_button'].show = false;
-        }
-    }
-
-    // generally non-giftable players are not FB friends, so offer to find them for you
-    if(!dialog.widgets['gift_button'].show &&
+    if(!dialog.widgets['message_button'].show &&
+       user_id != session.user_id &&
        player.get_any_abtest_value('enable_player_fbpage_button', gamedata['client']['enable_player_fbpage_button']) &&
        knowledge['facebook_id']) {
         dialog.widgets['fbpage_button'].show = true;
@@ -721,6 +709,23 @@ PlayerInfoDialog.update_profile_tab = function(dialog) {
                         dialog.widgets['spy_button'].tooltip.str = dialog.data['widgets']['spy_button']['ui_tooltip_other_region'].replace('%REGION', dialog.widgets['home_region_value'].str);
                     }
                 }
+            }
+
+            // SEND GIFT button
+            if(user_id != session.user_id &&
+               player.resource_gifts_enabled() &&
+               ((session.is_in_alliance() && session.alliance_id == r['alliance_id']) /* is same alliance */ ||
+                find_friend_by_user_id(user_id))) {
+                var is_giftable = !player.cooldown_active('send_gift:'+user_id.toString());
+                dialog.widgets['gift_button'].show = true;
+                dialog.widgets['gift_button'].state = is_giftable ? 'normal' : 'disabled';
+                dialog.widgets['gift_button'].onclick = (function (_uid) { return function() {
+                    change_selection(null);
+                    FBSendRequests.invoke_send_gifts_dialog(_uid, 'player_info_profile_tab');
+                }; })(user_id);
+                dialog.widgets['gift_button'].tooltip.str = is_giftable ? null : dialog.data['widgets']['gift_button']['ui_tooltip_already_sent'];
+            } else {
+                dialog.widgets['gift_button'].show = false;
             }
 
             if(player.get_any_abtest_value('enable_alliances', gamedata['client']['enable_alliances']) && ('alliance_id' in r)) {

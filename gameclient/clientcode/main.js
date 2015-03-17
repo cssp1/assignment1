@@ -25446,7 +25446,7 @@ function alliance_info_member_rowfunc(dialog, row, rowdata) {
                                                      null,
                                                      d.data['widgets']['manage_button']['ui_tooltip_info'])];
 
-                if(gamedata['gift_alliancemates']) {
+                if(gamedata['gift_alliancemates'] && player.resource_gifts_enabled()) {
                     buttons.push(new ContextMenuButton(d.data['widgets']['manage_button']['ui_name_gift'],
                                                        (function (_user_id) { return function(w) {
 

@@ -5866,15 +5866,16 @@
             "battles_button": { "kind": "ActionButton", "xy": [551,118], "dimensions": [134,28], "text_size": 13, "text_style": "bold",
                                 "bg_image": "action_button_134px", "ui_name": "Battle History" },
 
-            "gift_button": { "kind": "ActionButton", "xy": [551,153], "dimensions": [134,28], "text_size": 13, "text_style": "bold",
-                             "bg_image": "action_button_134px", "ui_name": "Send Gifts", "show": 0,
-                             "ui_tooltip": "", "tooltip_delay": 0, "ui_tooltip_already_sent": "Gift already sent today.\nCheck back tomorrow to send another gift." },
-            // mutually exclusive with gift_button
+            // fbpage/message are mutually exclusive (since you can't message a non-friend)
             "fbpage_button": { "kind": "ActionButton", "xy": [551,153], "dimensions": [134,28], "text_size": 13, "text_style": "bold",
                                 "bg_image": "action_button_134px", "ui_name": "Find on Facebook", "show": 0 },
 
-            "message_button": { "kind": "ActionButton", "xy": [551,188], "dimensions": [134,28], "text_size": 13, "text_style": "bold",
+            "message_button": { "kind": "ActionButton", "xy": [551,153], "dimensions": [134,28], "text_size": 13, "text_style": "bold",
                                 "bg_image": "action_button_134px", "ui_name": "Send Message", "show": 0 },
+
+            "gift_button": { "kind": "ActionButton", "xy": [551,188], "dimensions": [134,28], "text_size": 13, "text_style": "bold",
+                             "bg_image": "action_button_134px", "ui_name": "Send Gift", "show": 0,
+                             "ui_tooltip": "", "tooltip_delay": 0, "ui_tooltip_already_sent": "Gift already sent today.\nCheck back tomorrow to send another gift." },
 
             "alliance_invite_button": { "kind": "ActionButton", "xy": [551,223], "dimensions": [134,28], "text_size": 13, "text_style": "bold",
                                         "bg_image": "action_button_134px", "ui_name": "Invite to Alliance",
