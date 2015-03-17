@@ -150,7 +150,7 @@ tag_chars_ext = name_chars_simple + \
 name_chars_ext = tag_chars_ext + \
                  [' ', "'"]
 descr_disallowed_chars = ['\n', '\t', '\r']
-alias_disallowed_chars = ['\n', '\t', '\r', '\\', '/', ' ', '.', ':', ';', '+', '*', '(', ')', '<', '>', '[', ']', '{', '}', ',', '|', '"', "'", '\0'] # keep in sync with main.js and errors.json ALIAS_BAD
+alias_disallowed_chars = ['\n', '\t', '\r', '\\', '/', ' ', '.', ':', ';', '+', '*', '(', ')', '<', '>', '[', ']', '{', '}', ',', '|', '"', "'", '_', '&', '^', '%', '$', '#', '@', '!', '~', '?', '`', '\0'] # keep in sync with main.js and errors.json ALIAS_BAD
 
 def is_valid_alliance_descr(name):
     if len(name) > 256: return False
