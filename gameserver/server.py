@@ -6794,7 +6794,8 @@ class Player(AbstractPlayer):
         # we must use this because the new time-series metrics imply a value of 0 when daily samples
         # are missing, but we need to distinguish against old players who didn't ever record those metrics
         new_history = {'history_version':3,
-                       'xp_gen':gamedata['player_xp'].get('xp_gen',0) # also mark this account as not needing an XP migration
+                       # also mark this account as not needing an XP migration
+                       'xp_gen': gamedata['player_xp'].get('xp_migrate_to', gamedata['player_xp'].get('xp_gen',0))
                        }
 
         # NOTE: carry over certain metrics even across tutorial restarts
