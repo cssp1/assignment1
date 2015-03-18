@@ -37287,7 +37287,8 @@ function update_upgrade_dialog(dialog) {
     // set up equipment widgets
     if(equip_slots) {
             // horrible hack to deal with tooltip overlap
-            var child_dialog = (dialog.children[dialog.children.length-1].user_data && dialog.children[dialog.children.length-1].user_data['dialog']);
+            var child_dialog = (dialog.children[dialog.children.length-1].user_data && dialog.children[dialog.children.length-1].user_data['dialog'] &&
+                                dialog.children[dialog.children.length-1].user_data['dialog'] != 'upgrade_bar');
             equip_slots = get_leveled_quantity(equip_slots, Math.max(old_level, 1));
             var last_label = null, slot_i = 0;
 
@@ -37766,7 +37767,8 @@ function update_upgrade_dialog_equipment(dialog) {
 
         if(equip_slots) {
             // horrible hack to deal with tooltip overlap
-            var child_dialog = (dialog.children[dialog.children.length-1].user_data && dialog.children[dialog.children.length-1].user_data['dialog']);
+            var child_dialog = (dialog.children[dialog.children.length-1].user_data && dialog.children[dialog.children.length-1].user_data['dialog'] &&
+                                dialog.children[dialog.children.length-1].user_data['dialog'] != 'upgrade_bar');
 
             equip_slots = get_leveled_quantity(equip_slots, Math.max(old_level, 1));
             var slot_i = 0;
