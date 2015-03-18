@@ -6518,6 +6518,7 @@
     "squad_control": {
         "bg_image": "dialog_736x423_bg",
         "dimensions": [736,423],
+        "clip_children": 0,
         "widgets": {
             "title": { "kind": "TextField", "xy": [18,14], "dimensions": [221, 41], "text_size": 30, "text_style": "thick",
                        "text_hjustify": "left", "ui_name_normal": "!TX Army", "ui_name_manage": "Battalions",
