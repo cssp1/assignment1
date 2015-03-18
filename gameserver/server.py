@@ -3574,16 +3574,26 @@ class Session(object):
 
     def give_tech(self, player, retmsg, tech_name, level, lab, method):
         assert player is self.player
+        spec = player.get_abtest_spec(TechSpec, tech_name)
+
         current = player.tech.get(tech_name, 0)
         if current >= level: return
         player.tech[tech_name] = level
         player.recalc_stattab(self.player)
         player.update_unit_levels(self.player, tech_name, self, retmsg)
-        # award XP
-        spec = player.get_abtest_spec(TechSpec, tech_name)
-        amount = sum((TechSpec.get_leveled_quantity(getattr(spec, 'cost_'+res), level) for res in gamedata['resources']))
-        xp = int(amount*gamedata['player_xp']['research'])
+
+        # award XP for each level achieved along the way
+        xp = 0
+        for step in xrange(current+1, level+1):
+            override = TechSpec.get_leveled_quantity(spec.upgrade_xp, step)
+            if override >= 0:
+                xp += override
+            else:
+                xp += int(gamedata['player_xp']['research'] * \
+                          sum((TechSpec.get_leveled_quantity(getattr(spec, 'cost_'+res), step) for res in gamedata['resources']), 0))
+
         gamesite.gameapi.give_xp_to(self, player, retmsg, xp, 'research', [lab.x,lab.y] if lab else None, obj_session_id = lab.obj_id if lab else None)
+
         if player is self.player:
             tech_reply = "TECH_UPDATE"
             state_reply = "PLAYER_STATE_UPDATE"
@@ -4610,6 +4620,7 @@ class GameObjectSpec(Spec):
         ["upgrade_credit_cost", -1],
         ["upgrade_speedup_cost_factor", 1],
         ["upgrade_xp",-1],
+        ["proposed_upgrade_xp", -1], # for debug messages only
         ["worth_less_xp", 0],
         ] + resource_fields("produces") + [
         ["production_capacity", 0],
@@ -4737,6 +4748,8 @@ class TechSpec(Spec):
     fields = [ ["research_credit_cost", 999],
                ] + resource_fields("cost") + [
                ["research_time", 0],
+               ["upgrade_xp", -1],
+               ["proposed_upgrade_xp", -1], # for debug messages only
                ["metric_events", ""],
                ["combat_level", 0],
                ["research_category", None],
@@ -11086,8 +11099,12 @@ class LivePlayer(Player):
                 if name in gamedata['starting_conditions']['tech'] and lev <= gamedata['starting_conditions']['tech'][name]:
                     continue
                 spec = self.get_abtest_spec(TechSpec, name)
-                cost = sum((spec.get_leveled_quantity(getattr(spec, 'cost_'+res), lev) for res in gamedata['resources']), 0)
-                xp['research'] += int(new_player_xp['research'] * cost)
+                override = spec.get_leveled_quantity(spec.upgrade_xp, lev)
+                if override >= 0:
+                    xp['research'] += override
+                else:
+                    xp['research'] += int(new_player_xp['research'] * \
+                                          sum((spec.get_leveled_quantity(getattr(spec, 'cost_'+res), lev) for res in gamedata['resources']), 0))
 
         xp['buildings'] = 0
         for obj in self.home_base_iter():

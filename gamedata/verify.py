@@ -216,7 +216,8 @@ def check_mandatory_fields(specname, spec, kind):
     # check that per-level array parameters have the right number of elements
     for check_field in ['max_hp','maxvel','turn_rate','consumes_space','armor',
                         'requires','provides_space','build_time','repair_time','consumes_power',
-                        'consumes_power_while_building','upgrade_credit_cost','upgrade_speedup_cost_factor','metric_events',
+                        'consumes_power_while_building','upgrade_credit_cost','upgrade_speedup_cost_factor','upgrade_xp','proposed_upgrade_xp',
+                        'metric_events',
                         'provides_inventory','provides_squads','provides_deployed_squads','provides_squad_space','provides_total_space'] + \
     ['build_cost_'+res for res in gamedata['resources']] + \
     ['produces_'+res for res in gamedata['resources']] + \
@@ -224,6 +225,9 @@ def check_mandatory_fields(specname, spec, kind):
         if (check_field in spec) and (type(spec[check_field]) is list) and (len(spec[check_field]) != max_level):
             error |= 1
             print '%s %s "%s" array length (%d) does not match max level (%d - as determined by length of %s array)' % (kind, specname, check_field, len(spec[check_field]), max_level, GameDataUtil.MAX_LEVEL_FIELD[kind])
+
+    if 'upgrade_xp' in spec and kind == 'buildings' and spec['name'] not in gamedata['player_xp']['buildings']:
+        error |= 1; print '%s %s has upgrade_xp but is not listed in player_xp.buildings (needs to be there, even if 0)' % (kind, specname)
 
     if 'consumes_space' in spec and spec['consumes_space'] == 0:
         if spec.get('donatable',True):
