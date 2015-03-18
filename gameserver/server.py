@@ -11135,7 +11135,10 @@ class LivePlayer(Player):
         for name, data in self.completed_quests.iteritems():
             if name not in gamedata['quests']: continue
             quest = gamedata['quests'][name]
-            xp['quests'] += int(new_player_xp['quest_reward_resources'] * sum((getattr(quest, 'reward_'+res, 0) for res in gamedata['resources']), 0))
+            if ('quest_reward_resources' in new_player_xp):
+                xp['quests'] += int(new_player_xp['quest_reward_resources'] * sum((getattr(quest, 'reward_'+res, 0) for res in gamedata['resources']), 0))
+            elif ('reward_xp' in quest):
+                xp['quests'] += max(int(quest['reward_xp'] * new_player_xp['quests']), new_player_xp['quests_min'])
 
         total_xp = sum(xp.itervalues(), 0)
         new_level = bisect.bisect(new_player_xp['level_xp'], total_xp) - 1
