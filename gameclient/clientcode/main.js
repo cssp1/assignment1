@@ -5796,6 +5796,12 @@ player.get_giftable_friend_info_list_async = function(cb) {
                     // ensure cached player info
                     var player_info = PlayerCache.query_sync(member_id);
                     if(player_info) {
+                        // Facebook doesn't allow sending requests to non-friends who aren't playing anymore,
+                        // so skip them. The limit seems to be around 7-9 days. But anyone who uninstalls the app may cause an error immediately.
+                        if(!('last_login_time' in player_info) ||
+                           player_info['last_login_time'] < server_time - 5*86400) {
+                            return;
+                        }
                         _giftable_friends.push(player_info);
                     }
                 });
