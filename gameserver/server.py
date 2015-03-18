@@ -11008,19 +11008,27 @@ class LivePlayer(Player):
                                              (reason, bucks, user_id))
 
         # migrate XP from old to new system
-        if SpinConfig.game() == 'mf' and \
-           self.history.get('xp_gen',0) < gamedata['player_xp'].get('xp_gen',0):
+        old_gen = self.history.get('xp_gen',0)
+        cur_gen = gamedata['player_xp'].get('xp_gen',0)
+        if old_gen < cur_gen:
+            old_xp = self.resources.xp
+            old_level = self.resources.player_level
             new_xp, new_level = self.recalculate_xp()
             if gamedata['server']['log_xp_migration']:
                 gamesite.exception_log.event(server_time, 'player %d migrate_xp gen %d->%d: OLD xp %d level %d NEW xp %d level %d delta %+d' %
                                              (self.user_id,
-                                              self.history.get('xp_gen',0), gamedata['player_xp'].get('xp_gen',0),
-                                              self.resources.xp, self.resources.player_level,
+                                              old_gen, cur_gen,
+                                              old_xp, old_level,
                                               new_xp, new_level, new_level-self.resources.player_level))
 
-            self.history['xp_gen'] = gamedata['player_xp'].get('xp_gen',0)
-            self.resources.xp = new_xp
-            self.resources.player_level = new_level
+            if old_gen < gamedata['player_xp'].get('xp_migrate_to',0):
+                self.history['xp_gen'] = gamedata['player_xp'].get('xp_migrate_to',0) # mark as migrated
+                if (new_xp > old_xp) or gamedata['player_xp'].get('xp_migrate_allow_loss', False):
+                    self.resources.xp = new_xp
+                    self.resources.player_level = new_level
+                    if ('xp_migration_mail' in gamedata['strings']) and ((new_xp != old_xp) or (new_level != old_level)):
+                        self.mailbox_append(self.make_system_mail(gamedata['strings']['xp_migration_mail'],
+                                                                  replace_s = '%d' % (new_xp - old_xp), replace_level = '%d' % new_level))
 
         if 'destination' in self.travel_state:
             # get rid of legacy destination field

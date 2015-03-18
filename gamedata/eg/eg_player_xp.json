@@ -5,7 +5,7 @@
 {
     // generation number of XP calculation - if player.history.xp_gen is less than this, the server
     // will overwrite the player's XP and level on login.
-    "xp_gen": 2,
+    "xp_gen": 0,
 
     // cumulative total experience points required to reach level N
     // this is hand-tweaked to ensure a good predator:prey ratio at most levels, where attackability is primarily determined by CC level
