@@ -32,6 +32,10 @@ FBSendRequests.invoke_send_gifts_dialog = function(to_user, reason, info_list) {
 
 FBSendRequests.FBSendRequestsDialogV2 = {};
 
+/** Keep track of user IDs that have caused dialog failures, and don't retry them
+    @type {Object.<string,number>} */
+FBSendRequests.user_id_blacklist = {};
+
 /** Multi-Friend-Selector request dialog
  * @param {(number|null)} to_user - user_id of a friend to auto-select (may be null)
  * @param {string} reason for metrics purposes
@@ -154,10 +158,17 @@ FBSendRequests.invoke_send_gifts_dialog_v2 = function(to_user, reason, info_list
                     }
                 } else {
                     // cancel: {'error_code': 4201, 'error_message': 'User canceled the Dialog flow'}
-                    metric_event('4105_send_gifts_fb_fail', {'api':'apprequests', 'api_version': 2, 'attempt_id': __dialog.user_data['attempt_id'], 'method': __dialog.user_data['reason'],
+                    if(response && response['error_message'] && response['error_message'].indexOf('Can only send requests to friends') == 0) {
+                        goog.array.forEach(__batches[_batch_num], function(r) {
+                            console.log('blacklisting '+r.user_id.toString());
+                            FBSendRequests.user_id_blacklist[r.user_id.toString()] = 1;
+                        });
+                    } else {
+                        metric_event('4105_send_gifts_fb_fail', {'api':'apprequests', 'api_version': 2, 'attempt_id': __dialog.user_data['attempt_id'], 'method': __dialog.user_data['reason'],
                                                                  'message': (response && response['error_message'] ? response['error_message'] : 'unknown'),
                                                                  'sum': player.get_denormalized_summary_props('brief')});
-                    do_next = false; // after one cancel, cancel all the rest
+                        do_next = false; // after one cancel, cancel all the rest
+                    }
                 }
 
                 if(_batch_num+1 < __batches.length && do_next) {

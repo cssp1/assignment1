@@ -5802,6 +5802,9 @@ player.get_giftable_friend_info_list_async = function(cb) {
                            player_info['last_login_time'] < server_time - 5*86400) {
                             return;
                         }
+                        // also skip blacklisted players
+                        if(member_id.toString() in FBSendRequests.user_id_blacklist) { return; }
+
                         _giftable_friends.push(player_info);
                     }
                 });
