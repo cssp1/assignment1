@@ -11031,6 +11031,25 @@ class LivePlayer(Player):
                         self.mailbox_append(self.make_system_mail(gamedata['strings']['xp_migration_mail'],
                                                                   replace_s = '%d' % (new_xp - old_xp), replace_level = '%d' % new_level))
 
+        # fix TR turret head tech XP - we forgot to add upgrade_xp to the MG and Mortar turret head techs
+        if gamedata['game_id'] == 'tr' and account_creation_time < 1426718214 and self.history.get('turret_head_mg_mortar_xp_fixed',0) < 1:
+            missing_xp = 0
+            for techname in ('turret_head_mg','turret_head_mortar'):
+                time_series = self.history.get('tech:'+techname+'_at_time',{})
+                if len(time_series) > 1: # only give XP for upgrades completed AFTER the initial migration
+                    spec = self.get_abtest_spec(TechSpec, techname)
+                    migrated_level = min(time_series.values())
+                    for stime, level in time_series.iteritems():
+                        if level > migrated_level:
+                            missing_xp += spec.get_leveled_quantity(spec.upgrade_xp, level)
+            if missing_xp > 0:
+                self.resources.gain_xp(missing_xp, 'turret_head_mg_mortar_xp_fix')
+                self.mailbox_append(self.make_system_mail(gamedata['strings']['turret_head_mg_mortar_xp_fix_mail'],
+                                                          replace_s = '%d' % missing_xp))
+                if gamedata['server']['log_xp_migration']:
+                    gamesite.exception_log.event(server_time, 'player %d turret_head_mg_mortar_xp_fix added %d missing XP' % (self.user_id, missing_xp))
+            self.history['turret_head_mg_mortar_xp_fixed'] = 1
+
         if 'destination' in self.travel_state:
             # get rid of legacy destination field
             del self.travel_state['destination']
