@@ -19283,7 +19283,7 @@ class GAMEAPI(resource.Resource):
                        'unique_per_sender': 'resource_gift'}
 
         for recipient_user_id in recipient_user_id_list:
-            if (not recipient_user_id) or recipient_user_id <= 0:
+            if (not recipient_user_id) or recipient_user_id <= 0 or recipient_user_id == session.user.user_id:
                 continue
 
             # note: this is susceptible to client-side spoofing, sending invalid user_ids, or picking user_ids out of thin air!
