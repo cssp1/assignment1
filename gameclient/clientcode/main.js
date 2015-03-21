@@ -13310,6 +13310,7 @@ function invoke_cheat_menu() {
         layout.add(new SPUI.Button("Remove All Barriers", function() { remove_all_barriers(); change_selection(null); }));
         layout.add(new SPUI.Button("Upgrade All Barriers", function() { upgrade_all_barriers(); change_selection(null); }));
         layout.add(new SPUI.Button("Give 10,000 Gamebucks", function() { change_selection_ui(null); send_to_server.func(["CAST_SPELL", GameObject.VIRTUAL_ID, "CHEAT_GIVE_GAMEBUCKS", 10000]); }));
+        layout.add(new SPUI.Button("Give Daily Gifts", function() { change_selection_ui(null); send_to_server.func(["CAST_SPELL", GameObject.VIRTUAL_ID, "CHEAT_GIVE_GIFTS"]); }));
         layout.add(new SPUI.Button("Drain Resources", function() { change_selection_ui(null); send_to_server.func(["CAST_SPELL", GameObject.VIRTUAL_ID, "CHEAT_DRAIN_RESOURCES"]); }));
         layout.add(new SPUI.Button("Clear Cooldowns/Auras", function() {
             change_selection_ui(null);

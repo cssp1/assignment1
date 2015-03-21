@@ -23947,6 +23947,19 @@ class GAMEAPI(resource.Resource):
                     retmsg.append(["ERROR", "DISALLOWED_IN_SECURE_MODE"])
                 else:
                     session.execute_consequent_safe(spellargs[0], session.player, retmsg, reason='CHEAT_EXECUTE_CONSEQUENT')
+            elif spellname == "CHEAT_GIVE_GIFTS":
+                if not session.player.is_cheater:
+                    retmsg.append(["ERROR", "DISALLOWED_IN_SECURE_MODE"])
+                else:
+                    for i in xrange(5):
+                        gamesite.msg_client.msg_send([{'from': session.player.user_id + i,
+                                                       'to': [session.player.user_id],
+                                                       'type': 'resource_gift',
+                                                       'msg_id': generate_mail_id(),
+                                                       'expire_time': server_time + gamedata['server']['message_expire_time']['resource_gift'],
+                                                       'from_pcache': self.get_player_cache_props(session.user, session.player),
+                                                       'unique_per_sender': 'resource_gift'}])
+
             elif spellname == "CHEAT_GIVE_ITEMS":
                 if not session.player.is_cheater:
                     retmsg.append(["ERROR", "DISALLOWED_IN_SECURE_MODE"])
