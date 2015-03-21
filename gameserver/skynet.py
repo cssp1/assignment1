@@ -2667,8 +2667,11 @@ if __name__ == '__main__':
             # query adstats
             time_range = None
             if max_frequency > 0: # must snap to 1/7/28-day boundary to get valid unique_impressions data
-                local_ts = time_now # pacific_to_utc(time_now)
-                local_ts = 86400*(local_ts//86400) # snap to previous day end
+                # snap to previous UTC day end, in Pacific time
+                # seems weird, but this is what the Facebook API wants...
+                local_ts = 86400*(time_now//86400)
+                local_ts = utc_to_pacific(local_ts)
+                # grab one-week window
                 time_range = [local_ts - 7*86400, local_ts]
             save_dry_run = dry_run; dry_run = False
             stats = adstats_pull_dict(db, adgroup_list, time_range = time_range)
