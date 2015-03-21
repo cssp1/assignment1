@@ -5077,21 +5077,25 @@
 
             "sunken_right":{"kind":"StaticImage","xy":[169,12],"dimensions":[306,273],"asset":"dialog_sunken_306x273"},
             "raised_area":{"kind":"StaticImage","xy":[218,60],"dimensions":[209,203],"asset":"dialog_raised_209x203"},
-            "reward_area":{"kind":"StaticImage","xy":[235,197],"dimensions":[173,45],"asset":"dialog_sunken_173x45"},
+            "reward_area":{"kind":"StaticImage","xy":[235,192],"dimensions":[173,60],"asset":"dialog_sunken_resizable", "bg_image_resizable": 1},
 
             "title": { "kind": "TextField", "xy": [185,25], "dimensions": [277, 25], "text_size": 17, "text_style": "bold",
-                       "text_hjustify": "left", "ui_name": "Gift Received!" },
+                       "text_hjustify": "left", "ui_name": "Gift Received!", "ui_name_plural": "Gifts Received!" },
 
             "close_button": { "kind": "ActionButton", "xy": [463,1], "dimensions": [19,22], "bg_image": "close_button_small", "push_bg_image": 1 },
 
-            "friend_icon": { "kind": "FriendIcon", "xy": [298, 85], "dimensions": [50,73], "state": "disabled" },
+            "friend_icon": { "kind": "FriendIcon", "xy": [298, 70], "dimensions": [50,73], "state": "disabled" },
+
+            "and_others": { "kind": "TextField", "xy": [236,145], "dimensions": [173,22], "text_size": 13, "text_style": "normal",
+                            "ui_name": "and %d other(s)", "show": 0 },
 
             "gave_you": { "kind": "TextField", "xy": [236,165], "dimensions": [173,22], "text_size": 13, "text_style": "normal",
                           "ui_name": "gave you:" },
 
-            "resource_icon": { "kind": "StaticImage", "xy": [257,209], "dimensions": [21,21], "asset": "resource_icon_water" },
-            "resource_amount": { "kind": "TextField", "xy": [292,209], "dimensions": [83,21], "ui_name": "xxx,xxx,xxx",
-                                 "text_size": 13, "text_style": "bold" },
+            "resource_icon": { "show": 0, "kind": "StaticImage", "xy": [257,200], "xy_single": [257,211], "dimensions": [21,21],
+                               "array": [1,2], "array_offset": [0,25] },
+            "resource_amount": { "show": 0, "kind": "TextField", "xy": [292,200], "xy_single": [292,211], "dimensions": [83,21], "text_size": 13, "text_style": "bold",
+                                 "array": [1,2], "array_offset": [0,25] },
 
             "say_thanks_button": { "kind": "ActionButton", "xy": [187,296], "dimensions": [134,28],  "text_size": 13, "text_style": "bold",
                                    "bg_image": "menu_button_134px","ui_name": "Say Thanks" },

@@ -13310,7 +13310,7 @@ function invoke_cheat_menu() {
         layout.add(new SPUI.Button("Remove All Barriers", function() { remove_all_barriers(); change_selection(null); }));
         layout.add(new SPUI.Button("Upgrade All Barriers", function() { upgrade_all_barriers(); change_selection(null); }));
         layout.add(new SPUI.Button("Give 10,000 Gamebucks", function() { change_selection_ui(null); send_to_server.func(["CAST_SPELL", GameObject.VIRTUAL_ID, "CHEAT_GIVE_GAMEBUCKS", 10000]); }));
-        layout.add(new SPUI.Button("Give Daily Gifts", function() { change_selection_ui(null); send_to_server.func(["CAST_SPELL", GameObject.VIRTUAL_ID, "CHEAT_GIVE_GIFTS"]); }));
+        layout.add(new SPUI.Button("Get Daily Gifts", function() { change_selection_ui(null); send_to_server.func(["CAST_SPELL", GameObject.VIRTUAL_ID, "CHEAT_GIVE_GIFTS"]); }));
         layout.add(new SPUI.Button("Drain Resources", function() { change_selection_ui(null); send_to_server.func(["CAST_SPELL", GameObject.VIRTUAL_ID, "CHEAT_DRAIN_RESOURCES"]); }));
         layout.add(new SPUI.Button("Clear Cooldowns/Auras", function() {
             change_selection_ui(null);
@@ -14450,7 +14450,36 @@ function invoke_idle_check_dialog(play_time) {
     //idle_check_state.timer = window.setTimeout(function() { SPINPUNCHGAME.shutdown(); }, 15000);
 }
 
-function invoke_gift_received_dialog(userid, info, loot) {
+/** @type {!Array.< {user_id: number, info: Object, loot: Object} >} */
+var gift_received_list = [];
+
+function gift_received(user_id, info, loot) {
+    if(gamedata['client']['collapse_received_gifts']) {
+        gift_received_list.push({user_id: user_id, info: info, loot: loot});
+        if(gift_received_list.length == 1) {
+            notification_queue.push(function() { invoke_gift_received_dialog(null); });
+        }
+    } else {
+        var ls = [{user_id: user_id, info:info, loot:loot}];
+        notification_queue.push((function (_ls) { return function() { invoke_gift_received_dialog(_ls); }; })(ls));
+    }
+}
+
+function invoke_gift_received_dialog(override_ls) {
+    var ls;
+    if(override_ls !== null) { // use passed list
+        ls = override_ls;
+    } else { // grab global list
+        ls = gift_received_list;
+        gift_received_list = [];
+    }
+
+    if(ls.length < 1 ||
+       !player.resource_gifts_enabled()) {
+        // note: do not show dialog if gifting is turned off
+        return;
+    }
+
     change_selection(null);
 
     var dialog_data = gamedata['dialogs']['gift_received_dialog'];
@@ -14461,30 +14490,62 @@ function invoke_gift_received_dialog(userid, info, loot) {
     dialog.auto_center();
     dialog.modal = true;
 
-    dialog.widgets['close_button'].onclick = function() { change_selection(null); };
+    dialog.widgets['close_button'].onclick = close_parent_dialog;
 
-    // try to figure out the friend's level and FBID
-    var sender_fbid = (info && info['facebook_id'] ? info['facebook_id'] : null);
-    var level = (info && info['player_level'] ? info['player_level'] : 1);
-    var name = (info ? PlayerCache.get_ui_name(info) : 'Unknown');
-    dialog.widgets['friend_icon'].set_user(userid);
-
-    var asset = null, amount = 0;
-    for(var res in gamedata['resources']) {
-        if(res in loot && loot[res] > 0) {
-            asset = 'resource_icon_'+res; amount = loot[res];
-            break;
+    // sort gifts by amount
+    ls.sort(function(a, b) {
+        var a_amt = Math.max.apply(Math, goog.object.getValues(a.loot)),
+            b_amt = Math.max.apply(Math, goog.object.getValues(b.loot));
+        if(a_amt > b_amt) {
+            return -1;
+        } else if(a_amt < b_amt) {
+            return 1;
+        } else {
+            return 0;
         }
+    });
+
+    if(ls.length > 1) {
+        dialog.widgets['title'].str = dialog.data['widgets']['title']['ui_name_plural'];
+        dialog.widgets['and_others'].show = true;
+        dialog.widgets['and_others'].str = dialog.data['widgets']['and_others']['ui_name'].replace('%d', pretty_print_number(ls.length-1));
     }
 
-    if(asset) { dialog.widgets['resource_icon'].asset = asset; }
-    if(amount) { dialog.widgets['resource_amount'].str = pretty_print_number(amount); }
+    // display loot
+    var loot_i = 0;
+    var total_loot = {};
+    goog.array.forEach(ls, function(gift) {
+        goog.object.extend(total_loot, gift.loot);
+    });
+
+    for(var res in gamedata['resources']) {
+        if(res in total_loot && total_loot[res] > 0) {
+            dialog.widgets['resource_icon'+loot_i.toString()].show =
+                dialog.widgets['resource_amount'+loot_i.toString()].show = true;
+            dialog.widgets['resource_icon'+loot_i.toString()].asset = gamedata['resources'][res]['icon_small'];
+            dialog.widgets['resource_amount'+loot_i.toString()].str = pretty_print_number(total_loot[res]);
+            loot_i += 1;
+            if(loot_i >= dialog.data['widgets']['resource_icon']['array'][1]) { console.log('not enough resource widgets'); break; }
+        }
+    }
+    if(loot_i == 1) {
+        dialog.widgets['resource_icon0'].xy = dialog.data['widgets']['resource_icon']['xy_single'];
+        dialog.widgets['resource_amount0'].xy = dialog.data['widgets']['resource_amount']['xy_single'];
+
+    }
+
+    // pick one sender to show friend and "say thanks" option
+    var sender_user_id = ls[0].user_id;
+    dialog.widgets['friend_icon'].set_user(ls[0].user_id);
+    var info = ls[0].info;
+    var sender_fbid = (info && info['facebook_id'] ? info['facebook_id'] : null);
+    var sender_name = (info ? PlayerCache.get_ui_name(info) : 'Unknown');
 
     if(get_facebook_viral('say_thanks') && sender_fbid) {
         dialog.widgets['say_thanks_button'].onclick = (function (a, b, c, d) { return function() {
             change_selection(null);
             invoke_say_thanks(a, b, c, d);
-        }; })(sender_fbid, userid, name, loot);
+        }; })(sender_fbid, sender_user_id, sender_name, ls[0].loot);
     } else {
         dialog.widgets['say_thanks_button'].show = false;
     }
@@ -41215,15 +41276,9 @@ function handle_server_message(data) {
     } else if(msg == "RECEIVED_GIFT2") {
         var sender_user_id = data[1];
         var sender_info = data[2]; // could be stale, so don't enter into PlayerCache
-        var res = data[3];
+        var loot = data[3];
 
-        var do_notify = (function(user_id, info, loot) { return function() {
-            invoke_gift_received_dialog(user_id, info, loot);
-        };})(sender_user_id, sender_info, res);
-
-        if(player.resource_gifts_enabled()) { // note: do not show dialog if gifting is turned off
-            notification_queue.push(do_notify);
-        }
+        gift_received(sender_user_id, sender_info, loot);
 
     } else if(msg == "SESSION_LOOT_UPDATE") {
         session.last_loot = session.loot;
