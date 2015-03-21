@@ -2715,6 +2715,8 @@ def check_abtest(name, data):
     error = 0
     if 'eligible' in data and type(data['eligible']) is dict: # some legacy "eligibles" are strings
         error |= check_predicate(data['eligible'], reason='abtest:'+name)
+    if 'default_group' not in data:
+        error |= 1; print 'A/B test %s missing default_group' % (name,)
     return error
 
 def check_resource(name, data):

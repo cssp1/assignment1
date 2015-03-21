@@ -10775,6 +10775,8 @@ class LivePlayer(Player):
                     breakpoints = []
                     bp = 0.0
                     for group in groups:
+                        if group not in data['groups']:
+                            raise Exception('group %r not found in %r' % (group, data))
                         weight = data['groups'][group].get('weight', 1.0/len(groups))
                         bp += weight
                         breakpoints.append(bp)
