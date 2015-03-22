@@ -676,6 +676,8 @@
     "gift_amount_randomness": 0.25, // gift amount varies by +/- this much (fraction of base amount, 0-1)
     "gift_amount_decay": 0.50, // size of gift N+1 relative to gift N (per day), for diminishing returns (1.0 to disable)
 
+    "unit_donation_max_age": 259200, // unit donation requests older than this disappear
+
     "gamebucks_in_deposits": 1, // whether iron_deposits can contain gamebucks
 
     // see https://developers.facebook.com/docs/payments/payer_promotion/

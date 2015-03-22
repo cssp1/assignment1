@@ -41693,6 +41693,10 @@ function handle_server_message(data) {
                   sender_info['type'] == 'unit_donation') {
             if(!player.unit_donation_enabled()) { return; }
 
+            if(sender_info['type'] == 'unit_donation_request' && sender_info['time'] < server_time - gamedata['unit_donation_max_age']) {
+                return; // request is stale
+            }
+
             // handle unit donation messages
             var tag = sender_info['tag'] || 0;
 

@@ -393,7 +393,7 @@ class NoSQLClient (object):
                     self.alliance_table(TABLE).remove({'_id':row['_id']})
 
         print 'Checking for stale unit_donation_requests...'
-        earliest = time_now - 24*60*60 # clear entries more than 1 day old
+        earliest = time_now - gamedata['unit_donation_max_age'] # clear old entries
         n = self.unit_donation_requests_table().remove({'time':{'$lt':earliest}})['n']
         if n > 0:
             print '  Deleted', n, 'old unit_donation_requests'
