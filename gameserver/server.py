@@ -19356,9 +19356,15 @@ class GAMEAPI(resource.Resource):
                         duration = gamedata['server']['message_expire_time']['resource_gift'] - (server_time - msg['time'])
                         if duration > 0:
                             time_struct = time.gmtime(server_time)
+                            if 'from_pcache' in msg:
+                                from_ui_name = pcache_get_ui_name(msg['from_pcache'])
+                            elif 'from_name' in msg:
+                                from_ui_name = msg['from_name']
+                            else:
+                                from_ui_name = 'Unknown'
                             session.player.mailbox_append(session.player.make_system_mail(template,
                                                                                           duration = duration,
-                                                                                          replacements = {'%SENDER': msg.get('from_name','Unknown'),
+                                                                                          replacements = {'%SENDER': from_ui_name,
                                                                                                           '%DAY': time.strftime('%d %b %Y', time_struct),
                                                                                                           '%TIME': time.strftime('%H:%S', time_struct)}))
                             ret['new_mail'] = True
