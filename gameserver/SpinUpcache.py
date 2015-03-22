@@ -455,6 +455,7 @@ FACEBOOK_CAMPAIGN_MAP = {
     # game-sourced viral acquisition
     'achievement_brag': 'game_viral',
     'appcenter_request': 'game_viral',
+    'cheeve': 'game_viral',
     'facebook_app_request': 'game_viral',
     'facebook_friend_invite': 'game_viral',
     'facebook_message': 'game_viral',
@@ -473,6 +474,7 @@ FACEBOOK_CAMPAIGN_MAP = {
     'feed_playing': 'game_viral',
     'feed_thanks': 'game_viral',
     'notification': 'game_viral',
+    'promo_code': 'game_viral',
     'request': 'game_viral',
     'reminders': 'game_viral', # this is a reminder *about* a request
     'search': 'game_viral',

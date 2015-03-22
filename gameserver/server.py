@@ -11847,6 +11847,8 @@ def get_acquisition_data_from_url(url, user_id):
             ret['fb_ref'] = q['fb_ref'][0]
         if (q.has_key('notif_t') and q['notif_t'][0] == 'app_notification'):
             ret['useless'] = 1 # app-to-user notification - already acquired
+    elif q.has_key('spin_promo_code'):
+        ret = {'type': 'ad_click', 'url': url, 'campaign_name': 'promo_code' }
     elif q.has_key('ref'):
         ref = q['ref'][0]
         if ref == 'notif':
