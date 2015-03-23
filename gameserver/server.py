@@ -11122,7 +11122,9 @@ class LivePlayer(Player):
 
         # initialize achievement_points score
         if self.history.get('achievement_points_published',0) < 1:
-            self.modify_scores({'achievement_points':self.get_achievement_points()}, method='=', reason = 'login_migrate')
+            points = self.get_achievement_points()
+            if points > 0:
+                self.modify_scores({'achievement_points':points}, method='=', reason = 'login_migrate')
             self.history['achievement_points_published'] = 1
 
         # publish any modified scores
