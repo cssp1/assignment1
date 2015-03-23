@@ -23324,7 +23324,7 @@ function invoke_leaderboard(force_period, force_mode, force_chapter) {
         dialog.user_data['enable_tokens'] = !!props['enable_token_leaderboard'];
     }
 
-    dialog.user_data['periods'] = ['week', 'season'];
+    dialog.user_data['periods'] = ['week', 'season', 'ALL'];
     dialog.user_data['categories'] = [];
 
     goog.object.forEach(gamedata['strings']['leaderboard']['categories'], function(data, name) {
@@ -23351,6 +23351,7 @@ function invoke_leaderboard(force_period, force_mode, force_chapter) {
     dialog.widgets['show_all'].onclick = function(w) { leaderboard_change_page(w.parent, null, 'all', null, 0); };
     dialog.widgets['show_week'].onclick = function(w) { leaderboard_change_page(w.parent, 'week', null, null, 0); };
     dialog.widgets['show_season'].onclick = function(w) { leaderboard_change_page(w.parent, 'season', null, null, 0); };
+    dialog.widgets['show_alltime'].onclick = function(w) { leaderboard_change_page(w.parent, 'ALL', null, null, 0); };
     dialog.widgets['friend_icon'].set_user(session.user_id);
     dialog.widgets['friend_icon'].onclick = function(w) { PlayerInfoDialog.invoke(session.user_id); };
 
@@ -23359,13 +23360,17 @@ function invoke_leaderboard(force_period, force_mode, force_chapter) {
     dialog.user_data['friend_data'] = {}; // indexed by [categotry][period]
     for(var i = 0; i < dialog.user_data['categories'].length; i++) {
         var cat = dialog.user_data['categories'][i];
+        var catdata = gamedata['strings']['leaderboard']['categories'][cat];
         dialog.user_data['data'][cat] = {};
         dialog.user_data['friend_data'][cat] = {};
         for(var j = 0; j < dialog.user_data['periods'].length; j++) {
             var period = dialog.user_data['periods'][j];
             dialog.user_data['data'][cat][period] = null;
             dialog.user_data['friend_data'][cat][period] = null;
-            dialog.user_data['queries'].push([cat, period]);
+            // if no periods are specified, default to week/season only
+            if(goog.array.contains(catdata['periods'] || ['week','season'], period)) {
+                dialog.user_data['queries'].push([cat, period]);
+            }
         }
     }
 
@@ -23441,17 +23446,30 @@ function leaderboard_change_page(dialog, period, mode, chapter, page) {
     if(goog.array.indexOf(['trophies_pvp','trophies_pvv'], chapter) != -1) {
         dialog.widgets['show_week'].show = (gamedata['matchmaking']['ladder_point_frequency'] === 'week');
         dialog.widgets['show_season'].show = (gamedata['matchmaking']['ladder_point_frequency'] === 'season');
+        dialog.widgets['show_alltime'].show = false;
     } else if('periods' in ui_data) {
         dialog.widgets['show_week'].show = goog.array.contains(ui_data['periods'], 'week');
         dialog.widgets['show_season'].show = goog.array.contains(ui_data['periods'], 'season');
+        dialog.widgets['show_alltime'].show = goog.array.contains(ui_data['periods'], 'ALL');
     } else {
         dialog.widgets['show_week'].show = dialog.widgets['show_season'].show = true;
+        dialog.widgets['show_alltime'].show = false;
     }
 
-    if(period == 'week' && !dialog.widgets['show_week'].show) {
+    if(period == 'ALL' && !dialog.widgets['show_alltime'].show) {
         period = dialog.user_data['period'] = 'season';
+    } else if(period == 'week' && !dialog.widgets['show_week'].show) {
+        if(dialog.widgets['show_season'].show) {
+            period = dialog.user_data['period'] = 'season';
+        } else if(dialog.widgets['show_alltime'].show) {
+            period = dialog.user_data['period'] = 'ALL';
+        }
     } else if(period == 'season' && !dialog.widgets['show_season'].show) {
-        period = dialog.user_data['period'] = 'week';
+        if(dialog.widgets['show_week'].show) {
+            period = dialog.user_data['period'] = 'week';
+        } else if(dialog.widgets['show_alltime'].show) {
+            period = dialog.user_data['period'] = 'ALL';
+        }
     }
 
     if(mode == 'friends') {
@@ -23572,6 +23590,7 @@ function leaderboard_change_page(dialog, period, mode, chapter, page) {
     dialog.widgets['show_all'].str = dialog.data['widgets']['show_all']['ui_name'+(region_specific ? '_region': '')];
     dialog.widgets['show_week'].state = (period === 'week' ? 'active' : 'normal');
     dialog.widgets['show_season'].state = (period === 'season' ? 'active' : 'normal');
+    dialog.widgets['show_alltime'].state = (period === 'ALL' ? 'active' : 'normal');
 
     var is_contest_page = false;
     if(mode === 'all' && period === 'week' && chapter === 'quarry_resources' && player.get_event_time('current_event', 'event_quarry_contest', 'inprogress')) {

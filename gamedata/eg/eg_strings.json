@@ -173,7 +173,8 @@
         },
         "default_category": [[{"predicate": "LIBRARY", "name": "token_event_happening"}, "tokens_looted"],
                              [{"predicate": "ALWAYS_TRUE"}, "trophies_pvp"]],
-        "periods": { "week": { "title": "(This week)", "name": "Week", "short": "weekly", "brag": "This Week" },
+        "periods": { "ALL": { "title": "(All time)", "name": "All-time", "short": "all-time", "brag": "All-time" },
+                     "week": { "title": "(This week)", "name": "Week", "short": "weekly", "brag": "This Week" },
                      "season": { "title": "(Season %SEASON)", "name": "Season", "short": "season", "brag": "This Season" } },
         "current_stat": "Current %stat",
         "prev_stat": "%period %d - Ending %stat"

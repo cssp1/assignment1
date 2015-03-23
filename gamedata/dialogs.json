@@ -5402,9 +5402,9 @@
                        "text_hjustify": "left", "ui_name": "Leaders" },
             "sunken": {"kind": "StaticImage", "xy":[36,66], "dimensions":[665,372], "asset": "dialog_sunken_resizable", "bg_image_resizable": 1},
 
-            "category_button": { "kind": "ActionButton", "xy": [617,22], "dimensions": [74,32], "text_size": 13, "text_style": "bold",
+            "category_button": { "kind": "ActionButton", "xy": [627,22], "dimensions": [74,32], "text_size": 13, "text_style": "bold",
                                  "bg_image": "menu_button_resizable", "bg_image_resizable": 1, "ui_name": "",
-                                 "array": [7,1], "array_offset": [-79,0] },
+                                 "array": [7,1], "array_offset": [-77,0] },
 
             "sunken2": {"kind": "StaticImage", "xy":[38,67], "dimensions":[661,60], "asset": "dialog_sunken_gray_resizable", "bg_image_resizable":1 },
             "rankings_label": { "kind": "TextField", "xy": [48,80], "dimensions": [364, 16], "text_size": 16, "text_style": "bold",
@@ -5427,6 +5427,12 @@
                              "ui_name": "Season Total", "mouseover_sound": 1, "bg_image": "radio_button", "push_bg_image": 1, "text_offset": [23,0],
                              "bg_image_offset": [0,0]
                            },
+            // note: season and alltime are mutually exclusive
+            "show_alltime": { "kind": "ActionButton", "xy": [479,100], "dimensions": [80,18], "text_size": 13, "text_style": "thick", "text_hjustify": "left",
+                              "text_color": [1,1,1,1],
+                              "ui_name": "All Time", "mouseover_sound": 1, "bg_image": "radio_button", "push_bg_image": 1, "text_offset": [23,0],
+                              "bg_image_offset": [0,0]
+                            },
 
             "divider2": { "kind": "Line", "xy": [592, 76], "dimensions": [0, 42], "color": [0.7,0.7,0.7,0.5], "stroke_width": 1 },
 
