@@ -5591,6 +5591,9 @@
                          "text_color_complete_unnerfed": [1,0.5,0,1],
                          "text_color_incomplete": [1,1,1,1]
                        },
+            "achpts": { "kind": "TextField", "xy": [72,47], "dimensions": [346, 17], "text_size": 13,
+                        "text_hjustify": "right", "ui_name_plural": "%d Medals", "ui_name": "%d Medal"
+                      },
             "achtext": { "kind": "TextField", "xy": [72,22], "dimensions": [352, 34], "text_size": 13,
                          "text_hjustify": "left",
                          "text_color": [0.75, 0.75, 0.75, 1] },
@@ -5666,7 +5669,8 @@
             "sunken": {"kind": "StaticImage", "xy":[10,62], "dimensions":[716,405], "asset": "dialog_sunken_resizable", "bg_image_resizable":1 },
 
             "player_name": { "kind": "TextField", "xy": [238,70], "dimensions": [438, 28], "text_size": 22, "text_style": "bold",
-                             "text_hjustify": "center", "ui_name": "Loading...", "drop_shadow": 1 },
+                             "text_hjustify": "center", "ui_name": "Loading...", "ui_name_points_plural": "%d Medals", "ui_name_points": "%d Medal",
+                             "drop_shadow": 1 },
 
             "cat_sunken": {"kind": "StaticImage", "xy":[25,105], "dimensions":[176,352], "asset": "dialog_sunken_gray_resizable", "bg_image_resizable":1 },
 

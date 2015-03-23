@@ -1064,7 +1064,6 @@ PlayerInfoDialog.invoke_achievements_tab = function(parent, preselect_category, 
     dialog.widgets['ach_list'].user_data['rowdata'] = [];
     dialog.user_data['player_achievements'] = null;
 
-    dialog.widgets['player_name'].str = PlayerInfoDialog.format_name_with_level(knowledge);
     dialog.widgets['lag_note'].show = (user_id != session.user_id);
 
     // create and sort cateory list
@@ -1148,6 +1147,13 @@ PlayerInfoDialog.achievements_tab_receive = function(dialog, achdata) {
     if(!dialog.parent) { return; } // dialog got closed asynchronously
 
     dialog.user_data['player_achievements'] = achdata;
+
+    var achievement_points = get_achievement_points(achdata);
+
+    dialog.widgets['player_name'].str = PlayerInfoDialog.format_name_with_level(dialog.parent.user_data['info']);
+    if(achievement_points > 0) {
+        dialog.widgets['player_name'].str += ' - '+dialog.data['widgets']['player_name'][(achievement_points == 1 ? 'ui_name_points' : 'ui_name_points_plural')].replace('%d', pretty_print_number(achievement_points));
+    }
 
     dialog.widgets['cat_progress_bg'].show =
         dialog.widgets['cat_progress'].show =

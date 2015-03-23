@@ -23977,6 +23977,11 @@ function achievement_widget_setup(dialog, rowdata, player_achievements, player_h
     dialog.widgets['achicon'].asset = rowdata['icon'];
     col = dialog.data['widgets']['achiconbg']['color_' + (gotten ? (unnerfed ? 'yes_unnerfed' : 'yes') : 'no')];
     dialog.widgets['achiconbg'].color = SPUI.make_colorv(col);
+    var points = ('achievement_points' in rowdata ? rowdata['achievement_points'] : 0);
+    dialog.widgets['achpts'].show = (points > 0);
+    if(points > 0) {
+        dialog.widgets['achpts'].str = dialog.data['widgets']['achpts'][(points == 1 ? 'ui_name' : 'ui_name_plural')].replace('%d', pretty_print_number(points));
+    }
     if(('achhider') in dialog.widgets) { dialog.widgets['achhider'].show = !gotten; }
 }
 
@@ -33054,6 +33059,19 @@ player.current_trophy_type = function() {
     return null;
 };
 
+/** @return {number} */
+var get_achievement_points = function(player_achievements) {
+    var total = 0;
+    goog.object.forEach(player_achievements, function(props, name) {
+        var data = gamedata['achievements'][name];
+        if(!data) { return; }
+        var points = ('achievement_points' in data ? data['achievement_points'] : 0);
+        if(points > 0) {
+            total += points;
+        }
+    });
+    return total;
+};
 
 function invoke_sprobe_dialog() {
     player.record_feature_use('sprobe_dialog');
