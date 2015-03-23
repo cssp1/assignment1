@@ -601,8 +601,18 @@ class JQueryUI (PageContent):
             var store = {fields:[], data:[]};
             store.fields.push({name:'stage_name'});
             // get cohort names
+
+            // due to what seems like a bug in Ext.js that causes a syntax error on cohort names that start with "1." float-like strings,
+            // we need to sanitize the cohort names here.
+            var cohort_name = function(src) {
+                while(src.indexOf('.') != -1) {
+                  src = src.replace('.', '_');
+                }
+                return src;
+            };
+
             for(var i = 0; i < retmsg['funnel'][0]['cohorts'].length; i++) {
-                var cname = retmsg['funnel'][0]['cohorts'][i]['name'];
+                var cname = cohort_name(retmsg['funnel'][0]['cohorts'][i]['name']);
                 store.fields.push({name:cname,type:'string'});
                 store.fields.push({name:cname+'_conv',type:'string'});
                 if(show_pay_corr) {
@@ -621,21 +631,22 @@ class JQueryUI (PageContent):
                 var rec = {stage_name: stage['stage']};
                 for(var c = 0; c < stage['cohorts'].length; c++) {
                     var cohort = stage['cohorts'][c];
+                    var cname = cohort_name(cohort['name']);
                     if(cohort['N'] < 1) {
-                        rec[cohort['name']] = 'N=0';
-                        rec[cohort['name']+'_conv'] = '-';
+                        rec[cname] = 'N=0';
+                        rec[cname+'_conv'] = '-';
                     } else {
                         if('yes' in cohort) {
-                            rec[cohort['name']] = cohort['yes'].toString()+' of N='+cohort['N'].toString();
-                            rec[cohort['name']+'_conv'] = '<b>'+(100.0*cohort['yes']/cohort['N']).toFixed(1)+'%</b>';
+                            rec[cname] = cohort['yes'].toString()+' of N='+cohort['N'].toString();
+                            rec[cname+'_conv'] = '<b>'+(100.0*cohort['yes']/cohort['N']).toFixed(1)+'%</b>';
                         } else if('value' in cohort) {
-                            rec[cohort['name']] = 'N=' + cohort['N'].toString();
-                            rec[cohort['name']+'_conv'] = '<b>$'+cohort['value'].toFixed(3)+'</b>';
+                            rec[cname] = 'N=' + cohort['N'].toString();
+                            rec[cname+'_conv'] = '<b>$'+cohort['value'].toFixed(3)+'</b>';
                         }
                     }
                     if(show_pay_corr && 'mcc_with_paying' in cohort) {
-                            rec[cohort['name']+'_mcc_with_paying'] = cohort['mcc_with_paying'];
-                            rec[cohort['name']+'_mcc_with_paying_p'] = cohort['mcc_with_paying_p'];
+                            rec[cname+'_mcc_with_paying'] = cohort['mcc_with_paying'];
+                            rec[cname+'_mcc_with_paying_p'] = cohort['mcc_with_paying_p'];
                     }
                 }
                 if(stage['cohorts'].length == 2) {
@@ -682,7 +693,7 @@ class JQueryUI (PageContent):
             // set up list view columns
             var columns = [{header:'Stage', dataIndex: 'stage_name', flex:1.5}];
             for(var i = 0; i < retmsg['funnel'][0]['cohorts'].length; i++) {
-                var cname = retmsg['funnel'][0]['cohorts'][i]['name'];
+                var cname = cohort_name(retmsg['funnel'][0]['cohorts'][i]['name']);
                 columns.push({header:cname, dataIndex: cname, flex:1});
                 columns.push({header:'Conv', dataIndex: cname+'_conv', flex:0.5,
                                renderer: function(value) { return value; } });
