@@ -1151,7 +1151,7 @@ PlayerInfoDialog.achievements_tab_receive = function(dialog, achdata) {
     var achievement_points = get_achievement_points(achdata);
 
     dialog.widgets['player_name'].str = PlayerInfoDialog.format_name_with_level(dialog.parent.user_data['info']);
-    if(achievement_points > 0) {
+    if(achievement_points > 0 && player.get_any_abtest_value('enable_achievement_points', gamedata['client']['enable_achievement_points'])) {
         dialog.widgets['player_name'].str += ' - '+dialog.data['widgets']['player_name'][(achievement_points == 1 ? 'ui_name_points' : 'ui_name_points_plural')].replace('%d', pretty_print_number(achievement_points));
     }
 

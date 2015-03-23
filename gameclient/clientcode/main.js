@@ -23978,8 +23978,8 @@ function achievement_widget_setup(dialog, rowdata, player_achievements, player_h
     col = dialog.data['widgets']['achiconbg']['color_' + (gotten ? (unnerfed ? 'yes_unnerfed' : 'yes') : 'no')];
     dialog.widgets['achiconbg'].color = SPUI.make_colorv(col);
     var points = ('achievement_points' in rowdata ? rowdata['achievement_points'] : 0);
-    dialog.widgets['achpts'].show = (points > 0);
-    if(points > 0) {
+    dialog.widgets['achpts'].show = (points > 0) && player.get_any_abtest_value('enable_achievement_points', gamedata['client']['enable_achievement_points']);
+    if(dialog.widgets['achpts'].show) {
         dialog.widgets['achpts'].str = dialog.data['widgets']['achpts'][(points == 1 ? 'ui_name' : 'ui_name_plural')].replace('%d', pretty_print_number(points));
     }
     if(('achhider') in dialog.widgets) { dialog.widgets['achhider'].show = !gotten; }
