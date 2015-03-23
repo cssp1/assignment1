@@ -10662,7 +10662,7 @@ class LivePlayer(Player):
                     gamesite.exception_log.event(server_time, 'override_abtests_from_url: user %d %s GROUP %s NOT FOUND' % \
                                                  (self.user_id, test_name, group))
 
-        if self.is_developer():
+        if self.is_developer() or (not spin_secure_mode):
             if ('event_time_override' in q):
                 self.event_time_override = int(q['event_time_override'][0])
                 gamesite.exception_log.event(server_time, 'event_time_override: user %d -> %d' % \
