@@ -1938,6 +1938,7 @@ class GameProxy(proxy.ReverseProxyResource):
                 metric_event_coded(None, '0113_account_deauthorized', {'user_id': user_id})
                 # mark account as "deauthorized" by setting last_login_time=-1 in player_cache
                 db_client.player_cache_update(user_id, {'last_login_time':-1}, reason = 'FBDEAUTHAPI')
+            return ''
 
         elif self.path == '/ADMIN/':
             return admin_stats.render_html()
