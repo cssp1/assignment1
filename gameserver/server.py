@@ -229,6 +229,7 @@ SCORE_FIELDS = {
     'trophies_pve': {'history_prefix': 'trophies_pve'},
     'trophies_pvv': {'history_prefix': 'trophies_pvv'},
     'tokens_looted': {'history_prefix': 'tokens_looted'},
+    'achievement_points': {'history_prefix': 'achievement_points'},
     }
 SCORE_PERIODS = ['week', 'season']
 
@@ -8356,6 +8357,14 @@ class Player(AbstractPlayer):
 
     def level(self): return self.resources.player_level
 
+    def get_achievement_points(self):
+        total = 0
+        for name in self.achievements:
+            data = gamedata['achievements'].get(name, None)
+            if data:
+                total += data.get('achievement_points', 0)
+        return total
+
     # the official way to get a player's current ladder point count
     def ladder_points(self): return self.get_master_score('trophies_pvp')
     def trophies_pvv(self): return self.get_master_score('trophies_pvv')
@@ -11110,6 +11119,11 @@ class LivePlayer(Player):
 
         self.send_inventory_intro_mail(session, None)
         self.reseed_lottery(force = False)
+
+        # initialize achievement_points score
+        if self.history.get('achievement_points_published',0) < 1:
+            self.modify_scores({'achievement_points':self.get_achievement_points()}, method='=', reason = 'login_migrate')
+            self.history['achievement_points_published'] = 1
 
         # publish any modified scores
         self.publish_scores2(reason = 'migrate')
@@ -16441,6 +16455,8 @@ class GAMEAPI(resource.Resource):
         session.player.achievements[name] = props
         retmsg.append(["ACHIEVEMENT_CLAIMED", name, props])
         metric_event_coded(session.user.user_id, '4055_achievement_claimed', {'name': name, 'sum': session.player.get_denormalized_summary_props('brief')})
+        session.player.modify_scores({'achievement_points':session.player.get_achievement_points()}, method='=', reason = 'claim_achievement')
+
         if data.get('chat_announce', True) and \
            session.alliance_chat_channel and \
            session.player.get_any_abtest_value('chat_alliance_achievements', gamedata['chat_alliance_achievements']):

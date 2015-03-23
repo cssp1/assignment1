@@ -208,7 +208,7 @@ PlayerInfoDialog.statistics_tab_select = function(dialog, new_loc) {
     // perform the query
 
     // which stats to query - for now, hard-coded to be a subset of the ones recorded in Scores2
-    dialog.user_data['stats'] = goog.array.filter(['trophies_pvp','trophies_pvv','tokens_looted','resources_looted',
+    dialog.user_data['stats'] = goog.array.filter(['trophies_pvp','trophies_pvv','tokens_looted','achievement_points','resources_looted',
                                                    'damage_inflicted','havoc_caused','hive_kill_points','quarry_resources','strongpoint_resources'],
                                                   function(stat) { return (stat in gamedata['strings']['leaderboard']['categories']) &&
                                                                    ('group' in gamedata['strings']['leaderboard']['categories'][stat]) &&
