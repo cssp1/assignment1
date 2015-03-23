@@ -1931,6 +1931,14 @@ class GameProxy(proxy.ReverseProxyResource):
             else:
                 raise Exception('unhandled request: '+repr(request))
 
+        elif self.path == '/FBDEAUTHAPI':
+            signed_request = SpinFacebook.parse_signed_request(request.args['signed_request'][0], SpinConfig.config['facebook_app_secret'])
+            user_id = social_id_table.social_id_to_spinpunch('fb'+str(signed_request['user_id']), False)
+            if user_id:
+                metric_event_coded(None, '0113_account_deauthorized', {'user_id': user_id})
+                # mark account as "deauthorized" by setting last_login_time=-1 in player_cache
+                db_client.player_cache_update(user_id, {'last_login_time':-1}, reason = 'FBDEAUTHAPI')
+
         elif self.path == '/ADMIN/':
             return admin_stats.render_html()
 
@@ -1956,7 +1964,7 @@ class GameProxy(proxy.ReverseProxyResource):
                 ret = self.render_ROOT(request, frame_platform = 'fb')
             elif self.path == '/KGROOT':
                 ret = self.render_ROOT(request, frame_platform = 'kg')
-            elif self.path in ('/GAMEAPI', '/CREDITAPI', '/TRIALPAYAPI', '/KGAPI', '/CONTROLAPI', '/METRICSAPI', '/ADMIN/', '/PING', '/OGPAPI', '/FBRTAPI'):
+            elif self.path in ('/GAMEAPI', '/CREDITAPI', '/TRIALPAYAPI', '/KGAPI', '/CONTROLAPI', '/METRICSAPI', '/ADMIN/', '/PING', '/OGPAPI', '/FBRTAPI', '/FBDEAUTHAPI'):
                 ret = self.render_API(request)
             else:
                 ret = str('error')
@@ -2256,7 +2264,7 @@ class ProxyRoot(TwistedNoResource):
                 self.static_resources[srcfile] = UncachedJSFile('../gameclient/'+srcfile)
 
         self.proxied_resources = {}
-        for chnam in ('', 'KGROOT', 'GAMEAPI', 'METRICSAPI', 'CREDITAPI', 'TRIALPAYAPI', 'KGAPI', 'CONTROLAPI', 'ADMIN', 'OGPAPI', 'FBRTAPI', 'PING'):
+        for chnam in ('', 'KGROOT', 'GAMEAPI', 'METRICSAPI', 'CREDITAPI', 'TRIALPAYAPI', 'KGAPI', 'CONTROLAPI', 'ADMIN', 'OGPAPI', 'FBRTAPI', 'FBDEAUTHAPI', 'PING'):
             res = GameProxy('/'+chnam)
 
             # configure auth on canvas page itself (OPTIONAL now, only for demoing game outside of company)

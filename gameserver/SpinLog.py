@@ -185,6 +185,7 @@ def MetricsLogFilter(child):
     return JSONLogFilter(child,
                          # *maybe* allow stuff like authenticated_visit here, if performance impact is not bad
                          allow = [#'0115_logged_in', # obsolete - use sessions table
+                                  '0113_account_deauthorized',
                                   '0140_tutorial_oneway_ticket',
                                   '0140_tutorial_start',
                                   '0141_tutorial_start_client',
@@ -247,6 +248,7 @@ def AcquisitionsLogFilter(child):
                          allow = ['0110_created_new_account',
                                   '0111_account_lapsed', # note: written by ETL scripts, not server code, but included here for reference
                                   '0112_account_reacquired',
+                                  '0113_account_deauthorized',
                                   ])
 def InventoryLogFilter(child):
     return JSONLogFilter(child,

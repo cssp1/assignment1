@@ -127,7 +127,8 @@ if __name__ == '__main__':
                 if f in row:
                     keyvals.append(('stack', row[f]))
 
-        elif row['event_name'] in ('0140_tutorial_oneway_ticket',
+        elif row['event_name'] in ('0113_account_deauthorized',
+                                   '0140_tutorial_oneway_ticket',
                                    '0140_tutorial_start',
                                    '0141_tutorial_start_client',
                                    '0145_deploy_one_unit',
