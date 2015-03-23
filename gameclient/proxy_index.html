@@ -103,6 +103,8 @@ var spin_try_start = function(module) {
      }
 };
 
+var spin_unsupported_browser_redirect_pending = false;
+
 var spin_check_browser = function() {
     var supported = true;
     var method = null;
@@ -127,10 +129,13 @@ var spin_check_browser = function() {
     if(!supported) {
         spin_allow_start = false;
         console.log('Browser does not support '+method);
-        // delay redirect to hopefully allow metrics to fire
-        window.setTimeout(function() { location.href = spin_unsupported_browser_landing; }, 1500);
-        if(method) {
-            SPLWMetrics.send_event(spin_metrics_anon_id, '0940_unsupported_browser', add_demographics({'method':method}));
+        if(!spin_unsupported_browser_redirect_pending) {
+            spin_unsupported_browser_redirect_pending = true;
+            // delay redirect to hopefully allow metrics to fire
+            window.setTimeout(function() { location.href = spin_unsupported_browser_landing; }, 1500);
+            if(method) {
+                SPLWMetrics.send_event(spin_metrics_anon_id, '0940_unsupported_browser', add_demographics({'method':method}));
+            }
         }
     }
 
@@ -171,7 +176,7 @@ position: fixed; width: 100%; top:0; background: none;
 </style>
 </head>
 
-<body onload="if(0) { SPLWMetrics.send_event(spin_metrics_anon_id, '0021_page_load_finish', {'time_to_load_page':(new Date()).getTime()/1000 - spin_pageload_begin}); }; if(spin_check_browser()) { $ONLOAD$ }" style="margin:0px;border:0px;background:#ffffff;overflow:hidden;">
+<body onload="if(0) { SPLWMetrics.send_event(spin_metrics_anon_id, '0021_page_load_finish', {'time_to_load_page':(new Date()).getTime()/1000 - spin_pageload_begin}); }; if(spin_check_browser()) { spin_setup_startup_div(); $ONLOAD$ }" style="margin:0px;border:0px;background:#ffffff;overflow:hidden;">
 
 $FACEBOOK_SDK$
 
