@@ -20,7 +20,7 @@ def pretty_print_time(sec):
         sec -= hours*(60*60)
     return ' '.join(ret)
 
-time_re = re.compile('XXXXXX_([0-9]+)') # detect comments of the form XXXXXX_UNIXTIME
+time_re = re.compile('XXXXXX_?([0-9]+)') # detect comments of the form XXXXXX_UNIXTIME
 def six_X_comment_is_relevant(line, time_now):
     match = time_re.search(line)
     if match:
