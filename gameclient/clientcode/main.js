@@ -42387,6 +42387,11 @@ function handle_server_message(data) {
     } else if(msg == "ERROR") {
         data.shift();
         var name = data.shift();
+
+        if(!(name in gamedata['errors'])) {
+            throw Error('error info not found in gamedata: '+name);
+        }
+
         var display_title = gamedata['errors'][name]['ui_title'] || null;
         var display_string = gamedata['errors'][name]['ui_name'];
         var argument = null;
