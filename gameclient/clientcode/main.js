@@ -18520,6 +18520,12 @@ Region.prototype.check_map_integrity = function(where) {
 };
 
 Region.prototype.receive_feature_update = function(res) {
+    var preserve_locks = false;
+    if(res['preserve_locks']) {
+        preserve_locks = true;
+        delete res['preserve_locks'];
+    }
+
     var feature = this.map_index.get_by_base_id(res['base_id']);
 
     if(feature) {
@@ -18539,11 +18545,13 @@ Region.prototype.receive_feature_update = function(res) {
         } else {
             if(gamedata['territory']['check_map_integrity'] >= 2) { this.check_map_integrity('receive_feature_update, existing, update, enter'); }
 
-            // for incremental updates, a missing
-            // LOCK_STATE or protection timer means that it was dropped
-            if('LOCK_STATE' in feature) { delete feature['LOCK_STATE']; }
-            if('LOCK_OWNER' in feature) { delete feature['LOCK_OWNER']; }
-            if('protection_end_time' in feature) { delete feature['protection_end_time']; }
+            if(!preserve_locks) {
+                // for incremental updates, a missing
+                // LOCK_STATE or protection timer means that it was dropped
+                if('LOCK_STATE' in feature) { delete feature['LOCK_STATE']; }
+                if('LOCK_OWNER' in feature) { delete feature['LOCK_OWNER']; }
+                if('protection_end_time' in feature) { delete feature['protection_end_time']; }
+            }
 
             var cur_loc = feature['base_map_loc'] || null, new_loc = ('base_map_loc' in res ? res['base_map_loc'] : cur_loc);
             if((!cur_loc && new_loc) ||

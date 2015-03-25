@@ -7821,7 +7821,9 @@ class Player(AbstractPlayer):
         if not squad: return None
 
         # this is the map feature we'll send back to the client to fix any incorrect predictions
-        rollback_feature = {'base_id': self.squad_base_id(squad_id)}
+        rollback_feature = {'base_id': self.squad_base_id(squad_id),
+                            'preserve_locks':1 # tell the client not to forget lock state!
+                            }
         if not squad.get('map_loc'):
             # squad is not on the map
             rollback_feature['DELETED'] = 1
