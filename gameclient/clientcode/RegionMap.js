@@ -1839,6 +1839,7 @@ RegionMap.RegionMap.prototype.draw_feature = function(feature) {
         var label_xy = base_xy;
         var show_label = true, is_guard = false;
         var squad_sid = null, squad_id = -1;
+        var squad_pending = false; // own squad has pending orders
         var classification = this.classify_feature(feature);
 
         if(feature['base_type'] == 'squad') {
@@ -1850,6 +1851,15 @@ RegionMap.RegionMap.prototype.draw_feature = function(feature) {
             if(f && f['base_type'] == 'quarry') { is_guard = true; }
 
             //if(feature['base_landlord_id'] != session.user_id) { show_label = false; } // no labels for enemy squads
+            if(owned) {
+                var squad_data = player.squads[squad_sid];
+                if((squad_data && squad_data['pending']) ||
+                   player.squad_get_client_data(squad_id, 'move_pending') ||
+                   player.squad_get_client_data(squad_id, 'halt_pending')
+                  ) {
+                    squad_pending = true;
+                }
+            }
         }
 
         if(this.zoom > 0.05 && !is_guard && (feature['base_type'] != 'squad' || selected)) {
@@ -1919,6 +1929,12 @@ RegionMap.RegionMap.prototype.draw_feature = function(feature) {
                         GameArt.assets[assetname].states[state].draw([0,0], facing, client_time);
                     }
                     SPUI.ctx.restore();
+
+                    // show your own pending moves/halts as loading spinners
+                    if(squad_pending) {
+                        var offset = [0.5,0.4];
+                        GameArt.assets['loading_spinner'].states['normal'].draw(vec_add(moving_xy, vec_mul(offset,gamedata['territory']['cell_size'])), 0, client_time);
+                    }
 
                     // draw label at moving location
                     label_xy = moving_xy;
@@ -2042,6 +2058,11 @@ RegionMap.RegionMap.prototype.draw_feature = function(feature) {
                         }
                     }
                 }
+            }
+
+            // show your own pending moves/halts as loading spinners
+            if(!busy_asset && squad_pending && !moving) {
+                busy_asset = 'loading_spinner';
             }
 
             // never show bubble if we're showing a flame
