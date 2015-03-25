@@ -1739,21 +1739,21 @@
 
     // these need to be separate dialogs so their fade_unless_hover works right
     "crafting_dialog_scroll_left": {
-        "dimensions": [50,16],
+        "dimensions": [50,18],
         "widgets": {
             "scroll_left_bg": { "kind": "SolidRect", "xy": [12,4], "dimensions": [26,10], "color": [1,1,1,1], "alpha": 0.86,
                                 "path": [[0,10], [13,0], [26,10], [0,10]],
                                 "fade_unless_hover": 0.5 },
-            "scroll_left": { "kind": "ActionButton", "xy": [0,0], "dimensions": [50,16] }
+            "scroll_left": { "kind": "ActionButton", "xy": [0,0], "dimensions": [50,18] }
         }
     },
     "crafting_dialog_scroll_right": {
-        "dimensions": [50,16],
+        "dimensions": [50,18],
         "widgets": {
             "scroll_right_bg": { "kind": "SolidRect", "xy": [12,5], "dimensions": [26,10], "color": [1,1,1,1], "alpha": 0.86,
                                  "path": [[0,0], [26,0], [13,10], [0,0]],
                                  "fade_unless_hover": 0.5 },
-            "scroll_right": { "kind": "ActionButton", "xy": [0,0], "dimensions": [50,16] }
+            "scroll_right": { "kind": "ActionButton", "xy": [0,0], "dimensions": [50,18] }
         }
     },
     "crafting_dialog_arrow_right": {
@@ -7775,6 +7775,8 @@
         "dimensions": [60,36],
         "xy": [45,-50], // offset relative to center of left-hand edge of screen
         "margin": 4, // pixel margin at top/bottom
+        "anim_time": 0.25,
+        "vjustify": "top", // anchor to "top" or "center" of left edge
         "clip_children": 0, "transparent_to_mouse": 1,
         "widgets": {
             "bgrect": { "kind":"SolidRect", "xy":[0,0], "dimensions": [60,240], "color":[0.066,0.066,0.066,0.86], "bevel":4 },
@@ -7804,8 +7806,8 @@
                        "ui_tooltip_complete": "Click to view completed mission:\n%s",
                        //"ui_tooltip_complete": "Click to claim reward for:\n%s",
                        "array": [1,15], "array_offset": [60,60] },
-            "maximize": { "kind": "Dialog", "dialog": "crafting_dialog_scroll_right", "xy": [5,17], "dimensions": [50,16] },
-            "minimize": { "kind": "Dialog", "dialog": "crafting_dialog_scroll_left", "xy": [5,17], "dimensions": [50,16] }
+            "maximize": { "kind": "Dialog", "dialog": "crafting_dialog_scroll_right", "xy": [5,17], "dimensions": [50,18] },
+            "minimize": { "kind": "Dialog", "dialog": "crafting_dialog_scroll_left", "xy": [5,17], "dimensions": [50,18] }
         }
     },
 

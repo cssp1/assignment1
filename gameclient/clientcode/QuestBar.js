@@ -25,8 +25,27 @@ QuestBar.invoke = function() {
     var dialog_data = gamedata['dialogs']['quest_bar'];
     var dialog = new SPUI.Dialog(dialog_data);
     dialog.user_data['dialog'] = 'quest_bar';
+    dialog.user_data['maximized'] = !!player.get_any_abtest_value('quest_bar_default_maximized', gamedata['client']['quest_bar_default_maximized']);
+    dialog.user_data['start_time'] = -1; // for animation
+    dialog.user_data['start_height'] = -1;
+    dialog.widgets['maximize'].widgets['scroll_right'].onclick = function(w) { QuestBar.maximize(w.parent.parent); };
+    dialog.widgets['minimize'].widgets['scroll_left'].onclick = function(w) { QuestBar.minimize(w.parent.parent); };
     dialog.ondraw = QuestBar.update;
     return dialog;
+};
+
+QuestBar.maximize = function(dialog) {
+    if(dialog.user_data['maximized']) { return; }
+    dialog.user_data['maximized'] = true;
+    dialog.user_data['start_time'] = client_time;
+    dialog.user_data['start_height'] = dialog.wh[1];
+};
+
+QuestBar.minimize = function(dialog) {
+    if(!dialog.user_data['maximized']) { return; }
+    dialog.user_data['maximized'] = false;
+    dialog.user_data['start_time'] = client_time;
+    dialog.user_data['start_height'] = dialog.wh[1];
 };
 
 QuestBar.update = function(dialog) {
@@ -54,18 +73,45 @@ QuestBar.update = function(dialog) {
 
     var space = canvas_height - 2*margin - top;
 
-    var n_shown = Math.min(quest_list.length, dialog.data['widgets']['icon']['array'][0]*dialog.data['widgets']['icon']['array'][1]);
-    dialog.wh[1] = n_shown * dialog.data['widgets']['icon']['array_offset'][1] + dialog.data['dimensions'][1];
-    while(dialog.wh[1] > space && n_shown > 1) {
-        n_shown -= 1;
-        dialog.wh[1] -= dialog.data['widgets']['icon']['array_offset'][1];
+    var max_shown = Math.min(quest_list.length, dialog.data['widgets']['icon']['array'][1]);
+    var want_height;
+    // minimized?
+    if(!dialog.user_data['maximized']) {
+        want_height = 1 * dialog.data['widgets']['icon']['array_offset'][1] + dialog.data['dimensions'][1];
+    } else {
+        want_height = max_shown * dialog.data['widgets']['icon']['array_offset'][1] + dialog.data['dimensions'][1];
+        // drop icons until we fit in the vertical space, but don't go below 1
+        while(want_height > Math.max(space, dialog.data['widgets']['icon']['array_offset'][1] + dialog.data['dimensions'][1])) {
+            want_height -= dialog.data['widgets']['icon']['array_offset'][1];
+        }
     }
 
-    // center vertically
-    dialog.xy[1] = canvas_height_half - Math.floor(dialog.wh[1]/2);
+    // grow/shrink animation
+    var t = (dialog.user_data['start_time'] > 0 ? (client_time - dialog.user_data['start_time']) / dialog.data['anim_time'] : 1);
 
-    // don't go off the top of the screen
-    dialog.xy[1] = Math.max(dialog.xy[1], top + margin);
+    if(t >= 1) {
+        dialog.wh[1] = want_height;
+    } else {
+        dialog.wh[1] = dialog.user_data['start_height'] + Math.floor((want_height - dialog.user_data['start_height']) * t);
+    }
+
+    // limit number shown to available vertical space
+    var n_shown = max_shown;
+    while(n_shown > 1 && (dialog.data['widgets']['maximize']['xy'][1] + dialog.data['widgets']['maximize']['dimensions'][1] +
+                          n_shown * dialog.data['widgets']['icon']['array_offset'][1]) > dialog.wh[1]) {
+        n_shown -= 1;
+    }
+
+    if(dialog.data['vjustify'] == 'center') {
+        // center vertically
+        dialog.xy[1] = canvas_height_half - Math.floor(dialog.wh[1]/2);
+
+        // don't go off the top of the screen
+        dialog.xy[1] = Math.max(dialog.xy[1], top + margin);
+    } else {
+        // attach to top-left
+        dialog.xy[1] = top + margin;
+    }
 
     // cut off vertically before missions button (Valentina)
     if('desktop_bottom' in desktop_dialogs) {
@@ -83,6 +129,8 @@ QuestBar.update = function(dialog) {
     goog.array.forEach(['maximize','minimize'], function(wname) {
         dialog.widgets[wname].xy = vec_add(dialog.data['widgets'][wname]['xy'], [0, n_shown * dialog.data['widgets']['icon']['array_offset'][1]]);
     });
+    dialog.widgets['maximize'].show = !dialog.user_data['maximized'];
+    dialog.widgets['minimize'].show = dialog.user_data['maximized'];
 
     for(var y = 0; y < dialog.data['widgets']['icon']['array'][1]; y++) {
         for(var x = 0; x < dialog.data['widgets']['icon']['array'][0]; x++) {
