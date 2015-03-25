@@ -38,17 +38,51 @@ QuestBar.update = function(dialog) {
         dialog.show = true;
     }
 
-    var n_shown = Math.min(quest_list.length, dialog.data['widgets']['icon']['array'][0]*dialog.data['widgets']['icon']['array'][1]);
-    dialog.wh[1] = n_shown * dialog.data['widgets']['icon']['array_offset'][1] + dialog.data['widgets']['icon']['xy'][1];
-    while(dialog.wh[1] > canvas_height && n_shown > 1) {
-        n_shown -= 1;
-        dialog.wh[1] -=  dialog.data['widgets']['icon']['array_offset'][1];
+    // attach to left-hand side (but shift by chat frame width)
+    dialog.xy[0] = dialog.data['xy'][0] + get_console_shift();
+
+    var margin = dialog.data['margin'];
+
+    var top = 0;
+
+    // move down below aura bar to prevent overlap
+    if(('aura_bar' in desktop_dialogs) && (dialog.xy[0] + dialog.wh[0] >= desktop_dialogs['aura_bar'].get_absolute_xy()[0] - 4 * margin)) {
+        // use height of aura_timer widget to judge top since aura_bar has artificially large height
+        top = desktop_dialogs['aura_bar'].get_absolute_xy()[1] + desktop_dialogs['aura_bar'].data['widgets']['aura_timer']['xy'][1] +
+            desktop_dialogs['aura_bar'].data['widgets']['aura_timer']['dimensions'][1];
     }
+
+    var space = canvas_height - 2*margin - top;
+
+    var n_shown = Math.min(quest_list.length, dialog.data['widgets']['icon']['array'][0]*dialog.data['widgets']['icon']['array'][1]);
+    dialog.wh[1] = n_shown * dialog.data['widgets']['icon']['array_offset'][1] + dialog.data['dimensions'][1];
+    while(dialog.wh[1] > space && n_shown > 1) {
+        n_shown -= 1;
+        dialog.wh[1] -= dialog.data['widgets']['icon']['array_offset'][1];
+    }
+
+    // center vertically
+    dialog.xy[1] = canvas_height_half - Math.floor(dialog.wh[1]/2);
+
+    // don't go off the top of the screen
+    dialog.xy[1] = Math.max(dialog.xy[1], top + margin);
+
+    // cut off vertically before missions button (Valentina)
+    if('desktop_bottom' in desktop_dialogs) {
+        var missions_pos = desktop_dialogs['desktop_bottom'].widgets['missions_button'].get_absolute_xy();
+        if(dialog.xy[0] + dialog.wh[0] >= missions_pos[0] - 2 * margin) {
+            while(dialog.xy[1] + dialog.wh[1] >= missions_pos[1] && n_shown > 1) {
+                n_shown -= 1;
+                dialog.wh[1] -= dialog.data['widgets']['icon']['array_offset'][1];
+            }
+        }
+    }
+
     dialog.widgets['bgrect'].wh[1] = dialog.wh[1];
 
-    // center vertically, and attach to left-hand side
-    dialog.xy = vec_add(dialog.data['xy'], [get_console_shift(), canvas_height_half - Math.floor(dialog.wh[1]/2)]);
-    dialog.xy[1] = Math.max(dialog.xy[1], 0); // don't go off the top of the screen
+    goog.array.forEach(['maximize','minimize'], function(wname) {
+        dialog.widgets[wname].xy = vec_add(dialog.data['widgets'][wname]['xy'], [0, n_shown * dialog.data['widgets']['icon']['array_offset'][1]]);
+    });
 
     for(var y = 0; y < dialog.data['widgets']['icon']['array'][1]; y++) {
         for(var x = 0; x < dialog.data['widgets']['icon']['array'][0]; x++) {
