@@ -65,7 +65,11 @@ FBSendRequests.invoke_send_gifts_dialog_v2 = function(to_user, reason, info_list
 
     dialog.widgets['send_button'].onclick = function(w) {
         var dialog = w.parent;
-        var rowdata = dialog.user_data['rowdata'];
+
+        if(!dialog) { throw Error('no dialog!'); }
+        if(!dialog.user_data['recipients']) {
+            throw Error('no recipients! rowdata '+dialog.user_data['rowdata'].length);
+        }
 
         var recipient_user_ids = goog.array.map(goog.object.getKeys(dialog.user_data['recipients']),
                                                 // this returns strings, so coerce back to integers
@@ -282,7 +286,7 @@ FBSendRequests.FBSendRequestsDialogV2.receive_giftable_friends = function(dialog
 
     // do what Throne Rush does and just immediately go with the first 50 people!
     var instant = dialog.user_data['instant'];
-    if(response.length && instant > 0) {
+    if(response.length >= 1 && instant >= 1) {
         for(var i = 0; i < Math.min(instant, response.length); i++) {
             dialog.user_data['recipients'][response[i]['user_id']] = 1;
         }
