@@ -8,17 +8,23 @@ import re, os
 import time, calendar, urllib
 import SpinJSON
 
+
+# Unfortuantely the load() functions duplicate much of what preprocess.py does. We should eventually unify them.
+
 # regular expression that matches C++-style comments (see gamedata/preprocess.py for a better explanation)
 comment_remover = re.compile('(?<!tp:|ps:|: "|":"|=\\\\")//.*?$')
-include_detector = re.compile('@"([^"]+)"')
+slurp_detector = re.compile('@"([^"]+)"')
+include_detector = re.compile('^#include "(.+)"')
+include_stripped_detector = re.compile('^#include_stripped "(.+)"')
 
-def load_fd(fd, stripped = False, verbose = False):
+# returns UTF8 string
+def load_fd_raw(fd, stripped = False, verbose = False, path = None):
     js = ''
     contents_cache = {}
     for line in fd:
         line = comment_remover.sub('', line)
         # look for @"filename" and replace with "contents-of-that-file"
-        match = include_detector.search(line)
+        match = slurp_detector.search(line)
         if match:
             filename = match.group(1).replace('$HOME', os.getenv('HOME'))
             if filename in contents_cache:
@@ -32,14 +38,33 @@ def load_fd(fd, stripped = False, verbose = False):
                     contents = '' # silently continue with empty field
 
                 contents_cache[filename] = contents
-            line = include_detector.sub('"'+contents+'"', line)
+            line = slurp_detector.sub('"'+contents+'"', line)
+
+        # detect #include directives
+        include_match = include_detector.search(line)
+        include_stripped_match = include_stripped_detector.search(line)
+        match = include_match or include_stripped_match
+        if match:
+            assert path
+
+            # get the name of the file to include from the regular expression
+            filename = os.path.join(path, match.group(1))
+
+            # replace the line with the contents of the included file
+            line = load_fd_raw(open(filename), stripped = (match is include_stripped_match), path = os.path.dirname(filename))
+
         js += line
     if stripped:
         js = '{'+js+'}'
-    return SpinJSON.loads(js)
+    return js
+
+# returns JSON object
+def load_fd(fd, stripped = False, verbose = False, path = None):
+    raw = load_fd_raw(fd, stripped, verbose, path)
+    return SpinJSON.loads(raw)
 
 def load(filename, stripped = False, verbose = False):
-    return load_fd(open(filename), stripped = stripped, verbose = verbose)
+    return load_fd(open(filename), stripped = stripped, verbose = verbose, path = os.path.dirname(filename))
 
 def gameserver_dir():
     e = os.getenv('SPIN_GAMESERVER')
