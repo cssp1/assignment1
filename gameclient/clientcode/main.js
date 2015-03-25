@@ -31215,15 +31215,18 @@ function update_missions_dialog(dialog) {
 // set scroll position, shifting selection to keep it visible
 function missions_dialog_scroll(dialog, first_row) {
     // constrain first_row to valid range
-    first_row = Math.max(Math.min(first_row, player.active_quests.length - 1), 0);
+    first_row = Math.max(Math.min(first_row, dialog.user_data['quest_list'].length - 1), 0);
     // quantize first_row to pages
     first_row = Math.floor(first_row/dialog.user_data['visible_rows'])*dialog.user_data['visible_rows'];
     dialog.user_data['first_row'] = first_row;
 
     // fill in UI quest list at left-hand side of dialog
     var ui_row = 0;
-    for(var i = first_row; i < player.active_quests.length; i++) {
+    for(var i = first_row; i < dialog.user_data['quest_list'].length; i++) {
         var quest = dialog.user_data['quest_list'][i];
+        if(!quest) {
+            throw Error('first_row '+first_row.toString()+' active_quests ' + player.active_quests.length.toString() + ' quest_list '+dialog.user_data['quest_list'].length.toString());
+        }
         var rowname = 'row'+ui_row.toString();
         dialog.widgets[rowname].show = true;
         dialog.widgets[rowname].str = quest['ui_name'];
