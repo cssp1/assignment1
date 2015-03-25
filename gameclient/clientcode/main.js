@@ -9501,6 +9501,9 @@ function init_desktop_dialogs() {
         }
     }
 
+    // we want to add these dialogs to SPUI.root in order, but underneath anything already there
+    var root_next = SPUI.root.children.length > 0 ? SPUI.root.children[0] : null;
+
     // top dialog
     var dialog_name;
     if(session.home_base) {
@@ -9516,7 +9519,7 @@ function init_desktop_dialogs() {
         // defensive battle bars
         var defensive_battle_bars = invoke_defensive_battle_bars();
         desktop_dialogs['defensive_battle_bars'] = defensive_battle_bars;
-        SPUI.root.add(defensive_battle_bars);
+        SPUI.root.add_before(root_next, defensive_battle_bars);
     }
 
     var enable_control_buttons = (!session.has_attacked &&
@@ -9553,12 +9556,12 @@ function init_desktop_dialogs() {
         if(session.viewing_base.base_landlord_id != session.user_id) {
             var enemy_portrait_dialog = invoke_enemy_portrait_dialog();
             desktop_dialogs['enemy_portrait_dialog'] = enemy_portrait_dialog;
-            SPUI.root.add(enemy_portrait_dialog);
+            SPUI.root.add_before(root_next, enemy_portrait_dialog);
 
             var enemy_resource_bars = new SPUI.Dialog(gamedata['dialogs']['enemy_resource_bars']);
             enemy_resource_bars.ondraw = update_enemy_resource_bars;
             desktop_dialogs['enemy_resource_bars'] = enemy_resource_bars;
-            SPUI.root.add(enemy_resource_bars);
+            SPUI.root.add_before(root_next, enemy_resource_bars);
 
             init_playfield_speed_bar();
         }
@@ -9609,12 +9612,12 @@ function init_desktop_dialogs() {
 
     // the desktop_top ondraw function goes and updates ALL desktop dialogs
     dialog.ondraw = update_desktop_dialogs;
-    SPUI.root.add(dialog);
+    SPUI.root.add_before(root_next, dialog);
 
     // player portrait
     var player_portrait_dialog = invoke_player_portrait_dialog();
     desktop_dialogs['player_portrait_dialog'] = player_portrait_dialog;
-    SPUI.root.add(player_portrait_dialog);
+    SPUI.root.add_before(root_next, player_portrait_dialog);
 
     // aura bar
     // IMPORTANT - must be added AFTER player_portrait_dialog because its ondraw needs to read the portrait's position
@@ -9622,7 +9625,7 @@ function init_desktop_dialogs() {
     aura_bar.transparent_to_mouse = true;
     desktop_dialogs['aura_bar'] = aura_bar;
     aura_bar.ondraw = update_aura_bar;
-    SPUI.root.add(aura_bar);
+    SPUI.root.add_before(root_next, aura_bar);
 
     // combat resource bars
     if(!session.home_base) {
@@ -9664,7 +9667,7 @@ function init_desktop_dialogs() {
     dialog = new SPUI.Dialog(gamedata['dialogs'][dialog_name]);
     dialog.transparent_to_mouse = true;
     desktop_dialogs['desktop_bottom'] = dialog;
-    SPUI.root.add(dialog);
+    SPUI.root.add_before(root_next, dialog);
 
     if(session.home_base) {
         if(session.has_attacked) {
@@ -9747,7 +9750,7 @@ function init_desktop_dialogs() {
         var attack_button_dialog = new SPUI.Dialog(gamedata['dialogs']['attack_button_dialog']);
         desktop_dialogs['attack_button_dialog'] = attack_button_dialog;
         attack_button_dialog.ondraw = update_attack_button_dialog;
-        SPUI.root.add(attack_button_dialog);
+        SPUI.root.add_before(root_next, attack_button_dialog);
     }
 
     // chat frame
@@ -9757,7 +9760,7 @@ function init_desktop_dialogs() {
     }
 
     if(session.home_base && !session.has_attacked) {
-        SPUI.root.add(global_chat_frame);
+        SPUI.root.add_before(root_next, global_chat_frame);
         global_chat_frame.show = (player.tutorial_state === "COMPLETE");
 
         if(player.tutorial_state === "COMPLETE" && player.get_any_abtest_value('enable_desktop_quest_bar', gamedata['client']['enable_desktop_quest_bar'])) {
@@ -15440,7 +15443,7 @@ function tutorial_step(clear_nonmodal_ui) {
     }
 
     if(player.tutorial_state === "COMPLETE") {
-        global_chat_frame.show = true;
+        init_desktop_dialogs(); // refresh desktop dialog show settings
         return;
     }
 

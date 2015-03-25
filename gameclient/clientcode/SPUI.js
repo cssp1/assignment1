@@ -256,7 +256,13 @@ SPUI.Container.prototype.add_at_index = function(elem, i) {
     return elem;
 };
 
+// add a new child before other child "bef"
+// if "bef" is null, add at end of list.
 SPUI.Container.prototype.add_before = function(bef, elem) {
+    if(!bef) {
+        this.add(elem); return;
+    }
+
     for(var i = 0; i < this.children.length; i++) {
         var p = this.children[i];
         if(p === bef) {
