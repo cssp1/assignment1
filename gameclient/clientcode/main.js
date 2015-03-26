@@ -42225,6 +42225,8 @@ function handle_server_message(data) {
         do_unsupported_browser_redirect(data.length > 1 ? data[1] : null);
     } else if(msg == "ACCOUNT_BANNED") {
         do_account_banned_redirect();
+    } else if(msg == "PUSH_PREFERENCES") {
+        player.preferences = data[1] || {};
     } else if(msg == "PUSH_GAMEDATA") {
         var new_gamedata_str = data[1];
         var new_abtests = data[2];

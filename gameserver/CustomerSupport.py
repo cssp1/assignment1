@@ -158,6 +158,35 @@ class HandleChatUnofficial(Handler):
         if 'chat_official' in player: del player['chat_official']
         return ReturnValue(result = 'ok')
 
+class HandleChatBlockOrUnblock(Handler):
+    def do_exec_online(self, session, retmsg):
+        other_id = int(self.args['other_id'])
+        assert other_id != session.player.user_id
+        if session.player.player_preferences is None:
+            session.player.player_preferences = {}
+        self._do(session.player.player_preferences, other_id)
+        retmsg.append(["PUSH_PREFERENCES", session.player.player_preferences])
+        return ReturnValue(result = 'ok')
+    def do_exec_offline(self, user, player):
+        other_id = int(self.args['other_id'])
+        assert other_id != user['user_id']
+        if ('player_preferences' not in player) or (player['player_preferences'] is None):
+            player['player_preferences'] = {}
+        self._do(player['player_preferences'], other_id)
+        return ReturnValue(result = 'ok')
+
+class HandleChatBlock(HandleChatBlockOrUnblock):
+    def _do(self, prefs, other_id):
+        if 'blocked_users' not in prefs:
+            prefs['blocked_users'] = []
+        if other_id not in prefs['blocked_users']:
+            prefs['blocked_users'].append(other_id)
+class HandleChatUnblock(HandleChatBlockOrUnblock):
+    def _do(self, prefs, other_id):
+        if 'blocked_users' in prefs:
+            if other_id in prefs['blocked_users']:
+                prefs['blocked_users'].remove(other_id)
+
 class HandleClearCooldown(Handler):
     def do_exec_online(self, session, retmsg):
         if self.args['name'] == 'ALL':
@@ -264,6 +293,8 @@ methods = {
     'make_developer': HandleMakeDeveloper,
     'unmake_developer': HandleUnmakeDeveloper,
     'clear_alias': HandleClearAlias,
+    'chat_block': HandleChatBlock,
+    'chat_unblock': HandleChatUnblock,
     'chat_official': HandleChatOfficial,
     'chat_unofficial': HandleChatUnofficial,
     'clear_lockout': HandleClearLockout,

@@ -299,6 +299,30 @@ var method_chat_unofficial = function() {
         send_request('player', 'chat_unofficial', $.extend(ident, {}), function(result) { alert("Success!"); });
     }
 };
+
+var method_chat_block_or_unblock = function(other_id, method_name) {
+    var ident = get_ident();
+    var ui_reason = check_ui_reason($("#chat_reason")[0].value);
+    if(ident && ui_reason) {
+        if(!ident['user_id']) {
+            display_error('Please look up this player by User ID');
+            return;
+        }
+        if(!other_id) {
+            display_error('Please fill in the ID of the other player you want to block/unblock');
+            return;
+        }
+        send_request('player', method_name, $.extend(ident, {'other_id': other_id, 'ui_reason': ui_reason}), (function (_method_name, _my_id, _other_id, _ui_reason) { return function(result) {
+            send_request('player', _method_name, {'user_id': _other_id, 'other_id': _my_id, 'ui_reason': _ui_reason}, (function (__method_name, __my_id, __other_id) { return function(result) {
+                alert({'chat_block':"Blocked", 'chat_unblock':"Unblocked"}[__method_name]+" communication between players "+
+                      __my_id.toString()+" and "+__other_id.toString()+"!");
+            }; })(_method_name, _my_id, _other_id));
+        }; })(method_name, ident['user_id'], other_id, ui_reason));
+    }
+};
+var method_chat_block = function(other_id) { method_chat_block_or_unblock(other_id, 'chat_block'); };
+var method_chat_unblock = function(other_id) { method_chat_block_or_unblock(other_id, 'chat_unblock'); };
+
 var method_clear_lockout = function() {
     var ident = get_ident();
     var ui_reason = check_ui_reason($("#cooldown_reason")[0].value);
@@ -1083,6 +1107,7 @@ $(function() {
     $('#lookup_output').elastic();
     $('#send_message_body').elastic();
     $('#chat_gag_duration').spinner({max:240, min:1, step:1});
+    $('#chat_block_other_id').spinner({min:0, step:1});
     $('#gamebucks_amount').spinner({max:50000, min:0, step:100});
     $('#item_to_give_qty').spinner({max:50, min:1, step:1});
     spin_giveable_items.forEach(function(entry) {
@@ -1170,6 +1195,10 @@ $(function() {
       <button onclick="method_chat_gag($('#chat_gag_duration').spinner('value')*3600)" class="spin_button">Mute (Temporary)</button>
       <button onclick="method_chat_gag(-1)" class="spin_button">Mute (Permanent)</button><p>
       <button onclick="method_clear_alias()" class="spin_button">Clear Alias</button><p>
+      Other Player ID: <input type="text" id="chat_block_other_id" name="chat_block_other_id">
+        <button onclick="method_chat_block($('#chat_block_other_id').spinner('value'))" class="spin_button" style="width:200px;">Block Communication</button>
+        <button onclick="method_chat_unblock($('#chat_block_other_id').spinner('value'))" class="spin_button" style="width:200px;">Unblock Communication</button>
+      <p>
       <p>
       Reason for this action:
       <br>
