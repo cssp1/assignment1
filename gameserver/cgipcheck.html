@@ -162,6 +162,12 @@ var get_ident = function() {
     }
 };
 
+var pretty_ident = function(ident) {
+    if('user_id' in ident) { return 'User ID '+ident['user_id'].toString(); }
+    if('facebook_id' in ident) { return 'Facebook ID '+ident['facebook_id'].toString(); }
+    return 'unknown ident';
+};
+
 var check_ui_reason = function(reason) {
     if(!reason || reason.length < 1) {
         display_error('Please type the reason you are taking this action in the "Reason" field');
@@ -323,6 +329,35 @@ var method_chat_block_or_unblock = function(other_id, method_name) {
 var method_chat_block = function(other_id) { method_chat_block_or_unblock(other_id, 'chat_block'); };
 var method_chat_unblock = function(other_id) { method_chat_block_or_unblock(other_id, 'chat_unblock'); };
 
+var method_chat_get = function() {
+    var ident = get_ident();
+    if(ident) {
+        var time_now = (new Date()).getTime()/1000;
+        send_request('chat', 'get', $.extend(ident, {'start_time':Math.floor(time_now - 7*86400)}), (function (ui_ident) { return function(result) {
+            display_chat_messages(ui_ident, result);
+        }; })(pretty_ident(ident)));
+    }
+};
+// the server returns an array of raw JSON for chat messages - convert to GUI form
+var display_chat_messages = function(ui_ident, result) {
+    var lines = ['Chat messages sent by '+ui_ident+' in last week (newest at top)',
+                 '',
+                 pad_string('TIME',20)+' '+pad_string('CHANNEL',16)+' MESSAGE'];
+    var show_templates = ['default', 'turf_winner', 'official'];
+    result.forEach(function(r) {
+        if(!r['sender']['chat_name']) { return; } // non-text message
+        var template = r['sender']['type'] || 'default';
+        if(show_templates.indexOf(template) < 0) { return; } // non-typed message
+        var sender_name = r['sender']['chat_name'];
+        if('alliance_tag' in r['sender']) {
+            sender_name += ' ['+r['sender']['alliance_tag']+']';
+        }
+        var s = pretty_print_ts(r['time']) + ' ' + pad_string(r['channel'],16) + ' ' + sender_name + ': ' + r['text'];
+        lines.push(s);
+    });
+    window.open('data:text/plain,'+encodeURIComponent(lines.join('\n')), '_blank');
+};
+
 var method_clear_lockout = function() {
     var ident = get_ident();
     var ui_reason = check_ui_reason($("#cooldown_reason")[0].value);
@@ -374,6 +409,15 @@ var log_entry_time = function(entry) {
 // prettify timestamps for GUI
 var pretty_print_ts = function(ts) {
     return (new Date(ts*1000)).toUTCString().slice(5,25);
+};
+
+// pad string with spaces
+var pad_string = function(s, len) {
+    var ret = s;
+    while(ret.length < len) {
+        ret += ' ';
+    }
+    return ret;
 };
 
 // return pretty HTML version of log entry
@@ -1167,7 +1211,7 @@ $(function() {
 
 <div id="per_player" style="position:relative;display:none;">
 
-<div style="position:absolute;top:5px;right:5px;"><button onclick="method_get_raw_player()" style="width:150px;height:30px;">Get PlayerDB File</button></div>
+<div style="position:absolute;top:5px;right:5px;"><button onclick="method_get_raw_player()" style="width:200px;height:30px;">Get PlayerDB File</button></div>
 <textarea id="lookup_output" readonly style="width:100%;height:10%;font-family:monospace;font-size:12px;"></textarea>
 
 <hr>
@@ -1190,15 +1234,16 @@ $(function() {
       <input type="text" id="give_gamebucks_reason" style="width:500px;">
     </div>
     <div id="player_tools_chat_gag">
+      <button onclick="method_chat_get()" class="spin_button" style="width:200px;">Get Recent Messages</button><p>
       <button onclick="method_chat_ungag()" class="spin_button">Unmute</button>
       Duration: <input type="text" id="chat_gag_duration" name="chat_gag_duration" value="12"> Hours
       <button onclick="method_chat_gag($('#chat_gag_duration').spinner('value')*3600)" class="spin_button">Mute (Temporary)</button>
       <button onclick="method_chat_gag(-1)" class="spin_button">Mute (Permanent)</button><p>
-      <button onclick="method_clear_alias()" class="spin_button">Clear Alias</button><p>
       Other Player ID: <input type="text" id="chat_block_other_id" name="chat_block_other_id">
         <button onclick="method_chat_block($('#chat_block_other_id').spinner('value'))" class="spin_button" style="width:200px;">Block Communication</button>
         <button onclick="method_chat_unblock($('#chat_block_other_id').spinner('value'))" class="spin_button" style="width:200px;">Unblock Communication</button>
       <p>
+      <button onclick="method_clear_alias()" class="spin_button">Clear Alias</button><p>
       <p>
       Reason for this action:
       <br>

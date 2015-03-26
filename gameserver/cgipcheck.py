@@ -253,6 +253,19 @@ def do_action(path, method, args, spin_token_data, nosql_client):
             else:
                 raise Exception('unknown scm method '+method)
 
+        elif path[0] == 'chat':
+            # non-player-specific chat methods
+            if method == 'get':
+                qs = {'time': {'$gte':int(args['start_time'])},
+                      'sender.user_id': int(args['user_id'])
+                      }
+                if 'end_time' in args:
+                    qs['time']['$lt'] = int(args['end_time'])
+
+                result = {'result': list(nosql_client.chat_buffer_table().find(qs, {'_id':0,'channel':1,'sender':1,'text':1,'time':1}).sort([('time',-1)]).limit(1000))}
+            else:
+                raise Exception('unknown '+path[0]+' method '+method)
+
         elif path[0] == 'logs':
             # log retrieval methods
             check_role(spin_token_data, 'ADMIN')
