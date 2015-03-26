@@ -5186,6 +5186,11 @@ class GameObject:
     def is_inert(self):
         return self.spec.kind == 'inert'
 
+    def cost_to_repair(self, player):
+        return self.spec.cost_to_repair(self.level, self.hp/float(self.max_hp), player)
+    def time_to_repair(self, player):
+        return self.cost_to_repair(player)['time']
+
 class Mobile(GameObject):
     def __init__(self, obj_id, spec, owner, x, y, hp, level, build_finish_time, auras):
         GameObject.__init__(self, obj_id, spec, owner, x, y, hp, level, build_finish_time, auras)
@@ -5213,10 +5218,6 @@ class Mobile(GameObject):
                 gamesite.exception_log.event(server_time, 'Mobile orders that are not a list: %s' % repr(orders))
         self.patrol = int(not (not state.get('patrol', None)))
         self.squad_id = state.get('squad_id', None)
-    def cost_to_repair(self, player):
-        return self.spec.cost_to_repair(self.level, self.hp/float(self.max_hp), player)
-    def time_to_repair(self, player):
-        return self.cost_to_repair(player)['time']
 
     # reposition in middle of map, used for deploying squad units that don't have positions yet
     def ensure_mobile_position(self, base_ncells):
@@ -12925,8 +12926,7 @@ class Store:
                     if obj.is_repairing():
                         repair_time = obj.repair_finish_time - server_time
                     else:
-                        health = float(obj.hp) / obj.max_hp
-                        repair_time = int((1.0-health)*obj.get_leveled_quantity(obj.spec.repair_time))
+                        repair_time = obj.time_to_repair(session.player)
 
                     if repair_time < 0:
                         repair_time = 0
@@ -18429,9 +18429,7 @@ class GAMEAPI(resource.Resource):
                 if object.owner is not session.player: continue
                 if object.is_building() and object.is_damaged():
                     if (not object.is_repairing()):
-                        health = float(object.hp) / float(object.max_hp)
-                        health = max(0.0, min(health, 1.0))
-                        repair_time = max(1, int((1.0-health)*object.get_leveled_quantity(object.spec.repair_time)))
+                        repair_time = object.time_to_repair(session.player)
                         object.repair_finish_time = server_time + repair_time
                         object.disarmed = True
                         if session.has_object(object.obj_id) and (retmsg is not None):
