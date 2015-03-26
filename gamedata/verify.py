@@ -2032,6 +2032,9 @@ def check_ai_base_contents(strid, base, owner, base_type):
                 max_level = -1
                 if KIND == 'buildings' and ('%RESOURCE' not in item['spec']):
                     spec = gamedata['buildings'][item['spec']]
+                    if spec.get('error',False):
+                        error |= 1; print 'ERROR: AI base %s has an invalid building %s' % (strid, spec['name'])
+
                     max_level = len(spec['build_time'])
                     is_storage = False
                     # is_producer = False
