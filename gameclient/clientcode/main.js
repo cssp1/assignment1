@@ -14029,7 +14029,7 @@ function init_dialog_repair_buttons(dialog, base_damage) {
                 // client-side predict
                 var health = (obj.hp) / (1.0*obj.max_hp);
                 health = Math.max(0.0, Math.min(health, 1.0))
-                var repair_time = Math.max(1, Math.floor((1.0-health)*obj.get_leveled_quantity(obj.spec['repair_time'])));
+                var repair_time = Math.max(1, Math.floor((1.0-health)*(obj.get_leveled_quantity(obj.spec['repair_time'])/obj.get_stat('repair_speed',1))))
                 obj.repair_finish_time = server_time + repair_time;
                 obj.update_all_actions(server_time);
             }
@@ -38777,7 +38777,7 @@ Store.get_base_price = function(unit_id, spell, spellarg, ignore_error) {
                     repair_time = obj.repair_finish_time - server_time;
                 } else {
                     var health = (1.0*obj.hp) / obj.max_hp;
-                    repair_time = Math.floor((1-health) * obj.get_leveled_quantity(obj.spec['repair_time']));
+                    repair_time = Math.floor((1-health) * (obj.get_leveled_quantity(obj.spec['repair_time'])/obj.get_stat('repair_speed',1)));
                 }
                 if(repair_time < 0) { repair_time = 0; }
                 sum_time += repair_time;
@@ -45984,7 +45984,7 @@ function draw_building_or_inert(obj, powerfac) {
     }
 
     if(obj.is_building() && obj.is_repairing()) {
-        var progress = 1 + (server_time - obj.repair_finish_time)/obj.get_leveled_quantity(obj.spec['repair_time']);
+        var progress = 1 + (server_time - obj.repair_finish_time)/(obj.get_leveled_quantity(obj.spec['repair_time'])/obj.get_stat('repair_speed',1));
         if(progress >= 1) {
             progress = 1;
             // ping server to see if it's been repaired
@@ -47087,7 +47087,7 @@ function draw_health_bar(xy, obj) {
 
     if(obj.is_building() && obj.is_repairing()) {
         // estimate HP level
-        var rep = 1 + (server_time - obj.repair_finish_time)/obj.get_leveled_quantity(obj.spec['repair_time']);
+        var rep = 1 + (server_time - obj.repair_finish_time)/(obj.get_leveled_quantity(obj.spec['repair_time'])/obj.get_stat('repair_speed',1));
         hp = Math.floor(/*(1-rep)*obj.hp + */ rep*max_hp);
     }
 

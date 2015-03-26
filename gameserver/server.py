@@ -2686,8 +2686,8 @@ class DamageLog(object):
 
             if ('cur_health' not in entry): continue # no change
             spec = GameObjectSpec.lookup(entry['spec'])
-            orig_cost = spec.cost_to_repair(entry['level'], entry['orig_health'], self.observer)
-            cur_cost = spec.cost_to_repair(entry['level'], entry['cur_health'], self.observer)
+            orig_cost = spec.cost_to_repair(entry['level'], entry['orig_health'], self.observer, obj_id)
+            cur_cost = spec.cost_to_repair(entry['level'], entry['cur_health'], self.observer, obj_id)
 
             # ignore trivial amounts of building damage (<=10sec to repair)
             if spec.kind == 'building' and len(cur_cost) == 1 and cur_cost.get('time',0) <= 10: continue
@@ -4719,7 +4719,10 @@ class GameObjectSpec(Spec):
     def get_research_categories(self, player):
         return self.research_categories
 
-    def cost_to_repair(self, level, hp_ratio, player):
+    # obj_id is needed to look up any building modstats that affect repair time
+    # (XXXXXX this awkwardly reaches into player.stattab.modded_buildings - might need to fix later by passing the Building instance itself,
+    # or a speed_factor, but that complicates DamageLog.finalize()...)
+    def cost_to_repair(self, level, hp_ratio, player, obj_id = None):
         if self.kind == 'mobile':
             if self.resurrectable or hp_ratio > 0:
                 cost_ratio = self.unit_repair_resources if self.unit_repair_resources >= 0 else player.get_any_abtest_value('unit_repair_resources', gamedata['unit_repair_resources'])
@@ -4740,7 +4743,12 @@ class GameObjectSpec(Spec):
             ret['time'] = max(1, int(time_ratio * health_ratio * self.get_leveled_quantity(self.build_time, level) / float(spd)))
             return ret
         elif self.kind == 'building':
-            return {'time': max(1, int((1.0-hp_ratio)*self.get_leveled_quantity(self.repair_time, level)))}
+            repair_time = self.get_leveled_quantity(self.repair_time, level)
+            speed_factor = 1
+            if obj_id and (obj_id in player.stattab.modded_buildings):
+                modstats = player.stattab.modded_buildings[obj_id].modstats
+                speed_factor = ModChain.get_stat(modstats.get('repair_speed', None), 1)
+            return {'time': max(1, int((1.0-hp_ratio)*(repair_time/speed_factor)))}
         else:
             raise Exception('unknown kind '+self.kind)
 
@@ -5187,7 +5195,7 @@ class GameObject:
         return self.spec.kind == 'inert'
 
     def cost_to_repair(self, player):
-        return self.spec.cost_to_repair(self.level, self.hp/float(self.max_hp), player)
+        return self.spec.cost_to_repair(self.level, self.hp/float(self.max_hp), player, self.obj_id)
     def time_to_repair(self, player):
         return self.cost_to_repair(player)['time']
 
@@ -5435,7 +5443,7 @@ class Building(GameObject):
         # because it needs to go through the power_changed path etc.
         if self.repair_finish_time > 0:
             # bump hp up to what it should be after the elapsed time
-            percent_unrepaired = float(self.repair_finish_time - server_time) / self.get_leveled_quantity(self.spec.repair_time)
+            percent_unrepaired = float(self.repair_finish_time - server_time) / (self.get_leveled_quantity(self.spec.repair_time) / self.get_stat('repair_speed', 1))
 
             # do not let hp == self.max_hp, since that will make is_damaged() false and throw off other code
             max_hp = self.max_hp - 1
