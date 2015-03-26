@@ -498,7 +498,8 @@
         "CONQUESTS": { "ui_name": "%d Conquests", "ui_progress": "%d1/%d2 Conquests" },
         "HAS_ATTACKED": { "ui_name": "You must be in combat to do this" },
         "HAS_DEPLOYED": { "ui_name": "You must be in combat and have deployed units to do this" },
-        "HAS_TITLE": { "ui_name": "Unlock title: %s" }
+        "HAS_TITLE": { "ui_name": "Unlock title: %s" },
+        "PLAYER_LEVEL": { "ui_name": "Achieve Level %d" }
     },
 
     // HTML to override what goes in the spin_footer_linkbar div

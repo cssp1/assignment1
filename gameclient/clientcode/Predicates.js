@@ -1477,6 +1477,20 @@ HasTitlePredicate.prototype.do_ui_describe = function(player) {
 
 /** @constructor
   * @extends Predicate */
+function PlayerLevelPredicate(data) {
+    goog.base(this, data);
+    this.level = data['level'];
+}
+goog.inherits(PlayerLevelPredicate, Predicate);
+PlayerLevelPredicate.prototype.is_satisfied = function(player, qdata) {
+    return (player.level() >= this.level);
+};
+PlayerLevelPredicate.prototype.do_ui_describe = function(player) {
+    return new PredicateUIDescription(gamedata['strings']['predicates'][this.kind]['ui_name'].replace('%d', this.level.toString()));
+};
+
+/** @constructor
+  * @extends Predicate */
 function LadderPlayerPredicate(data) {
     goog.base(this, data);
 }
@@ -1665,6 +1679,8 @@ function read_predicate(data) {
         return new HasAliasPredicate(data);
     } else if(kind === 'HAS_TITLE') {
         return new HasTitlePredicate(data);
+    } else if(kind === 'PLAYER_LEVEL') {
+        return new PlayerLevelPredicate(data);
     } else if(kind === 'BASE_SIZE') {
         return new BaseSizePredicate(data);
     } else if(kind === 'HOME_REGION') {

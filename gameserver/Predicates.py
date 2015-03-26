@@ -700,6 +700,13 @@ class HasTitlePredicate(Predicate):
     def is_satisfied(self, player, qdata):
         return player.unlocked_titles and (self.name in player.unlocked_titles)
 
+class PlayerLevelPredicate(Predicate):
+    def __init__(self, data):
+        Predicate.__init__(self, data)
+        self.level = data['level']
+    def is_satisfied(self, player, qdata):
+        return player.level() >= self.level
+
 class NewBirthdayPredicate(Predicate):
     def __init__(self, data):
         Predicate.__init__(self, data)
@@ -898,6 +905,8 @@ def read_predicate(data):
         return HasTitlePredicate(data)
     elif kind == 'HAS_ALIAS':
         return HasAliasPredicate(data)
+    elif kind == 'PLAYER_LEVEL':
+        return PlayerLevelPredicate(data)
     elif kind == 'LADDER_PLAYER':
         return LadderPlayerPredicate(data)
     elif kind == 'IS_IN_ALLIANCE':

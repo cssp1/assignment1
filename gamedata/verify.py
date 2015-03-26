@@ -1333,7 +1333,7 @@ PREDICATE_TYPES = set(['AND', 'OR', 'NOT', 'ALWAYS_TRUE', 'ALWAYS_FALSE', 'TUTOR
                    'FACEBOOK_LIKES_CLIENT', 'PRICE_REGION', 'COUNTRY', 'COUNTRY_TIER', 'EVENT_TIME', 'ABSOLUTE_TIME', 'TIME_OF_DAY', 'BROWSER_NAME',
                    'BROWSER_OS', 'BROWSER_NAME', 'BROWSER_VERSION', 'SELECTED', 'UI_CLEAR', 'QUEST_CLAIMABLE', 'HOME_BASE', 'HAS_ATTACKED', 'HAS_DEPLOYED',
                    'PRE_DEPLOY_UNITS', 'DIALOG_OPEN', 'FOREMAN_IS_BUSY', 'INVENTORY', 'HAS_ITEM', 'HAS_ITEM_SET', 'HOME_REGION', 'REGION_PROPERTY', 'LADDER_PLAYER',
-                   'MAIL_ATTACHMENTS_WAITING', 'AURA_ACTIVE', 'AI_INSTANCE_GENERATION', 'USER_ID', 'LOGGED_IN_RECENTLY', 'PVP_AGGRESSED_RECENTLY', 'IS_IN_ALLIANCE', 'FRAME_PLATFORM', 'NEW_BIRTHDAY', 'HAS_ALIAS', 'HAS_TITLE',
+                   'MAIL_ATTACHMENTS_WAITING', 'AURA_ACTIVE', 'AI_INSTANCE_GENERATION', 'USER_ID', 'LOGGED_IN_RECENTLY', 'PVP_AGGRESSED_RECENTLY', 'IS_IN_ALLIANCE', 'FRAME_PLATFORM', 'NEW_BIRTHDAY', 'HAS_ALIAS', 'HAS_TITLE', 'PLAYER_LEVEL',
                    'PURCHASED_RECENTLY', 'SESSION_LENGTH_TREND', 'ARMY_SIZE',
                    'VIEWING_BASE_DAMAGE', 'VIEWING_BASE_OBJECT_DESTROYED', 'BASE_SIZE'
                    ])
@@ -1477,6 +1477,10 @@ def check_predicate(pred, reason = '', context = None, context_data = None,
     elif pred['predicate'] == 'HAS_TITLE':
         if pred.get('name',None) not in gamedata['titles']:
             error |= 1; print '%s: %s predicate name %r not found in gamedata.titles' % (reason, pred['predicate'], pred.get('name'))
+    elif pred['predicate'] == 'PLAYER_LEVEL':
+        if pred['level'] > len(gamedata['player_xp']['level_xp'])-1:
+            error |= 1; print '%s: %s predicate "level" %d is greater than the max level (%d)' % (reason, pred['predicate'], pred['level'],
+                                                                                                  len(gamedata['player_xp']['level_xp'])-1)
     return error
 
 # check old-style "logic" blocks which are if/then/else compositions of predicates and consequents (used for quest tips)
