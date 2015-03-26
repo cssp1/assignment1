@@ -6643,6 +6643,7 @@ class AbstractPlayer(object):
             return 'human'
     def is_developer(self): return False
     class AbstractStattab(object):
+        modded_buildings = {}
         def get_player_stat(self, stat): raise Exception('AbstractPlayer has no stat table')
         def get_unit_stat(self, specname, stat, default_value): return default_value
 
@@ -8807,7 +8808,7 @@ class Player(AbstractPlayer):
                 base_value = ModChain.get_base_value(stat, obj.spec, obj.level)
                 obj.modstats[stat] = ModChain.make_chain(base_value, {'level':obj.level})
             obj.modstats[stat] = ModChain.add_mod(obj.modstats[stat], method, strength, kind, source, props)
-            self.modded_buildings.add(obj)
+            self.modded_buildings[obj.obj_id] = obj
 
         # apply modstat to all units in a specific manufacture category
         # category can be "ALL" to apply to all (unlocked) units
@@ -8844,7 +8845,7 @@ class Player(AbstractPlayer):
 
         def __init__(self, player, observer, additional_base = None):
             assert additional_base is not player.my_home # avoid accidentally iterating twice through home
-            self.modded_buildings = set()
+            self.modded_buildings = {}
             self.state_changed_buildings = set()
 
             self.units = {}
@@ -9075,7 +9076,7 @@ class Player(AbstractPlayer):
 
                     'player': self.player_stats,
                     'units': self.units,
-                    'buildings': dict([(obj.obj_id, obj.modstats) for obj in self.modded_buildings]),
+                    'buildings': dict([(obj.obj_id, obj.modstats) for obj in self.modded_buildings.itervalues()]),
                     'item_sets': dict([(name, len(val)) for name, val in self.item_sets.iteritems()]),
                     'limited_equipped': self.limited_equipped
                     }
