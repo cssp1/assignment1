@@ -1288,9 +1288,8 @@
             "unit_repair_speed": { "ui_name": "Repair Speed", "ui_tooltip": "Bonus to unit healing/repair speed", "display": "pct" },
             "crafting_speed": { "ui_name": "Production Rate", "ui_tooltip": "Bonus to item production speed", "display": "pct" },
 
-            // properties of the UNIT
-            "repair_speed": { "ui_name": "Repair Speed", "ui_tooltip": "Bonus to unit healing/repair speed", "display": "pct" },
-
+            // properties of the UNIT or BUILDING itself
+            "repair_speed": { "ui_name": "Repair Speed", "ui_tooltip": "Bonus to healing/repair speed", "display": "pct" },
 
             // for GUI only - display build limits on townhall
             "limit:storages": { "ui_name": "Depots", "check_spec": "supply_depot", // which spec whose "limit" to check
