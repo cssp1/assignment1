@@ -16,6 +16,7 @@ goog.require('SPUI');
 goog.require('SPFB');
 goog.require('PlayerCache');
 goog.require('AllianceCache');
+goog.require('goog.array');
 goog.require('goog.object');
 
 /** Start the send-gift process (which uses the Facebook Requests API)
