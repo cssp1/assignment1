@@ -631,6 +631,8 @@ TurretHeadDialog.set_stats_display = function(dialog, emplacement_obj, name, rel
     if(relative_to) {
         var relative_statlist = get_weapon_spell_features2(emplacement_obj.spec, relative_spell);
         goog.array.forEach(relative_statlist, function(rstat) {
+            // when switching from a ranged weapon to a PBAOE weapon, don't show range dropping to zero
+            if(rstat == 'weapon_range') { return; }
             if(!goog.array.contains(statlist, rstat)) {
                 statlist.push(rstat);
             }

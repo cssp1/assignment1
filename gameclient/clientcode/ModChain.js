@@ -356,6 +356,8 @@ ModChain.display_value_detailed = function(stat, modchain, spec, level, auto_spe
         show_base = true;
         // these stats correspond to spell parameters with slightly different names
         var source_stat = {'weapon_range':'range', 'effective_weapon_range':'effective_range'}[stat] || stat;
+        // allow manual override of values displayed in GUI, to help with distance unit mismatches
+        if(source_stat == 'splash_range' && ('ui_splash_range' in auto_spell)) { source_stat = 'ui_splash_range'; }
         modchain = ModChain.recompute_with_new_base_val(modchain, get_leveled_quantity(auto_spell[source_stat]||0,auto_spell_level), level);
     } else if(stat == 'weapon') {
         show_base = true;
