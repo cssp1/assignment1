@@ -36089,6 +36089,7 @@ function build_dialog_scroll(dialog, page) {
                     // build time
                     var build_time = get_leveled_quantity(spec['build_time'], 1);
                     if(build_time > 0) {
+                        build_time = Math.floor(build_time / get_player_stat(player.stattab, 'foreman_speed'));
                         //tooltip_text.push(dialog.data['widgets']['grid']['ui_tooltip_builds_in'].replace('%s',pretty_print_time(build_time)));
                     } else {
                         tooltip_text.push(dialog.data['widgets']['grid']['ui_tooltip_builds_instantly']);
@@ -37115,7 +37116,11 @@ function update_upgrade_dialog(dialog) {
         }
 
         var cost_time = get_leveled_quantity((tech ? tech['research_time'] : unit.spec['build_time']), new_level);
-        if(tech && builder) { cost_time = Math.floor(cost_time / builder.get_stat('research_speed',1)); }
+        if(tech && builder) {
+            cost_time = Math.floor(cost_time / builder.get_stat('research_speed',1));
+        } else if(!tech && unit && cost_time > 0) {
+            cost_time = Math.floor(cost_time / get_player_stat(player.stattab, 'foreman_speed'));
+        }
         widget = dialog.widgets['cost_time'];
         widget.str = (cost_time > 0 ? pretty_print_time(cost_time) : '');
 

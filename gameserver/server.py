@@ -8859,6 +8859,7 @@ class Player(AbstractPlayer):
 
             self.units = {}
             self.player_stats = {
+                'foreman_speed': ModChain.make_chain(1),
                 'loot_factor_pvp': ModChain.make_chain(1),
                 'loot_factor_pve': ModChain.make_chain(1),
                 'quarry_yield_bonus': ModChain.make_chain(1),
@@ -17321,6 +17322,8 @@ class GAMEAPI(resource.Resource):
             object.halt_production(session.player)
 
         build_time = GameObjectSpec.get_leveled_quantity(object.spec.build_time, object.level+1)
+        if build_time > 0:
+            build_time = int(build_time / session.player.stattab.get_player_stat('foreman_speed'))
 
         object.upgrade_start_time = server_time
         if build_time >= 1:
@@ -18099,6 +18102,8 @@ class GAMEAPI(resource.Resource):
                 session.player.resources.gain_res(negative_cost, reason='building_construction')
                 admin_stats.econ_flow_res(session.player, 'investment', 'buildings', negative_cost, spec = building_type, level = 1)
             build_time = GameObjectSpec.get_leveled_quantity(spec.build_time, 1)
+            if build_time > 0:
+                build_time = int(build_time / session.player.stattab.get_player_stat('foreman_speed'))
         else:
             build_time = -1
 
