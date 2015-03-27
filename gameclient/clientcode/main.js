@@ -37259,6 +37259,45 @@ function update_upgrade_dialog(dialog) {
                             });
     }
 
+    // XP AMOUNT
+    var xp_amount = 0;
+    if(new_level <= max_level) {
+        if(tech) {
+            var override = get_leveled_quantity(('upgrade_xp' in tech ? tech['upgrade_xp'] : -1), new_level);
+            if(override >= 0) {
+                xp_amount = override;
+            } else {
+                var res_amount = 0;
+                for(var res in gamedata['resources']) {
+                    res_amount += get_leveled_quantity(tech['cost_'+res] || 0, new_level);
+                }
+                xp_amount = Math.floor(gamedata['player_xp']['research'] * res_amount);
+            }
+        } else {
+            if(unit && (unit.spec['name'] in gamedata['player_xp']['buildings'])) {
+                var override = get_leveled_quantity(('upgrade_xp' in unit.spec ? unit.spec['upgrade_xp'] : -1), new_level);
+                if(override >= 0) {
+                    xp_amount = override;
+                } else {
+                    var res_amount = 0;
+                    for(var res in gamedata['resources']) {
+                        res_amount += get_leveled_quantity(unit.spec['build_cost_'+res] || 0, new_level);
+                    }
+                    var coeff;
+                    if(new_level == 1 && ('level_1' in gamedata['player_xp']['buildings'])) {
+                        coeff = gamedata['player_xp']['buildings']['level_1'];
+                    } else {
+                        coeff = gamedata['player_xp']['buildings'][unit.spec['name']];
+                    }
+                    xp_amount += Math.floor(coeff * res_amount);
+                }
+            }
+        }
+        if(xp_amount > 0) {
+            feature_list.push('xp');
+        }
+    }
+
     var grid_y = 0;
     var delta_color = SPUI.make_colorv(dialog.data['widgets']['col0,']['delta_color']);
 
@@ -37284,6 +37323,19 @@ function update_upgrade_dialog(dialog) {
             break;
         }
         var stat_name = feature_list[i];
+
+        if(stat_name == 'xp') {
+            // special case for XP gain
+            feature_widget(dialog, grid_y, 0).show = true;
+            feature_widget(dialog, grid_y, 0).str = gamedata['strings']['modstats']['stats']['xp']['ui_name'];
+            feature_widget(dialog, grid_y, 0).tooltip.str = gamedata['strings']['modstats']['stats']['xp']['ui_tooltip'];
+            var xp_col = (new_level == 1 ? 1 : 2);
+            feature_widget(dialog, grid_y, (xp_col == 1 ? 2 : 1)).show = false;
+            feature_widget(dialog, grid_y, xp_col).show = true;
+            feature_widget(dialog, grid_y, xp_col).str = '+'+pretty_print_number(xp_amount)+' XP';
+            feature_widget(dialog, grid_y, xp_col).text_color = delta_color;
+            feature_widget(dialog, grid_y, xp_col).tooltip.str = gamedata['strings']['modstats']['stats']['xp']['ui_tooltip'];
+        } else {
 
         var spec = null;
         var old_spell_level = old_level, new_spell_level = new_level; // levels keying the auto_spell stats we are displaying
@@ -37368,6 +37420,7 @@ function update_upgrade_dialog(dialog) {
             if(feature_widget(dialog, grid_y, 2).str != feature_widget(dialog, grid_y, 1).str) {
                 feature_widget(dialog, grid_y, 2).text_color = delta_color;
             }
+        }
         }
 
         grid_y += 1;

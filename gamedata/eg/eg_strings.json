@@ -1273,6 +1273,9 @@
         "security_team": "Spawns %units",
         "security_team_unit": "%qtyx %name",
         "stats": {
+            // for GUI only
+            "xp": {"ui_name": "XP Gain", "ui_tooltip": "XP you will earn by completing this upgrade", "display": "integer" },
+
             "armor": { "ui_name": "Armor", "ui_tooltip": "Subtracted from damage taken on each hit", "display": "integer" },
             "consumes_space": { "ui_name": "Space", "ui_tooltip": "Space occupied by this unit.\nUpgrade Tactical Ops Center and Reserves Bay to increase limit.", "display": "integer" },
             "damage_taken": { "ui_name": "Damage Resist", "ui_tooltip": "Reduces all damage taken by a percentage", "display": "one_minus_pct" },
