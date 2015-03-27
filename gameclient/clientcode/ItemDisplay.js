@@ -39,7 +39,7 @@ ItemDisplay.get_inventory_item_weapon_spellname = function(spec) {
         var effect_list = spec['equip']['effects'];
         for(var i = 0; i < effect_list.length; i++) {
             var effect = effect_list[i];
-            if(effect['code'] == 'modstat' && effect['stat'] == 'weapon' && effect['method'] == 'replace') {
+            if(effect['code'] == 'modstat' && (effect['stat'] == 'weapon' || effect['stat'] == 'continuous_cast') && effect['method'] == 'replace') {
                 return effect['strength'];
             }
         }

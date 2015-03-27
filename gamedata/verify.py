@@ -1187,7 +1187,7 @@ def check_item(itemname, spec):
 
 MODIFIABLE_STATS = {'unit/building': set(['max_hp', 'maxvel', 'weapon_damage', 'weapon_range', 'ice_effects', 'rate_of_fire',
                                           'damage_taken', 'armor', 'unit_repair_speed', 'repair_speed', 'swamp_effects',
-                                          'research_speed', 'manufacture_speed', 'weapon', 'weapon_level', 'weapon_asset', 'permanent_auras',
+                                          'research_speed', 'manufacture_speed', 'weapon', 'weapon_level', 'weapon_asset', 'permanent_auras', 'continuous_cast',
                                           'anti_air', 'anti_missile', 'resurrection', 'on_destroy', 'splash_range','effective_range','accuracy']),
                     'player': set(['loot_factor_pvp', 'loot_factor_pve', 'travel_speed', 'deployable_unit_space',
                                    'chat_template', 'chat_gagged', 'quarry_yield_bonus', 'turf_quarry_yield_bonus',

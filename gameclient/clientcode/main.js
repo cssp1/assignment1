@@ -1538,10 +1538,20 @@ function get_weapon_range(stats, level, spell) {
 GameObject.prototype.is_shooter = function() { return (this.get_auto_spell() != null); };
 GameObject.prototype.weapon_range = function() {
     var spell = this.get_auto_spell();
-    if(!spell && ('continuous_cast' in this.spec)) {
-        var s = gamedata['spells'][this.spec['continuous_cast']];
-        if(s['code'] == 'pbaoe' && 'splash_range' in s) { spell = s; }
+
+    // check for a continuously-casted PBAOE spell
+    if(!spell) {
+        var continuous_spell = this.spec['continuous_cast'] || null;
+        if(this.is_building()) {
+            continuous_spell = this.get_stat('continuous_cast', continuous_spell);
+        } // XXX no case for units that have continuous_cast modded!
+
+        if(continuous_spell) {
+            var s = gamedata['spells'][continuous_spell];
+            if(s['code'] == 'pbaoe' && 'splash_range' in s) { spell = s; }
+        }
     }
+
     return get_weapon_range(this.combat_stats, this.get_auto_spell_level(), spell);
 };
 GameObject.prototype.is_invul = function() { return this.spec['quarry_invul'] && session.is_quarry(); };
@@ -2334,13 +2344,17 @@ GameObject.prototype.run_control = function() {
         }
     }
 
-    if(this.spec['continuous_cast'] &&
+    var continuous_spell = this.spec['continuous_cast'] || null;
+    if(this.is_building()) {
+        continuous_spell = this.get_stat('continuous_cast', continuous_spell);
+    } // XXX no case for units that have continuous_cast modded!
+
+    if(continuous_spell &&
        (this.is_inert() ||
         (!this.is_destroyed() &&
          this.control_state === control_states.CONTROL_STOP &&
          !(this.is_building() && (this.is_under_construction() || this.is_upgrading() || this.is_repairing() || this.disarmed))))) {
-        var name = this.spec['continuous_cast'];
-        this.cast_client_spell(name, gamedata['spells'][name], null, null);
+        this.cast_client_spell(continuous_spell, gamedata['spells'][continuous_spell], null, null);
     }
 };
 
@@ -36830,7 +36844,7 @@ function get_weapon_spell_features2(spec, spell) {
     if('effective_range' in spell) {
         ret.push('effective_weapon_range');
     }
-    if(!is_melee_spell(spell) && ('range' in spell)) {
+    if(!is_melee_spell(spell) && ('range' in spell) && (spell['code'] != 'pbaoe')) {
         ret.push('weapon_range');
     }
     if('min_range' in spell) {
