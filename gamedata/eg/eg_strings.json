@@ -471,7 +471,9 @@
     "predicates": {
         "ALWAYS_FALSE": { "ui_name": "Locked" },
         "AURA_ACTIVE": { "ui_name": "Aura active: %s" },
+        "AURA_INACTIVE": { "ui_name": "Effect must expire: %s", "ui_name_togo": "Effect must expire: %s (%togo to go)" },
         "COOLDOWN_ACTIVE": { "ui_name": "Cooldown active: %s" },
+        "COOLDOWN_INACTIVE": { "ui_name": "On cooldown: %togo" },
         "ALL_BUILDINGS_UNDAMAGED": { "ui_name": "All buildings undamaged" },
         "OBJECT_UNDAMAGED": { "ui_name": "Repair %s" },
         "OBJECT_UNBUSY": { "ui_name": "%s not damaged or busy" },
