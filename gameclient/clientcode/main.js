@@ -37478,7 +37478,13 @@ function update_upgrade_dialog(dialog) {
             var last_label = null, slot_i = 0;
 
             for(var type_name in equip_slots) {
-                if(!player.is_cheater && ('show' in gamedata['strings']['equip_slots'][type_name]) && !gamedata['strings']['equip_slots'][type_name]['show']) { continue; }
+                if(!player.is_cheater &&
+                   ((('show' in gamedata['strings']['equip_slots'][type_name]) &&
+                     !gamedata['strings']['equip_slots'][type_name]['show']) ||
+                    (('show_if' in gamedata['strings']['equip_slots'][type_name]) &&
+                    !read_predicate(gamedata['strings']['equip_slots'][type_name]['show_if']).is_satisfied(player,null)))) {
+                    continue;
+                }
                 var n_slots = get_leveled_quantity(equip_slots[type_name], Math.max(old_level, 1));
                 var max_slots = get_leveled_quantity(equip_slots[type_name], max_level);
                 var n = 0;
@@ -37958,7 +37964,13 @@ function update_upgrade_dialog_equipment(dialog) {
             equip_slots = get_leveled_quantity(equip_slots, Math.max(old_level, 1));
             var slot_i = 0;
             for(var type_name in equip_slots) {
-                if(!player.is_cheater && ('show' in gamedata['strings']['equip_slots'][type_name]) && !gamedata['strings']['equip_slots'][type_name]['show']) { continue; }
+                if(!player.is_cheater &&
+                   ((('show' in gamedata['strings']['equip_slots'][type_name]) && !gamedata['strings']['equip_slots'][type_name]['show']) ||
+                    (('show_if' in gamedata['strings']['equip_slots'][type_name]) &&
+                     !read_predicate(gamedata['strings']['equip_slots'][type_name]['show_if']).is_satisfied(player,null))
+                   )) {
+                    continue;
+                }
 
                 var n_slots = get_leveled_quantity(equip_slots[type_name], Math.max(old_level, 1));
                 var max_slots = get_leveled_quantity(equip_slots[type_name], max_level);
@@ -43485,7 +43497,13 @@ function create_mouse_tooltip() {
 
                 if(equip) {
                     for(var slot_type in equip) {
-                        if(!player.is_cheater && ('show' in gamedata['strings']['equip_slots'][slot_type]) && !gamedata['strings']['equip_slots'][slot_type]['show']) { continue; }
+                        if(!player.is_cheater &&
+                           ((('show' in gamedata['strings']['equip_slots'][slot_type]) && !gamedata['strings']['equip_slots'][slot_type]['show']) ||
+                            (('show_if' in gamedata['strings']['equip_slots'][slot_type]) &&
+                             !read_predicate(gamedata['strings']['equip_slots'][slot_type]['show_if']).is_satisfied(player,null))
+                           )) {
+                            continue;
+                        }
 
                         var item_list = equip[slot_type];
                         for(var i = 0; i < item_list.length; i++) {
@@ -46347,7 +46365,11 @@ function draw_building_or_inert(obj, powerfac) {
         var ecount = 0, elevel = 0;
         for(var slot_type in obj.equipment) {
             if(slot_type == "mine" || // maybe set "show":0 on mine slots?
-               ('show' in gamedata['strings']['equip_slots'][slot_type]) && !gamedata['strings']['equip_slots'][slot_type]['show']) { continue; }
+               (('show' in gamedata['strings']['equip_slots'][slot_type]) && !gamedata['strings']['equip_slots'][slot_type]['show']) ||
+               (('show_if' in gamedata['strings']['equip_slots'][slot_type]) &&
+                !read_predicate(gamedata['strings']['equip_slots'][slot_type]['show_if']).is_satisfied(player,null))) {
+                continue;
+            }
             var item_list = obj.equipment[slot_type];
             for(var i = 0; i < item_list.length; i++) {
                 if(item_list[i]) {
