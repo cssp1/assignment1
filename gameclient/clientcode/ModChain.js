@@ -219,12 +219,14 @@ ModChain.display_tooltip = function(stat, modchain, show_base, ui_data) {
                     ls.push(gamedata['strings']['modstats']['bonuses']);
                 }
                 var ui_delta = '';
+                var invert_sign = (display_mode == 'one_minus_pct' ? -1 : 1);
+
                 if(mod['method'] == '*=(1-strength)') {
-                    ui_delta = (100*(mod['strength'])).toFixed(0)+'%';
+                    ui_delta = (invert_sign*mod['strength'] < 0 ? '+' : '-') + (100*(Math.abs(mod['strength']))).toFixed(0)+'%';
                 } else if(mod['method'] == '*=(1+strength)') {
-                    ui_delta = (mod['strength'] >= 0 ? '+' : '-') + (100*(Math.abs(mod['strength']))).toFixed(0)+'%';
+                    ui_delta = (invert_sign*mod['strength'] >= 0 ? '+' : '-') + (100*(Math.abs(mod['strength']))).toFixed(0)+'%';
                 } else if(mod['method'] == '*=strength') {
-                    ui_delta = (mod['strength'] >= 0 ? '' : '-') + (100*(Math.abs(mod['strength']))).toFixed(0)+'%';
+                    ui_delta = (invert_sign*mod['strength'] >= 0 ? '' : '-') + (100*(Math.abs(mod['strength']))).toFixed(0)+'%';
                 } else if(mod['method'] == 'replace') {
                     ui_delta = ModChain.display_value(mod['strength'], display_mode, 'tooltip');
                 } else if(mod['method'] == 'concat') {
