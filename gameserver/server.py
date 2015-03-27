@@ -18686,6 +18686,10 @@ class GAMEAPI(resource.Resource):
                 session.player.send_inventory_update(retmsg)
                 return False
 
+            if 'requires' in add_spec['equip'] and (not Predicates.read_predicate(add_spec['equip']['requires']).is_satisfied(session.player, None)):
+                retmsg.append(["ERROR", "REQUIREMENTS_NOT_SATISFIED", add_spec['equip']['requires']])
+                return False
+
             if (not session.player.is_cheater):
                 # check unique_equipped constraint
                 if ('unique_equipped' in add_spec) and ((not remove_spec) or (remove_spec.get('unique_equipped',None) != add_spec['unique_equipped'])):
@@ -18752,6 +18756,8 @@ class GAMEAPI(resource.Resource):
             else:
                 assert session.player.inventory_remove(add_item, 1, None) # do not log - player still has item
             assert Equipment.equip_add(equipment, obj_spec, obj_level, dest_addr, add_spec)
+            if 'on_equip' in add_spec['equip']:
+                session.execute_consequent_safe(add_spec['equip']['on_equip'], session.player, retmsg, reason='on_equip')
 
         if force and inventory_slot < 0:
             pass # out of thin air

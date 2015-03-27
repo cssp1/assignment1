@@ -21795,7 +21795,15 @@ function invoke_equip_chooser(inv_dialog, parent_widget, tech, unit, slot_type, 
                 player.equipped_item_iter(func);
             }
 
-            items.push([i, item, min_level, unique_conflict]);
+            var failed_pred = null;
+            if('requires' in espec['equip']) {
+                var pred = read_predicate(espec['equip']['requires']);
+                if(!pred.is_satisfied(player, null)) {
+                    failed_pred = pred;
+                }
+            }
+
+            items.push([i, item, min_level, unique_conflict, failed_pred]);
         }
     }
 
@@ -21863,7 +21871,7 @@ function invoke_equip_chooser(inv_dialog, parent_widget, tech, unit, slot_type, 
 
     for(var i = 0; i < items.length; i++) {
         if(i >= dialog.data['widgets']['equip_item']['array'][0]) { break; }
-        var inv_slot = items[i][0], item = items[i][1], min_level = items[i][2], unique_conflict = items[i][3];
+        var inv_slot = items[i][0], item = items[i][1], min_level = items[i][2], unique_conflict = items[i][3], failed_pred = items[i][4];
         var spec = ItemDisplay.get_inventory_item_spec(item['spec']);
 
         dialog.widgets['equip_frame'+i].show =
@@ -21891,6 +21899,11 @@ function invoke_equip_chooser(inv_dialog, parent_widget, tech, unit, slot_type, 
             dialog.widgets['equip_frame'+i].state = 'disabled';
             dialog.widgets['equip_frame'+i].tooltip.text_color = SPUI.error_text_color;
             dialog.widgets['equip_frame'+i].tooltip.str = gamedata['errors']['EQUIP_INVALID_UNIQUE']['ui_name'].replace('%s', ItemDisplay.get_inventory_item_spec(unique_conflict)['ui_name']);
+        } else if(failed_pred) {
+            dialog.widgets['equip_frame'+i].state = 'disabled_clickable';
+            dialog.widgets['equip_frame'+i].tooltip.text_color = SPUI.error_text_color;
+            dialog.widgets['equip_frame'+i].tooltip.str = failed_pred.ui_describe(player);
+            dialog.widgets['equip_frame'+i].onclick = get_requirements_help(failed_pred);
         } else {
             dialog.widgets['equip_frame'+i].onclick = (function (_inv_slot, _item, _tech, _unit, _slot_type, _slot_n, _ui_slot, _equipped_now) { return function(w) {
                 if(_tech) {
@@ -21907,7 +21920,7 @@ function invoke_equip_chooser(inv_dialog, parent_widget, tech, unit, slot_type, 
             }; })(inv_slot, item, tech, unit, slot_type, slot_n, ui_slot, equipped_now);
         }
 
-        if(!unique_conflict) {
+        if(!unique_conflict && !failed_pred) {
             dialog.widgets['equip_frame'+i].onenter = (function (_inv_slot, _item, _context_props) { return function(w) {
                 var dialog = w.parent;
                 if(dialog.user_data['context'] &&
