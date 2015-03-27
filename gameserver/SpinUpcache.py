@@ -510,6 +510,7 @@ PURCHASE_CATEGORY_MAP = {'MAKE_DROIDS': 'manufacturing', # dummy entry for produ
                          'UPGRADE_FOR_MONEY': 'building_upgrade',
                          'BOOST_IRON_10PCT': 'resource_boost', 'BOOST_IRON_25PCT': 'resource_boost', 'BOOST_IRON_50PCT': 'resource_boost', 'BOOST_IRON_100PCT': 'resource_boost',
                          'BOOST_WATER_10PCT': 'resource_boost', 'BOOST_WATER_25PCT': 'resource_boost', 'BOOST_WATER_50PCT': 'resource_boost', 'BOOST_WATER_100PCT': 'resource_boost',
+                         'BOOST_RES3_10PCT': 'resource_boost', 'BOOST_RES3_25PCT': 'resource_boost', 'BOOST_RES3_50PCT': 'resource_boost', 'BOOST_RES3_100PCT': 'resource_boost',
                          'BUY_RESOURCES_TOPUP': 'resource_boost',
                          'REPAIR_ALL_FOR_MONEY': 'repair',
                          'UNIT_REPAIR_SPEEDUP_FOR_MONEY': 'repair',
