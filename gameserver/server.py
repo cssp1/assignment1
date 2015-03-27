@@ -8900,9 +8900,12 @@ class Player(AbstractPlayer):
                                 effects = equip['equip']['effects']
                                 for i in xrange(len(effects)):
                                     effect = effects[i]
-                                    if effect['code'] == 'modstat':
-                                        if (not 'apply_if' in effect) or Predicates.read_predicate(effect['apply_if']).is_satisfied(self.player, None):
+                                    if (not 'apply_if' in effect) or Predicates.read_predicate(effect['apply_if']).is_satisfied(self.player, None):
+                                        if effect['code'] == 'modstat':
                                             self.apply_modstat_to_building(obj, effect['stat'], effect['method'], effect['strength'], 'equipment', equip['name'], {'effect':i})
+                                        elif effect['code'] == 'apply_player_aura':
+                                            player.do_apply_aura(effect['aura_name'], effect.get('aura_strength',1), -1,
+                                                                 effect.get('stack',-1), effect.get('data',None), ignore_limit=True)
 
             # calculate effect of techs
             for tech_name, level in player.tech.iteritems():
