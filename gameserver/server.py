@@ -9024,7 +9024,9 @@ class Player(AbstractPlayer):
                             if affects_units and type(affects_units) is not list:
                                 affects_units = [affects_units,] # single unit
 
-                            affects_building = effect.get('affects_building', spec.get('affects_building', None))
+                            affects_buildings = effect.get('affects_building', spec.get('affects_building', None))
+                            if affects_buildings and type(affects_buildings) is not list:
+                                affects_buildings = [affects_buildings,]
                             affects_manufacture_category = effect.get('affects_manufacture_category', spec.get('affects_manufacture_category', None))
                             affects_kind = effect.get('affects_kind', spec.get('affects_kind', None))
                             affects = effect.get('affects', spec.get('affects', None))
@@ -9039,9 +9041,9 @@ class Player(AbstractPlayer):
                                 for unit in affects_units:
                                     self.apply_modstat_to_unit(unit, effect['stat'], effect['method'], strength, 'aura', spec['name'], props)
 
-                            if affects_building:
+                            if affects_buildings:
                                 for obj in self.player.home_base_iter():
-                                    if obj.is_building() and obj.spec.name == affects_building:
+                                    if obj.is_building() and obj.spec.name in affects_buildings:
                                         self.apply_modstat_to_building(obj, effect['stat'], effect['method'], strength, 'aura', spec['name'], props)
                                         if obj.is_producer():
                                             obj.update_production(player, player.my_home.base_type, player.my_home.base_region, compute_power_factor(player.my_home.get_power_state()))
