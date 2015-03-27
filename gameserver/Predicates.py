@@ -316,6 +316,12 @@ class AuraActivePredicate(Predicate):
             if aura['spec'] == self.aura_name and aura.get('stack',1) >= self.min_stack:
                 return True
         return False
+class AuraInactivePredicate(Predicate):
+    def __init__(self, data):
+        Predicate.__init__(self, data)
+        self.act_pred = AuraActivePredicate(data)
+    def is_satisfied(self, player, qdata):
+        return not self.act_pred.is_satisfied(player, qdata)
 
 class CooldownActivePredicate(Predicate):
     def __init__(self, data):
@@ -827,6 +833,7 @@ def read_predicate(data):
     elif kind == 'TECH_LEVEL': return TechLevelPredicate(data)
     elif kind == 'QUEST_COMPLETED': return QuestCompletedPredicate(data)
     elif kind == 'AURA_ACTIVE': return AuraActivePredicate(data)
+    elif kind == 'AURA_INACTIVE': return AuraInactivePredicate(data)
     elif kind == 'COOLDOWN_ACTIVE': return CooldownActivePredicate(data)
     elif kind == 'COOLDOWN_INACTIVE': return CooldownInactivePredicate(data)
     elif kind == 'ABTEST': return ABTestPredicate(data)

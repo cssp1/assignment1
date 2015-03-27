@@ -666,6 +666,27 @@ AuraActivePredicate.prototype.do_ui_describe = function(player) {
 
 /** @constructor
   * @extends Predicate */
+function AuraInactivePredicate(data) {
+    goog.base(this, data);
+    this.act_pred = new AuraActivePredicate(data);
+}
+goog.inherits(AuraInactivePredicate, Predicate);
+AuraInactivePredicate.prototype.is_satisfied = function(player, qdata) { return !this.act_pred.is_satisfied(player, qdata); };
+AuraInactivePredicate.prototype.do_ui_describe = function(player) {
+    var togo = -1;
+    for(var i = 0; i < player.player_auras.length; i++) {
+        var aura = player.player_auras[i];
+        if(aura['spec'] == this.act_pred.aura_name && ((aura['stack']||1) >= this.act_pred.min_stack)) {
+            if(('end_time' in aura) && (aura['end_time'] > 0) && (aura['end_time'] < server_time)) { continue; }
+            togo = ('end_time' in aura ? aura['end_time'] - server_time : -1);
+        }
+    }
+    var template = gamedata['strings']['predicates'][this.kind][(togo > 0 ? 'ui_name_togo' : 'ui_name')];
+    return new PredicateUIDescription(template.replace('%s', gamedata['auras'][this.act_pred.aura_name]['ui_name']).replace('%togo', pretty_print_time(togo)));
+};
+
+/** @constructor
+  * @extends Predicate */
 function CooldownActivePredicate(data) {
     goog.base(this, data);
     this.name = data['name'];
@@ -1595,6 +1616,7 @@ function read_predicate(data) {
     else if(kind === 'TECH_LEVEL') { return new TechLevelPredicate(data); }
     else if(kind === 'QUEST_COMPLETED') { return new QuestCompletedPredicate(data); }
     else if(kind === 'AURA_ACTIVE') { return new AuraActivePredicate(data); }
+    else if(kind === 'AURA_INACTIVE') { return new AuraInactivePredicate(data); }
     else if(kind === 'COOLDOWN_ACTIVE') { return new CooldownActivePredicate(data); }
     else if(kind === 'COOLDOWN_INACTIVE') { return new CooldownInactivePredicate(data); }
     else if(kind === 'ABTEST') { return new ABTestPredicate(data); }
