@@ -1683,7 +1683,7 @@ def adgroup_targeting(db, tgt):
 def reachestimate_tgt(tgt):
     # strip out the parts of tgt that don't apply to the reach estimate
     reach_tgt = tgt.copy()
-    for FIELD in ('body','title','image','creative_object_id','creative_story_id','creative_action_spec','destination','version','bid_type'):
+    for FIELD in ('body','title','image','creative_object_id','creative_story_id','creative_action_spec','destination','version'):
         if FIELD in reach_tgt: del reach_tgt[FIELD]
     return reach_tgt
 
