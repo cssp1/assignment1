@@ -4299,6 +4299,82 @@ Building.prototype.modify_stats_by_modstats = function() {
 // return true if the object should be invisible to opponents
 Building.prototype.is_invisible = function() { return !!this.spec['invisible']; };
 
+/** return position/text/icon/etc for the idle state, if it should be drawn in the GUI
+    @return {({idle: Object,
+              asset: string,
+              icon_pos: !Array.<number>,
+              click_bounds: ((!Array.<!Array.<number>>)|null),
+              text_str: (string|null),
+              text_pos: (Array.<number>|null)})|null}
+ */
+Building.prototype.get_idle_state_appearance = function() {
+    if(session.home_base && !session.has_attacked && gamedata['client']['enable_idle_icons'] && !player.is_cheater &&
+       this.team === 'player' && !this.spec['worth_less_xp'] &&
+       player.tutorial_state == "COMPLETE" && get_preference_setting(player.preferences, 'show_idle_buildings') &&
+       read_predicate({'predicate':'LIBRARY', 'name': ('show_idle_buildings' in gamedata['predicate_library'] ? 'show_idle_buildings' : 'extended_tutorial_complete')}).is_satisfied(player,null)) {
+        var idle = this.get_idle_state();
+        if(!idle || !idle['state']) { return null; }
+
+        if(!(idle['state'] in gamedata['strings']['idle_buildings'])) { throw Error('unknown building idle state '+idle['state']); }
+        var icon_name = gamedata['strings']['idle_buildings'][idle['state']]['icon'];
+        if(!(icon_name in GameArt.assets)) { throw Error('invalid draw_idle_icon '+icon_name); }
+
+        var icon_sprite = GameArt.assets[icon_name].states['normal'];
+        var xy = this.draw_xy();
+        var default_text_height = this.get_health_bar_dims()[2];
+        var icon_pos = vec_add(xy, [0, -Math.floor(0.75*default_text_height + icon_sprite.wh[1]/2)]);
+
+        var click_bounds = [[icon_pos[0] - icon_sprite.wh[0]/2, icon_pos[0] + icon_sprite.wh[0]/2],
+                            [icon_pos[1] - icon_sprite.wh[1]/2, icon_pos[1] + icon_sprite.wh[1]/2]];
+
+        var text_str = gamedata['strings']['idle_buildings'][idle['state']]['ui_name'] || null;
+        var text_pos = null;
+        if(text_str) {
+            text_pos = icon_pos;
+            if(idle['s_replace']) { text_str = text_str.replace('%s', idle['s_replace']); }
+            var text_edge = measure_centered_text(ctx, text_str, text_pos);
+            click_bounds[0][1] = Math.max(click_bounds[0][1], text_pos[0] + (text_pos[0]-text_edge[0]));
+            icon_pos = vec_add(text_edge, [-25,-3]);
+            click_bounds[0][0] = Math.min(click_bounds[0][0], icon_pos[0] - icon_sprite.wh[0]/2);
+        }
+
+        return {idle: idle,
+                asset: icon_name,
+                icon_pos: icon_pos,
+                click_bounds: click_bounds,
+                text_str: text_str,
+                text_pos: text_pos};
+    }
+    return null;
+};
+
+Building.prototype.detect_click = function(xy, ji, zoom, fuzz) {
+    if(goog.base(this, 'detect_click', xy, ji, zoom, fuzz)) {
+        return true;
+    }
+    var appearance = this.get_idle_state_appearance();
+    if(appearance && appearance.click_bounds) {
+        var p = screen_to_playfield(xy);
+        var b = appearance.click_bounds;
+        if(p[0] >= b[0][0] && p[0] < b[0][1] && p[1] >= b[1][0] && p[1] < b[1][1]) {
+            return true;
+        }
+    }
+    return false;
+};
+
+// for odd gridsizes, add one-half unit to center the sprite on the grid bounds
+MapBlockingGameObject.prototype.get_odd_shift = function() {
+    var gridsize = this.spec['gridsize'];
+    return [gridsize[0] > 1 && (gridsize[0]&1) ? 0.5 : 0,
+            gridsize[1] > 1 && (gridsize[1]&1) ? 0.5 : 0];
+};
+MapBlockingGameObject.prototype.draw_xy = function() {
+    var odd_shift = this.get_odd_shift();
+    return vec_floor(ortho_to_draw(vec_add([this.x, this.y], odd_shift)));
+};
+
+
 // ObjectCollection
 
 // note: unlike in the server (where ObjectCollection assigns id numbers), in the client we assume
@@ -46012,11 +46088,7 @@ Building.prototype.get_idle_state_advanced = function() {
 };
 
 function draw_building_or_inert(obj, powerfac) {
-    // for odd gridsizes, add one-half unit to center the sprite on the grid bounds
-    var gridsize = obj.spec['gridsize'];
-    var odd_shift = [gridsize[0] > 1 && (gridsize[0]&1) ? 0.5 : 0,
-                     gridsize[1] > 1 && (gridsize[1]&1) ? 0.5 : 0];
-    var xy = vec_floor(ortho_to_draw(vec_add([obj.x, obj.y], odd_shift)));
+    var xy = obj.draw_xy();
 
     var icon;
     var icon_state = 'unset';
@@ -46314,6 +46386,7 @@ function draw_building_or_inert(obj, powerfac) {
         if(weapon_asset) {
             var weapon_icon = GameArt.assets[weapon_asset];
             if(weapon_icon) {
+                var odd_shift = obj.get_odd_shift();
                 var x = obj.x + odd_shift[0], z = obj.y + odd_shift[1];
                 var weapon_offset = obj.get_leveled_quantity(obj.spec['weapon_offset']);
                 var pos = vec_floor(ortho_to_draw_3d(v3_add([x,0,z], weapon_offset)));
@@ -46555,11 +46628,9 @@ function draw_building_or_inert(obj, powerfac) {
     draw_health_bar(xy, obj);
 
     // draw build idle status
-    if(session.home_base && !session.has_attacked && gamedata['client']['enable_idle_icons'] && !player.is_cheater &&
-       obj.is_building() && obj.team === 'player' && !obj.spec['worth_less_xp'] &&
-       player.tutorial_state == "COMPLETE" && get_preference_setting(player.preferences, 'show_idle_buildings') &&
-       read_predicate({'predicate':'LIBRARY', 'name': ('show_idle_buildings' in gamedata['predicate_library'] ? 'show_idle_buildings' : 'extended_tutorial_complete')}).is_satisfied(player,null)) {
-        var idle = obj.get_idle_state();
+    if(obj.is_building()) {
+        var appearance = obj.get_idle_state_appearance();
+        var idle = (appearance ? appearance.idle : null);
         if(idle && idle['can_upgrade']) {
             // draw "can upgrade" arrow, based on equip icon position
             var img = GameArt.assets[gamedata['strings']['idle_buildings']['upgrade_advanced']['icon']].states['normal'];
@@ -46580,23 +46651,15 @@ function draw_building_or_inert(obj, powerfac) {
 
             img.draw(pos, 0, client_time);
         }
-        if(idle && idle['state']) {
+        if(appearance && appearance.asset) {
             // draw idle state
-            if(!(idle['state'] in gamedata['strings']['idle_buildings'])) { throw Error('unknown building idle state '+idle['state']); }
-            var icon_name = gamedata['strings']['idle_buildings'][idle['state']]['icon'];
-            if(!(icon_name in GameArt.assets)) { throw Error('invalid draw_idle_icon '+icon_name); }
-            var icon_sprite = GameArt.assets[icon_name].states['normal'];
+            var icon_sprite = GameArt.assets[appearance.asset].states['normal'];
 
-            var icon_pos = vec_add(xy, [0, -Math.floor(0.75*default_text_height + icon_sprite.wh[1]/2)]);
-
-            var text_str = gamedata['strings']['idle_buildings'][idle['state']]['ui_name'] || null;
-            if(text_str) {
-                if(idle['s_replace']) { text_str = text_str.replace('%s', idle['s_replace']); }
-                var text_edge = draw_centered_text_with_shadow(ctx, text_str, icon_pos);
-                icon_pos = vec_add(text_edge, [-25,-3]);
+            if(appearance.text_str) {
+                draw_centered_text_with_shadow(ctx, appearance.text_str, appearance.text_pos);
             }
 
-            icon_sprite.draw(icon_pos, 0, client_time);
+            icon_sprite.draw(appearance.icon_pos, 0, client_time);
         }
     }
 
@@ -47243,6 +47306,18 @@ function draw_centered_text(ctx, str, xy) {
             var text_xy = vec_add(xy, [-Math.floor(dims.width/2), i*SPUI.desktop_font.leading]);
             ret[0] = Math.min(ret[0], text_xy[0]);
             ctx.fillText(lines[i], text_xy[0], text_xy[1]);
+        }
+    }
+    return ret;
+}
+function measure_centered_text(ctx, str, xy) { // saw as draw_centered_text(), but don't draw anything
+    var ret = vec_copy(xy);
+    var lines = str.split('\n');
+    for(var i = 0; i < lines.length; i++) {
+        if(lines[i].length > 0) {
+            var dims = ctx.measureText(lines[i]);
+            var text_xy = vec_add(xy, [-Math.floor(dims.width/2), i*SPUI.desktop_font.leading]);
+            ret[0] = Math.min(ret[0], text_xy[0]);
         }
     }
     return ret;
