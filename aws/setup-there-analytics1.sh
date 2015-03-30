@@ -66,5 +66,21 @@ echo "MISSING: set up swap space"
 echo "MISSING: mysql config for analytics (use /usr/bin/mysql_secure_installation to set root password)"
 # NOTE! be sure to set new databases to utf8 collate utf8_general_ci !
 # my.cnf settings: see aws/analytics1/etc/my.cnf
+
+# add analytics1 user:
+# grant usage on *.* to 'analytics1'@'%' identified by 'password';
+# grant all privileges on $GAME_upcache.* to 'analytics1'@'%';
+# grant all privileges on skynet.* to 'analytics1'@'%';
+
+# add chartio user:
+# grant usage on *.* to 'chartio'@'%' identified by 'password' require ssl;
+# grant select, execute, show view on $GAME_upcache.* to 'chartio'@'%';
+# grant select, execute, show view on skynet.* to 'chartio'@'%';
+
+# add ordinary user:
+# grant usage on *.* to 'username'@'%' identified by 'password';
+# grant select, insert, drop, alter, create temporary tables, lock tables, execute, create view, show view on $GAME_upcache.* to 'username'@'%';
+# grant select, insert, drop, alter, create temporary tables, lock tables, execute, create view, show view on skynet.* to 'username'@'%';
+
 echo "MISSING: easy_install pymongo - then see setup-there-prod.sh for MongoDB setup instructions"
 echo "MISSING: /etc/aliases: add 'root: awstech@example.com' mail alias"
