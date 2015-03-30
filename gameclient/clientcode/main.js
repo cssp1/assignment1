@@ -2390,6 +2390,8 @@ function apply_target_lead(P, target_vel, speed) {
     return -1; // no solution found
 }
 
+var no_miss_hack_reported = false;
+
 /** @param {GameObject} my_source
     @param {GameObjectId} my_id
     @param {string} my_spec_name
@@ -2551,6 +2553,14 @@ function do_fire_projectile(my_source, my_id, my_spec_name, my_level, my_team, m
             impact_spread *= 3;
         }
         //console.log('range '+shot_length.toFixed(1)+' ('+eff_range.toFixed(1)+'-'+max_range.toFixed(1)+') accuracy '+accuracy.toFixed(2));
+    }
+
+    if(miss && spell['no_miss_hack']) { // XXX temporary band-aid fix for unexpected missed strikes
+        if(!no_miss_hack_reported) {
+            no_miss_hack_reported = true;
+            metric_event('3350_no_miss_hack', {'spellname':spell['name'], 'shot_length':shot_length, 'eff_range': eff_range, 'max_range': max_range});
+        }
+        miss = 0;
     }
 
     // create graphical projectiles and impact effects
