@@ -2558,7 +2558,10 @@ function do_fire_projectile(my_source, my_id, my_spec_name, my_level, my_team, m
     if(miss && spell['no_miss_hack']) { // XXX temporary band-aid fix for unexpected missed strikes
         if(!no_miss_hack_reported) {
             no_miss_hack_reported = true;
-            metric_event('3350_no_miss_hack', {'spellname':spell['name'], 'shot_length':shot_length, 'eff_range': eff_range, 'max_range': max_range});
+            metric_event('3350_no_miss_hack', {'spellname':spell['name'], 'shot_length':shot_length, 'eff_range': eff_range, 'max_range': max_range,
+                                               'my_pos': my_pos, 'target_pos': target_pos,
+                                               'target_hit_radius': (target ? target.hit_radius() : -1),
+                                               'target_specname': (target ? target.spec['name'] : 'null')});
         }
         miss = 0;
     }
