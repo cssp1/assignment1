@@ -6820,7 +6820,7 @@ function find_object_at_screen_pixel(xy, ji, include_unselectable) {
     // note: prioritize units over buildings if there is any overlap
     // also sort units by Z order
     var found_units = [];
-    var found_building = null;
+    var found_buildings = [];
 
     // fudge factor for clicking on units - you can be off by this many pixels (at zoom=1) and still hit
     var position_fuzz = 2;
@@ -6849,7 +6849,7 @@ function find_object_at_screen_pixel(xy, ji, include_unselectable) {
             if(temp.is_destroyed() && session.has_attacked && (session.viewing_base.base_type != 'quarry' || session.viewing_base.base_landlord_id != session.user_id)) { continue; }
 
             if(temp.detect_click(xy, ji, view_zoom, position_fuzz)) {
-                found_building = temp;
+                found_buildings.push(temp);
                 // do not break out of loop
             }
         } else {
@@ -6859,25 +6859,25 @@ function find_object_at_screen_pixel(xy, ji, include_unselectable) {
         }
     }
 
-    if(found_units.length > 0) {
-        var ret;
-        if(found_units.length < 2) {
-            ret = found_units[0];
+    var found_list = (found_units.length > 0 ? found_units : found_buildings);
+    var ret = null;
+
+    if(found_list.length > 0) {
+        if(found_list.length < 2) {
+            ret = found_list[0];
         } else {
             // return unit with highest Z coordinate
-            var high_unit = found_units[0], high_z = -1;
-            for(var i = 0; i < found_units.length; i++) {
-                var unit_xy = found_units[i].interpolate_pos();
+            var high_unit = found_list[0], high_z = -1;
+            for(var i = 0; i < found_list.length; i++) {
+                var unit_xy = found_list[i].interpolate_pos();
                 var unit_z = ortho_to_depth(unit_xy);
                 if(unit_z > high_z) {
                     high_z = unit_z;
-                    high_unit = found_units[i];
+                    high_unit = found_list[i];
                 }
             }
             ret = high_unit;
         }
-    } else {
-        ret = found_building;
     }
 
     if(player.tutorial_state === 'click_on_rover_action') {
