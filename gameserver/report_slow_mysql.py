@@ -77,5 +77,12 @@ if __name__ == '__main__':
 
     if do_prune:
         if verbose: print 'pruning', 'mysql.slow_log'
-        cur.execute("TRUNCATE mysql.slow_log;")
+        cur.execute("SELECT EXISTS(SELECT 1 FROM mysql.proc p WHERE db = 'mysql' AND name = 'rds_rotate_slow_log') AS has_rds_proc")
+        row = cur.fetchone()
+        if row['has_rds_proc']:
+            # on Amazon RDS - use the stored procedure
+            cur.execute("CALL mysql.rds_rotate_slow_log();")
+        else:
+            # manual truncation
+            cur.execute("TRUNCATE mysql.slow_log;")
         con.commit()
