@@ -4352,12 +4352,14 @@ Building.prototype.detect_click = function(xy, ji, zoom, fuzz) {
     if(goog.base(this, 'detect_click', xy, ji, zoom, fuzz)) {
         return true;
     }
-    var appearance = this.get_idle_state_appearance();
-    if(appearance && appearance.click_bounds) {
-        var p = screen_to_playfield(xy);
-        var b = appearance.click_bounds;
-        if(p[0] >= b[0][0] && p[0] < b[0][1] && p[1] >= b[1][0] && p[1] < b[1][1]) {
-            return true;
+    if(!this.spec['worth_less_xp'] && player.get_any_abtest_value('idle_icon_type', gamedata['client']['idle_icon_type'] || 'old') == 'advanced') {
+        var appearance = this.get_idle_state_appearance();
+        if(appearance && appearance.click_bounds) {
+            var p = screen_to_playfield(xy);
+            var b = appearance.click_bounds;
+            if(p[0] >= b[0][0] && p[0] < b[0][1] && p[1] >= b[1][0] && p[1] < b[1][1]) {
+                return true;
+            }
         }
     }
     return false;
