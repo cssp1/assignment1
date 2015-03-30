@@ -2,6 +2,10 @@
 
 exit 0 # XXX disabled by default
 
+# to restore:
+# gunzip -c ${GAME}_upcache.mysql.gz | perl -pe 's/\sDEFINER=`[^`]+`@`[^`]+`//' | mysql -u ... -p... --host ... ${GAME}_upcache
+# (the Perl edit is to remove DEFINERs that refer to users that may not exist in the destination server)
+
 GAME_DIR=/home/ec2-user/summonersgate
 DB=sg_upcache
 SAVE_DIR=/media/ephemeral0a/backup-scratch
