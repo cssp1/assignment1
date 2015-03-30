@@ -420,7 +420,7 @@ def get_num_levels(histogram, val):
 def check_levels(specname, spec):
     # list of fields that have array values that are NOT indexed by level
     # note: if you add something here, also update gameserver's Spec.compute_maxlevel() if the new field is also in GameObjectSpec
-    ignore = ('limit', 'spells', 'gridsize', 'unit_collision_gridsize', 'exclusion_zone', 'equip_icon_offset', 'elite_marker_offset', 'equip_icon_delta', 'level_flag_offset', 'effects',
+    ignore = ('limit', 'spells', 'gridsize', 'unit_collision_gridsize', 'exclusion_zone', 'equip_icon_offset', 'elite_marker_offset', 'equip_icon_delta', 'level_flag_offset', 'effects', 'click_bounds',
               # note: the 3D weapon_offset must be a per-level array, since there is no easy way to distinguish it from a 3-level scalar
               'max_ui_level',
               'defense_types', 'health_bar_dims', 'show_alliance_at', 'scan_counter_offset', 'research_categories', 'crafting_categories',

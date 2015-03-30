@@ -472,17 +472,36 @@ GameArt.AbstractSprite.prototype.draw_topleft_at_size = function(xy, facing, tim
     if(!dest_wh) { dest_wh = this.wh; }
     this.do_draw(xy, facing, time, dest_wh);
 };
-GameArt.AbstractSprite.prototype.detect_click = function(xy, facing, time, mouseloc, zoom, fuzz) {
-    if(!this.wh) { return false; }
 
+/** Return bounding box for sprite-based click detection
+    @param {!Array.<number>} xy
+    @param {number} facing
+    @param {number} time
+    @param {number} zoom
+    @param {number} fuzz
+    @return {(!Array.<!Array.<number>>)|null} */
+GameArt.AbstractSprite.prototype.detect_click_bounds = function(xy, facing, time, zoom, fuzz) {
+    if(!this.wh) { return null; }
     var loc;
     if(this.center === null) {
         loc = xy;
     } else {
         loc = [xy[0]-zoom*this.center[0],xy[1]-zoom*this.center[1]];
     }
-    var my_bounds = [ [loc[0]-zoom*fuzz, loc[0]+zoom*this.wh[0]+zoom*fuzz],
-                      [loc[1]-zoom*fuzz, loc[1]+zoom*this.wh[1]+zoom*fuzz] ];
+    return [ [loc[0]-zoom*fuzz, loc[0]+zoom*this.wh[0]+zoom*fuzz],
+             [loc[1]-zoom*fuzz, loc[1]+zoom*this.wh[1]+zoom*fuzz] ];
+};
+/** Perform sprite-based click detection against a point
+    @param {!Array.<number>} xy
+    @param {number} facing
+    @param {number} time
+    @param {!Array.<number>} mouseloc
+    @param {number} zoom
+    @param {number} fuzz
+    @return {boolean} */
+GameArt.AbstractSprite.prototype.detect_click = function(xy, facing, time, mouseloc, zoom, fuzz) {
+    var my_bounds = this.detect_click_bounds(xy, facing, time, zoom, fuzz);
+    if(!my_bounds) { return false; }
     if(mouseloc[0] >= my_bounds[0][0] && mouseloc[0] < my_bounds[0][1] &&
        mouseloc[1] >= my_bounds[1][0] && mouseloc[1] < my_bounds[1][1]) {
         return true;
@@ -499,18 +518,17 @@ GameArt.range_overlap = function(a0, a1, b0, b1) {
     if(a0 >= b1 && a1 >= b1) { return false; }
     return true;
 };
+/** Perform sprite-based click detection against a rectangle
+    @param {!Array.<number>} xy
+    @param {number} facing
+    @param {number} time
+    @param {!Array.<!Array.<number>>} mouserect
+    @param {number} zoom
+    @param {number} fuzz
+    @return {boolean} */
 GameArt.AbstractSprite.prototype.detect_rect = function(xy, facing, time, mouserect, zoom, fuzz) {
-    if(!this.wh) { return false; }
-
-    var loc;
-    if(this.center === null) {
-        loc = xy;
-    } else {
-        loc = [xy[0]-zoom*this.center[0],xy[1]-zoom*this.center[1]];
-    }
-    var my_bounds = [ [loc[0]-fuzz, loc[0]+zoom*this.wh[0]+zoom*fuzz],
-                      [loc[1]-fuzz, loc[1]+zoom*this.wh[1]+zoom*fuzz] ];
-
+    var my_bounds = this.detect_click_bounds(xy, facing, time, zoom, fuzz);
+    if(!my_bounds) { return false; }
     return GameArt.range_overlap(mouserect[0][0], mouserect[0][1], my_bounds[0][0], my_bounds[0][1]) &&
            GameArt.range_overlap(mouserect[1][0], mouserect[1][1], my_bounds[1][0], my_bounds[1][1]);
 };

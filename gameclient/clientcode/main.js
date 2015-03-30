@@ -919,6 +919,7 @@ var synchronizer = new Synchronizer();
 var AI_DEBUG = 0; // 1 = display unit AI states, 2 = also print lots of AI info to console
 var PLAYFIELD_DEBUG = false; // display unit and building info debug text
 var COMBAT_DEBUG = (get_query_string('wombat') == '1');
+var CLICK_DETECTION_DEBUG = (get_query_string('click_detection_debug') == '1');
 
 // object movement/spell control states
 var control_states = {
@@ -1433,6 +1434,8 @@ GameObject.prototype.calc_draw_pos = function() {
     return [p, depth];
 };
 GameObject.prototype.update_draw_pos = function() { this.draw_pos_cache = this.calc_draw_pos(); };
+
+GameObject.prototype.detect_click = goog.abstractMethod;
 
 /** @return {boolean} */
 GameObject.prototype.is_indestructible = function() {
@@ -3666,6 +3669,29 @@ MapBlockingGameObject.prototype.calc_draw_pos = function() {
              this.y - this.spec['unit_collision_gridsize'][1]/2];
     var depth = ortho_to_depth(p);
     return [[this.x, this.y], depth];
+};
+
+MapBlockingGameObject.prototype.detect_click = function(xy, ji, zoom, fuzz) {
+    var pos = this.interpolate_pos();
+    // check orthogonal grid position against object's base area
+    var bounds = get_grid_bounds(pos, this.spec['gridsize']);
+    if(ji[0] >= bounds[0][0] && ji[0] < bounds[0][1] && ji[1] >= bounds[1][0] && ji[1] < bounds[1][1]) {
+        return true;
+    }
+    if(this.spec['click_bounds']) {
+        var c = ortho_to_playfield(pos);
+        var b = this.spec['click_bounds'];
+        var s = screen_to_playfield(xy);
+        if(s[0] >= c[0]+b[0][0] && s[0] < c[0]+b[0][1] && s[1] >= c[1]+b[1][0] && s[1] < c[1]+b[1][1]) {
+            return true;
+        }
+    } else if(this.spec['click_detection'] == 'sprite') {
+        var asset = GameArt.assets[this.get_leveled_quantity(this.spec['art_asset'])];
+        if(asset.detect_click(ortho_to_screen(pos), this.interpolate_facing(), client_time, 'normal', xy, view_zoom, fuzz)) {
+            return true;
+        }
+    }
+    return false;
 };
 
 /**
@@ -6746,23 +6772,12 @@ function find_object_at_screen_pixel(xy, ji, include_unselectable) {
             // in combat, skip destroyed buildings (but in peacetime keep them, because you want the context menu to repair)
             if(temp.is_destroyed() && session.has_attacked && (session.viewing_base.base_type != 'quarry' || session.viewing_base.base_landlord_id != session.user_id)) { continue; }
 
-            // non-mobile
-
-            // check orthogonal grid position against object's base area
-            var bounds = get_grid_bounds(objji, temp.spec['gridsize']);
-            if((ji[0] >= bounds[0][0] && ji[0] < bounds[0][1] && ji[1] >= bounds[1][0] && ji[1] < bounds[1][1]) ||
-               (temp.spec['click_detection'] == 'sprite' && GameArt.assets[temp.get_leveled_quantity(temp.spec['art_asset'])].detect_click(ortho_to_screen(objji),
-                                                                                                                                           0, client_time, 'normal', xy, view_zoom, position_fuzz))) {
+            if(temp.detect_click(xy, ji, view_zoom, position_fuzz)) {
                 found_building = temp;
                 // do not break out of loop
             }
-
         } else {
-            // mobile units use the sprite hit detection code
-            if(temp.is_destroyed()) { continue; }
-
-            var asset = GameArt.assets[temp.get_leveled_quantity(temp.spec['art_asset'])];
-            if(asset.detect_click(ortho_to_screen_3d([objji[0], temp.altitude, objji[1]]), temp.interpolate_facing(), client_time, 'normal', xy, view_zoom, position_fuzz)) {
+            if(!temp.is_destroyed() && temp.detect_click(xy, ji, view_zoom, position_fuzz)) {
                 found_units.push(temp);
             }
         }
@@ -7582,6 +7597,16 @@ GameObject.prototype.interpolate_facing = function() {
     var progress = (visit_base_pending ? 1 : (client_time - last_tick_time)/(TICK_INTERVAL/combat_time_scale()));
     return this.cur_facing + progress*(this.next_facing - this.cur_facing);
 };
+
+Mobile.prototype.detect_click = function(xy, ji, zoom, fuzz) {
+    // mobile units use the sprite hit detection code
+    var asset = GameArt.assets[this.get_leveled_quantity(this.spec['art_asset'])];
+    var pos = this.interpolate_pos();
+    if(asset.detect_click(ortho_to_screen_3d([pos[0], this.altitude, pos[1]]), this.interpolate_facing(), client_time, 'normal', xy, zoom, fuzz)) {
+        return true;
+    }
+    return false;
+}
 
 Mobile.prototype.run_ai = function() {
     if(this.ai_state === ai_states.AI_ATTACK_STATIONARY) {
@@ -46575,6 +46600,8 @@ function draw_building_or_inert(obj, powerfac) {
         }
     }
 
+    if(CLICK_DETECTION_DEBUG) { draw_click_detection(obj); }
+
     if(0 /*PLAYFIELD_DEBUG*/) {
         // draw text label
         draw_centered_text(ctx, obj.spec['ui_name'] + ' (' + obj.team + ')', [xy[0], xy[1]-18]);
@@ -46838,6 +46865,8 @@ function draw_unit(unit) {
         draw_aura(xy, [xy[0]+15*count, xy[1]-35], aura);
         count++;
     }
+
+    if(CLICK_DETECTION_DEBUG) { draw_click_detection(unit); }
 
     unit.update_permanent_effect();
 
@@ -47140,6 +47169,59 @@ function draw_selection_highlight(unit, config_override) {
     }
     if(unit.team === 'player') {
         draw_unit_control(unit, curpos);
+    }
+    ctx.restore();
+}
+
+function draw_click_detection(unit) {
+    ctx.save();
+    // color uniquely
+    var COLORS = ['rgb(255,0,0)','rgba(0,255,0)','rgb(0,0,255)'];
+    var index = unit.id.charCodeAt(unit.id.length-1);
+    ctx.fillStyle = ctx.strokeStyle = COLORS[index % COLORS.length];
+    ctx.globalAlpha = 0.15;
+    var position_fuzz = 2;
+    if(unit.is_building()) {
+        var pos = unit.interpolate_pos();
+        var bound = get_grid_bounds(pos, unit.spec['gridsize']);
+        ctx.beginPath();
+        SPUI.add_quad_to_path([ortho_to_draw([bound[0][0], bound[1][0]]),
+                               ortho_to_draw([bound[0][1], bound[1][0]]),
+                               ortho_to_draw([bound[0][1], bound[1][1]]),
+                               ortho_to_draw([bound[0][0], bound[1][1]])]);
+        ctx.fill();
+        ctx.stroke();
+
+        if(unit.spec['click_bounds']) {
+            var c = ortho_to_playfield(pos);
+            var b = unit.spec['click_bounds'];
+            ctx.save();
+            ctx.setTransform(1,0,0,1,0,0); // undo playfield transform
+            ctx.beginPath();
+            SPUI.add_quad_to_path([playfield_to_screen([c[0]+b[0][0], c[1]+b[1][0]]),
+                                   playfield_to_screen([c[0]+b[0][1], c[1]+b[1][0]]),
+                                   playfield_to_screen([c[0]+b[0][1], c[1]+b[1][1]]),
+                                   playfield_to_screen([c[0]+b[0][0], c[1]+b[1][1]])]);
+            ctx.fill();
+            ctx.stroke();
+            ctx.restore();
+        } else if(unit.spec['click_detection'] == 'sprite') {
+            var asset = GameArt.assets[unit.get_leveled_quantity(unit.spec['art_asset'])];
+            var sprite = asset.states['normal'];
+            var cound = sprite.detect_click_bounds(ortho_to_screen(pos), unit.interpolate_facing(), client_time, view_zoom, position_fuzz);
+            if(cound) {
+                ctx.save();
+                ctx.setTransform(1,0,0,1,0,0); // undo playfield transform
+                ctx.beginPath();
+                SPUI.add_quad_to_path([[cound[0][0], cound[1][0]],
+                                       [cound[0][1], cound[1][0]],
+                                       [cound[0][1], cound[1][1]],
+                                       [cound[0][0], cound[1][1]]]);
+                ctx.fill();
+                ctx.stroke();
+                ctx.restore();
+            }
+        }
     }
     ctx.restore();
 }
