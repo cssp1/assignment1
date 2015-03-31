@@ -184,6 +184,7 @@ def is_valid_alias(name):
     for c in name:
         if c in alias_disallowed_chars: return False
     if chat_filter.is_bad(name): return False
+    if 'spinpunch' in name.lower(): return False
     return True
 
 # decorate the name of a history key with a suffix for the current PvP season
