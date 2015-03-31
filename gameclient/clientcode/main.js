@@ -4301,11 +4301,11 @@ Building.prototype.is_invisible = function() { return !!this.spec['invisible']; 
 
 /** return position/text/icon/etc for the idle state, if it should be drawn in the GUI
     @return {({idle: Object,
-              asset: string,
-              icon_pos: !Array.<number>,
-              click_bounds: ((!Array.<!Array.<number>>)|null),
-              text_str: (string|null),
-              text_pos: (Array.<number>|null)})|null}
+              asset: (string|undefined),
+              icon_pos: (!Array.<number>|undefined),
+              click_bounds: ((!Array.<!Array.<number>>)|null|undefined),
+              text_str: (string|null|undefined),
+              text_pos: (Array.<number>|null|undefined)})|null}
  */
 Building.prototype.get_idle_state_appearance = function() {
     if(session.home_base && !session.has_attacked && gamedata['client']['enable_idle_icons'] && !player.is_cheater &&
@@ -4313,8 +4313,8 @@ Building.prototype.get_idle_state_appearance = function() {
        player.tutorial_state == "COMPLETE" && get_preference_setting(player.preferences, 'show_idle_buildings') &&
        read_predicate({'predicate':'LIBRARY', 'name': ('show_idle_buildings' in gamedata['predicate_library'] ? 'show_idle_buildings' : 'extended_tutorial_complete')}).is_satisfied(player,null)) {
         var idle = this.get_idle_state();
-        if(!idle || !idle['state']) { return null; }
-
+        if(!idle) { return null; }
+        if(!idle['state']) { return {idle: idle}; }
         if(!(idle['state'] in gamedata['strings']['idle_buildings'])) { throw Error('unknown building idle state '+idle['state']); }
         var icon_name = gamedata['strings']['idle_buildings'][idle['state']]['icon'];
         if(!(icon_name in GameArt.assets)) { throw Error('invalid draw_idle_icon '+icon_name); }
