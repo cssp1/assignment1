@@ -4319,8 +4319,10 @@ Building.prototype.get_idle_state_appearance = function() {
         var icon_name = gamedata['strings']['idle_buildings'][idle['state']]['icon'];
         if(!(icon_name in GameArt.assets)) { throw Error('invalid draw_idle_icon '+icon_name); }
 
+        // all coordinates here are in playfield coordinate system
+
         var icon_sprite = GameArt.assets[icon_name].states['normal'];
-        var xy = this.draw_xy();
+        var xy = this.playfield_xy();
         var default_text_height = this.get_health_bar_dims()[2];
         var icon_pos = vec_add(xy, [0, -Math.floor(0.75*default_text_height + icon_sprite.wh[1]/2)]);
 
@@ -4355,6 +4357,7 @@ Building.prototype.detect_click = function(xy, ji, zoom, fuzz) {
     if(!this.spec['worth_less_xp'] && player.get_any_abtest_value('idle_icon_type', gamedata['client']['idle_icon_type'] || 'old') == 'advanced') {
         var appearance = this.get_idle_state_appearance();
         if(appearance && appearance.click_bounds) {
+            // work in playfield coordinate system
             var p = screen_to_playfield(xy);
             var b = appearance.click_bounds;
             if(p[0] >= b[0][0] && p[0] < b[0][1] && p[1] >= b[1][0] && p[1] < b[1][1]) {
@@ -4371,9 +4374,9 @@ MapBlockingGameObject.prototype.get_odd_shift = function() {
     return [gridsize[0] > 1 && (gridsize[0]&1) ? 0.5 : 0,
             gridsize[1] > 1 && (gridsize[1]&1) ? 0.5 : 0];
 };
-MapBlockingGameObject.prototype.draw_xy = function() {
+MapBlockingGameObject.prototype.playfield_xy = function() {
     var odd_shift = this.get_odd_shift();
-    return vec_floor(ortho_to_draw(vec_add([this.x, this.y], odd_shift)));
+    return vec_floor(ortho_to_playfield(vec_add([this.x, this.y], odd_shift)));
 };
 
 
@@ -8444,7 +8447,15 @@ function playfield_to_ortho(xy) {
 function screen_to_ortho(xy) {
     return playfield_to_ortho(screen_to_playfield(xy));
 }
-
+/** @param {!Array.<number>} ji
+    @return {!Array.<number>} */
+function playfield_to_draw(ji) {
+    if(view_is_zoomed()) {
+        return ji;
+    } else {
+        return playfield_to_screen(ji);
+    }
+}
 
 // cache of last known pixel dimensions of Facebook iframe area
 var fb_iframe_dims = null;
@@ -46090,7 +46101,7 @@ Building.prototype.get_idle_state_advanced = function() {
 };
 
 function draw_building_or_inert(obj, powerfac) {
-    var xy = obj.draw_xy();
+    var xy = playfield_to_draw(obj.playfield_xy());
 
     var icon;
     var icon_state = 'unset';
@@ -46658,10 +46669,10 @@ function draw_building_or_inert(obj, powerfac) {
             var icon_sprite = GameArt.assets[appearance.asset].states['normal'];
 
             if(appearance.text_str) {
-                draw_centered_text_with_shadow(ctx, appearance.text_str, appearance.text_pos);
+                draw_centered_text_with_shadow(ctx, appearance.text_str, playfield_to_draw(appearance.text_pos));
             }
 
-            icon_sprite.draw(appearance.icon_pos, 0, client_time);
+            icon_sprite.draw(playfield_to_draw(appearance.icon_pos), 0, client_time);
         }
     }
 
