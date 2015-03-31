@@ -45995,7 +45995,7 @@ Building.prototype.get_idle_state_advanced = function() {
                                 }
                                 if(res_ok) { // can make at least one unit
                                     // detect human units by looking for a walk cycle in units.json
-                                    draw_idle_icon = (spec['walk_period'] ? 'train_advanced' : 'manufacture_advanced');
+                                    draw_idle_icon = (spec['walk_period'] ? 'train_advanced' : (spec['flying'] && 'manufacture_flying_advanced' in gamedata['strings']['idle_buildings'] ? 'manufacture_flying_advanced' : 'manufacture_advanced'));
                                     break;
                                 }
                             }
@@ -46644,7 +46644,7 @@ function draw_building_or_inert(obj, powerfac) {
     if(obj.is_building()) {
         var appearance = obj.get_idle_state_appearance();
         var idle = (appearance ? appearance.idle : null);
-        if(idle && idle['can_upgrade']) {
+        if(idle && idle['can_upgrade'] && ('upgrade_advanced' in gamedata['strings']['idle_buildings'])) {
             // draw "can upgrade" arrow, based on equip icon position
             var img = GameArt.assets[gamedata['strings']['idle_buildings']['upgrade_advanced']['icon']].states['normal'];
 
@@ -46672,7 +46672,17 @@ function draw_building_or_inert(obj, powerfac) {
                 draw_centered_text_with_shadow(ctx, appearance.text_str, playfield_to_draw(appearance.text_pos));
             }
 
+            var has_state = false;
+            if(gamedata['client']['idle_icon_pulse_period'] > 0 && mouse_state.hovering_over !== obj) {
+                has_state = true;
+                ctx.save();
+                var amp = gamedata['client']['idle_icon_pulse_amplitude'];
+                ctx.globalAlpha = (1-amp) + amp * (0.5*(Math.sin(2*Math.PI*(client_time/gamedata['client']['idle_icon_pulse_period'] + obj.anim_offset))+1));
+            }
             icon_sprite.draw(playfield_to_draw(appearance.icon_pos), 0, client_time);
+            if(has_state) {
+                ctx.restore();
+            }
         }
     }
 
