@@ -1,0 +1,2 @@
+Launch a new EC2 instance. Paste the entire contents of boostrap.sh
+into "instance data", done!

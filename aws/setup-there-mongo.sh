@@ -4,7 +4,7 @@ SYSTEM=$1
 
 . ./setup-there-common.sh
 
-YUMPACKAGES="xfsprogs telnet subversion nscd munin-node strace sendmail-cf patch fail2ban screen"
+YUMPACKAGES="git xfsprogs telnet subversion nscd munin-node strace sendmail-cf patch fail2ban screen"
 
 echo "SETUP(remote): Installing additional packages..."
 sudo yum -y -q install $YUMPACKAGES
