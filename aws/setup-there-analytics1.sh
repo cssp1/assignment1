@@ -20,7 +20,7 @@ sudo /etc/init.d/nscd start
 sudo chkconfig fail2ban on
 sudo /etc/init.d/fail2ban start
 
-sudo chkconfig mysqld on
+sudo chkconfig mysqld off # moved to RDS
 
 echo "SETUP(remote): Unpacking filesystem overlay..."
 (cd / && gunzip -c /home/ec2-user/overlay-analytics1.cpio.gz | sudo cpio -iuvd -R root:root)
@@ -63,8 +63,8 @@ echo "MISSING: /home/ec2-user/.ssh/slack.token (with incoming webhook for analyt
 echo "MISSING: /home/ec2-user/.ssh/host-awssecret"
 echo "MISSING: set up scratch space in /media/aux/tmp for backup script"
 echo "MISSING: set up swap space"
-echo "MISSING: mysql config for analytics (use /usr/bin/mysql_secure_installation to set root password)"
-# NOTE! be sure to set new databases to utf8 collate utf8_general_ci !
+echo "MISSING: mysql config for analytics (or RDS - if local, use /usr/bin/mysql_secure_installation to set root password)"
+# NOTE! be sure to set new databases to character set utf8 collate utf8_general_ci !
 # my.cnf settings: see aws/analytics1/etc/my.cnf
 
 # add analytics1 user:
@@ -82,5 +82,5 @@ echo "MISSING: mysql config for analytics (use /usr/bin/mysql_secure_installatio
 # grant select, insert, drop, alter, create temporary tables, lock tables, execute, create view, show view on $GAME_upcache.* to 'username'@'%';
 # grant select, insert, drop, alter, create temporary tables, lock tables, execute, create view, show view on skynet.* to 'username'@'%';
 
-echo "MISSING: easy_install pymongo - then see setup-there-prod.sh for MongoDB setup instructions"
+echo "MISSING: easy_install pymongo - then see setup-there-mongo.sh for MongoDB setup instructions"
 echo "MISSING: /etc/aliases: add 'root: awstech@example.com' mail alias"
