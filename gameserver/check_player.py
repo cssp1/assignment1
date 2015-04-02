@@ -289,7 +289,7 @@ if __name__ == '__main__':
 
         print fmt % ('User ID:', str(user_id))
         if player.get('alias', None):
-            print fmt % ('Alias:', player['alias'])
+            print fmt % ('Alias (Call Sign):', player['alias'])
 
         if user.get('frame_platform', None):
             print fmt % ('Frame Platform:', {'fb':'Facebook','kg':'Kongregate'}[user['frame_platform']])
