@@ -4315,8 +4315,13 @@ Building.prototype.get_idle_state_appearance = function() {
         var idle = this.get_idle_state();
         if(!idle) { return null; }
         if(!idle['state']) { return {idle: idle}; }
+
         if(!(idle['state'] in gamedata['strings']['idle_buildings'])) { throw Error('unknown building idle state '+idle['state']); }
-        var icon_name = gamedata['strings']['idle_buildings'][idle['state']]['icon'];
+        var state_data = gamedata['strings']['idle_buildings'][idle['state']];
+
+        var icon_name = state_data['icon'];
+        if(!icon_name) { return {idle: idle}; } // no icon
+
         if(!(icon_name in GameArt.assets)) { throw Error('invalid draw_idle_icon '+icon_name); }
 
         // all coordinates here are in playfield coordinate system
@@ -4329,7 +4334,7 @@ Building.prototype.get_idle_state_appearance = function() {
         var click_bounds = [[icon_pos[0] - icon_sprite.wh[0]/2, icon_pos[0] + icon_sprite.wh[0]/2],
                             [icon_pos[1] - icon_sprite.wh[1]/2, icon_pos[1] + icon_sprite.wh[1]/2]];
 
-        var text_str = gamedata['strings']['idle_buildings'][idle['state']]['ui_name'] || null;
+        var text_str = state_data['ui_name'] || null;
         var text_pos = null;
         if(text_str) {
             text_pos = icon_pos;
