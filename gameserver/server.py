@@ -11080,6 +11080,43 @@ class LivePlayer(Player):
                     gamesite.exception_log.event(server_time, 'player %d turret_head_mg_mortar_xp_fix added %d missing XP' % (self.user_id, missing_xp))
             self.history['turret_head_mg_mortar_xp_fixed'] = 1
 
+        # fix TR building/tech XP added April 2015
+        if gamedata['game_id'] == 'tr' and \
+           account_creation_time < 1927994000 and \
+           len(gamedata['player_xp']['level_xp']) >= 50 and \
+           self.history.get('201504_xp_fixed',0) < 1:
+            missing_xp = 0
+            missing_xp_dict = {}
+            for techname in ('turret_head_tow','turret_head_hel_laser','turret_head_artillery'):
+                spec = self.get_abtest_spec(TechSpec, techname)
+                for level in xrange(1, 1+self.tech.get(techname, 0)):
+                    xp = spec.get_leveled_quantity(spec.upgrade_xp, level)
+                    missing_xp_dict['%s:L%d' % (techname, level)] = xp
+                    missing_xp += xp
+            for obj in self.my_home.iter_objects():
+                if obj.is_building():
+                    if obj.spec.name in ('barrier', 'airfield', 'fishing_factory', 'flight_center', 'hardware_depot', 'hardware_factory',
+                                         'leader_factory', 'leader_lab', 'motor_pool', 'squad_bay', 'transmitter', 'warehouse', 'weapon_factory',
+                                         'weapon_lab', 'turret_emplacement'):
+                        for level in xrange(1, 1+obj.level):
+                            xp = obj.spec.get_leveled_quantity(obj.spec.upgrade_xp, level)
+                            if xp < 0:
+                                coeff = gamedata['player_xp']['buildings'][obj.spec.name if level > 1 else 'level_1']
+                                cost = sum((obj.spec.get_leveled_quantity(getattr(obj.spec, 'build_cost_'+res), level) for res in gamedata['resources']), 0)
+                                xp = int(coeff * cost)
+                            key = '%s:L%d' % (obj.spec.name, level)
+                            missing_xp_dict[key] = missing_xp_dict.get(key,0) + xp
+                            missing_xp += xp
+            self.history['201504_xp_prefix'] = self.resources.xp # save previous XP, in case we mess up
+            if missing_xp > 0:
+                self.resources.gain_xp(missing_xp, '201504_xp_fix')
+                self.mailbox_append(self.make_system_mail(gamedata['strings']['201504_xp_fix_mail'],
+                                                          replace_s = '%d' % missing_xp))
+                if gamedata['server']['log_xp_migration']:
+                    gamesite.exception_log.event(server_time, 'player %d 201504_xp_fix added %d missing XP %r' % (self.user_id, missing_xp, missing_xp_dict))
+            self.history['201504_xp_fixed'] = 1
+            self.history['201504_xp_fixed_at'] = server_time
+
         if 'destination' in self.travel_state:
             # get rid of legacy destination field
             del self.travel_state['destination']
