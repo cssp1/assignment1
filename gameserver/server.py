@@ -16927,11 +16927,13 @@ class GAMEAPI(resource.Resource):
             old_alias = session.player.alias
             old_name = session.user.get_ui_name(session.player)
 
-            if not gamesite.nosql_client.player_alias_claim(new_alias):
+            if gamesite.nosql_client.player_alias_exists(new_alias) or \
+               not gamesite.nosql_client.player_alias_claim(new_alias.lower()):
                 retmsg.append(["ERROR", "ALIAS_TAKEN"])
                 return False
             if old_alias:
-                gamesite.nosql_client.player_alias_release(old_alias)
+                gamesite.nosql_client.player_alias_release(old_alias) # for legacy case-sensitive aliases
+                gamesite.nosql_client.player_alias_release(old_alias.lower())
 
             session.player.alias = new_alias
             # if the server crashes here, playerdb might have the old alias, but only the new alias will be reserved in the DB

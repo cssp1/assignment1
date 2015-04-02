@@ -738,6 +738,12 @@ class NoSQLClient (object):
         tbl.remove({'_id': alias})
         return True
 
+    def player_alias_exists(self, alias, reason=''):
+        return self.instrument('player_alias_exists(%s)'%reason, self._player_alias_exists, (alias,))
+    def _player_alias_exists(self, alias):
+        tbl = self.player_alias_table()
+        return bool(tbl.find_one({'_id': alias}))
+
     def player_alias_claim(self, alias, reason=''):
         return self.instrument('player_alias_claim(%s)'%reason, self._player_alias_claim, (alias,))
     def _player_alias_claim(self, alias):
