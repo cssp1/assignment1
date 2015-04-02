@@ -2846,6 +2846,7 @@ class Session(object):
         self.deferred_history_update = False
         self.deferred_power_change = False
         self.deferred_player_state_update = False
+        self.deferred_player_cooldowns_update = False
         self.deferred_donated_units_update = False
         self.deferred_object_state_updates = set()
         self.deferred_player_name_update = False
@@ -19384,6 +19385,7 @@ class GAMEAPI(resource.Resource):
             # the gift will be successfully queued, now remember that we sent it so we can't send one again too quickly
             session.player.cooldown_trigger('send_gift:'+str(recipient_user_id), gamedata['gift_interval'])
             #session.user.create_fb_open_graph_action('sent_gift', {'profile': fbid})
+            session.deferred_player_cooldowns_update = True
 
         if len(db_message['to']) > 0:
             gamesite.msg_client.msg_send([db_message])
@@ -20601,6 +20603,10 @@ class GAMEAPI(resource.Resource):
         if session.deferred_player_state_update:
             session.deferred_player_state_update = False
             retmsg.append(["PLAYER_STATE_UPDATE", session.player.resources.calc_snapshot().serialize()])
+
+        if session.deferred_player_cooldowns_update:
+            session.deferred_player_cooldowns_update = False
+            retmsg.append(["COOLDOWNS_UPDATE", session.player.cooldowns])
 
         if session.deferred_donated_units_update:
             session.deferred_donated_units_update = False
