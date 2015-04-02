@@ -1768,8 +1768,8 @@ class User:
         if not SpinConfig.config['enable_facebook']:
             return
         assert self.fb_oauth_token
-        ver = SpinConfig.config.get('facebook_api_versions',{}).get('apprequests',None)
-        if ver and float(ver[1:]) >= 2.0:
+        ver = SpinFacebook.api_version_number('apprequests')
+        if ver >= 2.0:
             self.retrieve_facebook_requests_start_v2() # new /apprequests method
         else:
             self.retrieve_facebook_requests_start_v1() # old fql method

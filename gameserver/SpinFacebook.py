@@ -94,6 +94,16 @@ def api_version_string(feature):
         sver = 'v2.2' # fallback default (sync with: FacebookSDK.js, fb_guest.html, gameserver/SpinFacebook.py, gameclient/clientcode/SPFB.js)
     return (sver + '/') if sver else ''
 
+def api_version_number(feature):
+    api_versions = SpinConfig.config.get('facebook_api_versions', {})
+    if api_versions and (feature in api_versions):
+        ver = float(api_versions[feature][1:])
+    elif api_versions and ('default' in api_versions):
+        ver = float(api_versions['default'][1:])
+    else:
+        ver = 2.2
+    return ver
+
 def versioned_graph_endpoint(feature, path, protocol = 'https://', subdomain = 'graph'):
     return protocol + subdomain + '.facebook.com/'+api_version_string(feature) + path
 
