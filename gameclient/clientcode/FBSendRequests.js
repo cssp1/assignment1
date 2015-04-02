@@ -72,7 +72,17 @@ FBSendRequests.invoke_send_gifts_dialog_v2 = function(to_user, reason, info_list
             throw Error('no recipients! rowdata '+dialog.user_data['rowdata'].length);
         }
 
-        var recipient_user_ids = goog.array.map(goog.object.getKeys(dialog.user_data['recipients']),
+        // grab stuff out of user_data since it is going to disappear
+        var recipients = dialog.user_data['recipients'];
+        var rowdata = dialog.user_data['rowdata'];
+        var is_instant = dialog.user_data['instant'];
+        var attempt_id = dialog.user_data['attempt_id'];
+        var reason = dialog.user_data['reason'];
+
+        GameArt.assets["success_playful_22"].states['normal'].audio.play(client_time);
+        close_parent_dialog(w);
+
+        var recipient_user_ids = goog.array.map(goog.object.getKeys(recipients),
                                                 // this returns strings, so coerce back to integers
                                                 function(x) { return parseInt(x, 10); });
 
@@ -80,7 +90,7 @@ FBSendRequests.invoke_send_gifts_dialog_v2 = function(to_user, reason, info_list
 
         // get list of non-Facebook recipient user IDs
         var non_facebook_recipients = goog.array.filter(recipient_user_ids, function(user_id) {
-            var info = goog.array.find(dialog.user_data['rowdata'], function(x) { return x['user_id'] == user_id; });
+            var info = goog.array.find(rowdata, function(x) { return x['user_id'] == user_id; });
             return !(info['facebook_id']);
         });
 
@@ -89,6 +99,7 @@ FBSendRequests.invoke_send_gifts_dialog_v2 = function(to_user, reason, info_list
                 player.cooldown_client_trigger('send_gift:'+user_id.toString(), gamedata['gift_interval']);
             });
             send_to_server.func(["SEND_GIFTS2", null, non_facebook_recipients]);
+            invoke_ui_locker();
         }
 
         // for Facebook receipients, we have to break into batches of 50 and then invoke the Facebook API
@@ -97,7 +108,7 @@ FBSendRequests.invoke_send_gifts_dialog_v2 = function(to_user, reason, info_list
         var fb_recipients = goog.array.filter(
             // convert user_ids to Facebook IDs (or null)
             goog.array.map(recipient_user_ids, function(user_id) {
-                var info = goog.array.find(dialog.user_data['rowdata'], function(x) { return x['user_id'] == user_id; });
+                var info = goog.array.find(rowdata, function(x) { return x['user_id'] == user_id; });
                 if(info['facebook_id']) {
                     return {facebook_id: info['facebook_id'], user_id: user_id};
                 }
@@ -106,8 +117,7 @@ FBSendRequests.invoke_send_gifts_dialog_v2 = function(to_user, reason, info_list
             // filter out nulls
             function (data) { return data !== null; });
 
-        GameArt.assets["success_playful_22"].states['normal'].audio.play(client_time);
-        close_parent_dialog(w);
+
 
         var batches = [];
         // partition recipients into batches of <= 50 for FB API calls
@@ -123,12 +133,12 @@ FBSendRequests.invoke_send_gifts_dialog_v2 = function(to_user, reason, info_list
             batches.push(batch);
         }
 
-        var do_send = function (_dialog, _batches, batch_num, _do_send) {
+        var do_send = function (_is_instant, _attempt_id, _reason, _batches, batch_num, _do_send) {
             // Facebook API wants a comma-separated list of the recipient Facebook IDs
             var to_string = goog.array.map(_batches[batch_num], function(r) { return r.facebook_id; }).join(',');
 
-            metric_event((_dialog.user_data['instant'] ? '4103_send_gifts_fb_prompt' : '4102_send_gifts_ingame_fb_prompt'),
-                         {'api': 'apprequests', 'api_version': 2, 'attempt_id': _dialog.user_data['attempt_id'], 'method': _dialog.user_data['reason'], 'batch': _batches[batch_num].length,
+            metric_event((_is_instant ? '4103_send_gifts_fb_prompt' : '4102_send_gifts_ingame_fb_prompt'),
+                         {'api': 'apprequests', 'api_version': 2, 'attempt_id': _attempt_id, 'method': _reason, 'batch': _batches[batch_num].length,
                           'sum': player.get_denormalized_summary_props('brief')});
             var viral = gamedata['virals']['send_gifts'];
             var params = {'method':'apprequests',
@@ -141,12 +151,12 @@ FBSendRequests.invoke_send_gifts_dialog_v2 = function(to_user, reason, info_list
                           'show_error': !spin_secure_mode
                          };
 
-            SPFB.ui(params, (function (__dialog, __batches, _batch_num, __do_send) { return function(response) {
+            SPFB.ui(params, (function (__is_instant, __attempt_id, __reason, __batches, _batch_num, __do_send) { return function(response) {
                 //console.log("FBSendRequests.FBSendRequestsDialogV2 response"); console.log(response);
                 var do_next = true;
                 if(response && response['request']) {
                     // success: {'request': 'NNNNNNN', 'to': ['IDIDIDIDID',...]}
-                    metric_event('4104_send_gifts_fb_success', {'api':'apprequests', 'api_version': 2, 'attempt_id': __dialog.user_data['attempt_id'], 'method': __dialog.user_data['reason'],
+                    metric_event('4104_send_gifts_fb_success', {'api':'apprequests', 'api_version': 2, 'attempt_id': __attempt_id, 'method': __reason,
                                                                     'request_id': response['request'].toString(), 'batch':(response['to'] ? response['to'].length : 0),
                                                                     'sum': player.get_denormalized_summary_props('brief')});
 
@@ -160,6 +170,7 @@ FBSendRequests.invoke_send_gifts_dialog_v2 = function(to_user, reason, info_list
                         });
 
                         send_to_server.func(["SEND_GIFTS2", response['request'].toString(), user_id_list]);
+                        invoke_ui_locker();
                     }
                 } else {
                     // cancel: {'error_code': 4201, 'error_message': 'User canceled the Dialog flow'}
@@ -169,7 +180,7 @@ FBSendRequests.invoke_send_gifts_dialog_v2 = function(to_user, reason, info_list
                             FBSendRequests.user_id_blacklist[r.user_id.toString()] = 1;
                         });
                     } else {
-                        metric_event('4105_send_gifts_fb_fail', {'api':'apprequests', 'api_version': 2, 'attempt_id': __dialog.user_data['attempt_id'], 'method': __dialog.user_data['reason'],
+                        metric_event('4105_send_gifts_fb_fail', {'api':'apprequests', 'api_version': 2, 'attempt_id': __attempt_id, 'method': __reason,
                                                                  'message': (response && response['error_message'] ? response['error_message'] : 'unknown'),
                                                                  'sum': player.get_denormalized_summary_props('brief')});
                         do_next = false; // after one cancel, cancel all the rest
@@ -177,12 +188,12 @@ FBSendRequests.invoke_send_gifts_dialog_v2 = function(to_user, reason, info_list
                 }
 
                 if(_batch_num+1 < __batches.length && do_next) {
-                    __do_send(__dialog, __batches, _batch_num+1, __do_send);
+                    __do_send(__is_instant, __attempt_id, __reason, __batches, _batch_num+1, __do_send);
                 }
-            }; })(_dialog, _batches, batch_num, _do_send));
+            }; })(_is_instant, _attempt_id, _reason, _batches, batch_num, _do_send));
         };
 
-        do_send(dialog, batches, 0, do_send);
+        do_send(is_instant, attempt_id, reason, batches, 0, do_send);
     };
 
     change_selection_ui(dialog);
