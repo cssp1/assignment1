@@ -12604,6 +12604,15 @@ function update_desktop_dialogs() {
     dialog.xy = [desktop_dialogs['desktop_top'].xy[0], // Math.max(0, Math.floor(canvas_width/2 - dialog.wh[0]/2)),
                  canvas_height - dialog.wh[1]];
 
+    if(!session.home_base && session.has_attacked && gamedata['client']['end_attack_button_placement'] == 'bottom_left') {
+        // make sure desktop_bottom and unit deployment bar don't slide underneath the End Attack button with narrow browser window
+
+        // compute absolute X coordinate of right-hand edge of End Attack button, plus a little padding
+        var edge = 2*gamedata['dialogs']['attack_button_dialog']['bottom_left_offset'][0] +
+            gamedata['dialogs']['attack_button_dialog']['dimensions'][0];
+        dialog.xy[0] = Math.max(dialog.xy[0], edge);
+    }
+
     if(global_spell_icon) {
         var namsp = null;
         if(selection.unit && selection.unit.is_mobile()) {
