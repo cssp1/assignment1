@@ -3210,6 +3210,7 @@ def main(args):
         'error_sound',
         'building_context_1buttons_bg',
         'action_button_resizable',
+        'menu_button_resizable',
         'xp_gain_sound',
         'harvest_sound',
         'minor_level_up_sound',
