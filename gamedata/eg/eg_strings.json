@@ -364,6 +364,7 @@
         "join_alliance": { "ui_name": "Join Clan", "icon": "stop_icon_small" },
         "join_alliance_advanced": { "ui_name": "Join Clan", "icon": "transmit_icon_small" },
         "upgrade_to_join_alliance": { "ui_name": "Upgrade to Join Clan", "icon": "transmit_icon_small" },
+        "upgrade_to_add_army_space": {},
         "request_unit_donation": { "ui_name": "Reinforcements", "icon": "stop_icon_small" },
         "request_unit_donation_advanced": { "ui_name": "Reinforcements", "icon": "transmit_icon_small" },
         "upgrade": { "ui_name": "Upgrade", "icon": "stop_icon_small" },

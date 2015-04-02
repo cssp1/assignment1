@@ -17976,7 +17976,7 @@ function invoke_building_context_menu(mouse_xy) {
             if(session.home_base && obj.is_factory()) {
                 upgrade_is_active = false;
                 if(obj.is_manufacturing() && player.unit_speedups_enabled()) {
-                    buttons.push(new ContextMenuButton({ui_name: gamedata['spells']['SPEEDUP_FOR_MONEY']['ui_name'], onclicK: function() {invoke_speedup_dialog('speedup'); }}));
+                    buttons.push(new ContextMenuButton({ui_name: gamedata['spells']['SPEEDUP_FOR_MONEY']['ui_name'], onclick: function() {invoke_speedup_dialog('speedup'); }}));
                 }
                 buttons.push(new ContextMenuButton({ui_name: gamedata['spells']['MAKE_DROIDS']['ui_name'],
                                                     onclick: (function (_obj) { return function() {
@@ -46136,6 +46136,18 @@ Building.prototype.get_idle_state_advanced = function() {
                 }
             }
         }
+    } else if(this.spec['name'] === gamedata['squad_building']) {
+        if(can_upgrade) {
+            draw_idle_icon = 'upgrade_to_add_army_space';
+        }
+        /* // disregard resource requirements?
+        if(this.level < this.get_max_ui_level()) {
+            var req = get_leveled_quantity(this.spec['requires']||null, this.level+1);
+            if(!req || read_predicate(req).is_satisfied(player, null)) {
+                draw_idle_icon = 'upgrade_to_add_army_space';
+            }
+        }
+        */
     }
 
     return {'state': draw_idle_icon,
