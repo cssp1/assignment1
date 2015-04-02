@@ -565,7 +565,7 @@ if __name__ == '__main__':
                 cur.execute("ALTER TABLE "+sql_util.sym(activity_table)+" ADD INDEX by_time (time)")
             if do_townhall:
                 if verbose: print 'building indices for', townhall_table
-                cur.execute("ALTER TABLE "+sql_util.sym(townhall_table)+" ADD INDEX ts (user_id, townhall_level, time), ADD INDEX ts2 (user_id, time, townhall_level)")
+                cur.execute("ALTER TABLE "+sql_util.sym(townhall_table)+" ADD INDEX ts (user_id, townhall_level, time), ADD INDEX ts2 (user_id, time, townhall_level), ADD INDEX by_th_time (townhall_level, time)")
 
             if do_tech:
                 pass # note: index is created incrementally now, to avoid long lockup of database
