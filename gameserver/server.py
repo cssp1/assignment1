@@ -1835,57 +1835,67 @@ class User:
     def retrieve_facebook_requests_start_v2(self):
         request_url = SpinFacebook.versioned_graph_endpoint('apprequests', 'me/apprequests') + \
                                                  '?'+ urllib.urlencode(dict(access_token = self.fb_oauth_token))
-        gamesite.AsyncHTTP_Facebook.queue_request(server_time, request_url, lambda result: self.retrieve_facebook_requests_complete_v2(result))
+        gamesite.AsyncHTTP_Facebook.queue_request(server_time, request_url, lambda result: self.retrieve_facebook_requests_paged_v2(result))
 
-    def retrieve_facebook_requests_complete_v2(self, result):
-        start_time = time.time()
+    def retrieve_facebook_requests_paged_v2(self, result, buffer = None):
+        if buffer is None:
+            buffer = []
 
         result = SpinJSON.loads(result)
-        if result: # XXX handle paging
 
-            to_delete = [] # list of request IDs to delete
+        if result:
+            buffer += result['data']
 
-            for req in result['data']:
-                if gamedata['server'].get('log_fb_apprequests',0) >= 2:
-                    gamesite.exception_log.event(server_time, 'player %s got FB apprequest %s' % (self.user_id, repr(req)))
-                my_data = req.get('data', None)
+        if result and ('paging' in result) and ('next' in result['paging']) and \
+           (('count' not in result) or (len(list_so_far) < int(result['count']))):
+            # fetch next page
+            gamesite.AsyncHTTP_Facebook.queue_request(server_time, result['paging']['next'],
+                                                      lambda result: self.retrieve_facebook_requests_paged_v2(result, buffer = buffer))
+        else:
+            # it's complete now
+            self.retrieve_facebook_requests_complete_v2(buffer)
 
-                # dispatch to different types of requests based on my_data
-                if my_data == 'friend_invite':
-                    sender_id = gamesite.social_id_table.social_id_to_spinpunch('fb'+req['from']['id'], False)
-                    if sender_id is None:
-                        sender_id = -1
+    def retrieve_facebook_requests_complete_v2(self, request_list):
+        to_delete = [] # list of request IDs to delete
 
-                    props = {'sender_fb_id':req['from']['id'], 'sender_user_id': sender_id, 'facebook_request_id':req['id'].split('_')[0], 'created_time':req['created_time']}
-                    metric_event_coded(self.user_id, '7120_friend_invite_accepted', props.copy())
+        for req in request_list:
+            if gamedata['server'].get('log_fb_apprequests',0) >= 2:
+                gamesite.exception_log.event(server_time, 'player %s got FB apprequest %s' % (self.user_id, repr(req)))
+            my_data = req.get('data', None)
 
-                    # record acquisition event
-                    props['type'] = 'facebook_friend_invite'
-                    self.update_acquisition_data(props, None)
+            # dispatch to different types of requests based on my_data
+            if my_data == 'friend_invite':
+                sender_id = gamesite.social_id_table.social_id_to_spinpunch('fb'+req['from']['id'], False)
+                if sender_id is None:
+                    sender_id = -1
 
-                elif my_data == 'gift':
-                    # reception of gifts is handled server-side upon login with dbclient gift_receive - the underlyting apprequest actually does nothing!
-                    pass
-                elif my_data is None:
-                    # this is a "naked" Facebook request that's just a text message
-                    pass
-                else:
-                    gamesite.exception_log.event(server_time, 'player %d received unhandled Facebook apprequest %s' % (self.user_id, repr(req)))
+                props = {'sender_fb_id':req['from']['id'], 'sender_user_id': sender_id, 'facebook_request_id':req['id'].split('_')[0], 'created_time':req['created_time']}
+                metric_event_coded(self.user_id, '7120_friend_invite_accepted', props.copy())
 
-                # tell Facebook to delete the request (even unhandled ones)
-                to_delete.append(req['id'])
+                # record acquisition event
+                props['type'] = 'facebook_friend_invite'
+                self.update_acquisition_data(props, None)
 
-            if to_delete:
-                if gamedata['server'].get('log_fb_apprequests',0) >= 2:
-                    gamesite.exception_log.event(server_time, 'player %s deleting %d FB apprequests' % (self.user_id, len(to_delete)))
+            elif my_data == 'gift':
+                # reception of gifts is handled server-side upon login with dbclient gift_receive - the underlyting apprequest actually does nothing!
+                pass
+            elif my_data is None:
+                # this is a "naked" Facebook request that's just a text message
+                pass
+            else:
+                gamesite.exception_log.event(server_time, 'player %d received unhandled Facebook apprequest %s' % (self.user_id, repr(req)))
 
-                batch = [{'method':'DELETE', 'relative_url': str(id)} for id in to_delete]
-                delete_url = SpinFacebook.versioned_graph_endpoint('apprequests', '') + \
-                             '?' + urllib.urlencode(dict(access_token=self.fb_oauth_token, batch=SpinJSON.dumps(batch)))
-                gamesite.AsyncHTTP_Facebook.queue_request(server_time, delete_url, lambda x: None, method = 'POST')
+            # tell Facebook to delete the request (even unhandled ones)
+            to_delete.append(req['id'])
 
-        end_time = time.time()
-        admin_stats.record_latency('AsyncHTTP(facebook_apprequests_v2)', end_time-start_time)
+        if to_delete:
+            if gamedata['server'].get('log_fb_apprequests',0) >= 2:
+                gamesite.exception_log.event(server_time, 'player %s deleting %d FB apprequests' % (self.user_id, len(to_delete)))
+
+            batch = [{'method':'DELETE', 'relative_url': str(id)} for id in to_delete]
+            delete_url = SpinFacebook.versioned_graph_endpoint('apprequests', '') + \
+                         '?' + urllib.urlencode(dict(access_token=self.fb_oauth_token, batch=SpinJSON.dumps(batch)))
+            gamesite.AsyncHTTP_Facebook.queue_request(server_time, delete_url, lambda x: None, method = 'POST')
 
     def create_fb_open_graph_action(self, action, params):
         if not SpinConfig.config['enable_facebook']:
