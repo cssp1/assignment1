@@ -491,7 +491,8 @@ FACEBOOK_CAMPAIGN_MAP = {
 # also implemented in SQL in analytics_views.sql - please keep in sync!
 def remap_facebook_campaigns(x):
     if x.startswith('viral_') or x.startswith('open_graph_'): return 'game_viral'
-    if '_bx_' in x: return 'cross_promo'
+    if '_bx_' in x: return 'cross_promo_paid'
+    if '_XP_' in x: return 'cross_promo_free'
     if x.endswith('/'): x = x[:-1]
     if '.com' in x: x = x[:x.index('.com')+len('.com')] # get rid of junk on the end of .com URL
     if x.startswith('canvasbookmark_feat'): x = 'canvasbookmark_featured' # some browsers added junk at the end
