@@ -34765,10 +34765,18 @@ function update_buy_gamebucks_sku2(dialog) {
 
 
 // utility to completely lock up the UI until server catches up, with optional cb to call after we close
+
+/** @type {SPUI.Dialog|null} */
+var g_ui_locker = null; // global instance
+
 /** @param {number|null=} sync_marker
     @param {function()=} cb */
 function invoke_ui_locker(sync_marker, cb) {
     if(!sync_marker && (sync_marker !== 0)) { sync_marker = synchronizer.request_sync(); }
+    if(g_ui_locker) {
+        g_ui_locker.user_data['sync_marker'] = Math.max(g_ui_locker.user_data['sync_marker'], sync_marker);
+        return g_ui_locker;
+    }
     var dialog_data = gamedata['dialogs']['ui_locker'];
     var dialog = new SPUI.Dialog(dialog_data);
     dialog.user_data['dialog'] = 'ui_locker';
@@ -34778,6 +34786,8 @@ function invoke_ui_locker(sync_marker, cb) {
     dialog.auto_center();
     dialog.modal = dialog_data['modal'];
     dialog.ondraw = update_ui_locker;
+    dialog.on_destroy = function(dialog) { if(g_ui_locker === dialog) { g_ui_locker = null; } };
+    g_ui_locker = dialog;
     return dialog;
 }
 function update_ui_locker(dialog) {
