@@ -21,7 +21,10 @@
      "ui_subject": "Birthday Gift",
      "ui_body": "Happy Birthday Commander! Please enjoy these special items on your very special day.",
      "expire_in": 604800, // one week
-     "show_if": {"predicate": "NEW_BIRTHDAY", "tag": "gift"},
+     "show_if": {"predicate": "AND", "subpredicates":[
+         {"predicate": "NEW_BIRTHDAY", "tag": "gift"},
+         {"predicate": "QUEST_COMPLETED", "quest_name": "activate_an_item"} // do not interfere with tutorial
+     ]},
      "on_send": {"consequent": "AND", "subconsequents": [
          {"consequent": "MARK_BIRTHDAY", "tag": "gift"},
          {"consequent": "PLAYER_HISTORY", "key": "birthday_gifts_received", "method": "increment", "value": 1}
