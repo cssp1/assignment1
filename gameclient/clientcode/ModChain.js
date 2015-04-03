@@ -162,6 +162,8 @@ ModChain.display_value = function(value, mode, context) {
             ui_value = (100*(1-value)).toFixed(0)+'%';
         } else if(mode == 'pct') {
             ui_value = (100*value).toFixed(0)+'%';
+        } else if(mode == 'pct.1') {
+            ui_value = (100*value).toFixed(1)+'%';
         } else if(mode == 'integer') {
             ui_value = pretty_print_number(value);
         } else if(mode == 'fixed:2') {
