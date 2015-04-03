@@ -408,11 +408,20 @@ InvokeBuyGamebucksConsequent.prototype.execute = function(state) {
 function InvokeUpgradeConsequent(data) {
     goog.base(this, data);
     this.tech = data['tech'] || null;
+    this.building = data['building'] || null;
 }
 goog.inherits(InvokeUpgradeConsequent, Consequent);
 InvokeUpgradeConsequent.prototype.execute = function(state) {
-    change_selection_ui(null);
-    invoke_upgrade_tech_dialog(this.tech, null);
+    if(this.tech) {
+        invoke_upgrade_tech_dialog(this.tech);
+    } else if(this.building) {
+        var target_obj = find_highest_level_object_by_type(this.building);
+        if(target_obj) {
+            invoke_upgrade_building_dialog(target_obj);
+        } else {
+            invoke_build_dialog(gamedata['buildings'][this.building]['build_category']);
+        }
+    }
 };
 
 /** @constructor
@@ -447,6 +456,18 @@ goog.inherits(InvokeMapConsequent, Consequent);
 InvokeMapConsequent.prototype.execute = function(state) {
     change_selection_ui(null);
     invoke_map_dialog(this.chapter);
+};
+
+/** @constructor
+  * @extends Consequent */
+function InvokeManufactureDialogConsequent(data) {
+    goog.base(this, data);
+    this.category = data['category'] || null;
+    this.specname = data['specname'] || null;
+}
+goog.inherits(InvokeManufactureDialogConsequent, Consequent);
+InvokeManufactureDialogConsequent.prototype.execute = function(state) {
+    invoke_manufacture_dialog('consequent', this.category, this.specname);
 };
 
 /** @constructor
@@ -486,6 +507,16 @@ goog.inherits(InvokeTopAlliancesDialogConsequent, Consequent);
 InvokeTopAlliancesDialogConsequent.prototype.execute = function(state) {
     var dialog = _invoke_alliance_dialog();
     alliance_list_change_tab(dialog, 'top');
+};
+
+/** @constructor
+  * @extends Consequent */
+function InvokeInventoryDialogConsequent(data) {
+    goog.base(this, data);
+}
+goog.inherits(InvokeInventoryDialogConsequent, Consequent);
+InvokeInventoryDialogConsequent.prototype.execute = function(state) {
+    invoke_inventory_dialog();
 };
 
 /** @constructor
@@ -687,9 +718,11 @@ function read_consequent(data) {
     else if(kind === 'INVOKE_BUILD_DIALOG') { return new InvokeBuildDialogConsequent(data); }
     else if(kind === 'INVOKE_CRAFTING_DIALOG') { return new InvokeCraftingConsequent(data); }
     else if(kind === 'INVOKE_MAP_DIALOG') { return new InvokeMapConsequent(data); }
+    else if(kind === 'INVOKE_MANUFACTURE_DIALOG') { return new InvokeManufactureDialogConsequent(data); }
     else if(kind === 'INVOKE_BLUEPRINT_CONGRATS') { return new InvokeBlueprintCongratsConsequent(data); }
     else if(kind === 'INVOKE_CHANGE_REGION_DIALOG') { return new InvokeChangeRegionDialogConsequent(data); }
     else if(kind === 'INVOKE_TOP_ALLIANCES_DIALOG') { return new InvokeTopAlliancesDialogConsequent(data); }
+    else if(kind === 'INVOKE_INVENTORY_DIALOG') { return new InvokeInventoryDialogConsequent(data); }
     else if(kind === 'INVITE_FRIENDS_PROMPT') { return new InviteFriendsPromptConsequent(data); }
     else if(kind === 'FACEBOOK_PERMISSIONS_PROMPT') { return new FacebookPermissionsPromptConsequent(data); }
     else if(kind === 'OPEN_URL') { return new OpenURLConsequent(data); }

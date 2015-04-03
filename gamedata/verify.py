@@ -1514,8 +1514,8 @@ CONSEQUENT_TYPES = set(['NULL', 'AND', 'RANDOM', 'IF', 'COND', 'LIBRARY',
                         'PLAYER_HISTORY', 'GIVE_LOOT', 'SESSION_LOOT', 'GIVE_TROPHIES', 'GIVE_TECH', 'APPLY_AURA', 'REMOVE_AURA', 'COOLDOWN_TRIGGER', 'COOLDOWN_TRIGGER', 'COOLDOWN_RESET',
                         'METRIC_EVENT', 'SPAWN_SECURITY_TEAM', 'CHAT_SEND', 'FIND_AND_REPLACE_ITEMS', 'FIND_AND_REPLACE_OBJECTS',
                         'VISIT_BASE', 'DISPLAY_MESSAGE', 'MESSAGE_BOX', 'TUTORIAL_ARROW', 'INVOKE_MAP_DIALOG', 'START_AI_ATTACK',
-                        'INVOKE_CRAFTING_DIALOG', 'INVOKE_BUILD_DIALOG', 'INVOKE_MISSIONS_DIALOG', 'INVOKE_STORE_DIALOG', 'INVOKE_BUY_GAMEBUCKS_DIALOG',
-                        'INVOKE_CHANGE_REGION_DIALOG', 'INVOKE_BLUEPRINT_CONGRATS', 'INVOKE_TOP_ALLIANCES_DIALOG', 'MARK_BIRTHDAY',
+                        'INVOKE_CRAFTING_DIALOG', 'INVOKE_BUILD_DIALOG', 'INVOKE_MISSIONS_DIALOG', 'INVOKE_STORE_DIALOG', 'INVOKE_UPGRADE_DIALOG', 'INVOKE_BUY_GAMEBUCKS_DIALOG', 'INVOKE_MANUFACTURE_DIALOG',
+                        'INVOKE_CHANGE_REGION_DIALOG', 'INVOKE_BLUEPRINT_CONGRATS', 'INVOKE_TOP_ALLIANCES_DIALOG', 'INVOKE_INVENTORY_DIALOG', 'MARK_BIRTHDAY',
                         'OPEN_URL', 'FACEBOOK_PERMISSIONS_PROMPT', 'DAILY_TIP_UNDERSTOOD', 'RANDOM', 'FORCE_SCROLL',
                         'GIVE_UNITS', 'TAKE_UNITS', 'PRELOAD_ART_ASSET', 'HEAL_ALL_UNITS', 'HEAL_ALL_BUILDINGS',
                         'ENABLE_COMBAT_RESOURCE_BARS', 'ENABLE_DIALOG_COMPLETION', 'INVITE_FRIENDS_PROMPT', 'DISPLAY_DAILY_TIP', 'TAKE_ITEMS',
@@ -1700,12 +1700,24 @@ def check_consequent(cons, reason = '', context = None, context_data = None):
         if ('select_mission' in cons) and (cons['select_mission'] not in gamedata['quests']):
             error |= 1; print '%s: select_mission "%s" not found' % (reason, cons['select_mission'])
 
+    elif cons['consequent'] == 'INVOKE_UPGRADE_DIALOG':
+        if ('building' in cons) and (cons['building'] not in gamedata['buildings']):
+            error |= 1; print '%s: building "%s" not found' % (reason, cons['building'])
+        if ('tech' in cons) and (cons['tech'] not in gamedata['tech']):
+            error |= 1; print '%s: tech "%s" not found' % (reason, cons['tech'])
+
+    elif cons['consequent'] == 'INVOKE_MANUFACTURE_DIALOG':
+        if ('category' in cons) and (cons['category'] not in gamedata['strings']['manufacture_categories']):
+            error |= 1; print '%s: category "%s" not found' % (reason, cons['category'])
+        if ('specname' in cons) and (cons['specname'] not in gamedata['units']):
+            error |= 1; print '%s: unit specname "%s" not found' % (reason, cons['specname'])
+
     elif cons['consequent'] in ('CHANGE_TITLE', 'UNLOCK_TITLE'):
         if cons['name'] not in gamedata['titles']:
             error |= 1; print '%s: invalid name "%s" not found in gamedata.titles' % (reason, cons['name'])
 
     elif cons['consequent'] in ['INVOKE_BLUEPRINT_CONGRATS', 'COOLDOWN_TRIGGER', 'COOLDOWN_RESET', 'SESSION_LOOT',
-                                'INVOKE_TOP_ALLIANCES_DIALOG', 'INVOKE_STORE_DIALOG', 'INVOKE_MAP_DIALOG', 'MESSAGE_BOX',
+                                'INVOKE_TOP_ALLIANCES_DIALOG', 'INVOKE_INVENTORY_DIALOG', 'INVOKE_STORE_DIALOG', 'INVOKE_MAP_DIALOG', 'MESSAGE_BOX',
                                 'INVOKE_CRAFTING_DIALOG', 'INVOKE_BUILD_DIALOG',
                                 'TUTORIAL_ARROW', 'INVOKE_BUY_GAMEBUCKS_DIALOG', 'INVOKE_CHANGE_REGION_DIALOG',
                                 'FACEBOOK_PERMISSIONS_PROMPT', 'FORCE_SCROLL', 'HEAL_ALL_UNITS', 'HEAL_ALL_BUILDINGS',
