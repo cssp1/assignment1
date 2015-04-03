@@ -69,7 +69,7 @@ if __name__ == '__main__':
                     'cost_iron': data['cost_iron'][LEVEL_SHIFT:LEVEL_SHIFT+mod_levels],
                     'research_credit_cost': data['research_credit_cost'][LEVEL_SHIFT:LEVEL_SHIFT+mod_levels],
                     'research_time': data['research_time'][LEVEL_SHIFT:LEVEL_SHIFT+mod_levels],
-                    'activation': { "predicate": "ALWAYS_FALSE" }, # obsolete
+                    'show_if': { "predicate": "ALWAYS_FALSE" }, # obsolete
                     'requires': { "predicate": "ALWAYS_FALSE" }, # obsolete
 #                    'activation': { "predicate": "ANY_ABTEST", "key": "enable_mod_techs", "value": 1, "default": 0 },
 #                    'requires': [{"predicate": "TECH_LEVEL", "tech": name, "min_level": min(max(level+LEVEL_REQ,1),8)} \

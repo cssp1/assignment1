@@ -282,6 +282,10 @@ def check_mandatory_fields(specname, spec, kind):
         if FIELD in spec:
             error |= check_predicate(spec[FIELD], reason = specname+':'+FIELD)
 
+    # "activation" is deprecated
+    if 'activation' in spec:
+        error |= 1; print '%s "activation" is deprecated, change to "show_if"' % specname
+
     if 'research_categories' in spec:
         for cat in spec['research_categories']:
             found = False
@@ -599,6 +603,10 @@ def check_tech(specname, keyname, spec, maxlevel):
     for FIELD in ('activation', 'show_if'):
         if FIELD in spec:
             error |= check_predicate(spec[FIELD], reason = specname+':'+FIELD)
+
+    # "activation" is deprecated
+    if 'activation' in spec:
+        error |= 1; print '%s "activation" is deprecated, change to "show_if"' % specname
 
     if 'completion' in spec:
         comp = spec['completion'] if type(spec['completion']) is list else [spec['completion'],]

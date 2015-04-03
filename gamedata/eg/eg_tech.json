@@ -21,6 +21,6 @@
         "cost_iron": [1],
         "research_credit_cost": [1],
         "research_time": [1],
-        "activation": {"predicate": "ALWAYS_FALSE"}
+        "show_if": {"predicate": "ALWAYS_FALSE"}
     }
 }
