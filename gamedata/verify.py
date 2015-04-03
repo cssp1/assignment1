@@ -2319,6 +2319,7 @@ def check_ai_bases_and_attacks(ai_bases, ai_attacks):
                 by_completion[comp] = bdep
 
     for strid, base in sorted(ai_bases['bases'].items(), key = lambda id_base: int(id_base[0])):
+        strid = '%s (%s%s)' % (strid, base['ui_name'], (' L%d' % base['resources']['player_level']) if 'resources' in base else '')
         if base.get('kind', 'ai_base') == 'ai_attack':
             berror, bdep, complist = check_ai_attack(strid, base)
         else:
