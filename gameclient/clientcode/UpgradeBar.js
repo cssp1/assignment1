@@ -146,19 +146,19 @@ UpgradeBar.update_contents = function(dialog, kind, specname, new_level, obj_id)
         var temp = dialog.data['widgets']['output'][(level > 1 ? 'ui_goody_leveled' : 'ui_goody_unleveled')];
         if('tech' in goody) {
             var tech_spec = gamedata['tech'][goody['tech']];
-            if(tech_spec['developer_only'] && !player.is_developer()) { return; |
+            if(tech_spec['developer_only'] && !player.is_developer()) { return; }
             if(('show_if' in tech_spec) && !read_predicate(tech_spec['show_if']).is_satisfied(player,null)) { return; }
             temp = temp.replace('%THING', tech_spec['ui_name']);
             linkcode = 'tech='+goody['tech'];
         } else if('building' in goody) {
             var building_spec = gamedata['buildings'][goody['building']];
-            if(building_spec['developer_only'] && !player.is_developer()) { return; |
+            if(building_spec['developer_only'] && !player.is_developer()) { return; }
             if(('show_if' in building_spec) && !read_predicate(building_spec['show_if']).is_satisfied(player,null)) { return; }
             temp = temp.replace('%THING', building_spec['ui_name']);
             linkcode = 'building='+goody['building'];
         } else if('crafting_recipe' in goody) {
             var recipe = gamedata['crafting']['recipes'][goody['crafting_recipe']];
-            if(recipe['developer_only'] && !player.is_developer()) { return; |
+            if(recipe['developer_only'] && !player.is_developer()) { return; }
             if(('show_if' in recipe) && !read_predicate(recipe['show_if']).is_satisfied(player,null)) { return; }
             var n;
             if('ui_name' in recipe) {
