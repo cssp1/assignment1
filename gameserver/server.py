@@ -8940,7 +8940,11 @@ class Player(AbstractPlayer):
                                             self.apply_modstat_to_building(obj, effect['stat'], effect['method'], strength, 'equipment', equip['name'], {'effect':i, 'level':level})
                                         elif effect['code'] == 'apply_player_aura':
                                             strength = GameObjectSpec.get_leveled_quantity(effect.get('aura_strength',1), level)
-                                            player.do_apply_aura(effect['aura_name'], strength = strength, duration = -1, level = effect.get('aura_level',1),
+                                            if 'aura_level' in effect:
+                                                aura_level = GameObjectSpec.get_leveled_quantity(effect.get('aura_level',1), level)
+                                            else:
+                                                aura_level = level # same level as item
+                                            player.do_apply_aura(effect['aura_name'], strength = strength, duration = -1, level = aura_level,
                                                                  stack = effect.get('stack',-1), data = effect.get('data',None), ignore_limit = True)
 
             # calculate effect of techs
