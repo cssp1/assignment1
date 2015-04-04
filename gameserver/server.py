@@ -6288,7 +6288,7 @@ class Base(object):
 
             # this override is for hitlist, which is "either townhall or X%+ base damage"
             for aura in session.player.player_auras:
-                for effect in aura.get('effects',[]):
+                for effect in aura.get('effects',[]): # XXXXXX doesn't this need to indirect via 'spec'?
                     if effect['code'] == 'base_damage_win_condition':
                         if base_damage >= effect['amount']:
                             return True
@@ -6920,7 +6920,7 @@ class Player(AbstractPlayer):
 
         auras = self.get_any_abtest_value('starting_player_auras', gamedata['starting_conditions']['player_auras'])
         for aura in auras:
-            self.apply_aura(aura['name'], aura.get('strength',1), aura.get('duration',-1), stack = aura.get('stack',-1), ignore_limit = True)
+            self.apply_aura(aura['name'], strength = aura.get('strength',1), duration = aura.get('duration',-1), level = aura.get('level',1), stack = aura.get('stack',-1), ignore_limit = True)
 
     def is_ai(self): return self.read_only
     def is_human(self): return not self.is_ai()
@@ -7079,26 +7079,31 @@ class Player(AbstractPlayer):
             if (not force) and (retmsg is not None):
                 retmsg.append(["ERROR", "HARMLESS_RACE_CONDITION"])
 
-    def do_apply_aura(self, aura_name, aura_strength, aura_duration, stack = -1, data = None, ignore_limit = False):
+    def do_apply_aura(self, aura_name, strength = 1, duration = -1, level = 1, stack = -1, data = None, ignore_limit = False):
         spec = gamedata['auras'][aura_name]
         aura = None
 
-        # find any existing aura with same spec
+        # find any existing aura with same spec and level
         for a in self.player_auras:
-            if a['spec'] == aura_name:
+            if a['spec'] == aura_name and a.get('level',1) == level:
                 aura = a
                 break
+
         if aura is not None:
             # stack existing aura
 
             # OVERWRITE old strength - necessary so you can't
             # infinitely extend a powerful aura by repeatedly
             # applying cheaper, weaker auras with the same effect.
-            aura['strength'] = aura_strength
+            if strength != 1:
+                aura['strength'] = strength
+            elif ('strength' in aura):
+                del aura['strength']
+
             if stack > 0:
                 aura['stack'] = aura.get('stack',1) + stack
 
-            new_end_time = server_time + aura_duration if aura_duration > 0 else -1
+            new_end_time = server_time + duration if duration > 0 else -1
 
             if True: # always overwrite aura duration
                 aura['start_time'] = server_time
@@ -7116,9 +7121,13 @@ class Player(AbstractPlayer):
             if (not ignore_limit) and (len(self.player_auras) >= gamedata['player_aura_limit']):
                 return False
             # create new aura
-            aura = {'spec': aura_name, 'strength': aura_strength, 'start_time': server_time}
-            if aura_duration > 0:
-                aura['end_time'] = server_time + aura_duration
+            aura = {'spec': aura_name, 'start_time': server_time}
+            if strength != 1:
+                aura['strength'] = strength
+            if level != 1:
+                aura['level'] = level
+            if duration > 0:
+                aura['end_time'] = server_time + duration
             if stack > 0:
                 aura['stack'] = stack
             if data is not None:
@@ -7128,9 +7137,9 @@ class Player(AbstractPlayer):
         return True
 
     # confusing: remove_aura sends stattab update, apply_aura does not (both recalc stattab)
-    def apply_aura(self, aura_name, aura_strength, aura_duration, stack = -1, data = None, ignore_limit = False):
+    def apply_aura(self, *args, **kwargs):
         self.prune_player_auras()
-        success = self.do_apply_aura(aura_name, aura_strength, aura_duration, stack = stack, data = data, ignore_limit = ignore_limit)
+        success = self.do_apply_aura(*args, **kwargs)
         if success:
             self.recalc_stattab(self)
         return success
@@ -7147,7 +7156,7 @@ class Player(AbstractPlayer):
             aura_name = data['aura_name']
             spec = gamedata['auras'][aura_name]
             assert spec['ends_on'] == 'session_change' # regional auras should go away on session change
-            ret |= self.apply_aura(aura_name, data.get('aura_strength',1), data.get('aura_duration',-1), data.get('stack',-1), ignore_limit = True)
+            ret |= self.apply_aura(aura_name, strength = data.get('aura_strength',1), duration = data.get('aura_duration',-1), level = data.get('aura_level',1), stack = data.get('stack',-1), ignore_limit = True)
         return ret
 
     def run_battle_end_auras(self, outcome, session, retmsg):
@@ -8774,7 +8783,7 @@ class Player(AbstractPlayer):
                 decay = True
 
         if decay:
-            if self.apply_aura('trophy_pvp_decay', 1, -1, data = {'base_repair_time':base_repair_time}, ignore_limit = True) and (retmsg is not None):
+            if self.apply_aura('trophy_pvp_decay', data = {'base_repair_time':base_repair_time}, ignore_limit = True) and (retmsg is not None):
                 retmsg.append(["PLAYER_AURAS_UPDATE" if self is session.player else "ENEMY_AURAS_UPDATE", self.player_auras])
         else:
             self.remove_aura(session, retmsg, 'trophy_pvp_decay', force = True)
@@ -8862,7 +8871,7 @@ class Player(AbstractPlayer):
                 has_n = len(self.item_sets[set_name])
                 aura_name = set_spec['bonus_aura'][has_n-1]
                 if aura_name and (aura_name in gamedata['auras']):
-                    self.player.do_apply_aura(aura_name, 1, -1, ignore_limit = True) # stack = has_n?
+                    self.player.do_apply_aura(aura_name, ignore_limit = True) # stack = has_n?
 
         def __init__(self, player, observer, additional_base = None):
             assert additional_base is not player.my_home # avoid accidentally iterating twice through home
@@ -8916,8 +8925,8 @@ class Player(AbstractPlayer):
                                         if effect['code'] == 'modstat':
                                             self.apply_modstat_to_building(obj, effect['stat'], effect['method'], effect['strength'], 'equipment', equip['name'], {'effect':i})
                                         elif effect['code'] == 'apply_player_aura':
-                                            player.do_apply_aura(effect['aura_name'], effect.get('aura_strength',1), -1,
-                                                                 effect.get('stack',-1), effect.get('data',None), ignore_limit=True)
+                                            player.do_apply_aura(effect['aura_name'], strength = effect.get('aura_strength',1), duration = -1, level = effect.get('aura_level',1),
+                                                                 stack = effect.get('stack',-1), data = effect.get('data',None), ignore_limit = True)
 
             # calculate effect of techs
             for tech_name, level in player.tech.iteritems():
@@ -16116,7 +16125,7 @@ class GAMEAPI(resource.Resource):
                     strength = 1
                     stack = -1
 
-                session.player.do_apply_aura(spec['name'], strength, togo, stack = stack, ignore_limit = True)
+                session.player.do_apply_aura(spec['name'], strength = strength, duration = togo, stack = stack, ignore_limit = True)
                 need_aura_update = True
 
         session.player.recalc_stattab(session.player)
@@ -16718,7 +16727,7 @@ class GAMEAPI(resource.Resource):
             assert target == 'player'
             #assert aura_duration > 0
 
-            success = session.player.apply_aura(aura_name, aura_strength, aura_duration, stack = aura_stack)
+            success = session.player.apply_aura(aura_name, strength = aura_strength, duration = aura_duration, stack = aura_stack)
             if success:
                 session.player.stattab.send_update(session, retmsg)
             else:
@@ -19534,8 +19543,8 @@ class GAMEAPI(resource.Resource):
                 elif msg['type'] == 'apply_aura':
                     end_time = msg['end_time']
                     if end_time > server_time:
-                        if session.player.apply_aura(msg['aura_name'], msg.get('aura_strength',1),
-                                                     end_time - server_time, ignore_limit = True):
+                        if session.player.apply_aura(msg['aura_name'], strength = msg.get('aura_strength',1), level = msg.get('aura_level',1), data = msg.get('aura_data',None),
+                                                     duration = end_time - server_time, ignore_limit = True):
                             retmsg.append(["PLAYER_AURAS_UPDATE", session.player.player_auras])
                     to_ack.append(msg['msg_id'])
 

@@ -871,7 +871,8 @@ def update_turf(db, lock_manager, region_id, dry_run = True):
                                             'expire_time': end_time,
                                             'end_time': end_time,
                                             'aura_name': aura['spec'],
-                                            'aura_strength': aura['strength']}])
+                                            'aura_level': aura.get('level',1),
+                                            'aura_strength': aura.get('strength',1)}])
 
                 if chat_client:
                     if (winner_id != prev_winner_id) and (total_points > 0):

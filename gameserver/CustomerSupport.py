@@ -208,7 +208,7 @@ class HandleChatGag(Handler):
     def do_exec_online(self, session, retmsg):
         if 'duration' in self.args:
             # new-style gag
-            if session.player.apply_aura('chat_gagged', 1, int(self.args['duration']), ignore_limit = True):
+            if session.player.apply_aura('chat_gagged', duration = int(self.args['duration']), ignore_limit = True):
                 session.player.stattab.send_update(session, session.deferred_messages)
         else:
             # old-style gag
