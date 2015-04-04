@@ -9614,6 +9614,7 @@ class Player(AbstractPlayer):
                 'attacker_facebook_id':summary['attacker_facebook_id'],
                 'attacker_name':summary['attacker_name'],
                 'attacker_level':summary['attacker_level'],
+                'defender_outcome':summary['defender_outcome'],
                 'base_id': summary['base_id'],
                 'base_damage': summary['base_damage'],
                 'lost_units':sum(summary['loot'].get('units_killed', {}).itervalues()),

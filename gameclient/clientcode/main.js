@@ -14049,7 +14049,22 @@ function invoke_you_were_attacked_dialog(recent_attacks) {
         }
     }
 
-    dialog.widgets['you_endured'].str = dialog.data['widgets']['you_endured']['ui_name'].replace('%d', pretty_print_number(recent_attacks.length));
+    var outcome_win = 0, outcome_loss = 0, outcome_unknown = 0;
+    goog.array.forEach(recent_attacks, function(a) {
+        if(a['defender_outcome'] == 'victory') {
+            outcome_win += 1;
+        } else if(a['defender_outcome'] == 'defeat') {
+            outcome_loss += 1;
+        } else {
+            outcome_unknown += 1;
+        }
+    });
+
+    if(outcome_unknown == 0 && gamedata['common_win_condition'] == 'battle_stars') {
+        dialog.widgets['you_endured'].str = dialog.data['widgets']['you_endured']['ui_name_winloss'].replace('%total', pretty_print_number(recent_attacks.length)).replace('%win', pretty_print_number(outcome_win)).replace('%loss', pretty_print_number(outcome_loss));
+    } else {
+        dialog.widgets['you_endured'].str = dialog.data['widgets']['you_endured']['ui_name_waves'].replace('%total', pretty_print_number(recent_attacks.length));
+    }
 
     dialog.widgets['you_destroyed'].show = (killed_units>0);
     dialog.widgets['you_destroyed'].str = dialog.data['widgets']['you_destroyed']['ui_name'].replace('%d', pretty_print_number(killed_units));
@@ -14125,7 +14140,7 @@ function invoke_you_were_attacked_dialog(recent_attacks) {
 };
 
 function test_you_were_attacked_dialog() {
-    var at = {'lost_iron':100, 'lost_water':200, 'lost_units':5, 'defender_protection_expired_at':server_time-60, 'killed_units':5, 'killed_units_water':300, 'killed_units_iron':400, 'defender_xp': 123, 'time': server_time-30, 'attacker_name': 'FOO', 'attacker_user_id':1112, 'attacker_facebook_id':'example1', 'attacker_level':5, 'viewing_trophies_pvp':20};
+    var at = {'defender_outcome': 'victory', 'lost_iron':100, 'lost_water':200, 'lost_units':5, 'defender_protection_expired_at':server_time-60, 'killed_units':5, 'killed_units_water':300, 'killed_units_iron':400, 'defender_xp': 123, 'time': server_time-30, 'attacker_name': 'FOO', 'attacker_user_id':1112, 'attacker_facebook_id':'example1', 'attacker_level':5, 'viewing_trophies_pvp':20};
     invoke_you_were_attacked_dialog([at,at]);
 }
 

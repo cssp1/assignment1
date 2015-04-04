@@ -4951,6 +4951,7 @@
         "default_button": "repair_instant_button",
         "widgets": {
             "sunken": {"kind": "StaticImage", "xy":[8,35], "dimensions":[754,418], "asset": "dialog_sunken_754x418" },
+            "splash_bg": { "kind": "SolidRect", "xy": [331,55], "dimensions": [410,338], "color": [0,0,0,1] },
             "splash": {"kind": "StaticImage", "xy":[332,56], "dimensions":[408,336], "asset": "splash_defense" },
             "divider": { "kind": "Line", "xy": [306, 56], "dimensions": [0, 383], "color": [0,0,0,0.5], "stroke_width": 1 },
 
@@ -4979,7 +4980,7 @@
 
             "attacked_by": { "kind": "TextField", "xy": [32,205], "dimensions": [277,22], "text_size": 13, "text_style": "normal",
                              "text_hjustify": "left",
-                             "ui_name": "Attacked by %s and %d others",
+                             "ui_name": "Attacked by %s",
                              "ui_name_one_other": "Attacked by %s and %d other",
                              "ui_name_many_others": "Attacked by %s and %d others"
                            },
@@ -4991,7 +4992,10 @@
 
             "you_endured": { "kind": "TextField", "xy": [32,308], "dimensions": [277,22], "text_size": 13, "text_style": "normal",
                              "text_color": [0,0.85,0,1],
-                             "text_hjustify": "left", "ui_name": "You endured %d attack wave(s)" },
+                             "text_hjustify": "left",
+                             "ui_name_waves": "You endured %total attack wave(s)",
+                             "ui_name_winloss": "You endured %total attack(s) (%win Won, %loss Lost)"
+                           },
             "you_destroyed": { "kind": "TextField", "xy": [32,323], "dimensions": [277,22], "text_size": 13, "text_style": "normal",
                                "text_color": [0,0.85,0,1],
                                "text_hjustify": "left", "ui_name": "You destroyed %d attacking unit(s)" },
