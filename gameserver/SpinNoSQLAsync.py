@@ -10,6 +10,8 @@
 import SpinConfig
 from twisted.internet import reactor, defer
 import txmongo
+import pymongo.errors
+import time
 
 # adjust some connection parameters by monkey-patching
 txmongo.connection._Connection.initialDelay = 2 # Delay for the first reconnection attempt

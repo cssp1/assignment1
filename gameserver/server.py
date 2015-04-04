@@ -1847,7 +1847,7 @@ class User:
             buffer += result['data']
 
         if result and ('paging' in result) and ('next' in result['paging']) and \
-           (('count' not in result) or (len(list_so_far) < int(result['count']))):
+           (('count' not in result) or (len(buffer) < int(result['count']))):
             # fetch next page
             gamesite.AsyncHTTP_Facebook.queue_request(server_time, result['paging']['next'],
                                                       lambda result: self.retrieve_facebook_requests_paged_v2(result, buffer = buffer))
