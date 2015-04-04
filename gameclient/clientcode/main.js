@@ -3909,7 +3909,7 @@ Building.prototype.is_emplacement = function() { return this.spec['equip_slots']
 // return the name of the turret head item equipped here, if any, otherwise null
 Building.prototype.turret_head_item = function() {
     if(this.equipment && this.equipment['turret_head'] && this.equipment['turret_head'].length > 0) {
-        return this.equipment['turret_head'][0];
+        return this.equipment['turret_head'][0] ? player.decode_equipped_item(this.equipment['turret_head'][0])['spec'] : null;
     }
     return null;
 };
@@ -3926,9 +3926,9 @@ Building.prototype.is_minefield_armed = function() { return (this.equipment && t
 // returns the name of mine item associated with this minefield, if any, otherwise null
 Building.prototype.minefield_item = function() {
     if(this.equipment && this.equipment['mine'] && this.equipment['mine'].length > 0) {
-        return this.equipment['mine'][0];
+        return (this.equipment['mine'][0] ? player.decode_equipped_item(this.equipment['mine'][0])['spec'] : null);
     } else if(this.config && this.config['mine'] && this.config['mine'].length > 0) {
-        return (typeof(this.config['mine']) === 'string' ? this.config['mine'] : this.config['mine'][0]);
+        return (typeof(this.config['mine']) === 'string' ? this.config['mine'] : player.decode_equipped_item(this.config['mine'][0])['spec']);
     }
     return null;
 };
@@ -6436,13 +6436,23 @@ UnitEquipSlotAddress.prototype.equals = function(other) {
     return (goog.base(this, 'equals', other) && this.specname == other.specname);
 };
 
+/** Legacy equipment entry format is just a specname string. New equipment format is a full {'spec':..., 'level':...} dictionary
+    @param {?} data
+    @return {Object} */
+player.decode_equipped_item = function(data) {
+    if(typeof(data) === 'string') {
+        return {'spec':data};
+    }
+    return data;
+};
+
 /** Iterate through all equipped items
     @param {function(Object, EquipSlotAddress):(boolean|undefined)} func (return true to stop iteration) */
 player.equipped_item_iter = function(func) {
     var stop = false;
     goog.object.forEach(player.unit_equipment, function(equipment, specname) {
         goog.object.forEach(equipment, function(name_list, slot_type) {
-            goog.array.forEach(name_list, function(name, slot_index) { if(name) { stop |= func({'spec':name}, new UnitEquipSlotAddress(specname, slot_type, slot_index)); } });
+            goog.array.forEach(name_list, function(name, slot_index) { if(name) { stop |= func(player.decode_equipped_item(name), new UnitEquipSlotAddress(specname, slot_type, slot_index)); } });
         });
     });
     if(stop) { return; }
@@ -6450,7 +6460,7 @@ player.equipped_item_iter = function(func) {
         if(obj.is_building() && obj.team === 'player') {
             if(obj.equipment) {
                 goog.object.forEach(obj.equipment, function(name_list, slot_type) {
-                    goog.array.forEach(name_list, function(name, slot_index) { if(name) { stop |= func({'spec':name}, new BuildingEquipSlotAddress(obj.id, slot_type, slot_index)); } });
+                    goog.array.forEach(name_list, function(name, slot_index) { if(name) { stop |= func(player.decode_equipped_item(name), new BuildingEquipSlotAddress(obj.id, slot_type, slot_index)); } });
                 });
             }
         }
@@ -21956,7 +21966,7 @@ function invoke_equip_chooser(inv_dialog, parent_widget, tech, unit, slot_type, 
     // see what is equipped already, if anything
     var equipped_now = null;
     if(equip && (slot_type in equip) && (slot_n < equip[slot_type].length)) {
-        equipped_now = equip[slot_type][slot_n];
+        equipped_now = equip[slot_type][slot_n] ? player.decode_equipped_item(equip[slot_type][slot_n])['spec'] : null;
     }
 
     var items = [];
@@ -29962,8 +29972,8 @@ function update_crafting_dialog_status_mines_and_missiles(dialog) {
                     if((tag in session.minefield_tags_by_tag) && (session.cur_objects.has_object(session.minefield_tags_by_tag[tag]))) {
                         // minefield exists
                         obj = session.cur_objects.get_object(session.minefield_tags_by_tag[tag]);
-                        cur_mine = (obj.equipment && (delivery_slot_type in obj.equipment) && obj.equipment[delivery_slot_type].length > 0 ? obj.equipment[delivery_slot_type][0] : null);
-                        cur_config = (obj.config && (delivery_slot_type in obj.config) && (obj.config[delivery_slot_type] in gamedata['items']) ? obj.config[delivery_slot_type] : null);
+                        cur_mine = (obj.equipment && (delivery_slot_type in obj.equipment) && obj.equipment[delivery_slot_type].length > 0 && obj.equipment[delivery_slot_type][0] ? player.decode_equipped_item(obj.equipment[delivery_slot_type][0])['spec'] : null);
+                        cur_config = (obj.config && (delivery_slot_type in obj.config) && obj.config[delivery_slot_type] && (player.decode_equipped_item(obj.config[delivery_slot_type])['spec'] in gamedata['items']) ? player.decode_equipped_item(obj.config[delivery_slot_type])['spec'] : null);
                     }
                 } else if(category == 'missiles') {
                     obj = find_object_by_type(catspec['delivery_building_for_ui']);
@@ -38210,7 +38220,7 @@ function update_upgrade_dialog_equipment(dialog) {
 
                     // update the items shown in the equipment slots
                     if(equip && (type_name in equip) && (equip[type_name].length > n) && equip[type_name][n]) {
-                        var especname = equip[type_name][n];
+                        var especname = player.decode_equipped_item(equip[type_name][n])['spec'];
                         var espec = ItemDisplay.get_inventory_item_spec(especname);
                         ItemDisplay.set_inventory_item_asset(dialog.widgets['equip_item'+slot_i], espec);
                         dialog.widgets['equip_item'+slot_i].show = true;
@@ -46614,7 +46624,7 @@ function draw_building_or_inert(obj, powerfac) {
             var item_list = obj.equipment[slot_type];
             for(var i = 0; i < item_list.length; i++) {
                 if(item_list[i]) {
-                    var espec = ItemDisplay.get_inventory_item_spec(item_list[i]);
+                    var espec = ItemDisplay.get_inventory_item_spec(player.decode_equipped_item(item_list[i])['spec']);
                     if(('equip' in espec) && ('show_to_enemy' in espec['equip']) && !espec['equip']['show_to_enemy'] && obj.team !== 'player') { continue; }
                     elevel = Math.max(elevel, espec['level'] || 1);
                     ecount += 1;
