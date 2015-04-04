@@ -8873,6 +8873,18 @@ class Player(AbstractPlayer):
                 if aura_name and (aura_name in gamedata['auras']):
                     self.player.do_apply_aura(aura_name, ignore_limit = True) # stack = has_n?
 
+        # we have to modify get_leveled_quantity() since "concat" values are lists
+        @staticmethod
+        def get_modstat_strength(effect, level):
+            if effect['method'] == 'concat':
+                assert type(effect['strength']) is list and len(effect['strength']) >= 1
+                if type(effect['strength'][0]) is not list:
+                    return effect['strength']
+                else:
+                    return GameObjectSpec.get_leveled_quantity(effect['strength'], level)
+            else:
+                return GameObjectSpec.get_leveled_quantity(effect['strength'], level)
+
         def __init__(self, player, observer, additional_base = None):
             assert additional_base is not player.my_home # avoid accidentally iterating twice through home
             self.modded_buildings = {}
@@ -8918,14 +8930,17 @@ class Player(AbstractPlayer):
                         for item in Equipment.equip_iter(obj.equipment):
                             if item['spec'] in gamedata['items']:
                                 equip = gamedata['items'][item['spec']]
+                                level = item.get('level',1)
                                 effects = equip['equip']['effects']
                                 for i in xrange(len(effects)):
                                     effect = effects[i]
                                     if (not 'apply_if' in effect) or Predicates.read_predicate(effect['apply_if']).is_satisfied(self.player, None):
                                         if effect['code'] == 'modstat':
-                                            self.apply_modstat_to_building(obj, effect['stat'], effect['method'], effect['strength'], 'equipment', equip['name'], {'effect':i})
+                                            strength = self.get_modstat_strength(effect, level)
+                                            self.apply_modstat_to_building(obj, effect['stat'], effect['method'], strength, 'equipment', equip['name'], {'effect':i, 'level':level})
                                         elif effect['code'] == 'apply_player_aura':
-                                            player.do_apply_aura(effect['aura_name'], strength = effect.get('aura_strength',1), duration = -1, level = effect.get('aura_level',1),
+                                            strength = GameObjectSpec.get_leveled_quantity(effect.get('aura_strength',1), level)
+                                            player.do_apply_aura(effect['aura_name'], strength = strength, duration = -1, level = effect.get('aura_level',1),
                                                                  stack = effect.get('stack',-1), data = effect.get('data',None), ignore_limit = True)
 
             # calculate effect of techs
@@ -8944,25 +8959,26 @@ class Player(AbstractPlayer):
                     for effect in tech_spec.effects:
                         if effect['code'] == 'modstat':
                             if (not 'apply_if' in effect) or Predicates.read_predicate(effect['apply_if']).is_satisfied(self.player, None):
+                                strength = self.get_modstat_strength(effect, level)
                                 if tech_spec.affects_unit:
-
-                                    self.apply_modstat_to_unit(tech_spec.affects_unit, effect['stat'], effect['method'], GameObjectSpec.get_leveled_quantity(effect['strength'], level), 'tech', tech_name, {'level':level})
+                                    self.apply_modstat_to_unit(tech_spec.affects_unit, effect['stat'], effect['method'], strength, 'tech', tech_name, {'level':level})
                                 elif tech_spec.affects_manufacture_category:
-                                    self.apply_modstat_to_manufacture_category(tech_spec.affects_manufacture_category, effect['stat'], effect['method'], GameObjectSpec.get_leveled_quantity(effect['strength'], level), 'tech', tech_name, {'level':level})
+                                    self.apply_modstat_to_manufacture_category(tech_spec.affects_manufacture_category, effect['stat'], effect['method'], strength, 'tech', tech_name, {'level':level})
 
 
             # calculate effects of unit equipment
             for name, equipment in player.unit_equipment.iteritems():
-                for slot_type, items in equipment.iteritems():
-                    for item in items:
-                        item_spec = gamedata['items'].get(item, None)
-                        if not item_spec or ('equip' not in item_spec): continue # skip invalid specs
-                        effects = item_spec['equip']['effects']
-                        for i in xrange(len(effects)):
-                            effect = effects[i]
-                            if effect['code'] == 'modstat':
-                                if (not 'apply_if' in effect) or Predicates.read_predicate(effect['apply_if']).is_satisfied(self.player, None):
-                                    self.apply_modstat_to_unit(name, effect['stat'], effect['method'], effect['strength'], 'equipment', item, {'effect':i})
+                for item in Equipment.equip_iter(equipment):
+                    item_spec = gamedata['items'].get(item['spec'], None)
+                    if not item_spec or ('equip' not in item_spec): continue # skip invalid specs
+                    effects = item_spec['equip']['effects']
+                    level = item.get('level',1)
+                    for i in xrange(len(effects)):
+                        effect = effects[i]
+                        if effect['code'] == 'modstat':
+                            if (not 'apply_if' in effect) or Predicates.read_predicate(effect['apply_if']).is_satisfied(self.player, None):
+                                strength = self.get_modstat_strength(effect, level)
+                                self.apply_modstat_to_unit(name, effect['stat'], effect['method'], strength, 'equipment', item_spec['name'], {'effect':i, 'level':level})
 
             self.quarry_control_limit = 0
 
@@ -9029,18 +9045,25 @@ class Player(AbstractPlayer):
                     continue
                 spec = gamedata['auras'][aura['spec']]
                 if not spec.get('server', False): continue
+                level = aura.get('level',1)
 
                 if 'effects' in spec: # new-style auras
                     for effect in spec['effects']:
                         if ('apply_if' in effect) and (not Predicates.read_predicate(effect['apply_if']).is_satisfied(self.player, None)): continue
                         end_time = aura.get('end_time',-1)
-                        props = {'end_time':end_time} if end_time > 0 else None
+                        if end_time > 0 or level != 1:
+                            props = {}
+                            if end_time > 0: props['end_time'] = end_time
+                            if level != 1: props['level'] = level
+                        else:
+                            props = None
+
                         if effect['code'] == 'modstat':
                             # usually we get the strength from the aura, but optionally override from the effect spec
                             if 'strength_per_stack' in effect:
                                 strength = effect['strength_per_stack']*aura.get('stack',1)
                             elif 'strength' in effect:
-                                strength = effect['strength']
+                                strength = self.get_modstat_strength(effect, level)
                             else:
                                 strength = aura.get('strength',1)
 
