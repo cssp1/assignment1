@@ -19,6 +19,7 @@ def inventory_schema(sql_util): return {
                ('event_name', 'VARCHAR(128) NOT NULL')] + \
               sql_util.summary_in_dimensions() + \
               [('spec', 'VARCHAR(255) NOT NULL'),
+               ('level', 'INT1'),
                ('stack', 'INT4 NOT NULL'),
                ('expire_time', 'INT8'),
                ('reason', 'VARCHAR(32)')],
@@ -28,6 +29,7 @@ def inventory_summary_schema(sql_util): return {
     'fields': [('day', 'INT8 NOT NULL')] + \
               sql_util.summary_out_dimensions() + \
               [('spec', 'VARCHAR(255) NOT NULL'),
+               ('level', 'INT1'),
                ('event_name', 'VARCHAR(128) NOT NULL'),
                ('reason', 'VARCHAR(32)'),
                ('stack', 'INT8 NOT NULL')],
@@ -97,6 +99,7 @@ if __name__ == '__main__':
                        ('event_name',row['event_name'])] + \
                        sql_util.parse_brief_summary(row['sum']) + \
                       [('spec',row['spec']),
+                       ('level',row.get('level',None)),
                        ('stack',row['stack']),
                        ('expire_time',row.get('expire_time',None)),
                        ('reason',row.get('reason',None))]
@@ -155,12 +158,13 @@ if __name__ == '__main__':
                         "       townhall_level AS townhall_level, " + \
                         "       "+sql_util.encode_spend_bracket("prev_receipts")+" AS spend_bracket, " + \
                         "       spec AS spec, " + \
+                        "       level AS level, " + \
                         "       event_name AS event_name, " + \
                         "       reason AS reason, " + \
                         "       SUM(stack) AS stack " + \
                         "FROM " + sql_util.sym(inventory_table) + " inv " + \
                         "WHERE time >= %s AND time < %s+86400 " + \
-                        "GROUP BY day, frame_platform, country_tier, townhall_level, spend_bracket, spec, event_name, reason ORDER BY NULL", [day_start,]*2)
+                        "GROUP BY day, frame_platform, country_tier, townhall_level, spend_bracket, spec, level, event_name, reason ORDER BY NULL", [day_start,]*2)
 
             con.commit() # one commit per day
     else:

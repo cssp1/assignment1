@@ -25,6 +25,7 @@ crafting_recipes_schema = {
     'fields': [('recipe_id', 'VARCHAR(64) NOT NULL'),
                ('is_output', 'TINYINT(1) NOT NULL'),
                ('resource', 'VARCHAR(64) NOT NULL'),
+               ('level', 'INT1'),
                ('amount', 'INT4 NOT NULL')],
     'indices': {'master': {'keys': [('recipe_id','ASC'),('is_output','ASC')]}}
     }
@@ -176,7 +177,7 @@ if __name__ == '__main__':
             if kind == 'unit': num_levels = len(data['max_hp'])
             elif kind == 'building': num_levels = len(data['build_time'])
             elif kind == 'tech': num_levels = len(data['research_time'])
-            elif kind == 'item': num_levels = 1
+            elif kind == 'item': num_levels = data.get('level_max',1)
             elif kind == 'recipe': num_levels = 1
 
 
@@ -262,6 +263,7 @@ if __name__ == '__main__':
             keyvals.append((('recipe_id', specname),
                             ('is_output', 0),
                             ('resource', entry['spec']),
+                            ('level', entry.get('level',None)),
                             ('amount', entry.get('stack',1))))
 
         for entry in data['product']:
@@ -272,6 +274,7 @@ if __name__ == '__main__':
             keyvals.append((('recipe_id', specname),
                             ('is_output', 1),
                             ('resource', res),
+                            ('level', entry.get('level',None)),
                             ('amount', amt)))
 
         total += len(keyvals)
