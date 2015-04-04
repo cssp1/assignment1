@@ -78,7 +78,11 @@ echo "SETUP(remote): (Re)starting munin-node..."
 sudo /etc/init.d/munin-node restart
 
 # allow Python to bind to lower ports (dangerous?)
-sudo setcap 'cap_net_bind_service=+ep' /usr/bin/python2.6
+for P in /usr/bin/python2.6 /usr/bin/python26 /usr/bin/python2.7 /usr/bin/python27; do
+    if [ -e $P ]; then
+	sudo setcap 'cap_net_bind_service=+ep' $P
+    fi
+done
 
 echo "SETUP(remote): ${GAME_ID}prod setup done!"
 
