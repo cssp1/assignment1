@@ -167,12 +167,15 @@ ItemDisplay.add_inventory_item_effect = function(widget, str, color) {
 
 /** return displayable name for item of given spec
     @param {Object} spec
+    @param {?number=} level
     @returns {string} */
-ItemDisplay.get_inventory_item_ui_name = function(spec) {
+ItemDisplay.get_inventory_item_ui_name = function(spec, level) {
     if(spec['fungible'] && spec['resource'] == 'gamebucks') {
         return Store.gamebucks_ui_name();
     } else {
-        return spec['ui_name'];
+        var ret = spec['ui_name'];
+        if(level) { ret += ' L'+level.toString(); }
+        return ret;
     }
 };
 
@@ -190,12 +193,15 @@ ItemDisplay.strip_inventory_item_ui_name_level_suffix = function(ui_name) {
 
 /** return displayable name for item of given spec, using "ui_name_long" if available
     @param {Object} spec
+    @param {?number=} level
     @returns {string} */
-ItemDisplay.get_inventory_item_ui_name_long = function(spec) {
+ItemDisplay.get_inventory_item_ui_name_long = function(spec, level) {
     if(spec['fungible'] && spec['resource'] == 'gamebucks') {
         return Store.gamebucks_ui_name();
     } else {
-        return spec['ui_name_long'] || spec['ui_name'];
+        var ret = spec['ui_name_long'] || spec['ui_name'];
+        if(level) { ret += ' L'+level.toString(); }
+        return ret;
     }
 };
 

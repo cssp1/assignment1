@@ -6298,11 +6298,14 @@ player.can_repair_unit_of_spec = function(spec, hp) {
 
 player.can_repair_unit = function(obj) { return player.can_repair_unit_of_spec(obj.spec, obj.hp); };
 
-player.inventory_item_quantity_and_expiration = function(specname) {
+/** @param {string} specname
+    @param {?number=} level
+    @return {!Array.<number>} */
+player.inventory_item_quantity_and_expiration = function(specname, level) {
     var total = 0, expire_time = -1;
     for(var i = 0; i < player.inventory.length; i++) {
         var item = player.inventory[i];
-        if(item['spec'] == specname) {
+        if(item['spec'] == specname && (!level || (item['level']||1) == level)) {
             if((!('expire_time' in item)) || (item['expire_time'] >= server_time)) {
                 var stack = (('stack' in item) ? item['stack'] : 1);
                 total += stack;
@@ -6318,8 +6321,12 @@ player.inventory_item_quantity_and_expiration = function(specname) {
     }
     return [total, expire_time];
 };
-player.inventory_item_quantity = function(specname) {
-    var quant_expr = player.inventory_item_quantity_and_expiration(specname);
+
+/** @param {string} specname
+    @param {?number=} level
+    @return {number} */
+player.inventory_item_quantity = function(specname, level) {
+    var quant_expr = player.inventory_item_quantity_and_expiration(specname, level);
     return quant_expr[0];
 };
 
@@ -6581,12 +6588,13 @@ player.count_limited_equipped = function(product_spec, delivery_address) {
  * @param {number=} min_count
  * @param {boolean=} check_mail
  * @param {boolean=} check_crafting
+ * @param {?number=} level
  */
-player.has_item = function(name, min_count, check_mail, check_crafting) {
+player.has_item = function(name, min_count, check_mail, check_crafting, level) {
     if(!min_count) { min_count = 1; }
     var count = 0;
     var func = function(x) {
-        if(x['spec'] == name) {
+        if(x['spec'] == name && (!level || ((x['level']||1) == level))) {
             count += ('stack' in x ? x['stack'] : 1);
             if(count >= min_count) {
                 return true;
@@ -6604,11 +6612,12 @@ player.has_item = function(name, min_count, check_mail, check_crafting) {
  * @param {string} name
  * @param {boolean=} check_mail
  * @param {boolean=} check_crafting
+ * @param {?number=} level
  */
-player.count_item = function(name, check_mail, check_crafting) {
+player.count_item = function(name, check_mail, check_crafting, level) {
     var count = 0;
     var func = function(x) {
-        if(x['spec'] == name) {
+        if(x['spec'] == name && (!level || ((x['level']||1) == level))) {
             count += ('stack' in x ? x['stack'] : 1);
         }
         return false;
@@ -36802,9 +36811,9 @@ function get_requirements_help(kind, arg, options) {
         noun = 'crafting';
         verb = 'obtain_ingredients';
         var item_list = [];
-        goog.object.forEach(arg, function(qty, specname) {
-            var spec = ItemDisplay.get_inventory_item_spec(specname);
-            item_list.push(ItemDisplay.get_inventory_item_stack_prefix(spec, qty) + ItemDisplay.get_inventory_item_ui_name_long(spec));
+        goog.array.forEach(arg, function(item) {
+            var spec = ItemDisplay.get_inventory_item_spec(item['spec']);
+            item_list.push(ItemDisplay.get_inventory_item_stack_prefix(spec, item['stack']||1) + ItemDisplay.get_inventory_item_ui_name_long(spec, item['level']));
         });
         ui_arg_s = item_list.join(', ');
     } else if(kind == 'speedup' || kind == 'repair') {
@@ -38767,19 +38776,25 @@ function can_cast_spell_detailed(unit_id, spellname, spellarg) {
 
             // check ingredient requirements
             if('ingredients' in recipe_spec) {
-                // have to pre-sum by specname in case there are multiple entries in the array with the same specname
-                var by_specname = {};
+                // have to pre-sum by specname and level in case there are multiple matching entries
+                var by_specname_and_level = {};
                 goog.array.forEach(recipe_spec['ingredients'], function(ingr) {
                     var stack = ('stack' in ingr ? ingr['stack'] : 1);
-                    by_specname[ingr['spec']] = (by_specname[ingr['spec']] || 0) + stack;
+                    var key = ingr['spec'];
+                    if('level' in ingr) {
+                        key += ':'+ingr['level'].toString();
+                    }
+                    by_specname_and_level[key] = (by_specname_and_level[key] || 0) + stack;
                 });
-                var missing_items = {};
-                goog.object.forEach(by_specname, function(qty, specname) {
-                    if(player.inventory_item_quantity(specname) < qty) {
-                        missing_items[specname] = qty - player.inventory_item_quantity(specname);
+                var missing_items = [];
+                goog.object.forEach(by_specname_and_level, function(qty, key) {
+                    var specname_level = key.split(':');
+                    var specname = specname_level[0], level = (specname_level.length > 1 ? parseInt(specname_level[1],10) : null);
+                    if(player.inventory_item_quantity(specname, level) < qty) {
+                        missing_items.push({'spec':specname, 'level':level, 'stack': qty - player.inventory_item_quantity(specname, level)});
                     }
                 });
-                if(goog.object.getCount(missing_items) > 0) {
+                if(missing_items.length > 0) {
                     return [false, gamedata['errors']['CRAFT_INGREDIENT_MISSING']['ui_name'], ['crafting_ingredients', missing_items]];
                 }
             }

@@ -3720,7 +3720,7 @@ class Session(object):
            player.find_object_by_type(gamedata['inventory_building']):
             player.loot_buffer += loot
             for item in loot:
-                player.inventory_log_event('5125_item_obtained', item['spec'], item.get('stack',1), item.get('expire_time',-1), reason=reason)
+                player.inventory_log_event('5125_item_obtained', item['spec'], item.get('stack',1), item.get('expire_time',-1), level=item.get('level',None), reason=reason)
         elif reason == 'ai_base':
             player.send_loot_mail(self.viewing_user.get_ui_name(self.viewing_player), self.viewing_player.resources.player_level,
                                   loot, retmsg, mail_template = mail_template)
@@ -7217,15 +7217,15 @@ class Player(AbstractPlayer):
                                         count += prod.get('stack', 1)
         return count
 
-    def has_item(self, name, min_count = 1, check_mail = False, check_crafting = False):
+    def has_item(self, name, min_count = 1, level = None, check_mail = False, check_crafting = False):
         count = 0
         for item in self.stored_item_iter(): # inventory and loot buffer
-            if item['spec'] == name:
+            if item['spec'] == name and (level is None or item.get('level',1) == level):
                 count += item.get('stack',1)
                 if count >= min_count:
                     return True
         for item in self.equipped_item_iter():
-            if item['spec'] == name:
+            if item['spec'] == name and (level is None or item.get('level',1) == level):
                 count += 1
                 if count >= min_count:
                     return True
@@ -7233,7 +7233,7 @@ class Player(AbstractPlayer):
             for mail in self.mailbox:
                 if ('attachments' in mail):
                     for at in mail['attachments']:
-                        if at['spec'] == name:
+                        if at['spec'] == name and (level is None or at.get('level',1) == level):
                             count += at.get('stack',1)
                             if count >= min_count:
                                 return True
@@ -7245,7 +7245,7 @@ class Player(AbstractPlayer):
                         recipe = gamedata['crafting']['recipes'].get(recipe_name, None)
                         if recipe:
                             for prod in recipe['product']:
-                                if ('spec' in prod) and prod['spec'] == name: # only works with deterministic products!
+                                if ('spec' in prod) and prod['spec'] == name and (level is None or prod.get('level',1) == level): # only works with deterministic products!
                                     count += prod.get('stack',1)
                                     if count >= min_count:
                                         return True
@@ -7254,7 +7254,7 @@ class Player(AbstractPlayer):
                             if ingr_list and gamedata['crafting']['categories'][recipe['crafting_category']].get('refund_ingredients', False):
                                 # only check ingredients if they are refundable and thus available to the player if cancelled
                                 for item in ingr_list:
-                                    if item['spec'] == name:
+                                    if item['spec'] == name and (level is None or item.get('level',1) == level):
                                         count += item.get('stack',1)
                                         if count >= min_count:
                                             return True
@@ -7280,7 +7280,7 @@ class Player(AbstractPlayer):
                 to_remove.append(item)
         for item in to_remove:
             self.inventory.remove(item)
-            self.inventory_log_event('5132_item_expired', item['spec'], -item.get('stack',1), item.get('expire_time',-1))
+            self.inventory_log_event('5132_item_expired', item['spec'], -item.get('stack',1), item.get('expire_time',-1), level = item.get('level',None))
         return len(to_remove) > 0
 
     def prune_mailbox(self):
@@ -9886,11 +9886,12 @@ class Player(AbstractPlayer):
 
     # log items entering or leaving player inventory
     # item_stack can be positive (item entering inventory) or negative (item exiting inventory)
-    def inventory_log_event(self, event_name, item_specname, item_stack, expire_time, reason=None):
+    def inventory_log_event(self, event_name, item_specname, item_stack, expire_time, level=None, reason=None):
         if not event_name: return
         if item_stack == 0: return
         if not gamedata['server'].get('log_inventory', True): return
         props = {'spec': item_specname, 'stack': item_stack}
+        if level is not None: props['level'] = level
         if expire_time and expire_time > 0: props['expire_time'] = expire_time
         if reason: props['reason'] = reason
         props['sum'] = self.get_denormalized_summary_props('brief')
@@ -10194,30 +10195,31 @@ class LivePlayer(Player):
 
     # used for processing untrusted requests from the client, checks to make sure there is an item in slot 'slot'
     # and that the spec matches what the client thinks it is. Returns spec, item or None, None
-    def inventory_verify_item(self, slot, specname):
-        if (slot > (len(self.inventory)-1)) or self.inventory[slot]['spec'] != specname:
+    def inventory_verify_item(self, slot, specname, level = None):
+        if (slot > (len(self.inventory)-1)) or self.inventory[slot]['spec'] != specname or (level is not None and self.inventory[slot].get('level',1) != level):
             return None
         return self.inventory[slot]
 
     # return how many items in item_list (format of loot_buffer and inventory) match "specname" and are not expired
-    def get_item_quantity(self, item_list, specname):
+    def get_item_quantity(self, item_list, specname, level = None):
         return sum([item.get('stack',1) for item in item_list \
                     if ((item['spec'] == specname) and \
+                        (level is None or (item.get('level',1) == level)) and \
                         (('expire_time' not in item) or (item['expire_time'] >= server_time)))], 0)
 
-    def inventory_item_quantity(self, specname): return self.get_item_quantity(self.inventory, specname)
-    def loot_buffer_item_quantity(self, specname): return self.get_item_quantity(self.loot_buffer, specname)
+    def inventory_item_quantity(self, specname, level = None): return self.get_item_quantity(self.inventory, specname, level = level)
+    def loot_buffer_item_quantity(self, specname, level = None): return self.get_item_quantity(self.loot_buffer, specname, level = level)
 
     # remove "total" number of items of spec "specname" from item_list (loot_buffer or inventory)
     # throws exception if insufficient quantity is present
     # returns number removed.
-    def item_remove_by_type(self, item_list, specname, total, event_name, reason=None):
-        assert self.get_item_quantity(item_list, specname) >= total
+    def item_remove_by_type(self, item_list, specname, total, event_name, level=None, reason=None):
+        assert self.get_item_quantity(item_list, specname, level=level) >= total
         n_removed = 0
         while total > 0:
             item = None
             for i in item_list:
-                if i['spec'] == specname:
+                if i['spec'] == specname and (level is None or i.get('level',1) == level):
                     item = i
                     break
             if item is None:
@@ -10228,8 +10230,8 @@ class LivePlayer(Player):
             n_removed += to_rem
         return n_removed
 
-    def loot_buffer_remove_by_type(self, specname, total, event_name, reason=None): return self.item_remove_by_type(self.loot_buffer, specname, total, event_name, reason)
-    def inventory_remove_by_type(self, specname, total, event_name, reason=None): return self.item_remove_by_type(self.inventory, specname, total, event_name, reason)
+    def loot_buffer_remove_by_type(self, specname, total, event_name, level=None, reason=None): return self.item_remove_by_type(self.loot_buffer, specname, total, event_name, level=level, reason=reason)
+    def inventory_remove_by_type(self, specname, total, event_name, level=None, reason=None): return self.item_remove_by_type(self.inventory, specname, total, event_name, level=level, reason=reason)
 
     # remove a quantity of "item" from "item_list" (which must contain it), and log inventory metric
     def item_remove(self, item_list, item, qty_to_rem, event_name, reason=None):
@@ -10244,7 +10246,7 @@ class LivePlayer(Player):
         elif count > 1:
             item['stack'] = count
         n_removed = original_count - count
-        self.inventory_log_event(event_name, item['spec'], -n_removed, item.get('expire_time',-1), reason=reason)
+        self.inventory_log_event(event_name, item['spec'], -n_removed, item.get('expire_time',-1), level = item.get('level',None), reason=reason)
         return n_removed
 
     def loot_buffer_remove(self, item, qty_to_rem, event_name, reason=None): return self.item_remove(self.loot_buffer, item, qty_to_rem, event_name, reason)
@@ -10253,7 +10255,7 @@ class LivePlayer(Player):
     def inventory_remove_stack(self, item, event_name, reason=None):
         # remove the entire stack. item must be in self.inventory
         self.inventory.remove(item)
-        self.inventory_log_event(event_name, item['spec'], -item.get('stack',1), item.get('expire_time',-1), reason=reason)
+        self.inventory_log_event(event_name, item['spec'], -item.get('stack',1), item.get('expire_time',-1), level = item.get('level',None), reason=reason)
         return item.get('stack',1)
 
     def inventory_has_space_for(self, item, max_slots):
@@ -10264,7 +10266,9 @@ class LivePlayer(Player):
 
         # join existing stack?
         for existing in self.inventory:
-            if existing['spec'] == item['spec'] and (existing.get('stack',1) + stack) <= stack_max:
+            if existing['spec'] == item['spec'] and \
+               existing.get('level',1) == item.get('level',1) and \
+               (existing.get('stack',1) + stack) <= stack_max:
                 return True
 
         # make new stack?
@@ -10299,7 +10303,9 @@ class LivePlayer(Player):
             if stack_max > 1:
                 # see if we can join an existing stack
                 for existing in self.inventory:
-                    if existing['spec'] == item['spec'] and existing.get('stack',1) < stack_max and existing.get('expire_time',-1) == expire_time:
+                    if existing['spec'] == item['spec'] and \
+                       existing.get('level',1) == item.get('level',1) and \
+                       existing.get('stack',1) < stack_max and existing.get('expire_time',-1) == expire_time:
                         dest = existing
                         break
             if dest:
@@ -10340,6 +10346,8 @@ class LivePlayer(Player):
 
                 # add whole item to inventory
                 new_item = {'spec': item['spec']}
+                if item.get('level',1) != 1:
+                    new_item['level'] = item['level']
                 if stack > 1:
                     new_item['stack'] = stack
                 if undiscardable:
@@ -16863,7 +16871,7 @@ class GAMEAPI(resource.Resource):
                session.player.find_object_by_type(gamedata['inventory_building']):
                 session.player.loot_buffer += items
                 for item in items:
-                    session.player.inventory_log_event('5125_item_obtained', item['spec'], item.get('stack',1), item.get('expire_time',-1), reason=spellname)
+                    session.player.inventory_log_event('5125_item_obtained', item['spec'], item.get('stack',1), item.get('expire_time',-1), level=item.get('level',None), reason=spellname)
 
                 retmsg.append(["LOOT_BUFFER_UPDATE", session.player.loot_buffer, True])
             else:
@@ -16906,7 +16914,7 @@ class GAMEAPI(resource.Resource):
                session.player.find_object_by_type(gamedata['inventory_building']):
                 session.player.loot_buffer += items
                 for item in items:
-                    session.player.inventory_log_event('5125_item_obtained', item['spec'], item.get('stack',1), item.get('expire_time',-1), reason='store')
+                    session.player.inventory_log_event('5125_item_obtained', item['spec'], item.get('stack',1), item.get('expire_time',-1), item.get('level',None), reason='store')
                 retmsg.append(["LOOT_BUFFER_UPDATE", session.player.loot_buffer, True])
 
             else:
@@ -17753,12 +17761,14 @@ class GAMEAPI(resource.Resource):
         # check for ingredient items (note: no recipe_level dependence)
         if take_ingredients and ('ingredients' in recipe):
             # have to pre-sum by specname in case there are multiple entries in the array with the same specname
-            by_specname = {}
+            by_specname_and_level = {}
             for entry in recipe['ingredients']:
-                by_specname[entry['spec']] = by_specname.get(entry['spec'],0) + entry.get('stack',1)
-            for specname, qty in by_specname.iteritems():
-                if player.inventory_item_quantity(specname) < qty:
-                    if retmsg is not None: retmsg.append(["ERROR", "CRAFT_INGREDIENT_MISSING", entry])
+                key = (entry['spec'], entry.get('level',None))
+                by_specname_and_level[key] = by_specname_and_level.get(key,0) + entry.get('stack',1)
+            for specname_level, qty in by_specname_and_level.iteritems():
+                specname, level = specname_level
+                if player.inventory_item_quantity(specname, level = level) < qty:
+                    if retmsg is not None: retmsg.append(["ERROR", "CRAFT_INGREDIENT_MISSING", {'spec':specname, 'level':level}, qty])
                     return False
 
         # check for queue usage exclusivity and collection buffer
@@ -17818,7 +17828,7 @@ class GAMEAPI(resource.Resource):
         # subtract ingredients (note: no recipe_level dependence)
         if take_ingredients and ('ingredients' in recipe):
             for entry in recipe['ingredients']:
-                player.inventory_remove_by_type(entry['spec'], entry.get('stack',1), '5130_item_activated', reason='crafting')
+                player.inventory_remove_by_type(entry['spec'], entry.get('stack',1), '5130_item_activated', level = entry.get('level',None), reason='crafting')
             if player is session.player:
                 session.player.send_inventory_update(retmsg)
 
@@ -17855,7 +17865,7 @@ class GAMEAPI(resource.Resource):
             if len(target.equipment) < 1:
                 target.equipment = None
             assert removed
-            player.inventory_log_event('5131_item_trashed', removed['spec'], -removed.get('stack',1), removed.get('expire_time',-1), reason='replaced')
+            player.inventory_log_event('5131_item_trashed', removed['spec'], -removed.get('stack',1), removed.get('expire_time',-1), level=removed.get('level',None), reason='replaced')
             if target is not object:
                 retmsg.append(["OBJECT_STATE_UPDATE2", target.serialize_state()])
             player.recalc_stattab(player)
@@ -17922,7 +17932,7 @@ class GAMEAPI(resource.Resource):
                 if ingr_list:
                     session.player.loot_buffer += ingr_list
                     for item in ingr_list:
-                        session.player.inventory_log_event('5125_item_obtained', item['spec'], item.get('stack',1), item.get('expire_time',-1), reason='refund')
+                        session.player.inventory_log_event('5125_item_obtained', item['spec'], item.get('stack',1), item.get('expire_time',-1), level = item.get('level',None), reason='refund')
                     #session.give_loot(session.player, retmsg, ingr_list, 'refund', reason_id = recipe['name'])
                     session.player.send_inventory_update(retmsg)
                     retmsg.append(["LOOT_BUFFER_UPDATE", session.player.loot_buffer, True])
@@ -17981,7 +17991,7 @@ class GAMEAPI(resource.Resource):
                     assert self.do_equip_building(session, retmsg, [None, delivery_address['obj_id'], (delivery_address['slot_type'],delivery_address.get('slot_index',0)), -1, item['spec'], None, None],
                                                   force = True)
                     looted += loot
-                    session.player.inventory_log_event('5125_item_obtained', item['spec'], item.get('stack',1), item.get('expire_time',-1), reason='crafted')
+                    session.player.inventory_log_event('5125_item_obtained', item['spec'], item.get('stack',1), item.get('expire_time',-1), level = item.get('level',None), reason='crafted')
                 except:
                     gamesite.exception_log.event(server_time, 'player %d crafting delivery %s target not found, discarding.\n%s' % \
                                                  (object.owner.user_id, repr(bus.craft_state), traceback.format_exc()))
@@ -18007,7 +18017,7 @@ class GAMEAPI(resource.Resource):
                         pass # already given, do NOT put in loot_buffer
                     else:
                         session.player.loot_buffer += loot
-                        session.player.inventory_log_event('5125_item_obtained', item['spec'], item.get('stack',1), item.get('expire_time',-1), reason='crafted')
+                        session.player.inventory_log_event('5125_item_obtained', item['spec'], item.get('stack',1), item.get('expire_time',-1), level = item.get('level',None), reason='crafted')
 
             if 'completion' in recipe:
                 session.execute_consequent_safe(recipe['completion'], session.player, retmsg, reason='crafting_recipe:%s:completion' % recipe['name'])
@@ -18829,7 +18839,7 @@ class GAMEAPI(resource.Resource):
             assert Equipment.equip_remove(equipment, dest_addr, remove_specname)
             if remove_spec and remove_spec.get('remove_fragility',0) >= 1:
                 # item destroyed
-                session.player.inventory_log_event('5131_item_trashed', remove_specname, -1, -1, reason='removed')
+                session.player.inventory_log_event('5131_item_trashed', remove_specname, -1, -1, reason='removed') # XXXXXX level
             else:
                 # note: pass inflated max_usable_inventory here as "buffer" space, since we checked for space above
                 assert session.player.inventory_add_item({'spec':remove_specname}, max_usable_inventory + inventory_buffer) == 1
@@ -20014,7 +20024,7 @@ class GAMEAPI(resource.Resource):
                                 # record expenditure of the item (e.g. landmines)
                                 if owning_player:
                                     session.attack_item_expended(owning_player.user_id, specname, 1)
-                                    owning_player.inventory_log_event('5131_item_trashed', specname, -1, -1, reason='destroyed')
+                                    owning_player.inventory_log_event('5131_item_trashed', specname, -1, -1, reason='destroyed') # XXXXXX level
 
                         if items_destroyed:
                             event_props['items_destroyed'] = [x[2] for x in items_destroyed]
@@ -23692,7 +23702,7 @@ class GAMEAPI(resource.Resource):
                         if 'attachments_ghost' not in mail: mail['attachments_ghost'] = []
                         mail['attachments_ghost'].append(original_at)
 
-                        session.player.inventory_log_event('5140_mail_attachment_collected', original_at['spec'], original_at.get('stack',1), original_at.get('expire_time',-1))
+                        session.player.inventory_log_event('5140_mail_attachment_collected', original_at['spec'], original_at.get('stack',1), original_at.get('expire_time',-1), level=original_at.get('level',None))
                         if original_at.get('log',False):
                             if 'mail_attachment_history' not in session.player.history: session.player.history['mail_attachment_history'] = []
                             session.player.history['mail_attachment_history'].append({'reason':original_at['log'],
@@ -23797,7 +23807,7 @@ class GAMEAPI(resource.Resource):
             client_contents = arg[1]
             if session.player.loot_buffer:
                 for entry in session.player.loot_buffer:
-                    session.player.inventory_log_event('5131_item_trashed', entry['spec'], -entry.get('stack',1), entry.get('expire_time',-1), reason='loot_buffer')
+                    session.player.inventory_log_event('5131_item_trashed', entry['spec'], -entry.get('stack',1), entry.get('expire_time',-1), level = entry.get('level',None), reason='loot_buffer')
                     session.increment_player_metric('item:'+entry['spec']+':trashed', entry.get('stack',1), time_series=False)
             session.player.loot_buffer = []
             retmsg.append(["LOOT_BUFFER_UPDATE", session.player.loot_buffer, False])

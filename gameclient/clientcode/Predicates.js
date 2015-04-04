@@ -1424,16 +1424,17 @@ function HasItemPredicate(data) {
     goog.base(this, data);
     this.item_name = data['item_name'];
     this.min_count = data['min_count'] || 1;
+    this.level = data['level'] || null;
     this.check_mail = data['check_mail'] || false;
     this.check_crafting = data['check_crafting'] || false;
 }
 goog.inherits(HasItemPredicate, Predicate);
 HasItemPredicate.prototype.is_satisfied = function(player, qdata) {
-    return player.has_item(this.item_name, this.min_count, this.check_mail, this.check_crafting);
+    return player.has_item(this.item_name, this.min_count, this.check_mail, this.check_crafting, this.level);
 };
 HasItemPredicate.prototype.ui_progress = function(player, qdata) {
     var ret = gamedata['strings']['predicates'][this.kind]['ui_progress'];
-    ret = ret.replace('%d1', player.count_item(this.item_name, this.check_mail, this.check_crafting).toString());
+    ret = ret.replace('%d1', player.count_item(this.item_name, this.check_mail, this.check_crafting, this.level).toString());
     ret = ret.replace('%d2', this.min_count.toString());
     return ret;
 };
