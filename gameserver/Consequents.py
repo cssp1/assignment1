@@ -337,6 +337,9 @@ class FindAndReplaceItemsConsequent(Consequent):
 
     def execute(self, session, player, retmsg, context=None):
         obj_updates = set()
+
+        # XXX note: this doesn't handle leveled items specially
+
         for obj in player.home_base_iter():
             if obj.is_building():
                 if self.recipe_map and self.affect_crafting and obj.is_crafting():
@@ -347,13 +350,21 @@ class FindAndReplaceItemsConsequent(Consequent):
                 if self.item_map and self.affect_equipment and obj.equipment:
                     for slot_type in obj.equipment:
                         for i in xrange(len(obj.equipment[slot_type])):
-                            if obj.equipment[slot_type][i] in self.item_map:
+                            if type(obj.equipment[slot_type][i]) is dict and \
+                               obj.equipment[slot_type][i]['spec'] in self.item_map:
+                                obj.equipment[slot_type][i]['spec'] = self.item_map[obj.equipment[slot_type][i]['spec']]
+                                obj_updates.add(obj)
+                            elif obj.equipment[slot_type][i] in self.item_map:
                                 obj.equipment[slot_type][i] = self.item_map[obj.equipment[slot_type][i]]
                                 obj_updates.add(obj)
                 if self.config_map and self.affect_config and obj.config:
                     for key in obj.config:
                         if key in self.config_map:
-                            if obj.config[key] in self.config_map[key]:
+                            if type(obj.config[key]) is dict and \
+                               obj.config[key]['spec'] in self.config_map[key]:
+                                obj.config[key]['spec'] = self.config_map[key][obj.config[key]['spec']]
+                                obj_updates.add(obj)
+                            elif obj.config[key] in self.config_map[key]:
                                 obj.config[key] = self.config_map[key][obj.config[key]]
                                 obj_updates.add(obj)
 
@@ -361,7 +372,11 @@ class FindAndReplaceItemsConsequent(Consequent):
             for equipment in player.unit_equipment.itervalues():
                 for slot_type in equipment:
                     for i in xrange(len(equipment[slot_type])):
-                        equipment[slot_type][i] = self.item_map.get(equipment[slot_type][i], equipment[slot_type][i])
+                        if type(equipment[slot_type][i]) is dict:
+                            if equipment[slot_type][i]['spec'] in self.item_map:
+                                equipment[slot_type][i]['spec'] = self.item_map[equipment[slot_type][i]['spec']]
+                        else:
+                            equipment[slot_type][i] = self.item_map.get(equipment[slot_type][i], equipment[slot_type][i])
 
         if self.item_map and self.affect_inventory:
             for entry in player.inventory:
@@ -407,7 +422,12 @@ class FindAndReplaceObjectsConsequent(Consequent):
                                 if obj.equipment is None: obj.equipment = {}
                                 if slot_type not in obj.equipment: obj.equipment[slot_type] = []
                                 for name in name_list:
-                                    if name not in obj.equipment[slot_type]:
+                                    found = False
+                                    for entry in obj.equipment[slot_type]:
+                                        if entry == name or (type(entry) is dict and entry['spec'] == name):
+                                            found = True
+                                            break
+                                    if not found:
                                         obj.equipment[slot_type].append(name)
 
                         session.deferred_object_state_updates.add(obj)
