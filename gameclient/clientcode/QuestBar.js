@@ -25,7 +25,11 @@ QuestBar.invoke = function() {
     var dialog_data = gamedata['dialogs']['quest_bar'];
     var dialog = new SPUI.Dialog(dialog_data);
     dialog.user_data['dialog'] = 'quest_bar';
-    dialog.user_data['maximized'] = !!player.get_any_abtest_value('quest_bar_default_maximized', gamedata['client']['quest_bar_default_maximized']);
+    if('quest_bar_minimized' in player.preferences && player.preferences['quest_bar_minimized']) {
+        dialog.user_data['maximized'] = false;
+    } else {
+        dialog.user_data['maximized'] = !!player.get_any_abtest_value('quest_bar_default_maximized', gamedata['client']['quest_bar_default_maximized']);
+    }
     dialog.user_data['start_time'] = -1; // for animation
     dialog.user_data['start_height'] = -1;
     dialog.widgets['maximize'].widgets['scroll_right'].onclick = function(w) { QuestBar.maximize(w.parent.parent); };
@@ -39,6 +43,8 @@ QuestBar.maximize = function(dialog) {
     dialog.user_data['maximized'] = true;
     dialog.user_data['start_time'] = client_time;
     dialog.user_data['start_height'] = dialog.wh[1];
+    player.preferences['quest_bar_minimized'] = false;
+    send_to_server.func(["UPDATE_PREFERENCES", player.preferences]);
 };
 
 QuestBar.minimize = function(dialog) {
@@ -46,6 +52,8 @@ QuestBar.minimize = function(dialog) {
     dialog.user_data['maximized'] = false;
     dialog.user_data['start_time'] = client_time;
     dialog.user_data['start_height'] = dialog.wh[1];
+    player.preferences['quest_bar_minimized'] = true;
+    send_to_server.func(["UPDATE_PREFERENCES", player.preferences]);
 };
 
 QuestBar.update = function(dialog) {
