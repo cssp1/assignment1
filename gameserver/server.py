@@ -20541,7 +20541,7 @@ class GAMEAPI(resource.Resource):
         # CLIENT_HELLO message is handled as a special case, because it does not have a session yet
         if arg[0][0] == "CLIENT_HELLO":
 
-            session, go_async = self.handle_client_hello(http_request, client_ip, arg[0], retmsg)
+            session, go_async = self.handle_client_hello(http_request, client_ip, user_agent, arg[0], retmsg)
 
             arg = arg[1:]
 
@@ -20908,7 +20908,7 @@ class GAMEAPI(resource.Resource):
         admin_stats.record_latency('handle_client_hello', end_time - start_time)
         return ret
 
-    def do_handle_client_hello(self, request, client_ip, arg, retmsg):
+    def do_handle_client_hello(self, request, client_ip, user_agent, arg, retmsg):
         # check IP bans
         if client_ip and str(client_ip) in gamedata['server']['banned_ips']:
             gamesite.exception_log.event(server_time, 'prevented banned IP %s from logging in' % client_ip)
@@ -20951,7 +20951,7 @@ class GAMEAPI(resource.Resource):
         if client_session_sig != server_session_sig:
             gamesite.exception_log.event(server_time, 'user %d logged in with invalid proxy signature: ID %s time %d servername %s data "%s" client "%s" server "%s" from IP %s user-agent "%s"' % \
                                          (client_user_id, client_session_id, client_session_time, spin_server_name, client_session_data, client_session_sig, server_session_sig, repr(client_ip),
-                                          SpinHTTP.get_twisted_header(request, 'user-agent')))
+                                          user_agent))
             retmsg.append(["ERROR", "CANNOT_LOG_IN_PROXY_SIGNATURE_INVALID"])
             return None, None
 
@@ -21014,7 +21014,7 @@ class GAMEAPI(resource.Resource):
                 return None, None
 
             self.log_out_async(wait_for_session, wait_reason,
-                               functools.partial(self.handle_client_hello, request, client_ip, arg, retmsg))
+                               functools.partial(self.handle_client_hello, request, client_ip, user_agent, arg, retmsg))
             return None, True
 
         # ensure that only one login on a user_id runs to successful completion
