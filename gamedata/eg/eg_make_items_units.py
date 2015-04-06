@@ -38,7 +38,7 @@ if __name__ == '__main__':
                 'ui_description': 'Adds unit to your army when activated.',
                 #'unit_icon': spec_name,
                 'icon': 'inventory_%s' % spec_name,
-                'stack_max': spec.get('item_stack_max', 5),
+                'max_stack': spec.get('item_max_stack', 5),
                 'use': { 'spellname': 'GIVE_UNITS', 'spellarg':
                          { spec_name: {'qty':1,'min_level':min_level} if min_level > 1 else 1 }
                          },

@@ -283,10 +283,10 @@ ItemDisplay.get_inventory_item_ui_subtitle = function(spec) {
         }
     }
 
-    if(gamedata['client']['item_tooltip_stack_max'] && subtitle) {
-        var stack_max = ('stack_max' in spec ? spec['stack_max'] : 1);
-        if(stack_max > 1) {
-            subtitle += ' (Max stack: '+pretty_print_number(stack_max)+')';
+    if(gamedata['client']['item_tooltip_max_stack'] && subtitle) {
+        var max_stack = ('max_stack' in spec ? spec['max_stack'] : 1);
+        if(max_stack > 1) {
+            subtitle += ' (Max stack: '+pretty_print_number(max_stack)+')';
         }
     }
 

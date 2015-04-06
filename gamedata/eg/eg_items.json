@@ -10,7 +10,7 @@
 // "ui_description": user-visible item tooltip
 // "icon": direct reference to an art.json entry for the (50x50) icon
 // (see main.js: get_inventory_item_asset())
-// "stack_max": max quantity of this item that can be stacked into one inventory slot (default 1)
+// "max_stack": max quantity of this item that can be stacked into one inventory slot (default 1)
 // "consumable": if true, item disappears when used (default true)
 // "use": what spell is cast when the item is used, including "spellname" and "spellarg"
 //       "spellarg": can be atomic, or a list that the client appends with specific parameters like a target unit or location (hard-coded)
@@ -48,7 +48,7 @@
     "ui_activate_button": "Go to Store",
     "icon": "inventory_ops_needs",
     "store_icon": "resource_icon_ops_needs",
-    "stack_max": 999999,
+    "max_stack": 999999,
     "rarity": 2,
     "use": { "spellname": "CLIENT_CONSEQUENT", "spellarg": {"consequent": "INVOKE_STORE_DIALOG", "category": "event_prizes" } },
 
@@ -70,7 +70,7 @@
     "name": "packaged_tutorial_droid",
     "use": { "spellname": "GIVE_UNITS_LIMIT_BREAK", "spellarg": { "rifleman": 1 } },
     "ui_description": "Adds soldiers to your base when activated.",
-    "stack_max": 1,
+    "max_stack": 1,
     "ui_name": "Rifleman L1+",
     "icon": "inventory_rifleman"
 },
@@ -94,7 +94,7 @@
     "name": "combat_time_warp_200pct",
     "ui_name": "Combat Fast Forward (2x)",
     "ui_description": "Activate to fast-forward combat action until the end of this battle.",
-    "rarity": 2, "stack_max": 50,
+    "rarity": 2, "max_stack": 50,
     "icon": "inventory_clock_fastforward_blue",
     "use": { "spellname": "APPLY_AURA", "spellarg": ["player", "combat_time_warped_faster", 1.0, -1] }, // normal + 100% = 200%
     "requires": { "ui_name": "This item can only be activated while defending your base or attacking an enemy base, quarry, or battalion.", "predicate": "HAS_ATTACKED"}
@@ -103,7 +103,7 @@
     "name": "combat_time_warp_400pct",
     "ui_name": "Combat Fast Forward (4x)",
     "ui_description": "Activate to fast-forward combat action until the end of this battle.",
-    "rarity": 3, "stack_max": 50,
+    "rarity": 3, "max_stack": 50,
     "icon": "inventory_clock_fastforward_purple",
     "use": { "spellname": "APPLY_AURA", "spellarg": ["player", "combat_time_warped_faster", 3.0, -1] }, // normal + 300% = 400%
     "requires": { "ui_name": "This item can only be activated while defending your base or attacking an enemy base, quarry, or battalion.", "predicate": "HAS_ATTACKED"}
@@ -112,7 +112,7 @@
     "name": "combat_time_warp_50pct",
     "ui_name": "Combat Slow Motion (0.5x)",
     "ui_description": "Activate to slow down combat action until the end of this battle.",
-    "rarity": 2, "stack_max": 50,
+    "rarity": 2, "max_stack": 50,
     "icon": "inventory_clock_slowmotion_green",
     "use": { "spellname": "APPLY_AURA", "spellarg": ["player", "combat_time_warped_slower", -0.5, -1] }, // normal - 50% = 50%
     "requires": { "ui_name": "This item can only be activated while attacking an enemy base, quarry, or battalion",
@@ -124,7 +124,7 @@
     "ui_name": "Sensor Charge",
     "ui_description": "Activate to add charges to your Long-Range Scanner.",
     "icon": "inventory_sensor_charge",
-    "stack_max": 1, // ensure that they get used immediately rather than stacking in inventory
+    "max_stack": 1, // ensure that they get used immediately rather than stacking in inventory
     "fungible": 1, "resource": "lottery_ticket"
 },
 
@@ -171,7 +171,7 @@
     "name": "instant_repair",
     "ui_name": "Instant Repair",
     "rarity": 1,
-    "stack_max": 10,
+    "max_stack": 10,
     "ui_description": "Activate to repair all damage to your on-screen units and buildings. If activated during an attack, does not repair destroyed units.",
     "icon": "inventory_repair_item_green",
     "use": { "spellname": "USE_INSTANT_REPAIR_ITEM" }

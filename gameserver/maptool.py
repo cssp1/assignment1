@@ -436,7 +436,7 @@ def refund_units(db, region_id, feature, objlist, user_id, days_to_claim = 7, ui
         item_name = 'packaged_'+name
         item_spec = gamedata['items'][item_name]
         while qty > 0:
-            stack = min(qty, item_spec.get('stack_max',1))
+            stack = min(qty, item_spec.get('max_stack',1))
             at = {'spec':item_name}
             if stack > 1: at['stack'] = stack
             attachments.append(at)

@@ -137,7 +137,7 @@
         "muzzle_height": -1,
         "manufacture_category": "starcraft",
         "consumes_space": 29,
-        "item_stack_max": 20, // stack_max for packaged units of this type
+        "item_max_stack": 20, // max_stack for packaged units of this type
         "turn_rate": 600,
         "defense_types": ["unit", "starcraft"],
         "spells": ["OH58_SHOOT", "MOVE_UNIT"],

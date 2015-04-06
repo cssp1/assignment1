@@ -7125,8 +7125,8 @@ class Player(AbstractPlayer):
                 if new_end_time < 0 and 'end_time' in aura: del aura['end_time']
                 else: aura['end_time'] = new_end_time
 
-            stack_max = spec.get('stack_max',-1)
-            if stack_max > 0: aura['stack'] = min(aura['stack'], stack_max)
+            max_stack = spec.get('max_stack',-1)
+            if max_stack > 0: aura['stack'] = min(aura['stack'], max_stack)
 
             # overwrite data
             if (data is None) and 'data' in aura: del aura['data']
@@ -7678,7 +7678,7 @@ class Player(AbstractPlayer):
                     to_remove.append(obj)
                     found = False
                     for att in attachments:
-                        if att['spec'] == item_spec and (att.get('stack',1) < gamedata['items'][item_spec].get('stack_max',1)):
+                        if att['spec'] == item_spec and (att.get('stack',1) < gamedata['items'][item_spec].get('max_stack',1)):
                             att['stack'] = att.get('stack',1)+1
                             found = True
                             break
@@ -7702,7 +7702,7 @@ class Player(AbstractPlayer):
                         to_remove.append(obj)
                         found = False
                         for att in attachments:
-                            if att['spec'] == item_spec and (att.get('stack',1) < gamedata['items'][item_spec].get('stack_max',1)):
+                            if att['spec'] == item_spec and (att.get('stack',1) < gamedata['items'][item_spec].get('max_stack',1)):
                                 att['stack'] = att.get('stack',1)+1
                                 found = True
                                 break
@@ -10281,13 +10281,13 @@ class LivePlayer(Player):
         spec = gamedata['items'][item['spec']]
         stack = item.get('stack',1)
         assert not spec.get('fungible',False)
-        stack_max = spec.get('stack_max',1)
+        max_stack = spec.get('max_stack',1)
 
         # join existing stack?
         for existing in self.inventory:
             if existing['spec'] == item['spec'] and \
                existing.get('level',1) == item.get('level',1) and \
-               (existing.get('stack',1) + stack) <= stack_max:
+               (existing.get('stack',1) + stack) <= max_stack:
                 return True
 
         # make new stack?
@@ -10309,7 +10309,7 @@ class LivePlayer(Player):
             return 0
 
         spec = gamedata['items'][item['spec']]
-        stack_max = spec.get('stack_max',1)
+        max_stack = spec.get('max_stack',1)
         fungible = spec.get('fungible',False)
         stack = item.get('stack',1)
         undiscardable = item.get('undiscardable',False)
@@ -10319,12 +10319,12 @@ class LivePlayer(Player):
         while stack > 0:
             dest = None
 
-            if stack_max > 1:
+            if max_stack > 1:
                 # see if we can join an existing stack
                 for existing in self.inventory:
                     if existing['spec'] == item['spec'] and \
                        existing.get('level',1) == item.get('level',1) and \
-                       existing.get('stack',1) < stack_max and existing.get('expire_time',-1) == expire_time:
+                       existing.get('stack',1) < max_stack and existing.get('expire_time',-1) == expire_time:
                         dest = existing
                         break
             if dest:
@@ -24152,8 +24152,8 @@ class GAMEAPI(resource.Resource):
                     else:
                         spec_name = spellargs[0]
                         if spec_name in gamedata['items']:
-                            stack_max = gamedata['items'][spec_name].get('stack_max',1)
-                            attachments.append({'spec':spec_name, 'stack':stack_max})
+                            max_stack = gamedata['items'][spec_name].get('max_stack',1)
+                            attachments.append({'spec':spec_name, 'stack':max_stack})
                         elif spec_name in gamedata['loot_tables']:
                             attachments += session.get_loot_items(session.player, gamedata['loot_tables'][spec_name]['loot'], -1, -1)
                 else:
@@ -24166,8 +24166,8 @@ class GAMEAPI(resource.Resource):
                         stack = 1
                         if 'fungible' in spec:
                             stack = int(30000*random.random())
-                        elif 'stack_max' in spec:
-                            stack = spec['stack_max'] # int((spec['stack_max']+1)*random.random())
+                        elif 'max_stack' in spec:
+                            stack = spec['max_stack'] # int((spec['max_stack']+1)*random.random())
                         item = {'spec':spec_name}
                         if stack > 1:
                             item['stack'] = stack

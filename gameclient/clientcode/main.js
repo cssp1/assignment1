@@ -6741,14 +6741,14 @@ function inventory_item_can_fit(item, inventory, max_usable_inventory) {
 
     // can stack with existing (returns true as long as 1 can fit)
 
-    var stack_max = (spec['stack_max'] || 1);
+    var max_stack = (spec['max_stack'] || 1);
     var orig_stack = togo;
     for(var i = 0; i < inventory.length; i++) {
         var inv = inventory[i];
         if(inv['spec'] === item['spec']) {
             var inv_stack = ('stack' in inv? inv['stack'] : 1);
-            if(inv_stack < stack_max) {
-                togo -= (stack_max - inv_stack);
+            if(inv_stack < max_stack) {
+                togo -= (max_stack - inv_stack);
                 if(togo <= 0) { break; }
             }
         }
@@ -6765,7 +6765,7 @@ function inventory_items_can_all_fit(items, inventory, max_usable_inventory) {
     for(var i = 0; i < items.length; i++) {
         var item = items[i];
         var spec = ItemDisplay.get_inventory_item_spec(item['spec']);
-        var stack_max = (spec['stack_max'] || 1);
+        var max_stack = (spec['max_stack'] || 1);
         var togo = ('stack' in item ? item['stack'] : 1);
 
         if(spec['fungible'] && !fungible_inventory_item_can_fit(spec, togo)) { // check for entire stack to fit
@@ -6777,8 +6777,8 @@ function inventory_items_can_all_fit(items, inventory, max_usable_inventory) {
             var inv = scratch[j];
             if(inv['spec'] === item['spec']) {
                 var inv_stack = ('stack' in inv? inv['stack'] : 1);
-                if(inv_stack < stack_max) {
-                    var added = Math.min(togo, (stack_max - inv_stack))
+                if(inv_stack < max_stack) {
+                    var added = Math.min(togo, (max_stack - inv_stack))
                     togo -= added;
                     inv['stack'] = inv_stack + added;
                 }

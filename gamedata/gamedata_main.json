@@ -225,7 +225,7 @@
         "enable_equipment": 1,
         "enable_unit_equipment": 1, // enable equipment slot UI on units
 
-        "item_tooltip_stack_max": 0, // show (Max stack: NN) in item tooltip
+        "item_tooltip_max_stack": 0, // show (Max stack: NN) in item tooltip
 
         // enable Alliance stuff (for both server and client)
         "enable_alliances": 1,

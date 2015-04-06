@@ -943,8 +943,8 @@ def check_crafting_recipe(recname, spec):
                 error |= 1; print '%s: ingredients uses unknown item %s' % (recname, entry['spec'])
             else:
                 ingr_spec = gamedata['items'][entry['spec']]
-                if entry.get('stack',1) > ingr_spec.get('stack_max',1):
-                    error |= 1; print '%s: ingredient "%r" stack cannot be greater than item\'s stack_max' % (recname, entry)
+                if entry.get('stack',1) > ingr_spec.get('max_stack',1):
+                    error |= 1; print '%s: ingredient "%r" stack cannot be greater than item\'s max_stack' % (recname, entry)
 
     error |= check_loot_table(spec['product'], reason = recname+':product')
     for FIELD in ('show_if', 'requires'):
@@ -1305,9 +1305,9 @@ def check_loot_table(table, reason = '', expire_time = -1, duration = -1, max_sl
                     else:
                         stack = 1
 
-                    if stack > spec.get('stack_max',1):
+                    if stack > spec.get('max_stack',1):
                         error |= 1
-                        print '%s: loot table entry (%s) gives more than the max stack size (%d) of item "%s"\n -> reduce loot amount or break this into multiple stacks of <= %d each' % (reason, repr(entry), spec.get('stack_max',1), entry['spec'], spec.get('stack_max',1))
+                        print '%s: loot table entry (%s) gives more than the max stack size (%d) of item "%s"\n -> reduce loot amount or break this into multiple stacks of <= %d each' % (reason, repr(entry), spec.get('max_stack',1), entry['spec'], spec.get('max_stack',1))
 
                 if ('use' in spec) and ('spellname' in spec['use']) and spec['use']['spellname'] == 'GIVE_UNITS' and ('sexy_unlocked' not in reason) and \
                    (not entry.get('resurrection_ok',False)) and any(gamedata['units'][u].get('resurrectable',False) for u in spec['use']['spellarg'].iterkeys()):
@@ -2857,7 +2857,7 @@ def check_store_sku(sku_name, sku):
                     error |= 1
                     print 'store sku %s refers to nonexistent item "%s"' % (sku_name, item_name)
                 item = gamedata['items'][item_name]
-                assert item['stack_max'] > 100
+                assert item['max_stack'] > 100
                 if 'store_icon' not in item:
                     error |= 1
                     print 'store sku %s currency item "%s" needs a store_icon' % (sku_name, item_name)
