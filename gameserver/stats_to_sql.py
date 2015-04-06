@@ -250,14 +250,17 @@ if __name__ == '__main__':
     keyvals = []
 
     for specname, data in gamedata['crafting']['recipes'].iteritems():
+        if 'level_max' in data or 'level' in data: raise Exception('leveled recipes not handled')
         keyvals.append((('recipe_id', specname),
                         ('is_output', 0),
                         ('resource', 'time'),
+                        ('level',None),
                         ('amount', data['craft_time'])))
         for res, amt in data['cost'].iteritems():
             keyvals.append((('recipe_id', specname),
                             ('is_output', 0),
                             ('resource', res),
+                            ('level',None),
                             ('amount', amt)))
         for entry in data.get('ingredients',[]):
             keyvals.append((('recipe_id', specname),
