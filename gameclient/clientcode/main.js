@@ -13454,59 +13454,50 @@ function reload_game() {
     }
 }
 
-function invoke_cheat_menu() {
+/** @param {!SPUI.DialogWidget} parent_widget
+    @return {!SPUI.Dialog} */
+function invoke_cheat_menu(parent_widget) {
     change_selection(player.virtual_units["CHEATMENU"]);
-    var win = new SPUI.Window();
-    win.xy = [150,100];
-    var layout = new SPUI.VLayout();
 
-    layout.add(new SPUI.Text("Developer Tools"));
+    /** @type {!Array.<ContextMenuButton>} */
+    var buttons = [];
 
-    var closure = function(spellname) { return function() {
-        send_to_server.func(["CAST_SPELL", GameObject.VIRTUAL_ID, spellname]);
-        change_selection(null);
-    }; };
-
-
-    layout.add(new SPUI.Button("Toggle Edit Mode", function() {
-        change_selection_ui(null);
+    buttons.push(new ContextMenuButton({ui_name: "Toggle Edit Mode", onclick: function() {
         player.is_cheater = !player.is_cheater;
         send_to_server.func(["CAST_SPELL", GameObject.VIRTUAL_ID, "CHEAT_REMOVE_LIMITS", player.is_cheater]);
-    }));
+    }}));
 
-    layout.add(new SPUI.Button("Save AI base to /var/tmp", function() {
-        change_selection_ui(null);
+    buttons.push(new ContextMenuButton({ui_name: "Save base in /var/tmp", asset: 'menu_button_resizable', onclick: function() {
         var timestamp = server_time.toFixed(0);
         var filename = '/var/tmp/'+gamedata['game_id']+'_saved_ai_base_'+timestamp+'.json';
         save_ai_base(filename);
-    }));
+    }}));
 
-    layout.add(new SPUI.Button("Clear", function() { change_selection_ui(null); destroy_all_enemies(); }));
+    buttons.push(new ContextMenuButton({ui_name: "Clear", asset: 'menu_button_resizable', onclick: function() {
+        destroy_all_enemies();
+    }}));
 
     if(player.is_cheater) {
-        layout.add(new SPUI.Button("Remove All Barriers", function() { remove_all_barriers(); change_selection(null); }));
-        layout.add(new SPUI.Button("Upgrade All Barriers", function() { upgrade_all_barriers(); change_selection(null); }));
-        layout.add(new SPUI.Button("Give 10,000 Gamebucks", function() { change_selection_ui(null); send_to_server.func(["CAST_SPELL", GameObject.VIRTUAL_ID, "CHEAT_GIVE_GAMEBUCKS", 10000]); }));
-        layout.add(new SPUI.Button("Get Daily Gifts", function() { change_selection_ui(null); send_to_server.func(["CAST_SPELL", GameObject.VIRTUAL_ID, "CHEAT_GIVE_GIFTS"]); }));
-        layout.add(new SPUI.Button("Drain Resources", function() { change_selection_ui(null); send_to_server.func(["CAST_SPELL", GameObject.VIRTUAL_ID, "CHEAT_DRAIN_RESOURCES"]); }));
-        layout.add(new SPUI.Button("Clear Cooldowns/Auras", function() {
-            change_selection_ui(null);
+        buttons.push(new ContextMenuButton({ui_name: "Remove All Barriers", asset: 'menu_button_resizable', onclick: function() {
+            remove_all_barriers(); }}));
+        buttons.push(new ContextMenuButton({ui_name: "Upgrade All Barriers", asset: 'menu_button_resizable', onclick: function() {
+            upgrade_all_barriers(); }}));
+        buttons.push(new ContextMenuButton({ui_name: "Get 10k Gamebucks", onclick: function() {
+            send_to_server.func(["CAST_SPELL", GameObject.VIRTUAL_ID, "CHEAT_GIVE_GAMEBUCKS", 10000]); }}));
+        buttons.push(new ContextMenuButton({ui_name: "Get Daily Gifts", asset: 'menu_button_resizable', onclick: function() {
+            send_to_server.func(["CAST_SPELL", GameObject.VIRTUAL_ID, "CHEAT_GIVE_GIFTS"]); }}));
+        buttons.push(new ContextMenuButton({ui_name: "Drain Resources", asset: 'menu_button_resizable', onclick: function() {
+            send_to_server.func(["CAST_SPELL", GameObject.VIRTUAL_ID, "CHEAT_DRAIN_RESOURCES"]); }}));
+        buttons.push(new ContextMenuButton({ui_name: "Clear Cooldowns", asset: 'menu_button_resizable', onclick: function() {
             send_to_server.func(["CAST_SPELL", GameObject.VIRTUAL_ID, "CHEAT_CLEAR_COOLDOWNS"]);
-            send_to_server.func(["CAST_SPELL", GameObject.VIRTUAL_ID, "CHEAT_CLEAR_PLAYER_AURAS"]);
-        }));
-        layout.add(new SPUI.Button("Get Donated Units", function() { change_selection_ui(null); send_to_server.func(["CAST_SPELL", GameObject.VIRTUAL_ID, "CHEAT_GET_DONATED_UNITS"]); }));
+            send_to_server.func(["CAST_SPELL", GameObject.VIRTUAL_ID, "CHEAT_CLEAR_PLAYER_AURAS"]); }}));
+        buttons.push(new ContextMenuButton({ui_name: "Get Donated Units", asset: 'menu_button_resizable', onclick: function() {
+            send_to_server.func(["CAST_SPELL", GameObject.VIRTUAL_ID, "CHEAT_GET_DONATED_UNITS"]); }}));
     }
-    //layout.add(new SPUI.Button("Clear Hostile Units", function() { destroy_all_enemies(); change_selection(null); }));
-    //layout.add(new SPUI.Button("Earn Credits Offerwall", Store.earn_fbcredits_with_offers));
-    //layout.add(new SPUI.Button("Assign A/B Cohort", invoke_abtest_dialog ));
-    //layout.add(new SPUI.Button("Test Video Widget", function() { change_selection(null); SPVideoWidget.init(SPVideoWidget.make_youtube_url('Icf6YiXV08Q'), null); } ));
 
+    //buttons.push(new ContextMenuButton({ui_name: "Simulate Chargeback", onclick: function() { change_selection_ui(null); send_to_server.func(["FBPAYMENT_SIMULATE_REFUND"]); }}));
 
-
-    //layout.add(new SPUI.Button("Simulate Chargeback", function() { change_selection_ui(null); send_to_server.func(["FBPAYMENT_SIMULATE_REFUND"]); }));
-
-    layout.add(new SPUI.Button("Reset Game", function() {
-        change_selection_ui(null);
+    buttons.push(new ContextMenuButton({ui_name: "Reset Game", onclick: function() {
         var msg = gamedata['strings']['reset_game_confirm'];
         invoke_child_message_dialog(msg['ui_title'], msg['ui_description'],
                                     {'cancel_button':true,
@@ -13519,13 +13510,11 @@ function invoke_cheat_menu() {
                                          // force refresh
                                          window.setTimeout(function() { reload_game(); }, 500);
                                      }});
-    }));
+    }}));
 
-    layout.add(new SPUI.Button("Log Out", function() { change_selection_ui(null); SPINPUNCHGAME.shutdown(); }));
+    buttons.push(new ContextMenuButton({ui_name: "Log Out", asset: 'menu_button_resizable', onclick: function() { SPINPUNCHGAME.shutdown(); }}));
 
-    win.add(layout);
-    selection.ui = win;
-    SPUI.root.add(win);
+    return invoke_generic_context_menu(vec_add(parent_widget.get_absolute_xy(), [Math.floor(parent_widget.wh[0]/2),65]), buttons);
 };
 
 function give_me_item(item) {
