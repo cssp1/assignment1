@@ -20,7 +20,7 @@ FILESTOGO="$HOME/.bashrc \
            $HOME/.dir_colors"
 
 # remote setup scripts
-FILESTOGO+=" setup-there-common.sh setup-there-analytics1.sh fix-ec2-mail.py"
+FILESTOGO+=" setup-there-common.sh setup-there-analytics1.sh fix-ec2-mail.py ec2-send-memory-metrics.py"
 
 # overlay
 FILESTOGO+=" /tmp/overlay-analytics1.cpio.gz"

@@ -9,3 +9,6 @@
 
 # run Facebook notification sender every hour at 0:10, 1:10, 2:10, ...
 10 * * * * ec2-user run-parts /etc/cron.spinpunch.fbnotify
+
+# send memory statistics to CloudWatch every minute
+* * * * * nobody /usr/local/bin/ec2-send-memory-metrics.py

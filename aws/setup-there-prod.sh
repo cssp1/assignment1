@@ -71,8 +71,11 @@ sudo chmod -R 0770 /var/lib/munin/plugin-state
 
 sudo newaliases
 
-echo "SETUP(remote): Mounting data EBS volume..."
+echo "SETUP(remote): Mounting data EBS volumes..."
 sudo mount -a
+
+echo "SETUP(remote): Setting up ec2-send-memory-metrics.py..."
+sudo install ./ec2-send-memory-metrics.py /usr/local/bin/ec2-send-memory-metrics.py
 
 echo "SETUP(remote): (Re)starting munin-node..."
 sudo /etc/init.d/munin-node restart

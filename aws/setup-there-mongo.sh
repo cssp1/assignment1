@@ -52,6 +52,9 @@ sudo /etc/init.d/fail2ban start
 echo "SETUP(remote): Fixing mail configuration..."
 sudo ./fix-ec2-mail.py
 
+echo "SETUP(remote): Setting up ec2-send-memory-metrics.py..."
+sudo install ./ec2-send-memory-metrics.py /usr/local/bin/ec2-send-memory-metrics.py
+
 echo "SETUP(remote): ${SYSTEM} setup done!"
 
 echo "MISSING:"

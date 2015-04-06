@@ -18,7 +18,7 @@ FILESTOGO="$HOME/.bashrc \
            $HOME/.dir_colors"
 
 # remote setup scripts
-FILESTOGO+=" setup-there-common.sh setup-there-${SYSTEM}.sh fix-ec2-mail.py"
+FILESTOGO+=" setup-there-common.sh setup-there-${SYSTEM}.sh fix-ec2-mail.py ec2-send-memory-metrics.py"
 
 # overlay
 FILESTOGO+=" /tmp/overlay-${SYSTEM}.cpio.gz"

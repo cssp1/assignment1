@@ -50,6 +50,9 @@ sudo mount -a
 echo "SETUP(remote): Fixing mail configuration..."
 sudo ./fix-ec2-mail.py
 
+echo "SETUP(remote): Setting up ec2-send-memory-metrics.py..."
+sudo install ./ec2-send-memory-metrics.py /usr/local/bin/ec2-send-memory-metrics.py
+
 echo "SETUP(remote): analytics1 setup done!"
 
 echo "MISSING: /etc/fstab, /etc/sysconfig/network hostname"
