@@ -4904,26 +4904,37 @@ class Equipment (object):
             for slot_type in equipment:
                 for x in equipment[slot_type]:
                     if x:
-                        yield {'spec': x}
+                        if type(x) is dict:
+                            yield x
+                        else:
+                            yield {'spec': x}
     # return a serialized representation of each equipped item, for sending to the client
     @staticmethod
     def equip_serialize(equipment):
         if equipment:
             assert type(equipment) is dict
             for slot_type in equipment:
-                for i, name in enumerate(equipment[slot_type]):
-                    if name:
-                        yield {'slot_type':slot_type, 'slot_index': i, 'item': {'spec': name}}
+                for i, entry in enumerate(equipment[slot_type]):
+                    if entry:
+                        if type(entry) is dict:
+                            yield {'slot_type':slot_type, 'slot_index': i, 'item': entry}
+                        else:
+                            yield {'slot_type':slot_type, 'slot_index': i, 'item': {'spec': entry}}
 
-    # check that there actually exists an item of the right spec at this address
+    # check that there actually exists an item of the right spec (and optionally level) at this address
     @staticmethod
-    def equip_has(equipment, addr, specname = None):
+    def equip_has(equipment, addr, specname = None, level = None):
         assert type(equipment) is dict
         slot_type, slot_num = addr
         if not equipment: return False
         if slot_type not in equipment: return False
         if slot_num >= len(equipment[slot_type]): return False
-        if specname and (equipment[slot_type][slot_num] != specname): return False
+        if specname:
+            if type(equipment[slot_type][slot_num]) is dict:
+                if (equipment[slot_type][slot_num]['spec'] != specname) or \
+                   (level is not None and equipment[slot_type][slot_num].get('level',1) != level): return False
+            else:
+                if (equipment[slot_type][slot_num] != specname) or (level is not None and level != 1): return False
         return True
 
     # get the item at this address (None if missing)
@@ -4934,7 +4945,11 @@ class Equipment (object):
         if not equipment: return None
         if slot_type not in equipment: return None
         if slot_num >= len(equipment[slot_type]): return None
-        return {'spec': equipment[slot_type][slot_num]}
+        if not equipment[slot_type][slot_num]: return None
+        if type(equipment[slot_type][slot_num]) is dict:
+            return equipment[slot_type][slot_num]
+        else:
+            return {'spec': equipment[slot_type][slot_num]}
 
     @staticmethod
     def equip_remove(equipment, addr, specname = None):
@@ -4946,7 +4961,7 @@ class Equipment (object):
         if not any(equipment[slot_type]): del equipment[slot_type]
         return old_item
 
-    @classmethod
+    @classmethod # XXXXXX handle items with properties
     def equip_add(cls, equipment, my_spec, my_level, addr, item_spec, probe_only = False, probe_will_remove = False):
         assert type(equipment) is dict
         assert type(item_spec) is dict
@@ -4977,7 +4992,7 @@ class Equipment (object):
         return True
 
     # similar to client's equip_is_compatible_with*() functions
-    @staticmethod
+    @staticmethod # XXXXXX handle items with properties
     def equip_is_compatible_with_slot(my_spec, my_level, slot_type, item_spec):
         if 'equip' not in item_spec: return False
         if 'compatible' in item_spec['equip']:
@@ -8930,7 +8945,7 @@ class Player(AbstractPlayer):
                         for item in Equipment.equip_iter(obj.equipment):
                             if item['spec'] in gamedata['items']:
                                 equip = gamedata['items'][item['spec']]
-                                level = item.get('level',1)
+                                level = item.get('level', equip.get('level',1))
                                 effects = equip['equip']['effects']
                                 for i in xrange(len(effects)):
                                     effect = effects[i]
