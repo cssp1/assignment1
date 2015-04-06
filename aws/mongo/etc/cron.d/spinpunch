@@ -3,4 +3,4 @@
 # 30 * * * * ec2-user run-parts /etc/cron.spinpunch.hourly
 
 # send memory statistics to CloudWatch every minute
-* * * * * nobody /usr/local/bin/ec2-send-memory-metrics.py
+* * * * * ec2-user /usr/local/bin/ec2-send-memory-metrics.py
