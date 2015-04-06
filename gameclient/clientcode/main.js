@@ -11778,6 +11778,7 @@ function update_desktop_dialogs() {
                 dialog.widgets['skip_tutorial_button'].show = false;
 
             if(player.tutorial_state == "COMPLETE" && player.quest_tracked && !session.has_attacked &&
+               player.get_any_abtest_value('enable_quest_tracker', gamedata['client']['enable_quest_tracker']) &&
                (player.get_any_abtest_value('skip_tutorial_button', gamedata['client']['skip_tutorial_button']) ||
                 !('tips' in player.quest_tracked))) {
                 var quest = player.quest_tracked;
