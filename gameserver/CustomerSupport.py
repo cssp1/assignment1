@@ -128,6 +128,16 @@ class HandleClearAlias(Handler):
         if 'alias' in player: del player['alias']
         return ReturnValue(result = 'ok')
 
+class HandleMarkUninstalled(Handler):
+    def do_exec_online(self, session, retmsg):
+        session.user.uninstalled = 1
+        self.gamesite.pcache_client.player_cache_update(self.user_id, {'uninstalled': 1})
+        return ReturnValue(result = 'ok')
+    def do_exec_offline(self, user, player):
+        user['uninstalled'] = 1
+        self.gamesite.pcache_client.player_cache_update(self.user_id, {'uninstalled': 1})
+        return ReturnValue(result = 'ok')
+
 class HandleMakeDeveloper(Handler):
     def do_exec_online(self, session, retmsg):
         session.user.developer = session.player.developer = 1 # note: update Player as well as User
@@ -290,6 +300,7 @@ methods = {
     'get_raw_user': HandleGetRawUser,
     'ban': HandleBan,
     'unban': HandleUnban,
+    'mark_uninstalled': HandleMarkUninstalled,
     'make_developer': HandleMakeDeveloper,
     'unmake_developer': HandleUnmakeDeveloper,
     'clear_alias': HandleClearAlias,

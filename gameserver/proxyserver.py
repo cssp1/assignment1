@@ -453,6 +453,9 @@ visitor_table = {}
 
 # Currently active GAMEAPI sessions
 
+def controlapi_url(gameserver_host, gameserver_port):
+    return 'http://%s:%d/CONTROLAPI' % (gameserver_host, gameserver_port)
+
 class ProxySession(object):
     # note: make local copies of some server fields at creation, so
     # that this object does not rely on a reference to the GameServer
@@ -465,7 +468,7 @@ class ProxySession(object):
         self.last_active_time = 0
         self.gameserver_name = gameserver_name # name of assigned server, for debugging and (old) load balancing
         self.gameserver_fwd = (gameserver_host, gameserver_port) # where to forward proxied GAMEAPI/CREDITAPI/etc requests
-        self.gameserver_ctrl= 'http://%s:%d/CONTROLAPI' % (gameserver_host, gameserver_port) # endpoint for CONTROLAPI requests
+        self.gameserver_ctrl= controlapi_url(gameserver_host, gameserver_port) # endpoint for CONTROLAPI requests
 
 
     def __repr__(self):
@@ -1936,8 +1939,19 @@ class GameProxy(proxy.ReverseProxyResource):
             user_id = social_id_table.social_id_to_spinpunch('fb'+str(signed_request['user_id']), False)
             if user_id:
                 metric_event_coded(None, '0113_account_deauthorized', {'user_id': user_id})
-                # mark account as "deauthorized" by setting last_login_time=-1 in player_cache
-                db_client.player_cache_update(user_id, {'last_login_time':-1}, reason = 'FBDEAUTHAPI')
+                # mark account as "deauthorized"
+
+                # pick any open server
+                qs = {'type':SpinConfig.game(), 'state':'ok',
+                      'gamedata_build': proxysite.proxy_root.static_resources['gamedata-%s-en_US.js' % SpinConfig.game()].build_date,
+                      'gameclient_build': proxysite.proxy_root.static_resources['compiled-client.js'].build_date}
+                result = db_client.server_status_query_one(qs, fields = {'hostname':1, 'game_http_port':1})
+                if result:
+                    url = controlapi_url(result['hostname'], result['game_http_port']) + '?' + \
+                          urllib.urlencode(dict(secret = str(SpinConfig.config['proxy_api_secret']),
+                                                method = 'mark_uninstalled',
+                                                user_id = str(user_id)))
+                    control_async_http.queue_request(proxy_time, url, lambda response: None)
             return ''
 
         elif self.path == '/ADMIN/':

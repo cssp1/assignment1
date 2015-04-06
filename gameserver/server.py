@@ -628,6 +628,7 @@ class UserTable:
               ('account_creation_time', int),
               ('last_login_time', int),
               ('last_login_ip', str),
+              ('uninstalled', int),
               ('birthday', None),
               ('browser_name', str),
               ('browser_version', int),
@@ -816,6 +817,7 @@ class User:
         self.account_creation_time = -1 # server_time at which account was originally created
         self.last_login_time = -1 # last time at which user played a game
         self.last_login_ip = '' # last IP address from which this user logged in
+        self.uninstalled = 0 # true if person uninstalled the game via the frame platform
         self.country = '' # Facebook country from which user last logged in
         self.fb_oauth_token = None # Facebook OAuth token from the proxyserver login
 
@@ -16407,7 +16409,7 @@ class GAMEAPI(resource.Resource):
         # only allow retrieval of a few user-visible fields
         manual_fields = (fields is not None)
         if fields is None:
-            fields = ['user_id', 'player_level', 'social_id', 'ui_name', 'real_name', 'kg_avatar_url', 'last_defense_time', 'last_login_time', # XXXXXX
+            fields = ['user_id', 'player_level', 'social_id', 'ui_name', 'real_name', 'kg_avatar_url', 'last_defense_time', 'last_login_time', 'uninstalled', # XXXXXX
                       'units_donated_cur_alliance', 'home_region', 'home_base_loc', 'ladder_player', 'pvp_player',
                       'LOCK_STATE', 'LOCK_OWNER', 'protection_end_time', 'base_damage', 'base_repair_time',
                       'facebook_id', 'kg_id',
@@ -21094,6 +21096,7 @@ class GAMEAPI(resource.Resource):
         user.social_id = social_id
         user.last_login_time = server_time
         user.last_login_ip = client_ip
+        user.uninstalled = 0
 
         # update profile fields
         if frame_platform == 'fb':
@@ -21577,6 +21580,8 @@ class GAMEAPI(resource.Resource):
         if abuse_warning_msg:
             retmsg += abuse_warning_msg
 
+        self.send_player_cache_update(session, 'login') # mainly for uninstalled flag and last_login_time
+
         # mark end of login messages
         retmsg.append(["END_SERVER_HELLO"])
 
@@ -21796,6 +21801,7 @@ class GAMEAPI(resource.Resource):
                        'account_creation_time': session.user.account_creation_time,
                        'last_login_time': session.user.last_login_time,
                        'last_login_ip': session.user.last_login_ip,
+                       'uninstalled': None,
                        'last_mtime': server_time,
                        'money_spent': session.player.history.get('money_spent',0.0),
                        'ui_name': session.user.get_ui_name(session.player),
