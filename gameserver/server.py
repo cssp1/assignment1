@@ -18866,6 +18866,9 @@ class GAMEAPI(resource.Resource):
                 # note: pass inflated max_usable_inventory here as "buffer" space, since we checked for space above
                 assert session.player.inventory_add_item({'spec':remove_specname}, max_usable_inventory + inventory_buffer) == 1
                 # no need to log - player already had item
+            if 'on_unequip' in remove_spec['equip']:
+                session.execute_consequent_safe(remove_spec['equip']['on_unequip'], session.player, retmsg, reason='on_unequip')
+
         if add_specname:
             if force and inventory_slot < 0:
                 pass # out of thin air

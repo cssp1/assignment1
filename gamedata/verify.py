@@ -1183,8 +1183,9 @@ def check_item(itemname, spec):
         if ('name' in equip) and (gamedata['game_id'] == 'tr') and ('turret_heads' in gamedata['crafting']['categories']) and (equip['name'] in ('mg_tower', 'mortar_emplacement', 'tow_emplacement')):
             error |= 1; print '%s: needs migration to be "compatible" with turret heads' % itemname
 
-        if 'on_equip' in equip:
-            error |= check_consequent(equip['on_equip'], reason = 'item %s: on_equip' % itemname)
+        for CONS in ('on_equip', 'on_unequip'):
+            if CONS in equip:
+                error |= check_consequent(equip[CONS], reason = 'item %s: %s' % (itemname, CONS))
 
     if 'store_price' in spec or 'store_requires' in spec:
         error |= 1; print '%s: has obsolete store_price or store_requires fields - these need to be migrated to the store catalog in gamedata_main.json' % (itemname)
