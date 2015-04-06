@@ -501,17 +501,7 @@ SPUI.draw_active_tooltip = function() {
     }
 };
 
-// V/HLayout
-
-/** @constructor
-  * @extends SPUI.Container
-  */
-SPUI.HLayout = function() {
-    goog.base(this);
-    this.pad = 5;
-};
-
-goog.inherits(SPUI.HLayout, SPUI.Container);
+// VLayout
 
 /** @constructor
   * @extends SPUI.Container
@@ -539,56 +529,6 @@ SPUI.VLayout.prototype.reflow = function() {
     var ret = [max_w, total_h];
     this.wh = ret;
     return ret;
-};
-
-SPUI.HLayout.prototype.reflow = function() {
-    var max_h = 0;
-    var total_w = this.pad;
-    var x = this.pad;
-    for(var i = 0; i < this.children.length; i++) {
-        var child = this.children[i];
-        var child_wh = child.reflow();
-        child.xy = [x,0];
-        total_w += child_wh[0] + this.pad;
-        x += child_wh[0] + this.pad;
-        max_h = Math.max(max_h, child_wh[1]);
-    }
-
-    var ret = [total_w, max_h];
-    this.wh = ret;
-    return ret;
-};
-
-// Window
-
-/** @constructor
-  * @extends SPUI.Container
-  */
-SPUI.Window = function() {
-    goog.base(this);
-    this.pad = 15;
-};
-
-goog.inherits(SPUI.Window, SPUI.Container);
-
-SPUI.Window.prototype.do_draw = function(offset) {
-    SPUI.ctx.save();
-    SPUI.ctx.fillStyle = '#000000';
-    SPUI.ctx.fillRect(this.xy[0]+offset[0],this.xy[1]+offset[1],this.wh[0],this.wh[1]);
-    SPUI.ctx.restore();
-};
-
-SPUI.Window.prototype.reflow = function() {
-    var child_wh = this.children[0].reflow();
-    this.children[0].xy = [this.pad, this.pad];
-    var ret = [child_wh[0] + 2*this.pad, child_wh[1] + 2*this.pad];
-    this.wh = ret;
-    return ret;
-};
-
-SPUI.Window.prototype.draw = function(offset) {
-    this.do_draw(offset);
-    this.children[0].draw([offset[0]+this.xy[0],offset[1]+this.xy[1]]);
 };
 
 // Text
@@ -648,104 +588,6 @@ SPUI.Text.prototype.reflow = function() {
     }
     this.wh = ret;
     return ret;
-};
-
-// Button
-
-/** @constructor
-  * @extends SPUI.Element
-  * @param {string} str
-  * @param {function()} onclick
-  * @param {Object=} props
-  */
-SPUI.Button = function(str, onclick, props) {
-    goog.base(this);
-    this.str = str;
-    this.onclick = onclick;
-    this.bgcolor = (props && props['bgcolor']) || new SPUI.Color(1,1,1,1);
-    this.font = SPUI.desktop_font;
-};
-
-goog.inherits(SPUI.Button, SPUI.Element);
-
-SPUI.Button.prototype.pad = [20,3];
-
-SPUI.Button.prototype.reflow = function()  {
-    var dims = SPUI.ctx.measureText(this.str);
-    var ret = [dims.width + 2*this.pad[0], this.font.size + 4*this.pad[1]];
-    this.wh = ret;
-    return ret;
-};
-
-SPUI.Button.prototype.draw = function(offset) {
-    SPUI.ctx.save();
-    SPUI.ctx.fillStyle = this.bgcolor.str();
-    SPUI.ctx.fillRect(this.xy[0]+offset[0],this.xy[1]+offset[1],this.wh[0],this.wh[1]);
-    SPUI.ctx.fillStyle = '#000000';
-    SPUI.ctx.fillText(this.str, this.xy[0]+offset[0]+this.pad[0], this.xy[1]+offset[1]+1*this.pad[1]+this.font.size);
-    SPUI.ctx.restore();
-};
-
-SPUI.Button.prototype.on_mouseup = function(uv, offset, button) {
-    if(uv[0] >= this.xy[0]+offset[0] &&
-       uv[0]  < this.xy[0]+offset[0]+this.wh[0] &&
-       uv[1] >= this.xy[1]+offset[1] &&
-       uv[1]  < this.xy[1]+offset[1]+this.wh[1]) {
-        // click is inside the area
-        this.onclick();
-        return true;
-    }
-    return false;
-};
-
-// Image
-
-/** @constructor
-  * @extends SPUI.Element
-  */
-SPUI.Image = function(src, wh, onclick) {
-    goog.base(this);
-    this.onclick = onclick;
-    this.wh = wh;
-    this.src = src;
-
-    if(src != '') {
-        this.loaded = false;
-        this.img = new Image();
-        this.img.onload = (function(t) { return function () { t.loaded = true; }; })(this);
-        this.img.src = src;
-    } else {
-        // hack - assume caller is setting this.img directly (e.g. from GameArt)
-        this.loaded = true;
-    }
-    console.log('SPUI.IMAGE IS DEPRECATED!');
-};
-goog.inherits(SPUI.Image, SPUI.Element);
-SPUI.Image.prototype.reflow = function () {
-    return this.wh;
-};
-SPUI.Image.prototype.draw = function(offset) {
-    if(this.loaded) {
-        try {
-            SPUI.ctx.drawImage(this.img, 0, 0, this.wh[0], this.wh[1], this.xy[0]+offset[0], this.xy[1]+offset[1], this.wh[0], this.wh[1]); // OK
-        } catch(e) {}
-    } else {
-        SPUI.ctx.fillStyle = '#000000';
-        SPUI.ctx.fillRect(this.xy[0]+offset[0],this.xy[1]+offset[1],this.wh[0],this.wh[1]);
-    }
-};
-SPUI.Image.prototype.on_mouseup = function(uv, offset, button) {
-    if(!this.onclick)
-        return false;
-    if(uv[0] >= this.xy[0]+offset[0] &&
-       uv[0]  < this.xy[0]+offset[0]+this.wh[0] &&
-       uv[1] >= this.xy[1]+offset[1] &&
-       uv[1]  < this.xy[1]+offset[1]+this.wh[1]) {
-        // click is inside the area
-        this.onclick();
-        return true;
-    }
-    return false;
 };
 
 // ErrorLog
