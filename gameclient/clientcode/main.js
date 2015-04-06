@@ -28239,6 +28239,7 @@ function invoke_manufacture_dialog(reason, category, specname, want_builder) {
     dialog.user_data['want_builder'] = want_builder || null; // prefer this builder, if available
 
     dialog.widgets['close_button'].onclick = close_parent_dialog;
+    dialog.widgets['dev_title'].show = player.is_cheater;
 
     init_army_dialog_buttons(dialog.widgets['army_dialog_buttons_army'], 'army', 'manufacture_dialog');
 
@@ -36030,6 +36031,7 @@ function invoke_build_dialog(newcategory) {
         change_selection(null);
     };
     dialog.widgets['inert_button'].show = !!player.is_cheater;
+    dialog.widgets['dev_title'].show = player.is_cheater;
 
     goog.array.forEach(['inert', 'resources', 'production', 'defense'], function(cat) {
         dialog.widgets[cat+'_button'].onclick = (function (_cat) { return function(w) { build_dialog_change_category(w.parent, _cat); }; })(cat);

@@ -1325,6 +1325,11 @@
                        "text_hjustify": "left", "ui_name": "Buildings" },
             "close_button": { "kind": "ActionButton", "xy": [706,1], "dimensions": [19,22], "bg_image": "close_button_small", "push_bg_image": 1 },
 
+            "dev_title": { "show": 0, "kind": "TextField", "xy": [50,50], "dimensions": [221, 41], "text_size": 13,
+                           "text_style": "thick", "text_color": [1,0,0,1], "drop_shadow": 1,
+                           "text_hjustify": "left",
+                           "ui_name": "You are in DEV Edit mode - unlock/resource requirements are NOT enforced!" },
+
             "inert_button": { "kind": "ActionButton", "xy": [124,22], "dimensions": [136,32], "text_size": 13, "text_style": "bold",
                               "bg_image": "menu_button_136px", "state": "normal", "ui_name": "DEV Scenery" },
             "inert_button_jewel": { "kind": "Dialog", "xy": [240,20], "dimensions": [17,14], "dialog": "notification_jewel" },
@@ -2195,6 +2200,11 @@
             "cat_button": { "kind": "ActionButton", "xy": [22,81], "dimensions": [73,17], "text_size": 13,
                             "highlight_text_color": [0.75,0.75,0.75,1], "text_hjustify": "center", "mouseover_sound": 1,
                             "array": [3,1], "array_offset": [71,0] },
+
+            "dev_title": { "show": 0, "kind": "TextField", "xy": [50,50], "dimensions": [221, 41], "text_size": 13,
+                           "text_style": "thick", "text_color": [1,0,0,1], "drop_shadow": 1,
+                           "text_hjustify": "left",
+                           "ui_name": "You are in DEV Edit mode - unlock/resource requirements are NOT enforced, and units are made instantly!" },
 
             "unit_hero_icon": { "kind": "ActionButton", "xy": [425,108], "dimensions": [150,125], "bg_image_offset": [0,32], "bg_image_justify": "center",
                                 "bg_image": "", "state": "hero",
