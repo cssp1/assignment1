@@ -18829,6 +18829,9 @@ class GAMEAPI(resource.Resource):
             if not Equipment.equip_has(equipment, dest_addr, remove_specname):
                 retmsg.append(["ERROR", "EQUIP_INVALID"])
                 return False
+            if 'unequip_requires' in remove_spec['equip'] and (not Predicates.read_predicate(remove_spec['equip']['unequip_requires']).is_satisfied(session.player, None)):
+                retmsg.append(["ERROR", "REQUIREMENTS_NOT_SATISFIED",remove_spec['equip']['unequip_requires']])
+                return False
 
         # check warehouse availability
         if (not force) and session.player.warehouse_is_busy():

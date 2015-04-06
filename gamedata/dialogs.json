@@ -2536,6 +2536,7 @@
 
             "equip_nothing_frame": { "kind": "ActionButton", "xy": [15,36], "dimensions": [50,50], "bg_image": "inventory_frame", "state": "invisible",
                                      "ui_tooltip": "Leave slot empty",
+                                     "ui_tooltip_unmet": "Cannot remove item due to unmet requirement:\n%s",
                                      "ui_tooltip_remove": "Return equipped item\nto Warehouse",
                                      "ui_tooltip_full": "Cannot remove item\nNo room in Warehouse",
                                      "tooltip_delay": 0, "fixed_tooltip_offset": [-20,101]

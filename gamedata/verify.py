@@ -1176,8 +1176,9 @@ def check_item(itemname, spec):
                            ('Level %d or higher' % crit['min_level'] in ui_descr) for ui_descr in ui_descr_list):
                     error |= 1; print '%s: requires min_level %d but the ui_description does not include the words "L%d or higher" or "Level %d or higher": "%s"' % (itemname, crit['min_level'], crit['min_level'], crit['min_level'], spec['ui_description'])
 
-            if 'requires' in crit:
-                error |= check_predicate(crit['requires'], reason = 'item %s: equip requires' % itemname)
+            for PRED in ('requires', 'unequip_requires'):
+                if PRED in crit:
+                    error |= check_predicate(crit[PRED], reason = 'item %s: equip %s' % (itemname,PRED))
 
         if ('name' in equip) and (gamedata['game_id'] == 'tr') and ('turret_heads' in gamedata['crafting']['categories']) and (equip['name'] in ('mg_tower', 'mortar_emplacement', 'tow_emplacement')):
             error |= 1; print '%s: needs migration to be "compatible" with turret heads' % itemname

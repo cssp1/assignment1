@@ -22058,26 +22058,38 @@ function invoke_equip_chooser(inv_dialog, parent_widget, tech, unit, slot_type, 
         dialog.widgets['close_button'].onclick = go_away;
 
     // handlers for the "equip nothing" button
+    dialog.widgets['equip_nothing_frame'].state = 'normal';
+    dialog.widgets['equip_nothing_frame'].tooltip.str = null;
+
     if(equipped_now) {
-        // check for full warehouse
-        var full = (player.inventory.length >= player.max_usable_inventory());
-        dialog.widgets['equip_nothing_frame'].tooltip.str = dialog.data['widgets']['equip_nothing_frame']['ui_tooltip_'+(full?'full':'remove')].replace('%s', ItemDisplay.get_inventory_item_spec(equipped_now)['ui_name']);
-        if(full) {
-            dialog.widgets['equip_nothing_frame'].state = 'disabled';
+        var spec = ItemDisplay.get_inventory_item_spec(equipped_now);
+        // check predicate
+        var pred = ('unequip_requires' in spec['equip'] ? read_predicate(spec['equip']['unequip_requires']) : null);
+        if(pred && !pred.is_satisfied(player, null)) {
+            dialog.widgets['equip_nothing_frame'].state = 'disabled_clickable';
+            dialog.widgets['equip_nothing_frame'].onclick = get_requirements_help(pred);
+            dialog.widgets['equip_nothing_frame'].tooltip.str = dialog.data['widgets']['equip_nothing_frame']['ui_tooltip_unmet'].replace('%s', pred.ui_describe(player));
         } else {
-            // clicking on the "nothing" item removes whatever was equipped
-            dialog.widgets['equip_nothing_frame'].onclick = (function (_equipped_now, _tech, _unit, _slot_type, _slot_n, _ui_slot) { return function(w) {
-                if(_tech) {
-                    // unit equipment
-                    if(!(_tech['associated_unit'] in player.unit_equipment)) { player.unit_equipment[tech['associated_unit']] = {}; }
-                    player.unit_equipment[tech['associated_unit']]['equip_pending'] = 1;
-                    send_to_server.func(["EQUIP_UNIT", tech['associated_unit'], [_slot_type, _slot_n], -1, null, _equipped_now, _ui_slot]);
-                } else {
-                    _unit.equip_pending = true;
-                    send_to_server.func(["EQUIP_BUILDING", _unit.id, [_slot_type, _slot_n], -1, null, _equipped_now, _ui_slot]);
-                }
-                close_parent_dialog(w);
-            }; })(equipped_now, tech, unit, slot_type, slot_n, ui_slot);
+            // check for full warehouse
+            var full = (player.inventory.length >= player.max_usable_inventory());
+            dialog.widgets['equip_nothing_frame'].tooltip.str = dialog.data['widgets']['equip_nothing_frame']['ui_tooltip_'+(full?'full':'remove')].replace('%s', ItemDisplay.get_inventory_item_ui_name(spec));
+            if(full) {
+                dialog.widgets['equip_nothing_frame'].state = 'disabled';
+            } else {
+                // clicking on the "nothing" item removes whatever was equipped
+                dialog.widgets['equip_nothing_frame'].onclick = (function (_equipped_now, _tech, _unit, _slot_type, _slot_n, _ui_slot) { return function(w) {
+                    if(_tech) {
+                        // unit equipment
+                        if(!(_tech['associated_unit'] in player.unit_equipment)) { player.unit_equipment[tech['associated_unit']] = {}; }
+                        player.unit_equipment[tech['associated_unit']]['equip_pending'] = 1;
+                        send_to_server.func(["EQUIP_UNIT", tech['associated_unit'], [_slot_type, _slot_n], -1, null, _equipped_now, _ui_slot]);
+                    } else {
+                        _unit.equip_pending = true;
+                        send_to_server.func(["EQUIP_BUILDING", _unit.id, [_slot_type, _slot_n], -1, null, _equipped_now, _ui_slot]);
+                    }
+                    close_parent_dialog(w);
+                }; })(equipped_now, tech, unit, slot_type, slot_n, ui_slot);
+            }
         }
     } else {
         dialog.widgets['equip_nothing_frame'].onclick = go_away;
