@@ -684,6 +684,13 @@ AuraInactivePredicate.prototype.do_ui_describe = function(player) {
     var template = gamedata['strings']['predicates'][this.kind][(togo > 0 ? 'ui_name_togo' : 'ui_name')];
     return new PredicateUIDescription(template.replace('%s', gamedata['auras'][this.act_pred.aura_name]['ui_name']).replace('%togo', pretty_print_time(togo)));
 };
+AuraInactivePredicate.prototype.do_ui_help = function(player) {
+    var aura_spec = gamedata['auras'][this.act_pred.aura_name];
+    if(aura_spec && aura_spec['speedupable']) {
+        return {'noun': 'player_aura', 'verb': 'speedup', 'target': this.act_pred.aura_name, 'ui_arg_s': aura_spec['ui_name'] };
+    }
+    return null;
+};
 
 /** @constructor
   * @extends Predicate */

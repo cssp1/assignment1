@@ -515,6 +515,7 @@ PURCHASE_CATEGORY_MAP = {'MAKE_DROIDS': 'manufacturing', # dummy entry for produ
                          'BUY_RESOURCES_TOPUP': 'resource_boost',
                          'REPAIR_ALL_FOR_MONEY': 'repair',
                          'UNIT_REPAIR_SPEEDUP_FOR_MONEY': 'repair',
+                         'PLAYER_AURA_SPEEDUP_FOR_MONEY': 'player_aura_speedup',
                          'UPGRADE_BARRIERS_LEVEL2': 'barriers', 'UPGRADE_BARRIERS_LEVEL3': 'barriers', 'UPGRADE_BARRIERS_LEVEL4': 'barriers',
                          'CHANGE_REGION_INSTANTLY': 'change_region',
                          'BUY_LOTTERY_TICKET': 'lottery',
@@ -645,7 +646,8 @@ def classify_purchase(gamedata, descr):
                 subcat = 'quarry'
             else:
                 subcat = 'base_and_units'
-
+    elif catname == 'player_aura_speedup':
+        subcat = fields[1]
     elif catname == 'crafting':
         #['CRAFT_FOR_MONEY','weapons_lab','first_recipe_name', optional: 'first_recipe_levelNN']
         subcat = fields[2]

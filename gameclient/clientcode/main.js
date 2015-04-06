@@ -16709,6 +16709,76 @@ function do_invoke_speedup_dialog(kind) {
     return dialog;
 }
 
+
+function invoke_player_aura_speedup_dialog(aura_name) {
+    var aura_spec = gamedata['auras'][aura_name];
+    var aura = goog.array.find(player.player_auras, function(a) {
+        return (a['spec'] == aura_name) && ('end_time' in a);
+    });
+    if(!aura) { return null; }
+
+    var dialog_data = gamedata['dialogs']['speedup_dialog'];
+    var dialog = new SPUI.Dialog(dialog_data);
+    dialog.user_data['dialog'] = 'speedup_dialog';
+    dialog.modal = true;
+    install_child_dialog(dialog);
+    dialog.auto_center();
+
+    dialog.widgets['title_speedup'].show = true;
+    dialog.widgets['close_button'].onclick = close_parent_dialog;
+
+    var time_left = aura['end_time'] - server_time;
+
+    var description_finish = gamedata['strings']['speedup']['finish_player_aura'].replace('%s', aura_spec['ui_name']);
+    var description_before = gamedata['strings']['speedup']['before_generic'];
+    var description = gamedata['strings']['speedup']['template'].replace('%TIME',pretty_print_time(time_left)).replace('%FINISH', description_finish).replace('%BEFORE', description_before);
+    dialog.widgets['description'].set_text_with_linebreaking(description);
+
+    var price, closure;
+    price = Store.get_user_currency_price(GameObject.VIRTUAL_ID, gamedata['spells']['PLAYER_AURA_SPEEDUP_FOR_MONEY'], aura_name);
+    if(price == 0) {
+        closure = (function (_aura_name) { return function(w) {
+            send_to_server.func(["CAST_SPELL", GameObject.VIRTUAL_ID, "PLAYER_AURA_SPEEDUP_FOR_FREE", _aura_name]);
+            invoke_ui_locker(synchronizer.request_sync(), (function (_w) { return function() { close_parent_dialog(_w); }; })(w));
+        }; })(aura_name);
+    } else {
+        closure = (function (_aura_name) {
+            return function(w) {
+                var dialog = w.parent;
+
+                // update price since time may have passed
+                var new_price = Store.get_user_currency_price(GameObject.VIRTUAL_ID, gamedata['spells']['PLAYER_AURA_SPEEDUP_FOR_MONEY'], _aura_name);
+                if(new_price === 0) {
+                    // convert to free speedup
+                    send_to_server.func(["CAST_SPELL", GameObject.VIRTUAL_ID, "PLAYER_AURA_SPEEDUP_FOR_FREE", _aura_name]);
+                    invoke_ui_locker(synchronizer.request_sync(), (function (_w) { return function() { close_parent_dialog(_w); }; })(w));
+                } else if(new_price < 0) {
+                    // order became invalid, maybe the building finished what it was doing
+                    close_parent_dialog(w);
+                } else {
+                    if(Store.place_user_currency_order(GameObject.VIRTUAL_ID, "PLAYER_AURA_SPEEDUP_FOR_MONEY", _aura_name,
+                                                       (function (_w) { return function() { close_parent_dialog(_w); }; })(w)
+                                                      )) {
+                        invoke_ui_locker(synchronizer.request_sync());
+                        dialog.widgets['ok_button'].str = dialog.data['widgets']['ok_button']['ui_name_pending'];
+                        dialog.widgets['ok_button'].state = 'disabled'; dialog.widgets['price_display'].onclick = null;
+                    }
+                }
+            };
+        })(aura_name);
+    }
+
+    dialog.widgets['price_display'].bg_image = player.get_any_abtest_value('price_display_asset', gamedata['store']['price_display_asset']);
+    dialog.widgets['price_display'].state = Store.get_user_currency();
+    dialog.widgets['price_display'].str = Store.display_user_currency_price(price); // PRICE
+    dialog.widgets['price_display'].tooltip.str = Store.display_user_currency_price_tooltip(price);
+
+    dialog.widgets['ok_button'].onclick =
+        dialog.widgets['price_display'].onclick = closure;
+
+    return dialog;
+}
+
 function invoke_confirm_cancel_message(type, cancel_cb) {
     var dialog_data = gamedata['dialogs']['confirm_cancel_dialog'];
     var dialog = new SPUI.Dialog(dialog_data);
@@ -22068,7 +22138,17 @@ function invoke_equip_chooser(inv_dialog, parent_widget, tech, unit, slot_type, 
         var pred = ('unequip_requires' in spec['equip'] ? read_predicate(spec['equip']['unequip_requires']) : null);
         if(pred && !pred.is_satisfied(player, null)) {
             dialog.widgets['equip_nothing_frame'].state = 'disabled_clickable';
-            dialog.widgets['equip_nothing_frame'].onclick = get_requirements_help(pred);
+            var help_func = get_requirements_help(pred);
+            if(help_func) {
+                dialog.widgets['equip_nothing_frame'].onclick = (function (_help_func) { return function(w) {
+                    // need to close equip chooser because the game state might change in a way that re-enables this,
+                    // and we are not updating after invoke()
+                    close_parent_dialog(w);
+                    _help_func();
+                }; })(help_func);
+            } else {
+                dialog.widgets['equip_nothing_frame'].onclick = null;
+            }
             dialog.widgets['equip_nothing_frame'].tooltip.str = dialog.data['widgets']['equip_nothing_frame']['ui_tooltip_unmet'].replace('%s', pred.ui_describe(player));
         } else {
             // check for full warehouse
@@ -22130,7 +22210,17 @@ function invoke_equip_chooser(inv_dialog, parent_widget, tech, unit, slot_type, 
             dialog.widgets['equip_frame'+i].state = 'disabled_clickable';
             dialog.widgets['equip_frame'+i].tooltip.text_color = SPUI.error_text_color;
             dialog.widgets['equip_frame'+i].tooltip.str = failed_pred.ui_describe(player);
-            dialog.widgets['equip_frame'+i].onclick = get_requirements_help(failed_pred);
+            var help_func = get_requirements_help(failed_pred);
+            if(help_func) {
+                dialog.widgets['equip_frame'+i].onclick = (function (_help_func) { return function(w) {
+                    // need to close equip chooser because the game state might change in a way that re-enables this,
+                    // and we are not updating after invoke()
+                    close_parent_dialog(w);
+                    _help_func();
+                }; })(help_func);
+            } else {
+                dialog.widgets['equip_frame'+i].onclick = null;
+            }
         } else {
             dialog.widgets['equip_frame'+i].onclick = (function (_inv_slot, _item, _tech, _unit, _slot_type, _slot_n, _ui_slot, _equipped_now) { return function(w) {
                 if(_tech) {
@@ -22286,6 +22376,12 @@ function invoke_aura_context(inv_dialog, slot_xy, slot, aura, show_dropdown) {
                                           1,"CANCEL_PLAYER_AURA"]);
     }
 
+    if(spec['speedupable']) {
+        dialog.user_data['buttons'].push([gamedata['strings']['auras']['speedup_button'],
+                                          gamedata['strings']['auras']['speedup_button_pending'],
+                                          1,"PLAYER_AURA_SPEEDUP_FOR_MONEY"]);
+    }
+
     //if(dialog.user_data['buttons'].length < 1) { dialog.user_data['show_dropdown'] = false; }
 
     for(var i = 0; i < dialog.data['widgets']['button']['array'][1]; i++) {
@@ -22305,6 +22401,12 @@ function invoke_aura_context(inv_dialog, slot_xy, slot, aura, show_dropdown) {
             widget.str = (aura['pending'] && aura['pending_action'] == butt[3] ? butt[1] : butt[0]);
             widget.state = (aura['pending']  ? 'disabled' : 'normal');
             widget.bg_image = dialog.data['widgets']['button']['bg_image_'+(butt[2] ? 'active':'passive')];
+            if(butt[3].indexOf("PLAYER_AURA_SPEEDUP") == 0) { // special case
+                widget.onclick = (function (_aura) { return function(w) {
+                    invoke_player_aura_speedup_dialog(_aura['spec']);
+                }; })(aura);
+                continue;
+            }
             var cb = make_button_cb(slot, aura, dialog, butt);
             if(butt[3].indexOf("CANCEL_PLAYER_AURA") == 0) { // add confirmation prompt
                 widget.onclick = (function (_cb, _aura, _i) { return function (w) {
@@ -36531,6 +36633,7 @@ function classify_unit_space_shortage() {
     @param {Object=} options */
 function get_requirements_help(kind, arg, options) {
     if(!options) { options = {}; }
+    var force_short_circuit = false; // this overrides options.short_circuit if true
 
     if(!player.get_any_abtest_value('plus_buttons', gamedata['client']['plus_buttons'])) { return null; }
     if(player.tutorial_state != "COMPLETE") { return null; }
@@ -36951,6 +37054,11 @@ function get_requirements_help(kind, arg, options) {
                 invoke_repair_dialog();
             }
         }; })(target);
+    } else if(verb == 'speedup' && noun == 'player_aura') {
+        force_short_circuit = true; // no use showing the info dialog separately
+        help_function = (function (_aura_name) { return function() {
+            invoke_player_aura_speedup_dialog(_aura_name);
+        }; })(target);
     } else if(verb == 'speedup' || verb == 'finish_construction') {
         help_function = (function (_target) { return function() {
             change_selection_unit(_target);
@@ -36997,7 +37105,7 @@ function get_requirements_help(kind, arg, options) {
         };
     }
 
-    if(options.short_circuit) {
+    if(options.short_circuit || force_short_circuit) {
         return help_function;
     }
 
