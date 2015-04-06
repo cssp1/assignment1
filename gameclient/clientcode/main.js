@@ -18306,16 +18306,28 @@ function ContextMenuButton(props) {
     @param {Array.<ContextMenuButton>} buttons
     @param {string=} dialog_name from gamedata['dialogs']
     @param {Object.<string, Array.<ContextMenuButton> >=} special_buttons that go in a separately-named widget array, e.g. for turret heads
-    @return {SPUI.Dialog} */
+    @return {!SPUI.Dialog} */
 function invoke_generic_context_menu(xy, buttons, dialog_name, special_buttons) {
     dialog_name = dialog_name || 'generic_context_menu';
-    if(buttons.length < 1 || buttons.length > gamedata['dialogs'][dialog_name]['widgets']['button']['array'][1]) {
+    if(buttons.length < 1) {
         throw Error('bad number of buttons for '+dialog_name+': '+buttons.length.toString());
     }
 
     var dialog = new SPUI.Dialog(gamedata['dialogs'][dialog_name]);
     dialog.user_data['dialog'] = 'context_menu';
     install_child_dialog(dialog);
+
+    // construct button widgets dynamically
+    for(var i = 0; i < buttons.length; i++) {
+        var w = SPUI.instantiate_widget(dialog.data['widgets']['button']);
+        w.xy = vec_add(dialog.data['widgets']['button']['xy'], vec_scale(i, dialog.data['widgets']['button']['array_offset']));
+        dialog.add(w);
+        var wname = 'button'+i.toString();
+        dialog.widgets[wname] = w;
+        if(wname == dialog.data['default_button']) {
+            dialog.default_button = w;
+        }
+    }
 
     // center the dialog horizontally on xy, and shift it upwards so
     // that the first button is directly underneath the cursor

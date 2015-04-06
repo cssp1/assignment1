@@ -402,7 +402,8 @@
             "level":  { "kind": "TextField", "xy": [0,24], "dimensions": [152, 17], "text_style": "normal", "text_size": 13, "ui_name": "Level %d0 of %d1" },
             "button": { "kind": "ActionButton", "xy": [9,47], "dimensions": [134,28], "text_offset": [0,1], "ui_tooltip": "", "tooltip_delay": 0,
                         "bg_image": "action_button_resizable", "bg_image_resizable": 1, "text_color": [0,0,0,1], "text_size": 13, "text_style": "bold",
-                        "array": [1,6], "array_offset": [0,36] }
+                        // note: these buttons are created dynamically in JavaScript
+                        "array": [1,0], "array_offset": [0,36] }
         }
     },
 
@@ -426,7 +427,8 @@
             "level":  { "kind": "TextField", "xy": [0,142], "dimensions": [172, 17], "text_style": "normal", "text_size": 13, "ui_name": "Level %d0 of %d1" },
             "button": { "kind": "ActionButton", "xy": [9,165], "dimensions": [154,28], "text_offset": [0,1], "ui_tooltip": "", "tooltip_delay": 0,
                         "bg_image": "action_button_resizable", "bg_image_resizable": 1, "text_color": [0,0,0,1], "text_size": 13, "text_style": "bold",
-                        "array": [1,6], "array_offset": [0,36] }
+                        // note: these buttons are created dynamically in JavaScript
+                        "array": [1,0], "array_offset": [0,36] }
         }
     },
 
@@ -440,7 +442,8 @@
 
             "button": { "kind": "ActionButton", "xy": [9,9], "dimensions": [134,28], "text_offset": [0,1], "ui_tooltip": "", "tooltip_delay": 0,
                         "bg_image": "action_button_resizable", "bg_image_resizable": 1, "text_color": [0,0,0,1], "text_size": 13, "text_style": "bold",
-                        "array": [1,6], "array_offset": [0,36] }
+                        // note: these buttons are created dynamically in JavaScript
+                        "array": [1,0], "array_offset": [0,36] }
         }
     },
 
