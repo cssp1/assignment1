@@ -12999,6 +12999,28 @@ class Store:
                 price = Store.get_speedup_price(session.player, unit.activity_speedup_kind(), time_to_finish, p_currency)
                 return price, p_currency
 
+        elif formula == 'player_aura_speedup_gamebucks':
+            aura_name = spellarg
+            p_currency = 'gamebucks'
+
+            aura_spec = gamedata['auras'].get(aura_name)
+            if (not aura_spec) or not aura_spec.get('speedupable', 0):
+                error_reason.append('invalid or non-speedupable aura: %s' % aura_name)
+                return -1, p_currency
+
+            aura = None
+            for a in session.player.player_auras:
+                if a['spec'] == aura_name and ('end_time' in a):
+                    aura = a
+                    break
+            if not aura:
+                error_reason.append('aura not found: %s' % aura_name)
+                return -1, p_currency
+
+            time_to_finish = max(aura['end_time'] - server_time, 0)
+            price = Store.get_speedup_price(session.player, 'player_aura', time_to_finish, p_currency)
+            return price, p_currency
+
         elif formula == 'unit_repair_speedup' or formula == 'unit_repair_speedup_gamebucks':
             if not session.player.unit_speedups_enabled():
                 return -1, p_currency
@@ -13775,6 +13797,20 @@ class Store:
             session.increment_player_metric('building:'+object.spec.name+':'+record_spend_type+'_spent_on_speedups', record_amount)
             session.increment_player_metric('building:'+object.spec.name+':'+hist_type+'_speedups_purchased', 1)
             session.increment_player_metric('building:'+object.spec.name+':'+record_spend_type+'_spent_on_'+hist_type+'_speedups', record_amount)
+
+        elif spellname == "PLAYER_AURA_SPEEDUP_FOR_MONEY":
+            aura_name = spellarg
+            aura = None
+            for a in session.player.player_auras:
+                if a['spec'] == aura_name and ('end_time' in a):
+                    aura = a
+                    break
+            assert aura
+            aura['end_time'] = server_time - 1
+            session.player.prune_player_auras()
+            retmsg.append(["PLAYER_AURAS_UPDATE", session.player.player_auras])
+            session.increment_player_metric('player_aura_speedups_purchased', 1)
+            session.increment_player_metric(record_spend_type+'_spent_on_player_aura_speedups', record_amount)
 
         elif spellname == "UNIT_REPAIR_SPEEDUP_FOR_MONEY":
 

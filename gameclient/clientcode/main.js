@@ -39082,6 +39082,23 @@ Store.get_base_price = function(unit_id, spell, spellarg, ignore_error) {
 
             return [price, p_currency];
         }
+    } else if(formula === 'player_aura_speedup_gamebucks') {
+        var aura_name = spellarg;
+        p_currency = 'gamebucks';
+        var aura_spec = gamedata['auras'][aura_name];
+        if(!aura_spec || !aura_spec['speedupable']) {
+            return [-1, p_currency];
+        }
+
+        var aura = goog.array.find(player.player_auras, function(a) {
+            return (a['spec'] == aura_name) && ('end_time' in a);
+        });
+        if(!aura) {
+            return [-1, p_currency];
+        }
+        var time_to_finish = Math.max(aura['end_time'] - server_time, 0)
+        var price = Store.get_speedup_price(player, 'player_aura', time_to_finish, p_currency);
+        return [price, p_currency];
     } else if(formula === 'unit_repair_speedup' || formula === 'unit_repair_speedup_gamebucks') {
         if(!player.unit_speedups_enabled()) {
             return [-1, p_currency];
