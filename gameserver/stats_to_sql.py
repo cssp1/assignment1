@@ -177,7 +177,7 @@ if __name__ == '__main__':
             if kind == 'unit': num_levels = len(data['max_hp'])
             elif kind == 'building': num_levels = len(data['build_time'])
             elif kind == 'tech': num_levels = len(data['research_time'])
-            elif kind == 'item': num_levels = data.get('level_max',1)
+            elif kind == 'item': num_levels = data.get('max_level',1)
             elif kind == 'recipe': num_levels = 1
 
 
@@ -250,7 +250,7 @@ if __name__ == '__main__':
     keyvals = []
 
     for specname, data in gamedata['crafting']['recipes'].iteritems():
-        if 'level_max' in data or 'level' in data: raise Exception('leveled recipes not handled')
+        if 'max_level' in data or 'level' in data: raise Exception('leveled recipes not handled')
         keyvals.append((('recipe_id', specname),
                         ('is_output', 0),
                         ('resource', 'time'),
