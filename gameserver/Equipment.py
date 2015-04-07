@@ -64,18 +64,22 @@ class Equipment (object):
             return {'spec': equipment[slot_type][slot_num]}
 
     @staticmethod
-    def equip_remove(equipment, addr, specname = None):
+    def equip_remove(equipment, addr, specname = None, level = None):
         assert type(equipment) is dict
         slot_type, slot_num = addr
-        assert Equipment.equip_has(equipment, addr, specname = specname)
-        old_item = {'spec': equipment[slot_type][slot_num]}
+        assert Equipment.equip_has(equipment, addr, specname = specname, level = level)
+        if type(equipment[slot_type][slot_num]) is dict:
+            old_item = equipment[slot_type][slot_num]
+        else:
+            old_item = {'spec': equipment[slot_type][slot_num]}
         equipment[slot_type][slot_num] = None
         if not any(equipment[slot_type]): del equipment[slot_type]
         return old_item
 
-    @classmethod # XXXXXX handle items with properties
-    def equip_add(cls, equipment, my_spec, my_level, addr, item_spec, probe_only = False, probe_will_remove = False):
+    @classmethod
+    def equip_add(cls, equipment, my_spec, my_level, addr, item, item_spec, probe_only = False, probe_will_remove = False):
         assert type(equipment) is dict
+        assert type(item) is dict
         assert type(item_spec) is dict
         slot_type, slot_num = addr
 
@@ -92,7 +96,7 @@ class Equipment (object):
             return False
 
         # check slot compatibility
-        if not cls.equip_is_compatible_with_slot(my_spec, my_level, slot_type, item_spec): return False
+        if not cls.equip_is_compatible_with_slot(my_spec, my_level, slot_type, item, item_spec): return False
 
         if probe_only: return True
 
@@ -100,12 +104,13 @@ class Equipment (object):
         if slot_type not in equipment: equipment[slot_type] = []
         while len(equipment[slot_type]) < slot_num+1:
             equipment[slot_type].append(None)
-        equipment[slot_type][slot_num] = item_spec['name']
+        equipment[slot_type][slot_num] = item
         return True
 
     # similar to client's equip_is_compatible_with*() functions
-    @staticmethod # XXXXXX handle items with properties
-    def equip_is_compatible_with_slot(my_spec, my_level, slot_type, item_spec):
+    @staticmethod
+    def equip_is_compatible_with_slot(my_spec, my_level, slot_type, item, item_spec):
+        # may want to check item.get('level',1) here
         if 'equip' not in item_spec: return False
         if 'compatible' in item_spec['equip']:
             crit_list = item_spec['equip']['compatible']

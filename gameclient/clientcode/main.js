@@ -22038,15 +22038,18 @@ function invoke_equip_chooser(inv_dialog, parent_widget, tech, unit, slot_type, 
 
     // see what is equipped already, if anything
     var equipped_now = null;
-    if(equip && (slot_type in equip) && (slot_n < equip[slot_type].length)) {
-        equipped_now = equip[slot_type][slot_n] ? player.decode_equipped_item(equip[slot_type][slot_n])['spec'] : null;
+    var equipped_now_specname = null, equipped_now_level = 1;
+    if(equip && (slot_type in equip) && (slot_n < equip[slot_type].length) && equip[slot_type][slot_n]) {
+        equipped_now = player.decode_equipped_item(equip[slot_type][slot_n]);
+        equipped_now_specname = equipped_now['spec'];
+        equipped_now_level = equipped_now['level'] || 1;
     }
 
     var items = [];
     var seen_specs = {};
     for(var i = 0; i < player.inventory.length; i++) {
         var item = player.inventory[i];
-        if(item['spec'] == equipped_now) { continue; } // don't list items the same type as what is already equipped
+        if(item['spec'] == equipped_now_specname && ((item['level']||1) == equipped_now_level)) { continue; } // don't list items the same type as what is already equipped
         if(item['spec'] in seen_specs) { continue; } // don't list duplicates
         seen_specs[item['spec']] = 1;
         var espec = ItemDisplay.get_inventory_item_spec(item['spec']);
@@ -22074,7 +22077,7 @@ function invoke_equip_chooser(inv_dialog, parent_widget, tech, unit, slot_type, 
                     var other_name = other_item['spec'];
                     var other_spec = ItemDisplay.get_inventory_item_spec(other_name);
                     if(other_spec && other_spec['unique_equipped']==espec['unique_equipped'] &&
-                       ((!equipped_now) || (gamedata['items'][equipped_now]||{})['unique_equipped'] != other_spec['unique_equipped'])) {
+                       ((!equipped_now_specname) || (gamedata['items'][equipped_now_specname]||{})['unique_equipped'] != other_spec['unique_equipped'])) {
                         unique_conflict = other_name;
                         return true;
                     }
@@ -22095,7 +22098,7 @@ function invoke_equip_chooser(inv_dialog, parent_widget, tech, unit, slot_type, 
     }
 
     // if no applicable equipment is available, give a help dialog
-    if(items.length < 1 && !equipped_now) {
+    if(items.length < 1 && !equipped_now_specname) {
         invoke_ingame_tip('no_equipment_tip', {frequency: GameTipFrequency.ALWAYS});
         return null;
     }
@@ -22134,8 +22137,8 @@ function invoke_equip_chooser(inv_dialog, parent_widget, tech, unit, slot_type, 
     dialog.widgets['equip_nothing_frame'].state = 'normal';
     dialog.widgets['equip_nothing_frame'].tooltip.str = null;
 
-    if(equipped_now) {
-        var spec = ItemDisplay.get_inventory_item_spec(equipped_now);
+    if(equipped_now_specname) {
+        var spec = ItemDisplay.get_inventory_item_spec(equipped_now_specname);
         // check predicate
         var pred = ('unequip_requires' in spec['equip'] ? read_predicate(spec['equip']['unequip_requires']) : null);
         if(pred && !pred.is_satisfied(player, null)) {
@@ -22189,7 +22192,7 @@ function invoke_equip_chooser(inv_dialog, parent_widget, tech, unit, slot_type, 
         ItemDisplay.set_inventory_item_asset(dialog.widgets['equip_item'+i], spec);
         ItemDisplay.set_inventory_item_stack(dialog.widgets['equip_stack'+i], spec, item);
 
-        //dialog.widgets['equip_frame'+i].state = (spec['name'] === equipped_now ? 'active' : 'normal');
+        //dialog.widgets['equip_frame'+i].state = (spec['name'] === equipped_now_specname ? 'active' : 'normal');
         var context_props = {};
 
         if(min_level > 0) {
@@ -22229,10 +22232,10 @@ function invoke_equip_chooser(inv_dialog, parent_widget, tech, unit, slot_type, 
                     // unit equipment
                     if(!(_tech['associated_unit'] in player.unit_equipment)) { player.unit_equipment[tech['associated_unit']] = {}; }
                     player.unit_equipment[tech['associated_unit']]['equip_pending'] = 1;
-                    send_to_server.func(["EQUIP_UNIT", tech['associated_unit'], [_slot_type, _slot_n], _inv_slot, _item['spec'], _equipped_now, _ui_slot]);
+                    send_to_server.func(["EQUIP_UNIT", tech['associated_unit'], [_slot_type, _slot_n], _inv_slot, _item, _equipped_now, _ui_slot]);
                 } else {
                     _unit.equip_pending = true;
-                    send_to_server.func(["EQUIP_BUILDING", _unit.id, [_slot_type, _slot_n], _inv_slot, _item['spec'], _equipped_now, _ui_slot]);
+                    send_to_server.func(["EQUIP_BUILDING", _unit.id, [_slot_type, _slot_n], _inv_slot, _item, _equipped_now, _ui_slot]);
                 }
 
                 close_parent_dialog(w);
@@ -30078,7 +30081,7 @@ function update_crafting_dialog_status_mines_and_missiles(dialog) {
             var delivery_slot_index;
             var multiple_delivery_slots;
             var pending = false;
-            var cur_mine = null;
+            var cur_mine_item = null;
             var cur_config = null;
 
             if(builder) {
@@ -30090,7 +30093,7 @@ function update_crafting_dialog_status_mines_and_missiles(dialog) {
                     if((tag in session.minefield_tags_by_tag) && (session.cur_objects.has_object(session.minefield_tags_by_tag[tag]))) {
                         // minefield exists
                         obj = session.cur_objects.get_object(session.minefield_tags_by_tag[tag]);
-                        cur_mine = (obj.equipment && (delivery_slot_type in obj.equipment) && obj.equipment[delivery_slot_type].length > 0 && obj.equipment[delivery_slot_type][0] ? player.decode_equipped_item(obj.equipment[delivery_slot_type][0])['spec'] : null);
+                        cur_mine_item = (obj.equipment && (delivery_slot_type in obj.equipment) && obj.equipment[delivery_slot_type].length > 0 && obj.equipment[delivery_slot_type][0] ? player.decode_equipped_item(obj.equipment[delivery_slot_type][0]) : null);
                         cur_config = (obj.config && (delivery_slot_type in obj.config) && obj.config[delivery_slot_type] && (player.decode_equipped_item(obj.config[delivery_slot_type])['spec'] in gamedata['items']) ? player.decode_equipped_item(obj.config[delivery_slot_type])['spec'] : null);
                     }
                 } else if(category == 'missiles') {
@@ -30100,7 +30103,7 @@ function update_crafting_dialog_status_mines_and_missiles(dialog) {
                     var delivery_building_spec = gamedata['buildings'][catspec['delivery_building_for_ui']];
                     max_slots = get_leveled_quantity(delivery_building_spec['equip_slots'][delivery_slot_type], get_max_level(delivery_building_spec));
                     if(obj) {
-                        cur_mine = (obj.equipment && (delivery_slot_type in obj.equipment) && obj.equipment[delivery_slot_type].length > delivery_slot_index ? obj.equipment[delivery_slot_type][delivery_slot_index] : null);
+                        cur_mine_item = (obj.equipment && (delivery_slot_type in obj.equipment) && obj.equipment[delivery_slot_type].length > delivery_slot_index ? player.decode_equipped_item(obj.equipment[delivery_slot_type][delivery_slot_index]) : null);
                         cur_config = (obj.config && (delivery_slot_type in obj.config) && obj.config[delivery_slot_type].length > delivery_slot_index && (obj.config[delivery_slot_type][delivery_slot_index] in gamedata['items']) ? obj.config[delivery_slot_type][delivery_slot_index] : null);
                     }
                 } else {
@@ -30201,21 +30204,21 @@ function update_crafting_dialog_status_mines_and_missiles(dialog) {
                     _obj.request_sync();
                 }; })(obj, delivery_slot_type, delivery_slot_index, multiple_delivery_slots);
 
-                if(cur_mine) {
-                    var cur_mine_spec = ItemDisplay.get_inventory_item_spec(cur_mine);
+                if(cur_mine_item) {
+                    var cur_mine_spec = ItemDisplay.get_inventory_item_spec(cur_mine_item['spec']);
                     num_ready += 1;
                     dialog.widgets['mine_icon'+wname].alpha = 1;
-                    dialog.widgets['mine_icon'+wname].asset = gamedata['items'][cur_mine]['icon'];
+                    dialog.widgets['mine_icon'+wname].asset = cur_mine_spec['icon'];
                     dialog.widgets['mine_frame'+wname].onclick = null;
-                    dialog.widgets['mine_frame'+wname].tooltip.str = dialog.data['widgets']['mine_frame']['ui_tooltip_armed'].replace('%s', gamedata['items'][cur_mine]['ui_name']);
+                    dialog.widgets['mine_frame'+wname].tooltip.str = dialog.data['widgets']['mine_frame']['ui_tooltip_armed'].replace('%s', cur_mine_spec['ui_name']);
                     dialog.widgets['mine_cancel'+wname].show = !(('can_unequip' in cur_mine_spec) && !cur_mine_spec['can_unequip']);
-                    dialog.widgets['mine_cancel'+wname].tooltip.str = dialog.data['widgets']['mine_cancel']['ui_tooltip_discard'].replace('%s', gamedata['items'][cur_mine]['ui_name']);
-                    dialog.widgets['mine_cancel'+wname].onclick = (function (_obj, _cur_mine, _delivery_slot_type, _delivery_slot_index, _unconfig_cb) { return function(w) {
-                        send_to_server.func(["EQUIP_BUILDING", _obj.id, [_delivery_slot_type,_delivery_slot_index], -1, null, _cur_mine, -1]);
+                    dialog.widgets['mine_cancel'+wname].tooltip.str = dialog.data['widgets']['mine_cancel']['ui_tooltip_discard'].replace('%s', cur_mine_spec['ui_name']);
+                    dialog.widgets['mine_cancel'+wname].onclick = (function (_obj, _cur_mine_item, _delivery_slot_type, _delivery_slot_index, _unconfig_cb) { return function(w) {
+                        send_to_server.func(["EQUIP_BUILDING", _obj.id, [_delivery_slot_type,_delivery_slot_index], -1, null, _cur_mine_item, -1]);
                         // maybe put a confirmation dialog here?
                         invoke_ui_locker();
                         _unconfig_cb();
-                    }; })(obj, cur_mine, delivery_slot_type, delivery_slot_index, unconfig_cb);
+                    }; })(obj, cur_mine_item, delivery_slot_type, delivery_slot_index, unconfig_cb);
                 } else if(in_progress_recipe) {
                     dialog.widgets['mine_icon'+wname].asset = get_crafting_recipe_icon(gamedata['crafting']['recipes'][in_progress_recipe]);
                     dialog.widgets['mine_icon'+wname].alpha = 1;
@@ -41616,7 +41619,7 @@ function handle_server_message(data) {
         }
     } else if(msg == "EQUIP_BUILDING_RESULT") {
         var my_arg = data[1], success = data[2];
-        var unit_id = my_arg[1], addr = my_arg[2], inv_slot = my_arg[3], add_specname = my_arg[4], remove_specname = my_arg[5], ui_slot = my_arg[6];
+        var unit_id = my_arg[1], addr = my_arg[2], inv_slot = my_arg[3], add_item = my_arg[4], remove_item = my_arg[5], ui_slot = my_arg[6];
 
         if(unit_id in session.cur_objects.objects) {
             var unit = session.cur_objects.objects[unit_id];
@@ -41626,6 +41629,7 @@ function handle_server_message(data) {
             if(success && selection.ui && selection.ui.user_data && selection.ui.user_data['dialog'] == 'upgrade_dialog' && selection.ui.user_data['unit'] == unit) {
                 var dialog = selection.ui;
                 var str, color;
+                var add_specname = (add_item ? add_item['spec'] : null), remove_specname = (remove_item ? remove_item['spec'] : null);
                 var ui_name = ItemDisplay.get_inventory_item_ui_name(ItemDisplay.get_inventory_item_spec(add_specname || remove_specname));
                 if(!add_specname) {
                     var what_happened;
@@ -41647,11 +41651,12 @@ function handle_server_message(data) {
 
     } else if(msg == "EQUIP_UNIT_RESULT") {
         var my_arg = data[1], success = data[2];
-        var dest_spec_name = my_arg[1], addr = my_arg[2], inv_slot = my_arg[3], add_specname = my_arg[4], remove_specname = my_arg[5], ui_slot = my_arg[6];
+        var dest_spec_name = my_arg[1], addr = my_arg[2], inv_slot = my_arg[3], add_item = my_arg[4], remove_item = my_arg[5], ui_slot = my_arg[6];
         // add feedback to Upgrade dialog
         var dialog = find_dialog('upgrade_dialog');
         if(dialog && dialog.user_data['tech'] && dialog.user_data['tech']['associated_unit'] == dest_spec_name) {
             var str, color;
+            var add_specname = (add_item ? add_item['spec'] : null), remove_specname = (remove_item ? remove_item['spec'] : null);
             var ui_name = ItemDisplay.get_inventory_item_ui_name(ItemDisplay.get_inventory_item_spec(add_specname || remove_specname));
             if(!add_specname) {
                 str = ui_name + " "+gamedata['strings']['combat_messages']['returned_to_warehouse']; color = [0.6,0.6,0.6,1];

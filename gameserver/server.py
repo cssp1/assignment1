@@ -17626,7 +17626,7 @@ class GAMEAPI(resource.Resource):
                     product_spec = gamedata['items'][product['spec']]
 
                     if not arg.do_replace:
-                        if not Equipment.equip_add(target.equipment or {}, target.spec, target.level, dest_addr, product_spec, probe_only = True):
+                        if not Equipment.equip_add(target.equipment or {}, target.spec, target.level, dest_addr, product, product_spec, probe_only = True):
                             if retmsg is not None: retmsg.append(["ERROR", "EQUIP_INVALID"])
                             return False
 
@@ -17931,7 +17931,9 @@ class GAMEAPI(resource.Resource):
                 item = loot[0]
                 try:
                     delivery_address = bus.craft_state['delivery']
-                    assert self.do_equip_building(session, retmsg, [None, delivery_address['obj_id'], (delivery_address['slot_type'],delivery_address.get('slot_index',0)), -1, item['spec'], None, None],
+                    assert self.do_equip_building(session, retmsg, [None, delivery_address['obj_id'], (delivery_address['slot_type'],delivery_address.get('slot_index',0)), -1,
+                                                                    item, # XXX do we need to copy this? copy.deepcopy(item)
+                                                                    None, None],
                                                   force = True)
                     looted += loot
                     session.player.inventory_log_event('5125_item_obtained', item['spec'], item.get('stack',1), item.get('expire_time',-1), level = item.get('level',None), reason='crafted')
@@ -18644,8 +18646,8 @@ class GAMEAPI(resource.Resource):
         dest_object_id = arg[1]
         dest_addr = arg[2]
         inventory_slot = arg[3]
-        add_specname = arg[4]
-        remove_specname = arg[5]
+        add_item = arg[4]
+        remove_item = arg[5]
         #user_tag = arg[6]
 
         # verify object
@@ -18663,7 +18665,7 @@ class GAMEAPI(resource.Resource):
 
         # prepare dict
         if obj.equipment is None: obj.equipment = {}
-        ret = self.do_equip(session, retmsg, obj.spec, obj.level, obj.equipment, dest_addr, inventory_slot, add_specname, remove_specname, force = force)
+        ret = self.do_equip(session, retmsg, obj.spec, obj.level, obj.equipment, dest_addr, inventory_slot, add_item, remove_item, force = force)
         if len(obj.equipment) < 1: obj.equipment = None
 
         if ret:
@@ -18680,8 +18682,8 @@ class GAMEAPI(resource.Resource):
         dest_spec_name = arg[1]
         dest_addr = arg[2]
         inventory_slot = arg[3]
-        add_specname = arg[4]
-        remove_specname = arg[5]
+        add_item = arg[4]
+        remove_item = arg[5]
         #user_tag = arg[6]
 
         # verify spec
@@ -18694,7 +18696,7 @@ class GAMEAPI(resource.Resource):
 
         # prepare dict
         if dest_spec_name not in session.player.unit_equipment: session.player.unit_equipment[dest_spec_name] = {}
-        ret = self.do_equip(session, retmsg, dest_spec, tech_level, session.player.unit_equipment[dest_spec_name], dest_addr, inventory_slot, add_specname, remove_specname)
+        ret = self.do_equip(session, retmsg, dest_spec, tech_level, session.player.unit_equipment[dest_spec_name], dest_addr, inventory_slot, add_item, remove_item)
         if len(session.player.unit_equipment[dest_spec_name]) < 1: del session.player.unit_equipment[dest_spec_name]
 
         if ret:
@@ -18705,8 +18707,11 @@ class GAMEAPI(resource.Resource):
         return ret
 
     # equip add/remove function that works on BOTH units and buildings, because it operates directly on the destination dictionary
-    def do_equip(self, session, retmsg, obj_spec, obj_level, equipment, dest_addr, inventory_slot, add_specname, remove_specname, force = False):
+    def do_equip(self, session, retmsg, obj_spec, obj_level, equipment, dest_addr, inventory_slot, add_item, remove_item, force = False):
         assert type(equipment) is dict
+
+        add_specname = add_item['spec'] if add_item else None
+        remove_specname = remove_item['spec'] if remove_item else None
 
         add_spec = gamedata['items'].get(add_specname, None) if add_specname else None
         remove_spec = gamedata['items'].get(remove_specname, None) if remove_specname else None
@@ -18714,9 +18719,13 @@ class GAMEAPI(resource.Resource):
         # verify item to be added
         if add_specname:
             if force and inventory_slot < 0:
-                add_item = {'spec':add_specname}
+                # item is being generated from someplace other than inventory (e.g. crafting)
+                pass
             else:
-                add_item = session.player.inventory_verify_item(inventory_slot, add_specname)
+                # REPLACE passed add_item with whatever is in nventory
+                source_item = session.player.inventory_verify_item(inventory_slot, add_specname, level = add_item.get('level',None)) # note: default level to None meaning "don't care" and not 1
+                add_item = copy.deepcopy(source_item)
+                if 'stack' in add_item: del add_item['stack'] # only take one
 
             if (add_item is None) or (add_spec is None):
                 retmsg.append(["ERROR", "HARMLESS_RACE_CONDITION"])
@@ -18740,17 +18749,17 @@ class GAMEAPI(resource.Resource):
                 # check limited_equipped constraint
                 if ('limited_equipped' in add_spec) and ((not remove_spec) or (remove_spec.get('limited_equipped',None) != add_spec['limited_equipped'])):
                     if session.player.stattab.limited_equipped.get(add_spec['limited_equipped'],0) < \
-                       1 + session.player.count_limited_equipped_items(add_spec['limited_equipped']):
+                       add_item.get('stack',1) + session.player.count_limited_equipped_items(add_spec['limited_equipped']):
                         retmsg.append(["ERROR", "EQUIP_INVALID_LIMITED", add_spec['name']])
                         return False
 
-            if not Equipment.equip_add(equipment, obj_spec, obj_level, dest_addr, add_spec, probe_only = True, probe_will_remove = bool(remove_specname)):
+            if not Equipment.equip_add(equipment, obj_spec, obj_level, dest_addr, add_item, add_spec, probe_only = True, probe_will_remove = bool(remove_specname)):
                 retmsg.append(["ERROR", "EQUIP_INVALID"])
                 return False
 
         # verify item to be removed
         if remove_specname:
-            if not Equipment.equip_has(equipment, dest_addr, remove_specname):
+            if not Equipment.equip_has(equipment, dest_addr, remove_specname, level = remove_item.get('level',None)): # note: default level to None meaning "don't care" and not 1
                 retmsg.append(["ERROR", "EQUIP_INVALID"])
                 return False
             if 'unequip_requires' in remove_spec['equip'] and (not Predicates.read_predicate(remove_spec['equip']['unequip_requires']).is_satisfied(session.player, None)):
@@ -18766,7 +18775,7 @@ class GAMEAPI(resource.Resource):
 
         # need extra warehouse space if removing an item without adding, or if adding from a stack greater than 1
         if remove_specname:
-            if add_specname and (add_item.get('stack',1) <= 1):
+            if add_specname and (source_item.get('stack',1) <= add_item.get('stack',1)):
                 # the add step is going to free up a space, so there is definitely room
                 inventory_buffer = 1
             elif remove_spec and remove_spec.get('remove_fragility',0) >= 1:
@@ -18774,7 +18783,7 @@ class GAMEAPI(resource.Resource):
                 inventory_buffer = 1
             else:
                 # the add step is NOT going to free up a space, need to check for room
-                if not session.player.inventory_has_space_for({'spec':remove_specname}, max_usable_inventory):
+                if not session.player.inventory_has_space_for(remove_item, max_usable_inventory):
                     retmsg.append(["ERROR", "INVENTORY_LIMIT"])
                     return False
                 inventory_buffer = 0
@@ -18782,13 +18791,14 @@ class GAMEAPI(resource.Resource):
         # now perform the operation atomically
         # any exceptions here mean item duping bugs!
         if remove_specname:
-            assert Equipment.equip_remove(equipment, dest_addr, remove_specname)
+            # note: replace with actual removed item
+            remove_item = Equipment.equip_remove(equipment, dest_addr, remove_specname, level = remove_item.get('level',None))
             if remove_spec and remove_spec.get('remove_fragility',0) >= 1:
                 # item destroyed
-                session.player.inventory_log_event('5131_item_trashed', remove_specname, -1, -1, reason='removed') # XXXXXX level
+                session.player.inventory_log_event('5131_item_trashed', remove_specname, -remove_item.get('stack',1), remove_item.get('expire_time',-1), level=remove_item.get('level',1), reason='removed')
             else:
                 # note: pass inflated max_usable_inventory here as "buffer" space, since we checked for space above
-                assert session.player.inventory_add_item({'spec':remove_specname}, max_usable_inventory + inventory_buffer) == 1
+                assert session.player.inventory_add_item(remove_item, max_usable_inventory + inventory_buffer) == 1
                 # no need to log - player already had item
             if 'on_unequip' in remove_spec['equip']:
                 session.execute_consequent_safe(remove_spec['equip']['on_unequip'], session.player, retmsg, reason='on_unequip')
@@ -18797,8 +18807,8 @@ class GAMEAPI(resource.Resource):
             if force and inventory_slot < 0:
                 pass # out of thin air
             else:
-                assert session.player.inventory_remove(add_item, 1, None) # do not log - player still has item
-            assert Equipment.equip_add(equipment, obj_spec, obj_level, dest_addr, add_spec)
+                assert session.player.inventory_remove(source_item, add_item.get('stack',1), None) # do not log - player still has item
+            assert Equipment.equip_add(equipment, obj_spec, obj_level, dest_addr, add_item, add_spec)
             if 'on_equip' in add_spec['equip']:
                 session.execute_consequent_safe(add_spec['equip']['on_equip'], session.player, retmsg, reason='on_equip')
 
@@ -19969,11 +19979,11 @@ class GAMEAPI(resource.Resource):
                                             items_destroyed.append((slot_type, slot_num, specname))
 
                             for slot_type, slot_num, specname in items_destroyed:
-                                Equipment.equip_remove(obj.equipment, (slot_type, slot_num), specname)
+                                removed_item = Equipment.equip_remove(obj.equipment, (slot_type, slot_num), specname)
                                 # record expenditure of the item (e.g. landmines)
                                 if owning_player:
                                     session.attack_item_expended(owning_player.user_id, specname, 1)
-                                    owning_player.inventory_log_event('5131_item_trashed', specname, -1, -1, reason='destroyed') # XXXXXX level
+                                    owning_player.inventory_log_event('5131_item_trashed', specname, -removed_item.get('stack',1), removed_item.get('expire_time',-1), level=removed_item.get('level',1), reason='destroyed')
 
                         if items_destroyed:
                             event_props['items_destroyed'] = [x[2] for x in items_destroyed]
@@ -23525,7 +23535,7 @@ class GAMEAPI(resource.Resource):
                     used_count = 1
                     if spec.get('consumable', True):
                         if is_equipped:
-                            Equipment.equip_remove(obj.equipment, (slot['slot_type'], slot['slot_index']), specname)
+                            Equipment.equip_remove(obj.equipment, (slot['slot_type'], slot['slot_index']), specname) # we don't care about the level here
                         else:
                             session.player.inventory_remove(item, 1, '5130_item_activated', reason='consumed')
 
