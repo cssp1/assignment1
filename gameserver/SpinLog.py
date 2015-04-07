@@ -113,7 +113,11 @@ class JSONLog(Log):
         time_string = '%10d' % t
 
         # human-readable version of above
-        pretty_time_string = pretty_time(st)
+        # (optional, turned off now to save space/time)
+        if 0:
+            pretty_time_string = pretty_time(st)
+        else:
+            pretty_time_string = None
 
         self.target.set_ymd((st.tm_year, st.tm_mon, st.tm_mday))
 
@@ -145,7 +149,9 @@ class JSONLog(Log):
         # strip off the {}
         str = str[1:-1]
 
-        out = '{"time":'+time_string+',"ptime":"'+pretty_time_string+'"'
+        out = '{"time":'+time_string
+        if pretty_time_string:
+            out +=',"ptime":"'+pretty_time_string+'"'
         if user_id is not None:
             out += ',"user_id":'+repr(user_id)
         if event_name is not None:
