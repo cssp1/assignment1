@@ -418,7 +418,6 @@ class FindAndReplaceObjectsConsequent(Consequent):
                             obj.change_level(replace['level'])
                         if 'equipment' in replace:
                             for slot_type, name_list in replace['equipment'].iteritems():
-                                # XXXXXX separate Equipment.py from server.py and use it here
                                 if obj.equipment is None: obj.equipment = {}
                                 if slot_type not in obj.equipment: obj.equipment[slot_type] = []
                                 for name in name_list:
