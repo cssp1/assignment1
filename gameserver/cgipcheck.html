@@ -751,7 +751,7 @@ var setup_ai_base = function() {
 var server_start = function() {
     var generation = $("#server_start_gen")[0].value;
     var qty = Math.min(Math.max(parseInt($("#server_start_qty")[0].value), 1), 20);
-    var port_range = [8002,8100];
+    var port_range = [8002,8200];
 
     var configs = [];
     for(var n = 0; n < qty; n++) {
