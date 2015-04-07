@@ -350,20 +350,20 @@ class FindAndReplaceItemsConsequent(Consequent):
                 if self.item_map and self.affect_equipment and obj.equipment:
                     for slot_type in obj.equipment:
                         for i in xrange(len(obj.equipment[slot_type])):
-                            if type(obj.equipment[slot_type][i]) is dict and \
-                               obj.equipment[slot_type][i]['spec'] in self.item_map:
-                                obj.equipment[slot_type][i]['spec'] = self.item_map[obj.equipment[slot_type][i]['spec']]
-                                obj_updates.add(obj)
+                            if type(obj.equipment[slot_type][i]) is dict:
+                                if obj.equipment[slot_type][i]['spec'] in self.item_map:
+                                    obj.equipment[slot_type][i]['spec'] = self.item_map[obj.equipment[slot_type][i]['spec']]
+                                    obj_updates.add(obj)
                             elif obj.equipment[slot_type][i] in self.item_map:
                                 obj.equipment[slot_type][i] = self.item_map[obj.equipment[slot_type][i]]
                                 obj_updates.add(obj)
                 if self.config_map and self.affect_config and obj.config:
                     for key in obj.config:
                         if key in self.config_map:
-                            if type(obj.config[key]) is dict and \
-                               obj.config[key]['spec'] in self.config_map[key]:
-                                obj.config[key]['spec'] = self.config_map[key][obj.config[key]['spec']]
-                                obj_updates.add(obj)
+                            if type(obj.config[key]) is dict:
+                                if obj.config[key]['spec'] in self.config_map[key]:
+                                    obj.config[key]['spec'] = self.config_map[key][obj.config[key]['spec']]
+                                    obj_updates.add(obj)
                             elif obj.config[key] in self.config_map[key]:
                                 obj.config[key] = self.config_map[key][obj.config[key]]
                                 obj_updates.add(obj)
