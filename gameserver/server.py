@@ -19972,11 +19972,16 @@ class GAMEAPI(resource.Resource):
                             items_destroyed = []
                             for slot_type in obj.equipment:
                                 for slot_num in xrange(len(obj.equipment[slot_type])):
-                                    specname = obj.equipment[slot_type][slot_num]
-                                    if specname in gamedata['items']:
-                                        spec = gamedata['items'][specname]
-                                        if spec.get('fragility',0) > 0 and random.random() < spec['fragility']:
-                                            items_destroyed.append((slot_type, slot_num, specname))
+                                    if obj.equipment[slot_type][slot_num]:
+                                        if type(obj.equipment[slot_type][slot_num]) is dict:
+                                            specname = obj.equipment[slot_type][slot_num]['spec']
+                                        else:
+                                            specname = obj.equipment[slot_type][slot_num]
+
+                                        if specname in gamedata['items']:
+                                            spec = gamedata['items'][specname]
+                                            if spec.get('fragility',0) > 0 and random.random() < spec['fragility']:
+                                                items_destroyed.append((slot_type, slot_num, specname))
 
                             for slot_type, slot_num, specname in items_destroyed:
                                 removed_item = Equipment.equip_remove(obj.equipment, (slot_type, slot_num), specname)
