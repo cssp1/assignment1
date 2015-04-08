@@ -23444,7 +23444,8 @@ class GAMEAPI(resource.Resource):
             slot = arg[1]
             is_equipped = (type(slot) is dict) # equip item, not in inventory
             specname = arg[2]
-            extra_spellargs = arg[3]
+            max_count = arg[3]
+            extra_spellargs = arg[4]
 
             if session.player.warehouse_is_busy(): # XXX what about equip items?
                 retmsg.append(["ERROR", "WAREHOUSE_IS_BUSY"])
@@ -23554,7 +23555,7 @@ class GAMEAPI(resource.Resource):
                         # in battle - history update will come after battle ends
                         pass
                     else:
-                        session.player.send_history_update(retmsg)
+                        session.deferred_player_history_update = True
             else:
                 raise Exception('item not usable '+repr(spec))
 

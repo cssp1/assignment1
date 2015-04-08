@@ -12865,7 +12865,7 @@ function update_combat_item_bar(dialog) {
                 }; })(slot, item);
 
                 dialog.widgets['frame'+i].onclick = (function (_i, _slot, _item) { return function(w) {
-                    if(inventory_action(_item, _slot, "INVENTORY_USE", true)) {
+                    if(inventory_action(_item, _slot, "INVENTORY_USE", {trigger_gcd: true})) {
                         // clear the tooltip if activation succeeds
                         invoke_inventory_context(w.parent, w, -1, null, false);
                     }
@@ -13148,7 +13148,7 @@ function do_build(ji) {
         ji = player.quantize_building_location(ji, spec);
         if(player.is_building_location_valid(ji, spec, null, {ignore_perimeter: !!spec['ignore_perimeter']})) {
             if(selection.item) {
-                inventory_send_request(selection.item, selection.slot, "INVENTORY_USE", [ji], false);
+                inventory_send_request(selection.item, selection.slot, "INVENTORY_USE", [ji]);
             } else {
                 send_to_server.func(["CAST_SPELL", GameObject.VIRTUAL_ID,
                                      selection.spellname,
@@ -21560,7 +21560,7 @@ function invoke_inventory_context(inv_dialog, parent_widget, slot, item, show_dr
                 }
             }
 
-        } else if(inventory_action(_item, _slot, butt[3], session.has_deployed)) { // trigger GCD during combat only
+        } else if(inventory_action(_item, _slot, butt[3], {trigger_gcd: session.has_deployed})) { // trigger GCD during combat only
             w.str = butt[1];
             w.state = 'disabled';
 
@@ -21737,7 +21737,15 @@ function update_inventory_context(dialog) {
     }
 }
 
-function inventory_action(item, slot, action, trigger_gcd) {
+/** @typedef {{trigger_gcd: (boolean|undefined),
+               max_count: (number|undefined)}} */
+var InventoryActionOptions;
+
+/** @param {!Object} item
+    @param {number|!Object} slot
+    @param {string} action
+    @param {InventoryActionOptions=} options */
+function inventory_action(item, slot, action, options) {
     if(('pending' in item) || player.cooldown_active('GCD')) { return false; }
 
     if(action == "INVENTORY_USE") {
@@ -21759,16 +21767,16 @@ function inventory_action(item, slot, action, trigger_gcd) {
                         read_consequent(spellarg).execute();
                         return true;
                     } else if(spellname.indexOf("CHANGE_REGION_INSTANTLY") == 0) {
-                        invoke_change_region_dialog((function (_item, _slot, _action, _trigger_gcd) { return function(spellarg) {
-                            inventory_send_request(_item, _slot, _action, spellarg, _trigger_gcd);
+                        invoke_change_region_dialog((function (_item, _slot, _action, _options) { return function(spellarg) {
+                            inventory_send_request(_item, _slot, _action, spellarg, _options);
                             return true;
-                        }; })(item, slot, action, trigger_gcd), spellname);
+                        }; })(item, slot, action, options), spellname);
                         return true;
                     } else if(spellname === "CHANGE_ALIAS") {
-                        invoke_change_alias_dialog((function (_item, _slot, _action, _trigger_gcd) { return function(spellarg) {
-                            inventory_send_request(_item, _slot, _action, spellarg, _trigger_gcd);
+                        invoke_change_alias_dialog((function (_item, _slot, _action, _options) { return function(spellarg) {
+                            inventory_send_request(_item, _slot, _action, spellarg, _options);
                             return true;
-                        }; })(item, slot, action, trigger_gcd), spellname);
+                        }; })(item, slot, action, options), spellname);
                         return true;
                     } else if(spellname === "APPLY_AURA") {
                         var aura_name = spellarg[1];
@@ -21781,10 +21789,10 @@ function inventory_action(item, slot, action, trigger_gcd) {
                         }
                         if(overlap) {
                             // warn player that this will overwrite instead of stacking on top of the current aura
-                            var do_it = (function (_item, _slot, _action, _trigger_gcd) { return function(spellarg) {
-                                inventory_send_request(_item, _slot, _action, spellarg, _trigger_gcd);
+                            var do_it = (function (_item, _slot, _action, _options) { return function(spellarg) {
+                                inventory_send_request(_item, _slot, _action, spellarg, _options);
                                 return true;
-                            }; })(item, slot, action, trigger_gcd);
+                            }; })(item, slot, action, options);
                             var msg = gamedata['strings']['player_aura_confirm_overwrite'];
                             invoke_child_message_dialog(msg['ui_title'],
                                                         msg['ui_description'].replace('%item', spec['ui_name']).replace('%existing', gamedata['auras'][aura_name]['ui_name']),
@@ -21817,16 +21825,16 @@ function inventory_action(item, slot, action, trigger_gcd) {
                         change_selection_ui_under(new AOEUICursor(null, -1, splash));
                         return true;
                     } else if(spell['activation'] == 'targeted_alliance_mate') {
-                        invoke_alliance_mate_gift_dialog((function (_item, _slot, _action, _trigger_gcd) { return function(recipient_id) {
-                            inventory_send_request(_item, _slot, _action, [recipient_id], _trigger_gcd);
+                        invoke_alliance_mate_gift_dialog((function (_item, _slot, _action, _options) { return function(recipient_id) {
+                            inventory_send_request(_item, _slot, _action, [recipient_id], _options);
                             return true;
-                        }; })(item, slot, action, trigger_gcd));
+                        }; })(item, slot, action, options));
                         return false;
                     } else if(spell['activation'] == 'targeted_friend') {
-                        invoke_friend_gift_dialog((function (_item, _slot, _action, _trigger_gcd) { return function(recipient_id) {
-                            inventory_send_request(_item, _slot, _action, [recipient_id], _trigger_gcd);
+                        invoke_friend_gift_dialog((function (_item, _slot, _action, _options) { return function(recipient_id) {
+                            inventory_send_request(_item, _slot, _action, [recipient_id], _options);
                             return true;
-                        }; })(item, slot, action, trigger_gcd),
+                        }; })(item, slot, action, options),
                                                   spec['pre_use'] || spell['pre_activation'] || null);
                         return false;
                     } else {
@@ -21836,17 +21844,29 @@ function inventory_action(item, slot, action, trigger_gcd) {
             }
         }
     }
-    inventory_send_request(item, slot, action, null, trigger_gcd);
+    inventory_send_request(item, slot, action, null, options);
     return true;
 }
 
-function inventory_send_request(item, slot, action, spellargs, trigger_gcd) {
+/** @param {!Object} item
+    @param {number|!Object} slot
+    @param {string} action
+    @param {?} spellargs
+    @param {InventoryActionOptions=} options */
+function inventory_send_request(item, slot, action, spellargs, options) {
     item['pending'] = 1;
     item['pending_time'] = client_time;
     item['pending_action'] = action;
-    if(trigger_gcd) { player.cooldown_client_trigger('GCD', gamedata['client']['global_cooldown']); }
+    if(options && options.trigger_gcd) { player.cooldown_client_trigger('GCD', gamedata['client']['global_cooldown']); }
     if(!spellargs) { spellargs = null; }
-    send_to_server.func([action, slot, item['spec'], spellargs]);
+
+    var msg;
+    if(action == 'INVENTORY_USE') {
+        msg = [action, slot, item['spec'], (options ? (options.max_count||1) : 1), spellargs];
+    } else {
+        msg = [action, slot, item['spec'], spellargs];
+    }
+    send_to_server.func(msg);
 
     if(action == 'INVENTORY_USE' && typeof(slot) == 'object') {
         // for equip items, remove from home_equip_items here
@@ -43544,7 +43564,7 @@ function do_on_mouseup(e) {
                 var spec = gamedata['items'][selection.item['spec']];
                 var spell = gamedata['spells'][selection.spellname];
 
-                inventory_send_request(selection.item, selection.slot, "INVENTORY_USE", [[j,i]], session.has_deployed); // trigger GCD during combat only
+                inventory_send_request(selection.item, selection.slot, "INVENTORY_USE", [[j,i]], {trigger_gcd: session.has_deployed}); // trigger GCD during combat only
 
                 SPFX.add_under(new SPFX.ClickFeedback([j,i], [1,1,1,1], client_time, client_time + 0.15));
                 if('ui_activation' in spell) {
