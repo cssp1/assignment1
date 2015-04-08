@@ -21356,6 +21356,20 @@ function update_inventory_dialog(dialog) {
     }
 };
 
+/** @constructor
+    @struct
+    @param {{ui_name: string,
+             ui_name_pending: string,
+             state: (string|undefined),
+             spellname: string}} props */
+var InventoryContextButton = function(props) {
+    this.ui_name = props.ui_name;
+    this.ui_name_pending = props.ui_name_pending;
+    this.state = props.state || 'passive';
+    if(!goog.array.contains(['active','passive'], this.state)) { throw Error('bad state '+this.state); }
+    this.spellname = props.spellname;
+}
+
 /** @param {SPUI.Dialog} inv_dialog
     @param {SPUI.DialogWidget} parent_widget
     @param {?} slot
@@ -21528,9 +21542,9 @@ function invoke_inventory_context(inv_dialog, parent_widget, slot, item, show_dr
         if(!w.parent) { return; }
         var butt = w.parent.user_data['buttons'][_i];
 
-        if(butt[3] === "SPEEDUP") {
+        if(butt.spellname === "SPEEDUP") {
             warehouse_busy_helper(find_object_by_type(gamedata['inventory_building']));
-        } else if(butt[3] === "EQUIP_UNIT") {
+        } else if(butt.spellname === "EQUIP_UNIT") {
             var spec = ItemDisplay.get_inventory_item_spec(item['spec']);
             var unit_name = spec['equip']['name'];
             var d = invoke_upgrade_tech_dialog(gamedata['units'][unit_name]['level_determined_by_tech'], null);
@@ -21560,8 +21574,8 @@ function invoke_inventory_context(inv_dialog, parent_widget, slot, item, show_dr
                 }
             }
 
-        } else if(inventory_action(_item, _slot, butt[3], {trigger_gcd: session.has_deployed})) { // trigger GCD during combat only
-            w.str = butt[1];
+        } else if(inventory_action(_item, _slot, butt.spellname, {trigger_gcd: session.has_deployed})) { // trigger GCD during combat only
+            w.str = butt.ui_name_pending;
             w.state = 'disabled';
 
             // disable all other buttons
@@ -21574,34 +21588,38 @@ function invoke_inventory_context(inv_dialog, parent_widget, slot, item, show_dr
     }; };
 
     if(player.warehouse_is_busy()) {
-        dialog.user_data['buttons'] = [[gamedata['strings']['inventory']['warehouse_busy'],"",1,"SPEEDUP"]];
+        dialog.user_data['buttons'] = [new InventoryContextButton({ui_name:gamedata['strings']['inventory']['warehouse_busy'],
+                                                                   ui_name_pending:'',
+                                                                   state:'active',
+                                                                   spellname:"SPEEDUP"})];
     } else {
         dialog.user_data['buttons'] = [];
         if('equip' in spec && spec['equip']['kind'] == 'mobile' && ('name' in spec['equip'])) {
-            dialog.user_data['buttons'].push([gamedata['strings']['inventory']['equip_button'],
-                                              gamedata['strings']['inventory']['equip_button_pending'],
-                                              1,"EQUIP_UNIT"]);
+            dialog.user_data['buttons'].push(new InventoryContextButton({ui_name:gamedata['strings']['inventory']['equip_button'],
+                                                                         ui_name_pending:gamedata['strings']['inventory']['equip_button_pending'],
+                                                                         state:'active',
+                                                                         spellname:"EQUIP_UNIT"}));
         } else {
-            var name = spec['ui_activate_button'] || gamedata['strings']['inventory']['activate_button'];
-            var name_pending = spec['ui_activate_button_pending'] || gamedata['strings']['inventory']['activate_button_pending'];
-            dialog.user_data['buttons'].push([name, name_pending,
-                                              1,"INVENTORY_USE"]);
+            dialog.user_data['buttons'].push(new InventoryContextButton({ui_name: spec['ui_activate_button'] || gamedata['strings']['inventory']['activate_button'],
+                                                                         ui_name_pending: spec['ui_activate_button_pending'] || gamedata['strings']['inventory']['activate_button_pending'],
+                                                                         state:'active',
+                                                                         spellname: "INVENTORY_USE"}));
         }
 
         // show refund button when a refund exists and show_refundable_when is true
         if(spec['refund'] && (('refundable_when' in spec) ? read_predicate(spec['refundable_when']).is_satisfied(player, null) : true)) {
-            dialog.user_data['buttons'].push([gamedata['strings']['inventory']['refund_button'],
-                                              gamedata['strings']['inventory']['refund_button_pending'],
-                                              0,"INVENTORY_REFUND_ALL"]);
+            dialog.user_data['buttons'].push(new InventoryContextButton({ui_name:gamedata['strings']['inventory']['refund_button'],
+                                                                         ui_name_pending:gamedata['strings']['inventory']['refund_button_pending'],
+                                                                         spellname:"INVENTORY_REFUND_ALL"}));
         }
 
-        dialog.user_data['buttons'].push([gamedata['strings']['inventory']['discard_button'],
-                                          gamedata['strings']['inventory']['discard_button_pending'],
-                                          0,"INVENTORY_TRASH"]);
+        dialog.user_data['buttons'].push(new InventoryContextButton({ui_name:gamedata['strings']['inventory']['discard_button'],
+                                                                     ui_name_pending:gamedata['strings']['inventory']['discard_button_pending'],
+                                                                     spellname:"INVENTORY_TRASH"}));
         if(item['stack'] && item['stack'] > 1) {
-            dialog.user_data['buttons'].push([gamedata['strings']['inventory']['discard_all_button'],
-                                              gamedata['strings']['inventory']['discard_all_button_pending'],
-                                              0,"INVENTORY_TRASH_ALL"]);
+            dialog.user_data['buttons'].push(new InventoryContextButton({ui_name:gamedata['strings']['inventory']['discard_all_button'],
+                                                                         ui_name_pending:gamedata['strings']['inventory']['discard_all_button_pending'],
+                                                                         spellname:"INVENTORY_TRASH_ALL"}));
         }
     }
 
@@ -21640,11 +21658,11 @@ function invoke_inventory_context(inv_dialog, parent_widget, slot, item, show_dr
         } else {
             var butt = dialog.user_data['buttons'][i];
             widget.show = 1;
-            widget.str = (item['pending'] && item['pending_action'] == butt[3] ? butt[1] : butt[0]);
-            widget.state = ((item['pending'] || (butt[3]=="INVENTORY_USE"&&!can_cast)) ? 'disabled' : 'normal');
-            widget.bg_image = dialog.data['widgets']['button']['bg_image_'+(butt[2] ? 'active':'passive')];
+            widget.str = (item['pending'] && item['pending_action'] == butt.spellname ? butt.ui_name_pending : butt.ui_name);
+            widget.state = ((item['pending'] || ((butt.spellname.indexOf("INVENTORY_USE")==0)&&!can_cast)) ? 'disabled' : 'normal');
+            widget.bg_image = dialog.data['widgets']['button']['bg_image_'+butt.state];
             var cb = make_button_cb(slot, item, i);
-            if(butt[3] == "INVENTORY_USE" && !can_cast) { // add tooltip
+            if(butt.spellname.indexOf("INVENTORY_USE")==0 && !can_cast) { // add tooltip
                 var tooltip_str = SPUI.break_lines(can_cast_detailed[1], SPUI.desktop_font, widget.data['max_tooltip_dimensions'])[0];
                 widget.tooltip.str = tooltip_str;
                 widget.tooltip.text_color = SPUI.error_text_color;
@@ -21655,8 +21673,8 @@ function invoke_inventory_context(inv_dialog, parent_widget, slot, item, show_dr
                         widget.state = 'disabled_clickable';
                     }
                 }
-            } else if(butt[3].indexOf("INVENTORY_TRASH") == 0 || butt[3].indexOf("INVENTORY_REFUND") == 0) { // add confirmation prompt
-                var want_refund = (butt[3].indexOf("INVENTORY_REFUND") == 0);
+            } else if(butt.spellname.indexOf("INVENTORY_TRASH") == 0 || butt.spellname.indexOf("INVENTORY_REFUND") == 0) { // add confirmation prompt
+                var want_refund = (butt.spellname.indexOf("INVENTORY_REFUND") == 0);
                 if(item['undiscardable']) { // really for tutorial only
                     widget.state = 'disabled';
                     widget.tooltip.str = gamedata['strings']['inventory']['undiscardable_tooltip'];
@@ -21674,7 +21692,7 @@ function invoke_inventory_context(inv_dialog, parent_widget, slot, item, show_dr
                     if(_want_refund) {
                         s = gamedata['strings']['inventory_confirm_refund'];
                     } else {
-                        s = gamedata['strings']['inventory_confirm_discard_'+(butt[3] == "INVENTORY_TRASH_ALL" ? 'all':'one')];
+                        s = gamedata['strings']['inventory_confirm_discard_'+(butt.spellname == "INVENTORY_TRASH_ALL" ? 'all':'one')];
                     }
                     var spec = ItemDisplay.get_inventory_item_spec(_item['spec']);
                     var ui_name = ItemDisplay.get_inventory_item_ui_name(spec);
