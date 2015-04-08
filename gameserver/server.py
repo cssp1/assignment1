@@ -19987,7 +19987,7 @@ class GAMEAPI(resource.Resource):
                                 removed_item = Equipment.equip_remove(obj.equipment, (slot_type, slot_num), specname)
                                 # record expenditure of the item (e.g. landmines)
                                 if owning_player:
-                                    session.attack_item_expended(owning_player.user_id, specname, 1)
+                                    session.attack_item_expended(owning_player.user_id, specname, removed_item.get('stack',1))
                                     owning_player.inventory_log_event('5131_item_trashed', specname, -removed_item.get('stack',1), removed_item.get('expire_time',-1), level=removed_item.get('level',1), reason='destroyed')
 
                         if items_destroyed:
