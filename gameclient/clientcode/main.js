@@ -21361,13 +21361,15 @@ function update_inventory_dialog(dialog) {
     @param {{ui_name: string,
              ui_name_pending: string,
              state: (string|undefined),
-             spellname: string}} props */
+             spellname: string,
+             max_count: (number|undefined)}} props */
 var InventoryContextButton = function(props) {
     this.ui_name = props.ui_name;
     this.ui_name_pending = props.ui_name_pending;
     this.state = props.state || 'passive';
     if(!goog.array.contains(['active','passive'], this.state)) { throw Error('bad state '+this.state); }
     this.spellname = props.spellname;
+    this.max_count = props.max_count || 1;
 }
 
 /** @param {SPUI.Dialog} inv_dialog
@@ -21574,7 +21576,8 @@ function invoke_inventory_context(inv_dialog, parent_widget, slot, item, show_dr
                 }
             }
 
-        } else if(inventory_action(_item, _slot, butt.spellname, {trigger_gcd: session.has_deployed})) { // trigger GCD during combat only
+        } else if(inventory_action(_item, _slot, butt.spellname, {trigger_gcd: session.has_deployed, // trigger GCD during combat only
+                                                                  max_count: butt.max_count})) {
             w.str = butt.ui_name_pending;
             w.state = 'disabled';
 
@@ -21604,6 +21607,14 @@ function invoke_inventory_context(inv_dialog, parent_widget, slot, item, show_dr
                                                                          ui_name_pending: spec['ui_activate_button_pending'] || gamedata['strings']['inventory']['activate_button_pending'],
                                                                          state:'active',
                                                                          spellname: "INVENTORY_USE"}));
+
+            // multi-activate for stacked units
+            if(item['stack'] && item['stack'] > 1 && spec['use'] && ('spellname' in spec['use']) && spec['use']['spellname'] == 'GIVE_UNITS') {
+                dialog.user_data['buttons'].push(new InventoryContextButton({ui_name:gamedata['strings']['inventory']['activate_all_button'],
+                                                                             ui_name_pending:gamedata['strings']['inventory']['activate_all_button_pending'],
+                                                                             state:'active',
+                                                                             spellname:"INVENTORY_USE", max_count: item['stack']}));
+            }
         }
 
         // show refund button when a refund exists and show_refundable_when is true
@@ -21880,7 +21891,7 @@ function inventory_send_request(item, slot, action, spellargs, options) {
 
     var msg;
     if(action == 'INVENTORY_USE') {
-        msg = [action, slot, item['spec'], (options ? (options.max_count||1) : 1), spellargs];
+        msg = [action, slot, item, (options ? (options.max_count||1) : 1), spellargs];
     } else {
         msg = [action, slot, item['spec'], spellargs];
     }

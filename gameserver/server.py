@@ -20542,20 +20542,22 @@ class GAMEAPI(resource.Resource):
                     # we have to go asynchronous and come back later)
                     msg = serial_arg[1].pop(0)
 
+                    if msg[0] == "CAST_SPELL":
+                        latency_tag = msg[0] + '('+msg[2]+')'
+                    elif msg[0] == "INVENTORY_USE":
+                        latency_tag = msg[0] + '('+msg[2]['spec']+')'
+                    elif 0 and msg[0] == "QUARRY_QUERY":
+                        latency_tag = msg[0] + ('_FULL' if msg[2]<=0 else '_INCREMENTAL')
+                    else:
+                        latency_tag = msg[0]
+
                     try:
                         if start_time < 0: start_time = time.time()
 
                         go_async = self.handle_message_guts(request, session, msg, retmsg)
 
                         end_time = time.time()
-                        if msg[0] == "CAST_SPELL":
-                            latency_tag = msg[0] + '('+msg[2]+')'
-                        elif msg[0] == "INVENTORY_USE":
-                            latency_tag = msg[0] + '('+msg[2]+')'
-    #                    elif msg[0] == "QUARRY_QUERY":
-    #                        latency_tag = msg[0] + ('_FULL' if msg[2]<=0 else '_INCREMENTAL')
-                        else:
-                            latency_tag = msg[0]
+
 
                         admin_stats.record_latency(latency_tag, end_time-start_time)
                         start_time = end_time # ends up including the list-processing stuff below in the next message, but that should be fast
@@ -20572,7 +20574,7 @@ class GAMEAPI(resource.Resource):
                             return server.NOT_DONE_YET
 
                     except Exception:
-                        gamesite.exception_log.event(server_time, 'handle_message_guts exception %s msg %s: %s' % (session.dump_exception_state(), msg[0], traceback.format_exc()))
+                        gamesite.exception_log.event(server_time, 'handle_message_guts exception %s msg %s: %s' % (session.dump_exception_state(), latency_tag, traceback.format_exc()))
                         retmsg.append(["ERROR", "SERVER_EXCEPTION"])
                         break
 
@@ -23443,7 +23445,8 @@ class GAMEAPI(resource.Resource):
             # which is the same format returned by Player.equipped_items_serialize()
             slot = arg[1]
             is_equipped = (type(slot) is dict) # equip item, not in inventory
-            specname = arg[2]
+            client_item = arg[2]
+            specname = client_item['spec']
             max_count = arg[3]
             extra_spellargs = arg[4]
 
@@ -23453,16 +23456,17 @@ class GAMEAPI(resource.Resource):
                 return
 
             if is_equipped:
+                addr = (slot['slot_type'],slot['slot_index'])
                 obj = session.player.get_object_by_obj_id(slot['obj_id'], fail_missing = False)
                 if (not obj) or (obj.owner is not session.player) or (not obj.equipment) or \
-                   (not Equipment.equip_has(obj.equipment, (slot['slot_type'],slot['slot_index']), specname)):
+                   (not Equipment.equip_has(obj.equipment, addr, specname, level = client_item.get('level',None))):
                     # XXX also test if obj is damaged or busy?
                     retmsg.append(["ERROR", "HARMLESS_RACE_CONDITION"])
                     retmsg.append(["INVENTORY_USE_RESULT", slot, specname, False, 0, None])
                     return
-                item = {'spec': specname} # "invent" the item
+                item = Equipment.equip_get(obj.equipment, addr)
             else:
-                item = session.player.inventory_verify_item(slot, specname)
+                item = session.player.inventory_verify_item(slot, specname, level = client_item.get('level',None))
 
             spec = gamedata['items'].get(specname, None)
             if (item is None) or (spec is None):
@@ -23475,7 +23479,7 @@ class GAMEAPI(resource.Resource):
             used_count = 0
 
             if spec.get('fungible',False):
-                # add directly
+                # add directly. Ignore max_count.
                 if spec['resource'] == 'gamebucks':
                     success = True
                     used_count = item.get('stack',1)
@@ -23516,50 +23520,67 @@ class GAMEAPI(resource.Resource):
                         return
 
                 uselist = spec['use'] if type(spec['use']) is list else [spec['use']]
-                for use in uselist:
-                    assert type(use) is dict
-                    if 'spellname' in use:
-                        spellname = use['spellname']
-                        spellarg = use.get('spellarg', None)
 
-                        if (spellarg is not None) and extra_spellargs:
-                            if not isinstance(spellarg, list):
-                                spellarg = [spellarg]
+                assert max_count >= 1 and max_count <= item.get('stack',1)
+
+                try: # ensure item conservation!
+
+                    for i in xrange(max_count):
+                        one_success = False
+                        for use in uselist:
+                            assert type(use) is dict
+                            if 'spellname' in use:
+                                spellname = use['spellname']
+                                spellarg = use.get('spellarg', None)
+
+                                if (spellarg is not None) and extra_spellargs:
+                                    if not isinstance(spellarg, list):
+                                        spellarg = [spellarg]
+                                    else:
+                                        spellarg = copy.copy(spellarg)
+                                    spellarg += extra_spellargs
+
+                                one_success = self.execute_spell(session, retmsg, spellname, spellarg, reason = 'item')
+                            elif 'consequent' in use:
+                                # do abort here on exceptions
+                                one_success = False
+                                session.execute_consequent_safe(use, session.player, retmsg, reason='use(%s)' % spec['name'], rethrow = True)
+                                one_success = True
+
+                            if not one_success:
+                                break # one of the 'use' actions failed
+
+                        if one_success:
+                            success = True # any one item succeeding makes the whole operation count as successful
+                            used_count += 1
+                        else: # hit an error, don't try to activate any more items
+                            break
+
+                finally: # on the way out, remove used items
+                    if success:
+                        if spec.get('consumable', True):
+                            if is_equipped:
+                                assert used_count == 1 # might need handling for stacked equipped items for e.g. consumable ammo
+                                Equipment.equip_remove(obj.equipment, (slot['slot_type'], slot['slot_index']), specname) # we don't care about the level here
                             else:
-                                spellarg = copy.copy(spellarg)
-                            spellarg += extra_spellargs
+                                session.player.inventory_remove(item, used_count, '5130_item_activated', reason='consumed')
 
-                        success = self.execute_spell(session, retmsg, spellname, spellarg, reason = 'item')
-                    elif 'consequent' in use:
-                        # do abort here on exceptions
-                        session.execute_consequent_safe(use, session.player, retmsg, reason='use(%s)' % spec['name'], rethrow = True)
-                        success = True
-                    if not success:
-                        break
+                            if session.has_attacked:
+                                # record the expenditure for this battle
+                                session.attack_item_expended(session.player.user_id, specname, used_count)
 
-                if success:
-                    used_count = 1
-                    if spec.get('consumable', True):
-                        if is_equipped:
-                            Equipment.equip_remove(obj.equipment, (slot['slot_type'], slot['slot_index']), specname) # we don't care about the level here
-                        else:
-                            session.player.inventory_remove(item, 1, '5130_item_activated', reason='consumed')
-
+                        session.increment_player_metric('items_activated', used_count, time_series = False)
+                        session.increment_player_metric('item:'+spec['name']+':activated', used_count, time_series = False)
                         if session.has_attacked:
-                            # record the expenditure for this battle
-                            session.attack_item_expended(session.player.user_id, specname, 1)
+                            # in battle - history update will come after battle ends
+                            pass
+                        else:
+                            session.deferred_history_update = True
 
-                    session.increment_player_metric('items_activated', 1, time_series = False)
-                    session.increment_player_metric('item:'+spec['name']+':activated', 1, time_series = False)
-                    if session.has_attacked:
-                        # in battle - history update will come after battle ends
-                        pass
-                    else:
-                        session.deferred_player_history_update = True
             else:
                 raise Exception('item not usable '+repr(spec))
 
-            retmsg.append(["INVENTORY_USE_RESULT", slot, specname, success, used_count, extra_spellargs])
+            retmsg.append(["INVENTORY_USE_RESULT", slot, specname, success, used_count, extra_spellargs]) # XXX return full item here
             if success and (not is_equipped):
                 session.player.send_inventory_update(retmsg)
                 retmsg.append(["PLAYER_STATE_UPDATE", session.player.resources.calc_snapshot().serialize()])

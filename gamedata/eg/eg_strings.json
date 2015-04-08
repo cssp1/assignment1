@@ -441,6 +441,7 @@
         "unrefundable_tooltip": "Item cannot be sold: %s",
         "equip_button": "Equip", "equip_button_pending": "Equipping...",
         "activate_button": "Activate", "activate_button_pending": "Activating...",
+        "activate_all_button": "Activate All", "activate_all_button_pending": "Activating...",
         "discard_button": "Discard", "discard_button_pending": "Discarding...",
         "discard_all_button": "Discard All", "discard_all_button_pending": "Discarding...",
         "refund_button": "Sell", "refund_button_pending": "Selling...",
