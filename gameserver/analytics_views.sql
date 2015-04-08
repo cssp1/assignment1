@@ -118,11 +118,11 @@ BEGIN
         IF (x LIKE 'viral_%' OR x LIKE 'open_graph_%') THEN
            RETURN 'game_viral';
         END IF;
-        IF (x LIKE '%_bx_%') THEN
-           RETURN 'cross_promo_paid'; -- Skynet paid cross promo
-        END IF;
-        IF (x LIKE '%_XP_%') THEN
+        IF (x LIKE '%_XP_%') OR (x LIKE '%5145_xp_%') THEN
            RETURN 'cross_promo_free'; -- in-game cross promo
+        END IF;
+	IF (x LIKE '%_bx_%') THEN
+           RETURN 'cross_promo_paid'; -- Skynet paid cross promo
         END IF;
 	IF (x LIKE '%/') THEN
            SET x = SUBSTRING(x, 1, CHAR_LENGTH(x)-1);
