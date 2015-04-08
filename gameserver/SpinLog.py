@@ -237,6 +237,7 @@ def MetricsLogFilter(child):
                                   '5201_insufficient_resources_go_to_store',
                                   '5202_insufficient_resources_topup_dialog',
                                   '5203_insufficient_resources_topup_buy_now',
+                                  '6000_reacquisition_gift_sent',
 
                                   '7150_friendstone_generated',
                                   '7151_friendstone_opened_send_ui',

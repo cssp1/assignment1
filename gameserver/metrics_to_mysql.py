@@ -127,6 +127,9 @@ if __name__ == '__main__':
                 if f in row:
                     keyvals.append(('stack', row[f]))
 
+        elif row['event_name'] == '6000_reacquisition_gift_sent':
+            keyvals.append(('spec', row['gift']))
+
         elif row['event_name'] in ('0113_account_deauthorized',
                                    '0140_tutorial_oneway_ticket',
                                    '0140_tutorial_start',
