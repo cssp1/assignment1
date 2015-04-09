@@ -24116,7 +24116,10 @@ class GAMEAPI(resource.Resource):
                                 attachments.append(item)
                     elif type(spellargs[0]) is dict:
                         if spellargs[0]['spec'] in gamedata['items']:
-                            attachments.append({'spec':spellargs[0]['spec'], 'stack':spellargs[0].get('stack',1)})
+                            at = {'spec':spellargs[0]['spec'], 'stack':spellargs[0].get('stack',1)}
+                            if 'level' in spellargs[0]:
+                                at['level'] = spellargs[0]['level']
+                            attachments.append(at)
                     else:
                         spec_name = spellargs[0]
                         if spec_name in gamedata['items']:
