@@ -2196,19 +2196,24 @@ function calculate_battle_outcome() {
             defeat = false; // allow battle to go on even if player has no units left
         }
 
-        // check if the player has any more deployable units
-        if(defeat && session.count_deployable_units() > 0) {
+        // don't end the battle if the player has any more deployable units
+        if(defeat && (session.count_deployable_units() > 0 || session.count_pre_deploy_donated_units() > 0)) {
             defeat = false;
         }
 
         // don't end the battle if the player has usable combat items
         if(defeat) {
+            goog.array.forEach(session.home_equip_items, function(entry) {
+                if(inventory_item_is_usable_in_combat(ItemDisplay.get_inventory_item_spec(entry['item']['spec']), session)) {
+                    defeat = false;
+                }
+            });
+        }
+        if(defeat) {
             for(var i = 0; i < player.inventory.length; i++) {
                 var item = player.inventory[i];
-
                 if(inventory_item_is_usable_in_combat(ItemDisplay.get_inventory_item_spec(item['spec']), session)) {
                     defeat = false;
-                    session.no_more_units = true;
                     break;
                 }
             }
