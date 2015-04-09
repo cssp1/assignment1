@@ -12317,8 +12317,10 @@ function update_desktop_dialogs() {
 
                     // check deployment space limit
                     var space = gamedata['units'][name]['consumes_space'];
-                    var limit = get_player_stat(player.stattab, 'deployable_unit_space');
-                    incr = Math.min(incr, Math.floor((limit - session.deployed_unit_space)/space));
+                    if(space > 0) {
+                        var limit = get_player_stat(player.stattab, 'deployable_unit_space');
+                        incr = Math.min(incr, Math.floor((limit - session.deployed_unit_space)/space));
+                    }
 
                     if(incr < 1) { return false; }
 
@@ -12370,9 +12372,7 @@ function update_desktop_dialogs() {
                         var cursor = new DeployUICursor();
                         change_selection_ui_under(cursor);
 
-                        while(true) {
-                            if(!_incr_callback(_specname, 1)()) { break; }
-                        }
+                        _incr_callback(_specname, session.count_deployable_units_of_spec(_specname) - session.count_pre_deploy_units_of_spec(_specname))();
 
                     };})(incr_callback);
 
