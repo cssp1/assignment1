@@ -12658,6 +12658,7 @@ class Store:
         specname = spellarg['skudata'].get('item',None)
         if (not catpath) or (not specname): return None
         stack = spellarg['skudata'].get('stack', 1)
+        level = spellarg['skudata'].get('level', 1)
         melt_time = spellarg['skudata'].get('melt_time',-1)
         melt_dur = spellarg['skudata'].get('melt_duration',-1)
         tm = player.get_absolute_time()
@@ -12681,12 +12682,12 @@ class Store:
         ret = None
         pr = -1
 
-        def sku_match(skudata, player, specname, stack, melt_time, melt_dur, tm):
+        def sku_match(skudata, player, specname, level, stack, melt_time, melt_dur, tm):
             if ('price' not in skudata): return False
             if (melt_time > 0) and (tm >= melt_time): return False
             if ('expire_time' in skudata) and (tm >= skudata['expire_time']): return False
             if ('start_time' in skudata) and (tm < skudata['start_time']): return False
-            if (skudata.get('item',None) != specname) or (skudata.get('stack',1) != stack): return False
+            if (skudata.get('item',None) != specname) or (skudata.get('stack',1) != stack) or (skudata.get('level',1) != level): return False
             if (skudata.get('melt_time',-1) != melt_time): return False
             if (skudata.get('melt_duration',-1) != melt_dur): return False
             if ('show_if' in skudata) and (not Predicates.read_predicate(skudata['show_if']).is_satisfied(player, None)): return False
@@ -12694,7 +12695,7 @@ class Store:
             return True
 
         for skudata in cat['skus']:
-            if sku_match(skudata, player, specname, stack, melt_time, melt_dur, tm):
+            if sku_match(skudata, player, specname, level, stack, melt_time, melt_dur, tm):
                 if pr < 0 or skudata['price'] < pr:
                     ret = skudata
                     pr = skudata['price']
@@ -12707,7 +12708,7 @@ class Store:
                     if ('extra_store_specials' in data):
                         extras = data['extra_store_specials'];
                         for skudata in extras:
-                            if sku_match(skudata, player, specname, stack, melt_time, melt_dur, tm):
+                            if sku_match(skudata, player, specname, level, stack, melt_time, melt_dur, tm):
                                 if pr < 0 or skudata['price'] < pr:
                                     ret = skudata
                                     pr = skudata['price']
@@ -16825,6 +16826,7 @@ class GAMEAPI(resource.Resource):
             assert skudata
             stack = int(skudata.get('stack',1))
             item = {'spec':skudata['item'], 'stack': stack}
+            if 'level' in skudata: item['level'] = skudata['level']
 
             melt_time = int(skudata.get('melt_time',-1))
             melt_dur = int(skudata.get('melt_duration',-1))
@@ -24110,23 +24112,39 @@ class GAMEAPI(resource.Resource):
                 attachments = []
 
                 if len(spellargs) > 0:
-                    if type(spellargs[0]) is list:
-                        for item in spellargs[0]:
-                            if item['spec'] in gamedata['items']:
-                                attachments.append(item)
-                    elif type(spellargs[0]) is dict:
-                        if spellargs[0]['spec'] in gamedata['items']:
-                            at = {'spec':spellargs[0]['spec'], 'stack':spellargs[0].get('stack',1)}
-                            if 'level' in spellargs[0]:
-                                at['level'] = spellargs[0]['level']
-                            attachments.append(at)
+                    # give a list of items, even if just a single one was passed
+                    if type(spellargs[0]) is not list:
+                        item_list = [spellargs[0]]
                     else:
-                        spec_name = spellargs[0]
-                        if spec_name in gamedata['items']:
-                            max_stack = gamedata['items'][spec_name].get('max_stack',1)
-                            attachments.append({'spec':spec_name, 'stack':max_stack})
-                        elif spec_name in gamedata['loot_tables']:
-                            attachments += session.get_loot_items(session.player, gamedata['loot_tables'][spec_name]['loot'], -1, -1)
+                        item_list = spellargs[0]
+
+                    for item in item_list:
+                        # strings: interpret as item or loot table name
+                        if type(item) in (str,unicode):
+                            if item in gamedata['items']:
+                                spec = gamedata['items'][item]
+                                attachments.append({'spec': item, 'stack': spec.get('max_stack',1)})
+                            elif item in gamedata['loot_tables']:
+                                attachments += session.get_loot_items(session.player, gamedata['loot_tables'][item]['loot'], -1, -1)
+                            else:
+                                pass # unrecognized
+
+                        elif type(item) is dict:
+                            # dict: interpret as item object
+                            if item['spec'] in gamedata['items']:
+                                spec = gamedata['items'][item['spec']]
+                                level = max(item.get('level',1), spec.get('max_level',1))
+                                stack = item.get('stack',1)
+                                at = {'spec':spellargs[0]['spec']}
+                                if level > 1:
+                                    at['level'] = level
+                                if stack > 1:
+                                    at['stack'] = stack
+                                if 'expire_time' in item:
+                                    at['expire_time'] = item['expire_time']
+                                attachments.append(at)
+                            else:
+                                pass # unrecognized
                 else:
                     n_attachments = 9 if random.random() > 0.25 else 1
                     possible_items = gamedata['items'].keys()

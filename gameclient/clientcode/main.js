@@ -39013,8 +39013,8 @@ function can_cast_spell(unit_id, spellname, spellarg) {
     return ret[0];
 }
 
-function sku_match(skudata, player, specname, stack, melt_time, melt_duration, tm, ignore_error) {
-    if(!('item' in skudata) || skudata['item'] !== specname) { return false; }
+function sku_match(skudata, player, specname, level, stack, melt_time, melt_duration, tm, ignore_error) {
+    if(!('item' in skudata) || skudata['item'] !== specname || ((skudata['level']||1) !== level)) { return false; }
     if(!('price' in skudata)) { return false; }
     if(melt_time > 0 && tm >= melt_time) { return false; }
     if(('start_time' in skudata) && (tm < skudata['start_time'])) { return false; }
@@ -39036,6 +39036,7 @@ Store.buy_item_find_skudata = function(spellarg, player, ignore_error) {
     var specname = spellarg['skudata']['item'];
     if(!catpath || !specname) { return null; }
     var stack = ('stack' in spellarg['skudata'] ? spellarg['skudata']['stack'] : 1);
+    var level = ('level' in spellarg['skudata'] ? spellarg['skudata']['level'] : 1);
     var melt_time = ('melt_time' in spellarg['skudata'] ? spellarg['skudata']['melt_time'] : -1);
     var melt_dur = ('melt_duration' in spellarg['skudata'] ? spellarg['skudata']['melt_duration'] : -1);
     var tm = player.get_absolute_time();
@@ -39057,7 +39058,7 @@ Store.buy_item_find_skudata = function(spellarg, player, ignore_error) {
 
     var ret = null, pr = -1;
     goog.array.forEach(cat['skus'], function(skudata) {
-        if(sku_match(skudata, player, specname, stack, melt_time, melt_dur, tm, ignore_error)) {
+        if(sku_match(skudata, player, specname, level, stack, melt_time, melt_dur, tm, ignore_error)) {
             if(pr < 0 || skudata['price'] < pr) {
                 // use lowest price, in case there are multiple matches
                 ret = skudata;
@@ -39076,7 +39077,7 @@ Store.buy_item_find_skudata = function(spellarg, player, ignore_error) {
                     var extras = data['extra_store_specials'];
                     for(var i = 0; i < extras.length; i++) {
                         var skudata = extras[i];
-                        if(sku_match(skudata, player, specname, stack, melt_time, melt_dur, tm, ignore_error)) {
+                        if(sku_match(skudata, player, specname, level, stack, melt_time, melt_dur, tm, ignore_error)) {
                             if(pr < 0 || skudata['price'] < pr) {
                                 // use lowest price, in case there are multiple matches
                                 ret = skudata;
