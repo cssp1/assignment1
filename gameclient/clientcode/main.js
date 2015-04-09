@@ -23522,6 +23522,7 @@ function invoke_battle_log_dialog(from_id, user_id, opprole, summary) {
         dialog.widgets[role+'_name'].str = name_str;
     }
     dialog.widgets['time_since_battle'].str = dialog.data['widgets']['time_since_battle']['ui_name'].replace('%s', pretty_print_time_brief(server_time - summary['time']));
+    dialog.widgets['revenge_note'].str = summary['is_revenge'] ? dialog.data['widgets']['revenge_note']['ui_name_revenge'] : null;
     dialog.widgets['battle_duration'].str = dialog.data['widgets']['battle_duration']['ui_name'].replace('%s', pretty_print_time(summary['duration']));
 
     dialog.widgets['scroll_left'].state = 'disabled';
@@ -23588,6 +23589,7 @@ function battle_log_change_page(dialog, page) {
         dialog.widgets['attacker_name'].show =
         dialog.widgets['attacker_type'].show =
         dialog.widgets['time_since_battle'].show =
+        dialog.widgets['revenge_note'].show =
         dialog.widgets['defender_portrait'].show =
         dialog.widgets['defender_name'].show =
         dialog.widgets['defender_type'].show =
