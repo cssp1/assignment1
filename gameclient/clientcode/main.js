@@ -31939,7 +31939,7 @@ function missions_dialog_select_mission(dialog, row) {
     }
 
     dialog.widgets['claim_button'].state = (pending ? 'bigaction' : 'normal');
-    dialog.widgets['claim_button'].str = dialog.data['widgets']['claim_button']['ui_name'+ (pending ? '' : '_accept')];
+    dialog.widgets['claim_button'].str = dialog.data['widgets']['claim_button']['ui_name'+ (pending ? '' : (quest['ui_accept_consequent'] ? '_show_me' : '_accept'))];
     dialog.widgets['claim_button'].bg_image = (pending ? 'action_button_134px' : 'menu_button_134px');
     if(pending) {
         dialog.widgets['claim_button'].onclick = (function (q) { return function(w) {

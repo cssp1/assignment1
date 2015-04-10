@@ -2762,7 +2762,8 @@
 
             "claim_button": { "kind": "ActionButton", "xy": [550,368], "dimensions": [134,28],
                               "bg_image": "action_button_134px", "text_color": [0,0,0,1], "text_size": 13, "text_style": "bold",
-                              "ui_name": "Claim Reward", "ui_name_accept": "Accept", "ui_name_claiming": "Claiming..."
+                              "ui_name": "Claim Reward", "ui_name_accept": "Accept", "ui_name_claiming": "Claiming...",
+                              "ui_name_show_me": "Show Me"
                               //"ui_tooltip": "",
                               //"tooltip_delay": 0
                             }
