@@ -145,7 +145,6 @@ if __name__ == '__main__':
             old_limit = time_now - KEEP_DAYS * 86400
 
             if verbose: print 'pruning', sql_table
-            cur = con.cursor()
             cur.execute("DELETE FROM "+sql_util.sym(sql_table)+" WHERE time < %s", old_limit)
             if do_optimize:
                 if verbose: print 'optimizing', sql_table
