@@ -2422,6 +2422,8 @@ def do_main():
                                     SpinLog.InventoryLogFilter(SpinNoSQLLog.NoSQLJSONLog(db_client, 'log_inventory')), # inventory events to MongoDB log_inventory
                                     SpinLog.LadderPvPLogFilter(SpinNoSQLLog.NoSQLJSONLog(db_client, 'log_ladder_pvp')), # ladder pvp events to MongoDB log_ladder_pvp
                                     SpinLog.DamageProtectionLogFilter(SpinNoSQLLog.NoSQLJSONLog(db_client, 'log_damage_protection')), # damage protection events to MongoDB log_damage_protection
+                                    SpinLog.AlliancesLogFilter(SpinNoSQLLog.NoSQLJSONLog(db_client, 'log_alliances')), # alliance events to MongoDB log_alliances
+                                    SpinLog.AllianceMembersLogFilter(SpinNoSQLLog.NoSQLJSONLog(db_client, 'log_alliance_members')), # alliance member events to MongoDB log_alliance_members
                                     SpinLog.FishingLogFilter(SpinNoSQLLog.NoSQLJSONLog(db_client, 'log_fishing')), # fishing events to MongoDB log_fishing
                                     SpinLog.QuestsLogFilter(SpinNoSQLLog.NoSQLJSONLog(db_client, 'log_quests')), # quests events to MongoDB log_quests
                                     SpinLog.AchievementsLogFilter(SpinNoSQLLog.NoSQLJSONLog(db_client, 'log_achievements')), # achievements events to MongoDB log_achievements

@@ -294,6 +294,24 @@ def AchievementsLogFilter(child):
     return JSONLogFilter(child,
                          allow = ['4055_achievement_claimed',
                                   ])
+def AlliancesLogFilter(child):
+    return JSONLogFilter(child,
+                         allow = ['4600_alliance_created',
+                                  '4601_alliance_settings_updated',
+                                  '4602_alliance_num_members_updated',
+                                  '4630_alliance_disbanded'
+                                  ])
+def AllianceMembersLogFilter(child):
+    return JSONLogFilter(child,
+                         allow = ['4605_alliance_member_invite_sent',
+                                  '4610_alliance_member_joined',
+                                  '4620_alliance_member_left',
+                                  '4625_alliance_member_kicked',
+                                  '4626_alliance_member_promoted',
+                                  '4640_alliance_member_join_request_sent',
+                                  '4650_alliance_member_join_request_accepted',
+                                  '4660_alliance_member_join_request_rejected'
+                                  ])
 def UnitDonationLogFilter(child):
     return JSONLogFilter(child,
                          allow = ['4150_units_donated'
