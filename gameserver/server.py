@@ -21565,6 +21565,21 @@ class GAMEAPI(resource.Resource):
         self.send_fb_achievements(session)
         self.log_out_preflush_open_graph(session)
 
+        if gamesite.sql_client:
+            alliance_id = gamesite.sql_client.get_users_alliance(session.user.user_id, reason = 'log_out_preflush')
+            if alliance_id >= 0:
+                session.player.history['alliance_id_cache'] = alliance_id
+            elif 'alliance_id_cache' in session.player.history:
+                del session.player.history['alliance_id_cache']
+        else:
+            alliance_id = None
+
+        alliance_id = self.send_player_cache_update(session, 'log_out_preflush', alliance_id = alliance_id)
+
+        # update all leaderboard stats - legacy only (scores2 gets updated on the fly)
+        if not session.player.isolate_pvp:
+            session.player.publish_scores1(alliance_id = alliance_id, reason = 'log_out_preflush')
+
     def send_fb_achievements(self, session):
         if not session.user.facebook_id: return
         if session.player.isolate_pvp or (session.player.tutorial_state != "COMPLETE"): return
@@ -21666,17 +21681,6 @@ class GAMEAPI(resource.Resource):
     # called AFTER playerdb is written
     def _log_out_postflush(self, session):
         #start_time = time.time()
-
-        if gamesite.sql_client:
-            alliance_id = gamesite.sql_client.get_users_alliance(session.user.user_id, reason = 'log_out_postflush')
-        else:
-            alliance_id = None
-
-        alliance_id = self.send_player_cache_update(session, 'log_out_postflush', alliance_id = alliance_id)
-
-        # update all leaderboard stats - legacy only (scores2 gets updated on the fly)
-        if not session.player.isolate_pvp:
-            session.player.publish_scores1(alliance_id = alliance_id, reason = 'log_out_postflush')
 
         if session.player.is_on_map():
             # update status of player's home base on map, and broadcast lock release
@@ -23130,6 +23134,9 @@ class GAMEAPI(resource.Resource):
                     session.player.update_alliance_score_cache(new_alliance_info['id'], alliance_info = new_alliance_info, reason='ALLIANCE_JOIN')
                     gamesite.pcache_client.player_cache_update(session.player.user_id, {'alliance_id': alliance_id}, reason = 'ALLIANCE_JOIN')
 
+                    if session.player.history.get('alliances_joined',0) < 1:
+                        session.player.history['alliance_first_join_time'] = server_time
+                        session.player.history['alliance_first_join_created'] = 0
                     session.increment_player_metric('alliances_joined', 1, time_series = False)
                     metric_event_coded(session.user.user_id, '4610_joined_alliance', {'alliance_id': new_alliance_info['id']})
                 else:
@@ -24513,6 +24520,9 @@ class GAMEAPI(resource.Resource):
                                 assert new_info and new_info['id'] == new_id
 
                                 retmsg.append(["ALLIANCE_UPDATE", new_info['id'], False, new_info, new_membership, False])
+                                if session.player.history.get('alliances_joined',0) < 1:
+                                    session.player.history['alliance_first_join_time'] = server_time
+                                    session.player.history['alliance_first_join_created'] = 1
                                 session.increment_player_metric('alliances_joined', 1, time_series = False)
                                 metric_event_coded(session.user.user_id, '4610_joined_alliance', {'alliance_id': new_id})
 

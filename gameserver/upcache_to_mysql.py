@@ -56,7 +56,7 @@ lite_accept_filter = re.compile('|'.join('^'+x+'$' for x in \
                                           'returned_[0-9]+-[0-9]+h',
                                           'reacquired_[0-9]+d', 'first_time_reacquired_[0-9]+d', 'last_time_reacquired_[0-9]+d',
                                           'townhall_level', # note: this is wishful thinking - upcache actually just uses toc_,central_computer_ etc
-                                          'birth_year', 'gender', 'friends_in_game', 'email', 'logged_in_times', 'alliances_joined', 'time_in_game',
+                                          'birth_year', 'gender', 'friends_in_game', 'email', 'logged_in_times', 'alliance_id_cache', 'alliances_joined', 'time_in_game',
                                           'spend_[0-9]+d', 'attacks_launched_vs_human', 'attacks_launched_vs_ai',
                                           'chat_messages_sent',
                                           ]))
