@@ -117,22 +117,25 @@ if __name__ == '__main__':
             # follow the keys in the schema, assuming that the summary dimensions start at position 3
             assert schema['fields'][3][0] == sql_util.summary_in_dimensions()[0][0]
 
-            keyvals.append([(keyname, row.get(keyname_map.get(keyname,keyname),None))
-                            for keyname, keytype in schema['fields'][0:3]])
+            kv = [(keyname, row.get(keyname_map.get(keyname,keyname),None))
+                  for keyname, keytype in schema['fields'][0:3]]
 
             if 'sum' in row:
-                keyvals += sql_util.parse_brief_summary(row['sum'])
+                kv += sql_util.parse_brief_summary(row['sum'])
             else:
-                keyvals += [(keyname,None) for keyname, keytype in sql_util.summary_in_dimensions()]
+                kv += [(keyname,None) for keyname, keytype in sql_util.summary_in_dimensions()]
 
-            keyvals.append([(keyname, row.get(keyname_map.get(keyname,keyname),None))
-                            for keyname, keytype in schema['fields'][3+len(sql_util.summary_in_dimensions()):]])
+            kv += [(keyname, row.get(keyname_map.get(keyname,keyname),None))
+                   for keyname, keytype in schema['fields'][3+len(sql_util.summary_in_dimensions()):]]
+
+            keyvals.append(kv)
+
             total += 1
             if commit_interval > 0 and len(keyvals) >= commit_interval:
-                flush_keyvals(sql_util, cur, sql_table+'_temp', keyvals)
+                flush_keyvals(sql_util, cur, sql_table, keyvals)
                 if verbose: print total, nosql_table, 'inserted'
 
-        if keyvals: flush_keyvals(sql_util, cur, sql_table+'_temp', keyvals)
+        if keyvals: flush_keyvals(sql_util, cur, sql_table, keyvals)
         con.commit()
         if verbose: print 'total', total, nosql_table, 'inserted'
 
