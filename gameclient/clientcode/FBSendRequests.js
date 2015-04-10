@@ -344,3 +344,52 @@ FBSendRequests.FBSendRequestsDialogV2.update_send_button = function(dialog) {
     dialog.widgets['send_button'].state = (count > 0 ? 'normal' : 'disabled');
     dialog.widgets['send_button'].str = dialog.data['widgets']['send_button'][(count < 1 ? 'ui_name_gift' : (count == 1 ? 'ui_name_gift_one': 'ui_name_gift_many'))].replace('%d', pretty_print_number(count));
 };
+
+/** Invoke Facebook prompt to send a single request.
+    @param {string} viral_name
+    @param {string} viral_replace_s
+    @param {number} to_user_id
+    @param {string} to_facebook_id
+    @param {function()} cb */
+FBSendRequests.invoke_send_single_dialog = function(viral_name, viral_replace_s, to_user_id, to_facebook_id, cb) {
+    var viral = gamedata['virals'][viral_name];
+    if(!viral) { return; }
+
+    // Facebook API wants a comma-separated list of the recipient Facebook IDs
+    var to_string = to_facebook_id.toString();
+    var attempt_id = make_unique_id();
+
+    metric_event('4102_send_gifts_ingame_fb_prompt',
+                 {'api': 'apprequests', 'api_version': 2, 'attempt_id': attempt_id, 'method': viral_name, 'batch': 1,
+                  'sum': player.get_denormalized_summary_props('brief')});
+
+    var params = {'method':'apprequests',
+                  'message': viral['ui_post_message'].replace('%s', viral_replace_s),
+                  'action_type': viral['og_action_type'], 'object_id': viral['og_object_id'],
+                  'data': 'gift',
+                  'title': viral['ui_title'],
+                  'frictionlessRequests': true,
+                  'to': to_string,
+                  'show_error': !spin_secure_mode
+                 };
+
+    SPFB.ui(params, (function (_to_user_id, _attempt_id, _viral_name, _cb) { return function(response) {
+        if(response && response['request'] && response['to']) {
+            // success: {'request': 'NNNNNNN', 'to': ['IDIDIDIDID',...]}
+            metric_event('4104_send_gifts_fb_success', {'api':'apprequests', 'api_version': 2, 'attempt_id': _attempt_id, 'method': _viral_name,
+                                                        'request_id': response['request'].toString(), 'batch':(response['to'] ? response['to'].length : 0),
+                                                        'sum': player.get_denormalized_summary_props('brief')});
+            // success
+            if(_cb) { _cb(); }
+        } else {
+            // cancel: {'error_code': 4201, 'error_message': 'User canceled the Dialog flow'}
+            if(response && response['error_message'] && response['error_message'].indexOf('Can only send requests to friends') == 0) {
+                FBSendRequests.user_id_blacklist[_to_user_id.toString()] = 1;
+            } else {
+                metric_event('4105_send_gifts_fb_fail', {'api':'apprequests', 'api_version': 2, 'attempt_id': _attempt_id, 'method': _viral_name,
+                                                         'message': (response && response['error_message'] ? response['error_message'] : 'unknown'),
+                                                         'sum': player.get_denormalized_summary_props('brief')});
+            }
+        }
+    }; })(to_user_id, attempt_id, viral_name, cb));
+};

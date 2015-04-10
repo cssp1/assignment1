@@ -21859,10 +21859,11 @@ function inventory_action(item, slot, action, options) {
                         change_selection_ui_under(new AOEUICursor(null, -1, splash));
                         return true;
                     } else if(spell['activation'] == 'targeted_alliance_mate') {
-                        invoke_alliance_mate_gift_dialog((function (_item, _slot, _action, _options) { return function(recipient_id) {
-                            inventory_send_request(_item, _slot, _action, [recipient_id], _options);
-                            return true;
-                        }; })(item, slot, action, options));
+                        invoke_alliance_mate_gift_dialog(ItemDisplay.get_inventory_item_ui_name(spec),
+                                                         (function (_item, _slot, _action, _options) { return function(recipient_id) {
+                                                             inventory_send_request(_item, _slot, _action, [recipient_id], _options);
+                                                             return true;
+                                                         }; })(item, slot, action, options));
                         return false;
                     } else if(spell['activation'] == 'targeted_friend') {
                         invoke_friend_gift_dialog((function (_item, _slot, _action, _options) { return function(recipient_id) {
@@ -21909,9 +21910,12 @@ function inventory_send_request(item, slot, action, spellargs, options) {
     }
 }
 
-function invoke_alliance_mate_gift_dialog(callback) {
+/** @param {string} item_ui_name
+    @param {function(number)} callback */
+function invoke_alliance_mate_gift_dialog(item_ui_name, callback) {
     var dialog = new SPUI.Dialog(gamedata['dialogs']['alliance_mate_gift_dialog']);
     dialog.user_data['dialog'] = 'alliance_mate_gift_dialog';
+    dialog.user_data['item_ui_name'] = item_ui_name;
     dialog.user_data['callback'] = callback;
     dialog.user_data['page'] = -1;
     dialog.user_data['rows_per_page'] = dialog.data['widgets']['portrait']['array'][1];
@@ -21985,11 +21989,31 @@ function alliance_mate_gift_dialog_setup_row(dialog, row, rowdata) {
 
         dialog.widgets['button'+row].onclick = (function (_id) { return function(w) {
             var _cb = w.parent.user_data['callback'];
-            close_parent_dialog(w);
-            if(_id > 0) {
+            var ui_name = w.parent.user_data['item_ui_name'];
+            if(_id <= 0) { close_parent_dialog(w); return; }
+
+            var info = PlayerCache.query_sync(_id);
+
+            // if we're going through a Facebook request, wrap the cb inside a request prompt
+            var wrapped_cb;
+            if('send_alliance_gift' in gamedata['virals'] && spin_frame_platform == 'fb' &&
+               info && info['facebook_id'] &&
+               ((goog.array.find(player.friends, function(f) { return f.user_id == _id; }) !== null) ||
+                (!info['uninstalled'] && ('last_login_time' in info) && info['last_login_time'] >= server_time - 5*86400 &&
+                 !(_id.toString() in FBSendRequests.user_id_blacklist)))) {
+                FBSendRequests.invoke_send_single_dialog('send_alliance_gift', ui_name, _id, info['facebook_id'],
+                                                         (function (__cb, __id, _w) { return function() {
+                                                             close_parent_dialog(_w);
+                                                             __cb(__id);
+                                                             invoke_ui_locker();
+                                                         }; })(_cb, _id, w));
+
+            } else {
+                close_parent_dialog(w);
                 _cb(_id);
                 invoke_ui_locker();
             }
+
         }; })(rowdata['user_id']);
     }
 }
