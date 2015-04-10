@@ -25008,6 +25008,9 @@ class GameSite(server.Site):
     def log_async_exception(self, exc):
         self.exception_log.event(server_time, exc)
     def log_facebook_exception(self, exc):
+        MAX_LEN = 1000
+        if len(exc) >= MAX_LEN:
+            exc = exc[0:MAX_LEN]+'...'
         self.facebook_log.event(server_time, exc)
     def log_kongregate_exception(self, exc):
         self.kongregate_log.event(server_time, exc)
