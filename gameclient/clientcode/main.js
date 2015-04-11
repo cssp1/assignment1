@@ -4771,6 +4771,7 @@ session.home_base = 1; // true if we are looking at our own base
 session.has_attacked = false; // true if there has been an attack in the current session
 session.has_deployed = false; // true if there has been an attack AND player has deployed at least one unit
 session.deploy_time = -1; // server_time at which has_deployed became 1
+session.change_time = -1; // client_time at which last SESSION_CHANGE was received (for debugging only)
 session.enable_combat_resource_bars = true; // used by the tutorial to hide combat resource bars (via ENABLE_COMBAT_RESOURCE_BARS consequent)
 session.enable_dialog_completion_buttons = true; // used by the tutorial to disable completions button when player shouldn't press them (via ENABLE_DIALOG_COMPLETION consequent)
 session.surrender_pending = false; // true if player has pressed Surrender and we are waiting for the session change
@@ -41000,7 +41001,9 @@ function handle_server_message(data) {
             if(battle_summary && ('loot' in battle_summary)) {
                 battle_loot = battle_summary['loot']; // for legacy code
             } else {
-                throw Error('received a bad battle summary: '+(battle_summary ? JSON.stringify(battle_summary) : 'null/undefined') + ' at '+(session.viewing_base ? session.viewing_base.base_id.toString() : 'null'));
+                throw Error('received a bad battle summary: '+(battle_summary ? JSON.stringify(battle_summary) : 'null/undefined') +
+                            ' at '+ (session.viewing_base ? session.viewing_base.base_id.toString() : 'null') +
+                            ' going to '+data[16] + ' after '+(client_time - session.change_time).toFixed(1)+' sec, deployed '+(server_time - session.deploy_time).toFixed(1)+' sec ago');
             }
 
             if(session.home_base) {
@@ -41036,6 +41039,8 @@ function handle_server_message(data) {
 
         // cancel "loading base" message if it hasn't fired yet
         cancel_loading_base_timer();
+
+        session.change_time = client_time;
 
         session.viewing_user_id = data[1];
         var unused_viewing_fbid = data[2];
