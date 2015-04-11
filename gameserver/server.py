@@ -2985,8 +2985,8 @@ class Session(object):
 
     # just return a string describing the current session state, for exception logging only
     def dump_exception_state(self):
-        return 'player %d viewing %d at %s, complete_attack_in_progress %r visit_base_in_progress %r logout_in_progress %r has_attacked %r viewing_base_lock %r' % \
-               (self.player.user_id, self.viewing_player.user_id, self.viewing_base.base_id, bool(self.complete_attack_in_progress), bool(self.visit_base_in_progress), bool(self.logout_in_progress), self.has_attacked, self.viewing_base_lock)
+        return 'player %d viewing %d at %s, is_async %r complete_attack_in_progress %r visit_base_in_progress %r logout_in_progress %r has_attacked %r viewing_base_lock %r' % \
+               (self.player.user_id, self.viewing_player.user_id, self.viewing_base.base_id, self.is_async, bool(self.complete_attack_in_progress), bool(self.visit_base_in_progress), bool(self.logout_in_progress), self.has_attacked, self.viewing_base_lock)
 
     def get_alliance_id(self, reason=''):
         if (not gamesite.sql_client) or \
@@ -20525,6 +20525,9 @@ class GAMEAPI(resource.Resource):
                 # prevent re-entry of handle_message_buffer() on a subsequent client message while an async request is still happening
                 # the client will get its answer from complete_deferred_message after the async request completes
                 #gamesite.exception_log.event(server_time, 'user %d: skipping message processing while async in flight, in %d out %d buf %s' % (session.user.user_id, session.incoming_serial, session.outgoing_serial, repr(session.message_buffer)))
+                break
+
+            if session.logout_in_progress: # allow no further message processing after logout begins
                 break
 
             if session.message_buffer[i][0] == session.incoming_serial:
