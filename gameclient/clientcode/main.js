@@ -17979,19 +17979,20 @@ function invoke_building_context_menu(mouse_xy) {
             upgrade_is_active = false;
 
             // REINFORCEMENTS button
+            var reinforcements_button = null;
             if(player.unit_donation_enabled()) {
                 var spell = gamedata['spells']['REQUEST_UNIT_DONATION'];
                 var togo = player.cooldown_togo(spell['cooldown_name']);
                 if(!session.is_in_alliance()) {
-                    buttons.push(new ContextMenuButton({ui_name: spell['ui_name'], state: 'disabled', ui_tooltip: spell['ui_tooltip_no_alliance'], asset: 'menu_button_resizable'}));
+                    reinforcements_button = new ContextMenuButton({ui_name: spell['ui_name'], state: 'disabled', ui_tooltip: spell['ui_tooltip_no_alliance'], asset: 'menu_button_resizable'});
                 } else if(player.alliance_building_is_busy()) {
-                    buttons.push(new ContextMenuButton({ui_name: spell['ui_name'], state: 'disabled', ui_tooltip: spell['ui_tooltip_busy'], asset: 'menu_button_resizable'}));
+                    reinforcements_button = new ContextMenuButton({ui_name: spell['ui_name'], state: 'disabled', ui_tooltip: spell['ui_tooltip_busy'], asset: 'menu_button_resizable'});
                 } else if(player.donated_units_space() >= player.donated_units_max_space()) {
-                    buttons.push(new ContextMenuButton({ui_name: spell['ui_name'], state: 'disabled', ui_tooltip: spell['ui_tooltip_no_space'], asset: 'menu_button_resizable'}));
+                    reinforcements_button = new ContextMenuButton({ui_name: spell['ui_name'], state: 'disabled', ui_tooltip: spell['ui_tooltip_no_space'], asset: 'menu_button_resizable'});
                 } else if(togo > 0) {
-                    buttons.push(new ContextMenuButton({ui_name: spell['ui_name'], state: 'disabled', ui_tooltip: spell['ui_tooltip_cooldown'].replace('%s',pretty_print_time(togo))}));
+                    reinforcements_button = new ContextMenuButton({ui_name: spell['ui_name'], state: 'disabled', ui_tooltip: spell['ui_tooltip_cooldown'].replace('%s',pretty_print_time(togo))});
                 } else {
-                    buttons.push(new ContextMenuButton({ui_name: spell['ui_name'], onclick: (function(_obj) { return function() {
+                    reinforcements_button = new ContextMenuButton({ui_name: spell['ui_name'], onclick: (function(_obj) { return function() {
                         request_unit_donation(_obj);
                         GameArt.assets["request_unit_donation_sound"].states['normal'].audio.play(client_time);
                         change_selection_ui(null);
@@ -18011,18 +18012,37 @@ function invoke_building_context_menu(mouse_xy) {
                                                          client_time, client_time + 3.0,
                                                          { drop_shadow: true, font_size: 20, text_style: 'thick' }));
                         }
-                    }; })(obj)}));
+                    }; })(obj)});
                 }
             }
 
             // ALLIANCES button
+            var alliances_button = null;
             if(1) {
                 var pred = read_predicate({'predicate':'LIBRARY','name':'alliance_join_requirement'});
                 if(!pred.is_satisfied(player, null)) {
-                    buttons.push(new ContextMenuButton({ui_name: gamedata['spells']['SHOW_ALLIANCES']['ui_name'], onclick: get_requirements_help(pred,null), state: 'disabled_clickable', ui_tooltip: gamedata['spells']['SHOW_ALLIANCES']['ui_name_unmet'].replace('%s',pred.ui_describe(player))}));
+                    alliances_button = new ContextMenuButton({ui_name: gamedata['spells']['SHOW_ALLIANCES']['ui_name'], onclick: get_requirements_help(pred,null), state: 'disabled_clickable', ui_tooltip: gamedata['spells']['SHOW_ALLIANCES']['ui_name_unmet'].replace('%s',pred.ui_describe(player))});
                     upgrade_is_active = true; // re-enable upgrade because it might be essential to join an alliance
                 } else {
-                    buttons.push(new ContextMenuButton({ui_name: gamedata['spells']['SHOW_ALLIANCES']['ui_name'], onclick: invoke_alliance_dialog, asset: 'menu_button_resizable'}));
+                    alliances_button = new ContextMenuButton({ui_name: gamedata['spells']['SHOW_ALLIANCES']['ui_name'], onclick: invoke_alliance_dialog,
+                                                              asset: (session.is_in_alliance() ? 'menu_button_resizable' : 'action_button_resizable')});
+                }
+            }
+
+            // put most relevant button at top
+            if(session.is_in_alliance()) {
+                if(reinforcements_button) {
+                    buttons.push(reinforcements_button);
+                }
+                if(alliances_button) {
+                    buttons.push(alliances_button);
+                }
+            } else {
+                if(alliances_button) {
+                    buttons.push(alliances_button);
+                }
+                if(reinforcements_button) {
+                    buttons.push(reinforcements_button);
                 }
             }
         }
