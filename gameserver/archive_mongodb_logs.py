@@ -70,6 +70,9 @@ TABLES = {
     # inventory source/sink log
     'inventory': { 's3_name': 'inventory', 'table_name': 'log_inventory', 'compression': 'zip', 'retain_for': 60*86400 },
 
+    # lottery log
+    'lottery': { 's3_name': 'lottery', 'table_name': 'log_lottery', 'compression': 'zip', 'retain_for': 60*86400 },
+
     # alliance logs
     'alliance_events': { 's3_name': 'alliance_events', 'table_name': 'log_alliances', 'compression': 'zip', 'retain_for': 14*86400 },
     'alliance_member_events': { 's3_name': 'alliance_member_events', 'table_name': 'log_alliance_members', 'compression': 'zip', 'retain_for': 14*86400 },

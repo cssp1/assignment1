@@ -2426,6 +2426,7 @@ def do_main():
                                     SpinLog.AllianceMembersLogFilter(SpinNoSQLLog.NoSQLJSONLog(db_client, 'log_alliance_members')), # alliance member events to MongoDB log_alliance_members
                                     SpinLog.FishingLogFilter(SpinNoSQLLog.NoSQLJSONLog(db_client, 'log_fishing')), # fishing events to MongoDB log_fishing
                                     SpinLog.QuestsLogFilter(SpinNoSQLLog.NoSQLJSONLog(db_client, 'log_quests')), # quests events to MongoDB log_quests
+                                    SpinLog.LotteryLogFilter(SpinNoSQLLog.NoSQLJSONLog(db_client, 'log_lottery')), # lottery events to MongoDB log_lottery
                                     SpinLog.AchievementsLogFilter(SpinNoSQLLog.NoSQLJSONLog(db_client, 'log_achievements')), # achievements events to MongoDB log_achievements
                                     SpinLog.UnitDonationLogFilter(SpinNoSQLLog.NoSQLJSONLog(db_client, 'log_unit_donation')), # unit donation events to MongoDB log_unit_donation
                                     SpinLog.LoginSourcesFilter(SpinNoSQLLog.NoSQLJSONLog(db_client, 'log_login_sources')), # login source events to MongoDB log_login_sources

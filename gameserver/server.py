@@ -25151,6 +25151,7 @@ class GameSite(server.Site):
                                              SpinLog.UnitDonationLogFilter(SpinNoSQLLog.NoSQLJSONLog(self.nosql_client, 'log_unit_donation')), # unit donation events to MongoDB log_unit_donation
                                              SpinLog.FishingLogFilter(SpinNoSQLLog.NoSQLJSONLog(self.nosql_client, 'log_fishing')), # fishing events to MongoDB log_fishing
                                              SpinLog.QuestsLogFilter(SpinNoSQLLog.NoSQLJSONLog(self.nosql_client, 'log_quests')), # quests events to MongoDB log_quests
+                                             SpinLog.LotteryLogFilter(SpinNoSQLLog.NoSQLJSONLog(self.nosql_client, 'log_lottery')), # lottery events to MongoDB log_lottery
                                              SpinLog.AchievementsLogFilter(SpinNoSQLLog.NoSQLJSONLog(self.nosql_client, 'log_achievements')), # achievements events to MongoDB log_achievements
                                              SpinLog.LoginSourcesFilter(SpinNoSQLLog.NoSQLJSONLog(self.nosql_client, 'log_login_sources')), # login source events to MongoDB log_login_sources
                                              SpinLog.LoginFlowFilter(SpinNoSQLLog.NoSQLJSONLog(self.nosql_client, 'log_login_flow')), # login flow events to MongoDB log_login_flow

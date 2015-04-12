@@ -290,6 +290,11 @@ def QuestsLogFilter(child):
                          allow = ['4010_quest_complete',
                                   '4011_quest_complete_again'
                                   ])
+def LotteryLogFilter(child):
+    return JSONLogFilter(child,
+                         allow = ['1630_lottery_scan_free',
+                                  '1631_lottery_scan_paid'
+                                  ])
 def AchievementsLogFilter(child):
     return JSONLogFilter(child,
                          allow = ['4055_achievement_claimed',
