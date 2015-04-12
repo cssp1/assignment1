@@ -83,7 +83,7 @@ sudo /etc/init.d/munin-node restart
 # allow Python to bind to lower ports (dangerous?)
 for P in /usr/bin/python2.6 /usr/bin/python26 /usr/bin/python2.7 /usr/bin/python27; do
     if [ -e $P ]; then
-	sudo setcap 'cap_net_bind_service=+ep' $P
+    sudo setcap 'cap_net_bind_service=+ep' $P
     fi
 done
 

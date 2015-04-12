@@ -121,10 +121,10 @@ BEGIN
         IF (x LIKE '%_XP_%') OR (x LIKE '%5145_xp_%') THEN
            RETURN 'cross_promo_free'; -- in-game cross promo
         END IF;
-	IF (x LIKE '%_bx_%') THEN
+    IF (x LIKE '%_bx_%') THEN
            RETURN 'cross_promo_paid'; -- Skynet paid cross promo
         END IF;
-	IF (x LIKE '%/') THEN
+    IF (x LIKE '%/') THEN
            SET x = SUBSTRING(x, 1, CHAR_LENGTH(x)-1);
         END IF;
         IF (x LIKE '%.com%') THEN
@@ -151,13 +151,13 @@ BEGIN
            -- if camp maps to MISSING, then ignore (!) this user (this is what ANALYTICS2 does - maybe we should report it as 'FB MISSING' instead?)
            -- otherwise, map to 'paid'
            RETURN (CASE (SELECT remap_facebook_campaigns(camp))
-	   	  WHEN 'facebook_free' THEN 'FB Free (Facebook)'
-		  WHEN 'game_viral' THEN 'FB Free (Game Viral)'
-		  WHEN 'cross_promo' THEN 'Cross Promo (Paid)' -- legacy data
-		  WHEN 'cross_promo_paid' THEN 'Cross Promo (Paid)'
-		  WHEN 'cross_promo_free' THEN 'Cross Promo (Free)'
-		  WHEN 'MISSING' THEN NULL
-		  ELSE 'FB Paid' END);
+           WHEN 'facebook_free' THEN 'FB Free (Facebook)'
+           WHEN 'game_viral' THEN 'FB Free (Game Viral)'
+           WHEN 'cross_promo' THEN 'Cross Promo (Paid)' -- legacy data
+           WHEN 'cross_promo_paid' THEN 'Cross Promo (Paid)'
+           WHEN 'cross_promo_free' THEN 'Cross Promo (Free)'
+           WHEN 'MISSING' THEN NULL
+           ELSE 'FB Paid' END);
         ELSE
            RETURN NULL;
         END IF;

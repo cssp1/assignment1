@@ -5901,7 +5901,7 @@
 
             // fbpage/message are mutually exclusive (since you can't message a non-friend)
             "fbpage_button": { "kind": "ActionButton", "xy": [551,153], "dimensions": [134,28], "text_size": 13, "text_style": "bold",
-                                "bg_image": "action_button_134px", "ui_name": "Find on Facebook", "show": 0 },
+                               "bg_image": "action_button_134px", "ui_name": "Find on Facebook", "show": 0 },
 
             "message_button": { "kind": "ActionButton", "xy": [551,153], "dimensions": [134,28], "text_size": 13, "text_style": "bold",
                                 "bg_image": "action_button_134px", "ui_name": "Send Message", "show": 0 },
