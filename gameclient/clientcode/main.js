@@ -41,6 +41,7 @@ goog.require('SPWebsocket');
 goog.require('SPVideoWidget');
 goog.require('ItemDisplay');
 goog.require('Dripper');
+goog.require('Bounce');
 goog.require('CombatEngine');
 goog.require('Showcase');
 goog.require('PlayerInfoDialog');
@@ -4311,6 +4312,7 @@ Building.prototype.is_invisible = function() { return !!this.spec['invisible']; 
               click_bounds: ((!Array.<!Array.<number>>)|null|undefined),
               text_str: (string|null|undefined),
               text_pos: (Array.<number>|null|undefined),
+              bounce: (boolean|undefined),
               pulse_period: (number|undefined),
               pulse_amplitude: (number|undefined)})|null}
  */
@@ -4340,6 +4342,10 @@ Building.prototype.get_idle_state_appearance = function() {
 
         var click_bounds = [[icon_pos[0] - icon_sprite.wh[0]/2, icon_pos[0] + icon_sprite.wh[0]/2],
                             [icon_pos[1] - icon_sprite.wh[1]/2, icon_pos[1] + icon_sprite.wh[1]/2]];
+        var is_bouncy = !!state_data['bounce'];
+        if(is_bouncy) {
+            click_bounds[1][0] -= icon_sprite.wh[1]/2; // enlarge click area vertically
+        }
 
         var text_str = state_data['ui_name'] || null;
         var text_pos = null;
@@ -4352,12 +4358,17 @@ Building.prototype.get_idle_state_appearance = function() {
             click_bounds[0][0] = Math.min(click_bounds[0][0], icon_pos[0] - icon_sprite.wh[0]/2);
         }
 
+        if(is_bouncy) {
+            icon_pos[1] = Math.floor(icon_pos[1] - 18 * Bounce.get(client_time));
+        }
+
         return {idle: idle,
                 asset: icon_name,
                 icon_pos: icon_pos,
                 click_bounds: click_bounds,
                 text_str: text_str,
                 text_pos: text_pos,
+                bounce: is_bouncy,
                 pulse_period: ('pulse_period' in state_data ? state_data['pulse_period'] : (gamedata['client']['idle_icon_pulse_period'] || 0)),
                 pulse_amplitude: ('pulse_amplitude' in state_data ? state_data['pulse_amplitude'] : (gamedata['client']['idle_icon_pulse_amplitude'] || 0))
                };
