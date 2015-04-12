@@ -8262,9 +8262,8 @@ class Player(AbstractPlayer):
                 (bay.is_damaged() and (not self.get_any_abtest_value('squads_available_during_squad_bay_repair', gamedata.get('squads_available_during_squad_bay_repair',0)))):
                  return True
          return False
-    def lottery_is_busy(self):
+    def lottery_is_busy(self, scanner):
          if self.get_any_abtest_value('enable_lottery', gamedata['enable_lottery']):
-             scanner = self.find_lottery_building()
              if (not scanner) or \
                 ((scanner.is_under_construction() or scanner.is_upgrading()) and (not self.get_any_abtest_value('lottery_available_during_scanner_upgrade', gamedata['lottery_available_during_scanner_upgrade']))) or \
                 (scanner.is_damaged() and (not self.get_any_abtest_value('lottery_available_during_scanner_repair', gamedata['lottery_available_during_scanner_repair']))):
@@ -10237,6 +10236,7 @@ class LivePlayer(Player):
                 elif spec['resource'] == 'lottery_ticket':
                     lottery_building = self.find_lottery_building()
                     if lottery_building:
+                        # XXX how to notify the client?
                         lottery_building.contents += stack
                         count += stack
                         stack = 0
@@ -11207,7 +11207,7 @@ class LivePlayer(Player):
     def get_lottery_slate(self, session):
         slot_tables = self.get_any_abtest_value('lottery_slot_tables', gamedata['lottery_slot_tables'])
         randgen = random.Random(self.lottery_seed)
-        return [session.get_loot_items(self, tab, -1, -1, rand_func = randgen.random) for tab in slot_tables]
+        return dict((slot_name, session.get_loot_items(self, tab, -1, -1, rand_func = randgen.random)) for slot_name, tab in slot_tables.iteritems())
 
     def send_inventory_intro_mail(self, session, retmsg):
         # retmsg will be None if called from migrate() on load
@@ -18820,41 +18820,66 @@ class GAMEAPI(resource.Resource):
             session.player.send_inventory_update(retmsg)
         return True
 
-    def do_lottery_scan(self, session, retmsg, scanner):
+    def do_lottery_scan(self, session, retmsg, scanner, source):
+        # how we are getting permission to scan
+        assert source in ('cooldown', 'contents', 'gamebucks')
+
+        if session.player.lottery_is_busy(scanner):
+            retmsg.append(["ERROR", "CANNOT_SCAN_BUILDING_BUSY"])
+            return False
+
         if not scanner.is_lottery_building():
             retmsg.append(["ERROR", "CANNOT_SCAN_NO_BUILDING"])
-            return
+            return False
         if scanner.contents < 1:
             retmsg.append(["ERROR", "CANNOT_SCAN_NO_CHARGES"])
-            return
+            return False
 
-        need_resource_update = False
+        if source == 'cooldown':
+            if self.cooldown_active('lottery'):
+                retmsg.append(["ERROR", "CANNOT_SCAN_ON_COOLDOWN"])
+                return False
+        elif source == 'contents':
+            if scanner.contents < 1:
+                retmsg.append(["ERROR", "CANNOT_SCAN_NO_CHARGES"])
+                return False
+
+        # check for inventory space
+        snapshot = session.player.resources.calc_snapshot()
+        if snapshot.cur_inventory() + 1 > snapshot.max_usable_inventory():
+            retmsg.append(["ERROR", "INVENTORY_LIMIT"])
+            return False
 
         slate = session.player.get_lottery_slate(session)
-        loot = slate[int(random.random() * len(slate))]
-
-        if gamedata['server']['log_lottery']:
-            gamesite.exception_log.event(server_time, 'player %d lottery result: %s' % \
-                                         (session.player.user_id, repr(loot)))
+        slot_names = sorted(slate.keys())
+        which_slot = slot_names[int(random.random() * len(slot_names))]
+        loot = slate[which_slot]
 
         assert len(loot) == 1
         item = loot[0]
-        spec = gamedata['items'][item['spec']]
-        if spec.get('fungible', False):
-            need_resource_update = True
-            stack = item.get('stack',1)
-            added = session.player.inventory_add_item(item, -1) # XXX not logged
-            if added != stack:
-                raise Exception('problem adding fungible lottery result %s to inventory, added = %d stack = %d, inv = %s' % (repr(item),added,stack,repr(session.player.inventory)))
-        else:
-            session.player.send_lottery_mail(loot, retmsg)
-        scanner.contents -= 1
-        session.player.reseed_lottery(force = True)
-        session.increment_player_metric('lottery_scans', 1)
+        assert session.player.inventory_add_item(item, snapshot.max_usable_inventory()) == item.get('stack',1)
+        session.player.inventory_log_event('5125_item_obtained', item['spec'], item.get('stack',1), item.get('expire_time',-1), level=item.get('level',None), reason='lottery')
+        metric_event_coded(session.user.user_id, '1631_lottery_scan_paid' if source == 'gamebucks' else '1630_lottery_scan_free',
+                           {'slot': which_slot, 'spec': item['spec'], 'level': item.get('level',None), 'stack': item.get('stack',1),
+                            'inv_slots': {'total': snapshot.max_usable_inventory(), 'full': snapshot.cur_inventory()}})
 
-        retmsg.append(["OBJECT_STATE_UPDATE2", scanner.serialize_state()])
-        if need_resource_update:
-            retmsg.append(["PLAYER_STATE_UPDATE", session.player.resources.calc_snapshot().serialize()])
+        session.deferred_player_state_update = True
+
+        # note: ANY scan resets the free timer, even charge/payment ones
+        session.player.cooldown_trigger('lottery_free', gamedata.get('lottery_free_interval', 86400))
+        retmsg.append(["COOLDOWNS_UPDATE", session.player.cooldowns])
+
+        # deduct resources
+        if source == 'cooldown':
+            pass
+        elif source == 'contents':
+            scanner.contents -= 1
+            session.deferred_object_state_updates.add(scanner)
+
+        session.player.reseed_lottery(force = True)
+        session.increment_player_metric('lottery_scans', 1, time_series = False)
+
+        return True
 
     # deploy units against a foreign (human or AI) player
     def do_attack(self, session, retmsg, spellargs):
@@ -23686,6 +23711,9 @@ class GAMEAPI(resource.Resource):
                                 # then we'll need to send an update of that
                                 if spec['resource'] == 'lottery_ticket':
                                     need_lottery_update = True
+                                    scanner = session.player.find_lottery_building()
+                                    if scanner:
+                                        session.deferred_object_state_updates.add(scanner)
                                 else:
                                     need_resource_update = True
 
@@ -23756,9 +23784,6 @@ class GAMEAPI(resource.Resource):
 
             if success:
                 session.player.send_inventory_update(retmsg)
-                if need_lottery_update:
-                    lottery_building = session.player.find_lottery_building()
-                    if lottery_building: retmsg.append(["OBJECT_STATE_UPDATE2", lottery_building.serialize_state()])
                 if need_resource_update:
                     retmsg.append(["PLAYER_STATE_UPDATE", session.player.resources.calc_snapshot().serialize()])
             retmsg.append(["MAIL_TAKE_ATTACHMENTS_RESULT", msg_id, client_index, success, need_resource_update or need_lottery_update, mail if mail else None])
@@ -24037,10 +24062,12 @@ class GAMEAPI(resource.Resource):
                 retmsg.append(["LOTTERY_GET_SLATE_RESULT", result])
 
             elif spellname == "LOTTERY_SCAN":
+                source = spellarg[0]
+                assert source in ('cooldown','contents') # cannot use "gamebucks" here!
                 if (session.viewing_base is not session.player.my_home) or (object.owner is not session.player):
                     retmsg.append(["ERROR", "CANNOT_CAST_SPELL_OUTSIDE_HOME_BASE"])
                     return
-                self.do_lottery_scan(session, retmsg, object)
+                self.do_lottery_scan(session, retmsg, object, source)
 
             elif spellname == "FISH_SLATE_ASSIGN":
                 if 'assign_fish_slate' not in gamedata['consequent_library']:

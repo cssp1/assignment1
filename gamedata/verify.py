@@ -3310,6 +3310,9 @@ def main(args):
     for name, data in gamedata['loot_tables'].iteritems():
         error |= check_loot_table(data['loot'], reason = 'loot_tables:'+name)
 
+    for name, loot in gamedata.get('lottery_slot_tables',{}).iteritems():
+        error |= check_loot_table(loot, reason='lottery_slot_tables:'+name)
+
     for name, pred in gamedata['predicate_library'].iteritems():
         expect_player_history_keys = None
         # check unit unlock predicates

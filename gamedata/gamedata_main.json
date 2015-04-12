@@ -545,13 +545,8 @@
 
     "enable_lottery": 0,
     "lottery_reseed_cooldown": 64800, // reseed lottery on a long cooldown, to avoid exploits
-    // note: this is NOT an ordinary loot table
-    // each entry corresponds to one of the lottery "slots"
-    "lottery_slot_tables": [[{"table": "lottery_test"}],
-                            [{"table": "lottery_test"}],
-                            [{"table": "lottery_test"}],
-                            [{"table": "lottery_test"}]
-                           ],
+    "lottery_free_interval": 86400, // how often you get a free lottery scan
+
     "lottery_available_during_scanner_upgrade": false,
     "lottery_available_during_scanner_repair": false,
 

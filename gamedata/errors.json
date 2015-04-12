@@ -39,7 +39,9 @@
     "NOTHING_TO_REPAIR": { "ui_name": "Nothing to repair" },
     "INSUFFICIENT_RESOURCES_TO_REPAIR": { "ui_name": "Not enough resources for repair" },
     "CANNOT_SCAN_NO_BUILDING": { "ui_name": "There is no scanner building to scan with" },
-    "CANNOT_SCAN_NO_CHARGES": { "ui_name": "There are no sensor charges left to scan with" },
+    "CANNOT_SCAN_BUILDING_BUSY": { "ui_name": "The scanner building is busy" },
+    "CANNOT_SCAN_NO_CHARGES": { "ui_name": "There are no charges left to scan with" },
+    "CANNOT_SCAN_ON_COOLDOWN": { "ui_name": "The scanner is on cooldown" },
 
     // sent when attempting to attack or collect
     "CANNOT_LOCK_QUARRY": { "ui_title": "Quarry Attacked", "ui_name": "Quarry %d has come under attack since it was loaded, please retry." },
