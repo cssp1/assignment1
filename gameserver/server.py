@@ -18863,7 +18863,7 @@ class GAMEAPI(resource.Resource):
             stack_to_add = item.get('stack',1)
             assert session.player.inventory_add_item(item, snapshot.max_usable_inventory()) == stack_to_add
             session.player.inventory_log_event('5125_item_obtained', item['spec'], stack_to_add, item.get('expire_time',-1), level=item.get('level',None), reason='lottery')
-            metric_event_coded(session.user.user_id, '1631_lottery_scan_paid' if source == 'gamebucks' else '1630_lottery_scan_free',
+            metric_event_coded(session.user.user_id, '1631_lottery_scan_paid' if source == 'paid' else '1630_lottery_scan_free',
                                {'slot': which_slot, 'spec': item['spec'], 'level': item.get('level',None), 'stack': stack_to_add, 'method': source,
                                 'inv_slots': {'total': snapshot.max_usable_inventory(), 'full': snapshot.cur_inventory()}})
 
