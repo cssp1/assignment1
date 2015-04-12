@@ -30,6 +30,7 @@ ifneq (${TYPECHECK},)
     CHECK_FLAGS += --compiler_flags=--jscomp_warning=missingProperties
     CHECK_FLAGS += --compiler_flags=--jscomp_warning=strictModuleDepCheck
     CHECK_FLAGS += --compiler_flags=--jscomp_warning=suspiciousCode
+    CHECK_FLAGS += --compiler_flags=--jscomp_warning=reportUnknownTypes
 else
     CHECK_FLAGS += --compiler_flags=--jscomp_off=checkTypes
 endif
@@ -66,9 +67,10 @@ compiled-client.js: clientcode/*.js
 		--output_mode=compiled \
 		--compiler_jar=google/compiler.jar \
 		--compiler_flags='--js=google/closure/goog/deps.js' \
-		--compiler_flags='--compilation_level=ADVANCED_OPTIMIZATIONS' \
-		--compiler_flags='--jscomp_off=reportUnknownTypes' \
 		--compiler_flags='--externs=clientcode/externs.js' \
+		--compiler_flags='--compilation_level=ADVANCED_OPTIMIZATIONS' \
+		--compiler_flags='--summary_detail_level=2' \
+		--compiler_flags='--warning_level=VERBOSE' \
 		--compiler_flags='--create_renaming_reports' \
 		--compiler_flags='--language_in=ECMASCRIPT5' \
 		${CHECK_FLAGS} ${OPT_FLAGS} \
@@ -79,19 +81,18 @@ compiled-client.js: clientcode/*.js
 	@mv _vars_map.out $@_vars_map.out
 
 check: clientcode/*.js
-# Compile our code with reportUnknownTypes enabled to call out anything that's not typed.
-# A lot of our code is not clean for this, but we can start to insist on strong typing in a subset of it.
-# (neither is the Closure library and other third-party code, so we insert a lot of @suppress{reportUnknownTypes} there)
+# OBSOLETE Separate type-checking pass on main.js. Not used anymore, the regular build now uses reportUnknownTypes by default.
+# (with @suppress{reportUnknownTypes} to turn off warnings on a file-by-file bases).
+# Code kept here in case we want to experiment with other Closure compilter options.
 
 	@google/closure/bin/build/closurebuilder.py \
 		--root='google'	--root='clientcode' \
-		--compiler_flags='--externs=clientcode/externs.js' \
-		--compiler_flags='--js=google/closure/goog/deps.js' \
 		--input='clientcode/main.js' \
 		--output_mode=compiled \
 		--compiler_jar=google/compiler.jar \
+		--compiler_flags='--js=google/closure/goog/deps.js' \
+		--compiler_flags='--externs=clientcode/externs.js' \
 		--compiler_flags='--compilation_level=ADVANCED_OPTIMIZATIONS' \
-		--compiler_flags='--jscomp_warning=reportUnknownTypes' \
 		--compiler_flags='--summary_detail_level=2' \
 		--compiler_flags='--warning_level=VERBOSE' \
 		--compiler_flags='--language_in=ECMASCRIPT5' \
