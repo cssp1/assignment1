@@ -4790,7 +4790,7 @@
             "subtitle": { "show": 0, "kind": "TextField", "xy": [0,49], "dimensions": [300, 12], "text_size": 13, "text_style": "normal",
                           "text_hjustify": "center", "text_vjustify": "center",
                           "ui_name_messages": "Check Your Messages",
-                          "ui_name_inventory": "Added to Warehouse"
+                          "ui_name_inventory": ""
                         },
 
             "sku_glow": { "kind":"StaticImage","bg_image_resizable":1,
@@ -4803,7 +4803,10 @@
             "sku": { "kind": "Dialog", "xy": [42,75], "dialog": "new_store_sku" },
 
             "close_button": { "kind": "ActionButton", "xy": [83,375], "dimensions": [134,28], "bg_image": "menu_button_134px", "push_bg_image": 1,
-                              "ui_name_messages": "Send to Messages", "ui_name": "Accept",
+                              "ui_name_messages": "Send to Messages",
+                              "ui_name_inventory": "Add to Warehouse",
+                              "ui_name_inventory_fungible": "Add to Storage",
+                              "ui_name": "Accept",
                               "text_color": [0,0,0,1], "text_size": 13, "text_style": "bold"},
 
             "expiry": { "kind": "TextField", "xy": [0,421], "dimensions": [300, 12], "text_size": 13, "text_style": "normal", "text_color": [1,0,0,1],
@@ -8146,26 +8149,57 @@
     },
 
     "lottery_dialog": {
-        "bg_image": "dialog_770x485_bg",
-        "dimensions": [770,485],
+        "dimensions": [736,436],
+        "default_button": "buy_button",
         "widgets": {
-            "sunken": {"kind": "StaticImage", "xy":[8,35], "dimensions":[754,418], "asset": "dialog_sunken_754x418" },
+            "glow": { "show": 0, "kind":"StaticImage","xy":[-30,-30],"dimensions":[796,496],"bg_image_resizable":1,"asset":"dialog_glow_resizable", "composite_mode": "lighter",
+                      "sound": "success_sound_exploding_glass_01",
+                      "fade":1, "duration": 1.5, "fade_peak": 0.2, "delay": -0.2},
+            "bg": { "kind":"StaticImage", "xy":[0,0], "dimensions": [736,436], "transparent_to_mouse":0, "asset": "dialog_resizable", "bg_image_resizable": 1},
+            "title": { "kind": "TextField", "xy": [39,14], "dimensions": [221, 41], "text_size": 30, "text_style": "thick",
+                       "text_hjustify": "left" },
+            "close_button": { "kind": "ActionButton", "xy": [706,1], "dimensions": [19,22], "bg_image": "close_button_small", "push_bg_image": 1 },
 
-            "goodies": { "show":0, "kind": "Dialog", "dialog": "item_display", "xy": [228,95], "dimensions": [50,50],
-                         "array": [4,1], "array_offset":[50,50] },
+            "sunken": {"kind": "StaticImage", "xy":[39,70], "dimensions":[659,357], "bg_image_resizable": 1, "asset": "dialog_sunken_resizable" },
+            "topbar": { "kind": "SolidRect", "xy": [41,72], "dimensions":[655,33], "color": [0,0,0,0.25] },
 
-            "charges": {"kind": "TextField", "xy": [176,43], "dimensions": [319,95], "text_size": 13,
-                        "text_hjustify": "center",
-                        "ui_name_some": "FREE Special Dispatches: %d",
-                        "ui_name_none": "Next Free Special Dispatch in: %s" },
+            "charges": { "kind": "TextField", "xy": [39,72], "dimensions": [659,33], "text_size": 13,
+                         "text_hjustify": "center", "text_vjustify": "center", "text_offset":[0,1]
+                         // ui_name from the LOTTERY_SCAN spell
+                       },
 
-            "price_display": { "kind": "ActionButton", "xy": [190,158], "dimensions": [120,32], "text_offset": [8,1], "text_size": 13, "text_style": "thick",
+            "sunken2": {"kind": "StaticImage", "xy":[56,112], "dimensions":[622,157], "bg_image_resizable": 1, "asset": "dialog_sunken_resizable" },
+
+            "goodies": { "show":0, "kind": "Dialog", "dialog": "item_display", "xy": [75,128], "dimensions": [50,50],
+                         "pulse_period_normal": 3.25, "pulse_period_scanning": 0.5, "pulse_amplitude": 0.33,
+                         "randomize_period_normal": 5, "randomize_period_scanning": 2,
+                         "array": [8,2], "array_offset":[75,75] },
+            "goodies_spinner": { "show":0, "kind": "StaticImage", "asset": "loading_spinner", "xy": [92,145], "dimensions": [16,16],
+                         "array": [8,2], "array_offset":[75,75] },
+
+            "cursor": { "show": 0, "kind": "StaticImage", "xy":[-25,-25], "dimensions":[100,100],
+                        "asset": "dialog_glow_resizable",
+                        "bg_image_resizable": 1, "alpha": 0.7, "composite_mode": "lighter",
+                        "anim_speed": 1200,
+                        "array": [3,1], "array_offset": [0,0] },
+
+            "price_display": { "kind": "ActionButton", "xy": [242,288], "dimensions": [120,32], "text_offset": [8,1], "text_size": 13, "text_style": "thick",
                                "bg_image": "price_display", "ui_tooltip": "", "tooltip_delay": 0 }, // PRICE
-            "buy_button": { "kind": "ActionButton", "xy": [311,159], "dimensions": [134,28], "text_offset": [0,0], "text_size": 13,
-                            "bg_image": "action_button_134px", "text_color": [0,0,0,1], "text_style": "bold",
-                            "ui_name": "Scan", "ui_name_loading": "Loading...", "ui_name_pending": "Scanning...",
+            "buy_button": { "kind": "ActionButton", "xy": [363,287], "dimensions": [134,32], "text_offset": [0,0], "text_size": 13,
+                            "bg_image": "action_button_resizable", "text_color": [0,0,0,1], "text_style": "bold",
+                            "bg_image_resizable": 1,
+                            "min_wait": 1.6, // wait at least this long for scan result even if it comes in immediately
+                            // ui_name from LOTTERY_SCAN spell
+                            "ui_name_loading": "Loading...",
                             "ui_tooltip": "", "tooltip_delay": 0 },
-            "close_button": { "kind": "ActionButton", "xy": [738,1], "dimensions": [19,22], "bg_image": "close_button_small", "push_bg_image": 1 }
+
+            "separator": {"kind": "Line", "xy": [50,354], "dimensions": [636,0], "color":  [0.063,0.176,0.36,0.5], "stroke_width": 2},
+            "history_label": { "kind": "TextField", "xy": [58,326], "dimensions": [659,33], "text_size": 13,
+                               "text_hjustify": "left",
+                               "ui_name": "Discovered this session:"
+                             },
+            "history": { "show":0, "kind": "Dialog", "dialog": "item_display", "xy": [68,363], "dimensions": [50,50],
+                         "array": [10,1], "array_offset":[60,60] }
         }
     },
 

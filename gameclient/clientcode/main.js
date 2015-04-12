@@ -5074,6 +5074,7 @@ player.reserved_inventory = 0;
 player.inventory = [];
 player.loot_buffer = [];
 player.donated_units = {};
+player.session_lottery_loot = []; // list of items won via lottery this session
 
 player.init = function() {
     for(var res in gamedata['resources']) {
@@ -23042,14 +23043,14 @@ function invoke_lottery_dialog(scanner) {
     dialog.user_data['scanner'] = scanner;
     dialog.user_data['last_contents'] = -1;
     dialog.user_data['slate'] = null;
-    dialog.user_data['slate_pending'] = false;
-    dialog.user_data['scan_pending'] = false;
+    dialog.user_data['scan_pending'] = -1; // client_time scan was launched
+    lottery_dialog_got_slate(dialog, null); // just to initialize user_data
 
     change_selection_ui(dialog);
     dialog.auto_center();
     dialog.modal = true;
     dialog.widgets['close_button'].onclick = close_parent_dialog;
-
+    dialog.widgets['title'].str = gamedata['spells']['LOTTERY_SCAN']['ui_name'];
     lottery_dialog_refresh_slate(dialog);
     dialog.ondraw = update_lottery_dialog;
     return dialog;
@@ -23062,39 +23063,82 @@ function lottery_dialog_refresh_slate(dialog) {
 function lottery_dialog_got_slate(dialog, result) {
     dialog.user_data['slate'] = result;
     dialog.user_data['slate_pending'] = false;
+    dialog.user_data['slate_offsets'] = {}; // random numbers for slate icon animation
+    dialog.user_data['slate_permutation'] = {}; // mapping from slate name to slot number
+    dialog.user_data['slate_permutation_inv'] = {}; // mapping from slot number (string) to slate name
+    dialog.user_data['slate_last_randomized'] = {}; // time each slot_name was last permuted
+    dialog.user_data['cursor_states'] = [];
+    for(var c = 0; c < dialog.data['widgets']['cursor']['array'][0]; c++) {
+        dialog.user_data['cursor_states'].push({'last':null, 'next':null, 'next_time': client_time, 'last_time':client_time});
+    }
+
+    if(!result) { return; }
+
     var i = 0;
-    var slots = [];
+    // create a randomized permutation
+    // http://en.wikipedia.org/wiki/Fisher%E2%80%93Yates_shuffle
+    var permute_list = [null];
+
     for(var slot_name in result) {
-        slots.push(slot_name);
+        dialog.user_data['slate_offsets'][slot_name] = Math.random();
+        var j = Math.floor(Math.random()*(i+1));
+        permute_list[i] = permute_list[j];
+        permute_list[j] = slot_name;
+        i += 1;
     }
-    for(var y = 0; y < dialog.data['widgets']['goodies']['array'][1]; y++) {
-        for(var x = 0; x < dialog.data['widgets']['goodies']['array'][0]; x++) {
-            var wname = SPUI.get_array_widget_name('goodies', dialog.data['widgets']['goodies']['array'], [x,y]);
-            if(i < slots.length) {
-                var item_list = result[slots[i]];
-                if(item_list.length != 1) { throw Error('bad lottery loot '+JSON.stringify(item_list)); }
-                var item = item_list[0];
-                dialog.widgets[wname].show = true;
-                ItemDisplay.display_item(dialog.widgets[wname], item, {context_parent: dialog});
-                ItemDisplay.attach_inventory_item_tooltip(dialog.widgets[wname].widgets['frame'], item, dialog);
-            } else {
-                dialog.widgets[wname].show = false;
-            }
-            i += 1;
-        }
-    }
+
+    // store the permutation as a forward and inverse mapping
+    goog.array.forEach(permute_list, function(slot_name, n) {
+        dialog.user_data['slate_last_randomized'][slot_name] = client_time - dialog.data['widgets']['goodies']['randomize_period_normal']*dialog.user_data['slate_offsets'][slot_name];
+        dialog.user_data['slate_permutation'][slot_name] = n;
+        dialog.user_data['slate_permutation_inv'][n.toString()] = slot_name;
+    });
 }
 
+function lottery_dialog_randomize_permutation(dialog, slot_name) {
+    var period = dialog.data['widgets']['goodies'][(dialog.user_data['scan_pending']>0 ? 'randomize_period_scanning':'randomize_period_normal')];
+    var max_i = goog.object.getCount(dialog.user_data['slate_permutation_inv']);
+    var old_i = dialog.user_data['slate_permutation'][slot_name];
+    var new_i = Math.floor(Math.random()*max_i);
+    var swap_with = dialog.user_data['slate_permutation_inv'][new_i.toString()];
+    if(client_time - dialog.user_data['slate_last_randomized'][swap_with] < period ||
+       client_time - dialog.user_data['slate_last_randomized'][slot_name] < period) {
+        return; // too soon
+    }
+    dialog.user_data['slate_permutation'][slot_name] = new_i;
+    dialog.user_data['slate_permutation_inv'][new_i.toString()] = slot_name;
+    dialog.user_data['slate_permutation'][swap_with] = old_i;
+    dialog.user_data['slate_permutation_inv'][old_i.toString()] = swap_with;
+    dialog.user_data['slate_last_randomized'][slot_name] = client_time - period * Math.random();
+}
+function lottery_dialog_get_slot_widget(dialog, i) {
+    var y = Math.floor(i / dialog.data['widgets']['goodies']['array'][0]);
+    var x = i % dialog.data['widgets']['goodies']['array'][0];
+    var wname = SPUI.get_array_widget_name('goodies', dialog.data['widgets']['goodies']['array'], [x,y]);
+    return dialog.widgets[wname];
+}
+function lottery_dialog_randomize_cursor(dialog, state) {
+    var max_i = goog.object.getCount(dialog.user_data['slate_permutation_inv']);
+    var offset = dialog.data['widgets']['cursor']['xy'];
+    if(state['next']) {
+        state['last'] = state['next'];
+    } else {
+        var i = Math.floor(max_i*Math.random());
+        state['last'] = vec_add(lottery_dialog_get_slot_widget(dialog, i).xy, offset);
+    }
+    var n = Math.floor(max_i*Math.random());
+    state['next'] = vec_add(lottery_dialog_get_slot_widget(dialog, n).xy, offset);
+    state['last_time'] = client_time;
+    state['next_time'] = client_time + vec_distance(state['next'], state['last'])/dialog.data['widgets']['cursor']['anim_speed'];
+}
 function update_lottery_dialog(dialog) {
     var scanner = dialog.user_data['scanner'];
     var state = player.get_lottery_state(scanner);
 
-    if(state.next_scan_method == 'contents') {
-        dialog.widgets['charges'].str = dialog.widgets['charges'].data['ui_name_some'].replace('%d', pretty_print_number(state.num_scans));
-    } else if(state.next_scan_method == 'cooldown') {
-        dialog.widgets['charges'].str = dialog.widgets['charges'].data['ui_name_some'].replace('%d', pretty_print_number(state.num_scans));
+    if(state.next_scan_method == 'cooldown' || state.next_scan_method == 'contents') {
+        dialog.widgets['charges'].str = gamedata['spells']['LOTTERY_SCAN']['ui_tooltip_remaining'].replace('%d', pretty_print_number(state.num_scans));
     } else if(state.next_scan_method == 'paid') {
-        dialog.widgets['charges'].str = dialog.widgets['charges'].data['ui_name_none'].replace('%s', pretty_print_time(player.cooldown_togo('lottery_free')));
+        dialog.widgets['charges'].str = gamedata['spells']['LOTTERY_SCAN']['ui_tooltip_on_cooldown'].replace('%s', pretty_print_time(player.cooldown_togo('lottery_free')));
     } else {
         throw Error('unhandled next_scan_method '+(state.next_scan_method || 'null'));
     }
@@ -23111,19 +23155,19 @@ function update_lottery_dialog(dialog) {
         display_price = Store.get_price(Store.get_user_currency(), scanner.id, gamedata['spells']['LOTTERY_SCAN'], spellarg, true);
     }
 
-    if(dialog.user_data['scan_pending'] || dialog.user_data['slate_pending']) {
+    if(dialog.user_data['scan_pending'] > 0 || dialog.user_data['slate_pending']) {
         dialog.widgets['price_display'].onclick =
             dialog.widgets['buy_button'].onclick = null;
         dialog.widgets['buy_button'].state = 'disabled';
         dialog.widgets['price_display'].str = '-';
         dialog.widgets['price_display'].tooltip.str = null;
-        dialog.widgets['buy_button'].str = dialog.data['widgets']['buy_button'][(dialog.user_data['scan_pending'] ? 'ui_name_pending' : 'ui_name_loading')];
+        dialog.widgets['buy_button'].str = (dialog.user_data['scan_pending'] > 0 ? gamedata['spells']['LOTTERY_SCAN']['ui_verb_pending'] : dialog.data['widgets']['buy_button']['ui_name_loading']);
     } else {
         dialog.widgets['buy_button'].state = 'normal';
         dialog.widgets['buy_button'].tooltip.str = null;
         dialog.widgets['price_display'].str = Store.display_user_currency_price(display_price); // PRICE
         dialog.widgets['price_display'].tooltip.str = Store.display_user_currency_price_tooltip(display_price); // PRICE
-        dialog.widgets['buy_button'].str = dialog.data['widgets']['buy_button']['ui_name'];
+        dialog.widgets['buy_button'].str = gamedata['spells']['LOTTERY_SCAN']['ui_verb'];
 
         if(!state.can_scan) {
             dialog.widgets['buy_button'].state = 'disabled_clickable';
@@ -23135,7 +23179,8 @@ function update_lottery_dialog(dialog) {
             dialog.widgets['price_display'].onclick =
                 dialog.widgets['buy_button'].onclick = (function (_spellarg) { return function(w) {
                     var dialog = w.parent;
-                    dialog.user_data['scan_pending'] = true;
+                    dialog.user_data['scan_pending'] = client_time;
+                    dialog.widgets['glow'].show = true; dialog.widgets['glow'].reset_fx();
                     send_to_server.func(["CAST_SPELL", dialog.user_data['scanner'].id, "LOTTERY_SCAN", _spellarg]);
                     lottery_dialog_refresh_slate(dialog);
                 }; })(spellarg);
@@ -23143,16 +23188,88 @@ function update_lottery_dialog(dialog) {
             dialog.widgets['price_display'].onclick =
                 dialog.widgets['buy_button'].onclick = (function (_spellarg) { return function(w) {
                     var dialog = w.parent;
-                    dialog.user_data['scan_pending'] = true;
-                    Store.place_user_currency_order(dialog.user_data['scanner'].id, 'LOTTERY_SCAN', _spellarg, null);
-                    lottery_dialog_refresh_slate(dialog);
+                    if(Store.place_user_currency_order(dialog.user_data['scanner'].id, 'LOTTERY_SCAN', _spellarg, null)) {
+                        dialog.user_data['scan_pending'] = client_time;
+                        dialog.widgets['glow'].show = true; dialog.widgets['glow'].reset_fx();
+                        lottery_dialog_refresh_slate(dialog);
+                    }
                 }; })(spellarg);
+        }
+    }
+
+    // show most recent loot
+    var history = player.session_lottery_loot;
+    var history_i = Math.max(0, player.session_lottery_loot.length - dialog.data['widgets']['history']['array'][1]*dialog.data['widgets']['history']['array'][0]);
+    for(var y = 0; y < dialog.data['widgets']['history']['array'][1]; y++) {
+        for(var x = 0; x < dialog.data['widgets']['history']['array'][0]; x++) {
+            var wname = SPUI.get_array_widget_name('history', dialog.data['widgets']['history']['array'], [x,y]);
+            if(history_i < history.length) {
+                var item = history[history_i];
+                dialog.widgets[wname].show = true;
+                ItemDisplay.display_item(dialog.widgets[wname], item, {context_parent: dialog});
+                ItemDisplay.attach_inventory_item_tooltip(dialog.widgets[wname].widgets['frame'], item, dialog);
+                dialog.widgets[wname].widgets['frame'].state = 'disabled';
+            } else {
+                dialog.widgets[wname].show = false;
+            }
+            history_i += 1;
+        }
+    }
+
+    // show slate
+    for(var y = 0; y < dialog.data['widgets']['goodies_spinner']['array'][1]; y++) {
+        for(var x = 0; x < dialog.data['widgets']['goodies_spinner']['array'][0]; x++) {
+            var wname = SPUI.get_array_widget_name('goodies_spinner', dialog.data['widgets']['goodies_spinner']['array'], [x,y]);
+            dialog.widgets[wname].show = dialog.user_data['slate_pending'];
+        }
+    }
+
+    var i = 0, max_i = goog.object.getCount(dialog.user_data['slate_permutation_inv']);
+    var to_randomize = []; // slot_names to be re-permuted after this pass
+    for(var y = 0; y < dialog.data['widgets']['goodies']['array'][1]; y++) {
+        for(var x = 0; x < dialog.data['widgets']['goodies']['array'][0]; x++) {
+            var wname = SPUI.get_array_widget_name('goodies', dialog.data['widgets']['goodies']['array'], [x,y]);
+
+            if(i < max_i) {
+                var slot_name = dialog.user_data['slate_permutation_inv'][i.toString()];
+                var item_list = dialog.user_data['slate'][slot_name];
+                if(item_list.length != 1) { throw Error('bad lottery loot '+JSON.stringify(item_list)); }
+                var item = item_list[0];
+                dialog.widgets[wname].show = true;
+                ItemDisplay.display_item(dialog.widgets[wname], item, {context_parent: dialog});
+                ItemDisplay.attach_inventory_item_tooltip(dialog.widgets[wname].widgets['frame'], item, dialog);
+                // pulse
+                var phase = dialog.user_data['slate_offsets'][slot_name];
+                var amp = dialog.data['widgets']['goodies']['pulse_amplitude'];
+                var period = dialog.data['widgets']['goodies'][dialog.user_data['scan_pending'] > 0 ? 'pulse_period_scanning': 'pulse_period_normal'];
+                var alpha = (1-amp) + amp * Math.sin((client_time/period + phase)*2*Math.PI);
+                dialog.widgets[wname].widgets['item'].alpha = alpha;
+                to_randomize.push(slot_name);
+            } else {
+                dialog.widgets[wname].show = false;
+            }
+            i += 1;
+        }
+    }
+    goog.array.forEach(to_randomize, function(slot_name) { lottery_dialog_randomize_permutation(dialog, slot_name); });
+
+    // show cursors
+    for(var c = 0; c < dialog.data['widgets']['cursor']['array'][0]; c++) {
+        dialog.widgets['cursor'+c.toString()].show = dialog.user_data['scan_pending'] > 0;
+        if(dialog.user_data['scan_pending'] > 0) {
+            var cs = dialog.user_data['cursor_states'][c];
+            var t = (client_time - cs['last_time'])/(cs['next_time']-cs['last_time']);
+            if(t >= 1 || !cs['next']) {
+                lottery_dialog_randomize_cursor(dialog, cs);
+                t = 0;
+            }
+            dialog.widgets['cursor'+c.toString()].xy = vec_add(cs['last'], vec_scale(t, vec_sub(cs['next'], cs['last'])));
         }
     }
 }
 
 function lottery_dialog_scan_result(dialog, which_slot, loot) {
-    dialog.user_data['scan_pending'] = false;
+    dialog.user_data['scan_pending'] = -1;
     if(loot) {
         do_invoke_item_discovered(loot, {tip_mode: 'inventory', enable_animation: false});
     }
@@ -35280,6 +35397,8 @@ function do_invoke_item_discovered(items, options) {
         if(options.tip_mode == 'messages') {
             dialog.widgets['store_soon'].show = true;
             dialog.widgets['close_button'].str = dialog.data['widgets']['close_button']['ui_name_messages'];
+        } else if(options.tip_mode == 'inventory') {
+            dialog.widgets['close_button'].str = dialog.data['widgets']['close_button'][(spec['fungible'] ? 'ui_name_inventory_fungible':'ui_name_inventory')];
         }
 
         sku.widgets['icon_frame'].onenter = (function (_item) { return function(w) {
@@ -42722,13 +42841,27 @@ function handle_server_message(data) {
         var which_slot = data[2];
         var loot = data[3];
 
-        // clear idle state cache
-        if(obj_id in session.cur_objects.objects && session.cur_objects.objects[obj_id].is_building()) {
-            session.cur_objects.objects[obj_id].idle_state_cache = null;
-        }
+        var handle_it = (function (_obj_id, _which_slot, _loot) { return function() {
+            // clear idle state cache
+            if(_obj_id in session.cur_objects.objects && session.cur_objects.objects[_obj_id].is_building()) {
+                session.cur_objects.objects[_obj_id].idle_state_cache = null;
+            }
 
+            player.session_lottery_loot = player.session_lottery_loot.concat(_loot);
+
+            if(selection.ui && selection.ui.user_data && selection.ui.user_data['dialog'] == 'lottery_dialog') {
+                lottery_dialog_scan_result(selection.ui, _which_slot, _loot);
+            }
+        }; })(obj_id, which_slot, loot);
+
+        var delay = 0;
         if(selection.ui && selection.ui.user_data && selection.ui.user_data['dialog'] == 'lottery_dialog') {
-            lottery_dialog_scan_result(selection.ui, which_slot, loot);
+            delay = Math.max(0, selection.ui.data['widgets']['buy_button']['min_wait'] - (client_time - selection.ui.user_data['scan_pending']));
+        }
+        if(delay >= 0) {
+            window.setTimeout(handle_it, 1000*delay);
+        } else {
+            handle_it();
         }
 
     } else if(msg == "NEW_BATTLE_HISTORIES") {
@@ -46648,7 +46781,7 @@ Building.prototype.get_idle_state_advanced = function() {
     // lottery takes priority over others
     if(this.is_lottery_building()) {
         var state = player.get_lottery_state(this);
-        if(state.can_scan || !state.on_cooldown) {
+        if((state.can_scan && state.next_scan_method != 'paid') || !state.on_cooldown) {
             draw_idle_icon = 'lottery_scan';
         }
     }
