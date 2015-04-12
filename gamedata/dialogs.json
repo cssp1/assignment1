@@ -4787,8 +4787,11 @@
 
             "title": { "kind": "TextField", "xy": [0,23], "dimensions": [300, 21], "text_size": 19, "text_style": "bold", "text_color": [1,1,0,1],
                        "text_hjustify": "center", "text_vjustify": "center", "ui_name": "ITEM DISCOVERED", "drop_shadow": 1 },
-            "subtitle": { "kind": "TextField", "xy": [0,49], "dimensions": [300, 12], "text_size": 13, "text_style": "normal",
-                          "text_hjustify": "center", "text_vjustify": "center", "ui_name": "Check Your Messages" },
+            "subtitle": { "show": 0, "kind": "TextField", "xy": [0,49], "dimensions": [300, 12], "text_size": 13, "text_style": "normal",
+                          "text_hjustify": "center", "text_vjustify": "center",
+                          "ui_name_messages": "Check Your Messages",
+                          "ui_name_inventory": "Added to Warehouse"
+                        },
 
             "sku_glow": { "kind":"StaticImage","bg_image_resizable":1,
                           //"xy":[37,70], "dimensions":[226,292],
@@ -4800,12 +4803,12 @@
             "sku": { "kind": "Dialog", "xy": [42,75], "dialog": "new_store_sku" },
 
             "close_button": { "kind": "ActionButton", "xy": [83,375], "dimensions": [134,28], "bg_image": "menu_button_134px", "push_bg_image": 1,
-                              "ui_name": "Send to Messages", "ui_name_modal": "Accept",
+                              "ui_name_messages": "Send to Messages", "ui_name": "Accept",
                               "text_color": [0,0,0,1], "text_size": 13, "text_style": "bold"},
 
             "expiry": { "kind": "TextField", "xy": [0,421], "dimensions": [300, 12], "text_size": 13, "text_style": "normal", "text_color": [1,0,0,1],
                         "text_hjustify": "center", "text_vjustify": "center", "ui_name": "Message expires in %d days" },
-            "store_soon": { "kind": "TextField", "xy": [0,441], "dimensions": [300, 12], "text_size": 13, "text_style": "normal",
+            "store_soon": { "show": 0, "kind": "TextField", "xy": [0,441], "dimensions": [300, 12], "text_size": 13, "text_style": "normal",
                             "text_hjustify": "center", "text_vjustify": "center", "ui_name": "Store item soon" }
         }
     },
@@ -8142,23 +8145,26 @@
         }
     },
 
-    "lottery_more_dialog": {
+    "lottery_dialog": {
         "bg_image": "dialog_770x485_bg",
         "dimensions": [770,485],
         "widgets": {
             "sunken": {"kind": "StaticImage", "xy":[8,35], "dimensions":[754,418], "asset": "dialog_sunken_754x418" },
 
-            "charges": {"kind": "TextField", "xy": [176,43], "dimensions": [319,95], "text_size": 13,
-                        "text_hjustify": "center", "ui_name": "Charges: %d" },
+            "goodies": { "show":0, "kind": "Dialog", "dialog": "item_display", "xy": [228,95], "dimensions": [50,50],
+                         "array": [4,1], "array_offset":[50,50] },
 
-            "use_button": { "kind": "ActionButton", "xy": [311,109], "dimensions": [134,28], "text_offset": [0,0], "text_size": 13,
-                            "bg_image": "action_button_134px", "text_color": [0,0,0,1], "text_style": "bold", "ui_name": "Use",
-                            "ui_tooltip": "", "ui_tooltip_empty": "You have no charges", "tooltip_delay": 0 },
+            "charges": {"kind": "TextField", "xy": [176,43], "dimensions": [319,95], "text_size": 13,
+                        "text_hjustify": "center",
+                        "ui_name_some": "FREE Special Dispatches: %d",
+                        "ui_name_none": "Next Free Special Dispatch in: %s" },
 
             "price_display": { "kind": "ActionButton", "xy": [190,158], "dimensions": [120,32], "text_offset": [8,1], "text_size": 13, "text_style": "thick",
                                "bg_image": "price_display", "ui_tooltip": "", "tooltip_delay": 0 }, // PRICE
             "buy_button": { "kind": "ActionButton", "xy": [311,159], "dimensions": [134,28], "text_offset": [0,0], "text_size": 13,
-                            "bg_image": "action_button_134px", "text_color": [0,0,0,1], "text_style": "bold", "ui_name": "Buy", "ui_name_pending": "Buying..." },
+                            "bg_image": "action_button_134px", "text_color": [0,0,0,1], "text_style": "bold",
+                            "ui_name": "Scan", "ui_name_loading": "Loading...", "ui_name_pending": "Scanning...",
+                            "ui_tooltip": "", "tooltip_delay": 0 },
             "close_button": { "kind": "ActionButton", "xy": [738,1], "dimensions": [19,22], "bg_image": "close_button_small", "push_bg_image": 1 }
         }
     },

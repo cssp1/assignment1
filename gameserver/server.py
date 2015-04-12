@@ -14038,6 +14038,10 @@ class Store:
             session.increment_player_metric(record_spend_type+'_spent_on_lottery', record_amount)
             retmsg.append(["OBJECT_STATE_UPDATE2", scanner.serialize_state()])
 
+        elif spellname == "LOTTERY_SCAN":
+            object = session.get_object(unit_id)
+            assert gameapi.do_lottery_scan(session, retmsg, object, 'paid')
+
         elif spellname.startswith("OFFER"):
             spell = gamedata['spells'][spellname]
             assert gameapi.execute_spell(session, retmsg, spell['effect']['spellname'], spell['effect']['spellarg'], reason = 'flash_offer')
@@ -18822,62 +18826,70 @@ class GAMEAPI(resource.Resource):
 
     def do_lottery_scan(self, session, retmsg, scanner, source):
         # how we are getting permission to scan
-        assert source in ('cooldown', 'contents', 'gamebucks')
+        assert source in ('cooldown', 'contents', 'paid')
+        success = True
 
         if session.player.lottery_is_busy(scanner):
             retmsg.append(["ERROR", "CANNOT_SCAN_BUILDING_BUSY"])
-            return False
+            success = False
 
         if not scanner.is_lottery_building():
             retmsg.append(["ERROR", "CANNOT_SCAN_NO_BUILDING"])
-            return False
-        if scanner.contents < 1:
-            retmsg.append(["ERROR", "CANNOT_SCAN_NO_CHARGES"])
-            return False
+            success = False
 
         if source == 'cooldown':
-            if self.cooldown_active('lottery'):
+            if session.player.cooldown_active('lottery_free'):
                 retmsg.append(["ERROR", "CANNOT_SCAN_ON_COOLDOWN"])
-                return False
+                success = False
         elif source == 'contents':
             if scanner.contents < 1:
                 retmsg.append(["ERROR", "CANNOT_SCAN_NO_CHARGES"])
-                return False
+                success = False
 
         # check for inventory space
         snapshot = session.player.resources.calc_snapshot()
         if snapshot.cur_inventory() + 1 > snapshot.max_usable_inventory():
             retmsg.append(["ERROR", "INVENTORY_LIMIT"])
-            return False
+            success = False
 
-        slate = session.player.get_lottery_slate(session)
-        slot_names = sorted(slate.keys())
-        which_slot = slot_names[int(random.random() * len(slot_names))]
-        loot = slate[which_slot]
+        if success:
+            slate = session.player.get_lottery_slate(session)
+            slot_names = sorted(slate.keys())
+            which_slot = slot_names[int(random.random() * len(slot_names))]
+            loot = slate[which_slot]
 
-        assert len(loot) == 1
-        item = loot[0]
-        assert session.player.inventory_add_item(item, snapshot.max_usable_inventory()) == item.get('stack',1)
-        session.player.inventory_log_event('5125_item_obtained', item['spec'], item.get('stack',1), item.get('expire_time',-1), level=item.get('level',None), reason='lottery')
-        metric_event_coded(session.user.user_id, '1631_lottery_scan_paid' if source == 'gamebucks' else '1630_lottery_scan_free',
-                           {'slot': which_slot, 'spec': item['spec'], 'level': item.get('level',None), 'stack': item.get('stack',1),
-                            'inv_slots': {'total': snapshot.max_usable_inventory(), 'full': snapshot.cur_inventory()}})
+            assert len(loot) == 1
+            item = loot[0]
+            stack_to_add = item.get('stack',1)
+            assert session.player.inventory_add_item(item, snapshot.max_usable_inventory()) == stack_to_add
+            session.player.inventory_log_event('5125_item_obtained', item['spec'], stack_to_add, item.get('expire_time',-1), level=item.get('level',None), reason='lottery')
+            metric_event_coded(session.user.user_id, '1631_lottery_scan_paid' if source == 'gamebucks' else '1630_lottery_scan_free',
+                               {'slot': which_slot, 'spec': item['spec'], 'level': item.get('level',None), 'stack': stack_to_add, 'method': source,
+                                'inv_slots': {'total': snapshot.max_usable_inventory(), 'full': snapshot.cur_inventory()}})
 
-        session.deferred_player_state_update = True
+            session.deferred_player_state_update = True
+            session.player.send_inventory_update(retmsg)
 
-        # note: ANY scan resets the free timer, even charge/payment ones
-        session.player.cooldown_trigger('lottery_free', gamedata.get('lottery_free_interval', 86400))
-        retmsg.append(["COOLDOWNS_UPDATE", session.player.cooldowns])
+            # note: free and charge scans reset the timer. Paid do not.
+            if source != 'paid':
+                session.player.cooldown_trigger('lottery_free', gamedata.get('lottery_free_interval', 86400))
+                retmsg.append(["COOLDOWNS_UPDATE", session.player.cooldowns])
 
-        # deduct resources
-        if source == 'cooldown':
-            pass
-        elif source == 'contents':
-            scanner.contents -= 1
-            session.deferred_object_state_updates.add(scanner)
+            # deduct resources
+            if source == 'cooldown':
+                pass
+            elif source == 'contents':
+                scanner.contents -= 1
+                session.deferred_object_state_updates.add(scanner)
 
-        session.player.reseed_lottery(force = True)
-        session.increment_player_metric('lottery_scans', 1, time_series = False)
+            session.player.reseed_lottery(force = True)
+            session.increment_player_metric('lottery_scans', 1, time_series = False)
+
+        else: # failure
+            which_slot = -1
+            loot = None
+
+        retmsg.append(["LOTTERY_SCAN_RESULT", scanner.obj_id, which_slot, loot])
 
         return True
 
@@ -24062,8 +24074,8 @@ class GAMEAPI(resource.Resource):
                 retmsg.append(["LOTTERY_GET_SLATE_RESULT", result])
 
             elif spellname == "LOTTERY_SCAN":
-                source = spellarg[0]
-                assert source in ('cooldown','contents') # cannot use "gamebucks" here!
+                source = spellargs[0]
+                assert source in ('cooldown','contents') # cannot use "paid" here!
                 if (session.viewing_base is not session.player.my_home) or (object.owner is not session.player):
                     retmsg.append(["ERROR", "CANNOT_CAST_SPELL_OUTSIDE_HOME_BASE"])
                     return

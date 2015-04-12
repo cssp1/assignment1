@@ -4310,7 +4310,9 @@ Building.prototype.is_invisible = function() { return !!this.spec['invisible']; 
               icon_pos: (!Array.<number>|undefined),
               click_bounds: ((!Array.<!Array.<number>>)|null|undefined),
               text_str: (string|null|undefined),
-              text_pos: (Array.<number>|null|undefined)})|null}
+              text_pos: (Array.<number>|null|undefined),
+              pulse_period: (number|undefined),
+              pulse_amplitude: (number|undefined)})|null}
  */
 Building.prototype.get_idle_state_appearance = function() {
     if(session.home_base && !session.has_attacked && gamedata['client']['enable_idle_icons'] && !player.is_cheater &&
@@ -4355,7 +4357,10 @@ Building.prototype.get_idle_state_appearance = function() {
                 icon_pos: icon_pos,
                 click_bounds: click_bounds,
                 text_str: text_str,
-                text_pos: text_pos};
+                text_pos: text_pos,
+                pulse_period: ('pulse_period' in state_data ? state_data['pulse_period'] : (gamedata['client']['idle_icon_pulse_period'] || 0)),
+                pulse_amplitude: ('pulse_amplitude' in state_data ? state_data['pulse_amplitude'] : (gamedata['client']['idle_icon_pulse_amplitude'] || 0))
+               };
     }
     return null;
 };
@@ -5779,9 +5784,11 @@ player.squad_bay_is_busy = function() {
     }
     return false;
 };
-player.lottery_is_busy = function() {
+
+/** @param {!Building} scanner
+    @return {boolean} */
+player.lottery_is_busy = function(scanner) {
     if(player.get_any_abtest_value('enable_lottery', gamedata['enable_lottery'])) {
-        var scanner = find_object_by_type('scanner');
         if(!scanner ||
            ((scanner.is_under_construction() || scanner.is_upgrading()) && !player.get_any_abtest_value('lottery_available_during_scanner_upgrade', gamedata['lottery_available_during_scanner_upgrade'])) ||
            (scanner.is_damaged() && !player.get_any_abtest_value('lottery_available_during_scanner_repair', gamedata['lottery_available_during_scanner_repair']))) {
@@ -5789,6 +5796,74 @@ player.lottery_is_busy = function() {
         }
     }
     return false;
+};
+
+/** @param {!Building} scanner
+    @return {{num_scans: number,
+              next_scan_method: (string|null),
+              can_scan: boolean,
+              on_cooldown: boolean,
+              fail_ui_reason: (string|null),
+              fail_helper: (function()|null)
+              }} */
+player.get_lottery_state = function(scanner) {
+    var ret = { num_scans: 0,
+                next_scan_method: null,
+                can_scan: false,
+                on_cooldown: false,
+                fail_ui_reason: null,
+                fail_helper: null };
+
+    var spell = gamedata['spells']['LOTTERY_SCAN'];
+
+    if(scanner.contents > 0) {
+        ret.num_scans += scanner.contents;
+        ret.next_scan_method = 'contents';
+        ret.can_scan = true;
+    }
+
+    var togo = player.cooldown_togo('lottery_free');
+    if(togo <= 0) {
+        ret.num_scans += 1;
+        ret.next_scan_method = 'cooldown'; // use cooldown first
+        ret.can_scan = true;
+    } else if(!ret.can_scan) {
+        // ret.fail_ui_reason = spell['ui_tooltip_on_cooldown'].replace('%s', pretty_print_time(togo));
+        // actually show the button as enabled
+        ret.can_scan = true;
+        ret.on_cooldown = true;
+        ret.next_scan_method = 'paid';
+    }
+
+    if(player.lottery_is_busy(scanner)) {
+        ret.can_scan = false;
+        ret.fail_ui_reason = spell['ui_tooltip_busy'];
+        ret.fail_helper = (function (_scanner) { return function() {
+            change_selection_unit(_scanner);
+            if(_scanner.is_damaged() && !_scanner.is_repairing()) {
+                invoke_repair_dialog();
+            } else {
+                invoke_speedup_dialog('speedup');
+            }
+        }; })(scanner);
+    }
+
+    if(player.inventory.length >= player.max_usable_inventory()) {
+        ret.can_scan = false;
+        ret.fail_ui_reason = spell['ui_tooltip_inventory_full'];
+        ret.fail_helper = get_requirements_help('inventory_space_need',null);
+    }
+
+    if('requires' in spell) {
+        var pred = read_predicate(spell['requires']);
+        if(!pred.is_satisfied(player, null)) {
+            ret.can_scan = false;
+            ret.fail_ui_reason = pred.ui_describe(player);
+            ret.fail_helper = get_requirements_help(pred);
+        }
+    }
+
+    return ret;
 };
 
 player.quantize_building_location = function(ji, spec) {
@@ -14236,7 +14311,7 @@ function init_dialog_repair_buttons(dialog, base_damage) {
     };
 
     if(base_damage > 0 || (player.unit_speedups_enabled() && any_unit_damage)) { // also check for unit repair cost?
-        var instant_price = Store.get_user_currency_price(0, gamedata['spells']['REPAIR_ALL_FOR_MONEY'], session.viewing_base.base_id);
+        var instant_price = Store.get_user_currency_price(GameObject.VIRTUAL_ID, gamedata['spells']['REPAIR_ALL_FOR_MONEY'], session.viewing_base.base_id);
         dialog.widgets['price_display'].str = Store.display_user_currency_price(instant_price); // PRICE
         dialog.widgets['price_display'].tooltip.str = Store.display_user_currency_price_tooltip(instant_price);
 
@@ -14550,7 +14625,7 @@ function invoke_buy_resources_dialog(amounts, continuation) {
         }
     }
 
-    var price = Store.get_user_currency_price(0, gamedata['spells']['BUY_RESOURCES_TOPUP'], dialog.user_data['amounts']);
+    var price = Store.get_user_currency_price(GameObject.VIRTUAL_ID, gamedata['spells']['BUY_RESOURCES_TOPUP'], dialog.user_data['amounts']);
 
     dialog.widgets['description'].set_text_with_linebreaking(ui_res.replace('%GAMEBUCKS_QTY', Store.display_user_currency_price(price)).replace('%GAMEBUCKS_NAME', Store.gamebucks_ui_name()));
 
@@ -16931,7 +17006,7 @@ function invoke_flash_offer(data) {
     }
     dialog.widgets['close_button'].onclick = function() { change_selection(null); };
 
-    var price = Store.get_user_currency_price(0, sku, null);
+    var price = Store.get_user_currency_price(GameObject.VIRTUAL_ID, sku, null);
     var closure = (function (_sku_name) {
         return function(w) {
             var dialog = w.parent;
@@ -18058,11 +18133,14 @@ function invoke_building_context_menu(mouse_xy) {
 
         if(session.home_base && obj.is_lottery_building() && !obj.is_under_construction()) {
             upgrade_is_active = false;
-            if(player.lottery_is_busy()) {
-                buttons.push(new ContextMenuButton({ui_name: gamedata['spells']['LOTTERY_SCAN']['ui_name'], state: 'disabled', ui_tooltip: gamedata['spells']['LOTTERY_SCAN']['ui_tooltip_busy']}));
-            } else {
-                buttons.push(new ContextMenuButton({ui_name: gamedata['spells']['LOTTERY_SCAN']['ui_name'], onclick: invoke_lottery_dialog}));
-            }
+            var state = player.get_lottery_state(obj);
+            buttons.push(new ContextMenuButton({ui_name: gamedata['spells']['LOTTERY_SCAN']['ui_name'],
+                                                state: (state.can_scan ? 'normal': 'disabled_clickable'),
+                                                asset: 'action_button_resizable',
+                                                ui_tooltip: state.fail_ui_reason,
+                                                onclick: (state.can_scan ?
+                                                          (function (_obj) { return function() { invoke_lottery_dialog(_obj); }; })(obj) : state.fail_helper)
+                                               }));
         }
 
         if(obj.is_damaged() && (!session.home_base || !obj.is_repairing())) {
@@ -18137,7 +18215,15 @@ function invoke_building_context_menu(mouse_xy) {
                 var cat = gamedata['crafting']['categories'][obj.spec['crafting_categories'][0]];
 
                 if(!obj.is_emplacement()) { // turret emplacements have special case, see below
+                    var is_active = true;
+                    if(obj.is_lottery_building()) {
+                        var state = player.get_lottery_state(obj);
+                        if(state.can_scan || !state.on_cooldown) {
+                            is_active = false; // lottery takes priority
+                        }
+                    }
                     buttons.push(new ContextMenuButton({ui_name: cat['ui_verb'] || gamedata['spells']['CRAFT_FOR_FREE']['ui_name'],
+                                                        asset: (is_active ? 'action_button_resizable' : 'menu_button_resizable'),
                                                         onclick: (function (_cat) { return function() {
                                                            if(_cat['dialog'] == 'fishing_dialog') {
                                                                invoke_fishing_dialog();
@@ -19864,7 +19950,7 @@ function invoke_change_region_offer_dialog() {
     var last_relocate = server_time - player.cooldowns[gamedata['spells']['CHANGE_REGION']['cooldown_name']]['start'];
     dialog.widgets['description'].set_text_with_linebreaking(dialog.data['widgets']['description']['ui_name'].replace('%last',pretty_print_time(last_relocate)).replace('%s', pretty_print_time(time_left)).replace('%currency', Store.gamebucks_ui_name()));
 
-    var price = Store.get_user_currency_price(0, gamedata['spells']['CHANGE_REGION_INSTANTLY'], null);
+    var price = Store.get_user_currency_price(GameObject.VIRTUAL_ID, gamedata['spells']['CHANGE_REGION_INSTANTLY'], null);
 
     dialog.widgets['price_display'].bg_image = player.get_any_abtest_value('price_display_asset', gamedata['store']['price_display_asset']);
     dialog.widgets['price_display'].state = Store.get_user_currency();
@@ -22933,74 +23019,131 @@ function update_unit_donation_dialog(dialog) {
     dialog.widgets['pending_rect'].show = dialog.widgets['pending_text'].show = dialog.widgets['pending_spinner'].show = pending;
 }
 
-function invoke_lottery_dialog() {
-    // XXX for testing only
-    var scanner = find_object_by_type('scanner');
-    if(!scanner || !scanner.is_lottery_building() || scanner.team !== 'player') { return; }
-    if(0 && scanner.contents >= 1) {
-        return invoke_lottery_scan_dialog(scanner);
-    } else {
-        return invoke_lottery_more_dialog(scanner);
-    }
-}
-function invoke_lottery_scan_dialog(scanner) {
-    change_selection_ui(null);
-    get_lottery_slate(scanner, function(result) { console.log(result); });
-    //send_to_server.func(["CAST_SPELL", scanner.id, "LOTTERY_SCAN"]);
-}
-
 var lottery_slate_receivers = [];
 function get_lottery_slate(scanner, callback) {
     lottery_slate_receivers.push(callback);
     send_to_server.func(["CAST_SPELL", scanner.id, "LOTTERY_GET_SLATE"]);
 }
 
-var lottery_scan_receivers = [];
-function lottery_scan(scanner, callback) {
-    lottery_scan_receivers.push(callback);
-    send_to_server.func(["CAST_SPELL", scanner.id, "LOTTERY_SCAN"]);
-}
-
-function invoke_lottery_more_dialog(scanner) {
-    var dialog = new SPUI.Dialog(gamedata['dialogs']['lottery_more_dialog']);
-    dialog.user_data['dialog'] = 'lottery_more_dialog';
+function invoke_lottery_dialog(scanner) {
+    var dialog = new SPUI.Dialog(gamedata['dialogs']['lottery_dialog']);
+    dialog.user_data['dialog'] = 'lottery_dialog';
     dialog.user_data['scanner'] = scanner;
     dialog.user_data['last_contents'] = -1;
+    dialog.user_data['slate'] = null;
+    dialog.user_data['slate_pending'] = false;
+    dialog.user_data['scan_pending'] = false;
+
     change_selection_ui(dialog);
     dialog.auto_center();
     dialog.modal = true;
     dialog.widgets['close_button'].onclick = close_parent_dialog;
 
+    lottery_dialog_refresh_slate(dialog);
+    dialog.ondraw = update_lottery_dialog;
+    return dialog;
+}
+
+function lottery_dialog_refresh_slate(dialog) {
+    dialog.user_data['slate_pending'] = true;
+    get_lottery_slate(dialog.user_data['scanner'], (function (_dialog) { return function(result) { lottery_dialog_got_slate(_dialog, result); }; })(dialog));
+}
+function lottery_dialog_got_slate(dialog, result) {
+    dialog.user_data['slate'] = result;
+    dialog.user_data['slate_pending'] = false;
+    var i = 0;
+    var slots = [];
+    for(var slot_name in result) {
+        slots.push(slot_name);
+    }
+    for(var y = 0; y < dialog.data['widgets']['goodies']['array'][1]; y++) {
+        for(var x = 0; x < dialog.data['widgets']['goodies']['array'][0]; x++) {
+            var wname = SPUI.get_array_widget_name('goodies', dialog.data['widgets']['goodies']['array'], [x,y]);
+            if(i < slots.length) {
+                var item_list = result[slots[i]];
+                if(item_list.length != 1) { throw Error('bad lottery loot '+JSON.stringify(item_list)); }
+                var item = item_list[0];
+                dialog.widgets[wname].show = true;
+                ItemDisplay.display_item(dialog.widgets[wname], item, {context_parent: dialog});
+                ItemDisplay.attach_inventory_item_tooltip(dialog.widgets[wname].widgets['frame'], item, dialog);
+            } else {
+                dialog.widgets[wname].show = false;
+            }
+            i += 1;
+        }
+    }
+}
+
+function update_lottery_dialog(dialog) {
+    var scanner = dialog.user_data['scanner'];
+    var state = player.get_lottery_state(scanner);
+
+    if(state.next_scan_method == 'contents') {
+        dialog.widgets['charges'].str = dialog.widgets['charges'].data['ui_name_some'].replace('%d', pretty_print_number(state.num_scans));
+    } else if(state.next_scan_method == 'cooldown') {
+        dialog.widgets['charges'].str = dialog.widgets['charges'].data['ui_name_some'].replace('%d', pretty_print_number(state.num_scans));
+    } else if(state.next_scan_method == 'paid') {
+        dialog.widgets['charges'].str = dialog.widgets['charges'].data['ui_name_none'].replace('%s', pretty_print_time(player.cooldown_togo('lottery_free')));
+    } else {
+        throw Error('unhandled next_scan_method '+(state.next_scan_method || 'null'));
+    }
+
     dialog.widgets['price_display'].bg_image = player.get_any_abtest_value('price_display_asset', gamedata['store']['price_display_asset']);
     dialog.widgets['price_display'].state = Store.get_user_currency();
 
-    var price = Store.get_user_currency_price(0, gamedata['spells']['BUY_LOTTERY_TICKET'], null);
-    dialog.widgets['price_display'].str = Store.display_user_currency_price(price); // PRICE
-    dialog.widgets['price_display'].tooltip.str = Store.display_user_currency_price_tooltip(price); // PRICE
+    var spellarg = state.next_scan_method;
+    var display_price;
+    if(state.next_scan_method == 'contents' || state.next_scan_method == 'cooldown') {
+        // free version
+        display_price = 0;
+    }else {
+        display_price = Store.get_price(Store.get_user_currency(), scanner.id, gamedata['spells']['LOTTERY_SCAN'], spellarg, true);
+    }
 
-    dialog.widgets['use_button'].state = (scanner.contents > 0 ? 'normal' : 'disabled');
-    dialog.widgets['use_button'].tooltip.str = dialog.widgets['use_button'].data['ui_tooltip' + (scanner.contents>0 ? '' : '_empty')];
-    dialog.widgets['use_button'].onclick = invoke_lottery_dialog;
+    if(dialog.user_data['scan_pending'] || dialog.user_data['slate_pending']) {
+        dialog.widgets['price_display'].onclick =
+            dialog.widgets['buy_button'].onclick = null;
+        dialog.widgets['buy_button'].state = 'disabled';
+        dialog.widgets['price_display'].str = '-';
+        dialog.widgets['price_display'].tooltip.str = null;
+        dialog.widgets['buy_button'].str = dialog.data['widgets']['buy_button'][(dialog.user_data['scan_pending'] ? 'ui_name_pending' : 'ui_name_loading')];
+    } else {
+        dialog.widgets['buy_button'].state = 'normal';
+        dialog.widgets['buy_button'].tooltip.str = null;
+        dialog.widgets['price_display'].str = Store.display_user_currency_price(display_price); // PRICE
+        dialog.widgets['price_display'].tooltip.str = Store.display_user_currency_price_tooltip(display_price); // PRICE
+        dialog.widgets['buy_button'].str = dialog.data['widgets']['buy_button']['ui_name'];
 
-    dialog.widgets['price_display'].onclick =
-    dialog.widgets['buy_button'].onclick = function(w) {
-        var dialog = w.parent;
-        // in order to be robust against unreliable Facebook credit
-        // order callbacks, detect the purchase by checking scanner.contents. Ugly :(
-        dialog.user_data['last_contents'] = dialog.user_data['scanner'].contents;
-        Store.place_user_currency_order(GameObject.VIRTUAL_ID, 'BUY_LOTTERY_TICKET', null, null);
-        w.str = dialog.data['widgets']['buy_buton']['ui_name_pending'];
-        w.state = 'disabled';
-    };
-    dialog.ondraw = update_lottery_more_dialog;
-    return dialog;
+        if(!state.can_scan) {
+            dialog.widgets['buy_button'].state = 'disabled_clickable';
+            dialog.widgets['buy_button'].tooltip.str = state.fail_ui_reason;
+            dialog.widgets['buy_button'].tooltip.text_color = SPUI.error_text_color;
+            dialog.widgets['price_display'].onclick =
+                dialog.widgets['buy_button'].onclick = state.fail_helper;
+        } else if(state.next_scan_method == 'contents' || state.next_scan_method == 'cooldown') {
+            dialog.widgets['price_display'].onclick =
+                dialog.widgets['buy_button'].onclick = (function (_spellarg) { return function(w) {
+                    var dialog = w.parent;
+                    dialog.user_data['scan_pending'] = true;
+                    send_to_server.func(["CAST_SPELL", dialog.user_data['scanner'].id, "LOTTERY_SCAN", _spellarg]);
+                    lottery_dialog_refresh_slate(dialog);
+                }; })(spellarg);
+        } else {
+            dialog.widgets['price_display'].onclick =
+                dialog.widgets['buy_button'].onclick = (function (_spellarg) { return function(w) {
+                    var dialog = w.parent;
+                    dialog.user_data['scan_pending'] = true;
+                    Store.place_user_currency_order(dialog.user_data['scanner'].id, 'LOTTERY_SCAN', _spellarg, null);
+                    lottery_dialog_refresh_slate(dialog);
+                }; })(spellarg);
+        }
+    }
 }
-function update_lottery_more_dialog(dialog) {
-    var scanner = dialog.user_data['scanner'];
-    dialog.widgets['charges'].str = dialog.widgets['charges'].data['ui_name'].replace('%d', pretty_print_number(scanner.contents));
-    if(dialog.user_data['last_contents'] >= 0 && scanner.contents != dialog.user_data['last_contents']) {
-        // order was completed, re-invoke dialog
-        invoke_lottery_dialog();
+
+function lottery_dialog_scan_result(dialog, which_slot, loot) {
+    dialog.user_data['scan_pending'] = false;
+    if(loot) {
+        do_invoke_item_discovered(loot, {tip_mode: 'inventory', enable_animation: false});
     }
 }
 
@@ -27221,7 +27364,7 @@ function update_squad_tile(dialog) {
         };
         dialog.widgets['cancel_button'].state = (repair_in_sync ? 'normal' : 'disabled');
 
-        var price = Store.get_user_currency_price(0, gamedata['spells']['UNIT_REPAIR_SPEEDUP_FOR_MONEY'], null);
+        var price = Store.get_user_currency_price(GameObject.VIRTUAL_ID, gamedata['spells']['UNIT_REPAIR_SPEEDUP_FOR_MONEY'], null);
         dialog.widgets['price_display'].bg_image = player.get_any_abtest_value('price_display_short_asset', gamedata['store']['price_display_short_asset']);
         dialog.widgets['price_display'].state = Store.get_user_currency();
         dialog.widgets['price_display'].str = (!repair_in_sync ? '' : Store.display_user_currency_price(price, 'compact')); // PRICE
@@ -28254,7 +28397,7 @@ function update_repair_control(dialog) {
     }
 
     // price/finish button
-    var price = Store.get_user_currency_price(0, gamedata['spells']['UNIT_REPAIR_SPEEDUP_FOR_MONEY'], null);
+    var price = Store.get_user_currency_price(GameObject.VIRTUAL_ID, gamedata['spells']['UNIT_REPAIR_SPEEDUP_FOR_MONEY'], null);
     dialog.widgets['price_display'].bg_image = player.get_any_abtest_value('price_display_short_asset', gamedata['store']['price_display_short_asset']);
     dialog.widgets['price_display'].state = Store.get_user_currency();
     dialog.widgets['price_display'].str = (!in_sync ? '' : Store.display_user_currency_price(price, 'compact')); // PRICE
@@ -35061,6 +35204,8 @@ function invoke_ui_locker_until_closed() {
     return dialog;
 }
 
+/** @param {!Array.<Object>} items
+    @param {number} duration */
 function invoke_item_discovered(items, duration) {
     // skip if using fast modal looting
     if(loot_dialog_fast_anim) {
@@ -35068,6 +35213,20 @@ function invoke_item_discovered(items, duration) {
         window.setTimeout(function() { invoke_loot_dialog(gamedata['strings']['combat_messages']['item_discovered']); }, 1);
         return null;
     }
+    return do_invoke_item_discovered(items, {duration: duration,
+                                             tip_mode: (player.get_any_abtest_value('modal_looting', gamedata['modal_looting']) ? null : 'messages'),
+                                             enable_animation: !player.get_any_abtest_value('modal_looting', gamedata['modal_looting'])
+                                            });
+}
+
+/** @param {!Array.<Object>} items
+    @param {{duration: (number|undefined),
+             tip_mode: (string|null|undefined),
+             enable_animation: (boolean|undefined)
+             }} options
+    @return {!SPUI.Dialog} */
+function do_invoke_item_discovered(items, options) {
+    var duration = options.duration || -1;
 
     var dialog_data = gamedata['dialogs']['item_discovered'];
     var dialog = new SPUI.Dialog(dialog_data);
@@ -35103,17 +35262,15 @@ function invoke_item_discovered(items, duration) {
 
     sku.user_data['context'] = null;
 
-    if(player.get_any_abtest_value('modal_looting', gamedata['modal_looting'])) {
-        // modal looting - turn off extra stuff, and no onhover tip, no animation
-        dialog.widgets['subtitle'].show = dialog.widgets['expiry'].show = dialog.widgets['store_soon'].show = false;
-        dialog.widgets['close_button'].str = dialog.data['widgets']['close_button']['ui_name_modal'];
-        dialog.widgets['close_button'].onclick = function(w) {
-            close_parent_dialog(w);
-            invoke_loot_dialog(); // immediate
-        };
-    } else {
-        // nonmodal looting
-        dialog.widgets['close_button'].onclick = close_item_discovered;
+    if(options.tip_mode) {
+        dialog.widgets['subtitle'].show = true;
+        dialog.widgets['subtitle'].str = dialog.data['widgets']['subtitle']['ui_name_'+options.tip_mode];
+
+        if(options.tip_mode == 'messages') {
+            dialog.widgets['store_soon'].show = true;
+            dialog.widgets['close_button'].str = dialog.data['widgets']['close_button']['ui_name_messages'];
+        }
+
         sku.widgets['icon_frame'].onenter = (function (_item) { return function(w) {
             var dialog = w.parent;
             if(dialog.user_data['context']) { return; }
@@ -35125,9 +35282,20 @@ function invoke_item_discovered(items, duration) {
             var dialog = w.parent;
             if(dialog.user_data['context']) { invoke_inventory_context(dialog, w, -1, null, false); }
         }; })(item);
-        dialog.ondraw = animate_item_discovered;
+    } else {
+        // modal looting - turn off extra stuff, and no onhover tip
+        dialog.widgets['subtitle'].show = dialog.widgets['expiry'].show = dialog.widgets['store_soon'].show = false;
     }
 
+    if(options.enable_animation) {
+        dialog.ondraw = animate_item_discovered;
+        dialog.widgets['close_button'].onclick = close_item_discovered;
+    } else {
+        dialog.widgets['close_button'].onclick = function(w) {
+            close_parent_dialog(w);
+            invoke_loot_dialog(); // immediate
+        };
+    }
 
     return dialog;
 }
@@ -42539,11 +42707,19 @@ function handle_server_message(data) {
         }
         lottery_slate_receivers = [];
     } else if(msg == "LOTTERY_SCAN_RESULT") {
-        var result = data[1];
-        for(var i = 0; i < lottery_scan_receivers.length; i++) {
-            lottery_scan_receivers[i](result);
+        var obj_id = data[1];
+        var which_slot = data[2];
+        var loot = data[3];
+
+        // clear idle state cache
+        if(obj_id in session.cur_objects.objects && session.cur_objects.objects[obj_id].is_building()) {
+            session.cur_objects.objects[obj_id].idle_state_cache = null;
         }
-        lottery_scan_receivers = [];
+
+        if(selection.ui && selection.ui.user_data && selection.ui.user_data['dialog'] == 'lottery_dialog') {
+            lottery_dialog_scan_result(selection.ui, which_slot, loot);
+        }
+
     } else if(msg == "NEW_BATTLE_HISTORIES") {
         player.new_battle_histories = data[1];
     } else if(msg == "QUERY_BATTLE_HISTORY_RESULT") {
@@ -46222,8 +46398,6 @@ Building.prototype.get_idle_state_legacy = function() {
                 }
             }
         }
-    } else if(this.is_lottery_building()) {
-        if(this.contents >= 1) { draw_idle_icon = 'scan'; }
     } else if(this.spec['name'] === gamedata['alliance_building']) {
         if(!session.is_in_alliance()) {
             var pr = gamedata['predicate_library']['alliance_join_requirement'];
@@ -46429,8 +46603,6 @@ Building.prototype.get_idle_state_advanced = function() {
         }
     } else if(this.is_crafter() && this.crafting_progress_one() < 0) {
         /* draw_idle_icon = 'craft_done_advanced'; */
-    } else if(this.is_lottery_building()) {
-        if(this.contents >= 1) { draw_idle_icon = 'scan'; }
     } else if(this.spec['name'] === gamedata['alliance_building']) {
         if(!session.is_in_alliance()) {
             var pr = gamedata['predicate_library']['alliance_join_requirement'];
@@ -46460,6 +46632,14 @@ Building.prototype.get_idle_state_advanced = function() {
             }
         }
         */
+    }
+
+    // lottery takes priority over others
+    if(this.is_lottery_building()) {
+        var state = player.get_lottery_state(this);
+        if(state.can_scan || !state.on_cooldown) {
+            draw_idle_icon = 'lottery_scan';
+        }
     }
 
     return {'state': draw_idle_icon,
@@ -46663,8 +46843,7 @@ function draw_building_or_inert(obj, powerfac) {
         (obj.is_factory() && !obj.is_manufacturing()) ||
         (obj.is_researcher() && !obj.is_researching()) ||
         (obj.is_producer() && producer_halted) ||
-        (obj.is_crafter() && !obj.is_crafting() && !obj.spec['invert_idle']) ||
-        (obj.is_lottery_building() && obj.contents < 1))) {
+        (obj.is_crafter() && !obj.is_crafting() && !obj.spec['invert_idle']))) {
         icon_time = 0;
     } else if(obj.spec['invert_idle'] && obj.is_building() && !obj.is_destroyed() && obj.is_crafter() && obj.is_crafting()) {
         // this is used for Logistics Dispatch
@@ -46786,7 +46965,7 @@ function draw_building_or_inert(obj, powerfac) {
     }
 
     // draw lottery scans remaining
-    if(obj.team === 'player' && obj.is_building() && obj.is_lottery_building() && obj.contents >= 1) {
+    if(0 && obj.team === 'player' && obj.is_building() && obj.is_lottery_building() && obj.contents >= 1) {
         ctx.save();
         ctx.beginPath();
         ctx.fillStyle = 'rgba(213,0,0,1)';
@@ -47040,11 +47219,11 @@ function draw_building_or_inert(obj, powerfac) {
             }
 
             var has_state = false;
-            if(gamedata['client']['idle_icon_pulse_period'] > 0 && mouse_state.hovering_over !== obj) {
+            if(appearance.pulse_period > 0 && mouse_state.hovering_over !== obj) {
                 has_state = true;
                 ctx.save();
-                var amp = gamedata['client']['idle_icon_pulse_amplitude'];
-                ctx.globalAlpha = (1-amp) + amp * (0.5*(Math.sin(2*Math.PI*(client_time/gamedata['client']['idle_icon_pulse_period'] + obj.anim_offset))+1));
+                var amp = appearance.pulse_amplitude;
+                ctx.globalAlpha = (1-amp) + amp * (0.5*(Math.sin(2*Math.PI*(client_time/appearance.pulse_period + obj.anim_offset))+1));
             }
             icon_sprite.draw(playfield_to_draw(appearance.icon_pos), 0, client_time);
             if(has_state) {
