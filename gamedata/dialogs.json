@@ -4782,39 +4782,49 @@
 
     "item_discovered": {
         "bg_image": "",
-        "dimensions": [300,450],
+        "dimensions": [300,452],
         "default_button": "close_button",
         "widgets": {
             "bg_blanker": { "kind": "SolidRect", "xy": [-2000,-2000], "dimensions": [4000,4000], "color":[0.012,0.012,0.012,0.85] },
 
-            "title": { "kind": "TextField", "xy": [0,23], "dimensions": [300, 21], "text_size": 19, "text_style": "bold", "text_color": [1,1,0,1],
+            "title": { "kind": "TextField", "xy": [0,-17], "dimensions": [300, 21], "text_size": 19, "text_style": "bold", "text_color": [1,1,0,1],
                        "text_hjustify": "center", "text_vjustify": "center", "ui_name": "ITEM DISCOVERED", "drop_shadow": 1 },
-            "subtitle": { "show": 0, "kind": "TextField", "xy": [0,49], "dimensions": [300, 12], "text_size": 13, "text_style": "normal",
+            "subtitle": { "show": 0, "kind": "TextField", "xy": [0,9], "dimensions": [300, 12], "text_size": 13, "text_style": "normal",
                           "text_hjustify": "center", "text_vjustify": "center",
                           "ui_name_messages": "Check Your Messages",
                           "ui_name_inventory": ""
                         },
 
             "sku_glow": { "kind":"StaticImage","bg_image_resizable":1,
-                          //"xy":[37,70], "dimensions":[226,292],
-                          "xy":[39,72], "dimensions":[222,288],
+                          "xy":[39,32], "dimensions":[222,288],
                           "asset": "dialog_glow_thinner", // "dialog_glow_thin_resizable",
                           "composite_mode": "lighter", "alpha": 0.5
                         },
 
-            "sku": { "kind": "Dialog", "xy": [42,75], "dialog": "new_store_sku" },
+            "sku": { "kind": "Dialog", "xy": [42,35], "dialog": "new_store_sku" },
 
-            "close_button": { "kind": "ActionButton", "xy": [83,375], "dimensions": [134,28], "bg_image": "menu_button_134px", "push_bg_image": 1,
+            "close_button": { "kind": "ActionButton", "xy": [83,333], "dimensions": [134,28], "bg_image": "menu_button_134px", "push_bg_image": 1,
                               "ui_name_messages": "Send to Messages",
                               "ui_name_inventory": "Done", // warehouse
                               "ui_name_inventory_fungible": "Done", // storage
                               "ui_name": "Accept",
                               "text_color": [0,0,0,1], "text_size": 13, "text_style": "bold"},
 
-            "expiry": { "kind": "TextField", "xy": [0,421], "dimensions": [300, 12], "text_size": 13, "text_style": "normal", "text_color": [1,0,0,1],
+            "expiry": { "kind": "TextField", "xy": [0,381], "dimensions": [300, 12], "text_size": 13, "text_style": "normal", "text_color": [1,0,0,1],
                         "text_hjustify": "center", "text_vjustify": "center", "ui_name": "Message expires in %d days" },
-            "store_soon": { "show": 0, "kind": "TextField", "xy": [0,441], "dimensions": [300, 12], "text_size": 13, "text_style": "normal",
-                            "text_hjustify": "center", "text_vjustify": "center", "ui_name": "Store item soon" }
+            "store_soon": { "show": 0, "kind": "TextField", "xy": [0,401], "dimensions": [300, 12], "text_size": 13, "text_style": "normal",
+                            "text_hjustify": "center", "text_vjustify": "center", "ui_name": "Store item soon" },
+
+            // this is a COPY of the buttons on the lottery_dialog, for player convenience
+            "lottery_price_display": { "show":0, "kind": "ActionButton", "xy": [24,379], "dimensions": [120,32], "text_offset": [8,1], "text_size": 13, "text_style": "thick",
+                                       "bg_image": "price_display", "ui_tooltip": "", "tooltip_delay": 0 }, // PRICE
+            "lottery_button": { "show":0, "kind": "ActionButton", "xy": [146,378], "dimensions": [134,32], "text_offset": [0,0], "text_size": 13,
+                                "bg_image": "action_button_resizable", "text_color": [0,0,0,1], "text_style": "bold",
+                                "bg_image_resizable": 1,
+                                "min_wait": 1.6, // wait at least this long for scan result even if it comes in immediately
+                                // ui_name from LOTTERY_SCAN spell
+                                "ui_name_loading": "Loading...",
+                                "ui_tooltip": "", "tooltip_delay": 0 }
         }
     },
 
@@ -8152,7 +8162,7 @@
 
     "lottery_dialog": {
         "dimensions": [736,436],
-        "default_button": "buy_button",
+        "default_button": "lottery_button",
         "widgets": {
             "glow": { "show": 0, "kind":"StaticImage","xy":[-30,-30],"dimensions":[796,496],"bg_image_resizable":1,"asset":"dialog_glow_resizable", "composite_mode": "lighter",
                       "sound": "success_sound_exploding_glass_01",
@@ -8188,15 +8198,15 @@
                         "anim_speed": 1200,
                         "array": [3,1], "array_offset": [0,0] },
 
-            "price_display": { "kind": "ActionButton", "xy": [317,310], "dimensions": [120,32], "text_offset": [8,1], "text_size": 13, "text_style": "thick",
-                               "bg_image": "price_display", "ui_tooltip": "", "tooltip_delay": 0 }, // PRICE
-            "buy_button": { "kind": "ActionButton", "xy": [438,309], "dimensions": [134,32], "text_offset": [0,0], "text_size": 13,
-                            "bg_image": "action_button_resizable", "text_color": [0,0,0,1], "text_style": "bold",
-                            "bg_image_resizable": 1,
-                            "min_wait": 1.6, // wait at least this long for scan result even if it comes in immediately
-                            // ui_name from LOTTERY_SCAN spell
-                            "ui_name_loading": "Loading...",
-                            "ui_tooltip": "", "tooltip_delay": 0 }
+            "lottery_price_display": { "kind": "ActionButton", "xy": [317,310], "dimensions": [120,32], "text_offset": [8,1], "text_size": 13, "text_style": "thick",
+                                       "bg_image": "price_display", "ui_tooltip": "", "tooltip_delay": 0 }, // PRICE
+            "lottery_button": { "kind": "ActionButton", "xy": [438,309], "dimensions": [134,32], "text_offset": [0,0], "text_size": 13,
+                                "bg_image": "action_button_resizable", "text_color": [0,0,0,1], "text_style": "bold",
+                                "bg_image_resizable": 1,
+                                "min_wait": 1.6, // wait at least this long for scan result even if it comes in immediately
+                                // ui_name from LOTTERY_SCAN spell
+                                "ui_name_loading": "Loading...",
+                                "ui_tooltip": "", "tooltip_delay": 0 }
 
 //            "separator": {"kind": "Line", "xy": [50,354], "dimensions": [636,0], "color":  [0.063,0.176,0.36,0.5], "stroke_width": 2},
 //            "history_label": { "kind": "TextField", "xy": [58,326], "dimensions": [659,33], "text_size": 13,
