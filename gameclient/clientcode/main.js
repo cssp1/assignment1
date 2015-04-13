@@ -5863,7 +5863,12 @@ player.get_lottery_state = function(scanner) {
     if(player.inventory.length >= player.max_usable_inventory()) {
         ret.can_scan = false;
         ret.fail_ui_reason = spell['ui_tooltip_inventory_full'];
-        ret.fail_helper = get_requirements_help('inventory_space_need',null);
+        ret.fail_helper = function() {
+            // send click event
+            metric_event('1632_lottery_no_space_help', {'sum': player.get_denormalized_summary_props('brief')});
+            var helper = get_requirements_help('inventory_space_need',null);
+            if(helper) { helper(); }
+        };
     }
 
     if('requires' in spell) {
@@ -18165,6 +18170,8 @@ function invoke_building_context_menu(mouse_xy) {
                                                 state: (state.can_scan ? 'normal': 'disabled_clickable'),
                                                 asset: 'action_button_resizable',
                                                 ui_tooltip: state.fail_ui_reason,
+                                                tooltip_text_color: SPUI.error_text_color,
+                                                text_color: (state.can_scan ? SPUI.make_colorv([0,0,1]) : SPUI.disabled_text_color),
                                                 onclick: (state.can_scan ?
                                                           (function (_obj) { return function() { invoke_lottery_dialog(_obj); }; })(obj) : state.fail_helper)
                                                }));
@@ -18476,6 +18483,8 @@ function invoke_building_context_menu(mouse_xy) {
     @param {{ui_name: string,
              onclick: (function(SPUI.DialogWidget)|null|undefined),
              state: (string|null|undefined),
+             text_color: (SPUI.Color|null|undefined),
+             tooltip_text_color: (SPUI.Color|null|undefined),
              ui_tooltip: (string|null|undefined),
              asset: (string|null|undefined)}} props
 */
@@ -18483,6 +18492,8 @@ function ContextMenuButton(props) {
     this.ui_name = props.ui_name;
     this.onclick = props.onclick || null;
     this.state = props.state || null;
+    this.text_color = props.text_color || null;
+    this.tooltip_text_color = props.tooltip_text_color || null;
     this.ui_tooltip = props.ui_tooltip || null;
     this.asset = props.asset || null;
 
@@ -18561,12 +18572,18 @@ function invoke_generic_context_menu(xy, buttons, dialog_name, special_buttons) 
             var widget = dialog.widgets[wname];
             if(!but.ui_name) { throw Error('blank ui_name for button on '+dialog_name); }
             widget.str = but.ui_name;
+            if(but.text_color) {
+                widget.text_color = but.text_color;
+            }
             widget.onclick = (function (_cb) { return function(w) {
                 close_parent_dialog(w);
                 if(_cb) { _cb(w); }
             }; })(but.onclick);
             widget.state = but.state || 'normal';
             widget.tooltip.str = but.ui_tooltip || null;
+            if(but.tooltip_text_color) {
+                widget.tooltip.text_color = but.tooltip_text_color;
+            }
             widget.bg_image = but.asset || widget.data['bg_image'];
         }
         for(; i < dialog.data['widgets'][(prefix ? prefix+'_' : '')+'button']['array'][1]; i++) {
