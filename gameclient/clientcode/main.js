@@ -23088,7 +23088,7 @@ function lottery_dialog_refresh_slate(dialog) {
 function lottery_dialog_got_slate(dialog, result) {
     dialog.user_data['slate'] = result;
     dialog.user_data['slate_pending'] = false;
-    dialog.user_data['slate_offsets'] = {}; // random numbers for slate icon animation
+    dialog.user_data['slot_offsets'] = {}; // random numbers for slate icon animation
     dialog.user_data['slate_permutation'] = {}; // mapping from slate name to slot number
     dialog.user_data['slate_permutation_inv'] = {}; // mapping from slot number (string) to slate name
     dialog.user_data['slate_last_randomized'] = {}; // time each slot_name was last permuted
@@ -23105,7 +23105,7 @@ function lottery_dialog_got_slate(dialog, result) {
     var permute_list = [null];
 
     for(var slot_name in result) {
-        dialog.user_data['slate_offsets'][slot_name] = Math.random();
+        dialog.user_data['slot_offsets'][i.toString()] = Math.random();
         var j = Math.floor(Math.random()*(i+1));
         permute_list[i] = permute_list[j];
         permute_list[j] = slot_name;
@@ -23114,7 +23114,7 @@ function lottery_dialog_got_slate(dialog, result) {
 
     // store the permutation as a forward and inverse mapping
     goog.array.forEach(permute_list, function(slot_name, n) {
-        dialog.user_data['slate_last_randomized'][slot_name] = client_time - dialog.data['widgets']['goodies']['randomize_period_normal']*dialog.user_data['slate_offsets'][slot_name];
+        dialog.user_data['slate_last_randomized'][slot_name] = client_time - dialog.data['widgets']['goodies']['randomize_period_normal']*Math.random();
         dialog.user_data['slate_permutation'][slot_name] = n;
         dialog.user_data['slate_permutation_inv'][n.toString()] = slot_name;
     });
@@ -23263,10 +23263,14 @@ function update_lottery_dialog(dialog) {
                 if(item_list.length != 1) { throw Error('bad lottery loot '+JSON.stringify(item_list)); }
                 var item = item_list[0];
                 dialog.widgets[wname].show = true;
-                ItemDisplay.display_item(dialog.widgets[wname], item, {context_parent: dialog});
-                ItemDisplay.attach_inventory_item_tooltip(dialog.widgets[wname].widgets['frame'], item, dialog);
+                if(gamedata['lottery_conceal_slate']) {
+                    ItemDisplay.display_item(dialog.widgets[wname], {'spec':'unknown_lottery_item'}, {context_parent: dialog});
+                } else {
+                    ItemDisplay.display_item(dialog.widgets[wname], item, {context_parent: dialog});
+                    ItemDisplay.attach_inventory_item_tooltip(dialog.widgets[wname].widgets['frame'], item, dialog);
+                }
                 // pulse
-                var phase = dialog.user_data['slate_offsets'][slot_name];
+                var phase = dialog.user_data['slot_offsets'][i.toString()];
                 var amp = dialog.data['widgets']['goodies']['pulse_amplitude'];
                 var period = dialog.data['widgets']['goodies'][dialog.user_data['scan_pending'] > 0 ? 'pulse_period_scanning': 'pulse_period_normal'];
                 var alpha = (1-amp) + amp * Math.sin((client_time/period + phase)*2*Math.PI);
