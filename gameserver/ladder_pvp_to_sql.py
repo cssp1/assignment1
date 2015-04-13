@@ -76,7 +76,7 @@ def ladder_pvp_summary_schema(sql_util, interval):
 
 if __name__ == '__main__':
     game_id = SpinConfig.game()
-    commit_interval = 1000
+    commit_interval = 10000
     verbose = True
     dry_run = False
     do_prune = False
@@ -121,8 +121,9 @@ if __name__ == '__main__':
 
     if verbose:  print 'start_time', start_time, 'end_time', end_time
 
-    batch = 0
     total = 0
+    batch = []
+
     affected_days = set()
 
     qs = {'time':{'$gt':start_time, '$lt':end_time}}
@@ -151,22 +152,19 @@ if __name__ == '__main__':
                   sql_util.parse_brief_summary(row['sum']) + \
                   [(FIELD, row.get(FIELD,None)) for FIELD in ('event_name','defender_id','is_revenge','battle_streak_ladder','is_victory',
                                                               'items_expended','deployed_donated_unit_space') + SUMFIELDS]
-
-        if not dry_run:
-            sql_util.do_insert(cur, ladder_pvp_table, keyvals)
-        else:
-            print keyvals
-
-        batch += 1
+        batch.append(keyvals)
         total += 1
         affected_days.add(86400*(row['time']//86400))
 
-        if commit_interval > 0 and batch >= commit_interval:
-            batch = 0
+        if (not dry_run) and commit_interval > 0 and len(batch) >= commit_interval:
+            sql_util.do_insert_batch(cur, ladder_pvp_table, batch)
             con.commit()
             if verbose: print total, 'inserted'
+            del batch[:]
 
+    sql_util.do_insert_batch(cur, ladder_pvp_table, batch)
     con.commit()
+    del batch[:]
     if verbose: print 'total', total, 'inserted', 'affecting', len(affected_days), 'day(s)'
 
     # update summary
