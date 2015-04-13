@@ -452,6 +452,9 @@ ItemDisplay.attach_inventory_item_tooltip = function(widget, item, context_paren
     // show tooltip on enter
     widget.onenter = (function (_slot, _item, _context_parent) {
         return function(w) {
+            // XXX horrible awkward hack to suppress tooltips when covered by other dialogs
+            if(w.parent.parent && w.parent.parent.user_data['hide_tooltips']) { return; }
+
             if(_context_parent.user_data['context']) {
                 // do not switch if context for this item is already up
                 if(_context_parent.user_data['context'].user_data['slot'] === _slot &&

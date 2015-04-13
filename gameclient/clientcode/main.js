@@ -23157,6 +23157,10 @@ function lottery_dialog_randomize_cursor(dialog, state) {
     state['next_time'] = client_time + vec_distance(state['next'], state['last'])/dialog.data['widgets']['cursor']['anim_speed'];
 }
 function update_lottery_dialog(dialog) {
+
+    // XXX horrible awkward hack to suppress lottery_dialog tooltips when covered by the item_discovered_dialog
+    dialog.user_data['hide_tooltips'] = (selection.ui.children[selection.ui.children.length-1] instanceof SPUI.Dialog);
+
     var scanner = dialog.user_data['scanner'];
     var state = player.get_lottery_state(scanner);
 
@@ -23211,12 +23215,9 @@ function update_lottery_dialog(dialog) {
                 if(item_list.length != 1) { throw Error('bad lottery loot '+JSON.stringify(item_list)); }
                 var item = item_list[0];
                 dialog.widgets[wname].show = true;
-                if(gamedata['lottery_conceal_slate']) {
-                    ItemDisplay.display_item(dialog.widgets[wname], {'spec':'unknown_lottery_item'}, {context_parent: dialog});
-                } else {
-                    ItemDisplay.display_item(dialog.widgets[wname], item, {context_parent: dialog});
-                    ItemDisplay.attach_inventory_item_tooltip(dialog.widgets[wname].widgets['frame'], item, dialog);
-                }
+                var displayed_item = (gamedata['lottery_conceal_slate'] ? {'spec':'unknown_lottery_item'} : item);
+                ItemDisplay.display_item(dialog.widgets[wname], displayed_item, {context_parent: dialog});
+
                 // pulse
                 var phase = dialog.user_data['slot_offsets'][i.toString()];
                 var amp = dialog.data['widgets']['goodies']['pulse_amplitude'];
