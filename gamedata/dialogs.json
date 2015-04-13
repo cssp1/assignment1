@@ -8165,19 +8165,22 @@
             "sunken": {"kind": "StaticImage", "xy":[39,70], "dimensions":[659,357], "bg_image_resizable": 1, "asset": "dialog_sunken_resizable" },
             "topbar": { "kind": "SolidRect", "xy": [41,72], "dimensions":[655,33], "color": [0,0,0,0.25] },
 
-            "charges": { "kind": "TextField", "xy": [39,72], "dimensions": [659,33], "text_size": 13,
+            "sunken_left":{"kind":"StaticImage","xy":[50,91],"dimensions":[153,315],"asset":"dialog_sunken_resizable","bg_image_resizable":1},
+            "sidebar_splash":{"kind":"StaticImage","xy":[54,96],"dimensions":[143,303],"asset":"dialog_sidebar_valentina"},
+
+            "charges": { "kind": "RichTextField", "xy": [236,360], "dimensions": [420,33], "text_size": 13,
                          "text_hjustify": "center", "text_vjustify": "center", "text_offset":[0,1]
                          // ui_name from the LOTTERY_SCAN spell
                        },
 
-            "sunken2": {"kind": "StaticImage", "xy":[56,112], "dimensions":[622,157], "bg_image_resizable": 1, "asset": "dialog_sunken_resizable" },
+            "sunken2": {"kind": "StaticImage", "xy":[237,112], "dimensions":[419,166], "bg_image_resizable": 1, "asset": "dialog_sunken_resizable" },
 
-            "goodies": { "show":0, "kind": "Dialog", "dialog": "item_display", "xy": [75,128], "dimensions": [50,50],
+            "goodies": { "show":0, "kind": "Dialog", "dialog": "item_display", "xy": [269,133], "dimensions": [50,50],
                          "pulse_period_normal": 3.25, "pulse_period_scanning": 0.5, "pulse_amplitude": 0.33,
                          "randomize_period_normal": 5, "randomize_period_scanning": 2,
-                         "array": [8,2], "array_offset":[75,75] },
-            "goodies_spinner": { "show":0, "kind": "StaticImage", "asset": "loading_spinner", "xy": [92,145], "dimensions": [16,16],
-                         "array": [8,2], "array_offset":[75,75] },
+                         "array": [5,2], "array_offset":[75,75] },
+            "goodies_spinner": { "show":0, "kind": "StaticImage", "asset": "loading_spinner", "xy": [286,150], "dimensions": [16,16],
+                         "array": [5,2], "array_offset":[75,75] },
 
             "cursor": { "show": 0, "kind": "StaticImage", "xy":[-25,-25], "dimensions":[100,100],
                         "asset": "dialog_glow_resizable",
@@ -8185,23 +8188,23 @@
                         "anim_speed": 1200,
                         "array": [3,1], "array_offset": [0,0] },
 
-            "price_display": { "kind": "ActionButton", "xy": [242,288], "dimensions": [120,32], "text_offset": [8,1], "text_size": 13, "text_style": "thick",
+            "price_display": { "kind": "ActionButton", "xy": [317,310], "dimensions": [120,32], "text_offset": [8,1], "text_size": 13, "text_style": "thick",
                                "bg_image": "price_display", "ui_tooltip": "", "tooltip_delay": 0 }, // PRICE
-            "buy_button": { "kind": "ActionButton", "xy": [363,287], "dimensions": [134,32], "text_offset": [0,0], "text_size": 13,
+            "buy_button": { "kind": "ActionButton", "xy": [438,309], "dimensions": [134,32], "text_offset": [0,0], "text_size": 13,
                             "bg_image": "action_button_resizable", "text_color": [0,0,0,1], "text_style": "bold",
                             "bg_image_resizable": 1,
                             "min_wait": 1.6, // wait at least this long for scan result even if it comes in immediately
                             // ui_name from LOTTERY_SCAN spell
                             "ui_name_loading": "Loading...",
-                            "ui_tooltip": "", "tooltip_delay": 0 },
+                            "ui_tooltip": "", "tooltip_delay": 0 }
 
-            "separator": {"kind": "Line", "xy": [50,354], "dimensions": [636,0], "color":  [0.063,0.176,0.36,0.5], "stroke_width": 2},
-            "history_label": { "kind": "TextField", "xy": [58,326], "dimensions": [659,33], "text_size": 13,
-                               "text_hjustify": "left",
-                               "ui_name": "Discovered this session:"
-                             },
-            "history": { "show":0, "kind": "Dialog", "dialog": "item_display", "xy": [68,363], "dimensions": [50,50],
-                         "array": [10,1], "array_offset":[60,60] }
+//            "separator": {"kind": "Line", "xy": [50,354], "dimensions": [636,0], "color":  [0.063,0.176,0.36,0.5], "stroke_width": 2},
+//            "history_label": { "kind": "TextField", "xy": [58,326], "dimensions": [659,33], "text_size": 13,
+//                               "text_hjustify": "left",
+//                               "ui_name": "Discovered this session:"
+//                             },
+//            "history": { "show":0, "kind": "Dialog", "dialog": "item_display", "xy": [68,363], "dimensions": [50,50],
+//                         "array": [10,1], "array_offset":[60,60] }
         }
     },
 

@@ -23161,9 +23161,9 @@ function update_lottery_dialog(dialog) {
     var state = player.get_lottery_state(scanner);
 
     if(state.next_scan_method == 'cooldown' || state.next_scan_method == 'contents') {
-        dialog.widgets['charges'].str = gamedata['spells']['LOTTERY_SCAN']['ui_tooltip_remaining'].replace('%d', pretty_print_number(state.num_scans));
+        dialog.widgets['charges'].set_text_bbcode(gamedata['spells']['LOTTERY_SCAN']['ui_tooltip_remaining'].replace('%d', pretty_print_number(state.num_scans)));
     } else if(state.next_scan_method == 'paid') {
-        dialog.widgets['charges'].str = gamedata['spells']['LOTTERY_SCAN']['ui_tooltip_on_cooldown'].replace('%s', pretty_print_time(player.cooldown_togo('lottery_free')));
+        dialog.widgets['charges'].set_text_bbcode(gamedata['spells']['LOTTERY_SCAN']['ui_tooltip_on_cooldown'].replace('%s', '[color=#ffff00]'+pretty_print_time(player.cooldown_togo('lottery_free'))+'[/color]'));
     } else {
         throw Error('unhandled next_scan_method '+(state.next_scan_method || 'null'));
     }
@@ -23192,7 +23192,7 @@ function update_lottery_dialog(dialog) {
         dialog.widgets['buy_button'].tooltip.str = null;
         dialog.widgets['price_display'].str = Store.display_user_currency_price(display_price); // PRICE
         dialog.widgets['price_display'].tooltip.str = Store.display_user_currency_price_tooltip(display_price); // PRICE
-        dialog.widgets['buy_button'].str = gamedata['spells']['LOTTERY_SCAN']['ui_verb'];
+        dialog.widgets['buy_button'].str = gamedata['spells']['LOTTERY_SCAN'][(state.next_scan_method == 'paid' ? 'ui_verb_paid' : 'ui_verb')];
 
         if(!state.can_scan) {
             dialog.widgets['buy_button'].state = 'disabled_clickable';
@@ -23223,21 +23223,23 @@ function update_lottery_dialog(dialog) {
     }
 
     // show most recent loot
-    var history = player.session_lottery_loot;
-    var history_i = Math.max(0, player.session_lottery_loot.length - dialog.data['widgets']['history']['array'][1]*dialog.data['widgets']['history']['array'][0]);
-    for(var y = 0; y < dialog.data['widgets']['history']['array'][1]; y++) {
-        for(var x = 0; x < dialog.data['widgets']['history']['array'][0]; x++) {
-            var wname = SPUI.get_array_widget_name('history', dialog.data['widgets']['history']['array'], [x,y]);
-            if(history_i < history.length) {
-                var item = history[history_i];
-                dialog.widgets[wname].show = true;
-                ItemDisplay.display_item(dialog.widgets[wname], item, {context_parent: dialog});
-                ItemDisplay.attach_inventory_item_tooltip(dialog.widgets[wname].widgets['frame'], item, dialog);
-                dialog.widgets[wname].widgets['frame'].state = 'disabled';
-            } else {
-                dialog.widgets[wname].show = false;
+    if('history' in dialog.data['widgets']) {
+        var history = player.session_lottery_loot;
+        var history_i = Math.max(0, player.session_lottery_loot.length - dialog.data['widgets']['history']['array'][1]*dialog.data['widgets']['history']['array'][0]);
+        for(var y = 0; y < dialog.data['widgets']['history']['array'][1]; y++) {
+            for(var x = 0; x < dialog.data['widgets']['history']['array'][0]; x++) {
+                var wname = SPUI.get_array_widget_name('history', dialog.data['widgets']['history']['array'], [x,y]);
+                if(history_i < history.length) {
+                    var item = history[history_i];
+                    dialog.widgets[wname].show = true;
+                    ItemDisplay.display_item(dialog.widgets[wname], item, {context_parent: dialog});
+                    ItemDisplay.attach_inventory_item_tooltip(dialog.widgets[wname].widgets['frame'], item, dialog);
+                    dialog.widgets[wname].widgets['frame'].state = 'disabled';
+                } else {
+                    dialog.widgets[wname].show = false;
+                }
+                history_i += 1;
             }
-            history_i += 1;
         }
     }
 
