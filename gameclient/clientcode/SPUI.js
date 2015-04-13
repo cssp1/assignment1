@@ -1948,7 +1948,7 @@ SPUI.ActionButton.prototype.do_draw = function(offset) {
             throw Error('undefined state "'+draw_state+'" for art asset "'+this.bg_image+'"');
 
         }
-        if(art_state.text_color != null) {
+        if(this.text_color === SPUI.default_text_color && art_state.text_color != null) {
             var col = art_state.text_color;
             this.text_color = new SPUI.Color(col[0], col[1], col[2], col[3]);
         }
