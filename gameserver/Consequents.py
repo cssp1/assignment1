@@ -91,12 +91,15 @@ class MetricEventConsequent(Consequent):
         self.props = data.get('props', {})
         self.frequency = data.get('frequency', None)
         self.tag = data.get('tag', self.event_name)
+        self.summary_key = data.get('summary_key', 'sum')
     def execute(self, session, player, retmsg, context=None):
         if self.frequency == 'session':
             if session.sent_metrics.get(self.tag, False):
                 return # already sent
             session.sent_metrics[self.tag] = True
         props = copy.deepcopy(self.props)
+        if self.summary_key:
+            props[self.summary_key] = player.get_denormalized_summary_props('brief')
         session.metric_event_coded(player, self.event_name, props)
 
 class SpawnSecurityTeamConsequent(Consequent):

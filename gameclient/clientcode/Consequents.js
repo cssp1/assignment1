@@ -618,7 +618,7 @@ function MetricEventConsequent(data) {
     this.props = data['props'] || {};
     this.frequency = data['frequency'] || null;
     this.tag = data['tag'] || this.event_name;
-    this.add_summary = data['add_summary'] || false;
+    this.summary_key = ('summary_key' in data ? data['summary_key'] : 'sum');
 }
 goog.inherits(MetricEventConsequent, Consequent);
 MetricEventConsequent.prototype.execute = function(state) {
@@ -632,8 +632,8 @@ MetricEventConsequent.prototype.execute = function(state) {
     if(state) {
         for(var k in state) { props[k] = state[k]; }
     }
-    if(this.add_summary) {
-        props['sum'] = player.get_denormalized_summary_props('brief');
+    if(this.summary_key) {
+        props[this.summary_key] = player.get_denormalized_summary_props('brief');
     }
     metric_event(this.event_name, props);
 };
