@@ -275,6 +275,7 @@ def LadderPvPLogFilter(child):
                                   '3304_ladder_skip',
                                   '3305_ladder_attack_start',
                                   '3306_ladder_attack_end',
+                                  '3307_ladder_peek',
                                   ])
 def DamageProtectionLogFilter(child):
     return JSONLogFilter(child,

@@ -27,6 +27,8 @@ def ladder_pvp_schema(sql_util):
                        ('is_victory', 'INT1'),
                        ('duration', 'INT4'),
                        ('base_damage', 'FLOAT4'),
+                       ('items_expended', 'INT4'),
+                       ('deployed_donated_unit_space', 'INT4'),
                        ('attacker_stars', 'INT1'),
                        ('attacker_res', 'INT8'),
                        ('defender_res', 'INT8'),
@@ -130,7 +132,7 @@ if __name__ == '__main__':
 
         if 'outcome' in row:
             row['is_victory'] = (row['outcome'] == 'victory')
-        if 'ladder_state' in row:
+        if row.get('ladder_state',None):
             row['is_revenge'] = row['ladder_state'].get('is_revenge', False)
             row['attacker_pts_reward_win'] = row['ladder_state']['points']['victory'][str(row['user_id'])]
             row['attacker_pts_risk_loss'] = row['ladder_state']['points']['defeat'][str(row['user_id'])]
@@ -147,7 +149,8 @@ if __name__ == '__main__':
         keyvals = [('time',row['time']),
                    ('user_id',row['user_id'])] + \
                   sql_util.parse_brief_summary(row['sum']) + \
-                  [(FIELD, row.get(FIELD,None)) for FIELD in ('event_name','defender_id','is_revenge','battle_streak_ladder','is_victory') + SUMFIELDS]
+                  [(FIELD, row.get(FIELD,None)) for FIELD in ('event_name','defender_id','is_revenge','battle_streak_ladder','is_victory',
+                                                              'items_expended','deployed_donated_unit_space') + SUMFIELDS]
 
         if not dry_run:
             sql_util.do_insert(cur, ladder_pvp_table, keyvals)

@@ -2900,7 +2900,9 @@ class Session(object):
         self.defending_squads = {} # XXX merge deployable/defending squads into participating_squads
         self.deployable_squads = {} # dict of base_id -> squads (map features) eligible for deployment into combat this session
         self.deployed_unit_space = 0 # how much "space" worth of units have already been deployed into the attack
+        self.deployed_donated_unit_space = 0 # SUBSET of deployed_unit_space for donated units
         self.deployed_units = None # for analytics only, keep track of how many units of each type were deployed
+        self.deployed_donated_units = None # for analytics only, keep track of how many units of each type were deployed (SUBSET of deployed_units)
 
         self.res_looter = None # ResLoot state object, set up at the beginning of each session
         self.starting_base_damage = None # copy of viewing_base.calc_base_damage() result made at the beginning of each session
@@ -15100,6 +15102,8 @@ class GAMEAPI(resource.Resource):
                                                                                   'defender_res': session.viewing_player.resources.get_fungible_amounts(),
                                                                                   'attacker_res_delta': dict((res,session.loot.get(res,0)) for res in gamedata['resources']),
                                                                                   'defender_res_delta': dict((res,(-1*session.loot.get(res+'_lost',0))) for res in gamedata['resources']),
+                                                                                  'items_expended': sum(session.items_expended.get(str(session.player.user_id),{}).itervalues(), 0),
+                                                                                  'deployed_donated_unit_space': session.deployed_donated_unit_space,
                                                                                   'battle_streak_ladder': session.player.cooldown_active('battle_streak_ladder'),
                                                                                   'ladder_state': session.ladder_state})
         # after defending against an AI attack at home
@@ -15704,6 +15708,7 @@ class GAMEAPI(resource.Resource):
         session.deployable_squads = new_deployable_squads
         session.defending_squads = new_defending_squads
         session.deployed_units = None
+        session.deployed_donated_units = None
 
         # simulate passage of time for repairs
         session.viewing_player.unit_repair_tick()
@@ -15893,14 +15898,16 @@ class GAMEAPI(resource.Resource):
                                 break
 
             props['pvp_balance'] = (session.pvp_balance if session.pvp_balance else 'equal')
-            if session.is_ladder_battle() and ((not session.using_squad_deployment()) or gamedata['server'].get('log_ladder_pvp_on_map',False)):
-                session.player.record_ladder_pvp_event('3303_ladder_spy', {'defender_id': session.viewing_player.user_id,
-                                                                           'attacker_pts': session.player.ladder_points(),
-                                                                           'defender_pts': session.viewing_player.ladder_points(),
-                                                                           'attacker_res': session.player.resources.get_fungible_amounts(),
-                                                                           'defender_res': session.viewing_player.resources.get_fungible_amounts(),
-                                                                           'battle_streak_ladder': session.player.cooldown_active('battle_streak_ladder'),
-                                                                           'ladder_state': session.ladder_state})
+            if ((not session.using_squad_deployment()) or gamedata['server'].get('log_ladder_pvp_on_map',False)):
+                if session.is_ladder_battle() or (session.viewing_player.is_human() and gamedata['server'].get('log_ladder_peek',False)):
+                    session.player.record_ladder_pvp_event('3303_ladder_spy' if session.is_ladder_battle() else '3307_ladder_peek',
+                                                           {'defender_id': session.viewing_player.user_id,
+                                                            'attacker_pts': session.player.ladder_points(),
+                                                            'defender_pts': session.viewing_player.ladder_points(),
+                                                            'attacker_res': session.player.resources.get_fungible_amounts(),
+                                                            'defender_res': session.viewing_player.resources.get_fungible_amounts(),
+                                                            'battle_streak_ladder': session.player.cooldown_active('battle_streak_ladder'),
+                                                            'ladder_state': session.ladder_state})
 
         if gamedata['prevent_same_alliance_attacks'] and \
            (session.viewing_player is not session.player) and \
@@ -19072,10 +19079,12 @@ class GAMEAPI(resource.Resource):
             session.player.attack_cooldown_start = server_time
 
             session.deployed_units = {}
+            session.deployed_donated_units = {}
 
             # count existing reinforcements
             session.deployed_unit_space = sum([obj.get_leveled_quantity(obj.spec.consumes_space) for obj in session.viewing_base.iter_objects() \
                                                if (obj.owner is session.player) and obj.is_mobile()])
+            session.deployed_donated_unit_space = 0
 
             event_props = {'attacker_user_id': session.user.user_id,
                            'attacker_level': session.player.resources.player_level,
@@ -19291,12 +19300,15 @@ class GAMEAPI(resource.Resource):
                 level = entry.get('level', session.player.tech.get(spec.level_determined_by_tech, 1))
 
                 unit = instantiate_object_for_player(session.player, session.player, entry['spec'], x=loc[0], y=loc[1], level=level, obj_id=obj_id)
+                space = unit.get_leveled_quantity(unit.spec.consumes_space)
+
                 if gamedata['donated_units_take_space']:
-                    space = unit.get_leveled_quantity(unit.spec.consumes_space)
                     if (session.deployed_unit_space + space) > deployment_limit:
                         retmsg.append(["ERROR", "CANNOT_DEPLOY_MORE_UNITS"])
                         break
                     session.deployed_unit_space += space
+
+                session.deployed_donated_unit_space += space # count this regardless of whether they take space
 
                 units.append((unit,{'method':'donated'}))
                 entry['stack'] = entry.get('stack', 1) - 1
@@ -19375,7 +19387,11 @@ class GAMEAPI(resource.Resource):
             if session.damage_log:
                 # need to think about how to track donated units (props['method']=='donated')
                 session.damage_log.init(unit, consumable = unit.spec.consumable)
+
+            # record for analytics
             session.deployed_units[unit.spec.name] = session.deployed_units.get(unit.spec.name,0) + 1
+            if props['method'] == 'donated':
+                session.deployed_donated_units[unit.spec.name] = session.deployed_donated_units.get(unit.spec.name,0) + 1
 
     def push_gamedata(self, session, retmsg):
         data_str = open(SpinConfig.gamedata_filename()).read()
