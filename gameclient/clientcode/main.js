@@ -35369,6 +35369,7 @@ function invoke_item_discovered(items, duration) {
         return null;
     }
     return do_invoke_item_discovered(items, {duration: duration,
+                                             title_mode: 'item_discovered',
                                              tip_mode: (player.get_any_abtest_value('modal_looting', gamedata['modal_looting']) ? null : 'messages'),
                                              enable_animation: !player.get_any_abtest_value('modal_looting', gamedata['modal_looting'])
                                             });
@@ -35376,6 +35377,7 @@ function invoke_item_discovered(items, duration) {
 
 /** @param {!Array.<Object>} items
     @param {{duration: (number|undefined),
+             title_mode: (string|null|undefined),
              tip_mode: (string|null|undefined),
              enable_animation: (boolean|undefined)
              }} options
@@ -35416,6 +35418,8 @@ function do_invoke_item_discovered(items, options) {
     sku.widgets['jewel'].show = false;
 
     sku.user_data['context'] = null;
+
+    dialog.widgets['title'].show = !!options.title_mode;
 
     if(options.tip_mode) {
         dialog.widgets['subtitle'].show = true;

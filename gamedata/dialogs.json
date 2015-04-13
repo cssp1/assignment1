@@ -4806,8 +4806,8 @@
 
             "close_button": { "kind": "ActionButton", "xy": [83,375], "dimensions": [134,28], "bg_image": "menu_button_134px", "push_bg_image": 1,
                               "ui_name_messages": "Send to Messages",
-                              "ui_name_inventory": "Add to Warehouse",
-                              "ui_name_inventory_fungible": "Add to Storage",
+                              "ui_name_inventory": "Done", // warehouse
+                              "ui_name_inventory_fungible": "Done", // storage
                               "ui_name": "Accept",
                               "text_color": [0,0,0,1], "text_size": 13, "text_style": "bold"},
 
