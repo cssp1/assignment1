@@ -18242,15 +18242,8 @@ function invoke_building_context_menu(mouse_xy) {
                 var cat = gamedata['crafting']['categories'][obj.spec['crafting_categories'][0]];
 
                 if(!obj.is_emplacement()) { // turret emplacements have special case, see below
-                    var is_active = true;
-                    if(obj.is_lottery_building()) {
-                        var state = player.get_lottery_state(obj);
-                        if(state.can_scan || !state.on_cooldown) {
-                            is_active = false; // lottery takes priority
-                        }
-                    }
                     buttons.push(new ContextMenuButton({ui_name: cat['ui_verb'] || gamedata['spells']['CRAFT_FOR_FREE']['ui_name'],
-                                                        asset: (is_active ? 'action_button_resizable' : 'menu_button_resizable'),
+                                                        asset: 'action_button_resizable',
                                                         onclick: (function (_cat) { return function() {
                                                            if(_cat['dialog'] == 'fishing_dialog') {
                                                                invoke_fishing_dialog();
