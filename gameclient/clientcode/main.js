@@ -9800,7 +9800,7 @@ function init_desktop_dialogs() {
         dialog.widgets['leaderboard_button'].onclick = function(w) { invoke_leaderboard(); };
         dialog.widgets['keyboard_shortcuts_button'].onclick = invoke_keyboard_shortcuts;
         dialog.widgets['keyboard_shortcuts_jewel'].ondraw = update_notification_jewel;
-        dialog.widgets['keyboard_shortcuts_jewel'].show = enable_control_buttons && player.get_any_abtest_value('enable_keyboard_shortcuts_jewel', gamedata['client']['enable_keyboard_shortcuts_jewel']);
+        dialog.widgets['keyboard_shortcuts_jewel'].show = dialog.widgets['keyboard_shortcuts_button'].show && player.get_any_abtest_value('enable_keyboard_shortcuts_jewel', gamedata['client']['enable_keyboard_shortcuts_jewel']);
 
         dialog.widgets['battle_history_button'].onclick = function(w) { invoke_battle_history_dialog(session.user_id, -1, '', -1, w); };
         dialog.widgets['battle_history_jewel'].ondraw = update_notification_jewel;
