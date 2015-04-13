@@ -9786,10 +9786,11 @@ function init_desktop_dialogs() {
                                    gamedata['tutorial'][player.tutorial_state]['enable_desktop_control_buttons']));
 
     if(session.home_base) {
-        dialog.widgets['keyboard_shortcuts_button'].show =
-            dialog.widgets['battle_history_button'].show =
-           dialog.widgets['battle_history_jewel'].show =
+        dialog.widgets['battle_history_button'].show =
+            dialog.widgets['battle_history_jewel'].show =
             dialog.widgets['leaderboard_button'].show = enable_control_buttons;
+
+        dialog.widgets['keyboard_shortcuts_button'].show = enable_control_buttons && (!('enable_keyboard_shortcuts_button' in gamedata['client']) || gamedata['client']['enable_keyboard_shortcuts_button']);
 
         dialog.widgets['leaderboard_button'].onclick = function(w) { invoke_leaderboard(); };
         dialog.widgets['keyboard_shortcuts_button'].onclick = invoke_keyboard_shortcuts;
@@ -9841,15 +9842,6 @@ function init_desktop_dialogs() {
                                         {'cancel_button': true,
                                          'ok_button_ui_name': s['ui_button'],
                                          'on_ok': tutorial_opt_out});
-        };
-        dialog.widgets['question_button'].onclick = function() {
-            player.quest_tracked = null; player.quest_tracked_dirty = true; // allow re-initialization of highest-priority quest
-            var tracked = tutorial_opt_in();
-
-            // if we can't automatically pick up a quest with GUI tips, punt by showing missions dialog
-            if(!tracked || tracked['ui_instructions']) {
-                invoke_missions_dialog(true);
-            }
         };
     }
 
@@ -11835,12 +11827,35 @@ function update_desktop_dialogs() {
     } // end NOT session.home_base
 
     if(session.home_base) {
-        dialog.widgets['question_button'].show = (player.tutorial_state == "COMPLETE" &&
-                                                  !session.has_attacked && !session.incoming_attack_pending() &&
-                                                  player.get_any_abtest_value('skip_tutorial_button', gamedata['client']['skip_tutorial_button']));
-        // only disable "?" button if there are live "click here" tips going on
-        dialog.widgets['question_button'].state = (player.quest_tracked && ('tips' in player.quest_tracked) && !player.quest_tracked['ui_instructions'] ? 'disabled' : 'normal');
 
+        if(gamedata['client']['desktop_question_button_consequent']) {
+            // new consequent-based ? button
+            dialog.widgets['question_button'].show = (player.tutorial_state == "COMPLETE") && !session.has_attacked;
+            // awkward positioning hack to move it over where the keyboard shortcuts button would go, if keyboard shortcuts are off
+            dialog.widgets['question_button'].xy = dialog.data['widgets']['question_button'][('enable_keyboard_shortcuts_button' in gamedata['client'] && !gamedata['client']['enable_keyboard_shortcuts_button']) ? 'xy_no_shortcuts': 'xy'];
+            dialog.widgets['question_button'].tooltip.str = dialog.data['widgets']['question_button']['ui_tooltip_consequent'];
+            dialog.widgets['question_button'].onclick = (function (_raw) { return function(w) {
+                read_consequent(_raw).execute();
+            }; })(gamedata['client']['desktop_question_button_consequent']);
+
+        } else { // old ? button
+
+            dialog.widgets['question_button'].onclick = function() {
+                player.quest_tracked = null; player.quest_tracked_dirty = true; // allow re-initialization of highest-priority quest
+                var tracked = tutorial_opt_in();
+
+                // if we can't automatically pick up a quest with GUI tips, punt by showing missions dialog
+                if(!tracked || tracked['ui_instructions']) {
+                    invoke_missions_dialog(true);
+                }
+            };
+
+            dialog.widgets['question_button'].show = (player.tutorial_state == "COMPLETE" &&
+                                                      !session.has_attacked && !session.incoming_attack_pending() &&
+                                                      player.get_any_abtest_value('skip_tutorial_button', gamedata['client']['skip_tutorial_button']));
+            // only disable "?" button if there are live "click here" tips going on
+            dialog.widgets['question_button'].state = (player.quest_tracked && ('tips' in player.quest_tracked) && !player.quest_tracked['ui_instructions'] ? 'disabled' : 'normal');
+        }
 
         if(player.tutorial_state == "COMPLETE" &&
            player.get_any_abtest_value('skip_tutorial_button', gamedata['client']['skip_tutorial_button']) &&

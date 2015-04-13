@@ -554,8 +554,10 @@
             "keyboard_shortcuts_button": { "kind": "ActionButton", "xy": [298,3], "dimensions": [23,23], "bg_image": "K_button",
                                            "ui_tooltip": "Keyboard Shortcuts", "fixed_tooltip_offset": [335, 15], "push_bg_image": 1 },
 
-            "question_button": { "kind": "ActionButton", "xy": [325,3], "dimensions": [23,23], "bg_image": "question_button", "push_bg_image": 1,
-                                 "ui_tooltip": "Enable Tutorial Missions", "fixed_tooltip_offset": [362, 15], "show": 0 },
+            "question_button": { "kind": "ActionButton", "xy": [325,3], "xy_no_shortcuts": [298,3], "dimensions": [23,23], "bg_image": "question_button", "push_bg_image": 1,
+                                 "ui_tooltip": "Enable Tutorial Missions",
+                                 "ui_tooltip_consequent": "Strategy Guide", // used when gamedata.client.desktop_question_button_consequent is enabled
+                                 "fixed_tooltip_offset": [362, 15], "show": 0 },
 
             // CHICKLET BUTTON JEWELS
             "battle_history_jewel": { "kind": "Dialog", "xy": [257,2], "dimensions": [17,14], "dialog": "notification_jewel" },
