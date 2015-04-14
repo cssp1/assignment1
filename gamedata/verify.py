@@ -913,10 +913,22 @@ def check_crafting_recipe(recname, spec):
     for FIELD in ('craft_time', 'cost', 'product','crafting_category'):
         if FIELD not in spec:
             error |= 1; print '%s: missing field %s' % (recname, FIELD)
+
+    prod_list = spec['product'] if type(spec['product'][0]) is list else [spec['product'],]
+    max_level = spec.get('max_level', 1)
+
+    for FIELD in ('craft_time', 'cost'):
+        if max_level > 1 and type(spec[FIELD]) is list and len(spec[FIELD]) != max_level:
+            error |= 1; print '%s: list of %s does not match max_level %d' % (recname, FIELD, max_level)
+
+    for FIELD in ('ingredients', 'product'):
+        if max_level > 1 and type(spec[FIELD][0]) is list and len(spec[FIELD]) != max_level:
+            error |= 1; print '%s: list of %s does not match max_level %d' % (recname, FIELD, max_level)
+
     if ('ui_name' not in spec):
         if spec['crafting_category'] == 'fishing':
             error |= 1; print '%s: ui_name is mandatory for fishing recipes' % recname
-        if not spec['product'][0].get('spec',None):
+        if not prod_list[0][0].get('spec',None):
             error |= 1; print '%s: has no ui_name but product is not a single item' % recname
 
     if spec['crafting_category'] not in gamedata['crafting']['categories']:
@@ -926,37 +938,50 @@ def check_crafting_recipe(recname, spec):
         if 'consumes_power' not in spec:
             error |= 1; print '%s: missing consumes_power (while crafting)' % (recname,)
 
+    if 'associated_item' in spec:
+        if spec['associated_item'] not in gamedata['items']:
+            error |=1; print '%s: associated_item % not found' % (recname, spec['associated_item'])
+        else:
+            item_spec = gamedata['items'][spec['associated_item']]
+            if max_level != item_spec.get('max_level',1):
+                error |=1; print '%s: max_level %d does not match associated_item %s max_level %d' % (recname, max_level, spec['associated_item'], item_spec.get('max_level',1))
+
     if ('associated_item_set' in spec):
         if spec['associated_item_set'] not in gamedata['item_sets']:
             error |=1; print '%s: has invalid associated_item_set "%s"' % (recname, spec['associated_item_set'])
         else:
-            if spec['product'][0].get('spec',None) not in gamedata['item_sets'][spec['associated_item_set']]['members'] and \
+            if prod_list[0][0].get('spec',None) not in gamedata['item_sets'][spec['associated_item_set']]['members'] and \
                len(gamedata['item_sets'][spec['associated_item_set']]['members']) > 0: # ignore empty item sets that are used only for crafting recipes
                 error |=1; print '%s: has associated_item_set "%s" but its product is not a member of that set' % (recname, spec['associated_item_set'])
 
-    for res, amount in spec['cost'].iteritems():
-        if res not in gamedata['resources']:
-            error |= 1; print '%s: cost uses unknown resource %s' % (recname, res)
-    if 'ingredients' in spec:
-        for entry in spec['ingredients']:
-            if entry['spec'] not in gamedata['items']:
-                error |= 1; print '%s: ingredients uses unknown item %s' % (recname, entry['spec'])
-            else:
-                ingr_spec = gamedata['items'][entry['spec']]
-                if entry.get('stack',1) > ingr_spec.get('max_stack',1):
-                    error |= 1; print '%s: ingredient "%r" stack cannot be greater than item\'s max_stack' % (recname, entry)
+    for level in xrange(max_level):
+        cost = GameDataUtil.get_leveled_quantity(spec['cost'], level)
+        for res, amount in cost.iteritems():
+            if res not in gamedata['resources']:
+                error |= 1; print '%s: cost uses unknown resource %s' % (recname, res)
+        if 'ingredients' in spec:
+            ingr_list = spec['ingredients'][level-1] if type(spec['ingredients'][0]) is list else spec['ingredients']
+            for entry in ingr_list:
+                if entry['spec'] not in gamedata['items']:
+                    error |= 1; print '%s: ingredients uses unknown item %s' % (recname, entry['spec'])
+                else:
+                    ingr_spec = gamedata['items'][entry['spec']]
+                    if entry.get('stack',1) > ingr_spec.get('max_stack',1):
+                        error |= 1; print '%s: ingredient "%r" stack cannot be greater than item\'s max_stack' % (recname, entry)
 
-    error |= check_loot_table(spec['product'], reason = recname+':product')
-    for FIELD in ('show_if', 'requires'):
-        if FIELD in spec:
-            error |= check_predicate(spec[FIELD], reason = recname+':'+FIELD)
+        prod_table = spec['product'][level-1] if type(spec['product'][0]) is list else spec['product']
+        error |= check_loot_table(prod_table, reason = recname+':product')
 
-    for CONS in ('completion', 'on_start'):
-        if CONS in spec:
-            error |= check_consequent(spec[CONS], recname+':'+CONS, context='crafting_recipe')
+        for FIELD in ('show_if', 'requires'):
+            if FIELD in spec:
+                error |= check_predicate(GameDataUtil.get_leveled_quantity(spec[FIELD], level), reason = recname+':'+FIELD)
 
-    if 'start_effect' in spec:
-        error |= check_visual_effect('%s:start_effect' % recname, spec['start_effect'])
+        for CONS in ('completion', 'on_start'):
+            if CONS in spec:
+                error |= check_consequent(GameDataUtil.get_leveled_quantity(spec[CONS], level), recname+':'+CONS, context='crafting_recipe')
+
+        if 'start_effect' in spec:
+            error |= check_visual_effect('%s:start_effect' % recname, GameDataUtil.get_leveled_quantity(spec['start_effect'], level))
 
     return error
 
@@ -992,6 +1017,17 @@ def check_item(itemname, spec):
     if spec['name'] != itemname.split(':')[1]:
         error |= 1
         print '%s:name mismatch' % itemname
+
+    max_level = spec.get('max_level', 1)
+
+    if 'associated_crafting_recipe' in spec:
+        if spec['associated_crafting_recipe'] not in gamedata['crafting']['recipes']:
+            error |=1; print '%s: associated_crafting_recipe % not found' % (recname, spec['associated_crafting_recipe'])
+        else:
+            recipe_spec = gamedata['crafting']['recipes'][spec['associated_crafting_recipe']]
+            if max_level != recipe_spec.get('max_level',1):
+                error |=1; print '%s: max_level %d does not match associated_crafting_recipe %s max_level %d' % (itemname, max_level, spec['associated_crafting_recipe'], recipe_spec.get('max_level',1))
+
 
     matches = level_re.match(itemname)
     if matches:

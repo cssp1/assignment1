@@ -23,6 +23,7 @@ stats_schema = {
     }
 crafting_recipes_schema = {
     'fields': [('recipe_id', 'VARCHAR(64) NOT NULL'),
+               ('recipe_level', 'INT4'),
                ('is_output', 'TINYINT(1) NOT NULL'),
                ('resource', 'VARCHAR(64) NOT NULL'),
                ('level', 'INT1'),
@@ -62,6 +63,47 @@ def flush_keyvals(sql_util, cur, tbl, keyvals):
         con.commit()
     del keyvals[:]
 
+# iterate through (level, num_value, str_value) of a possibly per-level value
+# but store non-leveled values as a single entry with level = None
+def leveled_quantity_iter(val, num_levels, reason):
+    val_type = None # 'num' or 'str'
+    val_levels = None
+
+    if type(val) in (int, float): # single number
+        val_type = 'num'
+        val_list = [float(val)]
+    elif type(val) in (str, unicode): # single string
+        val_type = 'str'
+        val_list = [val]
+
+    elif type(val) is list and len(val) == num_levels:
+        val_levels = num_levels
+        if type(val[0]) in (int, float): # per-level number
+            val_type = 'num'
+            val_list = map(float, val)
+        elif type(val[0]) in (str, unicode): # per-level string
+            val_type = 'str'
+            val_list = val
+
+    if val_type == 'str':
+        if key == 'name' or key == 'icon' or (key.startswith('ui_') and key != 'ui_name'):
+            # filter out unnecessary strings
+            return
+
+    if not val_type: return # not a recognized value type
+
+    for i in xrange(len(val_list)):
+        v = val_list[i]
+        if val_type == 'num':
+            if v < -2**31 or v > 2**31:
+                print 'value out of range: % L%d: %s' % (reason, i+1, repr(v))
+        elif val_type == 'str':
+            if len(v) > 64:
+                print 'value out of range: %s L%d: %s (len %d)' % (reason, i+1, v, len(v))
+
+    for i in xrange(val_levels) if val_levels else [0,]:
+        yield (i+1 if val_levels else None, val_list[i] if val_type == 'num' else None, val_list[i] if val_type == 'str' else None)
+
 if __name__ == '__main__':
     game_id = SpinConfig.game()
     commit_interval = 1000
@@ -93,13 +135,16 @@ if __name__ == '__main__':
     fishing_slates = SpinConfig.load_fd(fishing_json_fd, stripped=True) if fishing_json_fd else None
 
     cfg = SpinConfig.get_mysql_config(game_id+'_upcache')
-    con = MySQLdb.connect(*cfg['connect_args'], **cfg['connect_kwargs'])
+    if not dry_run:
+        con = MySQLdb.connect(*cfg['connect_args'], **cfg['connect_kwargs'])
+        cur = con.cursor(MySQLdb.cursors.DictCursor)
+    else:
+        cur = None
     stats_table = cfg['table_prefix']+game_id+'_stats'
     recipes_table = cfg['table_prefix']+game_id+'_crafting_recipes'
     fishing_slates_table = cfg['table_prefix']+game_id+'_fishing_slates'
     quest_stats_table = cfg['table_prefix']+game_id+'_quest_stats'
 
-    cur = con.cursor(MySQLdb.cursors.DictCursor)
     if not dry_run:
         filterwarnings('ignore', category = MySQLdb.Warning)
         for tbl, schema in ((stats_table, stats_schema),
@@ -178,8 +223,7 @@ if __name__ == '__main__':
             elif kind == 'building': num_levels = len(data['build_time'])
             elif kind == 'tech': num_levels = len(data['research_time'])
             elif kind == 'item': num_levels = data.get('max_level',1)
-            elif kind == 'recipe': num_levels = 1
-
+            elif kind == 'recipe': num_levels = data.get('max_level',1)
 
             # add max_level stat (redundant, but makes writing other queries easier)
             if num_levels > 1 or kind in ('unit','building','tech'):
@@ -191,49 +235,14 @@ if __name__ == '__main__':
                                 ('value_str',None)])
 
             for key, val in data.iteritems():
-                val_type = None # 'num' or 'str'
-                val_levels = None
-
-                if type(val) in (int, float): # single number
-                    val_type = 'num'
-                    val_list = [float(val)]
-                elif type(val) in (str, unicode): # single string
-                    val_type = 'str'
-                    val_list = [val]
-
-                elif type(val) is list and len(val) == num_levels:
-                    val_levels = num_levels
-                    if type(val[0]) in (int, float): # per-level number
-                        val_type = 'num'
-                        val_list = map(float, val)
-                    elif type(val[0]) in (str, unicode): # per-level string
-                        val_type = 'str'
-                        val_list = val
-
-                if val_type == 'str':
-                    if key == 'name' or key == 'icon' or (key.startswith('ui_') and key != 'ui_name'):
-                        # filter out unnecessary strings
-                        continue
-
-                if not val_type: continue # not a recognized value type
-
-
-                for i in xrange(len(val_list)):
-                    v = val_list[i]
-                    if val_type == 'num':
-                        if v < -2**31 or v > 2**31:
-                            print 'value out of range: %s %s %s L%d: %s' % (kind, specname, key, i+1, repr(v))
-                    elif val_type == 'str':
-                        if len(v) > 64:
-                            print 'value out of range: %s %s %s L%d: %s (len %d)' % (kind, specname, key, i+1, v, len(v))
-
+                reason = '%s %s %s' % (kind, specname, key)
                 keyvals += [[('kind',kind),
                              ('spec',specname),
                              ('stat',key),
-                             ('level',i+1 if val_levels else None),
-                             ('value_num',val_list[i] if val_type == 'num' else None),
-                             ('value_str',val_list[i] if val_type == 'str' else None)] \
-                            for i in (xrange(val_levels) if val_levels else [0,])]
+                             ('level',level),
+                             ('value_num',num_val),
+                             ('value_str',str_val)] \
+                            for level, num_val, str_val in leveled_quantity_iter(val, num_levels, reason)]
 
                 total += len(keyvals)
                 if commit_interval > 0 and len(keyvals) >= commit_interval:
@@ -241,44 +250,81 @@ if __name__ == '__main__':
                     if verbose: print total, 'object stats inserted'
 
     flush_keyvals(sql_util, cur, stats_table+'_temp', keyvals)
-    con.commit()
+    if not dry_run: con.commit()
     if verbose: print 'total', total, 'object stats inserted'
 
-    # CRAFTING RECIPES
+    # CRAFTING RECIPE INGREDIENTS/PRODUCTS
 
     total = 0
     keyvals = []
 
     for specname, data in gamedata['crafting']['recipes'].iteritems():
-        if 'max_level' in data or 'level' in data: raise Exception('leveled recipes not handled')
-        keyvals.append((('recipe_id', specname),
-                        ('is_output', 0),
-                        ('resource', 'time'),
-                        ('level',None),
-                        ('amount', data['craft_time'])))
-        for res, amt in data['cost'].iteritems():
-            keyvals.append((('recipe_id', specname),
-                            ('is_output', 0),
-                            ('resource', res),
-                            ('level',None),
-                            ('amount', amt)))
-        for entry in data.get('ingredients',[]):
-            keyvals.append((('recipe_id', specname),
-                            ('is_output', 0),
-                            ('resource', entry['spec']),
-                            ('level', entry.get('level',None)),
-                            ('amount', entry.get('stack',1))))
+        reason = 'crafting recipe: %s' % specname
+        num_levels = data.get('max_level',1)
 
-        for entry in data['product']:
-            if 'spec' not in entry:
-                raise Exception('cannot parse crafting recipe product: %s' % repr(entry))
-            res = entry['spec']
-            amt = entry.get('stack',1)
-            keyvals.append((('recipe_id', specname),
-                            ('is_output', 1),
-                            ('resource', res),
-                            ('level', entry.get('level',None)),
-                            ('amount', amt)))
+        keyvals += [(('recipe_id', specname),
+                     ('recipe_level',level),
+                     ('is_output', 0),
+                     ('resource', 'time'),
+                     ('level',None),
+                     ('amount', num_val)) \
+                    for level, num_val, str_val in leveled_quantity_iter(data['craft_time'], num_levels, reason)]
+
+        if 'cost' in data:
+            if type(data['cost']) is list:
+                cost_list = data['cost']
+                val_levels = num_levels
+            else:
+                cost_list = [data['cost']]
+                val_levels = None
+            for i in xrange(val_levels) if val_levels else [0,]:
+                for res, amt in cost_list[i].iteritems():
+                    keyvals += [(('recipe_id', specname),
+                                 ('recipe_level',i+1 if val_levels else None),
+                                 ('is_output', 0),
+                                 ('resource', res),
+                                 ('level', None),
+                                 ('amount', amt))]
+
+        if 'ingredients' in data:
+            assert type(data['ingredients']) is list
+            if len(data['ingredients']) > 0:
+
+                if type(data['ingredients'][0]) is list: # per-level list
+                    ingr_list = data['ingredients']
+                    assert len(ingr_list) == num_levels
+                    val_levels = num_levels
+                else:
+                    ingr_list = [data['ingredients']] # same for all levels
+                    val_levels = None
+            for i in xrange(val_levels) if val_levels else [0,]:
+                for entry in ingr_list[i]:
+                    keyvals += [(('recipe_id', specname),
+                                 ('recipe_level',i+1 if val_levels else None),
+                                 ('is_output', 0),
+                                 ('resource', entry['spec']),
+                                 ('level', entry.get('level',None)),
+                                 ('amount', entry.get('stack',1)))]
+        if 'product' in data:
+            assert type(data['product']) is list
+            if len(data['product']) > 0:
+                if type(data['product'][0]) is list: # per-level list
+                    prod_list = data['product']
+                    assert len(prod_list) == num_levels
+                    val_levels = num_levels
+                else:
+                    prod_list = [data['product']]
+                    val_levels = None
+                for i in xrange(val_levels) if val_levels else [0,]:
+                    for entry in prod_list[i]:
+                        if 'spec' not in entry:
+                            raise Exception('cannot parse crafting recipe product: %s' % repr(entry))
+                        keyvals += [(('recipe_id', specname),
+                                     ('recipe_level', i+1 if val_levels else None),
+                                     ('is_output', 1),
+                                     ('resource', entry['spec']),
+                                     ('level', entry.get('level',None)),
+                                     ('amount', entry.get('stack',1)))]
 
         total += len(keyvals)
         if commit_interval > 0 and len(keyvals) >= commit_interval:
@@ -286,7 +332,7 @@ if __name__ == '__main__':
             if verbose: print total, 'crafting recipe inputs/outputs inserted'
 
     flush_keyvals(sql_util, cur, recipes_table+'_temp', keyvals)
-    con.commit()
+    if not dry_run: con.commit()
     if verbose: print 'total', total, 'crafting recipe inputs/outputs inserted'
 
     # QUEST STATS
@@ -306,9 +352,9 @@ if __name__ == '__main__':
                 keyvals.append(('goal_building_spec', data['goal']['building_type']))
                 keyvals.append(('goal_building_qty', data['goal'].get('trigger_qty',1)))
                 keyvals.append(('goal_building_level', data['goal'].get('trigger_level',1)))
-            sql_util.do_insert(cur, quest_stats_table+'_temp', keyvals)
+            if not dry_run: sql_util.do_insert(cur, quest_stats_table+'_temp', keyvals)
             total += 1
-        con.commit()
+        if not dry_run: con.commit()
         if verbose: print 'total', total, 'quest stats inserted'
 
     # FISHING SLATES
@@ -322,7 +368,7 @@ if __name__ == '__main__':
                                 ('recipe_id', recipe_id)))
                 total += 1
         flush_keyvals(sql_util, cur, fishing_slates_table+'_temp', keyvals)
-        con.commit()
+        if not dry_run: con.commit()
         if verbose: print 'total', total, 'fishing slate entries inserted'
 
     if not dry_run:
