@@ -5475,9 +5475,6 @@ player.get_quest_status = function(quest) {
         }
     }
 
-    // note: the read_predicate calls below can recurse into player.can_activate/can_complete
-    // but that's fine and efficient because status is memoized by quest_cache
-
     if(('show_if' in quest) && !read_predicate(quest['show_if']).is_satisfied(player, qdata)) {
         return status; // show_if predicate not true
     }
@@ -5530,12 +5527,16 @@ player.update_quest_cache = function(force) {
     player.quest_cache = {};
     player.active_quests = [];
 
+    // Predicates that check for QUEST_COMPLETE can recurse and cause this to be O(N^2).
+    // Since game state cannot change during this loop, cache predicate results.
+    predicate_cache_on();
     for(var name in gamedata['quests']) {
         var quest = gamedata['quests'][name];
         if(player.can_activate_quest(quest)) {
             player.active_quests.push(quest);
         }
     }
+    predicate_cache_off();
 
     // sort active quest list so that it appears in the UI in good order,
     // and, if auto-accepting, make sure we accept the highest-priority eligible quest

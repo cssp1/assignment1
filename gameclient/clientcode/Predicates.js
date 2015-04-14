@@ -617,22 +617,47 @@ TechLevelPredicate.prototype.do_ui_help = function(player) {
     return null;
 };
 
+/** @type {(Object.<string,boolean>|null)} special cache just for QuestCompletedPredicate to avoid O(N^2) behavior */
+var quest_completed_predicate_cache = null;
+function predicate_cache_on() {
+    quest_completed_predicate_cache = {};
+}
+function predicate_cache_off() {
+    quest_completed_predicate_cache = null;
+}
+
 /** @constructor
   * @extends Predicate */
 function QuestCompletedPredicate(data) {
     goog.base(this, data);
-    this.quest_name = data['quest_name'];
-    this.quest = gamedata['quests'][this.quest_name];
+    this.quest = gamedata['quests'][data['quest_name']];
     this.must_claim = data['must_claim'] || false;
 }
 goog.inherits(QuestCompletedPredicate, Predicate);
 QuestCompletedPredicate.prototype.is_satisfied = function(player, qdata) {
-    if(!this.must_claim && !this.quest['force_claim'] && true) {
-        // new skip_quest_claim behavior
-        if(('activation' in this.quest) && !read_predicate(this.quest['activation']).is_satisfied(player, null)) { return false; }
-        return read_predicate(this.quest['goal']).is_satisfied(player, null);
+    if(!this.must_claim && !this.quest['force_claim']) {
+        // check recursively without requiring the other quest to be claimed
+
+        if(quest_completed_predicate_cache !== null && (this.quest['name'] in quest_completed_predicate_cache)) {
+            //console.log('HIT '+this.quest['name']);
+            return quest_completed_predicate_cache[this.quest['name']];
+        } else {
+            //console.log('MISS '+this.quest['name']);
+        }
+
+        var ret = true;
+        if(('activation' in this.quest) && !read_predicate(this.quest['activation']).is_satisfied(player, null)) {
+            ret = false;
+        }
+        if(ret && !read_predicate(this.quest['goal']).is_satisfied(player, null)) {
+            ret = false;
+        }
+        if(quest_completed_predicate_cache !== null) {
+            quest_completed_predicate_cache[this.quest['name']] = ret;
+        }
+        return ret;
     } else {
-        return (this.quest_name in player.completed_quests);
+        return (this.quest['name'] in player.completed_quests);
     }
 };
 QuestCompletedPredicate.prototype.do_ui_describe = function(player) {
