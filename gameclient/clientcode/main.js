@@ -3646,7 +3646,8 @@ MapBlockingGameObject.prototype.block_map_at = function(x,y,incr) {
         return;
     }
     var bounds = get_grid_bounds([x,y], this.spec['unit_collision_gridsize']);
-    astar_map.block_map([bounds[0][0], bounds[1][0]], [bounds[0][1]-bounds[0][0], bounds[1][1]-bounds[1][0]], incr);
+    // unknown if storing 'this' in cell.blockers will hurt performance
+    astar_map.block_map([bounds[0][0], bounds[1][0]], [bounds[0][1]-bounds[0][0], bounds[1][1]-bounds[1][0]], incr, this);
     invalidate_unit_paths();
     invalidate_all_threatlists();
 };

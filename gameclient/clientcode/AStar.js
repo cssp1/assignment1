@@ -314,8 +314,10 @@ AStar.AStarRectMap.prototype.get_unblocked_neighbors = function(node, checker, r
  * @param {!Array.<number>} xy upper-left corner of area to affect
  * @param {!Array.<number>} wh width and height (blockage is closed on the left and open on the right, i.e. [x,x+w-1] are the blocked cells, with x+w unblocked)
  * @param {number} value +1 to block, -1 to unblock
+ * @param {!Object} blocker reference to thing that is blocking here
  */
-AStar.AStarRectMap.prototype.block_map = function(xy, wh, value) {
+AStar.AStarRectMap.prototype.block_map = function(xy, wh, value, blocker) {
+    if(!blocker) { throw Error('must provide blocker'); } // Closure doesn't flag this
     for(var v = 0; v < wh[1]; v++) {
         for(var u = 0; u < wh[0]; u++) {
             var m = xy[1]+v, n = xy[0]+u;
@@ -324,8 +326,19 @@ AStar.AStarRectMap.prototype.block_map = function(xy, wh, value) {
                 if(cell) {
                     if(value > 0) {
                         cell.block();
+                        if(cell.blockers === null) {
+                            cell.blockers = [blocker];
+                        } else {
+                            cell.blockers.push(blocker);
+                        }
                     } else if(value < 0) {
                         cell.unblock();
+                        if(!cell.blockers || !goog.array.remove(cell.blockers, blocker)) {
+                            throw Error('unblock cell but blocker not found: '+JSON.stringify(blocker)+' in '+JSON.stringify(cell.blockers));
+                        }
+                        if(cell.blockers.length == 0) {
+                            cell.blockers = null;
+                        }
                     }
                     if(cell.is_empty()) {
                         this.free_cell([n,m]);
