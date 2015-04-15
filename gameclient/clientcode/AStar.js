@@ -813,6 +813,10 @@ AStar.AStarContext.prototype.debug_draw = function(ctx) {
         var xy = ortho_to_draw(vec_add(pos, [0.5,0.5]));
         ctx.fillStyle = col_str;
         ctx.fillRect(xy[0], xy[1], 4, 4);
+        if(item.score) {
+            ctx.fillStyle = 'rgb(255,255,255)';
+            ctx.fillText(item.score.toFixed(1), xy[0], xy[1]);
+        }
     });
     ctx.restore();
 };
@@ -896,7 +900,7 @@ AStar.AStarContext.prototype.search = function(start_pos, end_pos, path_checker)
             var col = (iter % 10) / 10;
             var col_s = ((255*col) & 0xFF).toString();
             var col_str = 'rgba('+col_s+','+col_s+','+col_s+',1)';
-            this.debug_scene.push({pos: currentNode.pos, col: col_str});
+            this.debug_scene.push({pos: currentNode.pos, col: col_str, score:currentNode.g});
         }
 
         // End case -- result has been found, return the traced path
@@ -946,7 +950,7 @@ AStar.AStarContext.prototype.search = function(start_pos, end_pos, path_checker)
 
             // g score is the shortest distance from start to current node, we need to check if
             //   the path we have arrived at this neighbor is the shortest one we have seen yet
-            // 1 is the distance from a node to it's neighbor.  This could be variable for weighted paths.
+            // 1 is the distance from a node to its neighbor.  This could be variable for weighted paths.
             var gScore = currentNode.g + 1 + cost; // add cost on top of normal movement
             var beenVisited = neighbor.visited;
 
@@ -984,6 +988,9 @@ AStar.AStarContext.prototype.search = function(start_pos, end_pos, path_checker)
     var ret = [];
     if(1 && (best_node != null)) {
         var curr = best_node;
+        if(AStar.ASTAR_DEBUG) {
+            console.log('AStar.search DONE(blocked) at ' + curr.pos[0].toString()+','+curr.pos[1].toString()+' iter '+iter.toString());
+        }
         while(curr.parent != null) {
             ret.push(curr.pos);
             curr = curr.parent;
