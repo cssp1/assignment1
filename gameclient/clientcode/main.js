@@ -3159,6 +3159,73 @@ GameObject.prototype.ai_pick_target_find_blocker = function(cur_cell, dest_cell,
     var blocker = null;
     var blocker_path_end = null;
 
+    if(gamedata['client']['astar_accessibility']) {
+        // use A* to plot a course through destructible blockers toward the target
+        //console.log('astar_accessibility '+vec_print(cur_cell)+' to '+vec_print(dest_cell)+' with range '+auto_spell_range.toString());
+        var ring_size = auto_spell_range + obj.hit_radius();
+
+        // A* cost function
+        // cost equals "how fast we can kill it" expressed in units of "time it would take to move one map cell"
+        var secs_per_move = 1.0 / this.combat_stats.maxvel;
+        var my_dps = this.get_leveled_quantity(auto_spell['damage'])/this.get_leveled_quantity(auto_spell['cooldown']);
+
+        var checker = function(cell, ignored_path) {
+            var blocker_list = cell.blockers;
+            if(!blocker_list) { return AStar.PASS; } // nothing here
+            var max_cost = AStar.PASS;
+            for(var k = 0; k < blocker_list.length; k++) {
+                var b = blocker_list[k];
+                if(!b.is_destroyed()) {
+                    if(b !== obj && b.is_building() && b.team === target_team) {
+                        var damage_mod = get_damage_modifier(priority_table, b);
+                        if(damage_mod > 0) {
+                            var secs_to_destroy = b.hp / (damage_mod * my_dps);
+                            var cost = secs_to_destroy / secs_per_move;
+                            //var cost = 0.1; // b.hp / my_damage;
+                            max_cost = Math.max(max_cost, cost); // cell cost is max of blocker costs
+                        } else {
+                            return AStar.NOPASS; // can't damage it
+                        }
+                    } else {
+                        return AStar.NOPASS; // blocked by something we can't destroy
+                    }
+                }
+            }
+            return max_cost;
+        };
+        var checker_key = this.team+':'+this.spec['name']; // checker should be unique to our team and spec
+
+        // perform the query
+        //PLAYFIELD_DEBUG=1;
+        //var path = astar_context.ring_search(cur_cell, dest_cell, ring_size, checker, checker_key);
+        var path = astar_context.search(cur_cell, dest_cell, checker, checker_key);
+        //PLAYFIELD_DEBUG=0;
+
+        if(path && path.length > 0) {
+            for(var i = 0; i < path.length; i++) {
+                var cell_pos = path[i];
+                if(astar_map.is_blocked(cell_pos) === AStar.PASS) { continue; } // ignore clear steps along path
+                var blocker_list = astar_map.cell(cell_pos).blockers;
+                if(!blocker_list) { continue; }
+                for(var k = 0; k < blocker_list.length; k++) {
+                    var b = blocker_list[k];
+                    if(b !== obj && !b.is_destroyed() && b.is_building() && b.team === target_team) {
+                        // found optimal blocker!
+                        blocker = b;
+                        // where to stand to smash it?
+                        // XXX could optimize by going further back along path to edge of weapon range
+                        blocker_path_end = (i > 0 ? path[i-1] : vec_copy(cur_cell));
+                        //console.log('astar_accessibility FOUND '+blocker.spec['name']+' at '+vec_print(blocker_path_end));
+                        playfield_check_pos(blocker_path_end, 'blocker_path_end');
+                        break;
+                    }
+                }
+                if(blocker) { break; }
+            }
+        }
+    } else {
+    // not indented to minimize diff
+
     /** @type {Object.<string,boolean>} - set of object IDs we've seen */
     var seen_objects = {}; // for making sure we only evaluate each candidate blocker once
 
@@ -3212,6 +3279,8 @@ GameObject.prototype.ai_pick_target_find_blocker = function(cur_cell, dest_cell,
         }
         if(blocker) { break; } // stop - any other objects would be further along the path and thus further away
     }
+    }
+
     return (blocker && blocker_path_end) ? {blocker:blocker, blocker_path_end:blocker_path_end} : null;
 };
 
