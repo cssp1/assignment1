@@ -3088,7 +3088,9 @@ GameObject.prototype.ai_pick_target_classic = function(auto_spell, auto_spell_le
 
                     if(!accessible && ('blocker' in priority_table)) { // no cell within shooting range of the target is accessible by a fully clear path
                         // try to identify a barrier along the way, and promote it up near the target's priority
-                        var temp = this.ai_pick_target_find_blocker(cur_cell, dest_cell, target_team, obj, auto_spell_range, priority_table);
+                        var temp = this.ai_pick_target_find_blocker(cur_cell, dest_cell, target_team, obj, auto_spell_range,
+                                                                    // note: pass damage_vs, not priority_vs, to avoid including things like "barrier":0
+                                                                    auto_spell['damage_vs'] || {});
                         if(temp) {
                             var blocker = temp.blocker, blocker_path_end = temp.blocker_path_end;
                             // found something in the way that we can smash!
@@ -3148,7 +3150,7 @@ GameObject.prototype.ai_pick_target_classic = function(auto_spell, auto_spell_le
     @param {string} target_team - limit candidate objects to those on this team
     @param {GameObject} obj - the actual target we're trying to reach
     @param {number} auto_spell_range - our weapon range
-    @param {!Object.<string,number>} priority_table - our merged damage/priority_vs table
+    @param {!Object.<string,number>} priority_table - scales our expected damage against various targets
     @return {{blocker:!GameObject, blocker_path_end: !Array.<number>}|null} - the blocking object, and the nearby cell coordinates from which we can hit it */
 // XXX should be a member of Mobile, not GameObject
 GameObject.prototype.ai_pick_target_find_blocker = function(cur_cell, dest_cell, target_team, obj, auto_spell_range, priority_table) {
