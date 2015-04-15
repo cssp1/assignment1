@@ -1040,10 +1040,13 @@ AStar.CachedAStarContext.prototype.debug_dump = function() {
  * @param {!Array.<number>} start_pos
  * @param {!Array.<number>} end_pos
  * @param {number} ring_size
+ * @param {string|null} checker_key
  * @return {string}
  */
-AStar.CachedAStarContext.prototype.cache_key = function(start_pos, end_pos, ring_size) {
-    return (start_pos[0].toFixed(0)+','+start_pos[1].toFixed(0)+':'+end_pos[0].toFixed(0)+','+end_pos[1].toFixed(0)+','+ring_size.toFixed(0));
+AStar.CachedAStarContext.prototype.cache_key = function(start_pos, end_pos, ring_size, checker_key) {
+    var ret = (start_pos[0].toFixed(0)+','+start_pos[1].toFixed(0)+':'+end_pos[0].toFixed(0)+','+end_pos[1].toFixed(0)+','+ring_size.toFixed(0));
+    if(checker_key) { ret += ','+checker_key; }
+    return ret;
 };
 
 /** Cached wrapper around A* search function
@@ -1051,22 +1054,35 @@ AStar.CachedAStarContext.prototype.cache_key = function(start_pos, end_pos, ring
  * @param {!Array.<number>} start_pos
  * @param {!Array.<number>} end_pos
  * @param {AStar.PathChecker=} path_checker
+ * @param {string=} checker_key to uniquely identify the path_checker for cache retrieval
  * @return {!Array.<!Array.<number>>}
  */
-AStar.CachedAStarContext.prototype.search = function(start_pos, end_pos, path_checker) {
-    if(path_checker) { throw Error('checkers not supported in CachedAStarContext'); }
+AStar.CachedAStarContext.prototype.search = function(start_pos, end_pos, path_checker, checker_key) {
+    if(path_checker) {
+        if(!checker_key) { throw Error('must provide a checker_key'); }
+    } else if(checker_key) {
+        throw Error('checker_key should be null');
+    }
+
     this.check_dirty();
 
-    var key = this.cache_key(start_pos, end_pos, 0);
+    var key = this.cache_key(start_pos, end_pos, 0, checker_key || null);
     if(key in this.cache) {
         // must make a copy, because the caller may mutate the path
         return goog.array.clone(this.cache[key]);
     }
 
-    this.ensure_connectivity();
+    var start_region, end_region;
 
-    var start_region = (this.connectivity ? this.connectivity.region_num(start_pos) : 0);
-    var end_region = (this.connectivity ? this.connectivity.region_num(end_pos) : 0);
+    // using a checker (for blocker destruction) means no connectivity, since connectivity is based on absolute blockage
+    // note that we COULD use connectivity if the checker was always more strict than basic is_blocked
+    if(!path_checker) {
+        this.ensure_connectivity();
+        start_region = (this.connectivity ? this.connectivity.region_num(start_pos) : 0);
+        end_region = (this.connectivity ? this.connectivity.region_num(end_pos) : 0);
+    } else {
+        start_region = end_region = 0;
+    }
 
     /** @type {!Array.<!Array.<number>>} */
     var ret;
@@ -1087,13 +1103,32 @@ AStar.CachedAStarContext.prototype.search = function(start_pos, end_pos, path_ch
   * @param {!Array.<number>} start_pos
   * @param {!Array.<number>} end_pos
   * @param {number} ring_size
+  * @param {AStar.PathChecker=} path_checker
+  * @param {string=} checker_key to uniquely identify the path_checker for cache retrieval
   * @return {!Array.<!Array.<number>>}
   */
-AStar.CachedAStarContext.prototype.ring_search = function(start_pos, end_pos, ring_size) {
+AStar.CachedAStarContext.prototype.ring_search = function(start_pos, end_pos, ring_size, path_checker, checker_key) {
     if(ring_size < 1) { throw Error('ring_size < 1'); }
+
+    /** @type {AStar.BlockChecker|null} */
+    var cell_checker = null;
+
+    if(path_checker) {
+        if(!checker_key) { throw Error('must provide a checker_key'); }
+
+        // adapt path_checker to evaluate ring around target
+        cell_checker = /** @type {AStar.BlockChecker} */ (function(cell) {
+            // not sure what to pass for the "path" here
+            return  path_checker(cell, [cell.pos]);
+        });
+
+    } else if(checker_key) {
+        throw Error('checker_key should be null');
+    }
+
     this.check_dirty();
 
-    var key = this.cache_key(start_pos, end_pos, ring_size);
+    var key = this.cache_key(start_pos, end_pos, ring_size, checker_key || null);
     if(key in this.cache) {
         this.hits++;
 
@@ -1105,9 +1140,13 @@ AStar.CachedAStarContext.prototype.ring_search = function(start_pos, end_pos, ri
         this.peak_size = Math.max(this.peak_size, this.size);
     }
 
-    this.ensure_connectivity();
-
-    var start_region = (this.connectivity ? this.connectivity.region_num(start_pos) : 0);
+    var start_region;
+    if(!path_checker) {
+        this.ensure_connectivity();
+        start_region = (this.connectivity ? this.connectivity.region_num(start_pos) : 0);
+    } else {
+        start_region = 0;
+    }
 
     /** @type {!Array.<!Array.<number>>|null} */
     var ret = null;
@@ -1124,9 +1163,9 @@ AStar.CachedAStarContext.prototype.ring_search = function(start_pos, end_pos, ri
                 for(var y = end_pos[1]-r; y <= end_pos[1]+r; y += ((x == end_pos[0]-r || x == end_pos[0]+r) ? 1 : 2*r)) {
                     if(x < 0 || x >= this.map.size[0] || y < 0 || y >= this.map.size[1]) { continue; }
                     var p = [x,y];
-                    var end_region = (this.connectivity ? this.connectivity.region_num(p) : 0);
+                    var end_region = ((!path_checker && this.connectivity) ? this.connectivity.region_num(p) : 0);
                     if(end_region == start_region && end_region >= 0) { // only consider if possibly accessible
-                        if(!this.map.is_blocked(p)) {
+                        if(this.map.is_blocked(p, cell_checker) !== AStar.NOPASS) {
                             points.push(p);
                         }
                     }
@@ -1146,7 +1185,7 @@ AStar.CachedAStarContext.prototype.ring_search = function(start_pos, end_pos, ri
                 }
             });
             for(var i = 0; i < points.length; i++) {
-                var path = this.search(start_pos, points[i]); // note: this uses the cache as well
+                var path = this.search(start_pos, points[i], path_checker, checker_key); // note: this uses the cache as well
                 if(path.length > 0) {
                     ret = path;
                     break;
