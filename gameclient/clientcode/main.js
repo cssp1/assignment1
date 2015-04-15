@@ -44564,7 +44564,7 @@ function create_mouse_tooltip() {
                         var item_list = equip[slot_type];
                         for(var i = 0; i < item_list.length; i++) {
                             if(item_list[i]) {
-                                var espec = ItemDisplay.get_inventory_item_spec(item_list[i]);
+                                var espec = ItemDisplay.get_inventory_item_spec(player.decode_equipped_item(item_list[i])['spec']);
                                 str.push(ItemDisplay.get_inventory_item_ui_name(espec));
                             }
                         }
