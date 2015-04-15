@@ -787,7 +787,7 @@ AStar.AStarContext = function(map, options) {
     this.iter_limit = options.iter_limit || -1;
 
     /** "scene graph" for debug drawing
-        @type {!Array.<{pos: !Array.<number>, col:string}>} */
+        @type {!Array.<{pos: !Array.<number>, col:string, score:number}>} */
     this.debug_scene = [];
 
     var heuristic_name = options.heuristic_name || 'manhattan';
