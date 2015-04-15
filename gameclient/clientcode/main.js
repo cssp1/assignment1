@@ -27156,10 +27156,10 @@ player.squad_find_path_adjacent_to = function(squad_id, dest) {
                             continue; // not necessarily blocked! (there might be another feature here though)
                         }
                     }
-                    return true; // blocked by this feature
+                    return AStar.NOPASS; // blocked by this feature
                 }
             }
-            return false; // not blocked
+            return AStar.PASS; // not blocked
         }; };
     }
 

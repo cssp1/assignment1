@@ -32,11 +32,21 @@ goog.require('goog.array');
 goog.require('goog.object');
 goog.require('BinaryHeap');
 
+AStar.ASTAR_DEBUG = 0;
+
 /** @const */
-var AStar = {
-    ASTAR_DEBUG: 0,
-    ASTAR_MAX_ITER: 999999 // limit iterations to prevent infinite loop
-};
+AStar.ASTAR_MAX_ITER = 999999; // limit iterations to prevent infinite loop
+
+/** @typedef {number} return value of is_blocked()
+    Note: a lot of legacy code assumes this is a boolean, so be careful! */
+AStar.PassStatus;
+
+/** @type {AStar.PassStatus} return value of is_blocked() that indicates cell is free to pass */
+AStar.PASS = 0;
+
+/** @type {AStar.PassStatus} return value of is_blocked() that indicates cell is never passable */
+AStar.NOPASS = Infinity;
+
 
 // DISTANCE HEURISTICS
 // See list of heuristics: http://theory.stanford.edu/~amitp/GameProgramming/Heuristics.html
@@ -71,14 +81,14 @@ AStar.heuristic_euclidean = function(start_pos, cur_pos, end_pos) {
 // for more complex situations, you can use the blockers list to associate state with
 // blockage, and then use a "checker" function to test against that state.
 
-/** Function to evaluate the blockage of a cell. Return true if blocked, false otherwise.
- * @typedef {function(AStar.AStarCell): boolean | null} */
+/** Function to evaluate the blockage of a cell. Return nonzero cost if blocked, 0 otherwise.
+ * @typedef {function(!AStar.AStarCell): !AStar.PassStatus | null} */
 AStar.BlockChecker;
 
 /** Function to evaluate the blockage of a cell when reached via a specific path.
  *  Note that path dependence may invalidate the A* algorithm.
  *  The second parameter is the array of coordinates along the path, excluding starting point, including ending point.
- * @typedef {function(AStar.AStarCell, !Array.<!Array.<number>>): boolean | null} */
+ * @typedef {function(!AStar.AStarCell, !Array.<!Array.<number>>): !AStar.PassStatus | null} */
 AStar.PathChecker;
 
 /** @constructor
@@ -117,10 +127,10 @@ AStar.AStarCell.prototype.unblock = function() { this.block_count -= 1; }
 /** Test map cell for blockage. Optionally supply a "checker" function that can perform
  * arbitrary logic. Otherwise just uses block_count to determine blockage.
  * @param {AStar.BlockChecker=} checker
- * @return {boolean} */
+ * @return {!AStar.PassStatus} */
 AStar.AStarCell.prototype.is_blocked = function(checker) {
     if(checker) { return checker(this); }
-    return this.block_count > 0;
+    return (this.block_count > 0 ? AStar.NOPASS : AStar.PASS);
 }
 
 /** Initialize fields needed by the A* search, lazily, and return reference to this.
@@ -224,7 +234,7 @@ AStar.AStarMap.prototype.cell_if_unblocked = function(xy, checker) {
        xy[1] >= 0 && xy[1] < this.size[1]) {
         if(this.terrain_func && this.terrain_func(xy)) { return null; }
         var c = this.cell(xy); // potentially create cell here if it is within the map area but not blocked
-        if(c.is_blocked(checker)) { return null; }
+        if(c.is_blocked(checker) === AStar.NOPASS) { return null; }
         return c;
     }
     return null;
@@ -232,16 +242,17 @@ AStar.AStarMap.prototype.cell_if_unblocked = function(xy, checker) {
 
 /** @param {!Array.<number>} xy
  * @param {AStar.BlockChecker=} checker
- * @return {boolean} */
+ * @return {!AStar.PassStatus} */
 AStar.AStarMap.prototype.is_blocked = function(xy, checker) {
     if(xy[0] >= 0 && xy[0] < this.size[0] &&
        xy[1] >= 0 && xy[1] < this.size[1]) {
-        if(this.terrain_func && this.terrain_func(xy)) { return true; }
-        if(!this.map[xy[1]]) { return false; }
+        if(this.terrain_func && this.terrain_func(xy)) { return AStar.NOPASS; }
+        if(!this.map[xy[1]]) { return AStar.PASS; }
         var c = this.map[xy[1]][xy[0]];
-        return (!!c) && c.is_blocked(checker);
+        if(!c) { return AStar.PASS; }
+        return c.is_blocked(checker);
     }
-    return true;
+    return AStar.NOPASS;
 };
 
 /** @return {number} */
@@ -668,7 +679,7 @@ AStar.Connectivity = function(map) {
     /** @type {!Array.<number>} */
     this.flood = new Array(this.size[0]*this.size[1]);
 
-    // use a flood-fill algorithm to assign region numbersj
+    // use a flood-fill algorithm to assign region numbers
 
     var val = 0;
     for(var y = 0; y < this.size[1]; y++) {
