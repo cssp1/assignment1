@@ -918,7 +918,8 @@ var synchronizer = new Synchronizer();
 // goals like "move here" "attack this thing" etc.
 
 var AI_DEBUG = 0; // 1 = display unit AI states, 2 = also print lots of AI info to console
-var PLAYFIELD_DEBUG = false; // display unit and building info debug text
+var PLAYFIELD_DEBUG = false; // extra checking/recording on playfield movement
+var PLAYFIELD_DEBUG_DRAW = false; // display unit and building info debug text
 var COMBAT_DEBUG = (get_query_string('wombat') == '1');
 var CLICK_DETECTION_DEBUG = (get_query_string('click_detection_debug') == '1');
 
@@ -45798,9 +45799,12 @@ function do_draw() {
             draw_backdrop(draw_playfield_objects);
 
             // draw map grid
-            if(PLAYFIELD_DEBUG) {
+            if(PLAYFIELD_DEBUG_DRAW) {
+                ctx.save();
+                ctx.font = SPUI.make_font(8, 12, 'normal').str();
                 draw_debug_map();
                 if(astar_context) { astar_context.debug_draw(ctx); }
+                ctx.restore();
             }
 
             if(draw_playfield_objects) {
