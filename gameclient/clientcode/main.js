@@ -3676,6 +3676,10 @@ GameObject.prototype.remove_permanent_effect = function() {
  */
 function MapBlockingGameObject() {
     goog.base(this);
+
+    // NESW neighbor presence - this is how much to ADD to bound size in each direction because of the presence or absence of a neighbor.
+    // Only updated by WallManager.
+    this.neighbors = [0,0,0,0];
 }
 goog.inherits(MapBlockingGameObject, GameObject);
 
@@ -3701,26 +3705,48 @@ MapBlockingGameObject.prototype.update_map = function(old_x, old_y, was_destroye
         if(!this.is_destroyed()) {
             this.block_map(1);
         }
+
+        if(wall_mgr && wall_mgr.spec === this.spec) { wall_mgr.dirty = true; }
     }
+};
+
+/** @return {!Array.<!Array.<number>>} map bounds CURRENTLY blocked
+    (may differ from original bounds if using collide_as_wall setting) */
+MapBlockingGameObject.prototype.current_collision_bounds = function(xy) {
+    var b = get_grid_bounds(xy, this.spec['unit_collision_gridsize']);
+    b[0][0] -= this.neighbors[3]; // west neighbor
+    b[0][1] += this.neighbors[1]; // east
+    b[1][0] -= this.neighbors[0]; // north
+    b[1][1] += this.neighbors[2]; // south
+    return b;
+};
+
+MapBlockingGameObject.prototype.set_neighbors = function(new_neighbors) {
+    if(!goog.array.some(this.neighbors, function(n, i) { return n != new_neighbors[i]; })) {
+        return; // no delta
+    }
+    this.block_map(-1);
+    this.neighbors = new_neighbors;
+    this.block_map(1);
 };
 
 /** Return true if this object overlays any grid cell along a list of cells
     @param {Array.<Array.<number>>} path
     @return {boolean} */
 MapBlockingGameObject.prototype.covers_any_of = function(path) {
-    var bounds = get_grid_bounds([this.x,this.y], this.spec['unit_collision_gridsize']);
+    var bounds = this.current_collision_bounds([this.x,this.y]);
     return goog.array.some(path, function(xy) {
         return (xy[0] >= bounds[0][0] && xy[0] < bounds[0][1] &&
                 xy[1] >= bounds[1][0] && xy[1] < bounds[1][1]);
     });
 };
 
+/** @private */
 MapBlockingGameObject.prototype.block_map_at = function(x,y,incr) {
     if(this.spec['unit_collision_gridsize'][0] <= 0) {
         return;
     }
-    var bounds = get_grid_bounds([x,y], this.spec['unit_collision_gridsize']);
-    // unknown if storing 'this' in cell.blockers will hurt performance
+    var bounds = this.current_collision_bounds([x,y]);
     astar_map.block_map([bounds[0][0], bounds[1][0]], [bounds[0][1]-bounds[0][0], bounds[1][1]-bounds[1][0]], incr, this);
     invalidate_unit_paths();
     invalidate_all_threatlists();
@@ -7424,12 +7450,89 @@ var last_chat_ping = 0;
 var last_loot_text_time = 0;
 var last_loot_text_count = 0;
 var last_loot_text_pos = null;
+
+/** The "Wall Manager" adjusts the neighbor values of Buildings representing linkable walls
+    to create or close collision gaps as necessary. Updated lazily at the beginning of the
+    next combat tick after any change to neighbor state.
+    @constructor
+    @struct
+    @param {!Array.<number>} size - map size, in grid cells
+    @param {!Object} spec - for the barrier object
+*/
+var WallManager = function(size, spec) {
+    this.spec = spec; // of the barrier object
+    this.gs = spec['unit_collision_gridsize'];
+    this.size = size; // xy dimensions in map cell units
+    for(var axis = 0; axis < 2; axis++) {
+        if(this.size[axis] % this.gs[axis] !== 0) {
+            throw Error('size is not a multiple of '+this.spec['name']+' unit_collision_gridsize');
+        }
+    }
+    this.chunk = [this.size[0]/this.gs[0], this.size[1]/this.gs[1]]; // xy dimensions of the bitmap (coarseness is the collision gridsize)
+    this.bitmap = new Array(this.chunk[0]*this.chunk[1]);
+    this.dirty = true;
+};
+
+/** Update neighbor states
+    @param {!Object.<string,GameObject>} obj_dict - the current objects in the session */
+WallManager.prototype.refresh = function(obj_dict) {
+    if(!this.dirty) { return; }
+    this.dirty = false;
+
+    // clear bitmap
+    for(var i = 0; i < this.chunk[0]*this.chunk[1]; i++) {
+        this.bitmap[i] = 0;
+    }
+
+    // pass 1: find barriers and build bitmap
+    var obj_list = [];
+    for(var id in obj_dict) {
+        var obj = obj_dict[id];
+        if(obj.spec !== this.spec || obj.is_destroyed()) { continue; }
+        obj_list.push(obj);
+
+        // add to bitmap
+        var y = Math.floor(obj.y / this.gs[1]);
+        var x = Math.floor(obj.x / this.gs[0]);
+        this.bitmap[this.chunk[0]*y + x] = 1;
+    }
+
+    // pass 2: set up new neighbor states
+    var DIRECTIONS = [[0,-1],[1,0],[0,1],[-1,0]]; // NESW offsets
+    goog.array.forEach(obj_list, function(obj) {
+        var neighbors = [-1,-1,-1,-1]; // shrink inward by 1 unit, unless a neighbor is found
+        for(var i = 0; i < DIRECTIONS.length; i++) {
+            var xy = vec_add([Math.floor(obj.x/this.gs[0]), Math.floor(obj.y/this.gs[1])], DIRECTIONS[i]);
+            if(xy[0] >= 0 && xy[0] < this.chunk[0] && xy[1] >= 0 && xy[1] < this.chunk[1]) {
+                if(this.bitmap[this.chunk[0]*xy[1] + xy[0]]) {
+                    neighbors[i] = 0;
+                }
+            }
+        }
+        obj.set_neighbors(neighbors);
+    }, this);
+};
+
+/** @type {WallManager|null} */
+var wall_mgr = null;
+
+/** @param {!Array.<number>} ncells of the playfield map */
+var init_wall_mgr = function(ncells) {
+    var spec = gamedata['buildings']['barrier'];
+    if(spec && (spec['collide_as_wall'] || gamedata['client']['enable_wall_manager'])) {
+        return new WallManager(ncells, spec);
+    }
+    return null;
+};
+
 var tick_astar_queries_left = 0;
 
 function run_unit_ticks() {
     if(client_time - last_tick_time > TICK_INTERVAL/combat_time_scale()) {
         // record time at which this tick was computed
         last_tick_time = client_time;
+
+        if(wall_mgr) { wall_mgr.refresh(session.cur_objects.objects); }
 
         if(astar_map) {
             astar_map.cleanup();
@@ -41592,6 +41695,7 @@ function handle_server_message(data) {
         voxel_map_accel = new VoxelMapAccelerator.VoxelMapAccelerator(ncells, gamedata['client']['map_accel_chunk']);
         team_map_accel = new TeamMapAccelerator.TeamMapAccelerator();
         map_queries_by_tag = {'ticks':0};
+        wall_mgr = init_wall_mgr(ncells);
 
         // read object state from server
         session.cur_objects.clear();
