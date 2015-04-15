@@ -126,7 +126,7 @@ AStar.AStarCell.prototype.unblock = function() { this.block_count -= 1; }
 
 /** Test map cell for blockage. Optionally supply a "checker" function that can perform
  * arbitrary logic. Otherwise just uses block_count to determine blockage.
- * @param {AStar.BlockChecker=} checker
+ * @param {(AStar.BlockChecker|null)=} checker
  * @return {!AStar.PassStatus} */
 AStar.AStarCell.prototype.is_blocked = function(checker) {
     if(checker) { return checker(this); }
@@ -923,15 +923,18 @@ AStar.AStarContext.prototype.search = function(start_pos, end_pos, path_checker)
         for(var i = 0, il = neighbors.length; i < il; i++) {
             var neighbor = neighbors[i];
 
-            if(!neighbor || neighbor.is_blocked(cell_checker) || neighbor.get(this.serial).closed) {
+            if(!neighbor || neighbor.get(this.serial).closed) {
                 // not a valid node to process, skip to next neighbor
                 continue;
             }
 
+            var cost = neighbor.is_blocked(cell_checker);
+            if(cost === AStar.NOPASS) { continue; } // completely blocked
+
             // g score is the shortest distance from start to current node, we need to check if
             //   the path we have arrived at this neighbor is the shortest one we have seen yet
             // 1 is the distance from a node to it's neighbor.  This could be variable for weighted paths.
-            var gScore = currentNode.g + 1;
+            var gScore = currentNode.g + 1 + cost; // add cost on top of normal movement
             var beenVisited = neighbor.visited;
 
             if(!beenVisited || (gScore < neighbor.g)) {
