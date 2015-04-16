@@ -8910,8 +8910,8 @@ class Player(AbstractPlayer):
 
                     self.main_squad_space += obj.get_leveled_quantity(obj.spec.provides_space)
                     if obj.spec.manufacture_category and obj.spec.unit_repair_speed:
-                        self.apply_modstat_to_manufacture_category(obj.spec.manufacture_category, 'repair_speed', '*=strength',
-                                                                   obj.get_stat('unit_repair_speed', obj.get_leveled_quantity(obj.spec.unit_repair_speed)),
+                        self.apply_modstat_to_manufacture_category(obj.spec.manufacture_category, 'repair_speed', '*=(1+strength)',
+                                                                   obj.get_stat('unit_repair_speed', obj.get_leveled_quantity(obj.spec.unit_repair_speed)) - 1.0,
                                                                    'building', obj.spec.name, {'level': obj.level})
 
                     self.quarry_control_limit += obj.get_leveled_quantity(obj.spec.provides_quarry_control)
