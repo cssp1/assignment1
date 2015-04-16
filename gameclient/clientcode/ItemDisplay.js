@@ -15,6 +15,7 @@ goog.require('goog.array');
 goog.require('SPUI');
 goog.require('SPFX');
 goog.require('GameArt');
+goog.require('ModChain');
 
 // requires from main.js: player.get_any_abtest_value, player.stattab, get_leveled_quantity, Store.display_user_currency_amount, vec_add,
 // Store.gamebucks_ui_name(),
@@ -294,13 +295,16 @@ ItemDisplay.get_inventory_item_ui_subtitle = function(spec) {
 };
 
 /** return displayable description for item of given spec, using BBCode
-    @param {Object} spec
-    @param {number=} stack
-    @param {number|null=} item_duration
+    @param {Object} item
     @param {{hide_item_set:(boolean|undefined)
             }=} opts
     @returns {string} BBCode result */
-ItemDisplay.get_inventory_item_ui_description = function(spec, stack, item_duration, opts) {
+ItemDisplay.get_inventory_item_ui_description = function(item, opts) {
+    var spec = ItemDisplay.get_inventory_item_spec(item['spec']);
+    var stack = ('stack' in item ? item['stack'] : 1);
+    var level = ('level' in item ? item['level'] : 1);
+    var item_duration = ('item_duration' in item ? item['item_duration'] : null);
+
     var descr = eval_cond_or_literal(spec['ui_description'], player, null);
     if(descr.indexOf("%price") != -1) { // special-case hack for cost-capping auras
         var price = spec['use']['spellarg'][2];
@@ -309,6 +313,31 @@ ItemDisplay.get_inventory_item_ui_description = function(spec, stack, item_durat
     while(descr.indexOf("%stack") != -1) {
         descr = descr.replace("%stack", pretty_print_number(stack || 1));
     }
+    while(descr.indexOf("%level") != -1) {
+        descr = descr.replace("%level", pretty_print_number(stack || 1));
+    }
+
+    if(descr.indexOf('%modstats') != -1) {
+        var effect_list = null;
+        if(spec['equip'] && spec['equip']['effects']) {
+            if(spec['equip']['effects'][0]['code'] == 'apply_player_aura') {
+                effect_list = gamedata['auras'][spec['equip']['effects'][0]['aura_name']]['effects'];
+            } else {
+                effect_list = spec['equip']['effects'];
+            }
+        }
+        if(effect_list) {
+            var ui_modstat_list = [];
+            goog.array.forEach(effect_list, function(eff) {
+                var strength = get_leveled_quantity(eff['strength'], level);
+                if(strength) {
+                    ui_modstat_list.push(ModChain.display_modstat_effect(eff, level));
+                }
+            });
+            descr = descr.replace('%modstats', ui_modstat_list.join('\n'));
+        }
+    }
+
     if(spec['item_set'] && !(opts && opts.hide_item_set)) {
         var item_set = gamedata['item_sets'][spec['item_set']];
         var set_cur = (item_set['name'] in player.stattab['item_sets'] ? player.stattab['item_sets'][item_set['name']] : 0);

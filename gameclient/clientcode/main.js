@@ -21115,7 +21115,7 @@ function mail_dialog_invoke_context(inv_dialog, slot, item) {
     }
 
     // resize height to fit description text
-    dialog.widgets['description'].set_text_bbcode(ItemDisplay.get_inventory_item_ui_description(spec, ('stack' in item ? item['stack'] : 1), item['item_duration']));
+    dialog.widgets['description'].set_text_bbcode(ItemDisplay.get_inventory_item_ui_description(item));
     dialog.widgets['description'].update_dims(); // force immediate text layout so we can determine how much space it takes up
     dialog.widgets['bgrect'].wh[1] = dialog.widgets['title'].wh[1] + dialog.widgets['description'].wh[1];
 
@@ -21872,7 +21872,7 @@ function invoke_inventory_context(inv_dialog, parent_widget, slot, item, show_dr
     }
 
     // enlarge height to fit description text
-    dialog.widgets['description'].set_text_bbcode(ItemDisplay.get_inventory_item_ui_description(spec, ('stack' in item ? item['stack'] : 1), item['item_duration']));
+    dialog.widgets['description'].set_text_bbcode(ItemDisplay.get_inventory_item_ui_description(item));
     dialog.widgets['description'].update_dims(); // force immediate text layout so we can determine how much space it takes up
     dialog.widgets['bgrect'].wh[1] = dialog.widgets['title'].wh[1] + dialog.widgets['subtitle'].wh[1] + dialog.widgets['description'].wh[1];
 
@@ -30253,7 +30253,7 @@ function crafting_dialog_select_recipe_leaders(dialog, specname, recipe) {
     dialog.widgets['name'].text_color = ItemDisplay.get_inventory_item_color(leader_spec);
 
     // work on line breaking
-    var bbtext = ItemDisplay.get_inventory_item_ui_description(leader_spec, 1, null, {hide_item_set:true});
+    var bbtext = ItemDisplay.get_inventory_item_ui_description({'spec': leader_spec['name']}, {hide_item_set:true}); // XXXXXX level
     dialog.widgets['description'].set_text_bbcode(bbtext);
     if(dialog.widgets['description'].clip_to_max_lines(dialog.data['widgets']['description']['max_lines'], dialog.data['widgets']['description']['ui_name_seemore'])) {
         // there was an overflow, add tooltip
@@ -39053,31 +39053,32 @@ function update_upgrade_dialog_equipment(dialog) {
 
                     // update the items shown in the equipment slots
                     if(equip && (type_name in equip) && (equip[type_name].length > n) && equip[type_name][n]) {
-                        var especname = player.decode_equipped_item(equip[type_name][n])['spec'];
+                        var eitem = player.decode_equipped_item(equip[type_name][n]);
+                        var especname = eitem['spec'];
                         var espec = ItemDisplay.get_inventory_item_spec(especname);
                         ItemDisplay.set_inventory_item_asset(dialog.widgets['equip_item'+slot_i], espec);
                         dialog.widgets['equip_item'+slot_i].show = true;
                         dialog.widgets['equip_frame'+slot_i].state = 'normal';
 
                         if(!child_dialog) {
-                            dialog.widgets['equip_frame'+slot_i].onenter = (function (_slot_i, _type_name, _n, _espec) { return function(w) {
+                            dialog.widgets['equip_frame'+slot_i].onenter = (function (_slot_i, _type_name, _n, _eitem) { return function(w) {
                                 var dialog = w.parent;
                                 if(dialog.user_data['context'] &&
                                    dialog.user_data['context'].user_data['slot'] === _slot_i) {
                                     return;
                                 }
-                                invoke_inventory_context(w.parent, w, _slot_i, {'spec':_espec['name']}, false, {'position':'top_or_bottom'});
-                            }; })(slot_i, type_name, n, espec);
+                                invoke_inventory_context(w.parent, w, _slot_i, _eitem, false, {'position':'top_or_bottom'});
+                            }; })(slot_i, type_name, n, eitem);
                         } else {
                             invoke_inventory_context(dialog, dialog.widgets['equip_frame'+slot_i], -1, null, false);
                             dialog.widgets['equip_frame'+slot_i].onenter = null;
                         }
-                        dialog.widgets['equip_frame'+slot_i].onleave_cb = (function (_slot_i, _type_name, _n, _espec) { return function(w) {
+                        dialog.widgets['equip_frame'+slot_i].onleave_cb = (function (_slot_i, _type_name, _n) { return function(w) {
                             if(dialog.user_data['context'] &&
                                dialog.user_data['context'].user_data['slot'] === _slot_i) {
                                 invoke_inventory_context(w.parent, w, -1, null, false);
                             }
-                        }; })(slot_i, type_name, n, espec);
+                        }; })(slot_i, type_name, n);
 
                         dialog.widgets['equip_frame'+slot_i].tooltip.str = null;
                     } else { // slot is not filled
