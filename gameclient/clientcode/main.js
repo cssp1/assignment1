@@ -22728,6 +22728,7 @@ function invoke_aura_context(inv_dialog, slot_xy, slot, aura, show_dropdown) {
     if(slot < 0) { return null; }
 
     var spec = gamedata['auras'][aura['spec']];
+    var level = ('level' in aura ? aura['level'] : 1);
     var dialog = new SPUI.Dialog(gamedata['dialogs']['inventory_context']);
     var cols = inv_dialog.data['widgets']['aura_frame']['array'][0];
     var x = (slot % cols), y = Math.floor(slot / cols);
@@ -22751,7 +22752,11 @@ function invoke_aura_context(inv_dialog, slot_xy, slot, aura, show_dropdown) {
     /////////////////////////////
 
     // TITLE
-    dialog.widgets['title'].str = spec['ui_name'];
+    var ui_name = spec['ui_name'];
+    if(ui_name.indexOf('%level') >= 0) {
+        ui_name = ui_name.replace('%level', pretty_print_number(level));
+    }
+    dialog.widgets['title'].str = ui_name;
     dialog.widgets['title'].text_color = ('name_color' in spec ? SPUI.make_colorv(spec['name_color']) : SPUI.default_text_color);
 
     // DESCRIPTION
@@ -22777,6 +22782,19 @@ function invoke_aura_context(inv_dialog, slot_xy, slot, aura, show_dropdown) {
     }
     if('extra_ui_description' in aura) {
         descr += aura['extra_ui_description'];
+    }
+    if(descr.indexOf('%level') >= 0) {
+        descr = descr.replace('%level', pretty_print_number(level));
+    }
+    if(descr.indexOf('%modstats') >= 0) {
+        var ui_modstat_list = [];
+        goog.array.forEach(spec['effects'], function(eff) {
+            var strength = get_leveled_quantity(eff['strength'], level);
+            if(strength) {
+                ui_modstat_list.push(ModChain.display_modstat_effect(eff, level));
+            }
+        });
+        descr = descr.replace('%modstats', ui_modstat_list.join('\n'));
     }
 
     //dialog.widgets['description'].set_text_with_linebreaking(descr);

@@ -258,6 +258,47 @@ ModChain.display_delta = function(strength, display_mode, method, cur_value, pre
     return ui_delta;
 };
 
+/** Given an (equip or aura) effect like {"code":"modstat", "stat":"foo", ...}, return a textural description of what the effect does.
+    @param {!Object} effect
+    @param {number} level
+    @return {string} */
+ModChain.display_modstat_effect = function(effect, level) {
+    if(effect['code'] != 'modstat') { throw Error('invalid effect code '+effect['code']); }
+    if(!(effect['stat'] in gamedata['strings']['modstats']['stats'])) { throw Error('unknown stat '+effect['stat']); }
+    var ui_data = gamedata['strings']['modstats']['stats'][effect['stat']];
+
+    var strength = get_leveled_quantity(effect['strength'], level);
+    var affected_data, affected_key; // look up strings
+    if(effect['affects']) {
+        affected_data = gamedata['strings']['modstats']['affects'];
+        affected_key = effect['affects'];
+    } else if(effect['affects_kind']) {
+        affected_data = gamedata['strings']['modstats']['affects_kind'];
+        affected_key = effect['affects_kind'];
+    } else if(effect['affects_building']) {
+        affected_data = gamedata['strings']['modstats']['affects_building'];
+        if(typeof effect['affects_building'] == 'object') { // array
+            affected_key = effect['affects_building'].join(',');
+        } else {
+            affected_key = effect['affects_building'];
+        }
+    } else {
+        throw Error('error parsing effect affects '+JSON.stringify(effect));
+    }
+    if(!(affected_key in affected_data)) {
+        throw Error('affected_key '+affected_key+' not found in gamedata.strings.modstats');
+    }
+
+    var ui_affected = affected_data[affected_key];
+    var ui_stat = ui_data['ui_name'];
+    var ui_delta = ModChain.display_delta(strength, ui_data['display']||null, effect['method']);
+
+    var ret = gamedata['strings']['modstats']['effect'].replace('%affected', ui_affected).replace('%stat', ui_stat).replace('%delta', ui_delta);
+
+    return ret;
+};
+
+
 /** Return the full multi-line tooltip describing an entire modchain
     @param {string} stat
     @param {?} modchain
