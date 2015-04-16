@@ -6322,11 +6322,11 @@
             // NOTE! array sizes must be >= the number of settings in gamedata_main.json:strings:settings
             "separator": {"kind": "Line", "xy": [43,133], "dimensions": [677,0], "color":  [0.063,0.176,0.36,0.5], "stroke_width": 1,
                           "array": [1,7], "array_offset": [0,40]},
-            "description": {"kind": "TextField", "xy": [145,100], "dimensions": [186,30],
+            "description": {"kind": "TextField", "xy": [125,100], "dimensions": [186,30],
                             "ui_name": "Load art before playing?",
                             "text_hjustify": "left", "text_size": 15, "text_style": "normal",
                             "array": [1,7], "array_offset": [0,40]},
-            "choice": {"kind": "ActionButton", "xy":[350,100], "dimensions":[155,36], "bg_image": "radio_button", "push_bg_image": 1, "bg_image_offset": [5,6],
+            "choice": {"kind": "ActionButton", "xy":[370,100], "dimensions":[155,36], "bg_image": "radio_button", "push_bg_image": 1, "bg_image_offset": [5,6],
                        "text_offset":[33,-2], "text_size": 15, "text_style": "normal", "text_hjustify": "left",
                        "ui_name": "Choice", "ui_tooltip": "", "tooltip_delay": 0,
                        "array": [2,7], "array_offset": [157,40]},
