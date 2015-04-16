@@ -956,6 +956,7 @@ def check_crafting_recipe(recname, spec):
 
     for level in xrange(max_level):
         cost = GameDataUtil.get_leveled_quantity(spec['cost'], level)
+        if cost is None: continue # null cost -> not craftable
         for res, amount in cost.iteritems():
             if res not in gamedata['resources']:
                 error |= 1; print '%s: cost uses unknown resource %s' % (recname, res)
