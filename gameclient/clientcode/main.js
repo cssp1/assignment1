@@ -2856,7 +2856,7 @@ GameObject.prototype.ai_threatlist_update = function() {
         aggro_radius = gamedata['map']['range_conversion'] * get_leveled_quantity(auto_spell['range'], auto_spell_level) * this.combat_stats.weapon_range;
     }
 
-    var targeting_result = this.ai_pick_target_classic(auto_spell, auto_spell_level, aggro_radius, false, prev_target_id, 'ai_threatlist_update');
+    var targeting_result = this.ai_pick_target_classic_cached(auto_spell, auto_spell_level, aggro_radius, false, prev_target_id, 'ai_threatlist_update');
     if(targeting_result && targeting_result.target) {
         this.ai_threatlist.push({'obj_id': targeting_result.target.id,
                                  'spec': targeting_result.target.spec.name,
@@ -2907,6 +2907,52 @@ GameObject.prototype.ai_pick_target_by_threatlist = function(auto_spell, auto_sp
 };
 
 // stateless version of target-picking
+
+// to help swarms of identical units find targets faster, cache the results
+var ai_pick_target_classic_cache = {};
+var ai_pick_target_classic_cache_gen = -1;
+var ai_pick_target_classic_cache_hits = 0, ai_pick_target_classic_cache_misses = 0;
+
+/** @param {Object} auto_spell
+    @param {number} auto_spell_level
+    @param {number} shoot_range
+    @param {boolean} nearest_only
+    @param {string|null} prev_target_id
+    @param {string} tag */
+GameObject.prototype.ai_pick_target_classic_cached = function(auto_spell, auto_spell_level, shoot_range, nearest_only, prev_target_id, tag) {
+    // this cache operates by sharing the targeting results for nearby identical units
+    // "nearby" means not necessarily in the same grid cell, but in the same connectivity region, so that pathing remains valid!
+    var CHUNK = this.spec['ai_pick_target_cache_chunk'] || gamedata['client']['ai_pick_target_cache_chunk'];
+
+    /** @type {string|null} cache key */
+    var key = null;
+
+    if(!nearest_only && CHUNK >= 1) {
+        astar_context.ensure_connectivity();
+        if(astar_context.connectivity) {
+            // cache is operational
+            if(ai_pick_target_classic_cache_gen != astar_map.generation) {
+                ai_pick_target_classic_cache_gen = astar_map.generation;
+                ai_pick_target_classic_cache = {};
+            }
+
+            var cur_cell = this.interpolate_pos();
+            key = this.spec['name']+','+this.team+','+Math.floor(cur_cell[0]/CHUNK).toFixed(0)+','+Math.floor(cur_cell[1]/CHUNK).toFixed(0)+','+astar_context.connectivity.region_num(vec_floor(cur_cell)).toFixed(0)+','+auto_spell['name']+','+(auto_spell_level||1).toFixed(0)+','+shoot_range.toFixed(3)+','+(prev_target_id || 'null');
+        }
+    }
+
+    if(key !== null && (key in ai_pick_target_classic_cache)) {
+        ai_pick_target_classic_cache_hits += 1;
+        return ai_pick_target_classic_cache[key];
+    }
+    var ret = this.ai_pick_target_classic(auto_spell, auto_spell_level, shoot_range, nearest_only, prev_target_id, tag);
+    if(key !== null) {
+        ai_pick_target_classic_cache_misses += 1;
+        ai_pick_target_classic_cache[key] = ret;
+    }
+    return ret;
+};
+
 /** @param {Object} auto_spell
     @param {number} auto_spell_level
     @param {number} shoot_range
@@ -7533,6 +7579,8 @@ function run_unit_ticks() {
         last_tick_time = client_time;
 
         if(wall_mgr) { wall_mgr.refresh(session.cur_objects.objects); }
+
+        ai_pick_target_classic_cache_gen = -1; // clear the targeting cache
 
         if(astar_map) {
             astar_map.cleanup();
