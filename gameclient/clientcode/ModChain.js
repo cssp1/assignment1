@@ -135,6 +135,9 @@ ModChain.recompute_with_new_base_val = function(old_chain, new_base, new_base_le
 
 // OK to reference gamedata directly for GUI-only stuff
 
+/** Return textual description of an on_destroy modstat, which usually means a security team
+    @param {Array.<!Object>|null} value
+    @param {string} context */
 ModChain.display_value_on_destroy = function(value, context) {
     if(!value) { return gamedata['strings']['modstats']['none']; }
     if(context == 'widget') { return gamedata['strings']['modstats']['on_destroy_widget']; }
@@ -155,7 +158,7 @@ ModChain.display_value_on_destroy = function(value, context) {
     return total.join(', ');
 };
 
-/** parse "pct.2" decimal precision values
+/** Parse "pct.2" decimal precision values from strings.json
     @param {string} mode_string
     @return {{mode: string, precision: number, invert_sign: number}} */
 ModChain.parse_display_mode = function(mode_string) {
@@ -167,10 +170,10 @@ ModChain.parse_display_mode = function(mode_string) {
             invert_sign: (goog.array.contains(['one_minus_pct'], mode) ? -1 : 1)};
 };
 
-/** display the final post-modification value of a stat
- @param {?} value
- @param {string|null} display_mode
- @param {string} context */
+/** Return a textual description of the final post-modification value of a stat
+    @param {?} value
+    @param {string|null} display_mode
+    @param {string} context */
 ModChain.display_value = function(value, display_mode, context) {
     var ui_value;
     if(display_mode) {
@@ -216,7 +219,7 @@ ModChain.display_value = function(value, display_mode, context) {
     return ui_value;
 };
 
-/** Display a percentage delta in a stat with appropriate precision
+/** Return a textural description of a percentage delta in a stat with appropriate precision
     @param {number} strength
     @param {number} min_precision
     @return {string} */
@@ -226,7 +229,7 @@ ModChain.display_delta_percent = function(strength, min_precision) {
     return (100*val).toFixed(precision)+'%';
 };
 
-/** Display the CHANGE in a stat due to a mod
+/** Return a textual description of the CHANGE in a stat due to a mod
     @param {?} strength
     @param {string|null} display_mode - display_mode from strings.json
     @param {string} method - the modification method
@@ -255,6 +258,12 @@ ModChain.display_delta = function(strength, display_mode, method, cur_value, pre
     return ui_delta;
 };
 
+/** Return the full multi-line tooltip describing an entire modchain
+    @param {string} stat
+    @param {?} modchain
+    @param {boolean} show_base
+    @param {!Object} ui_data
+    @return {string} */
 ModChain.display_tooltip = function(stat, modchain, show_base, ui_data) {
     var display_mode = ui_data['display'] || null;
     var ui_base = ModChain.display_value(modchain['val'], display_mode, 'tooltip');
@@ -328,6 +337,10 @@ ModChain.display_tooltip = function(stat, modchain, show_base, ui_data) {
     }
 };
 
+/** Set a SPUI TextWidget to display the right text label and tooltip for a stat
+    @param {!SPUI.TextWidget} widget
+    @param {string} stat
+    @param {Object?=} auto_spell */
 ModChain.display_label_widget = function(widget, stat, auto_spell) {
     // flip over to a different variant for one-shot weapons
     if(stat == 'weapon_damage' && auto_spell['kills_self']) {
