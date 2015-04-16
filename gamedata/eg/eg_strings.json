@@ -1313,7 +1313,7 @@
             "limit:minefield": { "ui_name": "Mines", "check_spec": "minefield", "check_method": "limit_requires",
                                  "ui_tooltip": "Number of land mine placements allowed"},
 
-            "maxvel": { "ui_name": "Speed", "ui_tooltip": "How fast the unit moves across the battlefield", "display": "fixed:2" },
+            "maxvel": { "ui_name": "Speed", "ui_tooltip": "How fast the unit moves across the battlefield", "display": "fixed.2" },
             "max_hp": { "ui_name": "Health", "ui_tooltip": "Amount of damage that can be taken before being destroyed", "display": "integer" },
 
             "production_capacity": { "ui_name": "Capacity", "ui_tooltip": "Storage space for resources awaiting collection", "display": "integer" },

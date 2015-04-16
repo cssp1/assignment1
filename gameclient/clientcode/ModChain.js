@@ -155,47 +155,104 @@ ModChain.display_value_on_destroy = function(value, context) {
     return total.join(', ');
 };
 
-ModChain.display_value = function(value, mode, context) {
+/** parse "pct.2" decimal precision values
+    @param {string} mode_string
+    @return {{mode: string, precision: number, invert_sign: number}} */
+ModChain.parse_display_mode = function(mode_string) {
+    var temp = mode_string.split('.');
+    var mode = temp[0];
+    var precision = (temp.length >= 2 ? parseInt(temp[1],10) : 0);
+    return {mode: mode, precision: precision,
+            // -1 if lower values actually increase the stat, otherwise 1
+            invert_sign: (goog.array.contains(['one_minus_pct'], mode) ? -1 : 1)};
+};
+
+/** display the final post-modification value of a stat
+ @param {?} value
+ @param {string|null} display_mode
+ @param {string} context */
+ModChain.display_value = function(value, display_mode, context) {
     var ui_value;
-    if(mode) {
-        if(mode == 'one_minus_pct') {
-            ui_value = (100*(1-value)).toFixed(0)+'%';
-        } else if(mode == 'pct') {
-            ui_value = (100*value).toFixed(0)+'%';
-        } else if(mode == 'pct.1') {
-            ui_value = (100*value).toFixed(1)+'%';
-        } else if(mode == 'integer') {
+    if(display_mode) {
+        var parsed = ModChain.parse_display_mode(display_mode);
+
+        if(parsed.mode == 'one_minus_pct') {
+            ui_value = (100*(1-value)).toFixed(parsed.precision)+'%';
+        } else if(parsed.mode == 'pct') {
+            ui_value = (100*value).toFixed(parsed.precision)+'%';
+        } else if(parsed.mode == 'integer') {
             ui_value = pretty_print_number(value);
-        } else if(mode == 'fixed:2') {
-            ui_value = value.toFixed(2);
-        } else if(mode == 'boolean') {
+        } else if(parsed.mode == 'fixed') {
+            ui_value = value.toFixed(parsed.precision);
+        } else if(parsed.mode == 'boolean') {
             ui_value = (value ? '\u2713' : 'X'); // use Unicode checkmark to indicate "yes"
-        } else if(mode == 'spellname') {
+        } else if(parsed.mode == 'spellname') {
             if(!value) {
                 ui_value = '-';
             } else {
                 if(!(value in gamedata['spells'])) { throw Error('bad value for spellname modstat: '+(value ? value.toString() : 'null')); }
                 ui_value = gamedata['spells'][value]['ui_name'];
             }
-        } else if(mode == 'auras') {
+        } else if(parsed.mode == 'auras') {
             var ui_list = [];
             goog.array.forEach(value, function(data) {
                 if(!(data['aura_name'] in gamedata['auras'])) { throw Error('bad value for aura modstat: '+data['aura_name'].toString()); }
                 var spec = gamedata['auras'][data['aura_name']];
+                // XXX display aura level somehow?
                 ui_list.push((context == 'widget' && ('ui_name_short' in spec)) ? spec['ui_name_short'] : spec['ui_name']);
             });
             ui_value = ui_list.join(', ');
-        } else if(mode == 'on_destroy') {
+        } else if(parsed.mode == 'on_destroy') {
             return ModChain.display_value_on_destroy(value, context);
-        } else if(mode == 'literal') {
+        } else if(parsed.mode == 'literal') {
             ui_value = value.toString();
         } else {
-            throw Error('unknown display mode '+mode);
+            throw Error('unknown display mode '+parsed.mode);
         }
     } else {
+        // no mode given, just show as a literal
         ui_value = value.toString();
     }
     return ui_value;
+};
+
+/** Display a percentage delta in a stat with appropriate precision
+    @param {number} strength
+    @param {number} min_precision
+    @return {string} */
+ModChain.display_delta_percent = function(strength, min_precision) {
+    var val = Math.abs(strength);
+    var precision = Math.max(min_precision, (val < 0.01 ? 1 : 0));
+    return (100*val).toFixed(precision)+'%';
+};
+
+/** Display the CHANGE in a stat due to a mod
+    @param {?} strength
+    @param {string|null} display_mode - display_mode from strings.json
+    @param {string} method - the modification method
+    @param {?=} cur_value - current value on mod chain, for fallback case where we don't know the chain method
+    @param {?=} prev_value - previous value on mod chain, just for showing concat as "+"
+    @return {string} */
+ModChain.display_delta = function(strength, display_mode, method, cur_value, prev_value) {
+    var parsed = (display_mode ? ModChain.parse_display_mode(display_mode) : null);
+    var ui_delta = '';
+
+    if(method == '*=(1-strength)') {
+        ui_delta = (parsed.invert_sign*strength < 0 ? '+' : '-') + ModChain.display_delta_percent(strength, parsed.precision);
+    } else if(method == '*=(1+strength)') {
+        ui_delta = (parsed.invert_sign*strength >= 0 ? '+' : '-') + ModChain.display_delta_percent(strength, parsed.precision);
+    } else if(method == '*=strength') {
+        ui_delta = (parsed.invert_sign*strength >= 0 ? '' : '-') + ModChain.display_delta_percent(strength, parsed.precision);
+    } else if(method == 'replace') {
+        ui_delta = ModChain.display_value(strength, display_mode, 'tooltip');
+    } else if(method == 'concat') {
+        ui_delta = (prev_value ? '+ ' : '') + ModChain.display_value(strength, display_mode, 'tooltip');
+    } else {
+        if(cur_value === undefined || prev_value === undefined) { throw Error('unknown method '+method+' and no cur/prev values'); }
+        var delta = cur_value - prev_value;
+        ui_delta = (delta >= 0 ? '+' : '-') + ModChain.display_value(Math.abs(delta), display_mode, 'tooltip'); // .toString();
+    }
+    return ui_delta;
 };
 
 ModChain.display_tooltip = function(stat, modchain, show_base, ui_data) {
@@ -220,23 +277,8 @@ ModChain.display_tooltip = function(stat, modchain, show_base, ui_data) {
                     if(show_base) { ls.push(''); } // make spacing look nice
                     ls.push(gamedata['strings']['modstats']['bonuses']);
                 }
-                var ui_delta = '';
-                var invert_sign = (display_mode == 'one_minus_pct' ? -1 : 1);
 
-                if(mod['method'] == '*=(1-strength)') {
-                    ui_delta = (invert_sign*mod['strength'] < 0 ? '+' : '-') + (100*(Math.abs(mod['strength']))).toFixed(0)+'%';
-                } else if(mod['method'] == '*=(1+strength)') {
-                    ui_delta = (invert_sign*mod['strength'] >= 0 ? '+' : '-') + (100*(Math.abs(mod['strength']))).toFixed(0)+'%';
-                } else if(mod['method'] == '*=strength') {
-                    ui_delta = (invert_sign*mod['strength'] >= 0 ? '' : '-') + (100*(Math.abs(mod['strength']))).toFixed(0)+'%';
-                } else if(mod['method'] == 'replace') {
-                    ui_delta = ModChain.display_value(mod['strength'], display_mode, 'tooltip');
-                } else if(mod['method'] == 'concat') {
-                    ui_delta = (modchain['mods'][i-1]['val'] ? '+ ' : '') + ModChain.display_value(mod['strength'], display_mode, 'tooltip');
-                } else {
-                    var delta = mod['val'] - modchain['mods'][i-1]['val'];
-                    ui_delta = (delta >= 0 ? '+' : '-') + ModChain.display_value(Math.abs(delta), display_mode, 'tooltip'); // .toString();
-                }
+                var ui_delta = ModChain.display_delta(mod['strength'], display_mode, mod['method'], mod['val'], modchain['mods'][i-1]['val']);
 
                 if(mod['kind'] == 'equipment') {
                     var espec = gamedata['items'][mod['source']];
@@ -273,7 +315,7 @@ ModChain.display_tooltip = function(stat, modchain, show_base, ui_data) {
                         togo = pretty_print_time(mod['end_time']-server_time);
                     }
                     var aspec = gamedata['auras'][mod['source']];
-                    var s = fmt.replace('%delta',ui_delta).replace('%thing', aspec['ui_name']);
+                    var s = fmt.replace('%delta',ui_delta).replace('%thing', aspec['ui_name'].replace('%level', (mod['level']||1).toString()));
                     if(togo) { s = s.replace('%togo', togo); }
                     ls.push(s);
                 } else {
