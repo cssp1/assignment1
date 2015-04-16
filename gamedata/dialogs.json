@@ -884,8 +884,8 @@
                                "ui_tooltip_same_alliance": "Unable to attack - this player is in your alliance!",
                                "ui_tooltip_you_are_isolated": "Unable to attack - you are isolated from PvP",
                                "ui_tooltip_they_are_isolated": "Unable to attack - this player is isolated from PvP",
-                               "ui_tooltip_no_units_for_climate": "Unable to attack - you have no units ready for this climate.\n(%name: %descr)",
-                               "ui_tooltip_no_units": "Unable to attack - you have no units. Return home and use %MENU menu to %VERB units.",
+                               "ui_tooltip_no_units_for_climate": "Unable to attack - you have no units for this climate.\n(%name: %descr)",
+                               "ui_tooltip_no_units": "Unable to attack - you have no units.\nReturn home and use %MENU menu to %VERB units.",
 
                                "state": "disabled", "tooltip_delay": 0,
                                "text_size": 15, "text_style": "bold", "drop_shadow": 0 }
