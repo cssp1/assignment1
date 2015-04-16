@@ -638,7 +638,7 @@
                                  },
 
             // used for announcing to players that they are in an A/B test, e.g. "You are in the PvP (ALPHA) test region"
-            "user_abtest_message": { "kind": "TextField", "xy": [245,55], "dimensions": [370,21], "drop_shadow": 1,
+            "user_abtest_message": { "kind": "TextField", "xy": [265,65], "dimensions": [370,21], "drop_shadow": 1,
                                      "text_color": [1,0.5,0,1], "text_size": 13, "text_hjustify": "center" },
 
             "edit_mode_message": { "show": 0, "kind": "TextField", "xy": [4,200], "dimensions": [136,32], "drop_shadow": 1,
