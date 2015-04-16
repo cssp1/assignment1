@@ -2922,7 +2922,7 @@ var ai_pick_target_classic_cache_hits = 0, ai_pick_target_classic_cache_misses =
 GameObject.prototype.ai_pick_target_classic_cached = function(auto_spell, auto_spell_level, shoot_range, nearest_only, prev_target_id, tag) {
     // this cache operates by sharing the targeting results for nearby identical units
     // "nearby" means not necessarily in the same grid cell, but in the same connectivity region, so that pathing remains valid!
-    var CHUNK = this.spec['ai_pick_target_cache_chunk'] || gamedata['client']['ai_pick_target_cache_chunk'];
+    var CHUNK = this.spec['ai_pick_target_cache_chunk'] || (get_preference_setting(player.preferences, 'sg_ai_20150416') ? 12 : 0) || player.get_any_abtest_value('ai_pick_target_cache_chunk', gamedata['client']['ai_pick_target_cache_chunk']) || -1;
 
     /** @type {string|null} cache key */
     var key = null;
@@ -3205,7 +3205,7 @@ GameObject.prototype.ai_pick_target_find_blocker = function(cur_cell, dest_cell,
     var blocker = null;
     var blocker_path_end = null;
 
-    if(gamedata['client']['astar_accessibility']) {
+    if(get_preference_setting(player.preferences, 'sg_ai_20150416') || player.get_any_abtest_value('astar_accessibility', gamedata['client']['astar_accessibility'])) {
         // use A* to plot a course through destructible blockers toward the target
         //console.log('astar_accessibility '+vec_print(cur_cell)+' to '+vec_print(dest_cell)+' with range '+auto_spell_range.toString());
         var ring_size = auto_spell_range + obj.hit_radius();
@@ -7565,7 +7565,7 @@ var wall_mgr = null;
 /** @param {!Array.<number>} ncells of the playfield map */
 var init_wall_mgr = function(ncells) {
     var spec = gamedata['buildings']['barrier'];
-    if(spec && (spec['collide_as_wall'] || gamedata['client']['enable_wall_manager'])) {
+    if(spec && (spec['collide_as_wall'] || player.get_any_abtest_value('enable_wall_manager', gamedata['client']['enable_wall_manager']))) {
         return new WallManager(ncells, spec);
     }
     return null;
@@ -34300,6 +34300,7 @@ function invoke_settings_dialog() {
 // manual setting >> A/B test >> default value from gamedata_main.json
 function get_preference_setting(prefs, pref_name) {
     var data = gamedata['strings']['settings'][pref_name];
+    if(!data) { return null; } // not active
     if(data['preference_key'] in prefs) {
         return prefs[data['preference_key']];
     }
