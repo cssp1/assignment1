@@ -127,6 +127,9 @@ if __name__ == '__main__':
                 if f in row:
                     keyvals.append(('stack', row[f]))
 
+        elif row['event_name'] == '3350_no_miss_hack':
+            keyvals.append(('spec', row['spellname']))
+
         elif row['event_name'] == '6000_reacquisition_gift_sent':
             keyvals.append(('spec', row['gift']))
 
