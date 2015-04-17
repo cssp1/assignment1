@@ -334,7 +334,14 @@ AStar.AStarRectMap.prototype.block_map = function(xy, wh, value, blocker) {
                     } else if(value < 0) {
                         cell.unblock();
                         if(!cell.blockers || !goog.array.remove(cell.blockers, blocker)) {
-                            throw Error('unblock cell but blocker not found: '+JSON.stringify(blocker)+' in '+JSON.stringify(cell.blockers));
+                            // just for debugging - assumes blocker is a GameObject
+                            var print_it = function(it) {
+                                if(it instanceof GameObject) {
+                                    return it.spec['name']+ ' hp '+it.hp.toString()+' at '+it.x.toString()+','+it.y.toString();
+                                }
+                                return 'unknown';
+                            };
+                            throw Error('unblock cell '+n.toString()+','+m.toString()+' but blocker not found: '+print_it(blocker)+' in '+(cell.blockers ? goog.array.map(cell.blockers, print_it).join(',') : 'null'));
                         }
                         if(cell.blockers.length == 0) {
                             cell.blockers = null;
