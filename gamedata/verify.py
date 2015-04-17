@@ -3259,6 +3259,12 @@ def main(args):
             if entry:
                 error |= check_consequent(entry, reason = 'level_up_reward', context = 'level_up')
 
+    # check that max_pvp_level_gap arrays are long enough
+    for kind, arr in gamedata['max_pvp_level_gap'].iteritems():
+        max_player_level = len(gamedata['player_xp']['level_xp'])
+        if len(arr) < max_player_level:
+            error |= 1; print 'max_pvp_level_gap array needs to be at least as long as the max player level (%d)' % max_player_level
+
     # make sure hard-coded art assets are present
     for art_asset in (
         # main.js
