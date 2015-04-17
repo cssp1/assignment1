@@ -278,6 +278,7 @@ if __name__ == '__main__':
                 cost_list = [data['cost']]
                 val_levels = None
             for i in xrange(val_levels) if val_levels else [0,]:
+                if cost_list[i] is None: continue # uncraftable level
                 for res, amt in cost_list[i].iteritems():
                     keyvals += [(('recipe_id', specname),
                                  ('recipe_level',i+1 if val_levels else None),
