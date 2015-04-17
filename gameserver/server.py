@@ -25586,7 +25586,7 @@ class GameSite(server.Site):
 
 
             # check for sessions where an attack has been going on for too long
-            elif (session.has_attacked) and (not session.visit_base_in_progress) and \
+            elif (session.has_attacked) and (not session.visit_base_in_progress) and (not session.complete_attack_in_progress) and \
                  (session.attack_finish_time > 0) and (server_time >= session.attack_finish_time):
                 # force the attack to conclude
                 client_inactive_time = server_time - session.last_active_time
