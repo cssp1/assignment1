@@ -305,7 +305,13 @@ ItemDisplay.get_inventory_item_ui_description = function(item, opts) {
     var level = ('level' in item ? item['level'] : 1);
     var item_duration = ('item_duration' in item ? item['item_duration'] : null);
 
-    var descr = eval_cond_or_literal(spec['ui_description'], player, null);
+    var descr = '';
+
+    if('max_level' in spec) {
+        descr += gamedata['strings']['cursors']['level_x_of_y'].replace('%cur', pretty_print_number(level)).replace('%max',pretty_print_number(spec['max_level']))+'\n\n';
+    }
+
+    descr += eval_cond_or_literal(spec['ui_description'], player, null);
     if(descr.indexOf("%price") != -1) { // special-case hack for cost-capping auras
         var price = spec['use']['spellarg'][2];
         descr = descr.replace("%price", Store.display_user_currency_amount(Store.convert_credit_price_to_user_currency(price), 'full'));
