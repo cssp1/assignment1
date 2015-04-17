@@ -24210,7 +24210,7 @@ class GAMEAPI(resource.Resource):
                             # dict: interpret as item object
                             if item['spec'] in gamedata['items']:
                                 spec = gamedata['items'][item['spec']]
-                                level = max(item.get('level',1), spec.get('max_level',1))
+                                level = min(item.get('level',1), spec.get('max_level',1))
                                 stack = item.get('stack',1)
                                 at = {'spec':spellargs[0]['spec']}
                                 if level > 1:
