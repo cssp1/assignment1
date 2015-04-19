@@ -18295,6 +18295,22 @@ function invoke_building_context_menu(mouse_xy) {
 
     if(obj.is_building()) {
 
+        if(session.home_base && obj.is_lottery_building() && !obj.is_under_construction()) {
+            upgrade_is_active = false;
+            var state = player.get_lottery_state(obj);
+            buttons.push(new ContextMenuButton({ui_name: gamedata['spells']['LOTTERY_SCAN']['ui_name'],
+                                                state: (state.can_scan ? 'normal': 'disabled_clickable'),
+                                                asset: 'action_button_resizable',
+                                                ui_tooltip: state.fail_ui_reason,
+                                                tooltip_text_color: SPUI.error_text_color,
+                                                text_color: (state.can_scan ?
+                                                             null // SPUI.make_colorv([0,0,1])
+                                                             : SPUI.disabled_text_color),
+                                                onclick: (state.can_scan ?
+                                                          (function (_obj) { return function() { invoke_lottery_dialog(_obj); }; })(obj) : state.fail_helper)
+                                               }));
+        }
+
         if(session.home_base && obj.is_warehouse() && !obj.is_under_construction()) {
             upgrade_is_active = false; // XXX may want to check for fullness!
             if(player.warehouse_is_busy()) {
@@ -18394,20 +18410,6 @@ function invoke_building_context_menu(mouse_xy) {
 
             // CHANGE REGION button
             add_change_region_button(buttons);
-        }
-
-        if(session.home_base && obj.is_lottery_building() && !obj.is_under_construction()) {
-            upgrade_is_active = false;
-            var state = player.get_lottery_state(obj);
-            buttons.push(new ContextMenuButton({ui_name: gamedata['spells']['LOTTERY_SCAN']['ui_name'],
-                                                state: (state.can_scan ? 'normal': 'disabled_clickable'),
-                                                asset: 'action_button_resizable',
-                                                ui_tooltip: state.fail_ui_reason,
-                                                tooltip_text_color: SPUI.error_text_color,
-                                                text_color: (state.can_scan ? SPUI.make_colorv([0,0,1]) : SPUI.disabled_text_color),
-                                                onclick: (state.can_scan ?
-                                                          (function (_obj) { return function() { invoke_lottery_dialog(_obj); }; })(obj) : state.fail_helper)
-                                               }));
         }
 
         if(obj.is_damaged() && (!session.home_base || !obj.is_repairing())) {
@@ -46876,6 +46878,14 @@ Building.prototype.get_idle_state_legacy = function() {
                     draw_idle_icon = 'request_unit_donation';
                 }
             }
+        }
+    }
+
+    // lottery takes priority over others
+    if(this.is_lottery_building()) {
+        var state = player.get_lottery_state(this);
+        if((state.can_scan && state.next_scan_method != 'paid') || !state.on_cooldown) {
+            draw_idle_icon = 'lottery_scan';
         }
     }
 
