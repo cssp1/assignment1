@@ -23530,7 +23530,7 @@ function update_lottery_dialog_buttons(dialog, lottery_dialog) {
         dialog.widgets['lottery_button'].state = 'normal';
         dialog.widgets['lottery_button'].tooltip.str = null;
         dialog.widgets['lottery_price_display'].str = Store.display_user_currency_price(display_price); // PRICE
-        dialog.widgets['lottery_price_display'].tooltip.str = Store.display_user_currency_price_tooltip(display_price); // PRICE
+        dialog.widgets['lottery_price_display'].tooltip.str = null; // this tends to show through item_discovered Store.display_user_currency_price_tooltip(display_price); // PRICE
         dialog.widgets['lottery_button'].str = gamedata['spells']['LOTTERY_SCAN'][(state.next_scan_method == 'paid' ? 'ui_verb_paid' : 'ui_verb')];
 
         if(!state.can_scan) {
