@@ -310,6 +310,19 @@ AStar.AStarRectMap.prototype.get_unblocked_neighbors = function(node, checker, r
     ret[3] = this.cell_if_unblocked([x,y+1], checker);
 };
 
+/** just for debugging - prints information about a blocker, which we assume to be a GameObject in astar_map
+    @suppress {reportUnknownTypes}
+    @param {*} maybe_it
+    @return {string} */
+AStar.AStarRectMap.debug_print_blocker = function(maybe_it) {
+    if(maybe_it instanceof GameObject) {
+        var it = /** @type {!GameObject} */ (maybe_it);
+        var ui_pos = it.x.toString() + ',' + it.y.toString();
+        return it.spec['name']+' hp '+it.hp.toString()+' at '+ui_pos;
+    }
+    return 'unknown';
+};
+
 /** update collision-detection data structure
  * @param {!Array.<number>} xy upper-left corner of area to affect
  * @param {!Array.<number>} wh width and height (blockage is closed on the left and open on the right, i.e. [x,x+w-1] are the blocked cells, with x+w unblocked)
@@ -334,14 +347,7 @@ AStar.AStarRectMap.prototype.block_map = function(xy, wh, value, blocker) {
                     } else if(value < 0) {
                         cell.unblock();
                         if(!cell.blockers || !goog.array.remove(cell.blockers, blocker)) {
-                            // just for debugging - assumes blocker is a GameObject
-                            var print_it = function(it) {
-                                if(it instanceof GameObject) {
-                                    return it.spec['name']+ ' hp '+it.hp.toString()+' at '+it.x.toString()+','+it.y.toString();
-                                }
-                                return 'unknown';
-                            };
-                            throw Error('unblock cell '+n.toString()+','+m.toString()+' but blocker not found: '+print_it(blocker)+' in '+(cell.blockers ? goog.array.map(cell.blockers, print_it).join(',') : 'null'));
+                            throw Error('unblock cell '+n.toString()+','+m.toString()+' but blocker not found: '+AStar.AStarRectMap.debug_print_blocker(blocker)+' in '+(cell.blockers ? goog.array.map(cell.blockers, AStar.AStarRectMap.debug_print_blocker).join(',') : 'null'));
                         }
                         if(cell.blockers.length == 0) {
                             cell.blockers = null;
