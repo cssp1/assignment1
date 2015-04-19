@@ -4129,7 +4129,13 @@ Building.prototype.is_manufacturer = function() {
     return (this.spec['spells'].indexOf("MAKE_DROIDS") != -1);
 };
 Building.prototype.is_lottery_building = function() {
-    return (this.spec['spells'].indexOf("LOTTERY_SCAN") != -1);
+    if(this.spec['spells'].indexOf("LOTTERY_SCAN") != -1) {
+        var spell = gamedata['spells']['LOTTERY_SCAN'];
+        if(!('show_if' in spell) || read_predicate(spell['show_if']).is_satisfied(player, null)) {
+            return true;
+        }
+    }
+    return false;
 };
 Building.prototype.is_warehouse = function() {
     return ('provides_inventory' in this.spec);
@@ -23460,7 +23466,7 @@ function update_lottery_dialog(dialog) {
                 if(item_list.length != 1) { throw Error('bad lottery loot '+JSON.stringify(item_list)); }
                 var item = item_list[0];
                 dialog.widgets[wname].show = true;
-                var displayed_item = (gamedata['lottery_conceal_slate'] ? {'spec':'unknown_lottery_item'} : item);
+                var displayed_item = (player.get_any_abtest_value('lottery_conceal_slate',gamedata['lottery_conceal_slate']) ? {'spec':'unknown_lottery_item'} : item);
                 ItemDisplay.display_item(dialog.widgets[wname], displayed_item, {context_parent: dialog});
 
                 // pulse
