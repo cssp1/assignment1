@@ -11202,7 +11202,8 @@ class LivePlayer(Player):
 
     # reseed lottery, if cooldown is up or 'force' is true
     def reseed_lottery(self, session, force = False):
-        slot_tables = self.get_any_abtest_value('lottery_slot_tables', gamedata['lottery_slot_tables'])
+        slot_tables = self.get_any_abtest_value('lottery_slot_tables', gamedata.get('lottery_slot_tables',None))
+        if slot_tables is None: return
 
         if force or (self.lottery_slate is None) or (len(self.lottery_slate) != len(slot_tables)) or \
            (not self.cooldown_active('lottery_reseed')):
