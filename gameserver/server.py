@@ -12723,10 +12723,11 @@ class Store:
         assert spell.has_key('paid')
         p_currency = 'fbcredits'
 
-        if 'requires' in spell:
-            if session and (not Predicates.read_predicate(spell['requires']).is_satisfied(session.player, None)):
-                error_reason.append('spell "requires" predicate is not satisfied')
-                return -1, p_currency
+        for PRED in ('requires',): # XXXXXX this never checked show_if - should it?
+            if PRED in spell:
+                if session and (not Predicates.read_predicate(spell[PRED]).is_satisfied(session.player, None)):
+                    error_reason.append('spell "%s" predicate is not satisfied' % PRED)
+                    return -1, p_currency
 
         if 'cooldown_name' in spell:
             cd_name = spell['cooldown_name']
@@ -14042,7 +14043,7 @@ class Store:
 
         elif spellname == "LOTTERY_SCAN":
             object = session.get_object(unit_id)
-            assert gameapi.do_lottery_scan(session, retmsg, object, 'paid')
+            assert gameapi.do_lottery_scan(session, retmsg, object, spellname, 'paid')
 
         elif spellname.startswith("OFFER"):
             spell = gamedata['spells'][spellname]
@@ -18831,9 +18832,10 @@ class GAMEAPI(resource.Resource):
             session.player.send_inventory_update(retmsg)
         return True
 
-    def do_lottery_scan(self, session, retmsg, scanner, source):
+    def do_lottery_scan(self, session, retmsg, scanner, spellname, source):
         # how we are getting permission to scan
         assert source in ('cooldown', 'contents', 'paid')
+        spell = session.player.get_abtest_spell(spellname)
         success = True
 
         if session.player.lottery_is_busy(scanner):
@@ -18843,6 +18845,11 @@ class GAMEAPI(resource.Resource):
         if not scanner.is_lottery_building():
             retmsg.append(["ERROR", "CANNOT_SCAN_NO_BUILDING"])
             success = False
+
+        for PRED in ('show_if', 'requires'):
+            if PRED in spell and (not Predicates.read_predicate(spell[PRED]).is_satisfied(session.player, None)):
+                retmsg.append(["ERROR", "REQUIREMENTS_NOT_SATISFIED", spell[PRED]])
+                success = False
 
         if source == 'cooldown':
             if session.player.cooldown_active('lottery_free'):
@@ -24097,7 +24104,7 @@ class GAMEAPI(resource.Resource):
                 if (session.viewing_base is not session.player.my_home) or (object.owner is not session.player):
                     retmsg.append(["ERROR", "CANNOT_CAST_SPELL_OUTSIDE_HOME_BASE"])
                     return
-                self.do_lottery_scan(session, retmsg, object, source)
+                self.do_lottery_scan(session, retmsg, object, spellname, source)
 
             elif spellname == "FISH_SLATE_ASSIGN":
                 if 'assign_fish_slate' not in gamedata['consequent_library']:
