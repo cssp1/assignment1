@@ -318,7 +318,7 @@ AStar.AStarRectMap.debug_print_blocker = function(maybe_it) {
     if(maybe_it instanceof GameObject) {
         var it = /** @type {!GameObject} */ (maybe_it);
         var ui_pos = it.x.toString() + ',' + it.y.toString();
-        return it.spec['name']+' hp '+it.hp.toString()+' at '+ui_pos;
+        return it.spec['name']+' hp '+it.hp.toString()+' at '+ui_pos+' history '+JSON.stringify(it.debug_block_history);
     }
     return 'unknown';
 };
@@ -328,8 +328,9 @@ AStar.AStarRectMap.debug_print_blocker = function(maybe_it) {
  * @param {!Array.<number>} wh width and height (blockage is closed on the left and open on the right, i.e. [x,x+w-1] are the blocked cells, with x+w unblocked)
  * @param {number} value +1 to block, -1 to unblock
  * @param {!Object} blocker reference to thing that is blocking here
+ * @param {string} reason for this call, for debugging purposes
  */
-AStar.AStarRectMap.prototype.block_map = function(xy, wh, value, blocker) {
+AStar.AStarRectMap.prototype.block_map = function(xy, wh, value, blocker, reason) {
     if(!blocker) { throw Error('must provide blocker'); } // Closure doesn't flag this
     for(var v = 0; v < wh[1]; v++) {
         for(var u = 0; u < wh[0]; u++) {

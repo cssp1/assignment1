@@ -3726,6 +3726,9 @@ function MapBlockingGameObject() {
     // NESW neighbor presence - this is how much to ADD to bound size in each direction because of the presence or absence of a neighbor.
     // Only updated by WallManager.
     this.neighbors = [0,0,0,0];
+
+    // for debugging only, record a history of the times we were blocked/unblocked
+    this.debug_block_history = [];
 }
 goog.inherits(MapBlockingGameObject, GameObject);
 
@@ -3733,23 +3736,27 @@ MapBlockingGameObject.prototype.is_blocker = function() { return true; };
 
 MapBlockingGameObject.prototype.receive_state = function(data, init, is_deploying) {
     var old_x = this.x, old_y = this.y;
-    var was_destroyed = this.spec && this.is_destroyed();
+    var was_destroyed = (this.spec ? this.is_destroyed() : false);
 
     goog.base(this, 'receive_state', data, init, is_deploying);
 
-    this.update_map(old_x, old_y, was_destroyed);
+    this.update_map([old_x, old_y], was_destroyed, 'receive_state(destr '+(was_destroyed?'1':'0')+'->'+(this.is_destroyed()?'1':'0'));
 };
 
-MapBlockingGameObject.prototype.update_map = function(old_x, old_y, was_destroyed) {
+/** Update collision data structure after a possible change in position and destruction state
+    @param {!Array.<number>} old_xy
+    @param {boolean} was_destroyed before this update
+    @param {string} reason, for debugging */
+MapBlockingGameObject.prototype.update_map = function(old_xy, was_destroyed, reason) {
     // update collision data structure
-    if(this.x != old_x || this.y != old_y || was_destroyed != this.is_destroyed()) {
-        if(old_x != -1 && old_y != -1 && !was_destroyed) {
+    if(this.x != old_xy[0] || this.y != old_xy[1] || was_destroyed != this.is_destroyed()) {
+        if(old_xy[0] != -1 && old_xy[1] != -1 && !was_destroyed) {
             // unblock old location
-            this.block_map_at(old_x, old_y, -1);
+            this.block_map_at(old_xy, -1, reason);
         }
         // block new location
         if(!this.is_destroyed()) {
-            this.block_map(1);
+            this.block_map(1, reason);
         }
 
         if(wall_mgr && wall_mgr.spec === this.spec) { wall_mgr.dirty = true; }
@@ -3771,9 +3778,9 @@ MapBlockingGameObject.prototype.set_neighbors = function(new_neighbors) {
     if(!goog.array.some(this.neighbors, function(n, i) { return n != new_neighbors[i]; })) {
         return; // no delta
     }
-    this.block_map(-1);
+    this.block_map(-1, 'set_neighbors(-1)');
     this.neighbors = new_neighbors;
-    this.block_map(1);
+    this.block_map(1, 'set_neighbors(1)');
 };
 
 /** Return true if this object overlays any grid cell along a list of cells
@@ -3787,18 +3794,26 @@ MapBlockingGameObject.prototype.covers_any_of = function(path) {
     });
 };
 
-/** @private */
-MapBlockingGameObject.prototype.block_map_at = function(x,y,incr) {
+/** @private
+    @param {!Array.<number>} xy of the building itself
+    @param {number} incr to add/subtract from blockage
+    @param {string} reason, for debugging */
+MapBlockingGameObject.prototype.block_map_at = function(xy, incr, reason) {
     if(this.spec['unit_collision_gridsize'][0] <= 0) {
         return;
     }
-    var bounds = this.current_collision_bounds([x,y]);
-    astar_map.block_map([bounds[0][0], bounds[1][0]], [bounds[0][1]-bounds[0][0], bounds[1][1]-bounds[1][0]], incr, this);
+    var bounds = this.current_collision_bounds(xy);
+    this.debug_block_history.push({'xy':xy, 'incr':incr, 'reason':reason});
+    astar_map.block_map([bounds[0][0], bounds[1][0]], [bounds[0][1]-bounds[0][0], bounds[1][1]-bounds[1][0]], incr, this, reason);
     invalidate_unit_paths();
     invalidate_all_threatlists();
 };
-MapBlockingGameObject.prototype.block_map = function(incr) {
-    this.block_map_at(this.x, this.y, incr);
+
+/** Block/unblock map at current location
+    @param {number} incr
+    @param {string} reason, for debugging */
+MapBlockingGameObject.prototype.block_map = function(incr, reason) {
+    this.block_map_at([this.x, this.y], incr, reason);
 };
 /** @override */
 MapBlockingGameObject.prototype.hit_radius = function() {
