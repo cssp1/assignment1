@@ -2179,7 +2179,7 @@ class PlayerTable:
               ('cooldowns', None, None),
               ('scores2', lambda s: s.serialize(), lambda player, observer, data: Scores2.CurScores(data)),
               ('creation_time', None, None),
-              ('lottery_seed', None, None),
+              ('lottery_slate', None, None),
               ('ladder_match', None, None),
               ('ladder_match_history', None, None),
 
@@ -6767,9 +6767,10 @@ class Player(AbstractPlayer):
         # time player last deployed units in an attack - used for throttling max attack rate
         self.attack_cooldown_start = -1
 
-        # seed for generating the lottery slate
-        # must NOT be alterable by user action unless 1) scan is conducted or 2) one day passes
-        self.lottery_seed = 0
+        # available items in the lottery slate
+        # dictionary {"slot0": {"spec":"foo"}, "slot1": ... }
+        # must NOT be alterable by user action unless 1) scan is conducted or 2) reseed cooldown time passes
+        self.lottery_slate = None
 
         # PvP ladder rival, must not be alterable unless 1) attack is made or 2) time passes or 3) player pays (and waits) to switch
         self.ladder_match = None
@@ -11135,7 +11136,7 @@ class LivePlayer(Player):
                     self.mailbox.remove(mail)
 
         self.send_inventory_intro_mail(session, None)
-        self.reseed_lottery(force = False)
+        self.reseed_lottery(session, force = False)
 
         # initialize achievement_points score
         if self.history.get('achievement_points_published',0) < 1:
@@ -11200,16 +11201,23 @@ class LivePlayer(Player):
         return total_xp, new_level
 
     # reseed lottery, if cooldown is up or 'force' is true
-    def reseed_lottery(self, force = False):
-        if force or (not self.cooldown_active('lottery_reseed')):
+    def reseed_lottery(self, session, force = False):
+        slot_tables = self.get_any_abtest_value('lottery_slot_tables', gamedata['lottery_slot_tables'])
+
+        if force or (self.lottery_slate is None) or (len(self.lottery_slate) != len(slot_tables)) or \
+           (not self.cooldown_active('lottery_reseed')):
+
             self.cooldown_trigger('lottery_reseed', gamedata['lottery_reseed_cooldown'])
-            self.lottery_seed = random.randint(0, 1<<31)
+            lottery_seed = random.randint(0, 1<<31)
+            randgen = random.Random(lottery_seed)
+            self.lottery_slate = dict((slot_name, session.get_loot_items(self, tab, -1, -1, rand_func = randgen.random)) for slot_name, tab in slot_tables.iteritems())
 
     # get the current lottery slate
     def get_lottery_slate(self, session):
-        slot_tables = self.get_any_abtest_value('lottery_slot_tables', gamedata['lottery_slot_tables'])
-        randgen = random.Random(self.lottery_seed)
-        return dict((slot_name, session.get_loot_items(self, tab, -1, -1, rand_func = randgen.random)) for slot_name, tab in slot_tables.iteritems())
+        # shouldn't need to reseed, since this is set up on login and respin, and otherwise it needs to stay the same so the GUI matches
+        # self.reseed_lottery(session, force = False)
+        assert self.lottery_slate
+        return self.lottery_slate
 
     def send_inventory_intro_mail(self, session, retmsg):
         # retmsg will be None if called from migrate() on load
@@ -18898,7 +18906,7 @@ class GAMEAPI(resource.Resource):
                 scanner.contents -= 1
                 session.deferred_object_state_updates.add(scanner)
 
-            session.player.reseed_lottery(force = True)
+            session.player.reseed_lottery(session, force = True)
             session.increment_player_metric('lottery_scans', 1, time_series = False)
 
         else: # failure
@@ -24095,6 +24103,7 @@ class GAMEAPI(resource.Resource):
                 return self.do_move_building(session, retmsg, object, spellargs)
 
             elif spellname == "LOTTERY_GET_SLATE":
+                session.player.reseed_lottery(session, force = False)
                 result = session.player.get_lottery_slate(session)
                 retmsg.append(["LOTTERY_GET_SLATE_RESULT", result])
 
