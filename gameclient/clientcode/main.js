@@ -44251,7 +44251,7 @@ function do_on_mouseup(e) {
                     // client-side predict - not 100% sure if this is safe?
                     var old_x = selection.unit.x, old_y = selection.unit.y;
                     selection.unit.x = ji[0]; selection.unit.y = ji[1];
-                    selection.unit.update_map(old_x, old_y, selection.unit.is_destroyed());
+                    selection.unit.update_map([old_x, old_y], selection.unit.is_destroyed(), 'MOVE_BUILDING predict');
                 }
             }
             change_selection(null);
