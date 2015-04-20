@@ -16327,7 +16327,8 @@ function update_tutorial_arrow_for_button(_dialog, _parent_path, _widget_name, _
         var parent_offset = [0,0];
         var found_widget_name = widget_name;
 
-        if(parent_path.indexOf("desktop_") === 0 || parent_path == 'attack_button_dialog') {
+        // special case for desktop dialogs
+        if(parent_path.indexOf("desktop_") === 0 || goog.array.contains(['attack_button_dialog','quest_bar'], parent_path)) {
             // pick desktop dialog directly
             parent = desktop_dialogs[parent_path] || null;
 
@@ -46007,11 +46008,20 @@ function do_draw() {
         }
 
         if(session.home_base && player.quest_tracked && player.quest_tracked_complete_time > 0 &&
-           client_time > player.quest_tracked_complete_time && !selection.ui && !notification_queue.pending()) {
+           client_time >= player.quest_tracked_complete_time && !selection.ui && !notification_queue.pending()) {
             player.quest_tracked_complete_time = -1;
             if(player.can_complete_quest(player.quest_tracked)) {
-                invoke_missions_dialog(true);
-                player.quest_tracked_dirty = true;
+                var method = player.get_any_abtest_value('on_quest_tips_complete', gamedata['client']['on_quest_tips_complete'] || 'missions_dialog');
+                if(method == 'quest_bar') {
+                    read_consequent({'consequent':'TUTORIAL_ARROW',
+                                     'arrow_type':'button',
+                                     'direction':'up', // XXX left?
+                                     'dialog_name':'quest_bar',
+                                     'widget_name':'frame0'}).execute();
+                } else {
+                    invoke_missions_dialog(true);
+                    player.quest_tracked_dirty = true;
+                }
             }
         }
 
