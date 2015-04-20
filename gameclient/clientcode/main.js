@@ -5494,14 +5494,29 @@ player.get_denormalized_summary_props = function(format) {
     return ret;
 };
 
-player.has_blocked_user = function(uid) {
-    if(!('blocked_users' in player.preferences)) { return false; }
-    var blist = player.preferences['blocked_users'];
-    for(var i = 0; i < blist.length; i++) {
-        if(blist[i] === uid) { return true; }
-    }
-    return false;
+
+/** generic function that operates on player.preferences['blocked_users'] or player.preferences['force_blocked_users']
+    @param {Array.<number>|null} blist
+    @param {number} uid
+    @return {boolean} */
+var _has_blocked_user = function(blist, uid) {
+    if(!blist) { return false; }
+    return goog.array.some(blist, function(entry) { return entry === uid; });
 };
+
+/** True if we have manually blocked the other player
+    @param {number} uid
+    @return {boolean} */
+player.has_blocked_user = function(uid) { return _has_blocked_user(player.preferences['blocked_users'] || null, uid); };
+
+/** True if we should never see the other player's chat messages
+    @param {number} uid
+    @return {boolean} */
+player.has_blocked_or_force_blocked_user = function(uid) {
+    return _has_blocked_user(player.preferences['blocked_users'] || null, uid) ||
+        _has_blocked_user(player.preferences['force_blocked_users'] || null, uid);
+};
+
 player.block_user = function(uid) {
     if(player.has_blocked_user(uid)) { return; }
     if(!('blocked_users' in player.preferences)) {
@@ -43025,7 +43040,9 @@ function handle_server_message(data) {
 
         } else {
             // normal chat message
-            if(player.has_blocked_user(sender_info['user_id']) && (sender_info['type'] != 'i_got_gagged') && (channel_name != 'DEVELOPER')) { return; }
+            if(player.has_blocked_or_force_blocked_user(sender_info['user_id']) &&
+               (sender_info['type'] != 'i_got_gagged') &&
+               (channel_name != 'DEVELOPER')) { return; }
 
             var body = SPHTTP.unwrap_string(wrapped_body);
             var props = {};

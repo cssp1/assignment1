@@ -169,6 +169,7 @@ class HandleChatUnofficial(Handler):
         return ReturnValue(result = 'ok')
 
 class HandleChatBlockOrUnblock(Handler):
+    PREF_KEY = 'force_blocked_users' # key in player preferences for blocked user list
     def do_exec_online(self, session, retmsg):
         other_id = int(self.args['other_id'])
         assert other_id != session.player.user_id
@@ -187,15 +188,15 @@ class HandleChatBlockOrUnblock(Handler):
 
 class HandleChatBlock(HandleChatBlockOrUnblock):
     def _do(self, prefs, other_id):
-        if 'blocked_users' not in prefs:
-            prefs['blocked_users'] = []
-        if other_id not in prefs['blocked_users']:
-            prefs['blocked_users'].append(other_id)
+        if self.PREF_KEY not in prefs:
+            prefs[self.PREF_KEY] = []
+        if other_id not in prefs[self.PREF_KEY]:
+            prefs[self.PREF_KEY].append(other_id)
 class HandleChatUnblock(HandleChatBlockOrUnblock):
     def _do(self, prefs, other_id):
-        if 'blocked_users' in prefs:
-            if other_id in prefs['blocked_users']:
-                prefs['blocked_users'].remove(other_id)
+        if self.PREF_KEY in prefs:
+            if other_id in prefs[self.PREF_KEY]:
+                prefs[self.PREF_KEY].remove(other_id)
 
 class HandleClearCooldown(Handler):
     def do_exec_online(self, session, retmsg):
