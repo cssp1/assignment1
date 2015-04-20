@@ -3096,26 +3096,30 @@ GameObject.prototype.ai_pick_target_classic = function(auto_spell, auto_spell_le
                     var test_path = null;
 
                     var test_point = vec_floor(pos);
+                    var ring_size;
                     if(!astar_map.is_blocked(test_point)) {
                         // destination itself is unblocked, try getting directly to it
+                        ring_size = -1;
                         test_path = astar_context.search(cur_cell, test_point);
                     } else {
                         // need to search in an expanding ring for unblocked cells
-                        var ring_size = Math.ceil(auto_spell_range + obj.hit_radius());
+                        ring_size = Math.ceil(auto_spell_range + obj.hit_radius());
                         test_path = astar_context.ring_search(cur_cell, test_point, ring_size);
                     }
 
                     if(verbose) {
-                        console.log('    PATH to '+obj.spec['name']+':'); console.log(test_path);
+                        console.log('    PATH to '+obj.spec['name']+' (ring '+ring_size.toString()+'):'); console.log(test_path);
                         if(test_path && test_path.length >= 1) {
                             console.log('    remainder '+(vec_distance(test_path[test_path.length-1], pos) - obj.hit_radius()).toString());
                         }
                     }
 
+                    if(test_path && test_path.length >= 1) {
+                        if(verbose) { console.log('    obstacles '+(vec_distance(test_path[test_path.length-1], pos)).toString()+' hit_radius '+obj.hit_radius().toString()+' spell_range '+auto_spell_range.toString()); }
+                    }
+
                     if(test_path && test_path.length >= 1 && vec_distance(test_path[test_path.length-1], pos) - obj.hit_radius() <= auto_spell_range) {
                         // target IS accessible by moving around obstacles
-
-                        if(verbose) { console.log('    obstacles '+(vec_distance(test_path[test_path.length-1], pos)).toString()+' hit_radius '+obj.hit_radius().toString()+' spell_range '+auto_spell_range.toString()); }
 
                         // but if the path takes us farther away than our priority_far_range BEYOND the direct path, consider the path not usable
                         // note: using test_path.length here directly is the Manhattan distance approximation, not true distance
@@ -3147,6 +3151,8 @@ GameObject.prototype.ai_pick_target_classic = function(auto_spell, auto_spell_le
                                                                     priority * priority_table['blocker'],
                                                                     blocker_path_end,
                                                                     obj));
+                        } else {
+                            if(verbose) { console.log("    NO BLOCKER FOUND"); }
                         }
                     }
                 }
