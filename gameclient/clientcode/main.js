@@ -1696,7 +1696,8 @@ GameObject.prototype.cast_client_spell = function(spell_name, spell, target, loc
                                               spell['always_friendly_fire'] || false);
             session.combat_engine.damage_effect_queue.push(effect);
 
-            var vfx = spell['visual_effect'] || spell['impact_visual_effect'] || null;
+            // note: use both muzzle_flash and impact, because impact location is the object's own location
+            var vfx = spell['visual_effect'] || spell['muzzle_flash_effect'] || spell['impact_visual_effect'] || null;
             if(vfx) {
                 SPFX.add_visual_effect(impact_pos, 0, [0,1,0], client_time, this.get_leveled_quantity(vfx), true, null);
             }
