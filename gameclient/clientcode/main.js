@@ -23583,6 +23583,11 @@ function update_lottery_dialog_buttons(dialog, lottery_dialog) {
                 dialog.widgets['lottery_button'].onclick = (function (_lottery_dialog, _spellarg) { return function(w) {
                     _lottery_dialog.user_data['scan_pending'] = client_time;
                     _lottery_dialog.widgets['glow'].show = true; _lottery_dialog.widgets['glow'].reset_fx();
+
+                    if(gamedata['client']['vfx']['lottery_scan']) {
+                        SPFX.add_visual_effect([0,0], 0, [0,1,0], client_time, gamedata['client']['vfx']['lottery_scan'], true, null);
+                    }
+
                     send_to_server.func(["CAST_SPELL", _lottery_dialog.user_data['scanner'].id, "LOTTERY_SCAN", _spellarg]);
                     lottery_dialog_refresh_slate(_lottery_dialog);
                     if(w.parent !== _lottery_dialog) {
@@ -23595,6 +23600,10 @@ function update_lottery_dialog_buttons(dialog, lottery_dialog) {
                     if(Store.place_user_currency_order(_lottery_dialog.user_data['scanner'].id, 'LOTTERY_SCAN', _spellarg, null)) {
                         _lottery_dialog.user_data['scan_pending'] = client_time;
                         _lottery_dialog.widgets['glow'].show = true; _lottery_dialog.widgets['glow'].reset_fx();
+                        if(gamedata['client']['vfx']['lottery_scan']) {
+                            SPFX.add_visual_effect([0,0], 0, [0,1,0], client_time, gamedata['client']['vfx']['lottery_scan'], true, null);
+                        }
+
                         lottery_dialog_refresh_slate(_lottery_dialog);
                         if(w.parent !== _lottery_dialog) {
                             close_dialog(w.parent);

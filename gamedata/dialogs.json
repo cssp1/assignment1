@@ -8165,7 +8165,7 @@
         "default_button": "lottery_button",
         "widgets": {
             "glow": { "show": 0, "kind":"StaticImage","xy":[-30,-30],"dimensions":[796,496],"bg_image_resizable":1,"asset":"dialog_glow_resizable", "composite_mode": "lighter",
-                      "sound": "success_sound_exploding_glass_01",
+                      //"sound": "success_sound_exploding_glass_01",
                       "fade":1, "duration": 1.5, "fade_peak": 0.2, "delay": -0.2},
             "bg": { "kind":"StaticImage", "xy":[0,0], "dimensions": [736,436], "transparent_to_mouse":0, "asset": "dialog_resizable", "bg_image_resizable": 1},
             "title": { "kind": "TextField", "xy": [39,14], "dimensions": [221, 41], "text_size": 30, "text_style": "thick",
