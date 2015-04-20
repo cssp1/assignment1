@@ -8187,7 +8187,8 @@
 
             "goodies": { "show":0, "kind": "Dialog", "dialog": "item_display", "xy": [269,133], "dimensions": [50,50],
                          "pulse_period_normal": 3.25, "pulse_period_scanning": 0.5, "pulse_amplitude": 0.33,
-                         "randomize_period_normal": 5, "randomize_period_scanning": 2,
+                         // permutation period
+                         "randomize_period_normal": -1, "randomize_period_scanning": -1,
                          "array": [5,2], "array_offset":[75,75] },
             "goodies_spinner": { "show":0, "kind": "StaticImage", "asset": "loading_spinner", "xy": [286,150], "dimensions": [16,16],
                          "array": [5,2], "array_offset":[75,75] },

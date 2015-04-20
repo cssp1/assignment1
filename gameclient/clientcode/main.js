@@ -23395,7 +23395,8 @@ function lottery_dialog_randomize_permutation(dialog, slot_name) {
     var old_i = dialog.user_data['slate_permutation'][slot_name];
     var new_i = Math.floor(Math.random()*max_i);
     var swap_with = dialog.user_data['slate_permutation_inv'][new_i.toString()];
-    if(client_time - dialog.user_data['slate_last_randomized'][swap_with] < period ||
+    if(period < 0 ||
+       client_time - dialog.user_data['slate_last_randomized'][swap_with] < period ||
        client_time - dialog.user_data['slate_last_randomized'][slot_name] < period) {
         return; // too soon
     }
