@@ -1139,9 +1139,10 @@ AStar.CachedAStarContext.prototype.search = function(start_pos, end_pos, path_ch
   * @param {number} ring_size
   * @param {AStar.PathChecker=} path_checker
   * @param {string=} checker_key to uniquely identify the path_checker for cache retrieval
+  * @param {boolean=} strict_limit - only return paths that end within ring_size of target (no partial paths)
   * @return {!Array.<!Array.<number>>}
   */
-AStar.CachedAStarContext.prototype.ring_search = function(start_pos, end_pos, ring_size, path_checker, checker_key) {
+AStar.CachedAStarContext.prototype.ring_search = function(start_pos, end_pos, ring_size, path_checker, checker_key, strict_limit) {
     if(ring_size < 1) { throw Error('ring_size < 1'); }
 
     if(AStar.ASTAR_DEBUG) {
@@ -1192,7 +1193,7 @@ AStar.CachedAStarContext.prototype.ring_search = function(start_pos, end_pos, ri
     if(start_region < 0) {
         ret = []; // search from inside blocked area
     } else {
-        for(var r = 1; r <= ring_size; r++) {
+        for(var r = 1; r <= Math.ceil(ring_size); r++) {
             /** @type {!Array.<!Array.<number>>} */
             var points = [];
 
@@ -1202,11 +1203,13 @@ AStar.CachedAStarContext.prototype.ring_search = function(start_pos, end_pos, ri
                     if(x < 0 || x >= this.map.size[0] || y < 0 || y >= this.map.size[1]) { continue; }
                     var p = [x,y];
                     var end_region = ((!path_checker && this.connectivity) ? this.connectivity.region_num(p) : 0);
-                    if(end_region == start_region && end_region >= 0) { // only consider if possibly accessible
-                        if(this.map.is_blocked(p, cell_checker) !== AStar.NOPASS) {
-                            points.push(p);
-                        }
-                    }
+                    // only consider if possibly accessible
+                    if(end_region != start_region || end_region < 0) { continue; }
+                    // only consider if end point is passable
+                    if(this.map.is_blocked(p, cell_checker) === AStar.NOPASS) { continue; }
+                    // only consider if end point is within straight-line ring-size distance
+                    if(strict_limit && vec_distance(p, end_pos) >= ring_size) { continue; }
+                    points.push(p);
                 }
             }
 
@@ -1222,12 +1225,18 @@ AStar.CachedAStarContext.prototype.ring_search = function(start_pos, end_pos, ri
                     return 0;
                 }
             });
+
             for(var i = 0; i < points.length; i++) {
-                var path = this.search(start_pos, points[i], path_checker, checker_key); // note: this uses the cache as well
-                if(path.length > 0) {
-                    ret = path;
-                    break;
+                if(AStar.ASTAR_DEBUG) {
+                    console.log('AStar.ring_search TESTING '+vec_print(points[i])+' ('+vec_distance(points[i],start_pos).toFixed(3)+')...');
                 }
+
+                var path = this.search(start_pos, points[i], path_checker, checker_key); // note: this uses the cache as well
+
+                if(path.length <= 0) { continue; } // reject, no path found
+                if(strict_limit && vec_distance(path[path.length-1], end_pos) >= ring_size) { continue; } // reject, not close enough to target
+                ret = path;
+                break;
             }
             if(ret !== null) { break; }
         }
