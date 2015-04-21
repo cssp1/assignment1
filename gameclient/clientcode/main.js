@@ -253,6 +253,8 @@ function vec_list_reversed(ls) {
     return ls.reverse();
 }
 
+/** @param {!Array.<number>} v
+    @return {string} */
 function vec_print(v) { return v[0].toString()+','+v[1].toString(); };
 
 function hex_slanted(a) {
