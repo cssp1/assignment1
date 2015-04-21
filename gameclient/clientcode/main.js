@@ -3259,7 +3259,7 @@ GameObject.prototype.ai_pick_target_find_blocker = function(cur_cell, dest_cell,
         // enlarge iter_limit because we want to work very hard to find a path.
         // if no path is found to a valid target, the unit will get stuck "marching in place!"
         var old_limit = astar_context.iter_limit;
-        astar_context.iter_limit = 2 * Math.ceil(ring_size) * Math.max(ncells[0],ncells[1]); // -1;
+        //astar_context.iter_limit = 2 * Math.ceil(ring_size) * Math.max(ncells[0],ncells[1]); // -1;
         var path = astar_context.search(cur_cell, dest_cell, checker, checker_key);
         astar_context.iter_limit = old_limit;
 
