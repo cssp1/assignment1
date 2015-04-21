@@ -1078,7 +1078,7 @@ AStar.CachedAStarContext.prototype.debug_dump = function() {
  * @return {string}
  */
 AStar.CachedAStarContext.prototype.cache_key = function(start_pos, end_pos, ring_size, checker_key) {
-    var ret = (start_pos[0].toFixed(0)+','+start_pos[1].toFixed(0)+':'+end_pos[0].toFixed(0)+','+end_pos[1].toFixed(0)+','+ring_size.toFixed(0));
+    var ret = (start_pos[0].toFixed(0)+','+start_pos[1].toFixed(0)+':'+end_pos[0].toFixed(0)+','+end_pos[1].toFixed(0)+','+ring_size.toFixed(3));
     if(checker_key) { ret += ','+checker_key; }
     return ret;
 };
@@ -1143,6 +1143,10 @@ AStar.CachedAStarContext.prototype.search = function(start_pos, end_pos, path_ch
   */
 AStar.CachedAStarContext.prototype.ring_search = function(start_pos, end_pos, ring_size, path_checker, checker_key) {
     if(ring_size < 1) { throw Error('ring_size < 1'); }
+
+    if(AStar.ASTAR_DEBUG) {
+        console.log('AStar.ring_search START '+vec_print(start_pos)+'->'+vec_print(end_pos)+' ring_size '+ring_size.toFixed(3));
+    }
 
     /** @type {AStar.BlockChecker|null} */
     var cell_checker = null;
@@ -1230,6 +1234,11 @@ AStar.CachedAStarContext.prototype.ring_search = function(start_pos, end_pos, ri
     }
     if(ret === null) { // no path
         ret = [];
+    }
+
+    if(AStar.ASTAR_DEBUG) {
+        console.log('AStar.ring_search DONE '+vec_print(start_pos)+'->'+vec_print(end_pos)+' ring_size '+ring_size.toFixed(3));
+        console.log(ret);
     }
 
     // must make a copy, because the caller may mutate the path

@@ -3140,6 +3140,9 @@ GameObject.prototype.ai_pick_target_classic = function(auto_spell, auto_spell_le
 
                     if(!accessible && ('blocker' in priority_table)) { // no cell within shooting range of the target is accessible by a fully clear path
                         // try to identify a barrier along the way, and promote it up near the target's priority
+                        if(verbose) {
+                            console.log("    LOOKING FOR BLOCKERS cur "+vec_print(cur_cell)+' dest '+vec_print(dest_cell)+' team '+target_team+' obj '+obj.id+' spell '+auto_spell['name']+' range '+auto_spell_range.toString());
+                        }
                         var temp = this.ai_pick_target_find_blocker(cur_cell, dest_cell, target_team, obj, auto_spell, auto_spell_range,
                                                                     // note: pass damage_vs, not priority_vs, to avoid including things like "barrier":0
                                                                     auto_spell['damage_vs'] || {});
