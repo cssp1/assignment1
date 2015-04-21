@@ -3221,6 +3221,7 @@ GameObject.prototype.ai_pick_target_find_blocker = function(cur_cell, dest_cell,
         // use A* to plot a course through destructible blockers toward the target
         //console.log('astar_accessibility '+vec_print(cur_cell)+' to '+vec_print(dest_cell)+' with range '+auto_spell_range.toString());
         var ring_size = auto_spell_range + obj.hit_radius();
+        var ncells = session.viewing_base.ncells();
 
         // A* cost function
         // cost equals "how fast we can kill it" expressed in units of "time it would take to move one map cell"
@@ -3254,10 +3255,13 @@ GameObject.prototype.ai_pick_target_find_blocker = function(cur_cell, dest_cell,
         var checker_key = this.team+':'+this.spec['name']; // checker should be unique to our team and spec
 
         // perform the query
-        //PLAYFIELD_DEBUG=1;
-        //var path = astar_context.ring_search(cur_cell, dest_cell, ring_size, checker, checker_key);
+
+        // enlarge iter_limit because we want to work very hard to find a path.
+        // if no path is found to a valid target, the unit will get stuck "marching in place!"
+        var old_limit = astar_context.iter_limit;
+        astar_context.iter_limit = 2 * Math.ceil(ring_size) * Math.max(ncells[0],ncells[1]); // -1;
         var path = astar_context.search(cur_cell, dest_cell, checker, checker_key);
-        //PLAYFIELD_DEBUG=0;
+        astar_context.iter_limit = old_limit;
 
         if(path && path.length > 0) {
             for(var i = 0; i < path.length; i++) {
