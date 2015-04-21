@@ -23386,7 +23386,17 @@ function lottery_dialog_refresh_slate(dialog) {
     dialog.user_data['slate_pending'] = true;
     get_lottery_slate(dialog.user_data['scanner'], (function (_dialog) { return function(result) { lottery_dialog_got_slate(_dialog, result); }; })(dialog));
 }
+
 function lottery_dialog_got_slate(dialog, result) {
+    if(dialog.user_data['scan_pending'] >= 0) {
+        // wait until it finishes
+        dialog.user_data['incoming_slate'] = result;
+    } else {
+        lottery_dialog_accept_slate(dialog, result);
+    }
+}
+
+function lottery_dialog_accept_slate(dialog, result) {
     dialog.user_data['slate'] = result;
     dialog.user_data['slate_pending'] = false;
     dialog.user_data['slot_offsets'] = {}; // random numbers for slate icon animation
@@ -23501,7 +23511,8 @@ function update_lottery_dialog(dialog) {
     for(var y = 0; y < dialog.data['widgets']['goodies_spinner']['array'][1]; y++) {
         for(var x = 0; x < dialog.data['widgets']['goodies_spinner']['array'][0]; x++) {
             var wname = SPUI.get_array_widget_name('goodies_spinner', dialog.data['widgets']['goodies_spinner']['array'], [x,y]);
-            dialog.widgets[wname].show = dialog.user_data['slate_pending'];
+            // show when slate is pending, but not if in the middle of a scan
+            dialog.widgets[wname].show = dialog.user_data['slate_pending'] && (dialog.user_data['scan_pending'] < 0);
         }
     }
 
@@ -23629,6 +23640,13 @@ function lottery_dialog_scan_result(dialog, which_slot, loot) {
     dialog.user_data['scan_pending'] = -1;
     if(loot) {
         do_invoke_item_discovered(loot, {tip_mode: 'inventory', enable_animation: false, lottery_dialog: dialog});
+    }
+
+    // update the slate, if we received the new one
+    if('incoming_slate' in dialog.user_data) { // may be null
+        var slate = dialog.user_data['incoming_slate'];
+        delete dialog.user_data['incoming_slate'];
+        lottery_dialog_accept_slate(dialog, slate);
     }
 }
 
