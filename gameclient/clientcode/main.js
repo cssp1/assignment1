@@ -3104,7 +3104,7 @@ GameObject.prototype.ai_pick_target_classic = function(auto_spell, auto_spell_le
                         test_path = astar_context.search(cur_cell, test_point);
                     } else {
                         // need to search in an expanding ring for unblocked cells
-                        ring_size = Math.ceil(auto_spell_range + obj.hit_radius());
+                        ring_size = auto_spell_range + obj.hit_radius();
                         test_path = astar_context.ring_search(cur_cell, test_point, ring_size);
                     }
 
