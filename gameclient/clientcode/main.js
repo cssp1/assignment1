@@ -4067,6 +4067,7 @@ Building.prototype.receive_state = function(data, init, is_deploying) {
 
         var congrats_func = (function (_spec_name, _level) { return function() {
             invoke_building_upgrade_congrats(_spec_name, _level);
+            player.claim_achievements();
         }; })(this.spec['name'], this.level);
 
         if(!player.is_cheater) {
