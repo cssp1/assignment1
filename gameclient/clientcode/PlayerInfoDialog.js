@@ -474,6 +474,8 @@ PlayerInfoDialog.invoke_profile_tab = function(parent) {
             var req = read_predicate(spell['requires'] || {'predicate':'ALWAYS_TRUE'});
             if(req.is_satisfied(player, null)) {
                 dialog.widgets['set_alias_button'].show = true;
+                dialog.widgets['set_alias_button'].tooltip.str = dialog.data['widgets']['set_alias_button']['ui_tooltip'];
+                dialog.widgets['set_alias_button'].tooltip.text_color = SPUI.default_text_color;
                 dialog.widgets['set_alias_button'].onclick = function(w) {
                     var parent = w.parent.parent;
                     invoke_change_alias_dialog(
@@ -492,8 +494,14 @@ PlayerInfoDialog.invoke_profile_tab = function(parent) {
                     );
                 };
             } else {
-                dialog.widgets['set_alias_button'].show = false;
+                //dialog.widgets['set_alias_button'].show = false;
+                dialog.widgets['set_alias_button'].show = true;
+                dialog.widgets['set_alias_button'].tooltip.text_color = SPUI.error_text_color;
+                dialog.widgets['set_alias_button'].tooltip.str = req.ui_describe(player);
+                dialog.widgets['set_alias_button'].onclick = get_requirements_help(req);
             }
+        } else {
+            dialog.widgets['set_alias_button'].show = false;
         }
     }
 
