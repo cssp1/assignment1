@@ -234,6 +234,17 @@
     "use": { "spellname": "BUY_PROTECTION28" }
 },
 
+"alias_changer": {
+    "name": "alias_changer",
+    "ui_name": "Call Sign Change",
+    "ui_description": "Activate to change your Call Sign. Once changed, you may not change it again for 10 days.",
+    "rarity": 3,
+    "max_stack": 1,
+    "icon": "inventory_transmitter",
+    "use": { "spellname": "CHANGE_ALIAS", "spellarg": [] // new name will be sent with INVENTORY_USE and appended
+           }
+},
+
 // DO NOT USE THIS ITEM, IT DOES NOT WORK, IT IS FOR THE STORE TOOLTIP ONLY!
 "base_expansion_10pct": {
     "name": "base_expansion_10pct",

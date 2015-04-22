@@ -228,6 +228,13 @@ var method_clear_cooldown = function() {
         send_request('player', 'clear_cooldown', $.extend(ident, {'name':name, 'ui_reason':ui_reason}), function(result) { alert("Success!"); });
     }
 };
+var method_remove_aura = function(aura_name) {
+    var ident = get_ident();
+    var ui_reason = check_ui_reason($("#chat_reason")[0].value);
+    if(ident && aura_name && ui_reason) {
+        send_request('player', 'remove_aura', $.extend(ident, {'aura_name':aura_name, 'ui_reason':ui_reason}), function(result) { alert("Success!"); });
+    }
+};
 var method_give_item = function() {
     var ident = get_ident();
     var ui_reason = check_ui_reason($("#item_to_give_reason")[0].value);
@@ -286,11 +293,25 @@ var method_unmake_developer = function() {
         send_request('player', 'unmake_developer', $.extend(ident, {'ui_reason':ui_reason}), function(result) { alert("Success!"); });
     }
 };
-var method_clear_alias = function() {
+var method_clear_alias = function(cooldown) {
     var ident = get_ident();
     var ui_reason = check_ui_reason($("#chat_reason")[0].value);
     if(ident && ui_reason) {
-        send_request('player', 'clear_alias', $.extend(ident, {'ui_reason':ui_reason}), function(result) { alert("Success!"); });
+        if(!ident['user_id']) {
+            display_error('Please look up this player by User ID');
+            return;
+        }
+
+        send_request('player', 'clear_alias', $.extend(ident, {'ui_reason':ui_reason}), (function(_ident, _ui_reason, _cooldown) { return function(result) {
+            if(_cooldown > 0) {
+                send_request('player', 'apply_aura', $.extend(_ident, {'ui_reason':_ui_reason,'aura_name':'alias_gagged','duration':_cooldown}),
+                             (function (__ident, __cooldown) { return function(result) {
+                                 alert("Cleared alias from player "+__ident['user_id'].toString()+" and added cooldown for "+(__cooldown/3600).toFixed(0)+" hours");
+                             }; })(_ident, _cooldown));
+            } else {
+                alert("Cleared alias from player "+_ident['user_id'].toString());
+            }
+        }; })(ident, ui_reason, cooldown));
     }
 };
 var method_chat_official = function() {
@@ -1152,6 +1173,7 @@ $(function() {
     $('#send_message_body').elastic();
     $('#chat_gag_duration').spinner({max:240, min:1, step:1});
     $('#chat_block_other_id').spinner({min:0, step:1});
+    $('#clear_alias_duration').spinner({max:999999, min:0, step:1});
     $('#gamebucks_amount').spinner({max:50000, min:0, step:100});
     $('#item_to_give_qty').spinner({max:50, min:1, step:1});
     spin_giveable_items.forEach(function(entry) {
@@ -1243,7 +1265,9 @@ $(function() {
         <button onclick="method_chat_block($('#chat_block_other_id').spinner('value'))" class="spin_button" style="width:200px;">Block Communication</button>
         <button onclick="method_chat_unblock($('#chat_block_other_id').spinner('value'))" class="spin_button" style="width:200px;">Unblock Communication</button>
       <p>
-      <button onclick="method_clear_alias()" class="spin_button" style="width:300px;">Remove Alias (Call Sign/Nickname)</button><p>
+      <button onclick="method_clear_alias($('#clear_alias_duration').spinner('value')*3600)" class="spin_button" style="width:300px;">Remove Alias (Call Sign/Nickname)</button>
+      Cooldown until new Alias: <input type="text" id="clear_alias_duration" name="clear_alias_duration" value="12"> Hours
+      <button onclick="method_remove_aura('alias_gagged')" class="spin_button" style="width:180px;">Undo Alias Cooldown</button>
       <p>
       Reason for this action:
       <br>

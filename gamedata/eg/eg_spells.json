@@ -444,6 +444,29 @@
         "ui_activation": "sent"
     },
 
+    "SET_ALIAS": { // set alias for the first time (only available if no alias set yet)
+        "ui_name": "Choose Call Sign",
+        "ui_description": "Pick the name you would like to be called in this game. Choose carefully - Call Signs cannot be changed easily!",
+        "ui_confirm": "Your new Call Sign \"%s\" will be permanent.",
+        "code": "change_alias", "activation": "popup",
+        "show_if": {"predicate": "NOT", "subpredicates": [{"predicate": "HAS_ALIAS"}]},
+        "requires": {"predicate": "AND", "subpredicates":[
+            {"predicate": "NOT", "subpredicates": [{"predicate": "HAS_ALIAS"}], "ui_name": "Call Sign already set"},
+            {"predicate": "AURA_INACTIVE", "aura_name": "alias_gagged"}
+        ]}
+    },
+    "CHANGE_ALIAS": { // change existing alias
+        "ui_name": "Change Call Sign",
+        "ui_description": "Change the name you are called in this game. Choose carefully - once you pick a Call Sign, you cannot change it for 10 days!",
+        "ui_confirm": "Your new Call Sign \"%s\" will be permanent.",
+        "code": "change_alias", "activation": "popup",
+        "cooldown_name": "CHANGE_ALIAS", "cooldown": 864000, // 10 days
+        "paid": 1, "price_formula": "constant", "price": 100, // 1000 Gamebucks
+        "show_if": {"predicate": "HAS_ALIAS"},
+        "requires": {"predicate": "AURA_INACTIVE", "aura_name": "alias_gagged"},
+        "new_store_tip_item": "alias_changer", "new_store_icon": "inventory_transmitter"
+    },
+
 #include_stripped "$GAME_ID_spells_weapons.json"
     ,
 #include_stripped "built/$GAME_ID_spells_auto.json"
