@@ -46977,11 +46977,13 @@ Building.prototype.get_idle_state_legacy = function() {
         }
     } else if(this.spec['name'] === gamedata['alliance_building']) {
         if(!session.is_in_alliance()) {
-            var pr = gamedata['predicate_library']['alliance_join_requirement'];
-            if(read_predicate({'predicate':'LIBRARY','name':'alliance_join_requirement'}).is_satisfied(player, null)) {
-                draw_idle_icon = 'join_alliance';
-            } else if(pr['predicate'] == 'BUILDING_LEVEL' && pr['building_type'] === this.spec['name'] && this.level < pr['trigger_level']) {
-                draw_idle_icon = 'upgrade';
+            if(!player.cooldown_active('alliance_deserter')) {
+                var pr = gamedata['predicate_library']['alliance_join_requirement'];
+                if(read_predicate({'predicate':'LIBRARY','name':'alliance_join_requirement'}).is_satisfied(player, null)) {
+                    draw_idle_icon = 'join_alliance';
+                } else if(pr['predicate'] == 'BUILDING_LEVEL' && pr['building_type'] === this.spec['name'] && this.level < pr['trigger_level']) {
+                    draw_idle_icon = 'upgrade';
+                }
             }
         } else {
             if(player.unit_donation_enabled()) {
@@ -47190,11 +47192,13 @@ Building.prototype.get_idle_state_advanced = function() {
         /* draw_idle_icon = 'craft_done_advanced'; */
     } else if(this.spec['name'] === gamedata['alliance_building']) {
         if(!session.is_in_alliance()) {
-            var pr = gamedata['predicate_library']['alliance_join_requirement'];
-            if(read_predicate({'predicate':'LIBRARY','name':'alliance_join_requirement'}).is_satisfied(player, null)) {
-                draw_idle_icon = 'join_alliance_advanced';
-            } else if(pr['predicate'] == 'BUILDING_LEVEL' && pr['building_type'] === this.spec['name'] && this.level < pr['trigger_level']) {
-                draw_idle_icon = 'upgrade_to_join_alliance';
+            if(!player.cooldown_active('alliance_deserter')) {
+                var pr = gamedata['predicate_library']['alliance_join_requirement'];
+                if(read_predicate({'predicate':'LIBRARY','name':'alliance_join_requirement'}).is_satisfied(player, null)) {
+                    draw_idle_icon = 'join_alliance_advanced';
+                } else if(pr['predicate'] == 'BUILDING_LEVEL' && pr['building_type'] === this.spec['name'] && this.level < pr['trigger_level']) {
+                    draw_idle_icon = 'upgrade_to_join_alliance';
+                }
             }
         } else {
             if(player.unit_donation_enabled()) {
