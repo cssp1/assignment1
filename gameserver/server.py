@@ -11045,9 +11045,9 @@ class LivePlayer(Player):
                     gamesite.exception_log.event(server_time, 'player %d turret_head_mg_mortar_xp_fix added %d missing XP' % (self.user_id, missing_xp))
             self.history['turret_head_mg_mortar_xp_fixed'] = 1
 
-        # fix TR building/tech XP added April 2015
+        # fix TR building/tech XP added 2015 April 23
         if gamedata['game_id'] == 'tr' and \
-           account_creation_time < 1927994000 and \
+           account_creation_time < (1429808400+2*86400) and \
            len(gamedata['player_xp']['level_xp']) >= 50 and \
            self.history.get('201504_xp_fixed',0) < 1:
             missing_xp = 0
@@ -11069,9 +11069,10 @@ class LivePlayer(Player):
                                 coeff = gamedata['player_xp']['buildings'][obj.spec.name if level > 1 else 'level_1']
                                 cost = sum((obj.spec.get_leveled_quantity(getattr(obj.spec, 'build_cost_'+res), level) for res in gamedata['resources']), 0)
                                 xp = int(coeff * cost)
-                            key = '%s:L%d' % (obj.spec.name, level)
-                            missing_xp_dict[key] = missing_xp_dict.get(key,0) + xp
-                            missing_xp += xp
+                            if xp > 0:
+                                key = '%s:L%d' % (obj.spec.name, level)
+                                missing_xp_dict[key] = missing_xp_dict.get(key,0) + xp
+                                missing_xp += xp
             self.history['201504_xp_prefix'] = self.resources.xp # save previous XP, in case we mess up
             if missing_xp > 0:
                 self.resources.gain_xp(missing_xp, '201504_xp_fix')
