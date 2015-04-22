@@ -2160,11 +2160,18 @@ def check_ai_base_contents(strid, base, owner, base_type):
                             error |= 1
                             print 'ERROR: Quarry %s: quarries do not support landmines' % (strid)
                         for slot in slots:
-                            if (type(str(slot)) is not str) or (slot not in gamedata['items']) or ('equip' not in gamedata['items'][slot]):
-                                error |= 1
-                                print 'ERROR: AI base %s has a %s equipped with invalid item "%s"' % (strid, KIND, slot)
+                            if type(slot) is dict:
+                                item = slot
+                            elif type(str(slot)) is str:
+                                item = {'spec':slot}
                             else:
-                                equip_spec = gamedata['items'][slot]
+                                error |= 1; print 'ERROR: AI base %s has a %s equipped with invalid item "%r"' % (strid, KIND, slot)
+                            if (item['spec'] not in gamedata['items']) or ('equip' not in gamedata['items'][item['spec']]) or \
+                               (item.get('level',1) > gamedata['items'][item['spec']].get('max_level',1)):
+                                error |= 1
+                                print 'ERROR: AI base %s has a %s equipped with invalid item "%r"' % (strid, KIND, slot)
+                            else:
+                                equip_spec = gamedata['items'][item['spec']]
                                 for effect in equip_spec['equip']['effects']:
                                     if effect['code'] == 'modstat' and effect['stat'] == 'on_destroy':
                                         conslist = effect['strength']
@@ -2173,7 +2180,7 @@ def check_ai_base_contents(strid, base, owner, base_type):
                                                 for secteam_name in cons['units']:
                                                     if not climate_allows_unit(climate_data, gamedata['units'][secteam_name]):
                                                         error |= 1
-                                                        print 'ERROR: AI base %s has %s with item %s that spawns security team unit %s not allowed by climate %s' % (strid, item['spec'], slot, secteam_name, climate)
+                                                        print 'ERROR: AI base %s has %s with item %r that spawns security team unit %s not allowed by climate %s' % (strid, item['spec'], slot, secteam_name, climate)
     if 'buildings' in base:
         error |= check_ai_base_contents_power(base['buildings'], strid)
     return error
