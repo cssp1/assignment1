@@ -41319,6 +41319,9 @@ function handle_server_message_bundle(serial, bundle) {
     }
 }
 
+// for debugging bad battle summaries
+var debug_session_change_history = [];
+
 function handle_server_message(data) {
     var msg = data[0];
 
@@ -41696,6 +41699,13 @@ function handle_server_message(data) {
         var battle_opponent_user_id = null, battle_opponent_fbid = null, battle_opponent_level = null, battle_opponent_friend = null, battle_opponent_name = null;
         var battle_outcome = data[10];
 
+        debug_session_change_history.push({'count': data[38],
+                                           'from': (session.viewing_base ? session.viewing_base.base_id.toString() : 'null'),
+                                           'to': data[16], 'deployed': session.has_deployed, 'summary?': !!data[9]});
+        if(debug_session_change_history.length > 5) { // limit to last few session changes
+            debug_session_change_history.splice(0, 5 - debug_session_change_history.length);
+        }
+
         if(session.has_deployed && (!session.is_quarry() || (session.viewing_user_id != session.user_id))) {
             battle_ended = true;
             battle_base = session.viewing_base;
@@ -41709,7 +41719,7 @@ function handle_server_message(data) {
             } else {
                 throw Error('received a bad battle summary: '+(battle_summary ? JSON.stringify(battle_summary) : 'null/undefined') +
                             ' at '+ (session.viewing_base ? session.viewing_base.base_id.toString() : 'null') +
-                            ' going to '+data[16] + ' after '+(client_time - session.change_time).toFixed(1)+' sec, deployed '+(server_time - session.deploy_time).toFixed(1)+' sec ago');
+                            ' going to '+data[16] + ' after '+(client_time - session.change_time).toFixed(1)+' sec, deployed '+(server_time - session.deploy_time).toFixed(1)+' sec ago, history '+JSON.stringify(debug_session_change_history));
             }
 
             if(session.home_base) {

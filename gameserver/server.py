@@ -2870,6 +2870,9 @@ class Session(object):
         # flag to prevent overlapping VISIT_BASE requests
         self.visit_base_in_progress = False
 
+        # for debugging, keep track of how many SESSION_CHANGE messages we've sent the client this login
+        self.debug_session_change_count = 0
+
         # same for complete_attack
         self.complete_attack_in_progress = False
         self.complete_attack_cbs = None
@@ -16031,8 +16034,10 @@ class GAMEAPI(resource.Resource):
                        session.viewing_player.is_pvp_player(),
                        [self.get_player_cache_props(session.user, session.player)] + \
                        ([self.get_player_cache_props(session.viewing_user, session.viewing_player, session.viewing_alliance_id_cache)] if ((session.viewing_player is not session.player) and (not session.viewing_player.is_ai())) else []),
-                       list(session.player.equipped_items_serialize())
+                       list(session.player.equipped_items_serialize()),
+                       session.debug_session_change_count
                        ])
+        session.debug_session_change_count += 1
         for astate in aura_states:
             retmsg.append(["OBJECT_AURAS_UPDATE", astate])
 
