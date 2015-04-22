@@ -32630,9 +32630,9 @@ function missions_dialog_select_mission(dialog, row) {
     }
 
     dialog.widgets['claim_button'].state = (pending ? 'bigaction' : 'normal');
-    dialog.widgets['claim_button'].str = dialog.data['widgets']['claim_button']['ui_name'+ (pending ? '' : (quest['ui_accept_consequent'] ? '_show_me' : '_accept'))];
     dialog.widgets['claim_button'].bg_image = (pending ? 'action_button_134px' : 'menu_button_134px');
     if(pending) {
+        dialog.widgets['claim_button'].str = dialog.data['widgets']['claim_button']['ui_name'];
         dialog.widgets['claim_button'].onclick = (function (q) { return function(w) {
             var dialog = w.parent;
             if(1) {
@@ -32644,7 +32644,22 @@ function missions_dialog_select_mission(dialog, row) {
             dialog.widgets['claim_button'].state = 'disabled';
         }; })(quest);
     } else {
-        dialog.widgets['claim_button'].onclick = (function (q) { return function() {
+
+        // see if we have a helper function for the goal predicate
+        var helper = null;
+
+        if(quest['ui_accept_consequent']) { // manual override is top priority
+            helper = (function (_cons) { return function() { _cons.execute(); }; })(read_consequent(quest['ui_accept_consequent']));
+        } else if(!quest['tips'] &&
+                  player.get_any_abtest_value('missions_dialog_predicate_help', gamedata['client']['missions_dialog_predicate_help'])) {
+            // try to generate a helper automatically, for non-blue-arrow-tips quests
+            helper = get_requirements_help(pred, null, {even_if_tutorial_incomplete:true, short_circuit:true});
+        }
+
+        // note: helper may still be null here
+
+        dialog.widgets['claim_button'].str = dialog.data['widgets']['claim_button']['ui_name'+ (helper ? '_show_me' : '_accept')];
+        dialog.widgets['claim_button'].onclick = (function (q, _helper) { return function() {
             if('ui_accept_url' in q) {
                 // override default behavior with a URL open
                 url_open_in_new_tab(q['ui_accept_url']);
@@ -32652,10 +32667,6 @@ function missions_dialog_select_mission(dialog, row) {
             }
 
             change_selection(null);
-
-            if('ui_accept_consequent' in q) {
-                read_consequent(q['ui_accept_consequent']).execute();
-            }
 
             // "accept" button works like "close" if in skip_tutorial mode
             if('skip_tutorial' in player.preferences && player.preferences['skip_tutorial']) {
@@ -32665,7 +32676,12 @@ function missions_dialog_select_mission(dialog, row) {
             } else {
                 tutorial_opt_in(q);
             }
-        }; })(quest);
+
+            if(_helper) {
+                _helper();
+            }
+
+        }; })(quest, helper);
     }
 
     dialog.widgets['mission_accomplished'].show =
