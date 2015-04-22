@@ -9048,8 +9048,6 @@ function invoke_playfield_controls_bar() {
         }
     };
 
-    dialog.widgets['settings_button'].show = ((player.tutorial_state == "COMPLETE") ||
-                                              gamedata['tutorial'][player.tutorial_state]['enable_desktop_control_buttons']);
     dialog.widgets['settings_button'].onclick = invoke_settings_dialog;
 
     dialog.widgets['music_button'].show = GameArt.enable_audio;
@@ -9097,6 +9095,8 @@ function update_playfield_controls_bar(dialog) {
         // attach to right side of desktop
         dialog.xy = vec_add(dialog.data['spacing'], [canvas_width-dialog.wh[0], Math.floor(canvas_height/2 - dialog.wh[1])]);
     }
+    dialog.widgets['settings_button'].show = session.enable_combat_resource_bars && ((player.tutorial_state == "COMPLETE") ||
+                                                                                     gamedata['tutorial'][player.tutorial_state]['enable_desktop_control_buttons']);
     dialog.widgets['fullscreen_button'].state = canvas_is_fullscreen ? 'reverse' : 'normal';
     if(GameArt.enable_audio) {
         dialog.widgets['music_button'].state = GameArt.music_volume > 0 ? 'on' : 'off';
