@@ -3593,7 +3593,7 @@ class Session(object):
                                        'source_obj_level': source_obj.level})
         if self.damage_log: self.damage_log.init_multi(units)
 
-    def give_tech(self, player, retmsg, tech_name, level, lab, method):
+    def give_tech(self, player, retmsg, tech_name, level, lab, method, give_xp = True):
         assert player is self.player
         spec = player.get_abtest_spec(TechSpec, tech_name)
 
@@ -3603,17 +3603,18 @@ class Session(object):
         player.recalc_stattab(self.player)
         player.update_unit_levels(self.player, tech_name, self, retmsg)
 
-        # award XP for each level achieved along the way
-        xp = 0
-        for step in xrange(current+1, level+1):
-            override = TechSpec.get_leveled_quantity(spec.upgrade_xp, step)
-            if override >= 0:
-                xp += override
-            else:
-                xp += int(gamedata['player_xp']['research'] * \
-                          sum((TechSpec.get_leveled_quantity(getattr(spec, 'cost_'+res), step) for res in gamedata['resources']), 0))
+        if give_xp:
+            # award XP for each level achieved along the way
+            xp = 0
+            for step in xrange(current+1, level+1):
+                override = TechSpec.get_leveled_quantity(spec.upgrade_xp, step)
+                if override >= 0:
+                    xp += override
+                else:
+                    xp += int(gamedata['player_xp']['research'] * \
+                              sum((TechSpec.get_leveled_quantity(getattr(spec, 'cost_'+res), step) for res in gamedata['resources']), 0))
 
-        gamesite.gameapi.give_xp_to(self, player, retmsg, xp, 'research', [lab.x,lab.y] if lab else None, obj_session_id = lab.obj_id if lab else None)
+            gamesite.gameapi.give_xp_to(self, player, retmsg, xp, 'research', [lab.x,lab.y] if lab else None, obj_session_id = lab.obj_id if lab else None)
 
         if player is self.player:
             tech_reply = "TECH_UPDATE"

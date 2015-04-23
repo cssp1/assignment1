@@ -178,8 +178,9 @@ class GiveTechConsequent(Consequent):
         Consequent.__init__(self, data)
         self.tech_name = data['tech_name']
         self.level = data.get('tech_level', 1)
+        self.give_xp = bool(data.get('give_xp', True))
     def execute(self, session, player, retmsg, context=None):
-        session.give_tech(player, retmsg, self.tech_name, self.level, None, 'give_tech')
+        session.give_tech(player, retmsg, self.tech_name, self.level, None, 'give_tech', give_xp = self.give_xp)
 
 class GiveLootConsequent(Consequent):
     def __init__(self, data):
