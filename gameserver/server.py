@@ -11080,7 +11080,8 @@ class LivePlayer(Player):
                 self.mailbox_append(self.make_system_mail(gamedata['strings']['201504_xp_fix_mail'],
                                                           replace_s = '%d' % missing_xp))
                 if gamedata['server']['log_xp_migration']:
-                    gamesite.exception_log.event(server_time, 'player %d 201504_xp_fix added %d missing XP %r' % (self.user_id, missing_xp, missing_xp_dict))
+                    gamesite.exception_log.event(server_time, 'player %d 201504_xp_fix added %d missing XP' % (self.user_id, missing_xp))
+                    #gamesite.exception_log.event(server_time, 'player %d 201504_xp_fix added %d missing XP %r' % (self.user_id, missing_xp, missing_xp_dict))
             self.history['201504_xp_fixed'] = 1
             self.history['201504_xp_fixed_at'] = server_time
 
