@@ -3819,6 +3819,7 @@ MapBlockingGameObject.prototype.block_map_at = function(xy, incr, reason) {
         return;
     }
     var bounds = this.current_collision_bounds(xy);
+    if(!reason || typeof(reason) !== 'string') { throw Error('bad reason'); }
     this.debug_block_history.push({'xy':xy, 'incr':incr, 'reason':reason});
     astar_map.block_map([bounds[0][0], bounds[1][0]], [bounds[0][1]-bounds[0][0], bounds[1][1]-bounds[1][0]], incr, this, reason);
     invalidate_unit_paths();
