@@ -86,7 +86,7 @@ if __name__ == '__main__':
 
     # find most recent entry
     start_time = -1
-    end_time = time_now - 60 # skip entries too close to "now" to ensure that all entries for a given second are present
+    end_time = time_now - 4*3600 # skip entries too close to "now" to ensure that all entries are present
     cur = con.cursor(MySQLdb.cursors.DictCursor)
     if dry_run:
         row = None
