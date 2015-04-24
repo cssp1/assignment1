@@ -41710,8 +41710,8 @@ function handle_server_message(data) {
         var battle_outcome = data[10];
 
         debug_session_change_history.push({'count': data[38],
-                                           'from': (session.viewing_base ? session.viewing_base.base_id.toString() : 'null'),
-                                           'to': data[16], 'deployed': session.has_deployed, 'summary?': !!data[9]});
+                                           'from': data[39],
+                                           'to': data[16], 'client_deployed': session.has_deployed, 'summary?': !!data[9]});
         if(debug_session_change_history.length > 5) { // limit to last few session changes
             debug_session_change_history.splice(0, 5 - debug_session_change_history.length);
         }

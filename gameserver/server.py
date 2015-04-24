@@ -15715,6 +15715,8 @@ class GAMEAPI(resource.Resource):
             if (session.viewing_player.country == 'unknown') and (session.viewing_user.country) and (session.viewing_user.country != 'unknown'):
                 session.viewing_player.country = session.viewing_user.country
 
+        debug_prev_base_id = session.viewing_base.base_id if session.viewing_base else 'null'
+
         if dest_base:
             session.viewing_base = dest_base
         else:
@@ -16037,7 +16039,8 @@ class GAMEAPI(resource.Resource):
                        [self.get_player_cache_props(session.user, session.player)] + \
                        ([self.get_player_cache_props(session.viewing_user, session.viewing_player, session.viewing_alliance_id_cache)] if ((session.viewing_player is not session.player) and (not session.viewing_player.is_ai())) else []),
                        list(session.player.equipped_items_serialize()),
-                       session.debug_session_change_count
+                       session.debug_session_change_count,
+                       debug_prev_base_id
                        ])
         session.debug_session_change_count += 1
         for astate in aura_states:
@@ -25608,7 +25611,8 @@ class GameSite(server.Site):
 
 
             # check for sessions where an attack has been going on for too long
-            elif (session.has_attacked) and (not session.visit_base_in_progress) and (not session.complete_attack_in_progress) and \
+            elif (not session.is_async) and \
+                 (session.has_attacked) and (not session.visit_base_in_progress) and (not session.complete_attack_in_progress) and \
                  (session.attack_finish_time > 0) and (server_time >= session.attack_finish_time):
                 # force the attack to conclude
                 client_inactive_time = server_time - session.last_active_time
