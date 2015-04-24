@@ -15115,7 +15115,17 @@ function invoke_gift_received_dialog(override_ls) {
     dialog.widgets['friend_icon'].set_user(ls[0].user_id);
     var info = ls[0].info;
     var sender_fbid = (info && info['facebook_id'] ? info['facebook_id'] : null);
-    var sender_name = (info ? PlayerCache.get_ui_name(info) : 'Unknown');
+
+    var sender_name;
+    if(info) {
+        if(info['facebook_name']) {
+            sender_name = info['facebook_name'];
+        } else {
+            sender_name = PlayerCache.get_ui_name(info);
+        }
+    } else {
+        sender_name = 'Unknown';
+    }
 
     if(get_facebook_viral('say_thanks') && sender_fbid) {
         dialog.widgets['say_thanks_button'].onclick = (function (a, b, c, d) { return function() {
@@ -15146,9 +15156,8 @@ function invoke_say_thanks(recipient_fb_id, recipient_user_id, recipient_fb_name
         loot_text += viral['ui_generic_loot'];
     }
 
-    FBShare.invoke({message:viral['ui_post_message'].replace('%THANKEE', recipient_fb_name),
-                    name:viral['ui_post_headline'].replace('%LOOT', loot_text),
-                    description:gamedata['virals']['ui_post_description'],
+    FBShare.invoke({name:viral['ui_post_headline'].replace('%LOOT', loot_text).replace('%THANKEE', recipient_fb_name),
+                    description:viral['ui_post_description'].replace('%LOOT', loot_text).replace('%THANKEE', recipient_fb_name),
                     picture: gamedata['virals']['common_image_path'] + (('image' in viral) ? viral['image'] : gamedata['virals']['default_image']),
                     ref:'feed_thanks'});
 };

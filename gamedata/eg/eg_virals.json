@@ -39,9 +39,8 @@
 
     "say_thanks": {
         "ui_generic_loot": "a gift",
-        "ui_post_headline": "Received %LOOT",
-        "ui_post_text": "Thanks to %THANKEE",
-        "ui_post_message": "Thank you %THANKEE!"
+        "ui_post_headline": "United we stand!",
+        "ui_post_description": "Thanks to %THANKEE for sending me %LOOT"
     },
 
     "facebook_message": {
