@@ -11048,7 +11048,7 @@ class LivePlayer(Player):
 
         # fix TR building/tech XP added 2015 April 23
         if gamedata['game_id'] == 'tr' and \
-           account_creation_time < (1429808400+2*86400) and \
+           account_creation_time < 1429904541 and \
            len(gamedata['player_xp']['level_xp']) >= 50 and \
            self.history.get('201504_xp_fixed',0) < 1:
             missing_xp = 0
