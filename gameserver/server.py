@@ -15697,7 +15697,6 @@ class GAMEAPI(resource.Resource):
 
         session.clear_objects()
         session.home_base = ((not dest_base_id) and (dest_user_id == session.user.user_id))
-        need_aura_update = False # XXXXXX this is never read anywhere
 
         if session.home_base:
             session.viewing_user = session.user
@@ -16047,12 +16046,12 @@ class GAMEAPI(resource.Resource):
         if session.player.prune_inventory(session):
             session.player.send_inventory_update(retmsg)
 
-        need_aura_update |= session.player.prune_player_auras(is_session_change = True)
+        session.player.prune_player_auras(is_session_change = True)
         session.viewing_player.prune_player_auras(is_session_change = True)
 
         # apply regional auras
-        need_aura_update |= session.player.apply_regional_auras()
-        need_aura_update |= session.viewing_player.apply_regional_auras()
+        session.player.apply_regional_auras()
+        session.viewing_player.apply_regional_auras()
 
         # set up PvP point auras
         if session.ladder_state:
@@ -16083,7 +16082,6 @@ class GAMEAPI(resource.Resource):
                         aura = gamedata['auras']['pvp_loot_'+cc_delta_kind]
                         session.player.player_auras.append({'spec':aura['name'], 'stack': cc_delta_stacks, 'strength': abs(aura['effects'][0]['strength_per_stack'])*cc_delta_stacks})
 
-            need_aura_update = True
             if gamedata['server']['log_ladder_pvp'] >= 3:
                 gamesite.exception_log.event(server_time, 'ladder spy (DMG %.02f %s %+d): %s' % \
                                              (base_damage, cc_delta_kind if cc_delta_kind else '-', cc_delta_stacks, session.format_ladder_state()))
@@ -16130,7 +16128,6 @@ class GAMEAPI(resource.Resource):
                     stack = -1
 
                 session.player.do_apply_aura(spec['name'], strength = strength, duration = togo, stack = stack, ignore_limit = True)
-                need_aura_update = True
 
         session.player.recalc_stattab(session.player)
         session.player.stattab.send_update(session, retmsg)
