@@ -1937,7 +1937,7 @@ function hurt_object(target, damage, vs_table, source) {
         }
     }
 
-    var was_destroyed = (target.hp <= 0); // always going be false unless we implement building repair
+    var was_destroyed = target.is_destroyed(); // always going be false unless we implement building repair
 
     var original_target_hp = target.hp;
 
@@ -2087,12 +2087,12 @@ function hurt_object(target, damage, vs_table, source) {
         }
     }
 
-    if(target.is_blocker() && was_destroyed != target.is_destroyed()) {
-        if(!was_destroyed) {
-            target.block_map(-1);
+    if(target.is_blocker()) {
+        if(!was_destroyed && target.is_destroyed()) {
+            target.block_map(-1, 'hurt_object(destroyed)');
         }
-        if(!target.is_destroyed()) {
-            target.block_map(1);
+        if(was_destroyed && !target.is_destroyed()) {
+            target.block_map(1, 'hurt_object(undestroyed)');
         }
     }
 
@@ -8532,7 +8532,7 @@ function create_object(data, is_deploying) {
 function remove_object(obj) {
     // update map
     if(obj.is_blocker() && !obj.is_destroyed()) {
-        obj.block_map(-1);
+        obj.block_map(-1, 'remove_object');
     }
 
     // deselect
