@@ -330,6 +330,9 @@ def _generate_showcase_consequent(game_id, event_dirname, data, atom):
                      "progress_key_cooldown": "ai_"+data['event_name']+suffix+"_instance", # this cooldown must be active in order for the progress_key to be valid
                      "achievement_keys": ["ai_"+data['event_name']+suffix+"_progress"] + (["ai_"+data['event_name']+extra_suffix+"_progress"] if extra_suffix else [])
                      }
+        if 'skip' in data:
+            showcase['level_skip'] = copy.deepcopy(data['skip'][diff])
+
         if has_tokens:
             showcase['token_item'] = 'token'
             showcase['corner_token_mode'] = 'token_progress'
@@ -592,16 +595,16 @@ def _generate_showcase_consequent(game_id, event_dirname, data, atom):
 # return a consequent for the "Fight Now" button on the event login announcement
 def make_fight_now_consequent(data, has_tokens):
     ret = { "consequent": "COND", "cond": []}
-    base_id = data['starting_base_id']
     for diff in data['difficulties']:
         suffix = data['key_suffix'][diff]
         for i in xrange(0, data['bases_per_difficulty']):
-            if 'skip' in data and data['skip'][diff][i]: raise Exception("need to update this code to support level skipping")
+            base_id = data['starting_base_id'] + i
+            if 'skip' in data and data['skip'][diff][i]:
+                continue
             kind = (data['kind'][i] if ('kind' in data) else 'ai_base')
             ret['cond'].append([{"predicate": "AI_BASE_ACTIVE", "user_id": base_id},
                                 {"consequent": "START_AI_ATTACK", "attack_id": base_id} if kind == 'ai_attack' else \
                                 {"consequent": "VISIT_BASE", "user_id": base_id}])
-            base_id += 1
 
     if has_tokens:
         ret['cond'].append([{"predicate": "AND", "subpredicates":[{"predicate": "PLAYER_HISTORY", "key": "ai_"+data['event_name']+suffix+"_progress_now",
@@ -805,16 +808,33 @@ if __name__ == '__main__':
             auto_cutscenes = dict((diff, [[] for _ in xrange(data['bases_per_difficulty'])]) for diff in data['difficulties'])
 
             for diff in data['difficulties']:
+                if 'skip' in data:
+                    skip = data['skip'][diff]
+                else:
+                    skip = [0,] * data['bases_per_difficulty']
+
+                level_map = [] # map from "original" progression index to skipped progression index (many-to-one)
+                unskipped_count = 0
+                first_unskipped = -1
+                last_unskipped = -1
+                for i in xrange(data['bases_per_difficulty']):
+                    level_map.append(unskipped_count)
+                    if not skip[i]:
+                        last_unskipped = unskipped_count
+                        if first_unskipped < 0:
+                            first_unskipped = unskipped_count
+                        unskipped_count += 1
+
                 # add progression_intro showcase on first level and victory showcase on final level
                 if data['showcase'].get('progression_reward_items',False):
-                    auto_cutscenes[diff][0].append({'speaker': 'progression_intro_showcase'})
-                auto_cutscenes[diff][data['bases_per_difficulty'] - 1].append({'speaker': 'victory_showcase'})
+                    auto_cutscenes[diff][first_unskipped].append({'speaker': 'progression_intro_showcase'})
+                auto_cutscenes[diff][last_unskipped].append({'speaker': 'victory_showcase'})
 
                 # add milestone showcases at the end of each progression phase (and before progress screens)
                 # note that this uses the "fake" progression loot phases listed in the "showcase", NOT the true skeleton "difficulty" phases
                 for phase in data['showcase'].get('progression_loot_phases', []):
-                    if phase['ends_at'] < data['bases_per_difficulty']:
-                        auto_cutscenes[diff][phase['ends_at'] - 1].append({'speaker': 'milestone_showcase'})
+                    if phase['ends_at'] < last_unskipped + 1:
+                        auto_cutscenes[diff][level_map[phase['ends_at'] - 1]].append({'speaker': 'milestone_showcase'})
 
                 # add progression showcases before and after major loot drops
                 if data['showcase'].get('progression_reward_items',False):
@@ -823,15 +843,15 @@ if __name__ == '__main__':
                         level = reward['level'] - 1
 
                         if level > 1: # level before the loot drop
-                            auto_cutscenes[diff][level - 1].append({'speaker': 'progression_showcase'})
-                        if level > 0 and level < data['bases_per_difficulty'] - 1: # level after the loot drop, if it's not the very last progression level of the event
-                            auto_cutscenes[diff][level].append({'speaker': 'progression_showcase'})
+                            auto_cutscenes[diff][level_map[level - 1]].append({'speaker': 'progression_showcase'})
+                        if level > 0 and level < last_unskipped: # level after the loot drop, if it's not the very last progression level of the event
+                            auto_cutscenes[diff][level_map[level]].append({'speaker': 'progression_showcase'})
 
                 # add intermediate showcase screens
                 for i in xrange(data['bases_per_difficulty'] - 4):
                     # if there's a series of 5 levels without showcases in a row, add one to the 3rd level
-                    if not auto_cutscenes[diff][i] and len([x for x in xrange(5) if auto_cutscenes[diff][i + x]]) == 0:
-                        auto_cutscenes[diff][i + 2].append({'speaker': 'showcase'})
+                    if not auto_cutscenes[diff][level_map[i]] and len([x for x in xrange(5) if auto_cutscenes[diff][level_map[i + x]]]) == 0:
+                        auto_cutscenes[diff][level_map[i + 2]].append({'speaker': 'showcase'})
 
     # create skeleton JSON header
     if separate_files:
@@ -894,6 +914,7 @@ if __name__ == '__main__':
 
         for i in xrange(data['bases_per_difficulty']):
             skip = ('skip' in data) and data['skip'][diff][i]
+            is_first_base = unskipped_count == 0
 
             print '''
 ////////////////////////////////////////////////////////////
@@ -943,7 +964,7 @@ if __name__ == '__main__':
             for FIELD in ('ui_info_url', 'analytics_tag'):
                 if FIELD in data: json.append((FIELD, data[FIELD]))
 
-            if i == 0:
+            if is_first_base:
                 json += [("ui_resets", data['ui_resets'])]
             json += [("ui_instance_cooldown", instance_cdname)]
 
@@ -955,9 +976,8 @@ if __name__ == '__main__':
 
             if skip: show_pred['subpredicates'] += [{"predicate": "ALWAYS_FALSE"}]
 
-            if i == 0:
+            if is_first_base:
                 # first base in series
-                assert not skip
 
                 show_pred['subpredicates'] += [{ "predicate": "NOT", "subpredicates": [{"predicate": "COOLDOWN_ACTIVE", "name": instance_cdname}]}]
 
@@ -1002,7 +1022,7 @@ if __name__ == '__main__':
             # activation predicate is more restrictive than show_if
             act_pred = copy.deepcopy(show_pred)
 
-            if i == 0:
+            if is_first_base:
                 if diff == 'Normal':
                     act_pred['subpredicates'] += [
                         { "predicate": "BUILDING_LEVEL", "building_type": gamedata['townhall'], "trigger_level": data['cc_level_to_play'][diff] },
@@ -1030,7 +1050,7 @@ if __name__ == '__main__':
                 assert diff in data['extra_activation_predicates']
                 if type(data['extra_activation_predicates'][diff][0]) is dict:
                     # predicate applies to the first level only
-                    if i == 0:
+                    if is_first_base:
                         extra_activation_pred = data['extra_activation_predicates'][diff]
                 else:
                     # one predicate per base
@@ -1234,7 +1254,7 @@ if __name__ == '__main__':
             if ('extra_key_suffix' in data):
                 completion['subconsequents'] += [{ "consequent": "PLAYER_HISTORY", "key": "ai_"+data['event_name']+data['extra_key_suffix'][diff]+"_progress", "method": "max", "value": i+1 }]
 
-            if i == 0:
+            if is_first_base:
                 completion['subconsequents'] += [
                     { "consequent": "PLAYER_HISTORY", "key": "ai_"+data['event_name']+data['key_suffix'][diff]+"_times_started", "method": "increment", "value": 1 },
                     { "consequent": "COOLDOWN_TRIGGER", "name": instance_cdname, "method": "periodic", "origin": data['reset_origin_time'], "period": data['reset_interval'] },

@@ -122,24 +122,52 @@ Showcase.apply_showcase_hacks = function(dialog, hack) {
     });
     dialog.widgets['login_splash'].show = dialog.widgets['login_splash_bar'].show = show_login_splash;
 
-    var level_progress = 0, total_levels = 0;
+    var level_map = null; // many-to-one mapping from index in unskipped linear progression to index in skipped progression sequence
+    if('level_skip' in hack) {
+        level_map = [];
+        var unskipped_count = 0;
+        for(var i = 0; i < hack['level_skip'].length; i++) {
+            level_map.push(unskipped_count);
+            if(!hack['level_skip'][i]) {
+                unskipped_count += 1;
+            }
+        }
+    } else if('total_levels' in hack) {
+        level_map = [];
+        for(var i = 0; i < hack['total_levels']; i++) {
+            level_map.push(i);
+        }
+    }
+
+    // "unskipped" is the position in the original progression, "skipped" is the index in the skipped sequence
+    var unskipped_level_progress = 0, skipped_level_progress = 0;
 
     if(('total_levels' in hack) && ('progress_key' in hack)) {
         dialog.widgets['levels_text'].show = 1;
         if(hack['progress_key'] in player.history &&
            (!hack['progress_key_cooldown'] || player.cooldown_active(hack['progress_key_cooldown']))) {
-            level_progress = player.history[hack['progress_key']];
+            unskipped_level_progress = player.history[hack['progress_key']];
         } else {
-            level_progress = 0;
+            unskipped_level_progress = 0;
         }
-        total_levels = hack['total_levels'];
-        dialog.widgets['levels_text'].str = dialog.data['widgets']['levels_text']['ui_name'].replace('%d1', level_progress.toString()).replace('%d2', total_levels.toString());
+        var total_unskipped_levels = hack['total_levels'];
+        var total_skipped_levels = level_map[hack['total_levels']-1]+1;
+        if(level_map) {
+            if(unskipped_level_progress >= level_map.length) {
+                skipped_level_progress = level_map[level_map.length-1]+1; // end of progression
+            } else {
+                skipped_level_progress = level_map[unskipped_level_progress];
+            }
+        } else {
+            skipped_level_progress = unskipped_level_progress;
+        }
+        dialog.widgets['levels_text'].str = dialog.data['widgets']['levels_text']['ui_name'].replace('%d1', skipped_level_progress.toString()).replace('%d2', total_skipped_levels.toString());
 
         if(hack['show_progress_bar']) {
             var bar = hack['show_progress_bar']; // should be "small" or "large"
             dialog.widgets[bar+'_progress_bar'].show = dialog.widgets[bar+'_progress_text'].show = true;
-            dialog.widgets[bar+'_progress_bar'].progress = (level_progress / total_levels);
-            dialog.widgets[bar+'_progress_text'].str = dialog.data['widgets'][bar+'_progress_text']['ui_name'].replace('%d', (100.0*level_progress/total_levels).toFixed(0));
+            dialog.widgets[bar+'_progress_bar'].progress = (skipped_level_progress / total_skipped_levels);
+            dialog.widgets[bar+'_progress_text'].str = dialog.data['widgets'][bar+'_progress_text']['ui_name'].replace('%d', (100.0*skipped_level_progress/total_skipped_levels).toFixed(0));
         }
     }
 
@@ -351,7 +379,7 @@ Showcase.apply_showcase_hacks = function(dialog, hack) {
         // a single item or an array of items that may drop on that level
         progression_item_list = goog.array.map(progression_item_list,
             function(entry) {
-                if(entry['level'] > level_progress) {
+                if(entry['level'] > unskipped_level_progress) {
                     // we need to get the drop count before we remove the structure of the loot table
                     var count = get_loot_drop_count(entry['loot']);
                     var flattened = flatten_loot(entry['loot']);
@@ -408,10 +436,10 @@ Showcase.apply_showcase_hacks = function(dialog, hack) {
 
                     var progression_item = progression_item_list[i];
 
-                    level.str = dialog.data['widgets']['progression_rewards_level']['ui_name'].replace('%d', progression_item['level'].toString());
+                    level.str = dialog.data['widgets']['progression_rewards_level']['ui_name'].replace('%d', (level_map[progression_item['level']-1]+1).toString());
 
                     // set headers text and highlight the next reward
-                    if(level_progress >= progression_item['level']) {
+                    if(unskipped_level_progress >= progression_item['level']) {
                         header.show = true;
                         highlight.show = false;
                         header.str = dialog.data['widgets']['progression_rewards_header']['ui_name_done'];
