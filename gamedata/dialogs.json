@@ -3702,7 +3702,7 @@
 
             "row_button": { "kind": "ActionButton", "xy": [528,113], "dimensions": [150,34],
                             "bg_image": "action_button_resizable", "bg_image_resizable": 1,
-                            "text_color": [0,0,0,1], "text_size": 13, "text_style": "bold", "drop_shadow": 1,
+                            "text_size": 13, "text_style": "bold", "drop_shadow": 1,
                             "ui_name": "Spy", "ui_name_under_attack": "Under Attack",
                             "ui_name_travel": "Travel", "ui_name_cancel_travel": "Cancel Travel",
                             "ui_name_ai_attack": "Start Defense", "ui_name_locked": "Locked",
