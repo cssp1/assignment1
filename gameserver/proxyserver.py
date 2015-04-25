@@ -2206,6 +2206,99 @@ class ArtFile(static.File):
         self.set_cdn_headers(request)
         return static.File.render(self, request)
 
+# We have to proxy Facebook and Kongregate portraits, to attach a specific Access-Control-Allow-Origin
+# so that drawing them will not taint the HTML Canvas.
+class PortraitProxy(twisted.web.resource.Resource):
+    # boilerplate to short-circuit path lookups
+    def getChildWithDefault(self, path, request): return self
+
+    def set_cdn_headers(self, request):
+        # note! this means that requests MUST have a unique ?origin=whatever in the URL!
+        SpinHTTP.set_access_control_headers_for_cdn(request, -1) # no max_age
+
+    def render_OPTIONS(self, request):
+        _ = self.parse_request(request)
+        self.set_cdn_headers(request)
+        return ''
+
+    def render(self, request):
+        source_url = self.parse_request(request)
+        self.set_cdn_headers(request)
+        d = defer.Deferred()
+        d.addBoth(self.complete_deferred_request, request)
+        fw = self.Forwarded(self, request, d)
+        self.async_http.queue_request(proxy_time, source_url, fw.on_response, error_callback = fw.on_error, callback_type = self.async_http.CALLBACK_FULL)
+        return twisted.web.server.NOT_DONE_YET
+
+    class Forwarded(object):
+        def __init__(self, parent, request, d):
+            self.parent = parent
+            self.request = request
+            self.d = d
+        def on_response(self, body = None, headers = None, status = None):
+            # forward a subset of applicable headers back to the client
+            for HEADER in ('content-type', 'content-length', 'content-encoding',
+                           'expires', 'last-modified', 'cache-control', 'date'):
+                if HEADER in headers:
+                    self.request.setHeader(HEADER, headers[HEADER][-1])
+            self.d.callback(body)
+        def on_error(self, ui_reason = None, body = None, headers = None, status = None):
+            self.d.errback(ui_reason)
+
+    def complete_deferred_request(self, body, request):
+        if body == twisted.web.server.NOT_DONE_YET:
+            return body
+        assert type(body) in (str, unicode)
+        if hasattr(request, '_disconnected') and request._disconnected: return
+        request.write(body)
+        request.finish()
+
+class FBPortraitProxy(PortraitProxy):
+    def __init__(self):
+        # keep our own private requester to avoid disturbing the main API calls, and to operate when the platform is disabled
+        config = SpinConfig.config['proxyserver'].get('AsyncHTTP_Facebook', {})
+        self.async_http = AsyncHTTP.AsyncHTTPRequester(-1, -1, config.get('request_timeout',30), 0,
+                                                       lambda x: facebook_log.event(proxy_time, x) if facebook_log else sys.stderr.write(x+'\n'),
+                                                       max_tries = config.get('max_tries',1),
+                                                       retry_delay = config.get('retry_delay',3))
+
+    def parse_request(self, request):
+        # sanity-check the URL we are about to proxy
+        parts = urlparse.urlparse(request.uri)
+        path_fields = parts.path.split('/')
+        assert len(path_fields) == 4
+        assert path_fields[1] == 'fb_portrait'
+        fbid = path_fields[2]
+        assert path_fields[3] == 'picture'
+        assert (not parts.params) and (not parts.fragment)
+        qs = urlparse.parse_qs(parts.query)
+        assert len(qs) == 1 and ('spin_origin' in qs)
+        return SpinFacebook.versioned_graph_endpoint('picture', '%s/picture' % fbid)
+
+class KGPortraitProxy(PortraitProxy):
+    def __init__(self):
+        # keep our own private requester to avoid disturbing the main API calls, and to operate when the platform is disabled
+        config = SpinConfig.config['proxyserver'].get('AsyncHTTP_Kongregate', {})
+        self.async_http = AsyncHTTP.AsyncHTTPRequester(-1, -1, config.get('request_timeout',30), 0,
+                                                       lambda x: kongregate_log.event(proxy_time, x) if facebook_log else sys.stderr.write(x+'\n'),
+                                                       max_tries = config.get('max_tries',1),
+                                                       retry_delay = config.get('retry_delay',3))
+
+    def parse_request(self, request):
+        # sanity-check the URL we are about to proxy
+        parts = urlparse.urlparse(request.uri)
+        path_fields = parts.path.split('/')
+        assert len(path_fields) == 3
+        assert path_fields[1] == 'kg_portrait'
+        assert path_fields[0] == '' and path_fields[2] == ''
+        assert (not parts.params) and (not parts.fragment)
+        qs = urlparse.parse_qs(parts.query)
+        assert len(qs) == 2 and ('spin_origin' in qs) and ('avatar_url' in qs)
+        avatar_url = qs['avatar_url'][-1]
+        avatar_parts = urlparse.urlparse(avatar_url)
+        assert avatar_parts.netloc.endswith('kongcdn.com')
+        return avatar_url
+
 class XDChannelResource(static.Data):
     # returns the "channel" file necessary for Facebook cross-domain JavaScript calls
     isLeaf = True
@@ -2261,6 +2354,8 @@ class ProxyRoot(TwistedNoResource):
 
         self.static_resources = {
             'art': ArtFile('../gameclient/art'),
+            'fb_portrait': FBPortraitProxy(),
+            'kg_portrait': KGPortraitProxy(),
             'channel': channel_resource, 'channel.php': channel_resource,
             'crossdomain.xml': flash_xd_resource,
             'compiled-client.js': CachedJSFile('../gameclient/compiled-client.js'),
