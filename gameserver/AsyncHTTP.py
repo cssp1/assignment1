@@ -13,8 +13,18 @@ import traceback
 from collections import deque
 
 class AsyncHTTPRequester(object):
+    # there are two "modes" for the callbacks on a request:
+
+    # callback receives one argument that is the response body (success)
+    # or a stringified error message (failure)
+    CALLBACK_BODY_ONLY = 'body_only'
+
+    # callback receives keyword arguments {body:"asdf", headers:{"Content-Type":["image/jpeg"]}, status:200}
+    # and failure also gets ui_reason: "Some Exception Happened"
+    CALLBACK_FULL = 'full'
+
     class Request:
-        def __init__(self, qtime, method, url, headers, callback, error_callback, postdata, max_tries):
+        def __init__(self, qtime, method, url, headers, callback, error_callback, postdata, max_tries, callback_type):
             self.method = method
             self.url = str(url)
             self.headers = headers
@@ -23,6 +33,7 @@ class AsyncHTTPRequester(object):
             self.postdata = postdata
             self.fire_time = qtime
             self.max_tries = max_tries
+            self.callback_type = callback_type
             self.tries = 1
         def __hash__(self): return hash((self.url, self.method, self.fire_time, self.callback))
         def __repr__(self): return self.method + ' ' + self.url
@@ -87,7 +98,7 @@ class AsyncHTTPRequester(object):
             self.idle_cb = None
             cb()
 
-    def queue_request(self, qtime, url, user_callback, method='GET', headers=None, postdata=None, error_callback=None, max_tries=None):
+    def queue_request(self, qtime, url, user_callback, method='GET', headers=None, postdata=None, error_callback=None, max_tries=None, callback_type = CALLBACK_BODY_ONLY):
         if self.total_request_limit > 0 and len(self.queue) >= self.total_request_limit:
             self.log_exception_func('AsyncHTTPRequester queue is full, dropping request %s %s!' % (method,url))
             self.n_dropped += 1
@@ -98,7 +109,7 @@ class AsyncHTTPRequester(object):
         else:
             max_tries = max(max_tries, self.default_max_tries)
 
-        request = AsyncHTTPRequester.Request(qtime, method, url, headers, user_callback, error_callback, postdata, max_tries)
+        request = AsyncHTTPRequester.Request(qtime, method, url, headers, user_callback, error_callback, postdata, max_tries, callback_type)
 
         self.queue.append(request)
         if self.verbosity >= 1:
@@ -114,17 +125,21 @@ class AsyncHTTPRequester(object):
         self.on_wire.add(request)
         if self.verbosity >= 1:
             print 'AsyncHTTPRequester opening connection %s, %d now in queue, %d now on wire' % (repr(request), len(self.queue), len(self.on_wire))
-        d = twisted.web.client.getPage(request.url,
-                                       method=request.method,
-                                       headers=request.headers,
-                                       agent='SpinPunch Game Server',
-                                       timeout=self.request_timeout,
-                                       postdata=request.postdata)
-        d.addCallback(self.on_response, request)
-        d.addErrback(self.on_error, request)
+
+        # this is like calling twisted.web.client.getPage, but we want the full HTTPClientFactory
+        # and not just its .deferred member, since we want access to response headers.
+        getter = twisted.web.client._makeGetterFactory(request.url, twisted.web.client.HTTPClientFactory,
+                                                       method=request.method,
+                                                       headers=request.headers,
+                                                       agent='SpinPunch Game Server',
+                                                       timeout=self.request_timeout,
+                                                       postdata=request.postdata)
+        d = getter.deferred
+        d.addCallback(self.on_response, getter, request)
+        d.addErrback(self.on_error, getter, request)
         return d
 
-    def on_response(self, response, request):
+    def on_response(self, response, getter, request):
         self.n_ok += 1
         self.on_wire.remove(request)
         if self.verbosity >= 1:
@@ -132,7 +147,10 @@ class AsyncHTTPRequester(object):
             if self.verbosity >= 3:
                 print 'AsyncHTTPRequester response was: ', response
         try:
-            request.callback(response)
+            if request.callback_type == self.CALLBACK_FULL:
+                request.callback(body = response, headers = getter.response_headers, status = getter.status)
+            else:
+                request.callback(response)
         except:
             self.log_exception_func('AsyncHTTP Exception: ' + traceback.format_exc())
         self.idlecheck()
@@ -149,7 +167,7 @@ class AsyncHTTPRequester(object):
         else:
             self._send_request()
 
-    def on_error(self, reason, request):
+    def on_error(self, reason, getter, request):
         # note: "reason" here is a twisted.python.failure.Failure object that wraps the exception that was thrown
 
         # for HTTP errors, extract the HTTP status code
@@ -157,10 +175,10 @@ class AsyncHTTPRequester(object):
             http_code = int(reason.value.status) # note! "status" is returned as a string, not an integer!
             if http_code == 404 and (not self.error_on_404):
                 # received a 404, but the client wants to treat it as success with buf = 'NOTFOUND'
-                return self.on_response('NOTFOUND', request)
+                return self.on_response('NOTFOUND', getter, request)
             elif http_code == 204:
                 # 204 is not actually an error, just an empty body
-                return self.on_response('', request)
+                return self.on_response('', getter, request)
 
         self.on_wire.remove(request)
         if request.tries < request.max_tries:
@@ -185,7 +203,10 @@ class AsyncHTTPRequester(object):
                     ui_reason = 'twisted.web.error.Error(HTTP %s (%s): "%s")' % (reason.value.status, reason.value.message, reason.value.response)
                 else:
                     ui_reason = repr(reason.value)
-                request.error_callback(ui_reason)
+                if request.callback_type == self.CALLBACK_FULL:
+                    request.error_callback(ui_reason = ui_reason, body = reason.value.response, headers = getter.response_headers, status = getter.status)
+                else:
+                    request.error_callback(ui_reason)
             except:
                 self.log_exception_func('AsyncHTTP Exception (error_callback): '+traceback.format_exc())
 
