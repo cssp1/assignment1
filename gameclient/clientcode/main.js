@@ -33,6 +33,7 @@ goog.require('SPHTTP');
 goog.require('SPFX');
 goog.require('SPFB');
 goog.require('FBShare');
+goog.require('FBUploadPhoto');
 goog.require('FBInviteFriends');
 goog.require('FBSendRequests');
 goog.require('SPay');
@@ -6386,6 +6387,11 @@ player.init_abtests = function(test_data) {
     var api_name = eval_cond_or_literal(player.get_any_abtest_value('payments_api', gamedata['store']['payments_api']), player, null);
     if(!api_name) { throw Error('cannot get payments_api name'); }
     SPay.set_api(api_name);
+
+    // while screenshot feature is in testing, force SPUI never to show off-origin portrait images that would taint the canvas
+    if(player.get_any_abtest_value('enable_post_screenshot', gamedata['client']['enable_post_screenshot'])) {
+        SPUI.force_anon_portraits = true;
+    }
 };
 
 player.get_abtest_value = function(test_name, key, default_value) {
@@ -15177,6 +15183,26 @@ function invoke_invite_friends_dialog(reason) {
     } else {
         throw Error('unhandled frame_platform '+spin_frame_platform);
     }
+}
+
+function invoke_post_screenshot(reason) {
+    if(!player.get_any_abtest_value('enable_post_screenshot', gamedata['client']['enable_post_screenshot'])) { throw Error('enable_post_screenshot needs to be turned on'); }
+    if(spin_frame_platform != 'fb' || !FBUploadPhoto.supported()) { throw Error('unsupported'); }
+    if(!gamedata['virals']['post_screenshot'] || !gamedata['strings']['post_screenshot_success']) { throw Error('missing post_screenshot viral or strings entry'); }
+
+    call_with_facebook_permissions('publish_actions', (function (_reason) { return function() {
+        var viral = gamedata['virals']['post_screenshot'];
+        var caption = viral['ui_caption'];
+        var cb = function(success) {
+            if(success) {
+                var s = gamedata['strings']['post_screenshot_success'];
+                invoke_child_message_dialog(s['ui_title'], s['ui_description']);
+            }
+        }
+
+        FBUploadPhoto.upload(canvas.toDataURL('image/jpeg'), 'SCREENSHOT.jpg',
+                             caption, true, _reason, cb);
+    }; })(reason));
 }
 
 function invoke_gift_prompt_dialog() {
@@ -48773,6 +48799,7 @@ goog.exportSymbol('test_you_were_attacked_dialog', test_you_were_attacked_dialog
 goog.exportSymbol('test_notify_achievements', test_notify_achievements);
 goog.exportSymbol('test_flash_offer', test_flash_offer);
 goog.exportSymbol('test_consequent', test_consequent);
+goog.exportSymbol('invoke_post_screenshot', invoke_post_screenshot);
 goog.exportSymbol('sprobe_run', sprobe_run);
 goog.exportSymbol('invoke_gift_prompt_dialog', invoke_gift_prompt_dialog);
 goog.exportSymbol('invoke_daily_tip', invoke_daily_tip);
