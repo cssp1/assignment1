@@ -75,6 +75,7 @@ var FB = {
     "ui": function() {},
     "init": function() {},
     "api": function() {},
+    "getLoginStatus": function() {},
     "AppEvents": {
         "activateApp": function() {},
         "logEvent": function() {},
