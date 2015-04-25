@@ -2350,14 +2350,25 @@ goog.inherits(SPUI.FriendPortrait, SPUI.ActionButton);
 SPUI.FriendPortrait.prototype.set_user = function(user_id) { this.user_id = user_id; };
 SPUI.FriendPortrait.prototype.invalidate = function() { this.displayed_user_id = null; };
 
+// return a generic anonymous portrait image from inside the art pack
+SPUI.get_anonymous_portrait_url = function(is_myself) {
+    var filename = (is_myself ? 'art/anon_portrait.jpg' : 'art/anon_portrait2.jpg');
+    return GameArt.art_url(filename, false);
+};
+
 SPUI.get_facebook_portrait_url = function(facebook_id) {
     facebook_id = facebook_id.toString(); // just make sure we don't get any numeric IDs
-    if(anon_mode || facebook_id.indexOf('example') == 0) {
-        var portrait = (facebook_id == spin_facebook_user ? 'anon_portrait.jpg' : 'anon_portrait2.jpg');
-        return spin_server_protocol+'s3.amazonaws.com/'+gamedata['public_s3_bucket']+'/'+portrait; // XXX maybe put this in the art pack instead?
+    if(anon_mode || facebook_id.indexOf('example') == 0) { // anonymous mode or testing sandbox
+        return SPUI.get_anonymous_portrait_url(facebook_id === spin_facebook_user);
     } else {
         return SPFB.versioned_graph_endpoint('user/picture', facebook_id+'/picture');
     }
+};
+SPUI.get_kongregate_portrait_url = function(kg_id, avatar_url) {
+    if(anon_mode || (kg_id && kg_id.indexOf('example') == 0)) { // anonymous mode or testing sandbox
+        return SPUI.get_anonymous_portrait_url(kg_id === spin_kongregate_user);
+    }
+    return avatar_url;
 };
 
 SPUI.FriendPortrait.prototype.update_display = function() {
@@ -2390,7 +2401,7 @@ SPUI.FriendPortrait.prototype.update_display = function() {
             // now try social network portrait URLs
             var url = null;
             var urls = {'fb': (info['facebook_id'] ? SPUI.get_facebook_portrait_url(info['facebook_id']) : null),
-                        'kg': info['kg_avatar_url'] || null };
+                        'kg': (info['kg_avatar_url'] ? SPUI.get_kongregate_portrait_url(info['kg_id'] || null, info['kg_avatar_url']) : null) };
 
             // first try current frame platform
             if(urls[spin_frame_platform]) {

@@ -3040,6 +3040,8 @@ def check_art(art, report_unreferenced_art_files = True, report_unreferenced_art
                      'art/mars_frontier_feed_icon3.jpg',
                      'art/facebook_credit_icon_100x100.png',
                      'art/daily_tips/%s_pageable_generic.jpg' % gamedata['game_id'],
+                     'art/anon_portrait.jpg',
+                     'art/anon_portrait2.jpg',
                     ])
     ref_list |= set(['art/daily_tips/'+tip['image'] for tip in gamedata['daily_tips'] if ('image' in tip)])
     #ref_list |= set(['art/facebook_assets/'+viral['image'] for viral in gamedata['virals'].itervalues() if (type(viral) is dict and ('image' in viral))])
