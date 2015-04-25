@@ -977,7 +977,7 @@ SPUI.Dialog.prototype.do_draw = function(offset) {
 
     if(this.modal) {
         SPUI.ctx.save();
-        SPUI.ctx.setTransform(1,0,0,1,0,0); // yes, zero out the global transform
+        set_default_canvas_transform(SPUI.ctx); // zero out the global transform
         SPUI.ctx.fillStyle = SPUI.modal_bg_color.str();
         // hack :)
         if(typeof(this.modal) === 'number') {

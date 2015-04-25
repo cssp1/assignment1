@@ -6,6 +6,8 @@ goog.provide('SPFX');
 
 /** @fileoverview
     @suppress {reportUnknownTypes} XXX we are not typesafe yet
+
+    Note: references canvas_width/canvas_height/canvas_oversample from main.js
 */
 
 goog.require('goog.array');
@@ -1225,8 +1227,6 @@ SPFX.Debris.prototype.draw = function() {
 
 // Blinking arrow to indicate units that are off-screen
 
-// note: references canvas_width/canvas_height from main.js
-
 /** @constructor
   * @extends SPFX.Effect
   */
@@ -1297,7 +1297,8 @@ SPFX.OffscreenArrow.prototype.draw = function() {
     var sprite = asset.states['normal'];
 
     SPFX.ctx.save();
-    SPFX.ctx.setTransform(1,0,0,1,0,0); // reset to null transform
+    set_default_canvas_transform(SPFX.ctx); // reset to null transform
+
     // blinking arrow
     if(Math.floor(2.0*SPFX.time) % 2 === 0) {
         sprite.draw([Math.floor(draw_loc[0]*canvas_width),

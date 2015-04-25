@@ -470,6 +470,11 @@ var canvas_div_offsetLeft = 0, canvas_div_offsetTop = 0;
 var canvas_div_offset_snoop_time = -1;
 var canvas_is_fullscreen = false;
 
+// scaling factor from actual screen pixels to "logical" canvas pixels, >1 when browser is in HiDPI "retina" mode
+// see http://www.html5rocks.com/en/tutorials/canvas/hidpi/ (but note backingStorePixelRatio should be just window.devicePixelRatio)
+var canvas_oversample = 1;
+
+
 // server_time is our estimate of the server's clock, in (floating-point) seconds
 // NOTE: server_time may not be monotonically increasing, because we re-adjust it when we receive each AJAX message!
 var server_time = 0, server_time_offset = 0;
@@ -8980,12 +8985,20 @@ function on_resize_iframe(e) {
 
 // read current canvas_div width/height and set game canvas accordingly
 function on_resize_game() {
-    canvas.width = canvas_div.offsetWidth;
-    canvas.height = canvas_div.offsetHeight;
+    // these are in oversampled / backing-store units, and should NOT be used for layout computations
+    canvas.width = canvas_oversample * canvas_div.offsetWidth;
+    canvas.height = canvas_oversample * canvas_div.offsetHeight;
+
+    canvas.style.width = canvas_div.offsetWidth.toString()+'px';
+    canvas.style.height = canvas_div.offsetHeight.toString()+'px';
+
+    // turning off imageSmoothing helps avoid seams on transparent GUI sprites,
+    // although it does create a somewhat blocky appearance.
+    ctx['imageSmoothingEnabled'] = (canvas_oversample === 1);
 
     // update cached dimensions
-    canvas_width = canvas.width;
-    canvas_height = canvas.height;
+    canvas_width = Math.floor(canvas.width / canvas_oversample);
+    canvas_height = Math.floor(canvas.height / canvas_oversample);
     canvas_width_half = Math.floor(canvas_width/2);
     canvas_height_half = Math.floor(canvas_height/2);
     canvas_div_offsetLeft = canvas_div.offsetLeft;
@@ -9001,6 +9014,11 @@ function on_resize_game() {
     player.quest_root.on_resize();
 
     force_draw();
+}
+
+/** Set the "base" transform for canvas drawing */
+function set_default_canvas_transform(ctx) {
+    ctx.setTransform(canvas_oversample, 0, 0, canvas_oversample, 0, 0);
 }
 
 function set_view_zoom(new_linear) {
@@ -41465,6 +41483,9 @@ function handle_server_message(data) {
         if(document.URL.indexOf('lazy_art=1') != -1) { use_lazy_art = true; }
         if(document.URL.indexOf('lazy_art=0') != -1) { use_lazy_art = false; }
 
+        if(!use_low_gfx && player.get_any_abtest_value('enable_canvas_oversample', gamedata['client']['enable_canvas_oversample'])) {
+            canvas_oversample = window['devicePixelRatio'] || 1;
+        }
 
         var enable_audio = (!blacklist_audio) && (get_query_string('enable_audio') !== '0') && buzz.isSupported() && (buzz.isMP3Supported() || buzz.isOGGSupported());
         var audio_driver = null;
@@ -41520,7 +41541,7 @@ function handle_server_message(data) {
         linkbar_put_id(session.user_id);
 
         // reflow in case the header height changed
-        if(need_reflow) { on_resize_browser(null); }
+        if(need_reflow || canvas_oversample !== 1) { on_resize_browser(null); }
 
         // fill footer ad area
         if(player.is_syfy_user()) {
@@ -45914,6 +45935,7 @@ function do_draw() {
     ctx.fillStyle = "#ffffff";
     ctx.strokeStyle = "#ffffff";
     ctx.lineWidth = 1;
+    set_default_canvas_transform(ctx);
 
     if(client_state == client_states.UNABLE_TO_LOGIN || SPINPUNCHGAME.client_death_sent) { // TIMED_OUT gets handled below
         kill_loading_screen();
@@ -46498,7 +46520,7 @@ function draw_backdrop_scenery() {
 }
 function draw_backdrop_blank() {
     ctx.save();
-    ctx.setTransform(1,0,0,1,0,0);
+    set_default_canvas_transform(ctx); // undo playfield transform
     ctx.fillStyle = '#202020';
     ctx.fillRect(0,0,canvas_width,canvas_height);
     ctx.restore();
@@ -46519,7 +46541,7 @@ function draw_backdrop_tiled(data) {
     }
 
     ctx.save();
-    ctx.setTransform(1,0,0,1,0,0); // undo playfield transform
+    set_default_canvas_transform(ctx); // undo playfield transform
 
     // [2,1]*tilesize must evenly divide nells*cellsize/2 in order for the edge tiles to line up
     // tilesize must be even
@@ -46719,7 +46741,7 @@ function draw_backdrop_whole(assetname) {
         return false;
     } else {
         ctx.save();
-        ctx.setTransform(1,0,0,1,0,0); // undo playfield transform
+        set_default_canvas_transform(ctx); // undo playfield transform
 
         var ncells = session.viewing_base.ncells();
 
@@ -46801,7 +46823,7 @@ function draw_backdrop_simple(assetname) {
         return false;
     } else {
         ctx.save();
-        ctx.setTransform(1,0,0,1,0,0); // undo playfield transform
+        set_default_canvas_transform(ctx); // undo playfield transform
         var tilesize = view_is_zoomed() ? vec_scale(view_zoom, backdrop_sprite.wh) : backdrop_sprite.wh;
         var start = [view_pos[0]*view_zoom - canvas_width_half, view_pos[1]*view_zoom - canvas_height_half];
         var end = [start[0]+canvas_width, start[1]+canvas_height];
@@ -48465,7 +48487,7 @@ function draw_click_detection(unit) {
             var c = ortho_to_playfield(pos);
             var b = unit.spec['click_bounds'];
             ctx.save();
-            ctx.setTransform(1,0,0,1,0,0); // undo playfield transform
+            set_default_canvas_transform(ctx); // undo playfield transform
             ctx.beginPath();
             SPUI.add_quad_to_path([playfield_to_screen([c[0]+b[0][0], c[1]+b[1][0]]),
                                    playfield_to_screen([c[0]+b[0][1], c[1]+b[1][0]]),
@@ -48480,7 +48502,7 @@ function draw_click_detection(unit) {
             var cound = sprite.detect_click_bounds(ortho_to_screen(pos), unit.interpolate_facing(), client_time, view_zoom, position_fuzz);
             if(cound) {
                 ctx.save();
-                ctx.setTransform(1,0,0,1,0,0); // undo playfield transform
+                set_default_canvas_transform(ctx); // undo playfield transform
                 ctx.beginPath();
                 SPUI.add_quad_to_path([[cound[0][0], cound[1][0]],
                                        [cound[0][1], cound[1][0]],
