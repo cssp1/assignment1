@@ -18,4 +18,5 @@ CMD 'nginx'
 # then:
 # docker build -t sg-server-maintenance-tr-promo .
 # docker tag sg-server-maintenance-tr-promo localhost:5000/sg-server-maintenance-tr-promo
+# ../bootstrap/run-docker-registry.sh (ensure your ~/.ssh/HOSTNAME-awssecret is set up)
 # docker push localhost:5000/sg-server-maintenance-tr-promo
