@@ -18753,8 +18753,11 @@ class GAMEAPI(resource.Resource):
                 # item is being generated from someplace other than inventory (e.g. crafting)
                 pass
             else:
-                # REPLACE passed add_item with whatever is in nventory
+                # REPLACE passed add_item with whatever is in inventory
                 source_item = session.player.inventory_verify_item(inventory_slot, add_specname, level = add_item.get('level',None)) # note: default level to None meaning "don't care" and not 1
+                if not source_item: # race condition (or cheat attempt), item not found
+                    retmsg.append(["ERROR", "HARMLESS_RACE_CONDITION"])
+                    return False
                 add_item = copy.deepcopy(source_item)
                 if 'stack' in add_item: del add_item['stack'] # only take one
 
