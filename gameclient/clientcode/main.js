@@ -46254,6 +46254,8 @@ function do_draw() {
             set_playfield_draw_transform(ctx);
 
             // when zoomed out, force image smoothing ON for nice downsampling
+            // (this pushes it onto the stack, overriding the global setting from on_resize_game() just for the playfield)
+            // really this should be set on a sprite-by-sprite basis to detect minification, a la OpenGL
             if(view_zoom < 1) {
                 ctx['imageSmoothingEnabled'] = true;
             }
@@ -47337,7 +47339,7 @@ Building.prototype.get_idle_state_advanced = function() {
 };
 
 function draw_building_or_inert(obj, powerfac) {
-    var xy = playfield_to_draw(obj.playfield_xy());
+    var xy = draw_quantize(playfield_to_draw(obj.playfield_xy()));
 
     var icon;
     var icon_state = 'unset';
@@ -47637,7 +47639,7 @@ function draw_building_or_inert(obj, powerfac) {
                 var odd_shift = obj.get_odd_shift();
                 var x = obj.x + odd_shift[0], z = obj.y + odd_shift[1];
                 var weapon_offset = obj.get_leveled_quantity(obj.spec['weapon_offset']);
-                var pos = vec_floor(ortho_to_draw_3d(v3_add([x,0,z], weapon_offset)));
+                var pos = draw_quantize(ortho_to_draw_3d(v3_add([x,0,z], weapon_offset)));
                 weapon_icon.draw(pos, facing + ((Math.PI/180)*(obj.spec['weapon_facing_fudge']||0)), icon_time, icon_state);
             } else {
                 //console.log('cannot find '+weapon_asset);
@@ -47647,10 +47649,10 @@ function draw_building_or_inert(obj, powerfac) {
 
     // draw wall segments
     if(wall_to['east']) {
-        icon.draw(ortho_to_draw([obj.x+wall_spacing, obj.y-wall_seg_offset]), facing, icon_time, icon_state + '_ew');
+        icon.draw(draw_quantize(ortho_to_draw([obj.x+wall_spacing, obj.y-wall_seg_offset])), facing, icon_time, icon_state + '_ew');
     }
     if(wall_to['south']) {
-        icon.draw(ortho_to_draw([obj.x-wall_seg_offset, obj.y+wall_spacing]), facing, icon_time, icon_state + '_ns');
+        icon.draw(draw_quantize(ortho_to_draw([obj.x-wall_seg_offset, obj.y+wall_spacing])), facing, icon_time, icon_state + '_ns');
     }
 
     // draw lottery scans remaining
@@ -47728,7 +47730,7 @@ function draw_building_or_inert(obj, powerfac) {
         if(fsprite_name in GameArt.assets) {
             var fsprite = GameArt.assets[fsprite_name].states['normal'];
             var foffset = ortho_to_draw_vector(obj.spec['level_flag_offset']);
-            fsprite.draw_topleft(vec_floor(vec_add(xy, foffset)), 0, 0);
+            fsprite.draw_topleft(draw_quantize(vec_add(xy, foffset)), 0, 0);
         }
     }
 
@@ -47773,7 +47775,7 @@ function draw_building_or_inert(obj, powerfac) {
             //ctx.save();
             //ctx.globalAlpha = gamedata['client']['cloaked_opacity'];
             for(var i = 0; i < draw_count; i++) {
-                esprite.draw_topleft(vec_floor(vec_add(vec_add(xy, eoffset), vec_scale(i, edelta))), 0, 0);
+                esprite.draw_topleft(draw_quantize(vec_add(vec_add(xy, eoffset), vec_scale(i, edelta))), 0, 0);
             }
             //ctx.restore();
         }
@@ -47914,7 +47916,7 @@ function draw_building_or_inert(obj, powerfac) {
                 var amp = appearance.pulse_amplitude;
                 ctx.globalAlpha = (1-amp) + amp * (0.5*(Math.sin(2*Math.PI*(client_time/appearance.pulse_period + obj.anim_offset))+1));
             }
-            icon_sprite.draw(playfield_to_draw(appearance.icon_pos), 0, client_time);
+            icon_sprite.draw(draw_quantize(playfield_to_draw(appearance.icon_pos)), 0, client_time);
             if(has_state) {
                 ctx.restore();
             }
@@ -47989,7 +47991,7 @@ function draw_unit(unit) {
         // NOTE: do not quantize xy, to get subpixel motion on the hovering effect for flying units
         // may be slow on some browsers!
     } else {
-        xy = vec_floor(xy);
+        xy = draw_quantize(xy);
     }
 
     if((xy[0]+MAX_UNIT_SPRITE_SIZE < view_roi[0][0]) ||
@@ -48560,7 +48562,7 @@ function draw_centered_text(ctx, str, xy) {
     for(var i = 0; i < lines.length; i++) {
         if(lines[i].length > 0) {
             var dims = ctx.measureText(lines[i]);
-            var text_xy = vec_add(xy, [-Math.floor(dims.width/2), i*SPUI.desktop_font.leading]);
+            var text_xy = draw_quantize(vec_add(xy, [-Math.floor(dims.width/2), i*SPUI.desktop_font.leading]));
             ret[0] = Math.min(ret[0], text_xy[0]);
             ctx.fillText(lines[i], text_xy[0], text_xy[1]);
         }
@@ -48573,7 +48575,7 @@ function measure_centered_text(ctx, str, xy) { // saw as draw_centered_text(), b
     for(var i = 0; i < lines.length; i++) {
         if(lines[i].length > 0) {
             var dims = ctx.measureText(lines[i]);
-            var text_xy = vec_add(xy, [-Math.floor(dims.width/2), i*SPUI.desktop_font.leading]);
+            var text_xy = draw_quantize(vec_add(xy, [-Math.floor(dims.width/2), i*SPUI.desktop_font.leading]));
             ret[0] = Math.min(ret[0], text_xy[0]);
         }
     }
