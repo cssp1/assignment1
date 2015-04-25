@@ -24,7 +24,8 @@ def _set_access_control_headers(request, origin, max_age):
     request.setHeader('Access-Control-Allow-Credentials', 'true')
     request.setHeader('Access-Control-Allow-Methods', 'POST, GET, HEAD, OPTIONS')
     request.setHeader('Access-Control-Allow-Headers', 'X-Requested-With')
-    request.setHeader('Access-Control-Max-Age', str(max_age))
+    if max_age >= 0:
+        request.setHeader('Access-Control-Max-Age', str(max_age))
 
 # get a raw HTTP header from Twisted request object
 def get_twisted_header(request, x):
