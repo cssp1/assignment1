@@ -25003,7 +25003,19 @@ function invoke_facebook_permissions_dialog(_scope, _cb) {
                         player.facebook_permissions = new_perms;
                         var success = player.has_facebook_permissions(___scope);
                         send_to_server.func(["INVOKE_FACEBOOK_AUTH_RESPONSE", ___scope, new_perms.join(','), success]);
-                        if(success && ___cb) { ___cb(); }
+
+                        // asynchronously update oauth token
+                        // XXXXXX replace with subscription https://developers.facebook.com/docs/reference/javascript/FB.Event.subscribe
+                        if(success) {
+                            SPFB.getLoginStatus((function (____cb) { return function(response) {
+                                if(response['status'] === 'connected') {
+                                    var new_token = response['authResponse']['accessToken'];
+                                    console.log('Updating spin_facebook_oauth_token = "'+new_token+'"');
+                                    spin_facebook_oauth_token = new_token;
+                                    if(____cb) { ____cb(); }
+                                }
+                            }; })(___cb), true);
+                        }
                     }
                 }; })(__scope, __cb));
             }; })(_scope, _cb));
