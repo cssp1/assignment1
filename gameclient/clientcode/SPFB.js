@@ -47,6 +47,18 @@ SPFB.api = function(url, method, props) {
     return FB.api(url, method, props);
 };
 
+/** @param {Function} cb
+    @param {boolean=} force */
+SPFB.getLoginStatus = function(cb, force) {
+    if(typeof FB === 'undefined') {
+        // note: calls back into main.js
+        invoke_timeout_message('0650_client_died_from_facebook_api_error',
+                               {'method':'getLoginStatus'}, {});
+        return;
+    }
+    FB.getLoginStatus(cb, force);
+};
+
 // App Events API
 // see https://developers.facebook.com/docs/canvas/appevents
 // these functions are designed to be safe to call unconditionally; they check spin_frame_platform and enable_fb_app_events internally
@@ -126,6 +138,9 @@ SPFB.api_version_number = function(feature) {
     }
 };
 
+/** @param {string} feature
+    @param {string} path
+    @return {string} */
 SPFB.versioned_graph_endpoint = function(feature, path) {
     return 'https://graph.facebook.com/'+SPFB.api_version_string(feature)+path;
 };
