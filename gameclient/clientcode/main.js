@@ -6392,11 +6392,6 @@ player.init_abtests = function(test_data) {
     var api_name = eval_cond_or_literal(player.get_any_abtest_value('payments_api', gamedata['store']['payments_api']), player, null);
     if(!api_name) { throw Error('cannot get payments_api name'); }
     SPay.set_api(api_name);
-
-    // while screenshot feature is in testing, force SPUI never to show off-origin portrait images that would taint the canvas
-    if(player.get_any_abtest_value('enable_post_screenshot', gamedata['client']['enable_post_screenshot'])) {
-        SPUI.force_anon_portraits = true;
-    }
 };
 
 player.get_abtest_value = function(test_name, key, default_value) {

@@ -123,6 +123,8 @@
         // number of seconds before asset-load-failure watchdog fires (-1 to disable)
         "art_download_timeout": { "image": 180, "audio": 360 },
 
+        "proxy_portraits": 1, // enable proxying of FB/KG profile pictures to avoid tainting the Canvas
+
         "min_speak_interval": 1.5, // don't repeat same unit speech sound effect within this many seconds
 
         "map_ping_interval": 10, // number of seconds between polling the server for region map updates (when region map is up) - disabled if longpoll is active

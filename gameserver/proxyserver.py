@@ -2273,7 +2273,7 @@ class FBPortraitProxy(PortraitProxy):
         assert (not parts.params) and (not parts.fragment)
         qs = urlparse.parse_qs(parts.query)
         assert len(qs) == 1 and ('spin_origin' in qs)
-        return SpinFacebook.versioned_graph_endpoint('picture', '%s/picture' % fbid)
+        return SpinFacebook.versioned_graph_endpoint('user/picture', '%s/picture' % fbid)
 
 class KGPortraitProxy(PortraitProxy):
     def __init__(self):

@@ -89,7 +89,8 @@ GameArt.art_url = function(filename, needs_cors) {
     }
 
     if(spin_http_origin) {
-        url += '?spin_origin='+encodeURIComponent(spin_http_origin);
+        var delimiter = (url.indexOf('?') > 0 ? '&' : '?'); // really hacky query string detection
+        url += delimiter+'spin_origin='+encodeURIComponent(spin_http_origin);
     }
 
     return url;
