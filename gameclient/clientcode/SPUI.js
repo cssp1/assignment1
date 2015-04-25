@@ -2350,6 +2350,8 @@ goog.inherits(SPUI.FriendPortrait, SPUI.ActionButton);
 SPUI.FriendPortrait.prototype.set_user = function(user_id) { this.user_id = user_id; };
 SPUI.FriendPortrait.prototype.invalidate = function() { this.displayed_user_id = null; };
 
+SPUI.force_anon_portraits = false; // set by the main client if we want to disable off-origin portrait image loading
+
 // return a generic anonymous portrait image from inside the art pack
 SPUI.get_anonymous_portrait_url = function(is_myself) {
     var filename = (is_myself ? 'art/anon_portrait.jpg' : 'art/anon_portrait2.jpg');
@@ -2358,14 +2360,14 @@ SPUI.get_anonymous_portrait_url = function(is_myself) {
 
 SPUI.get_facebook_portrait_url = function(facebook_id) {
     facebook_id = facebook_id.toString(); // just make sure we don't get any numeric IDs
-    if(anon_mode || facebook_id.indexOf('example') == 0) { // anonymous mode or testing sandbox
+    if(SPUI.force_anon_portraits || anon_mode || facebook_id.indexOf('example') == 0) { // anonymous mode or testing sandbox
         return SPUI.get_anonymous_portrait_url(facebook_id === spin_facebook_user);
     } else {
         return SPFB.versioned_graph_endpoint('user/picture', facebook_id+'/picture');
     }
 };
 SPUI.get_kongregate_portrait_url = function(kg_id, avatar_url) {
-    if(anon_mode || (kg_id && kg_id.indexOf('example') == 0)) { // anonymous mode or testing sandbox
+    if(SPUI.force_anon_portraits || anon_mode || (kg_id && kg_id.indexOf('example') == 0)) { // anonymous mode or testing sandbox
         return SPUI.get_anonymous_portrait_url(kg_id === spin_kongregate_user);
     }
     return avatar_url;
