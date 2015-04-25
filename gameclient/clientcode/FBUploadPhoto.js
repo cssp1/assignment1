@@ -59,7 +59,7 @@ FBUploadPhoto.dataURItoBlob = function(dataURI) {
 */
 FBUploadPhoto.upload = function(dataURI, ui_filename, caption, post_story, reason, callback) {
     var auth_token = spin_facebook_oauth_token;
-    var url = SPFB.versioned_graph_endpoint('photos', spin_facebook_user+'/photos?access_token'+auth_token);
+    var url = SPFB.versioned_graph_endpoint('photos', spin_facebook_user+'/photos?access_token='+auth_token);
     var img_blob = FBUploadPhoto.dataURItoBlob(dataURI);
 
     var fd = new FormData();
