@@ -46253,6 +46253,11 @@ function do_draw() {
             ctx.save();
             set_playfield_draw_transform(ctx);
 
+            // when zoomed out, force image smoothing ON for nice downsampling
+            if(view_zoom < 1) {
+                ctx['imageSmoothingEnabled'] = true;
+            }
+
             // draw backdrop
             draw_backdrop(draw_playfield_objects);
 
