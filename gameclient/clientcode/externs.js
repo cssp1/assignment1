@@ -49,8 +49,10 @@ var spin_kongregate_enabled;
 var spin_kongregate_user;
 /** @type {boolean} */
 var spin_facebook_enabled;
+/** @type {string} */
 var spin_facebook_user;
 var spin_facebook_signed_request;
+/** @type {string} */
 var spin_facebook_oauth_token;
 var spin_facebook_login_permissions;
 var spin_facebook_api_versions;
