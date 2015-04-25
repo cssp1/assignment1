@@ -1575,9 +1575,9 @@ RegionMap.RegionMap.prototype.make_hex_outline_path = function(xy) {
                [gamedata['territory']['cell_size'][0]/2, 0]];
 
     SPUI.ctx.beginPath();
-    SPUI.ctx.moveTo(Math.floor(xy[0]+vtx[0][0]), Math.floor(xy[1]+vtx[0][1]));
+    SPUI.ctx.moveTo(xy[0]+vtx[0][0], xy[1]+vtx[0][1]);
     for(var i = 1; i < vtx.length; i++) {
-        SPUI.ctx.lineTo(Math.floor(xy[0]+vtx[i][0]), Math.floor(xy[1]+vtx[i][1]));
+        SPUI.ctx.lineTo(xy[0]+vtx[i][0], xy[1]+vtx[i][1]);
     }
 };
 
@@ -1587,6 +1587,7 @@ RegionMap.RegionMap.prototype.draw_reticle = function(xy, size) {
     SPUI.ctx.beginPath();
     SPUI.ctx.lineWidth = 2;
     SPUI.ctx.beginPath();
+    // old, needs draw_quantize()
     SPUI.ctx.arc(Math.floor(xy[0]), Math.floor(xy[1]), size, 0, 2*Math.PI, false);
     SPUI.ctx.moveTo(Math.floor(xy[0]-size), Math.floor(xy[1]));
     SPUI.ctx.lineTo(Math.floor(xy[0]-1.8*size), Math.floor(xy[1]));
@@ -1644,8 +1645,8 @@ RegionMap.RegionMap.prototype.draw_travel = function() {
     if(progress < 1) {
         var txt = gamedata['strings']['regional_map']['arriving_in'].replace('%s', pretty_print_time_brief(player.travel_state['end_time'] - server_time));
         var dims = SPUI.ctx.measureText(txt);
-        var txy = [Math.floor(cur_xy[0]+gamedata['territory']['cell_size'][0]/2+10),
-                   Math.floor(cur_xy[1]+gamedata['territory']['cell_size'][1]/2+42)];
+        var txy = [cur_xy[0]+gamedata['territory']['cell_size'][0]/2+10,
+                   cur_xy[1]+gamedata['territory']['cell_size'][1]/2+42];
         SPUI.ctx.fillStyle = 'rgba(0,0,0,0.75)';
         SPUI.ctx.fillRect(txy[0]-4, txy[1]-1-this.font.size, dims.width+8, this.font.size+8);
         SPUI.ctx.fillStyle = 'rgba(200,200,200,1.0)';

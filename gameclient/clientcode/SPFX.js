@@ -942,11 +942,12 @@ SPFX.Projectile.prototype.draw = function() {
     this.last_time = SPFX.time;
 };
 
+/** Quantize a line segment for drawing. Mutates start/end in place.
+    @param {!Array.<number>} start
+    @param {!Array.<number>} end */
 function quantize_streak(start, end) {
-    start[0] = Math.floor(start[0]);
-    start[1] = Math.floor(start[1]);
-    end[0] = Math.floor(end[0]);
-    end[1] = Math.floor(end[1]);
+    start = draw_quantize(start);
+    end = draw_quantize(end);
 
     // prevent streak from disappearing between pixels
     if(start[0] == end[0] && start[1] == end[1]) {
@@ -1185,7 +1186,7 @@ SPFX.Explosion.prototype.draw = function() {
         }
     }
 
-    xy = [Math.floor(xy[0]), Math.floor(xy[1])];
+    xy = draw_quantize(xy);
 
     if(this.special_img) {
         if(this.sprite.center) {
@@ -1301,8 +1302,8 @@ SPFX.OffscreenArrow.prototype.draw = function() {
 
     // blinking arrow
     if(Math.floor(2.0*SPFX.time) % 2 === 0) {
-        sprite.draw([Math.floor(draw_loc[0]*canvas_width),
-                     Math.floor(draw_loc[1]*canvas_height)], 0, 0);
+        sprite.draw(draw_quantize([draw_loc[0]*canvas_width,
+                                   draw_loc[1]*canvas_height]), 0, 0);
     }
     SPFX.ctx.restore();
     /*
@@ -1366,14 +1367,16 @@ SPFX.CombatText.prototype.draw = function() {
     }
 
     var dims = SPFX.ctx.measureText(this.str);
-    xy[0] = Math.floor(xy[0] - dims.width/2);
-    xy[1] = Math.floor(xy[1] - (15 + this.speed*(SPFX.time - this.start_time)));
+    xy[0] = xy[0] - dims.width/2;
+    xy[1] = xy[1] - (15 + this.speed*(SPFX.time - this.start_time));
 
     // don't let it go off-screen horizontally
     if(xy[0] > roi[1][0] - dims.width) {
         xy[0] = roi[1][0] - dims.width;
     }
     if(xy[0] < roi[0][0]) { xy[0] = roi[0][0]; }
+
+    xy = draw_quantize(xy);
 
     if(this.drop_shadow && !SPUI.low_fonts) {
         SPFX.ctx.fillStyle = this.shadow_color.str();
@@ -1422,7 +1425,7 @@ SPFX.FeedbackEffect.prototype.draw = function() {
   */
 SPFX.ClickFeedback = function(pos, col, start_time, end_time) {
     goog.base(this, col, start_time, end_time);
-    this.pos = [Math.floor(pos[0]), Math.floor(pos[1])];
+    this.pos = vec_copy(pos);
 };
 goog.inherits(SPFX.ClickFeedback, SPFX.FeedbackEffect);
 SPFX.ClickFeedback.prototype.do_draw = function() {
@@ -1431,10 +1434,10 @@ SPFX.ClickFeedback.prototype.do_draw = function() {
     SPFX.ctx.save();
     SPFX.ctx.strokeStyle = this.color.str();
     SPFX.ctx.lineWidth = 2;
-    var xy = ortho_to_draw(this.pos);
+    var xy = draw_quantize(ortho_to_draw(this.pos));
     SPFX.ctx.beginPath();
 
-    SPFX.ctx.transform(1, 0, 0, 0.5, Math.floor(xy[0]), Math.floor(xy[1]));
+    SPFX.ctx.transform(1, 0, 0, 0.5, xy[0], xy[1]);
     SPFX.ctx.arc(0, 0, Math.floor(radius), 0, 2*Math.PI, false);
 
     SPFX.ctx.stroke();
@@ -1474,8 +1477,7 @@ SPFX.Shockwave.prototype.draw = function() {
     var t = SPFX.time - this.start_time;
     var u = t / (this.end_time - this.start_time);
 
-    var xy = ortho_to_draw_3d([this.where[0], this.altitude, this.where[1]]);
-    xy[0] = Math.floor(xy[0]), xy[1] = Math.floor(xy[1]);
+    var xy = draw_quantize(ortho_to_draw_3d([this.where[0], this.altitude, this.where[1]]));
 
     var rad, opacity;
     if(this.speed > 0) {

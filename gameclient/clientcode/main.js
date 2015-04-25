@@ -4788,10 +4788,10 @@ Base.prototype.draw_base_perimeter = function(purpose) {
     }
 
     // vertices of base perimeter
-    var v = [ortho_to_draw([mid[0]-rad[0], mid[1]-rad[1]]),
-             ortho_to_draw([mid[0]+rad[0], mid[1]-rad[1]]),
-             ortho_to_draw([mid[0]+rad[0], mid[1]+rad[1]]),
-             ortho_to_draw([mid[0]-rad[0], mid[1]+rad[1]])];
+    var v = [draw_quantize(ortho_to_draw([mid[0]-rad[0], mid[1]-rad[1]])),
+             draw_quantize(ortho_to_draw([mid[0]+rad[0], mid[1]-rad[1]])),
+             draw_quantize(ortho_to_draw([mid[0]+rad[0], mid[1]+rad[1]])),
+             draw_quantize(ortho_to_draw([mid[0]-rad[0], mid[1]+rad[1]]))];
 
     SPUI.ctx.save();
     SPUI.ctx.strokeStyle = '#FFFFFF';
@@ -4836,29 +4836,29 @@ Base.prototype.draw_base_perimeter = function(purpose) {
 
     if(shade_outside) {
         // all across the top
-        shade_quad([ortho_to_draw([0,0]), ortho_to_draw([ncells[0], 0]), ortho_to_draw([ncells[0], mid[1]-rad[1]]), ortho_to_draw([0, mid[1]-rad[1]])]);
+        shade_quad_quantize([ortho_to_draw([0,0]), ortho_to_draw([ncells[0], 0]), ortho_to_draw([ncells[0], mid[1]-rad[1]]), ortho_to_draw([0, mid[1]-rad[1]])]);
         // left side
-        shade_quad([ortho_to_draw([0,mid[1]-rad[1]]), ortho_to_draw([mid[0]-rad[0], mid[1]-rad[1]]), ortho_to_draw([mid[0]-rad[0], mid[1]+rad[1]]), ortho_to_draw([0, mid[1]+rad[1]])]);
+        shade_quad_quantize([ortho_to_draw([0,mid[1]-rad[1]]), ortho_to_draw([mid[0]-rad[0], mid[1]-rad[1]]), ortho_to_draw([mid[0]-rad[0], mid[1]+rad[1]]), ortho_to_draw([0, mid[1]+rad[1]])]);
         // right side
-        shade_quad([ortho_to_draw([mid[0]+rad[0],mid[1]-rad[1]]), ortho_to_draw([ncells[0], mid[1]-rad[1]]), ortho_to_draw([ncells[0], mid[1]+rad[1]]), ortho_to_draw([mid[0]+rad[0], mid[1]+rad[1]])]);
+        shade_quad_quantize([ortho_to_draw([mid[0]+rad[0],mid[1]-rad[1]]), ortho_to_draw([ncells[0], mid[1]-rad[1]]), ortho_to_draw([ncells[0], mid[1]+rad[1]]), ortho_to_draw([mid[0]+rad[0], mid[1]+rad[1]])]);
         // all across the bottom
-        shade_quad([ortho_to_draw([0,mid[1]+rad[1]]), ortho_to_draw([ncells[0], mid[1]+rad[1]]), ortho_to_draw([ncells[0], ncells[1]]), ortho_to_draw([0, ncells[1]])]);
+        shade_quad_quantize([ortho_to_draw([0,mid[1]+rad[1]]), ortho_to_draw([ncells[0], mid[1]+rad[1]]), ortho_to_draw([ncells[0], ncells[1]]), ortho_to_draw([0, ncells[1]])]);
     }
 
     if(0 && shade_offmap) { // XXX this is broken in view_is_zoomed case
         var top = ortho_to_draw([0,0]), right = ortho_to_draw([ncells[0], 0]), bottom = ortho_to_draw([ncells[0], ncells[1]]), left = ortho_to_draw([0, ncells[1]]);
         // bar across the top
-        if(top[1] > 0) { shade_quad([[0,0], [canvas_width,0], [canvas_width, top[1]], [0, top[1]]]); }
+        if(top[1] > 0) { shade_quad_quantize([[0,0], [canvas_width,0], [canvas_width, top[1]], [0, top[1]]]); }
         // upper-left quad
-        shade_quad([[0,top[1]], top, left, [0,left[1]]]);
+        shade_quad_quantize([[0,top[1]], top, left, [0,left[1]]]);
         // lower-left quad
-        shade_quad([[0,left[1]], left, bottom, [0,bottom[1]]]);
+        shade_quad_quantize([[0,left[1]], left, bottom, [0,bottom[1]]]);
         // upper-right quad
-        shade_quad([top, [canvas_width,top[1]], [canvas_width,right[1]], right]);
+        shade_quad_quantize([top, [canvas_width,top[1]], [canvas_width,right[1]], right]);
         // lower-right quad
-        shade_quad([right, [canvas_width,right[1]], [canvas_width,bottom[1]], bottom]);
+        shade_quad_quantize([right, [canvas_width,right[1]], [canvas_width,bottom[1]], bottom]);
         // bar across the bottom
-        if(bottom[1] < canvas_height) { shade_quad([[0,bottom[1]], [canvas_width,bottom[1]], [canvas_width,canvas_height], [0,canvas_height]]); }
+        if(bottom[1] < canvas_height) { shade_quad_quantize([[0,bottom[1]], [canvas_width,bottom[1]], [canvas_width,canvas_height], [0,canvas_height]]); }
     }
 
     // draw outline
@@ -8869,6 +8869,23 @@ function playfield_to_draw(ji) {
         return ji;
     } else {
         return playfield_to_screen(ji);
+    }
+}
+
+/** Most browser Canvas implementations seem to have a fast path that activates when
+    things are drawn at integer coordinate positions. This function quantizes 2D
+    coordinates appropriately for the current Canvas settings.
+    @param {!Array.<number>} xy
+    @return {!Array.<number>} */
+function draw_quantize(xy) {
+    if(view_is_zoomed()) {
+        // all bets are off, don't even bother
+        return xy;
+    } else if(canvas_oversample === 1) {
+        return [Math.floor(xy[0]), Math.floor(xy[1])];
+    } else {
+        return [Math.floor(xy[0]*canvas_oversample)/canvas_oversample,
+                Math.floor(xy[1]*canvas_oversample)/canvas_oversample];
     }
 }
 
@@ -13324,6 +13341,9 @@ function shade_quad(v) {
     SPUI.add_quad_to_path(v);
     SPUI.ctx.fill();
 }
+function shade_quad_quantize(v) {
+    shade_quad([draw_quantize(v[0]), draw_quantize(v[1]), draw_quantize(v[2]), draw_quantize(v[3])]);
+}
 
 // 'xy' in screen coordinates, 'range' nad 'min_range' in map cell units
 function draw_weapon_range(xy, range, friend, aoe, min_range) {
@@ -13411,10 +13431,10 @@ BuildUICursor.prototype.draw = function(offset) {
         var obj = session.cur_objects.objects[id];
         if(obj != selection.unit && obj.is_building() || (obj.is_inert() && obj.spec['unit_collision_gridsize'][0] != 0)) {
             var bound = get_grid_bounds([obj.x,obj.y], obj.spec['gridsize']);
-            shade_quad([ortho_to_draw([bound[0][0], bound[1][0]]),
-                        ortho_to_draw([bound[0][1], bound[1][0]]),
-                        ortho_to_draw([bound[0][1], bound[1][1]]),
-                        ortho_to_draw([bound[0][0], bound[1][1]])]);
+            shade_quad([draw_quantize(ortho_to_draw([bound[0][0], bound[1][0]])),
+                        draw_quantize(ortho_to_draw([bound[0][1], bound[1][0]])),
+                        draw_quantize(ortho_to_draw([bound[0][1], bound[1][1]])),
+                        draw_quantize(ortho_to_draw([bound[0][0], bound[1][1]]))]);
         }
     }
 
@@ -13665,17 +13685,20 @@ DeployUICursor.prototype.draw = function(offset) {
 
         // rectangle
         SPUI.ctx.beginPath();
-        SPUI.add_quad_to_path([vec_floor(ortho_to_draw([ji[0]-this.size, ji[1]-this.size])),
-                               vec_floor(ortho_to_draw([ji[0]+this.size, ji[1]-this.size])),
-                               vec_floor(ortho_to_draw([ji[0]+this.size, ji[1]+this.size])),
-                               vec_floor(ortho_to_draw([ji[0]-this.size, ji[1]+this.size]))]);
+        SPUI.add_quad_to_path([draw_quantize(ortho_to_draw([ji[0]-this.size, ji[1]-this.size])),
+                               draw_quantize(ortho_to_draw([ji[0]+this.size, ji[1]-this.size])),
+                               draw_quantize(ortho_to_draw([ji[0]+this.size, ji[1]+this.size])),
+                               draw_quantize(ortho_to_draw([ji[0]-this.size, ji[1]+this.size]))]);
         SPUI.ctx.fill();
         SPUI.ctx.stroke();
 
         // lines off the edges
         SPUI.ctx.beginPath();
-        var line = function(v0, v1) { SPUI.ctx.moveTo(Math.floor(v0[0]), Math.floor(v0[1]));
-                                      SPUI.ctx.lineTo(Math.floor(v1[0]), Math.floor(v1[1])); };
+        var line = function(v0, v1) {
+            v0 = draw_quantize(v0); v1 = draw_quantize(v1);
+            SPUI.ctx.moveTo(v0[0], v0[1]);
+            SPUI.ctx.lineTo(v1[0], v1[1]);
+        };
 
         // left
         line(ortho_to_draw([ji[0]-2*this.size, ji[1]]), ortho_to_draw([ji[0]-this.size, ji[1]]));
@@ -16325,6 +16348,8 @@ function update_valentina_nonmodal_message(dialog) {
                 }
 
                 if(bounds) {
+                    bounds[0] = draw_quantize(bounds[0]); // mixes x and y coordinate math
+                    bounds[1] = draw_quantize(bounds[1]); // mixes x and y coordinate math
                     var pad = 15;
                     bounds[0][0] -= pad; bounds[1][0] -= pad;
                     bounds[0][1] += pad; bounds[1][1] += pad;
@@ -16337,12 +16362,12 @@ function update_valentina_nonmodal_message(dialog) {
                     var c = box_color;
                     ctx.strokeStyle = c+(1-(1-opacity)*(1-opacity)).toString()+')';
                     ctx.fillStyle = c+opacity.toString()+')';
-                    ctx.fillRect(Math.floor(bounds[0][0]), Math.floor(bounds[1][0]),
-                                 Math.floor(bounds[0][1]-bounds[0][0]),
-                                 Math.floor(bounds[1][1]-bounds[1][0]));
-                    ctx.strokeRect(Math.floor(bounds[0][0]), Math.floor(bounds[1][0]),
-                                   Math.floor(bounds[0][1]-bounds[0][0]),
-                                   Math.floor(bounds[1][1]-bounds[1][0]));
+                    ctx.fillRect(bounds[0][0], bounds[1][0],
+                                 bounds[0][1]-bounds[0][0],
+                                 bounds[1][1]-bounds[1][0]);
+                    ctx.strokeRect(bounds[0][0], bounds[1][0],
+                                   bounds[0][1]-bounds[0][0],
+                                   bounds[1][1]-bounds[1][0]);
                     if(ui_text) {
                         ctx.fillStyle = '#ffffff';
                         ctx.fillText(ui_text, bounds[0][0]+pad, bounds[1][1]-pad);
@@ -46210,7 +46235,7 @@ function do_draw() {
             view_roi = [screen_to_playfield([0,0]), screen_to_playfield([canvas_width,canvas_height])];
         } else {
             // quantize view_pos to pixels when not zoomed, to avoid drawing at non-integer pixel coordinates
-            view_pos = vec_floor(view_pos);
+            view_pos = draw_quantize(view_pos);
             view_roi = [[0,0],[canvas_width,canvas_height]]; // draw space is screen space
         }
 
@@ -47917,8 +47942,7 @@ function draw_shadow(unit) {
 
     if(unit.altitude > 0 && !unit.is_destroyed() && 'shadow_asset' in unit.spec) {
         var curpos = unit.interpolate_pos_for_draw();
-        var xy = ortho_to_draw(curpos);
-        xy[0] = Math.floor(xy[0]); xy[1] = Math.floor(xy[1]);
+        var xy = draw_quantize(ortho_to_draw(curpos));
 
         if((xy[0]+MAX_UNIT_SPRITE_SIZE < view_roi[0][0]) ||
            (xy[0]-MAX_UNIT_SPRITE_SIZE > view_roi[1][0]) ||
@@ -48248,14 +48272,15 @@ function draw_clock(xy, color, start_tick, end_tick) {
 function draw_unit_control_order_segment(xy, state, d) {
     ctx.beginPath();
     ctx.strokeStyle = gamedata['client']['unit_control_colors'][(state == ai_states.AI_ATTACK_MOVE || state == ai_states.AI_ATTACK_MOVE_AGGRO || state == ai_states.AI_ATTACK_SPECIFIC) ? 'amove_later' : 'move_later'];
-    ctx.moveTo(Math.floor(xy[0]), Math.floor(xy[1]));
+    xy = draw_quantize(xy);
+    ctx.moveTo(xy[0], xy[1]);
 
-    xy = ortho_to_draw(d);
-    ctx.lineTo(Math.floor(xy[0]), Math.floor(xy[1]));
+    xy = draw_quantize(ortho_to_draw(d));
+    ctx.lineTo(xy[0], xy[1]);
 
     if(gamedata['client']['unit_control_detail'] >= 2) { // arc drawing is slow
         ctx.save();
-        ctx.transform(1, 0, 0, 0.5, Math.floor(xy[0]), Math.floor(xy[1]));
+        ctx.transform(1, 0, 0, 0.5, xy[0], xy[1]);
         ctx.arc(0, 0, 6, 0, 2*Math.PI, false);
         ctx.stroke();
         ctx.restore();
@@ -48283,7 +48308,7 @@ function draw_unit_control_order(xy, ord) {
 
 function draw_unit_control(unit, curpos) {
     //ctx.save();
-    var xy = ortho_to_draw(curpos);
+    var xy = draw_quantize(ortho_to_draw(curpos));
 
     // draw line to target
     var target_line_drawn = false;
@@ -48291,10 +48316,10 @@ function draw_unit_control(unit, curpos) {
     if(unit.control_target /*&& !unit.control_target.is_destroyed()*/ && (unit.control_state != control_states.CONTROL_STOP)) {
         ctx.strokeStyle = gamedata['client']['unit_control_colors']['target'];
         ctx.beginPath();
-        ctx.moveTo(Math.floor(xy[0]), Math.floor(xy[1]));
+        ctx.moveTo(xy[0],xy[1]);
         var target_pos = unit.control_target.interpolate_pos();
-        var target_xy = ortho_to_draw(target_pos);
-        ctx.lineTo(Math.floor(target_xy[0]), Math.floor(target_xy[1]));
+        var target_xy = draw_quantize(ortho_to_draw(target_pos));
+        ctx.lineTo(target_xy[0], target_xy[1]);
         ctx.stroke();
         target_line_drawn = true;
     }
@@ -48311,15 +48336,15 @@ function draw_unit_control(unit, curpos) {
         }
         //ctx.lineWidth = 1;
         ctx.beginPath();
-        ctx.moveTo(Math.floor(xy[0]), Math.floor(xy[1]));
+        ctx.moveTo(xy[0], xy[1]);
         for(var i = 0; i < unit.path.length; i++) {
-            xy = ortho_to_draw(vec_add(unit.path[i],[0.5,0.5]));
-            ctx.lineTo(Math.floor(xy[0]), Math.floor(xy[1]));
+            xy = draw_quantize(ortho_to_draw(vec_add(unit.path[i],[0.5,0.5])));
+            ctx.lineTo(xy[0], xy[1]);
         }
 
         if(gamedata['client']['unit_control_detail'] >= 2) { // arc drawing is slow
             ctx.save();
-            ctx.transform(1, 0, 0, 0.5, Math.floor(xy[0]), Math.floor(xy[1]));
+            ctx.transform(1, 0, 0, 0.5, xy[0], xy[1]);
             ctx.arc(0, 0, 6, 0, 2*Math.PI, false);
             ctx.stroke();
             ctx.restore();
@@ -48399,8 +48424,7 @@ function draw_selection_highlight(unit, config_override) {
 
     if(unit.is_mobile()) {
         // draw ellipse underneath the object
-        var xy = ortho_to_draw(curpos);
-        xy[0] = Math.floor(xy[0]); xy[1] = Math.floor(xy[1]);
+        var xy = draw_quantize(ortho_to_draw(curpos));
 
         if(gamedata['client']['unit_selection_shape'] == 'arc') { // arc drawing is slow
             ctx.save();
@@ -48440,21 +48464,21 @@ function draw_selection_highlight(unit, config_override) {
 
         if(unit.altitude > 0 && gamedata['client']['unit_control_detail'] >= 2) {
             // draw height line for flying units
-            var xya = ortho_to_draw_3d([curpos[0], unit.altitude, curpos[1]]);
+            var xya = draw_quantize(ortho_to_draw_3d([curpos[0], unit.altitude, curpos[1]]));
             ctx.strokeStyle = config['basecol']+config['altitude_alpha'].toString()+')';
             ctx.beginPath();
             ctx.moveTo(xy[0], xy[1]);
-            ctx.lineTo(Math.floor(xya[0]), Math.floor(xya[1]));
+            ctx.lineTo(xya[0], xya[1]);
             if(stroke_alpha > 0) { ctx.stroke(); }
         }
     } else {
         // draw rectangular outline for buildings
         var bound = get_grid_bounds(curpos, unit.spec['gridsize']);
         ctx.beginPath();
-        SPUI.add_quad_to_path([ortho_to_draw([bound[0][0], bound[1][0]]),
-                               ortho_to_draw([bound[0][1], bound[1][0]]),
-                               ortho_to_draw([bound[0][1], bound[1][1]]),
-                               ortho_to_draw([bound[0][0], bound[1][1]])]);
+        SPUI.add_quad_to_path([draw_quantize(ortho_to_draw([bound[0][0], bound[1][0]])),
+                               draw_quantize(ortho_to_draw([bound[0][1], bound[1][0]])),
+                               draw_quantize(ortho_to_draw([bound[0][1], bound[1][1]])),
+                               draw_quantize(ortho_to_draw([bound[0][0], bound[1][1]]))]);
         ctx.fill();
         if(stroke_alpha > 0) { ctx.stroke(); }
     }
