@@ -32,6 +32,7 @@ goog.require('SPText');
 goog.require('SPHTTP');
 goog.require('SPFX');
 goog.require('SPFB');
+goog.require('Screenshot');
 goog.require('FBShare');
 goog.require('FBUploadPhoto');
 goog.require('FBInviteFriends');
@@ -461,7 +462,12 @@ var client_art_states = {
 var client_art_state = client_art_states.DOWNLOADING_ESSENTIAL;
 
 // handles to the HTML5 div, canvas, and drawing context
-var canvas_div, canvas, ctx;
+
+/** @type {HTMLDivElement|null} */
+var canvas_div = null;
+/** @type {HTMLCanvasElement|null} */
+var canvas = null;
+var ctx = null;
 
 // cache canvas dimensions to avoid reflows
 // see comment at http://eli.thegreenplace.net/2010/02/13/finding-out-the-mouse-click-position-on-a-canvas-with-javascript/
@@ -9710,8 +9716,8 @@ SPINPUNCHGAME.init = function() {
         SPINPUNCHGAME.watchdog_timer = null;
     }, 10*1000);
 
-    canvas_div = document.getElementById('canvas_div');
-    canvas = document.getElementById('canvas');
+    canvas_div = /** @type {HTMLDivElement} */ (document.getElementById('canvas_div'));
+    canvas = /** @type {HTMLCanvasElement} */ (document.getElementById('canvas'));
 
     ctx = null;
     if(canvas.getContext) {
@@ -15221,12 +15227,34 @@ function invoke_invite_friends_dialog(reason) {
     }
 }
 
-function invoke_post_screenshot(reason) {
+/** @param {SPUI.Dialog|null} dialog to capture - otherwise captures full screen
+    @param {string} reason */
+function invoke_post_screenshot(dialog, reason) {
+    var codec = Screenshot.Codec.JPEG;
+    var filename = 'SCREENSHOT.jpg';
+
+    var dataURI;
+    if(dialog) {
+        var xy = dialog.get_absolute_xy();
+        var topleft = vec_scale(canvas_oversample, xy);
+        var dimensions = vec_scale(canvas_oversample, dialog.wh);
+        dataURI = Screenshot.capture_subimage(canvas, topleft, dimensions, codec);
+    } else {
+        dataURI = Screenshot.capture_full(canvas, codec);
+    }
+    console.log('captured data: '+dataURI.length.toString()); // XXXXXXX
+    do_post_screenshot(dataURI, filename, reason);
+}
+
+/** @param {string} data
+    @param {string} filename
+    @param {string} reason */
+function do_post_screenshot(data, filename, reason) {
     if(!player.get_any_abtest_value('enable_post_screenshot', gamedata['client']['enable_post_screenshot'])) { throw Error('enable_post_screenshot needs to be turned on'); }
     if(spin_frame_platform != 'fb' || !FBUploadPhoto.supported()) { throw Error('unsupported'); }
     if(!gamedata['virals']['post_screenshot'] || !gamedata['strings']['post_screenshot_success']) { throw Error('missing post_screenshot viral or strings entry'); }
 
-    call_with_facebook_permissions('publish_actions', (function (_reason) { return function() {
+    call_with_facebook_permissions('publish_actions', (function (_data, _filename, _reason) { return function() {
         var viral = gamedata['virals']['post_screenshot'];
         var caption = viral['ui_caption'];
         var cb = function(success) {
@@ -15236,9 +15264,8 @@ function invoke_post_screenshot(reason) {
             }
         }
 
-        FBUploadPhoto.upload(canvas.toDataURL('image/jpeg'), 'SCREENSHOT.jpg',
-                             caption, true, _reason, cb);
-    }; })(reason));
+        FBUploadPhoto.upload(_data, _filename, caption, true, _reason, cb);
+    }; })(data, filename, reason));
 }
 
 function invoke_gift_prompt_dialog() {

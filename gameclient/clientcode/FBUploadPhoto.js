@@ -5,7 +5,7 @@ goog.provide('FBUploadPhoto');
 // found in the LICENSE file.
 
 /** @fileoverview
-    Facebook Photo upload
+    Facebook Photo upload where the source pixels are a dataURI (e.g. created from canvas.toDataURL())
     !!! DOES NOT WORK ON IE9 DUE TO Uint8Array, Blob, and FormData !!!
 */
 
