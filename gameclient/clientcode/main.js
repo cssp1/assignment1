@@ -467,6 +467,7 @@ var client_art_state = client_art_states.DOWNLOADING_ESSENTIAL;
 var canvas_div = null;
 /** @type {HTMLCanvasElement|null} */
 var canvas = null;
+/** @type {CanvasRenderingContext2D|null} */
 var ctx = null;
 
 // cache canvas dimensions to avoid reflows
@@ -9719,9 +9720,8 @@ SPINPUNCHGAME.init = function() {
     canvas_div = /** @type {HTMLDivElement} */ (document.getElementById('canvas_div'));
     canvas = /** @type {HTMLCanvasElement} */ (document.getElementById('canvas'));
 
-    ctx = null;
     if(canvas.getContext) {
-        ctx = canvas.getContext('2d');
+        ctx = /** @type {CanvasRenderingContext2D} */ (canvas.getContext('2d'));
     }
 
     // check for bad browsers
@@ -15227,9 +15227,11 @@ function invoke_invite_friends_dialog(reason) {
     }
 }
 
-/** @param {SPUI.Dialog|null} dialog to capture - otherwise captures full screen
+/** Outer screenshot function. Ensure screenshot feature is available before calling.
+    @param {SPUI.Dialog|null} dialog to capture - otherwise captures full screen
     @param {string} reason */
 function invoke_post_screenshot(dialog, reason) {
+    if(!canvas) { throw Error('no canvas'); }
     var codec = Screenshot.Codec.JPEG;
     var filename = 'SCREENSHOT.jpg';
 
@@ -15242,30 +15244,97 @@ function invoke_post_screenshot(dialog, reason) {
     } else {
         dataURI = Screenshot.capture_full(canvas, codec);
     }
-    console.log('captured data: '+dataURI.length.toString()); // XXXXXXX
-    do_post_screenshot(dataURI, filename, reason);
+    invoke_post_screenshot_dialog(dataURI, filename, reason);
 }
 
-/** @param {string} data
+/** Show the preview/caption GUI
+    @param {string} data
     @param {string} filename
     @param {string} reason */
-function do_post_screenshot(data, filename, reason) {
+function invoke_post_screenshot_dialog(data, filename, reason) {
+    //change_selection(null);
+    var dialog_data = gamedata['dialogs']['post_screenshot_dialog'];
+    var dialog = new SPUI.Dialog(dialog_data);
+    dialog.user_data['dialog'] = 'post_screenshot_dialog';
+    dialog.user_data['image_data'] = data;
+    dialog.user_data['image_filename'] = filename;
+    dialog.user_data['reason'] = reason;
+
+    install_child_dialog(dialog);
+    dialog.auto_center();
+    dialog.modal = true;
+
+    var img = new Image();
+    img.src = data;
+    dialog.widgets['image'].raw_image = img;
+
+    // set scaling on the image to fit
+    var img_scale = 1/canvas_oversample;
+    if(img_scale * img.width > dialog.data['widgets']['image']['dimensions'][0]) {
+        img_scale *= dialog.data['widgets']['image']['dimensions'][0] / (img_scale*img.width);
+    }
+    if(img_scale * img.height > dialog.data['widgets']['image']['dimensions'][1]) {
+        img_scale *= dialog.data['widgets']['image']['dimensions'][1] / (img_scale*img.height);
+    }
+    var img_dims = vec_floor(vec_scale(img_scale, [img.width, img.height]));
+
+    dialog.widgets['image'].xy = vec_floor(vec_add(dialog.data['widgets']['image']['xy'],
+                                                   vec_scale(0.5, vec_sub(dialog.data['widgets']['image']['dimensions'], img_dims))));
+    dialog.widgets['image'].wh = [img.width, img.height];
+    dialog.widgets['image'].transform = [img_scale,0,0,img_scale,0,0];
+    dialog.widgets['image_bg'].xy = vec_add(dialog.widgets['image'].xy, vec_sub(dialog.data['widgets']['image_bg']['xy'],
+                                                                                dialog.data['widgets']['image']['xy']));
+    dialog.widgets['image_bg'].wh = vec_add(img_dims, vec_scale(2, vec_sub(dialog.data['widgets']['image']['xy'],
+                                                                           dialog.data['widgets']['image_bg']['xy'])));
+
+    dialog.widgets['close_button'].onclick = dialog.widgets['cancel_button'].onclick = close_parent_dialog;
+
+    dialog.widgets['caption_input'].ontextready =
+        dialog.widgets['ok_button'].onclick = function(w) {
+        var dialog = w.parent;
+        var player_caption = dialog.widgets['caption_input'].str;
+        do_post_screenshot(dialog.user_data['image_data'], dialog.user_data['image_filename'],
+                           player_caption, dialog.user_data['reason'],
+                           (function (_dialog) { return function() {
+                               close_dialog(_dialog);
+                           }; })(dialog));
+    };
+
+    SPUI.set_keyboard_focus(dialog.widgets['caption_input']);
+}
+
+/** Actually perform the upload. Request Facebook publish permission if necessary.
+    @param {string} data
+    @param {string} filename
+    @param {string|null} player_caption
+    @param {string} reason
+    @param {function()} callback - only called on successful upload
+*/
+function do_post_screenshot(data, filename, player_caption, reason, callback) {
     if(!player.get_any_abtest_value('enable_post_screenshot', gamedata['client']['enable_post_screenshot'])) { throw Error('enable_post_screenshot needs to be turned on'); }
     if(spin_frame_platform != 'fb' || !FBUploadPhoto.supported()) { throw Error('unsupported'); }
     if(!gamedata['virals']['post_screenshot'] || !gamedata['strings']['post_screenshot_success']) { throw Error('missing post_screenshot viral or strings entry'); }
 
-    call_with_facebook_permissions('publish_actions', (function (_data, _filename, _reason) { return function() {
-        var viral = gamedata['virals']['post_screenshot'];
-        var caption = viral['ui_caption'];
-        var cb = function(success) {
-            if(success) {
-                var s = gamedata['strings']['post_screenshot_success'];
-                invoke_child_message_dialog(s['ui_title'], s['ui_description']);
-            }
-        }
+    var viral = gamedata['virals']['post_screenshot'];
+    var caption = goog.string.trim(viral[(player_caption ? 'ui_caption_custom' : 'ui_caption')].replace('%PLAYER_CAPTION', player_caption || ''));
 
-        FBUploadPhoto.upload(_data, _filename, caption, true, _reason, cb);
-    }; })(data, filename, reason));
+    var cb = (function (_callback) { return function(success) {
+        if(success) {
+            if(_callback) { _callback(); }
+            var s = gamedata['strings']['post_screenshot_success'];
+            invoke_child_message_dialog(s['ui_title'], s['ui_description']);
+        }
+    }; })(callback);
+
+    if(!spin_facebook_enabled) {
+        console.log('do_post_screenshot: '+caption);
+        cb(true);
+        return;
+    }
+
+    call_with_facebook_permissions('publish_actions', (function (_data, _filename, _caption, _reason, _cb) { return function() {
+        FBUploadPhoto.upload(_data, _filename, _caption, true, _reason, _cb);
+    }; })(data, filename, caption, reason, cb));
 }
 
 function invoke_gift_prompt_dialog() {
@@ -41549,6 +41618,7 @@ function handle_server_message(data) {
 
         GameArt.init(client_time, canvas, ctx, gamedata['art'], gameart_onload, audio_driver, use_low_gfx, use_lazy_art, player.get_any_abtest_value('enable_pixel_manipulation_in_low_gfx', gamedata['client']['enable_pixel_manipulation_in_low_gfx']));
 
+        if(!ctx) { throw Error('ctx not initialized'); }
         SPFX.init(ctx, use_low_gfx, use_high_gfx);
 
         if('sound_volume' in player.preferences) {

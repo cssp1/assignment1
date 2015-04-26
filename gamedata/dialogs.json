@@ -4450,6 +4450,47 @@
         }
     },
 
+    "post_screenshot_dialog": {
+        "clip_children": 0,
+        "dimensions": [670,423],
+        "default_button": "ok_button",
+        "widgets": {
+            "bg": { "kind": "StaticImage", "xy": [0,0], "dimensions": [670,423], "asset": "dialog_resizable", "bg_image_resizable": 1,
+                    "layout": {"hresizable": 1, "hjustify": "left"}},
+
+            "close_button": { "kind": "ActionButton", "xy": [640,1], "dimensions": [24,24], "bg_image": "close_button_small", "push_bg_image": 1,
+                              "layout": {"hjustify": "right"}},
+
+            "title": { "kind": "TextField", "xy": [28,11], "dimensions": [434, 40], "text_size": 30, "text_style": "bold",
+                       "text_hjustify": "left", "text_vjustify": "center", "ui_name": "Post a Screenshot on Facebook",
+                       "layout": {"hjustify": "left"}},
+
+            "sunken": {"kind": "StaticImage", "xy":[28,62], "dimensions": [614,207], "asset": "dialog_sunken_white_resizable", "bg_image_resizable": 1,
+                       "layout": {"hresizable": 1, "hjustify": "left"}},
+
+            "image_bg": { "kind": "SolidRect", "xy": [38,72], "dimensions": [610,209], "color":[0,0,0,0], "bevel": 2,
+                          "outline_color": [0.05,0.05,0.05,1], "outline_width": 1
+                        },
+
+            "image": { "kind": "StaticImage", "xy": [42,76], "dimensions": [586,179] },
+
+            "caption_label": { "kind": "TextField", "xy": [30,277],
+                               "dimensions": [220, 28], "text_size": 15, "text_hjustify": "left", "text_style": "bold",
+                               "ui_name": "Add a message:" },
+            "caption_input_bg": { "kind": "StaticImage", "xy": [28,308], "dimensions": [614,54], "asset": "dialog_sunken_resizable", "bg_image_resizable": 1 },
+
+            "caption_input": { "kind": "TextInput", "xy": [38,314], "dimensions": [596,39],
+                               "text_size": 15, "text_hjustify": "left", "text_vjustify": "top",
+                               "max_chars": 99, "multiline": true, "clip_to": [38,314,596,39],
+                               "text_color": [1,1,1,1], "blank_on_enter": false },
+
+            "cancel_button": { "kind": "ActionButton", "xy": [360,376], "dimensions": [134,28], "text_offset": [0,1],
+                               "bg_image": "menu_button_134px", "text_size": 13, "text_style": "bold", "ui_name": "Cancel" },
+            "ok_button": { "kind": "ActionButton", "xy": [510,376], "dimensions": [134,28], "text_offset": [0,1],
+                           "bg_image": "action_button_134px", "text_size": 13, "text_style": "bold", "ui_name": "Post" }
+        }
+    },
+
     "new_store_dialog": {
         "clip_children": 0,
         "dimensions": [670,423], "max_dimensions":[9999,423],
