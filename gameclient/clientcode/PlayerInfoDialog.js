@@ -59,7 +59,11 @@ PlayerInfoDialog._invoke = function(user_id, info) {
     install_child_dialog(dialog);
     dialog.auto_center();
     dialog.modal = true;
+
     dialog.widgets['close_button'].onclick = close_parent_dialog;
+    dialog.widgets['screenshot_button'].show = post_screenshot_enabled();
+    dialog.widgets['screenshot_button'].onclick = function(w) { invoke_post_screenshot(w.parent, w.parent.widgets['tab'].user_data['dialog']); };
+
     dialog.widgets['statistics_button'].onclick = function(w) { PlayerInfoDialog.invoke_statistics_tab(w.parent); };
     dialog.widgets['achievements_button'].onclick = function(w) { PlayerInfoDialog.invoke_achievements_tab(w.parent); };
     dialog.widgets['profile_button'].onclick = function(w) { PlayerInfoDialog.invoke_profile_tab(w.parent); };

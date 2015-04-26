@@ -14420,6 +14420,10 @@ function invoke_you_were_attacked_dialog(recent_attacks) {
     dialog.modal = true;
 
     if('close_button' in dialog.widgets) { dialog.widgets['close_button'].onclick = function() { change_selection(null); }; }
+    if('screenshot_button' in dialog.widgets) {
+        dialog.widgets['screenshot_button'].show = post_screenshot_enabled();
+        dialog.widgets['screenshot_button'].onclick = function(w) { invoke_post_screenshot(w.parent, w.parent.user_data['dialog']); };
+    }
 
     // calculate statistics
     var current_base_damage = calc_base_damage();
@@ -15225,6 +15229,14 @@ function invoke_invite_friends_dialog(reason) {
     } else {
         throw Error('unhandled frame_platform '+spin_frame_platform);
     }
+}
+
+/** Check if screenshot posting is available
+    @return {boolean} */
+function post_screenshot_enabled() {
+    return player.get_any_abtest_value('enable_post_screenshot', gamedata['client']['enable_post_screenshot']) &&
+        (spin_frame_platform == 'fb') && FBUploadPhoto.supported() &&
+        !!gamedata['virals']['post_screenshot'] && !!gamedata['strings']['post_screenshot_success'];
 }
 
 /** Outer screenshot function. Ensure screenshot feature is available before calling.
@@ -24306,6 +24318,9 @@ function invoke_battle_log_dialog(from_id, user_id, opprole, summary) {
     dialog.auto_center();
     dialog.modal = true;
     dialog.widgets['close_button'].onclick = close_parent_dialog;
+
+    dialog.widgets['screenshot_button'].show = post_screenshot_enabled();
+    dialog.widgets['screenshot_button'].onclick = function(w) { invoke_post_screenshot(w.parent, w.parent.user_data['dialog']); };
 
     if(from_id != session.user_id) {
             // developer impersonation option

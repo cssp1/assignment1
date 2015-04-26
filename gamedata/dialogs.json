@@ -4462,7 +4462,7 @@
                               "layout": {"hjustify": "right"}},
 
             "title": { "kind": "TextField", "xy": [28,11], "dimensions": [434, 40], "text_size": 30, "text_style": "bold",
-                       "text_hjustify": "left", "text_vjustify": "center", "ui_name": "Post a Screenshot on Facebook",
+                       "text_hjustify": "left", "text_vjustify": "center", "ui_name": "Post Screenshot on Facebook",
                        "layout": {"hjustify": "left"}},
 
             "sunken": {"kind": "StaticImage", "xy":[28,62], "dimensions": [614,207], "asset": "dialog_sunken_white_resizable", "bg_image_resizable": 1,
@@ -5028,6 +5028,8 @@
             "splash_bg": { "kind": "SolidRect", "xy": [331,55], "dimensions": [410,338], "color": [0,0,0,1] },
             "splash": {"kind": "StaticImage", "xy":[332,56], "dimensions":[408,336], "asset": "splash_defense" },
             "divider": { "kind": "Line", "xy": [306, 56], "dimensions": [0, 383], "color": [0,0,0,0.5], "stroke_width": 1 },
+
+            "screenshot_button": {"show": 0, "kind": "ActionButton", "xy":[261,54], "dimensions":[23,23], "bg_image": "photo_button", "push_bg_image": 1},
 
             // x-157 y+31
             "title": { "kind": "TextField", "xy": [31,46], "dimensions": [277, 25], "text_size": 17, "text_style": "bold",
@@ -5691,9 +5693,10 @@
         "default_button": "close_button",
         "widgets": {
             "bg": {"kind": "StaticImage", "xy":[0,0], "dimensions":[736,480], "asset": "dialog_resizable", "bg_image_resizable": 1 },
-            "title": { "kind": "TextField", "xy": [37,14], "dimensions": [221, 41], "text_size": 30, "text_style": "thick",
+            "title": { "kind": "TextField", "xy": [37,13], "dimensions": [221, 41], "text_size": 30, "text_style": "thick",
                        "text_hjustify": "left", "ui_name": "Player Info" },
             "close_button": { "kind": "ActionButton", "xy": [706,1], "dimensions": [19,22], "bg_image": "close_button_small", "push_bg_image": 1 },
+            "screenshot_button": {"show": 0, "kind": "ActionButton", "xy":[212,24], "dimensions":[23,23], "bg_image": "photo_button", "push_bg_image": 1},
             "statistics_button": { "show": 0, "kind": "ActionButton", "xy": [268,18], "dimensions": [136,32], "text_size": 13, "text_style": "bold",
                                    "bg_image": "menu_button_136px", "state": "normal", "ui_name": "Statistics" },
             "profile_button": { "kind": "ActionButton", "xy": [412,18], "dimensions": [136,32], "text_size": 13, "text_style": "bold",
@@ -6081,6 +6084,7 @@
             "sunken": {"kind": "StaticImage", "xy":[36,66], "dimensions":[665,344], "asset": "dialog_sunken_665x344" },
             "title": { "kind": "TextField", "xy": [37,14], "dimensions": [221, 41], "text_size": 30, "text_style": "thick",
                        "text_hjustify": "left", "ui_name": "Battle Log" },
+            "screenshot_button": {"show": 0, "kind": "ActionButton", "xy":[212,26], "dimensions":[23,23], "bg_image": "photo_button", "push_bg_image": 1},
             "close_button": { "kind": "ActionButton", "xy": [706,1], "dimensions": [19,22], "bg_image": "close_button_small", "push_bg_image": 1 },
             "base_damage_label": { "kind": "TextField", "xy": [57,82], "dimensions": [105,19],"text_size": 13, "text_style": "bold",
                                    "text_hjustify": "left", "ui_name": "Base Damage" },
