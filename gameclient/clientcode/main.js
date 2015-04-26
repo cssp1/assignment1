@@ -15303,13 +15303,22 @@ function invoke_post_screenshot_dialog(data, filename, reason) {
 
     dialog.widgets['caption_input'].ontextready =
         dialog.widgets['ok_button'].onclick = function(w) {
-        var dialog = w.parent;
-        var player_caption = dialog.widgets['caption_input'].str;
-        do_post_screenshot(dialog.user_data['image_data'], dialog.user_data['image_filename'],
-                           player_caption, dialog.user_data['reason'],
-                           (function (_dialog) { return function() {
-                               close_dialog(_dialog);
-                           }; })(dialog));
+            var dialog = w.parent;
+            var player_caption = dialog.widgets['caption_input'].str;
+
+            if(do_post_screenshot(dialog.user_data['image_data'], dialog.user_data['image_filename'],
+                                  player_caption, dialog.user_data['reason'],
+                                  (function (_dialog) { return function(success) {
+                                      _dialog.widgets['ok_button'].state = 'normal';
+                                      _dialog.widgets['ok_button'].str = _dialog.data['widgets']['ok_button']['ui_name'];
+                                      if(success) {
+                                          close_dialog(_dialog);
+                                      }
+                                  }; })(dialog))) {
+                // only disable button when permissions are already granted, since (I think) Facebook blocks the GUI to request permissions
+                dialog.widgets['ok_button'].state = 'disabled';
+                dialog.widgets['ok_button'].str = dialog.data['widgets']['ok_button']['ui_name_pending'];
+            }
     };
 
     SPUI.set_keyboard_focus(dialog.widgets['caption_input']);
@@ -15320,7 +15329,8 @@ function invoke_post_screenshot_dialog(data, filename, reason) {
     @param {string} filename
     @param {string|null} player_caption
     @param {string} reason
-    @param {function()} callback - only called on successful upload
+    @param {function(boolean)} callback - with success as the parameter
+    @return {boolean} if the call was synchronous
 */
 function do_post_screenshot(data, filename, player_caption, reason, callback) {
     if(!player.get_any_abtest_value('enable_post_screenshot', gamedata['client']['enable_post_screenshot'])) { throw Error('enable_post_screenshot needs to be turned on'); }
@@ -15331,8 +15341,8 @@ function do_post_screenshot(data, filename, player_caption, reason, callback) {
     var caption = goog.string.trim(viral[(player_caption ? 'ui_caption_custom' : 'ui_caption')].replace('%PLAYER_CAPTION', player_caption || ''));
 
     var cb = (function (_callback) { return function(success) {
+        if(_callback) { _callback(success); }
         if(success) {
-            if(_callback) { _callback(); }
             var s = gamedata['strings']['post_screenshot_success'];
             invoke_child_message_dialog(s['ui_title'], s['ui_description']);
         }
@@ -15341,10 +15351,10 @@ function do_post_screenshot(data, filename, player_caption, reason, callback) {
     if(!spin_facebook_enabled) {
         console.log('do_post_screenshot: '+caption);
         cb(true);
-        return;
+        return true;
     }
 
-    call_with_facebook_permissions('publish_actions', (function (_data, _filename, _caption, _reason, _cb) { return function() {
+    return call_with_facebook_permissions('publish_actions', (function (_data, _filename, _caption, _reason, _cb) { return function() {
         FBUploadPhoto.upload(_data, _filename, _caption, true, _reason, _cb);
     }; })(data, filename, caption, reason, cb));
 }
@@ -25196,11 +25206,14 @@ function invoke_facebook_permissions_dialog(_scope, _cb) {
             }; })(_scope, _cb));
 }
 
-function call_with_facebook_permissions(scope, cb) {
+/** @return {boolean} if the call was synchronous */
+function call_with_facebook_permissions(scope, cb) { // XXXXXX needs a "fail_cb" as well for GUI locking
     if(!player.has_facebook_permissions(scope)) {
         invoke_facebook_permissions_dialog(scope, cb);
+        return false;
     } else {
         cb();
+        return true;
     }
 }
 

@@ -4487,7 +4487,7 @@
             "cancel_button": { "kind": "ActionButton", "xy": [360,376], "dimensions": [134,28], "text_offset": [0,1],
                                "bg_image": "menu_button_134px", "text_size": 13, "text_style": "bold", "ui_name": "Cancel" },
             "ok_button": { "kind": "ActionButton", "xy": [510,376], "dimensions": [134,28], "text_offset": [0,1],
-                           "bg_image": "action_button_134px", "text_size": 13, "text_style": "bold", "ui_name": "Post" }
+                           "bg_image": "action_button_134px", "text_size": 13, "text_style": "bold", "ui_name": "Post", "ui_name_pending": "Posting..." }
         }
     },
 
