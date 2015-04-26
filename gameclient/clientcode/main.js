@@ -45948,7 +45948,8 @@ FPSCounter.prototype.get = function() {
                                                                  'server_time_offset':server_time_offset,
                                                                  'canvas_width':canvas_width,
                                                                  'canvas_height':canvas_height,
-                                                                 'canvas_oversample':canvas_oversample
+                                                                 'canvas_oversample':canvas_oversample,
+                                                                 'devicePixelRatio':window['devicePixelRatio'] || null
                                                                 }));
             }
         }
@@ -45968,7 +45969,8 @@ function sprobe_init(cb) {
                                     spin_server_host, spin_server_http_port, spin_server_ssl_port,
                                     spin_game_server_host, spin_game_server_http_port, spin_game_server_ssl_port,
                                     spin_game_server_ws_port, spin_game_server_wss_port,
-                                    (fps_counter ? fps_counter.cur_fps : -1), canvas_width, canvas_height, canvas_oversample);
+                                    (fps_counter ? fps_counter.cur_fps : -1), canvas_width, canvas_height, canvas_oversample,
+                                    window['devicePixelRatio'] || null);
     return probe;
 }
 

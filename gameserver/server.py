@@ -677,6 +677,7 @@ class UserTable:
               ('canvas_width', int),
               ('canvas_height', int),
               ('canvas_oversample', None),
+              ('devicePixelRatio', None),
               ('age_group', None),
               ('preferences', None),
               ('chat_gagged', int),
@@ -840,6 +841,7 @@ class User:
         self.canvas_width = None
         self.canvas_height = None
         self.canvas_oversample = None
+        self.devicePixelRatio = None
 
         self.locale = None
 
@@ -22145,6 +22147,8 @@ class GAMEAPI(resource.Resource):
                 session.user.canvas_height = int(val['canvas_height'])
                 if 'canvas_oversample' in val:
                     session.user.canvas_oversample = parse_canvas_oversample(val['canvas_oversample'])
+                if 'devicePixelRatio' in val:
+                    session.user.devicePixelratio = parse_canvas_oversample(val['devicePixelRatio'])
 
             elif key == '0961_sprobe_result':
                 session.sprobe_in_progress = False
@@ -22155,6 +22159,8 @@ class GAMEAPI(resource.Resource):
                     session.user.canvas_height = int(val['report']['tests']['graphics']['canvas_height'])
                     if 'canvas_oversample' in val['report']['tests']['graphics']:
                         session.user.canvas_oversample = parse_canvas_oversample(val['report']['tests']['graphics']['canvas_oversample'])
+                    if 'devicePixelRatio' in val['report']['tests']['graphics']:
+                        session.user.devicePixelRatio = parse_canvas_oversample(val['report']['tests']['graphics']['devicePixelRatio'])
                 session.user.last_sprobe_result = val['report']
 
                 log_chance = SpinConfig.config.get('gameserver_global',{}).get('log_client_perf',0)
