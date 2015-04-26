@@ -110,6 +110,8 @@ def setup_field(gamedata, key, val, field_mode = None):
             return 'INT1' # count of techs unlocked in various categories, or single-bit flags
         elif key == 'has_facebook_likes':
             return 'INT1' # version number for Likes data
+        elif key == 'canvas_oversample':
+            return 'FLOAT4'
         else:
             return 'INT4'
 

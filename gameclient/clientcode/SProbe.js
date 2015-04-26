@@ -33,11 +33,11 @@ SProbe.Test.prototype.listen = function(cb) {
 /** @constructor
     @struct
     @extends SProbe.Test */
-SProbe.GraphicsTest = function(framerate, canvas_width, canvas_height) {
+SProbe.GraphicsTest = function(framerate, canvas_width, canvas_height, canvas_oversample) {
     // doesn't really probe anything, just reports the numbers given
     goog.base(this);
     this.state = SProbe.TestState.DONE;
-    this.result = {'result': 'ok', 'framerate': framerate, 'canvas_width':canvas_width, 'canvas_height':canvas_height};
+    this.result = {'result': 'ok', 'framerate': framerate, 'canvas_width':canvas_width, 'canvas_height':canvas_height, 'canvas_oversample':canvas_oversample};
 };
 goog.inherits(SProbe.GraphicsTest, SProbe.Test);
 
@@ -191,7 +191,7 @@ SProbe.WSPing.prototype.response = function() {
     @struct */
 SProbe.ProbeRun = function(cb, proxy_host, proxy_http_port, proxy_ssl_port,
                            game_host, game_http_port, game_ssl_port, game_ws_port, game_wss_port,
-                           framerate, canvas_width, canvas_height) {
+                           framerate, canvas_width, canvas_height, canvas_oversample) {
     this.cb = cb;
     this.tests = {};
 
@@ -209,7 +209,7 @@ SProbe.ProbeRun = function(cb, proxy_host, proxy_http_port, proxy_ssl_port,
     }
 
     if(framerate > 0) {
-        this.tests['graphics'] = new SProbe.GraphicsTest(framerate, canvas_width, canvas_height);
+        this.tests['graphics'] = new SProbe.GraphicsTest(framerate, canvas_width, canvas_height, canvas_oversample);
     }
     this.tests['connection'] = new SProbe.ConnectionTest();
     if(false && parseInt(proxy_http_port,10) > 0) { // no browsers allow this in the HTTPS facebook frame

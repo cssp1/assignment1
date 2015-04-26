@@ -676,6 +676,7 @@ class UserTable:
               ('liniad_context', None),
               ('canvas_width', int),
               ('canvas_height', int),
+              ('canvas_oversample', None),
               ('age_group', None),
               ('preferences', None),
               ('chat_gagged', int),
@@ -838,6 +839,7 @@ class User:
         # browser canvas pixel dimensions
         self.canvas_width = None
         self.canvas_height = None
+        self.canvas_oversample = None
 
         self.locale = None
 
@@ -11949,6 +11951,14 @@ def metric_alias(user_id, anon_id):
     km = KISSmetrics.KM(SpinConfig.config['kissmetrics_api_key'], async=gamesite.AsyncHTTP_metrics)
     km.alias(str(user_id), anon_id)
 
+# parse client-supplied canvas_oversample for metrics
+def parse_canvas_oversample(v):
+    if type(v) not in (int, float):
+        assert type(v) in (str, unicode)
+        if '.' in v: v = float(v)
+        else: v = int(v)
+    return v
+
 # raw 35-byte representation of a 1x1 transparent GIF, used as the "return value" from metrics requests
 TINY_GIF = 'GIF89a\x01\x00\x01\x00\x80\xff\x00\xff\xff\xff\x00\x00\x00,\x00\x00\x00\x00\x01\x00\x01\x00\x00\x02\x02D\x01\x00;'
 
@@ -22133,6 +22143,8 @@ class GAMEAPI(resource.Resource):
             if key == '0960_framerate' and 'canvas_width' in val:
                 session.user.canvas_width = int(val['canvas_width'])
                 session.user.canvas_height = int(val['canvas_height'])
+                if 'canvas_oversample' in val:
+                    session.user.canvas_oversample = parse_canvas_oversample(val['canvas_oversample'])
 
             elif key == '0961_sprobe_result':
                 session.sprobe_in_progress = False
@@ -22141,6 +22153,8 @@ class GAMEAPI(resource.Resource):
                 if 'graphics' in val['report']['tests']: # also save canvas width/height here
                     session.user.canvas_width = int(val['report']['tests']['graphics']['canvas_width'])
                     session.user.canvas_height = int(val['report']['tests']['graphics']['canvas_height'])
+                    if 'canvas_oversample' in val['report']['tests']['graphics']:
+                        session.user.canvas_oversample = parse_canvas_oversample(val['report']['tests']['graphics']['canvas_oversample'])
                 session.user.last_sprobe_result = val['report']
 
                 log_chance = SpinConfig.config.get('gameserver_global',{}).get('log_client_perf',0)
