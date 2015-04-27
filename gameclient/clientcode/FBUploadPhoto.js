@@ -99,7 +99,6 @@ FBUploadPhoto.on_response = function(event, callback, metric_props, caption) {
         metric_event('7274_photo_upload_failed', props);
     } else {
         var data = JSON.parse(io.getResponseText());
-        console.log(data);
         var props = goog.object.clone(metric_props);
         props['photo_id'] = data['id'];
         if(data['post_id']) { props['post_id'] = data['post_id']; }
