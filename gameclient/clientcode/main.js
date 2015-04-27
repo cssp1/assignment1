@@ -5507,6 +5507,14 @@ player.get_ui_name = function() {
     return player.ui_name;
 };
 
+/** Create a fake player cache entry based on the live player
+    @return {!Object} */
+player.get_player_cache_props = function() {
+    return {'ui_name': player.get_ui_name(),
+            'player_level': player.resource_state.player_level,
+            'alliance_id': session.alliance_id};
+};
+
 // same as server-side function, used for gathering summary dimensions for metric events
 player.get_denormalized_summary_props = function(format) {
     if(format != 'brief') { throw Error('unhandled format '+format); }
@@ -14422,7 +14430,12 @@ function invoke_you_were_attacked_dialog(recent_attacks) {
     if('close_button' in dialog.widgets) { dialog.widgets['close_button'].onclick = function() { change_selection(null); }; }
     if('screenshot_button' in dialog.widgets) {
         dialog.widgets['screenshot_button'].show = post_screenshot_enabled();
-        dialog.widgets['screenshot_button'].onclick = function(w) { invoke_post_screenshot(w.parent, w.parent.user_data['dialog']); };
+        dialog.widgets['screenshot_button'].onclick = function(w) {
+            var dialog = w.parent;
+            invoke_post_screenshot(dialog, /* reason = */ dialog.user_data['dialog'],
+                                   make_post_screenshot_caption(dialog.data['widgets']['screenshot_button']['ui_caption'],
+                                                                player.get_player_cache_props()));
+        };
     }
 
     // calculate statistics
@@ -15239,13 +15252,36 @@ function post_screenshot_enabled() {
         !!gamedata['virals']['post_screenshot'] && !!gamedata['strings']['post_screenshot_success'];
 }
 
+/** Fill in the %PLAYER replacement in the default caption.
+    @param {string} caption
+    @param {Object|null} info - player cache entry
+    @return {string|null} */
+function make_post_screenshot_caption(caption, info) {
+    if(!caption || !info) { return null; }
+    var ui_player = PlayerCache.get_ui_name(info);
+    if('alliance_id' in info && info['alliance_id'] >= 0) {
+        var alinfo = AllianceCache.query_info_sync(info['alliance_id']);
+        if(alinfo && alinfo['chat_tag']) {
+            ui_player += ' ['+alinfo['chat_tag']+']';
+        }
+    }
+    if('player_level' in info) {
+        ui_player += ' L'+info['player_level'].toString();
+    }
+    caption = caption.replace('%PLAYER', ui_player);
+    return caption;
+}
+
 /** Outer screenshot function. Ensure screenshot feature is available before calling.
     @param {SPUI.Dialog|null} dialog to capture - otherwise captures full screen
-    @param {string} reason */
-function invoke_post_screenshot(dialog, reason) {
+    @param {string} reason
+    @param {string|null=} caption_prefix
+*/
+function invoke_post_screenshot(dialog, reason, caption_prefix) {
     if(!canvas) { throw Error('no canvas'); }
     var codec = Screenshot.Codec.JPEG;
     var filename = 'SCREENSHOT.jpg';
+    if(!caption_prefix) { caption_prefix = null; }
 
     var dataURI;
     if(dialog) {
@@ -15256,21 +15292,23 @@ function invoke_post_screenshot(dialog, reason) {
     } else {
         dataURI = Screenshot.capture_full(canvas, codec);
     }
-    invoke_post_screenshot_dialog(dataURI, filename, reason);
+    invoke_post_screenshot_dialog(dataURI, filename, reason, caption_prefix);
 }
 
 /** Show the preview/caption GUI
     @param {string} data
     @param {string} filename
-    @param {string} reason */
-function invoke_post_screenshot_dialog(data, filename, reason) {
-    //change_selection(null);
+    @param {string} reason
+    @param {string|null} caption_prefix
+*/
+function invoke_post_screenshot_dialog(data, filename, reason, caption_prefix) {
     var dialog_data = gamedata['dialogs']['post_screenshot_dialog'];
     var dialog = new SPUI.Dialog(dialog_data);
     dialog.user_data['dialog'] = 'post_screenshot_dialog';
     dialog.user_data['image_data'] = data;
     dialog.user_data['image_filename'] = filename;
     dialog.user_data['reason'] = reason;
+    dialog.user_data['caption_prefix'] = caption_prefix;
 
     install_child_dialog(dialog);
     dialog.auto_center();
@@ -15300,14 +15338,25 @@ function invoke_post_screenshot_dialog(data, filename, reason) {
                                                                            dialog.data['widgets']['image_bg']['xy'])));
 
     dialog.widgets['close_button'].onclick = dialog.widgets['cancel_button'].onclick = close_parent_dialog;
+    dialog.widgets['caption_prefix'].str = caption_prefix;
+
+    //dialog.widgets['caption_input'].str = caption_prefix || '';
 
     dialog.widgets['caption_input'].ontextready =
         dialog.widgets['ok_button'].onclick = function(w) {
             var dialog = w.parent;
+            var caption_list = [];
+            if(dialog.user_data['caption_prefix']) {
+                caption_list.push(dialog.user_data['caption_prefix']);
+            }
             var player_caption = dialog.widgets['caption_input'].str;
+            if(player_caption) {
+                caption_list.push(player_caption);
+            }
+            var caption = caption_list.join(' - ');
 
             if(do_post_screenshot(dialog.user_data['image_data'], dialog.user_data['image_filename'],
-                                  player_caption, dialog.user_data['reason'],
+                                  caption, dialog.user_data['reason'],
                                   (function (_dialog) { return function(success) {
                                       _dialog.widgets['ok_button'].state = 'normal';
                                       _dialog.widgets['ok_button'].str = _dialog.data['widgets']['ok_button']['ui_name'];
@@ -24330,7 +24379,11 @@ function invoke_battle_log_dialog(from_id, user_id, opprole, summary) {
     dialog.widgets['close_button'].onclick = close_parent_dialog;
 
     dialog.widgets['screenshot_button'].show = post_screenshot_enabled();
-    dialog.widgets['screenshot_button'].onclick = function(w) { invoke_post_screenshot(w.parent, w.parent.user_data['dialog']); };
+    dialog.widgets['screenshot_button'].onclick = function(w) {
+        var dialog = w.parent;
+        invoke_post_screenshot(dialog, /* reason = */ dialog.user_data['dialog'],
+                               (from_id === session.user_id ? make_post_screenshot_caption(dialog.data['widgets']['screenshot_button']['ui_caption'], player.get_player_cache_props()) : null));
+    };
 
     if(from_id != session.user_id) {
             // developer impersonation option

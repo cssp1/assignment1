@@ -62,7 +62,11 @@ PlayerInfoDialog._invoke = function(user_id, info) {
 
     dialog.widgets['close_button'].onclick = close_parent_dialog;
     dialog.widgets['screenshot_button'].show = post_screenshot_enabled();
-    dialog.widgets['screenshot_button'].onclick = function(w) { invoke_post_screenshot(w.parent, w.parent.widgets['tab'].user_data['dialog']); };
+    dialog.widgets['screenshot_button'].onclick = function(w) {
+        var dialog = w.parent;
+        invoke_post_screenshot(dialog, /* reason = */ dialog.widgets['tab'].user_data['dialog'],
+                               make_post_screenshot_caption(dialog.data['widgets']['screenshot_button']['ui_caption'], dialog.user_data['info']));
+    };
 
     dialog.widgets['statistics_button'].onclick = function(w) { PlayerInfoDialog.invoke_statistics_tab(w.parent); };
     dialog.widgets['achievements_button'].onclick = function(w) { PlayerInfoDialog.invoke_achievements_tab(w.parent); };
@@ -415,7 +419,7 @@ PlayerInfoDialog.statistics_tab_setup_share_button = function(dialog, has_top_ra
     if(post_screenshot_enabled()) {
         dialog.widgets['share_button'].onclick = function(w) {
             if(w.parent && w.parent.parent) {
-                invoke_post_screenshot(w.parent.parent, w.parent.parent.widgets['tab'].user_data['dialog']);
+                w.parent.parent.widgets['screenshot_button'].onclick(w.parent.parent.widgets['screenshot_button']);
             }
         };
     } else {

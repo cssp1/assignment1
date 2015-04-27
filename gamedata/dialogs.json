@@ -4477,6 +4477,10 @@
             "caption_label": { "kind": "TextField", "xy": [30,277],
                                "dimensions": [220, 28], "text_size": 15, "text_hjustify": "left", "text_style": "bold",
                                "ui_name": "Add a message:" },
+
+            "caption_prefix": { "kind": "TextField", "xy": [28,277],
+                                "dimensions": [614, 28], "text_size": 15, "text_hjustify": "center", "text_style": "normal" },
+
             "caption_input_bg": { "kind": "StaticImage", "xy": [28,308], "dimensions": [614,54], "asset": "dialog_sunken_resizable", "bg_image_resizable": 1 },
 
             "caption_input": { "kind": "TextInput", "xy": [38,314], "dimensions": [596,39],
@@ -5029,7 +5033,8 @@
             "splash": {"kind": "StaticImage", "xy":[332,56], "dimensions":[408,336], "asset": "splash_defense" },
             "divider": { "kind": "Line", "xy": [306, 56], "dimensions": [0, 383], "color": [0,0,0,0.5], "stroke_width": 1 },
 
-            "screenshot_button": {"show": 0, "kind": "ActionButton", "xy":[261,54], "dimensions":[23,23], "bg_image": "photo_button", "push_bg_image": 1},
+            "screenshot_button": {"show": 0, "kind": "ActionButton", "xy":[261,54], "dimensions":[23,23], "bg_image": "photo_button", "push_bg_image": 1,
+                                  "ui_caption": "%PLAYER - Attack Log"},
 
             // x-157 y+31
             "title": { "kind": "TextField", "xy": [31,46], "dimensions": [277, 25], "text_size": 17, "text_style": "bold",
@@ -5696,7 +5701,8 @@
             "title": { "kind": "TextField", "xy": [37,13], "dimensions": [221, 41], "text_size": 30, "text_style": "thick",
                        "text_hjustify": "left", "ui_name": "Player Info" },
             "close_button": { "kind": "ActionButton", "xy": [706,1], "dimensions": [19,22], "bg_image": "close_button_small", "push_bg_image": 1 },
-            "screenshot_button": {"show": 0, "kind": "ActionButton", "xy":[212,24], "dimensions":[23,23], "bg_image": "photo_button", "push_bg_image": 1},
+            "screenshot_button": {"show": 0, "kind": "ActionButton", "xy":[212,24], "dimensions":[23,23], "bg_image": "photo_button", "push_bg_image": 1,
+                                  "ui_caption": "%PLAYER - Player Info"},
             "statistics_button": { "show": 0, "kind": "ActionButton", "xy": [268,18], "dimensions": [136,32], "text_size": 13, "text_style": "bold",
                                    "bg_image": "menu_button_136px", "state": "normal", "ui_name": "Statistics" },
             "profile_button": { "kind": "ActionButton", "xy": [412,18], "dimensions": [136,32], "text_size": 13, "text_style": "bold",
@@ -6084,7 +6090,8 @@
             "sunken": {"kind": "StaticImage", "xy":[36,66], "dimensions":[665,344], "asset": "dialog_sunken_665x344" },
             "title": { "kind": "TextField", "xy": [37,14], "dimensions": [221, 41], "text_size": 30, "text_style": "thick",
                        "text_hjustify": "left", "ui_name": "Battle Log" },
-            "screenshot_button": {"show": 0, "kind": "ActionButton", "xy":[212,26], "dimensions":[23,23], "bg_image": "photo_button", "push_bg_image": 1},
+            "screenshot_button": {"show": 0, "kind": "ActionButton", "xy":[212,26], "dimensions":[23,23], "bg_image": "photo_button", "push_bg_image": 1,
+                                  "ui_caption": "%PLAYER - Battle Log"},
             "close_button": { "kind": "ActionButton", "xy": [706,1], "dimensions": [19,22], "bg_image": "close_button_small", "push_bg_image": 1 },
             "base_damage_label": { "kind": "TextField", "xy": [57,82], "dimensions": [105,19],"text_size": 13, "text_style": "bold",
                                    "text_hjustify": "left", "ui_name": "Base Damage" },
