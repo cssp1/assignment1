@@ -376,6 +376,12 @@ def FBRequestsLogFilter(child):
                                   '7106_invite_friends_hit_acquisition',
                                   '7107_invite_friends_hit_redundant',
                                   ])
+def FBSharingLogFilter(child):
+    return JSONLogFilter(child,
+                         allow = ['7272_photo_upload_attempted',
+                                  '7273_photo_upload_completed'
+                                  '7274_photo_upload_failed',
+                                  ])
 def FBOpenGraphLogFilter(child):
     return JSONLogFilter(child,
                          allow = ['7140_fb_open_graph_action_published',

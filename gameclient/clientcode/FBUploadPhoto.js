@@ -13,6 +13,7 @@ goog.require('SPFB');
 goog.require('goog.net.XhrIo');
 goog.require('goog.crypt.base64');
 goog.require('goog.events');
+goog.require('goog.object');
 
 /** Check for browser support
     @return {boolean} */
@@ -51,13 +52,13 @@ FBUploadPhoto.dataURItoBlob = function(dataURI) {
  @param {string} dataURI canvas.toDataURL('image/jpeg')
  @param {string} ui_filename 'SCREENSHOT.jpg'
  @param {boolean} post_story
- @param {string} reason
  @param {string|null} caption
  @param {function(boolean)|null} callback
+ @param {!Object} metric_props
  @suppress {reportUnknownTypes,checkTypes} - Closure doesn't deal with the nested callbacks well
  Also, Closure's exten definition for append() is missing the third argument
 */
-FBUploadPhoto.upload = function(dataURI, ui_filename, caption, post_story, reason, callback) {
+FBUploadPhoto.upload = function(dataURI, ui_filename, caption, post_story, callback, metric_props) {
     var auth_token = spin_facebook_oauth_token;
     var url = SPFB.versioned_graph_endpoint('photos', spin_facebook_user+'/photos?access_token='+auth_token);
     var img_blob = FBUploadPhoto.dataURItoBlob(dataURI);
@@ -73,28 +74,36 @@ FBUploadPhoto.upload = function(dataURI, ui_filename, caption, post_story, reaso
         fd.append('caption', caption);
     }
 
-    metric_event('7272_photo_upload_attempted', {'facebook_id':spin_facebook_user, 'reason':reason});
+    var props = goog.object.clone(metric_props);
+    metric_event('7272_photo_upload_attempted', props);
 
     goog.net.XhrIo.send(url,
-                        (function (_cb) { return function(event) { FBUploadPhoto.on_response(event, _cb); }; })(callback),
+                        (function (_cb, _metric_props, _caption) { return function(event) { FBUploadPhoto.on_response(event, _cb, _metric_props, _caption); }; })(callback, metric_props, caption),
                         'POST', fd);
 };
 
 /** @param {goog.events.Event} event
-    @param {function(boolean)|null} callback */
-FBUploadPhoto.on_response = function(event, callback) {
+    @param {function(boolean)|null} callback
+    @param {!Object} metric_props
+    @param {string|null} caption
+*/
+FBUploadPhoto.on_response = function(event, callback, metric_props, caption) {
     var success = false;
     var io = /** @type {goog.net.XhrIo} */ (event.target);
     if(!io.isSuccess()) {
         var code = io.getLastErrorCode();
         var text = io.getResponseText();
         console.log('FBUploadPhoto error code '+code+' text '+text);
-        metric_event('7274_photo_upload_failed', {'facebook_id':spin_facebook_user, 'code':code, 'text':text});
+        var props = goog.object.clone(metric_props);
+        props['code'] = code; props['text'] = text;
+        metric_event('7274_photo_upload_failed', props);
     } else {
         var data = JSON.parse(io.getResponseText());
         console.log(data);
-        var props = {'facebook_id':spin_facebook_user, 'photo_id':data['id']};
+        var props = goog.object.clone(metric_props);
+        props['photo_id'] = data['id'];
         if(data['post_id']) { props['post_id'] = data['post_id']; }
+        if(caption) { props['caption'] = caption; }
         metric_event('7273_photo_upload_completed', props);
         success = true;
     }

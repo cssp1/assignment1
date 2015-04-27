@@ -21,6 +21,7 @@ GAME_DIR=/home/ec2-user/battlefrontmars
 (cd $GAME_DIR/gameserver && nice ./achievements_to_sql.py -q --prune) > /dev/null
 (cd $GAME_DIR/gameserver && nice ./fb_notifications_to_sql.py -q --prune) > /dev/null
 (cd $GAME_DIR/gameserver && nice ./fb_requests_to_sql.py -q --prune) > /dev/null
+(cd $GAME_DIR/gameserver && nice ./fb_sharing_to_sql.py -q --prune) > /dev/null
 (cd $GAME_DIR/gameserver && nice ./fb_permissions_to_sql.py -q --prune) > /dev/null
 (cd $GAME_DIR/gameserver && nice ./fb_open_graph_to_sql.py -q --prune) > /dev/null
 (cd $GAME_DIR/gameserver && nice ./sessions_to_sql.py -q --prune) > /dev/null

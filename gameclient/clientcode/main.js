@@ -15426,7 +15426,10 @@ function do_post_screenshot(data, filename, player_caption, reason, callback) {
     }
 
     return call_with_facebook_permissions('publish_actions', (function (_data, _filename, _caption, _reason, _cb) { return function() {
-        FBUploadPhoto.upload(_data, _filename, _caption, true, _reason, _cb);
+        var metric_props = {'sum': player.get_denormalized_summary_props('brief'),
+                            'facebook_id': spin_facebook_user,
+                            'reason': _reason};
+        FBUploadPhoto.upload(_data, _filename, _caption, true, _cb, metric_props);
     }; })(data, filename, caption, reason, cb));
 }
 

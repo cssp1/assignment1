@@ -2530,6 +2530,7 @@ def do_main():
                                     SpinLog.FBPermissionsLogFilter(SpinNoSQLLog.NoSQLJSONLog(db_client, 'log_fb_permissions')), # FB Permissions events to MongoDB log_fb_notifications
                                     SpinLog.FBNotificationsLogFilter(SpinNoSQLLog.NoSQLJSONLog(db_client, 'log_fb_notifications')), # FB Notification events to MongoDB log_fb_notifications
                                     SpinLog.FBRequestsLogFilter(SpinNoSQLLog.NoSQLJSONLog(db_client, 'log_fb_requests')), # FB Requests events to MongoDB log_fb_requests
+                                    SpinLog.FBSharingLogFilter(SpinNoSQLLog.NoSQLJSONLog(db_client, 'log_fb_sharing')), # FB Sharing events to MongoDB log_fb_sharing
                                     SpinLog.FBOpenGraphLogFilter(SpinNoSQLLog.NoSQLJSONLog(db_client, 'log_fb_open_graph')), # FB Open Graph events to MongoDB log_fb_open_graph
                                     SpinLog.ClientTroubleLogFilter(SpinNoSQLLog.NoSQLJSONLog(db_client, 'log_client_trouble')), # misc client trouble to MongoDB log_client_trouble (for analytics)
                                     SpinLog.ClientExceptionLogFilter(SpinNoSQLLog.NoSQLJSONLog(db_client, 'log_client_trouble'), brief = True), # abbreviated client exceptions to MongoDB log_client_trouble (for analytics)

@@ -104,6 +104,7 @@ TABLES = {
     'fb_notifications': { 's3_name': 'fb_notifications', 'table_name': 'log_fb_notifications', 'compression': 'zip', 'retain_for': 30*86400 },
     'fb_requests': { 's3_name': 'fb_requests', 'table_name': 'log_fb_requests', 'compression': 'zip', 'retain_for': 30*86400 },
     'fb_open_graph': { 's3_name': 'fb_open_graph', 'table_name': 'log_fb_open_graph', 'compression': 'zip', 'retain_for': 30*86400 },
+    'fb_sharing': { 's3_name': 'fb_sharing', 'table_name': 'log_fb_sharing', 'compression': 'zip', 'retain_for': 30*86400 },
 
     # activity log
     'activity': { 's3_name': 'activity', 'table_name': 'activity', 'compression': 'zip', 'retain_for': 7*86400 },
