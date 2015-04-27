@@ -359,7 +359,7 @@
     "chat_scroll_down": { "states": {
         "normal": { "images": ["art/ui/menu_buttons12.png"], "dimensions": [27,46], "origins": [267,268], "audio": "art/soundfx/menu_click.$AUDIO_CODEC", "volume": 0.25, "load_priority": 20 },
         "highlight": { "images": ["art/ui/menu_buttons12.png"], "dimensions": [27,46], "origins": [267,222], "audio": "art/soundfx/menu_click.$AUDIO_CODEC", "volume": 0.25, "load_priority": 20 },
-        "disabled": { "images": ["art/ui/menu_buttons12.png"], "dimensions": [27,46], "origins": [267,314], "load_priority": 25 }
+        "disabled": { "images": ["art/ui/menu_buttons12.png"], "dimensions": [27,36], "origins": [267,314], "load_priority": 25 } // trim off sprite incursion at the bottom
     } },
 
     // same as chat_scroll but without large highlight area
