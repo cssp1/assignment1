@@ -2050,7 +2050,7 @@ def climate_allows_unit(data, spec):
 
     return True
 
-def check_ai_base_contents(strid, base, owner, base_type):
+def check_ai_base_contents(strid, base, owner, base_type, ensure_force_building_levels = False):
     error = 0
     climate = base.get('base_climate', None)
     if climate:
@@ -2143,6 +2143,11 @@ def check_ai_base_contents(strid, base, owner, base_type):
                     if level <= 0 or level > max_level:
                         error |= 1
                         print 'ERROR: AI base %s has an object (%s) whose level is greater than the max (%d) for its type' % (strid, repr(item), max_level)
+
+                    if ensure_force_building_levels and KIND == 'buildings' and ('force_level' not in item) \
+                       and item['spec'] not in ('barrier','minefield',):
+                        error |= 1
+                        print 'ERROR: AI base %s has an building (%s) without a force_level setting' % (strid, repr(item))
 
                 if KIND == 'units' and gamedata['units'][item['spec']].get('invis_on_hold',False):
                     if 'orders' in item and item['orders'][0]['state'] == 4 and item['orders'][0].get('aggressive',False):
@@ -2309,7 +2314,9 @@ def check_ai_base(strid, base):
         error |= berror
 
     else:
-        error |= check_ai_base_contents(strid, base, base, 'home')
+        error |= check_ai_base_contents(strid, base, base, 'home',
+                                        # make sure hitlist bases all have explicit levels
+                                        ensure_force_building_levels = (base.get('ui_category',None) == 'hitlist'))
 
         deplist = []
         complist = None
