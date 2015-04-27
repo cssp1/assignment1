@@ -53,7 +53,7 @@ def from_playerdb(player, output, force_unit_level):
     for obj in player['my_base']:
         specname = obj['spec']
         props = {'spec': specname, 'xy': obj['xy']}
-        if obj.get('level',1) > 1: props['force_level'] = obj['level']
+        props['force_level'] = obj.get('level',1)
         if 'equipment' in obj: props['equipment'] = obj['equipment']
         if specname in gamedata['buildings']:
             spec = gamedata['buildings'][specname]
@@ -70,7 +70,7 @@ def from_playerdb(player, output, force_unit_level):
                 props['force_level'] = force_unit_level
             if 'orders' in obj: props['orders'] = obj['orders']
             if 'patrol' in obj: props['patrol'] = obj['patrol']
-            if 'level' in obj: props['force_level'] = obj['level']
+            props['force_level'] = obj.get('level',1)
             if obj.get('squad_id',0) != 0: continue # do not include units that belong to squads other than base defenders
             out['units'].append(props)
         elif specname in gamedata['inert']:
