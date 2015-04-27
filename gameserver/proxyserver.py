@@ -2297,7 +2297,7 @@ class KGPortraitProxy(PortraitProxy):
         avatar_url = qs['avatar_url'][-1]
         avatar_parts = urlparse.urlparse(avatar_url)
         if not avatar_parts.netloc.endswith('kongcdn.com'):
-            exception_log.event(proxy_time, 'unrecognized KG portrait URL: %r' % avatar_parts)
+            exception_log.event(proxy_time, 'unrecognized KG portrait URL: %s' % repr(avatar_parts))
         return avatar_url
 
 class XDChannelResource(static.Data):
