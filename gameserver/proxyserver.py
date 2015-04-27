@@ -2217,7 +2217,7 @@ class PortraitProxy(twisted.web.resource.Resource):
         SpinHTTP.set_access_control_headers_for_cdn(request, -1) # no max_age
 
     def render_OPTIONS(self, request):
-        _ = self.parse_request(request)
+        self.parse_request(request) # just to assert it is a valid request
         self.set_cdn_headers(request)
         return ''
 
