@@ -466,7 +466,7 @@
     // horizontal version of the controls bar
     "playfield_controls_bar_horizontal": {
         "xy": [0,180],
-        "dimensions": [104,23],
+        "dimensions": [131,23],
         "spacing_under": [0,5], // used when docked just below the chicklet buttons at desktop_top
         "spacing_right": [207,5], // used when docked to the LEFT of the "attack" button (used to be to the RIGHT of player portrait)
         "widgets": {
@@ -477,24 +477,29 @@
             "fullscreen_button": { "kind": "ActionButton", "xy": [54,0], "dimensions": [23,23], "bg_image": "fullscreen_button",
                                    "ui_tooltip": "Fullscreen", "tooltip_delay": 0, "fixed_tooltip_offset": [33,31], "push_bg_image": 1 },
             "settings_button": { "kind": "ActionButton", "xy": [81,0], "dimensions": [23,23], "bg_image": "settings_button",
-                                 "ui_tooltip": "Settings", "tooltip_delay": 0, "fixed_tooltip_offset": [64,31], "push_bg_image": 1 }
+                                 "ui_tooltip": "Settings", "tooltip_delay": 0, "fixed_tooltip_offset": [64,31], "push_bg_image": 1 },
+            "screenshot_button": {"show": 0, "kind": "ActionButton", "xy":[108,0], "dimensions":[23,23], "bg_image": "photo_button", "push_bg_image": 1,
+                                  "ui_caption": "%PLAYER - Home Base", "ui_tooltip": "Post Screenshot", "fixed_tooltip_offset": [70,31], "tooltip_delay": 0}
         }
     },
 
     // vertical version of the controls bar, docked just above the zoom bar
     "playfield_controls_bar_vertical": {
         "xy": [0,180],
-        "dimensions": [36,114], "spacing": [-5,-2],
+        "dimensions": [36,143], "spacing": [-5,-2],
         "widgets": {
-            "controls_bg": {"kind": "SolidRect", "xy":[3,-3], "dimensions":[33,117], "color":[0.066,0.066,0.066,0.86], "bevel":4 },
-            "sound_button": { "kind": "ActionButton", "xy": [8,0], "dimensions": [23,23], "bg_image": "audio_sound_button",
-                              "ui_tooltip": "Sound Effects On/Off", "tooltip_delay": 0, "fixed_tooltip_offset": [-148,0], "push_bg_image": 1 },
-            "music_button": { "kind": "ActionButton", "xy": [8,29], "dimensions": [23,23], "bg_image": "audio_music_button",
-                              "ui_tooltip": "Music On/Off", "tooltip_delay": 0, "fixed_tooltip_offset": [-95,29], "push_bg_image": 1 },
-            "fullscreen_button": { "kind": "ActionButton", "xy": [8,58], "dimensions": [23,23], "bg_image": "fullscreen_button",
-                                   "ui_tooltip": "Fullscreen", "tooltip_delay": 0, "fixed_tooltip_offset": [-80,58], "push_bg_image": 1 },
-            "settings_button": { "kind": "ActionButton", "xy": [8,87], "dimensions": [23,23], "bg_image": "settings_button",
-                                 "ui_tooltip": "Settings", "tooltip_delay": 0, "fixed_tooltip_offset": [-65,87], "push_bg_image": 1 }
+            "controls_bg": {"kind": "SolidRect", "xy":[3,-3], "dimensions":[33,146], "color":[0.066,0.066,0.066,0.86], "bevel":4 },
+            "screenshot_button": {"show": 0, "kind": "ActionButton", "xy":[8,0], "dimensions":[23,23], "bg_image": "photo_button", "push_bg_image": 1,
+                                  "ui_caption": "%PLAYER - Home Base",
+                                  "ui_tooltip": "Post Screenshot", "tooltip_delay": 0, "fixed_tooltip_offset": [-118,0] },
+            "sound_button": { "kind": "ActionButton", "xy": [8,29], "dimensions": [23,23], "bg_image": "audio_sound_button",
+                              "ui_tooltip": "Sound Effects On/Off", "tooltip_delay": 0, "fixed_tooltip_offset": [-146,29], "push_bg_image": 1 },
+            "music_button": { "kind": "ActionButton", "xy": [8,58], "dimensions": [23,23], "bg_image": "audio_music_button",
+                              "ui_tooltip": "Music On/Off", "tooltip_delay": 0, "fixed_tooltip_offset": [-95,58], "push_bg_image": 1 },
+            "fullscreen_button": { "kind": "ActionButton", "xy": [8,87], "dimensions": [23,23], "bg_image": "fullscreen_button",
+                                   "ui_tooltip": "Fullscreen", "tooltip_delay": 0, "fixed_tooltip_offset": [-80,87], "push_bg_image": 1 },
+            "settings_button": { "kind": "ActionButton", "xy": [8,116], "dimensions": [23,23], "bg_image": "settings_button",
+                                 "ui_tooltip": "Settings", "tooltip_delay": 0, "fixed_tooltip_offset": [-65,116], "push_bg_image": 1 }
         }
     },
 

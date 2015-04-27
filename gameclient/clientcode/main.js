@@ -9102,6 +9102,14 @@ function invoke_playfield_controls_bar() {
 
     dialog.widgets['settings_button'].onclick = invoke_settings_dialog;
 
+    dialog.widgets['screenshot_button'].onclick = function(w) {
+        var dialog = w.parent;
+        invoke_post_screenshot(null, /* reason = */ dialog.user_data['dialog'] + (session.home_base ? '_home': '_away'),
+                               make_post_screenshot_caption(dialog.data['widgets']['screenshot_button']['ui_caption'],
+                                                            (session.viewing_user_id === session.user_id ? player.get_player_cache_props() : PlayerCache.query_sync(session.viewing_user_id))
+                                                           ));
+    };
+
     dialog.widgets['music_button'].show = GameArt.enable_audio;
     dialog.widgets['sound_button'].show = GameArt.enable_audio;
 
@@ -9134,6 +9142,11 @@ function invoke_playfield_controls_bar() {
     return dialog;
 }
 function update_playfield_controls_bar(dialog) {
+    // on the old horizontal controls bar, there isn't enough space to show away from home or in battle.
+    dialog.widgets['screenshot_button'].show = ((player.tutorial_state == "COMPLETE") &&
+                                                (dialog.user_data['dialog'] == 'playfield_controls_bar_vertical' || (session.home_base && !session.has_attacked)) &&
+                                                post_screenshot_enabled());
+
     if(dialog.user_data['dialog'] == 'playfield_controls_bar_horizontal') {
         var top = desktop_dialogs['desktop_top'];
         if(!top) { dialog.show = false; return; }
@@ -9146,6 +9159,15 @@ function update_playfield_controls_bar(dialog) {
     } else {
         // attach to right side of desktop
         dialog.xy = vec_add(dialog.data['spacing'], [canvas_width-dialog.wh[0], Math.floor(canvas_height/2 - dialog.wh[1])]);
+        // hack for A/B test
+        if(!dialog.widgets['screenshot_button'].show) {
+            var delta = dialog.data['widgets']['sound_button']['xy'][1] - dialog.data['widgets']['screenshot_button']['xy'][1];
+            dialog.widgets['controls_bg'].xy = vec_add(dialog.data['widgets']['controls_bg']['xy'], [0,delta]);
+            dialog.widgets['controls_bg'].wh = vec_add(dialog.data['widgets']['controls_bg']['dimensions'], [0,-delta]);
+        } else {
+            dialog.widgets['controls_bg'].xy = dialog.data['widgets']['controls_bg']['xy'];
+            dialog.widgets['controls_bg'].wh =dialog.data['widgets']['controls_bg']['dimensions'];
+        }
     }
     dialog.widgets['settings_button'].show = session.enable_combat_resource_bars && ((player.tutorial_state == "COMPLETE") ||
                                                                                      gamedata['tutorial'][player.tutorial_state]['enable_desktop_control_buttons']);
