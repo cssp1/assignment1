@@ -5511,7 +5511,7 @@ player.get_ui_name = function() {
     @return {!Object} */
 player.get_player_cache_props = function() {
     return {'ui_name': player.get_ui_name(),
-            'player_level': player.resource_state.player_level,
+            'player_level': player.level(),
             'alliance_id': session.alliance_id};
 };
 
