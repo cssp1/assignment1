@@ -11955,6 +11955,7 @@ def metric_alias(user_id, anon_id):
 
 # parse client-supplied canvas_oversample for metrics
 def parse_canvas_oversample(v):
+    if v is None: return None
     if type(v) not in (int, float):
         assert type(v) in (str, unicode)
         if '.' in v: v = float(v)
