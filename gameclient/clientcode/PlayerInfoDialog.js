@@ -312,6 +312,7 @@ PlayerInfoDialog.statistics_tab_receive = function(dialog, data, status_code, qu
             dialog.widgets['output'].append_text([]); // add a blank line
         }
 
+        var has_top_rank = false; // controls appearance of "Share" button
         var by_group = {}; // mapping from group name -> stat name -> string to display
         var player_data = data[0];
 
@@ -319,6 +320,9 @@ PlayerInfoDialog.statistics_tab_receive = function(dialog, data, status_code, qu
             if(player_data[i]) {
                 var val = player_data[i]['absolute'] || 0;
                 var rank = ('rank' in player_data[i] ? player_data[i]['rank'] : -1);
+                if(rank >= 0 && rank < 100) {
+                    has_top_rank = true;
+                }
                 PlayerInfoDialog.statistics_tab_format_stat(dialog, stat, val, rank, by_group);
             }
         });
@@ -391,7 +395,7 @@ PlayerInfoDialog.statistics_tab_receive = function(dialog, data, status_code, qu
         }
         dialog.widgets['output'].scroll_to_top();
         PlayerInfoDialog.statistics_tab_scroll(dialog, 0);
-        PlayerInfoDialog.statistics_tab_setup_share_button(dialog);
+        PlayerInfoDialog.statistics_tab_setup_share_button(dialog, has_top_rank);
     } else {
         dialog.widgets['share_button'].show = false;
         dialog.widgets['loading_text'].str = dialog.data['widgets']['loading_text']['ui_name_unavailable'];
@@ -400,24 +404,33 @@ PlayerInfoDialog.statistics_tab_receive = function(dialog, data, status_code, qu
 };
 
 /** @param {!SPUI.Dialog} dialog */
-PlayerInfoDialog.statistics_tab_setup_share_button = function(dialog) {
+PlayerInfoDialog.statistics_tab_setup_share_button = function(dialog, has_top_rank) {
     if(spin_frame_platform != 'fb' || !gamedata['virals']['stats_share'] ||
        !player.get_any_abtest_value('enable_player_info_statistics_share_button',
                                     gamedata['client']['enable_player_info_statistics_share_button'])) {
         return;
     }
     dialog.widgets['share_button'].show = true;
-    dialog.widgets['share_button'].onclick = function(w) {
-        var dialog = w.parent;
-        var viral = gamedata['virals']['stats_share'];
-        var val = {'user_id': dialog.user_data['user_id'],
-                   'preselect': {'time': [dialog.user_data['time_displayed'] == -1 ? 'ALL' : dialog.user_data['time_scope'],
-                                          dialog.user_data['time_displayed']]}};
-        FBShare.invoke({link_qs: {'player_info_statistics': JSON.stringify(val)},
-                        name: viral['ui_post_headline'],
-                        ref: 'stats_share', // 15-char limit
-                       });
-    };
+    dialog.widgets['share_button'].str = dialog.data['widgets']['share_button'][(has_top_rank ? 'ui_name_top' : 'ui_name')];
+    if(post_screenshot_enabled()) {
+        dialog.widgets['share_button'].onclick = function(w) {
+            if(w.parent && w.parent.parent) {
+                invoke_post_screenshot(w.parent.parent, w.parent.parent.widgets['tab'].user_data['dialog']);
+            }
+        };
+    } else {
+        dialog.widgets['share_button'].onclick = function(w) {
+            var dialog = w.parent;
+            var viral = gamedata['virals']['stats_share'];
+            var val = {'user_id': dialog.user_data['user_id'],
+                       'preselect': {'time': [dialog.user_data['time_displayed'] == -1 ? 'ALL' : dialog.user_data['time_scope'],
+                                              dialog.user_data['time_displayed']]}};
+            FBShare.invoke({link_qs: {'player_info_statistics': JSON.stringify(val)},
+                            name: viral['ui_post_headline'],
+                            ref: 'stats_share', // 15-char limit
+                           });
+        };
+    }
 };
 
 
