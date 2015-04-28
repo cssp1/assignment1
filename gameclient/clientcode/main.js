@@ -15271,7 +15271,7 @@ function invoke_invite_friends_dialog(reason) {
     @return {boolean} */
 function post_screenshot_enabled() {
     return player.get_any_abtest_value('enable_post_screenshot', gamedata['client']['enable_post_screenshot']) &&
-        (spin_frame_platform == 'fb') && FBUploadPhoto.supported() &&
+        (spin_frame_platform == 'fb') && FBUploadPhoto.supported() && Screenshot.supported() &&
         !!gamedata['virals']['post_screenshot'] && !!gamedata['strings']['post_screenshot_success'];
 }
 
@@ -15315,6 +15315,13 @@ function invoke_post_screenshot(dialog, reason, caption_prefix) {
     } else {
         dataURI = Screenshot.capture_full(canvas, codec);
     }
+
+    if(dataURI === null) {
+        var s = gamedata['errors']['SCREENSHOT_FAILED'];
+        invoke_child_message_dialog(s['ui_title'], s['ui_name'], {'dialog': 'message_dialog_big'});
+        return;
+    }
+
     invoke_post_screenshot_dialog(dataURI, filename, reason, caption_prefix);
 }
 

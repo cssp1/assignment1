@@ -381,6 +381,7 @@ def FBSharingLogFilter(child):
                          allow = ['7272_photo_upload_attempted',
                                   '7273_photo_upload_completed',
                                   '7274_photo_upload_failed',
+                                  '7275_screenshot_failed',
                                   ])
 def FBOpenGraphLogFilter(child):
     return JSONLogFilter(child,

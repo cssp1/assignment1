@@ -63,7 +63,11 @@ var spin_loading_screen_name;
 var spin_loading_screen_data;
 var spin_loading_screen_mode;
 var spin_init_messages;
-var add_demographics;
+
+/** @param {!Object.<string,?>} props
+    @return {!Object.<string,?>} */
+var add_demographics = function(props) {};
+
 /** @type {Object.<string,?>} */
 var gamedata; // from gamedata.js
 var gameclient_build_date; // from compiled-client.js.date

@@ -14,12 +14,32 @@ Screenshot.Codec = {
     PNG: 'image/png'
 };
 
+/** Once we get an exception, blacklist further screenshot attempts */
+Screenshot.blacklisted = false;
+/** @return {boolean} */
+Screenshot.supported = function() { return !Screenshot.blacklisted; };
+
+/** Wrap the toDataURL call to trap browser security (canvas tainted) error
+    @param {!HTMLCanvasElement} canvas
+    @param {string} codec
+    @return {string|null} */
+Screenshot.toDataURL = function(canvas, codec) {
+    try {
+        return canvas.toDataURL(codec);
+    } catch(e) {
+        //log_exception(e, 'Screenshot.toDataURL');
+        metric_event('7275_screenshot_failed', add_demographics({}));
+        Screenshot.blacklisted = true;
+        return null;
+    }
+};
+
 /** Capture entire canvas
     @param {!HTMLCanvasElement} canvas
     @param {Screenshot.Codec} codec
-    @return {string} */
+    @return {string|null} */
 Screenshot.capture_full = function(canvas, codec) {
-    return canvas.toDataURL(codec);
+    return Screenshot.toDataURL(canvas, codec);
 };
 
 /** Capture subimage
@@ -27,7 +47,7 @@ Screenshot.capture_full = function(canvas, codec) {
     @param {!Array.<number>} topleft
     @param {!Array.<number>} dimensions
     @param {Screenshot.Codec} codec
-    @return {string} */
+    @return {string|null} */
 Screenshot.capture_subimage = function(canvas, topleft, dimensions, codec) {
     var con = /** @type {!CanvasRenderingContext2D} */ (canvas.getContext('2d'));
     var osc = /** @type {!HTMLCanvasElement} */ (document.createElement('canvas'));
@@ -35,5 +55,5 @@ Screenshot.capture_subimage = function(canvas, topleft, dimensions, codec) {
     var osc_con = /** @type {!CanvasRenderingContext2D} */ (osc.getContext('2d'));
     var data = con.getImageData(topleft[0], topleft[1], dimensions[0], dimensions[1]);
     /** @type {*} */ (osc_con.putImageData(data, 0, 0));
-    return osc.toDataURL(codec);
+    return Screenshot.toDataURL(osc, codec);
 };
