@@ -15332,6 +15332,7 @@ function invoke_post_screenshot_dialog(data, filename, reason, caption_prefix) {
     dialog.user_data['reason'] = reason;
     dialog.user_data['caption_prefix'] = caption_prefix;
     dialog.user_data['privacy'] = player.preferences['fb_post_privacy'] || FBUploadPhoto.Privacy.EVERYONE;
+    dialog.user_data['ui_locker'] = null;
     install_child_dialog(dialog);
     dialog.auto_center();
     dialog.modal = true;
@@ -15377,19 +15378,28 @@ function invoke_post_screenshot_dialog(data, filename, reason, caption_prefix) {
             }
             var caption = caption_list.join(' - ');
 
-            if(do_post_screenshot(dialog.user_data['image_data'], dialog.user_data['image_filename'],
-                                  caption, dialog.user_data['privacy'], dialog.user_data['reason'],
-                                  (function (_dialog) { return function(success) {
-                                      _dialog.widgets['ok_button'].state = 'normal';
-                                      _dialog.widgets['ok_button'].str = _dialog.data['widgets']['ok_button']['ui_name'];
-                                      if(success) {
-                                          close_dialog(_dialog);
-                                      }
-                                  }; })(dialog))) {
-                // only disable button when permissions are already granted, since (I think) Facebook blocks the GUI to request permissions
-                dialog.widgets['ok_button'].state = 'disabled';
-                dialog.widgets['ok_button'].str = dialog.data['widgets']['ok_button']['ui_name_pending'];
-            }
+            // this function locks up the GUI to prevent multiple clicks
+            var on_launch = (function (_dialog) { return function() {
+                _dialog.widgets['ok_button'].state = 'disabled';
+                _dialog.widgets['ok_button'].str = dialog.data['widgets']['ok_button']['ui_name_pending'];
+                _dialog.user_data['ui_locker'] = invoke_ui_locker_until_closed();
+            }; })(dialog);
+
+            var on_finish = (function (_dialog) { return function(success) {
+                _dialog.widgets['ok_button'].state = 'normal';
+                _dialog.widgets['ok_button'].str = _dialog.data['widgets']['ok_button']['ui_name'];
+                if(_dialog.user_data['ui_locker']) {
+                    close_dialog(_dialog.user_data['ui_locker']);
+                    _dialog.user_data['ui_locker'] = null;
+                }
+                if(success) {
+                    close_dialog(_dialog);
+                }
+            }; })(dialog);
+
+            do_post_screenshot(dialog.user_data['image_data'], dialog.user_data['image_filename'],
+                               caption, dialog.user_data['privacy'], dialog.user_data['reason'],
+                               on_launch, on_finish);
     };
 
     post_screenshot_dialog_update_privacy(dialog, dialog.user_data['privacy']);
@@ -15420,10 +15430,11 @@ function post_screenshot_dialog_update_privacy(dialog, new_setting) {
     @param {string|null} player_caption
     @param {FBUploadPhoto.Privacy|null} privacy
     @param {string} reason
-    @param {function(boolean)} callback - with success as the parameter
+    @param {function()} launch_callback - called when we're about to start the post
+    @param {function(boolean)} finish_callback - with success as the parameter
     @return {boolean} if the call was synchronous
 */
-function do_post_screenshot(data, filename, player_caption, privacy, reason, callback) {
+function do_post_screenshot(data, filename, player_caption, privacy, reason, launch_callback, finish_callback) {
     if(!player.get_any_abtest_value('enable_post_screenshot', gamedata['client']['enable_post_screenshot'])) { throw Error('enable_post_screenshot needs to be turned on'); }
     if(spin_frame_platform != 'fb' || !FBUploadPhoto.supported()) { throw Error('unsupported'); }
     if(!gamedata['virals']['post_screenshot'] || !gamedata['strings']['post_screenshot_success']) { throw Error('missing post_screenshot viral or strings entry'); }
@@ -15431,13 +15442,13 @@ function do_post_screenshot(data, filename, player_caption, privacy, reason, cal
     var viral = gamedata['virals']['post_screenshot'];
     var caption = goog.string.trim(viral[(player_caption ? 'ui_caption_custom' : 'ui_caption')].replace('%PLAYER_CAPTION', player_caption || ''));
 
-    var cb = (function (_callback) { return function(success) {
-        if(_callback) { _callback(success); }
+    var cb = (function (_finish_callback) { return function(success) {
+        if(_finish_callback) { _finish_callback(success); }
         if(success) {
             var s = gamedata['strings']['post_screenshot_success'];
             invoke_child_message_dialog(s['ui_title'], s['ui_description']);
         }
-    }; })(callback);
+    }; })(finish_callback);
 
     if(!spin_facebook_enabled) {
         console.log('do_post_screenshot ('+(privacy || 'no-privacy-setting')+'): '+caption);
@@ -15445,13 +15456,14 @@ function do_post_screenshot(data, filename, player_caption, privacy, reason, cal
         return true;
     }
 
-    return call_with_facebook_permissions('publish_actions', (function (_data, _filename, _caption, _privacy, _reason, _cb) { return function() {
+    return call_with_facebook_permissions('publish_actions', (function (_data, _filename, _caption, _privacy, _reason, _launch_cb, _cb) { return function() {
+        if(_launch_cb) { _launch_cb(); }
         var metric_props = {'sum': player.get_denormalized_summary_props('brief'),
                             'facebook_id': spin_facebook_user,
                             'privacy': _privacy,
                             'reason': _reason};
         FBUploadPhoto.upload(_data, _filename, _caption, _privacy, true, _cb, metric_props);
-    }; })(data, filename, caption, privacy, reason, cb));
+    }; })(data, filename, caption, privacy, reason, launch_callback, cb));
 }
 
 function invoke_gift_prompt_dialog() {
