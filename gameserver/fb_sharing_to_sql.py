@@ -21,6 +21,7 @@ def fb_sharing_schema(sql_util): return {
               [('facebook_id', 'VARCHAR(128)'),
                ('method', 'VARCHAR(128)'),
                ('post_id', 'VARCHAR(128)'),
+               ('privacy', 'VARCHAR(32)'),
                ('caption', 'VARCHAR(255)'),
                ],
     'indices': {'by_time': {'keys': [('time','ASC')]}}
@@ -93,7 +94,7 @@ if __name__ == '__main__':
                        ('user_id',row['user_id']),
                        ('event_name',row['event_name'])] + \
                        sql_util.parse_brief_summary(row['sum'])
-            for FIELD in ('facebook_id','method','post_id','caption'):
+            for FIELD in ('facebook_id','method','post_id','privacy','caption'):
                 if FIELD in row:
                     keyvals.append((FIELD, row[FIELD]))
 

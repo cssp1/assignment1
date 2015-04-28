@@ -15331,7 +15331,7 @@ function invoke_post_screenshot_dialog(data, filename, reason, caption_prefix) {
     dialog.user_data['image_filename'] = filename;
     dialog.user_data['reason'] = reason;
     dialog.user_data['caption_prefix'] = caption_prefix;
-
+    dialog.user_data['privacy'] = player.preferences['fb_post_privacy'] || FBUploadPhoto.Privacy.EVERYONE;
     install_child_dialog(dialog);
     dialog.auto_center();
     dialog.modal = true;
@@ -15378,7 +15378,7 @@ function invoke_post_screenshot_dialog(data, filename, reason, caption_prefix) {
             var caption = caption_list.join(' - ');
 
             if(do_post_screenshot(dialog.user_data['image_data'], dialog.user_data['image_filename'],
-                                  caption, dialog.user_data['reason'],
+                                  caption, dialog.user_data['privacy'], dialog.user_data['reason'],
                                   (function (_dialog) { return function(success) {
                                       _dialog.widgets['ok_button'].state = 'normal';
                                       _dialog.widgets['ok_button'].str = _dialog.data['widgets']['ok_button']['ui_name'];
@@ -15392,18 +15392,39 @@ function invoke_post_screenshot_dialog(data, filename, reason, caption_prefix) {
             }
     };
 
+    post_screenshot_dialog_update_privacy(dialog, dialog.user_data['privacy']);
     SPUI.set_keyboard_focus(dialog.widgets['caption_input']);
+}
+
+function post_screenshot_dialog_update_privacy(dialog, new_setting) {
+    if(dialog.user_data['privacy'] !== new_setting) {
+        console.log("HERE "+new_setting);
+        player.preferences['fb_post_privacy'] = new_setting;
+        send_to_server.func(["UPDATE_PREFERENCES", player.preferences]);
+        dialog.user_data['privacy'] = new_setting;
+    }
+
+    var priv = {'EVERYONE': FBUploadPhoto.Privacy.EVERYONE,
+                'ALL_FRIENDS': FBUploadPhoto.Privacy.ALL_FRIENDS,
+                'SELF': FBUploadPhoto.Privacy.SELF};
+    goog.object.forEach(priv, function(value, name) {
+        dialog.widgets['privacy_'+name].onclick = (function (_value) { return function(w) {
+            post_screenshot_dialog_update_privacy(w.parent, _value);
+        }; })(value);
+        dialog.widgets['privacy_'+name].state = (dialog.user_data['privacy'] === value ? 'active' : 'normal');
+    });
 }
 
 /** Actually perform the upload. Request Facebook publish permission if necessary.
     @param {string} data
     @param {string} filename
     @param {string|null} player_caption
+    @param {FBUploadPhoto.Privacy|null} privacy
     @param {string} reason
     @param {function(boolean)} callback - with success as the parameter
     @return {boolean} if the call was synchronous
 */
-function do_post_screenshot(data, filename, player_caption, reason, callback) {
+function do_post_screenshot(data, filename, player_caption, privacy, reason, callback) {
     if(!player.get_any_abtest_value('enable_post_screenshot', gamedata['client']['enable_post_screenshot'])) { throw Error('enable_post_screenshot needs to be turned on'); }
     if(spin_frame_platform != 'fb' || !FBUploadPhoto.supported()) { throw Error('unsupported'); }
     if(!gamedata['virals']['post_screenshot'] || !gamedata['strings']['post_screenshot_success']) { throw Error('missing post_screenshot viral or strings entry'); }
@@ -15420,17 +15441,18 @@ function do_post_screenshot(data, filename, player_caption, reason, callback) {
     }; })(callback);
 
     if(!spin_facebook_enabled) {
-        console.log('do_post_screenshot: '+caption);
+        console.log('do_post_screenshot ('+(privacy || 'no-privacy-setting')+'): '+caption);
         cb(true);
         return true;
     }
 
-    return call_with_facebook_permissions('publish_actions', (function (_data, _filename, _caption, _reason, _cb) { return function() {
+    return call_with_facebook_permissions('publish_actions', (function (_data, _filename, _caption, _privacy, _reason, _cb) { return function() {
         var metric_props = {'sum': player.get_denormalized_summary_props('brief'),
                             'facebook_id': spin_facebook_user,
+                            'privacy': _privacy,
                             'reason': _reason};
-        FBUploadPhoto.upload(_data, _filename, _caption, true, _cb, metric_props);
-    }; })(data, filename, caption, reason, cb));
+        FBUploadPhoto.upload(_data, _filename, _caption, _privacy, true, _cb, metric_props);
+    }; })(data, filename, caption, privacy, reason, cb));
 }
 
 function invoke_gift_prompt_dialog() {

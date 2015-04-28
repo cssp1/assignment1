@@ -23,6 +23,14 @@ FBUploadPhoto.supported = function() {
         (typeof('Uint8Array') !== 'undefined');
 };
 
+/** @enum {string} */
+FBUploadPhoto.Privacy = {
+    SELF: 'SELF',
+    ALL_FRIENDS: 'ALL_FRIENDS',
+    FRIENDS_OF_FRIENDS: 'FRIENDS_OF_FRIENDS',
+    EVERYONE: 'EVERYONE'
+};
+
 /** Convert base64/URLEncoded data component to a Blob
     @param {string} dataURI
     @return {!Blob} */
@@ -51,14 +59,15 @@ FBUploadPhoto.dataURItoBlob = function(dataURI) {
  Example: upload(canvas.toDataURL('image/jpeg'), 'SCREENSHOT.jpg', 'My Caption', true, 'player_statistics', null)
  @param {string} dataURI canvas.toDataURL('image/jpeg')
  @param {string} ui_filename 'SCREENSHOT.jpg'
- @param {boolean} post_story
  @param {string|null} caption
+ @param {FBUploadPhoto.Privacy|null} privacy
+ @param {boolean} post_story
  @param {function(boolean)|null} callback
  @param {!Object} metric_props
  @suppress {reportUnknownTypes,checkTypes} - Closure doesn't deal with the nested callbacks well
  Also, Closure's exten definition for append() is missing the third argument
 */
-FBUploadPhoto.upload = function(dataURI, ui_filename, caption, post_story, callback, metric_props) {
+FBUploadPhoto.upload = function(dataURI, ui_filename, caption, privacy, post_story, callback, metric_props) {
     var auth_token = spin_facebook_oauth_token;
     var url = SPFB.versioned_graph_endpoint('photos', spin_facebook_user+'/photos?access_token='+auth_token);
     var img_blob = FBUploadPhoto.dataURItoBlob(dataURI);
@@ -72,6 +81,9 @@ FBUploadPhoto.upload = function(dataURI, ui_filename, caption, post_story, callb
     }
     if(caption) {
         fd.append('caption', caption);
+    }
+    if(privacy) {
+        fd.append('privacy', JSON.stringify({'value': privacy}));
     }
 
     var props = goog.object.clone(metric_props);
