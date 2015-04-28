@@ -9969,6 +9969,7 @@ SPINPUNCHGAME.init = function() {
     if(spin_loading_screen_mode == 'canvas') {
         // start downloading the splash screen before GameArt init
         loading_screen_image = new Image();
+        loading_screen_image.crossOrigin = 'Anonymous';
         loading_screen_image.src = GameArt.art_url(spin_loading_screen_data, false);
     }
 
@@ -33983,6 +33984,7 @@ function daily_tip_pageable_show_tip(dialog, idx) {
     var image_name = ('image' in tip ? tip['image'] : gamedata['game_id']+'_pageable_generic.jpg');
     var image_url = GameArt.art_url('art/daily_tips/'+image_name, false);
     var img = new Image();
+    img.crossOrigin = 'Anonymous';
     img.src = image_url;
     dialog.widgets['picture'].raw_image = img;
 
@@ -34134,6 +34136,7 @@ function invoke_daily_tip(tipname, skip_notification_queue) {
             }
         };
     })(complete_cb, skip_notification_queue || false);
+    img.crossOrigin = 'Anonymous';
     img.src = GameArt.art_url('art/daily_tips/'+tip['image'], false);
 }
 

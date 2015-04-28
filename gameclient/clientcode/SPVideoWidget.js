@@ -57,6 +57,7 @@ SPVideoWidget.init = function(video_url, onclose) {
     }
 
     SPVideoWidget.close_button = document.createElement('img');
+    SPVideoWidget.close_button.crossOrigin = 'Anonymous';
     SPVideoWidget.close_button.src = GameArt.art_url(gamedata['art']['close_button']['states']['normal']['images'][0], false);
     SPVideoWidget.close_button.style.position = 'absolute';
     SPVideoWidget.close_button.style.right = '1px';

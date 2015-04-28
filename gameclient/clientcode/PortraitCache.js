@@ -15,6 +15,7 @@ PortraitCache.images = {};
 PortraitCache.get_raw_image = function(url) {
     if(!(url in PortraitCache.images)) {
         var image = new Image();
+        image.crossOrigin = 'Anonymous';
         image.src = url;
         PortraitCache.images[url] = image;
     }
