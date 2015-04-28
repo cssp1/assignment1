@@ -812,6 +812,9 @@
     "chat_ungag_success": { "ui_title": "User Unmuted",
                             "ui_description": "User ID %d (%s) has been unmuted." },
 
+    "post_screenshot_success": { "ui_title": "Screenshot Posted!",
+                                 "ui_description": "Visit your Facebook profile to see the post." },
+
     "skip_tutorial_confirm": { "ui_title": "Skip Tutorial Missions?",
                                "ui_button": "Skip",
                                "ui_description": "To resume, click the \"?\" button at the top of your screen." },
