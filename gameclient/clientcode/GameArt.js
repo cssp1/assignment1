@@ -927,7 +927,7 @@ GameArt.Image = function(filename, origin, wh, load_priority, delay_load) {
         // create new download request
         this.img = new Image();
         // this.img.setAttribute('crossOrigin','anonymous'); // ???
-        this.img.crossOrigin = ''; // necessary to allow getImageData to work via CORS on Firefox and Chrome
+        this.img.crossOrigin = 'Anonymous'; // necessary to allow getImageData to work via CORS on Firefox and Chrome
 
         // note: img.src is set by GameArt.init after all the Assets are set up
 
