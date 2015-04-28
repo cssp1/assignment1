@@ -15398,7 +15398,6 @@ function invoke_post_screenshot_dialog(data, filename, reason, caption_prefix) {
 
 function post_screenshot_dialog_update_privacy(dialog, new_setting) {
     if(dialog.user_data['privacy'] !== new_setting) {
-        console.log("HERE "+new_setting);
         player.preferences['fb_post_privacy'] = new_setting;
         send_to_server.func(["UPDATE_PREFERENCES", player.preferences]);
         dialog.user_data['privacy'] = new_setting;
