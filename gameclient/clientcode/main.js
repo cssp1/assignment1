@@ -7479,8 +7479,12 @@ function update_resources(data, init) {
     }
     player.resource_state["gamebucks"] = data["gamebucks"];
     player.resource_state["facebook_credits"] = data["facebook_credits"];
-    player.resource_state["player_level"] = data["player_level"];
     player.resource_state["protection_end_time"] = data["protection_end_time"];
+
+    if(data["player_level"] !== player.resource_state["player_level"]) {
+        player.resource_state["player_level"] = data["player_level"];
+        player.claim_achievements(); // check for level-up achievements
+    }
 
     if(init && update_resources_is_first_call) {
         update_resources_is_first_call = false;
@@ -15540,8 +15544,6 @@ function invoke_level_up_dialog() {
     send_to_server.func(["LEVEL_ME_UP", next_level]);
     SPFB.AppEvents.logEvent('ACHIEVED_LEVEL', null, {'LEVEL': next_level.toString()});
 
-    player.claim_achievements();
-
     if('level_up_notify' in gamedata['player_xp'] &&
        next_level < gamedata['player_xp']['level_up_notify'].length &&
        !gamedata['player_xp']['level_up_notify'][next_level]) {
@@ -15566,6 +15568,13 @@ function invoke_level_up_dialog() {
     // display reward consequent
     var level_up_rewards = player.get_any_abtest_value('level_up_reward', gamedata['player_xp']['level_up_reward'] || []);
     var reward_cons = level_up_rewards[Math.min(next_level, level_up_rewards.length-1)];
+
+    if(reward_cons) {
+        // awkward parsing for AND [HEAL_ALL_UNITS, something_else_hidden, ...]
+        if(reward_cons['consequent'] == 'AND') {
+            reward_cons = reward_cons['subconsequents'][0];
+        }
+    }
 
     if(reward_cons && reward_cons['consequent'] == 'GIVE_LOOT') {
         dialog.widgets['your_level_bonus'].str = dialog.data['widgets']['your_level_bonus']['ui_name_messages'];
