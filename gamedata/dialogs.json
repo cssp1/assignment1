@@ -7844,7 +7844,7 @@
 
             "button": { "kind": "ActionButton", "xy": [13,4], "dimensions": [134,28], "text_offset": [0,1],
                         "bg_image": "action_button_resizable", "bg_image_resizable": 1,
-                        "text_color": [0,0,0,1], "text_size": 13, "text_style": "bold", "ui_name": "Button 0",
+                        "text_size": 13, "text_style": "bold",
                         "ui_tooltip": "", "tooltip_delay": 0, "array": [1,4], "array_offset": [0,36]  }
         }
     },
