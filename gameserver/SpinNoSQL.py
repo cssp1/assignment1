@@ -1262,7 +1262,7 @@ class NoSQLClient (object):
             self._table(self.region_table_name(region, 'map')).ensure_index('base_landlord_id') # base_id is primary key for this
             self._table(self.region_table_name(region, 'map')).ensure_index('base_map_loc_flat') # used to speed up occupancy checks
 
-            self._table(self.region_table_name(region, 'map_deletions')).ensure_index('millitime', expireAfterSeconds=12*3600) # should be about as long as max session length
+            self._table(self.region_table_name(region, 'map_deletions')).ensure_index('millitime', expireAfterSeconds=3*3600) # should be about as long as max session length
 
 
             self._table(self.region_table_name(region, 'mobile')).ensure_index('owner_id') # ([('owner_id',pymongo.ASCENDING), ('squad_id',pymongo.ASCENDING)])
