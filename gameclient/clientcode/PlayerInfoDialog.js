@@ -531,9 +531,11 @@ PlayerInfoDialog.invoke_profile_tab = function(parent) {
         var spell = gamedata['spells']['CHANGE_TITLE'];
         if(!('show_if' in spell) || read_predicate(spell['show_if']).is_satisfied(player, null)) {
             var req = read_predicate(spell['requires'] || {'predicate':'ALWAYS_TRUE'});
+            dialog.widgets['change_title_button'].show = true;
+            dialog.widgets['change_title_button'].str = spell['ui_name'];
             if(req.is_satisfied(player, null)) {
-                dialog.widgets['change_title_button'].show = true;
-                dialog.widgets['change_title_button'].str = spell['ui_name'];
+                dialog.widgets['change_title_button'].state = 'normal';
+                dialog.widgets['change_title_button'].tooltip.str = null;
                 dialog.widgets['change_title_button'].onclick = function(w) {
                     var parent = w.parent.parent;
                     invoke_change_title_dialog(
@@ -552,8 +554,13 @@ PlayerInfoDialog.invoke_profile_tab = function(parent) {
                     );
                 };
             } else {
-                dialog.widgets['change_title_button'].show = false;
+                dialog.widgets['change_title_button'].state = 'disabled_clickable';
+                dialog.widgets['change_title_button'].onclick = get_requirements_help(req);
+                dialog.widgets['change_title_button'].tooltip.str = req.ui_describe(player);
+                dialog.widgets['change_title_button'].tooltip.text_color = SPUI.error_text_color;
             }
+        } else {
+            dialog.widgets['change_title_button'].show = false;
         }
     }
 

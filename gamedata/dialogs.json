@@ -5858,7 +5858,7 @@
                                   "tooltip_delay": 0, "ui_tooltip": "Choose Call Sign", "show": 0 },
 
             "change_title_button": { "kind": "ActionButton", "xy": [58,132], "dimensions": [120,22], "bg_image_resizable": 1, "text_size": 13, "text_style": "bold",
-                                     "bg_image": "action_button_resizable", "show": 0 },
+                                     "bg_image": "action_button_resizable", "ui_tooltip": "", "tooltip_delay": 0, "show": 0 },
 
             "friend_icon": { "kind": "FriendIcon", "xy": [96, 160], "dimensions": [50,73], "state": "normal" },
 
