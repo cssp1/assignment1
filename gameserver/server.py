@@ -12608,11 +12608,11 @@ class CONTROLAPI(resource.Resource):
         # note: ignore our own broadcasts
         if server != spin_server_name:
             self.gameapi.broadcast_map_update(region_id, base_id, data, originator, send_to_net = False)
-    def handle_broadcast_map_attack(self, request, region_id = None, base_id = None,
+    def handle_broadcast_map_attack(self, request, msg = None, region_id = None, base_id = None,
                                     attacker_id = None, defender_id = None, summary = None, pcache_info = None, server = None):
         # note: ignore our own broadcasts
         if server != spin_server_name:
-            self.gameapi.broadcast_map_attack(region_id, base_id, attacker_id, defender_id, summary, pcache_info, send_to_net = False)
+            self.gameapi.broadcast_map_attack(region_id, base_id, attacker_id, defender_id, summary, pcache_info, msg = msg, send_to_net = False)
     def handle_broadcast_turf_update(self, request, region_id = None, data = None):
         for session in session_table.itervalues():
             if not session.logout_in_progress:
@@ -25129,9 +25129,10 @@ class GAMEAPI(resource.Resource):
                                                          'server': spin_server_name, 'originator': originator },
                                                }, '', log = False)
 
-    def broadcast_map_attack(self, region_id, base_id, attacker_id, defender_id, summary, pcache_info, send_to_net = True):
-        upd = ["REGION_MAP_ATTACK_COMPLETE" if summary else "REGION_MAP_ATTACK_START",
-               region_id, base_id, attacker_id, defender_id, summary, pcache_info]
+    def broadcast_map_attack(self, region_id, base_id, attacker_id, defender_id, summary, pcache_info, send_to_net = True, msg = None):
+        if msg is None:
+            msg = "REGION_MAP_ATTACK_COMPLETE" if summary else "REGION_MAP_ATTACK_START" # legacy compatibility
+        upd = [msg, region_id, base_id, attacker_id, defender_id, summary, pcache_info]
         for session in session_table.itervalues():
             if session.player.user_id == defender_id and session.player.home_region == region_id and attacker_id != session.player.user_id:
                 session.send_deferred_message([upd], flush_now = True)
