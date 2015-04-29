@@ -1523,10 +1523,29 @@ function HasTitlePredicate(data) {
 }
 goog.inherits(HasTitlePredicate, Predicate);
 HasTitlePredicate.prototype.is_satisfied = function(player, qdata) {
-    return (player.unlocked_titles && (this.name in player.unlocked_titles));
+    var show_if = gamedata['titles'][this.name]['show_if'];
+    if(show_if && !read_predicate(show_if).is_satisfied(player, qdata)) { return false; }
+    var requires = gamedata['titles'][this.name]['requires'];
+    if(requires && !read_predicate(requires).is_satisfied(player, qdata)) { return false; }
+    return true;
 };
 HasTitlePredicate.prototype.do_ui_describe = function(player) {
     return new PredicateUIDescription(gamedata['strings']['predicates'][this.kind]['ui_name'].replace('%s', gamedata['titles'][this.name]['ui_name']));
+};
+
+/** @constructor
+  * @extends Predicate */
+function UsingTitlePredicate(data) {
+    goog.base(this, data);
+    this.name = data['name'] || null;
+}
+goog.inherits(UsingTitlePredicate, Predicate);
+UsingTitlePredicate.prototype.is_satisfied = function(player, qdata) {
+    if(this.name === null) { // true if player is using any valid title
+        return player.title && (player.title in gamedata['titles']);
+    } else {
+        return player.title === this.name;
+    }
 };
 
 /** @constructor
@@ -1734,6 +1753,8 @@ function read_predicate(data) {
         return new HasAliasPredicate(data);
     } else if(kind === 'HAS_TITLE') {
         return new HasTitlePredicate(data);
+    } else if(kind === 'USING_TITLE') {
+        return new UsingTitlePredicate(data);
     } else if(kind === 'PLAYER_LEVEL') {
         return new PlayerLevelPredicate(data);
     } else if(kind === 'BASE_SIZE') {

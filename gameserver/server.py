@@ -2146,7 +2146,7 @@ class PlayerTable:
               ('read_only', None, None),
               ('alias', None, None),
               ('title', None, None), # string value of current title to use
-              ('unlocked_titles', None, None), # dictionary of unlocked titles
+              # ('unlocked_titles', None, None), # dictionary of unlocked titles
               ('facebook_permissions', None, None), # needs to be in player rather than user because it is app-specific
               ('last_fb_notification_time', None, None),
               ('fbpayments_inflight', None, None),
@@ -4266,6 +4266,28 @@ class Session(object):
 
         return power_factor
 
+    def change_player_title(self, new_title_name, retmsg, force = False, chat_announce = True):
+        new_title_data = self.player.get_abtest_title(new_title_name)
+        assert new_title_data
+        if new_title_name != gamedata['default_title']:
+            # make sure it is unlocked
+            if (not self.player.is_cheater) and (not force):
+                for PRED in ('show_if', 'requires'):
+                    if (PRED in new_title_data) and (not Predicates.read_predicate(new_title_data[PRED]).is_satisfied(self.player, None)):
+                        retmsg.append(["ERROR", "REQUIREMENTS_NOT_SATISFIED", new_title_data[PRED]])
+                        return False
+
+        if self.player.title != new_title_name:
+            old_name = self.user.get_ui_name(self.player)
+            self.player.title = new_title_name
+            self.deferred_player_name_update = True
+            if chat_announce and self.alliance_chat_channel:
+                self.do_chat_send(self.alliance_chat_channel,
+                                  'I have a new title!',
+                                  bypass_gag = True, props = {'type':'changed_title',
+                                                              'old_name': old_name})
+            gamesite.gameapi.send_player_cache_update(self, 'change_title')
+        return True
 
 # This holds the state of an ongoing asynchronous session change request
 # NOTE: session changes back to player's home base bypass this and just use
@@ -6708,7 +6730,7 @@ class Player(AbstractPlayer):
 
         self.alias = None
         self.title = None
-        self.unlocked_titles = None # dictionary of {'title':1}
+        # self.unlocked_titles = None # dictionary of {'title':1}
 
         # dictionary mapping tech name to tech level e.g. { "tank_production": 1 }
         self.tech = {}
@@ -8162,6 +8184,8 @@ class Player(AbstractPlayer):
         return gamedata['regions'].get(name, None)
     def get_abtest_ai_base(self, user_id):
         return gamedata['ai_bases']['bases'].get(str(user_id), None)
+    def get_abtest_title(self, name):
+        return gamedata['titles'].get(name, None)
 
     # check for ANY active abtest group we're in that contains a value named 'key'
     # but, do NOT apply "default_group" behavior
@@ -17022,20 +17046,8 @@ class GAMEAPI(resource.Resource):
             self.send_player_cache_update(session, 'change_alias')
 
         elif spell.get('code') == 'change_title':
-            new_title = spellarg[0]
-            assert new_title in gamedata['titles']
-            assert (session.player.unlocked_titles and (new_title in session.player.unlocked_titles)) or \
-                   (new_title == gamedata['default_title'])
-            if session.player.title != new_title:
-                old_name = session.user.get_ui_name(session.player)
-                session.player.title = new_title
-                session.deferred_player_name_update = True
-                if session.alliance_chat_channel:
-                    session.do_chat_send(session.alliance_chat_channel,
-                                         'I have a new title!',
-                                         bypass_gag = True, props = {'type':'changed_title',
-                                                                     'old_name': old_name})
-                self.send_player_cache_update(session, 'change_title')
+            new_title_name = spellarg[0]
+            return session.change_player_title(new_title_name, retmsg, force = False)
 
         else:
             raise Exception('unknown spell '+spellname)
@@ -20735,7 +20747,7 @@ class GAMEAPI(resource.Resource):
             session.deferred_player_name_update = False
             retmsg.append(["PLAYER_UI_NAME_UPDATE", session.user.get_ui_name(session.player)])
             retmsg.append(["PLAYER_ALIAS_UPDATE", session.player.alias])
-            retmsg.append(["PLAYER_TITLES_UPDATE", session.player.title, session.player.unlocked_titles])
+            retmsg.append(["PLAYER_TITLES_UPDATE", session.player.title])
             retmsg.append(["PLAYER_CACHE_UPDATE", [self.get_player_cache_props(session.user, session.player)]])
 
         if gamesite.raw_log:
@@ -21379,7 +21391,7 @@ class GAMEAPI(resource.Resource):
                        ])
         retmsg.append(["PLAYER_UI_NAME_UPDATE", session.user.get_ui_name(session.player)])
         retmsg.append(["PLAYER_ALIAS_UPDATE", session.player.alias])
-        retmsg.append(["PLAYER_TITLES_UPDATE", session.player.title, session.player.unlocked_titles])
+        retmsg.append(["PLAYER_TITLES_UPDATE", session.player.title])
 
         if session.user.frame_platform == 'fb':
             retmsg.append(["FACEBOOK_CURRENCY_UPDATE", session.user.facebook_currency])

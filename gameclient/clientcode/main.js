@@ -5459,8 +5459,6 @@ player.ui_name = '(Unknown)';
 player.alias = null;
 /** @type {string|null} same as on server */
 player.title = null;
-/** @type {Object.<string,?>|null} same as on server */
-player.unlocked_titles = null;
 player.facebook_name = '(Unknown)';
 player.facebook_currency = null;
 player.facebook_permissions = spin_facebook_login_permissions.split(',');
@@ -15541,6 +15539,8 @@ function invoke_level_up_dialog() {
     // just ask the server to level us up asynchronously
     send_to_server.func(["LEVEL_ME_UP", next_level]);
     SPFB.AppEvents.logEvent('ACHIEVED_LEVEL', null, {'LEVEL': next_level.toString()});
+
+    player.claim_achievements();
 
     if('level_up_notify' in gamedata['player_xp'] &&
        next_level < gamedata['player_xp']['level_up_notify'].length &&
@@ -41897,7 +41897,7 @@ function handle_server_message(data) {
         player.alias = data[1];
     } else if(msg == "PLAYER_TITLES_UPDATE") {
         player.title = data[1];
-        player.unlocked_titles = data[2];
+        //player.unlocked_titles = data[2];
     } else if(msg == "PLAYER_CACHE_UPDATE") {
         PlayerCache.update_batch(data[1]);
     } else if(msg == "FACEBOOK_CURRENCY_UPDATE") {

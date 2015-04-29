@@ -1390,7 +1390,7 @@ PREDICATE_TYPES = set(['AND', 'OR', 'NOT', 'ALWAYS_TRUE', 'ALWAYS_FALSE', 'TUTOR
                    'FACEBOOK_LIKES_CLIENT', 'PRICE_REGION', 'COUNTRY', 'COUNTRY_TIER', 'EVENT_TIME', 'ABSOLUTE_TIME', 'TIME_OF_DAY', 'BROWSER_NAME',
                    'BROWSER_OS', 'BROWSER_NAME', 'BROWSER_VERSION', 'SELECTED', 'UI_CLEAR', 'QUEST_CLAIMABLE', 'HOME_BASE', 'HAS_ATTACKED', 'HAS_DEPLOYED',
                    'PRE_DEPLOY_UNITS', 'DIALOG_OPEN', 'FOREMAN_IS_BUSY', 'INVENTORY', 'HAS_ITEM', 'HAS_ITEM_SET', 'HOME_REGION', 'REGION_PROPERTY', 'LADDER_PLAYER',
-                   'MAIL_ATTACHMENTS_WAITING', 'AURA_ACTIVE', 'AURA_INACTIVE', 'AI_INSTANCE_GENERATION', 'USER_ID', 'LOGGED_IN_RECENTLY', 'PVP_AGGRESSED_RECENTLY', 'IS_IN_ALLIANCE', 'FRAME_PLATFORM', 'NEW_BIRTHDAY', 'HAS_ALIAS', 'HAS_TITLE', 'PLAYER_LEVEL',
+                   'MAIL_ATTACHMENTS_WAITING', 'AURA_ACTIVE', 'AURA_INACTIVE', 'AI_INSTANCE_GENERATION', 'USER_ID', 'LOGGED_IN_RECENTLY', 'PVP_AGGRESSED_RECENTLY', 'IS_IN_ALLIANCE', 'FRAME_PLATFORM', 'NEW_BIRTHDAY', 'HAS_ALIAS', 'HAS_TITLE', 'USING_TITLE', 'PLAYER_LEVEL',
                    'PURCHASED_RECENTLY', 'SESSION_LENGTH_TREND', 'ARMY_SIZE',
                    'VIEWING_BASE_DAMAGE', 'VIEWING_BASE_OBJECT_DESTROYED', 'BASE_SIZE'
                    ])
@@ -1535,8 +1535,8 @@ def check_predicate(pred, reason = '', context = None, context_data = None,
     elif pred['predicate'] == 'FACEBOOK_APP_NAMESPACE':
         if 'namespace' not in pred:
             error |= 1; print '%s: %s predicate missing a "namespace"' % (reason, pred['predicate'])
-    elif pred['predicate'] == 'HAS_TITLE':
-        if pred.get('name',None) not in gamedata['titles']:
+    elif pred['predicate'] in ('HAS_TITLE','USING_TITLE'):
+        if ((pred['predicate'] == 'HAS_TITLE') or ('name' in pred)) and (pred['name'] not in gamedata['titles']):
             error |= 1; print '%s: %s predicate name %r not found in gamedata.titles' % (reason, pred['predicate'], pred.get('name'))
     elif pred['predicate'] == 'PLAYER_LEVEL':
         if pred['level'] > len(gamedata['player_xp']['level_xp'])-1:
@@ -1568,7 +1568,7 @@ CONSEQUENT_TYPES = set(['NULL', 'AND', 'RANDOM', 'IF', 'COND', 'LIBRARY',
                         'GIVE_UNITS', 'TAKE_UNITS', 'PRELOAD_ART_ASSET', 'HEAL_ALL_UNITS', 'HEAL_ALL_BUILDINGS',
                         'ENABLE_COMBAT_RESOURCE_BARS', 'ENABLE_DIALOG_COMPLETION', 'INVITE_FRIENDS_PROMPT', 'DISPLAY_DAILY_TIP', 'TAKE_ITEMS',
                         'CLEAR_NOTIFICATIONS', 'DEV_EDIT_MODE', 'GIVE_GAMEBUCKS', 'LOAD_AI_BASE', 'REPAIR_ALL', 'FPS_COUNTER',
-                        'UNLOCK_TITLE', 'CHANGE_TITLE'
+                        'CHANGE_TITLE',
                    ])
 
 def check_consequent(cons, reason = '', context = None, context_data = None):
@@ -1760,7 +1760,7 @@ def check_consequent(cons, reason = '', context = None, context_data = None):
         if ('specname' in cons) and (cons['specname'] not in gamedata['units']):
             error |= 1; print '%s: unit specname "%s" not found' % (reason, cons['specname'])
 
-    elif cons['consequent'] in ('CHANGE_TITLE', 'UNLOCK_TITLE'):
+    elif cons['consequent'] in ('CHANGE_TITLE',):
         if cons['name'] not in gamedata['titles']:
             error |= 1; print '%s: invalid name "%s" not found in gamedata.titles' % (reason, cons['name'])
 

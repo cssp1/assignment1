@@ -705,7 +705,21 @@ class HasTitlePredicate(Predicate):
         Predicate.__init__(self, data)
         self.name = data['name']
     def is_satisfied(self, player, qdata):
-        return player.unlocked_titles and (self.name in player.unlocked_titles)
+        title = player.get_abtest_title(self.name)
+        for PRED in ('show_if','requires'):
+            if PRED in title and not read_predicate(title[PRED]).is_satisfied(player, qdata):
+                return False
+        return True
+
+class UsingTitlePredicate(Predicate):
+    def __init__(self, data):
+        Predicate.__init__(self, data)
+        self.name = data.get('name',None)
+    def is_satisfied(self, player, qdata):
+        if self.name is None:
+            return (player.title and player.get_abtest_title(player.title))
+        else:
+            return player.title == self.name
 
 class PlayerLevelPredicate(Predicate):
     def __init__(self, data):
@@ -911,6 +925,8 @@ def read_predicate(data):
         return NewBirthdayPredicate(data)
     elif kind == 'HAS_TITLE':
         return HasTitlePredicate(data)
+    elif kind == 'USING_TITLE':
+        return UsingTitlePredicate(data)
     elif kind == 'HAS_ALIAS':
         return HasAliasPredicate(data)
     elif kind == 'PLAYER_LEVEL':
