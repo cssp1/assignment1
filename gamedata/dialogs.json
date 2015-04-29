@@ -811,6 +811,7 @@
             "player_bg": { "kind": "StaticImage", "xy": [-5,-1], "dimensions": [209,59], "asset": "desktop_player" },
 
             "player_name": { "kind": "ActionButton", "xy": [47,9], "dimensions": [153,18], "ui_name": "Player",
+                             "clip_to": [47, 9, 153, 23],
                              "drop_shadow": 1,
                              "text_hjustify": "left", "text_size": 13, "text_style": "thick" },
 
@@ -843,7 +844,7 @@
                                 "ui_tooltip": "Click for Player Info", "tooltip_delay": 0, "fixed_tooltip_offset": [10,72]},
             "enemy_bg": { "kind": "StaticImage", "xy": [0,-1], "dimensions": [209,59], "asset": "desktop_player" },
             "enemy_name": { "kind": "ActionButton", "xy": [52,11], "dimensions": [153,18], "ui_name": "Enemy",
-                            "drop_shadow": 1,
+                            "drop_shadow": 1, "clip_to": [52,11,153,23],
                             "text_hjustify": "left", "text_size": 13, "text_style": "thick", "max_len": 20 },
             "enemy_level": { "kind": "TextField", "xy": [52,23], "dimensions": [75,36], "text_offset": [0,10],
                              "ui_name": "Level %d Rival",
@@ -2994,7 +2995,7 @@
             "level": { "kind": "TextField", "xy": [223,5], "dimensions": [17, 17], "text_size": 13, "text_hjustify": "center",
                        "text_color":[0.8,0.8,0.8,1], "ui_name": "L%d" },
             "name": { "kind": "TextField", "xy": [250,5], "dimensions": [250, 17], "text_size": 17, "text_hjustify": "left", "text_style": "bold",
-                      "drop_shadow":1, "clip_to": [250,5,250,21] },
+                      "drop_shadow":1, "clip_to": [250,5,215,21] },
 
             "info": { "kind": "TextField",
                       //"xy": [170,25], "dimensions": [250, 17], "text_size": 13, "text_hjustify": "left",
@@ -5852,7 +5853,7 @@
                             "text_color": [0.8,0.8,0.8,1],
                             "text_hjustify": "left", "ui_name": "Name:", "ui_name_alias": "Call Sign:" },
             "name": { "kind": "TextField", "xy": [57,98], "dimensions": [275, 28], "text_size": 24, "text_style": "bold",
-                      "text_hjustify": "left", "ui_name": "Loading..." },
+                      "text_hjustify": "left", "ui_name": "Loading...", "clip_to": [57, 98, 460, 33] },
 
             "set_alias_button": { "kind": "ActionButton", "xy": [108,75], "dimensions": [24,24], "bg_image": "pencil_button", "push_bg_image": 1,
                                   "tooltip_delay": 0, "ui_tooltip": "Choose Call Sign", "show": 0 },
