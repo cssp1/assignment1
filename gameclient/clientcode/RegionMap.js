@@ -1848,8 +1848,10 @@ RegionMap.RegionMap.prototype.draw_feature = function(feature) {
             squad_id = parseInt(squad_sid,10);
 
             // is this squad guarding a quarry?
-            var f = this.region.find_feature_at_coords(loc);
-            if(f && f['base_type'] == 'quarry') { is_guard = true; }
+            if(!moving) {
+                var f = this.region.find_feature_at_coords(loc);
+                if(f && f['base_type'] == 'quarry') { is_guard = true; }
+            }
 
             //if(feature['base_landlord_id'] != session.user_id) { show_label = false; } // no labels for enemy squads
             if(owned) {

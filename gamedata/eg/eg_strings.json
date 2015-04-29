@@ -432,7 +432,8 @@
 
         "your_squad_is_under_attack": "Your Battalion %basename is under attack by %attacker!",
         "your_squad_was_attacked_victory": "Your Battalion %basename repelled the attack by %attacker!",
-        "your_squad_was_attacked_defeat": "Your Battalion %basename was destroyed by %attacker!"
+        "your_squad_was_attacked_defeat": "Your Battalion %basename was destroyed by %attacker!",
+        "your_squad_was_diverted": "Your Battalion %basename was diverted to home base because its destination was conquered by %attacker"
     },
 
     "inventory": {

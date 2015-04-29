@@ -43756,7 +43756,7 @@ function handle_server_message(data) {
             // ignore updates if we're not on a map
             console.log('ignoring spurious REGION_MAP_UPDATES'); console.log(data[1]);
         }
-    } else if(msg == "REGION_MAP_ATTACK_START" || msg == "REGION_MAP_ATTACK_COMPLETE") {
+    } else if(msg == "REGION_MAP_ATTACK_START" || msg == "REGION_MAP_ATTACK_COMPLETE" || msg == "REGION_MAP_ATTACK_DIVERT") {
         var region_id = data[1], base_id = data[2], attacker_id = data[3], defender_id = data[4], summary = data[5], pcache_data = data[6];
         if(session.region.data && session.region.data['id'] == region_id) {
             var feature = session.region.find_feature_by_id(base_id);
@@ -43765,7 +43765,9 @@ function handle_server_message(data) {
 
                 if(defender_id == session.user_id) {
                     var what_happened;
-                    if(msg == "REGION_MAP_ATTACK_COMPLETE") {
+                    if(msg == "REGION_MAP_ATTACK_DIVERT") {
+                        what_happened = 'was_diverted';
+                    } else if(msg == "REGION_MAP_ATTACK_COMPLETE") {
                         what_happened = 'was_attacked_' + summary['defender_outcome'];
                     } else {
                         what_happened = 'is_under_attack';
