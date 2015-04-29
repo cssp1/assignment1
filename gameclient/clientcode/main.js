@@ -14727,6 +14727,9 @@ function init_dialog_repair_buttons(dialog, base_damage) {
                     var obj = session.cur_objects.objects[id];
                     if(obj.is_building() && obj.is_damaged()) {
                         send_to_server.func(["CAST_SPELL", obj.id, "SPEEDUP_FOR_FREE"]);
+                        if(obj.is_destroyed()) { // reblock
+                            obj.block_map(1, 'REPAIR/SPEEDUP_FOR_FREE predict');
+                        }
                         obj.hp = obj.max_hp; obj.repair_finish_time = -1; // client-side predict
                         obj.update_all_actions(server_time);
                     }
@@ -14746,6 +14749,9 @@ function init_dialog_repair_buttons(dialog, base_damage) {
                                                            for(var id in session.cur_objects.objects) {
                                                                var obj = session.cur_objects.objects[id];
                                                                if(obj.is_building() && obj.is_damaged()) {
+                                                                   if(obj.is_destroyed()) { // reblock
+                                                                       obj.block_map(1, 'REPAIR_ALL_FOR_MONEY predict');
+                                                                   }
                                                                    obj.hp = obj.max_hp; obj.repair_finish_time = -1; // client-side predict
                                                                    obj.update_all_actions(server_time);
                                                                }
