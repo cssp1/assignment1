@@ -1262,7 +1262,7 @@ class NoSQLClient (object):
             self._table(self.region_table_name(region, 'map')).ensure_index('base_landlord_id') # base_id is primary key for this
             self._table(self.region_table_name(region, 'map')).ensure_index('base_map_loc_flat') # used to speed up occupancy checks
 
-            self._table(self.region_table_name(region, 'map_deletions')).ensure_index('millitime', expireAfterSeconds=3*3600) # should be about as long as max session length
+            self._table(self.region_table_name(region, 'map_deletions')).ensure_index('millitime', expireAfterSeconds=12*3600) # should be about as long as max session length
 
 
             self._table(self.region_table_name(region, 'mobile')).ensure_index('owner_id') # ([('owner_id',pymongo.ASCENDING), ('squad_id',pymongo.ASCENDING)])
@@ -1372,7 +1372,7 @@ class NoSQLClient (object):
         ret = [self._decode_map_feature(x) for x in self.region_table(region, 'map').find({'last_mtime':{'$gte':updated_since}})]
         ret += [{'base_id':x['_id'],
                  'DELETED':1} for x in \
-                self.region_table(region, 'map_deletions').find({'millitime':{'$gte':datetime.datetime.fromtimestamp(float(updated_since))}},
+                self.region_table(region, 'map_deletions').find({'millitime':{'$gte':datetime.datetime.utcfromtimestamp(float(updated_since))}},
                                                                 {'_id':1})]
         return ret
 
@@ -1384,7 +1384,7 @@ class NoSQLClient (object):
     def _drop_map_feature(self, region, base_id):
         self.region_table(region, 'map').remove({'_id':base_id})
         # time field must be converted for the expireAfterSeconds TTL thing to work
-        self.region_table(region, 'map_deletions').save({'_id':base_id,'millitime':datetime.datetime.fromtimestamp(float(self.time))})
+        self.region_table(region, 'map_deletions').save({'_id':base_id,'millitime':datetime.datetime.utcfromtimestamp(float(self.time))})
 
     def update_map_feature(self, region, base_id, props, originator=None, do_hook = True, reason=''):
         ret = self.instrument('update_map_feature(%s)'%reason, self._update_map_feature, (region,base_id,props))
