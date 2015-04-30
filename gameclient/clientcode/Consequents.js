@@ -640,6 +640,17 @@ MetricEventConsequent.prototype.execute = function(state) {
 
 /** @constructor
   * @extends Consequent */
+function ClearUIConsequent(data) {
+    goog.base(this, data);
+}
+goog.inherits(ClearUIConsequent, Consequent);
+ClearUIConsequent.prototype.execute = function(state) {
+    change_selection_ui(null); // get rid of any existing GUI
+    player.quest_tracked_dirty = true; // update quest tips
+};
+
+/** @constructor
+  * @extends Consequent */
 function ClearNotificationsConsequent(data) {
     goog.base(this, data);
 }
@@ -732,6 +743,7 @@ function read_consequent(data) {
     else if(kind === 'ENABLE_DIALOG_COMPLETION') { return new EnableDialogCompletionConsequent(data); }
     else if(kind === 'PRELOAD_ART_ASSET') { return new PreloadArtAssetConsequent(data); }
     else if(kind === 'METRIC_EVENT') { return new MetricEventConsequent(data); }
+    else if(kind === 'CLEAR_UI') { return new ClearUIConsequent(data); }
     else if(kind === 'CLEAR_NOTIFICATIONS') { return new ClearNotificationsConsequent(data); }
     else if(kind === 'DEV_EDIT_MODE') { return new DevEditModeConsequent(data); }
     else if(kind === 'GIVE_GAMEBUCKS') { return new GiveGamebucksConsequent(data); }

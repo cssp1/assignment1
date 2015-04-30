@@ -1567,7 +1567,7 @@ CONSEQUENT_TYPES = set(['NULL', 'AND', 'RANDOM', 'IF', 'COND', 'LIBRARY',
                         'OPEN_URL', 'FACEBOOK_PERMISSIONS_PROMPT', 'DAILY_TIP_UNDERSTOOD', 'RANDOM', 'FORCE_SCROLL',
                         'GIVE_UNITS', 'TAKE_UNITS', 'PRELOAD_ART_ASSET', 'HEAL_ALL_UNITS', 'HEAL_ALL_BUILDINGS',
                         'ENABLE_COMBAT_RESOURCE_BARS', 'ENABLE_DIALOG_COMPLETION', 'INVITE_FRIENDS_PROMPT', 'DISPLAY_DAILY_TIP', 'TAKE_ITEMS',
-                        'CLEAR_NOTIFICATIONS', 'DEV_EDIT_MODE', 'GIVE_GAMEBUCKS', 'LOAD_AI_BASE', 'REPAIR_ALL', 'FPS_COUNTER',
+                        'CLEAR_UI', 'CLEAR_NOTIFICATIONS', 'DEV_EDIT_MODE', 'GIVE_GAMEBUCKS', 'LOAD_AI_BASE', 'REPAIR_ALL', 'FPS_COUNTER',
                         'CHANGE_TITLE',
                    ])
 
@@ -1770,7 +1770,7 @@ def check_consequent(cons, reason = '', context = None, context_data = None):
                                 'TUTORIAL_ARROW', 'INVOKE_BUY_GAMEBUCKS_DIALOG', 'INVOKE_CHANGE_REGION_DIALOG',
                                 'FACEBOOK_PERMISSIONS_PROMPT', 'FORCE_SCROLL', 'HEAL_ALL_UNITS', 'HEAL_ALL_BUILDINGS',
                                 'ENABLE_COMBAT_RESOURCE_BARS', 'ENABLE_DIALOG_COMPLETION', 'INVITE_FRIENDS_PROMPT', 'TAKE_ITEMS',
-                                'CLEAR_NOTIFICATIONS', 'DEV_EDIT_MODE', 'GIVE_GAMEBUCKS', 'LOAD_AI_BASE', 'REPAIR_ALL', 'FPS_COUNTER',
+                                'CLEAR_UI', 'CLEAR_NOTIFICATIONS', 'DEV_EDIT_MODE', 'GIVE_GAMEBUCKS', 'LOAD_AI_BASE', 'REPAIR_ALL', 'FPS_COUNTER',
                                 'NULL']:
         # we recognize these ones, but they don't have detailed sanity checks written for them yet
         pass
