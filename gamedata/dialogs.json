@@ -1513,7 +1513,7 @@
         "widgets": {
             "sunken": {"kind": "StaticImage", "xy":[0,0], "dimensions":[180,231], "bg_image_resizable": 1, "asset": "dialog_sunken_resizable" },
             "topbar": { "kind": "SolidRect", "xy": [2,2], "dimensions":[176,30], "color": [0,0,0,0.5] },
-            "name": { "kind": "TextField", "xy": [2,2], "dimensions": [176,30], "text_size": 15, "text_style": "thick",
+            "name": { "kind": "TextField", "xy": [2,2], "dimensions": [176,30], "text_size": 15, "text_style": "thick", "drop_shadow": 1,
                       "text_hjustify": "center", "text_vjustify": "center" },
 
             "icon": { "kind": "StaticImage", "xy": [15,44], "dimensions": [50,50] },
@@ -1558,7 +1558,7 @@
 
             "sunken": {"kind": "StaticImage", "xy":[0,0], "dimensions":[330,231], "bg_image_resizable": 1, "asset": "dialog_sunken_resizable" },
             "topbar": { "kind": "SolidRect", "xy": [2,2], "dimensions":[326,30], "color": [0,0,0,0.5] },
-            "name": { "kind": "TextField", "xy": [12,2], "dimensions": [326,30], "text_size": 13, "text_style": "thick",
+            "name": { "kind": "TextField", "xy": [12,2], "dimensions": [326,30], "text_size": 13, "text_style": "thick", "drop_shadow": 1,
                       "text_hjustify": "left", "text_vjustify": "center", "text_color": [0.8,0.8,0.8,1] },
 
             "item": { "kind": "Dialog", "dialog": "item_display", "xy": [25,49], "dimensions": [50,50] },
@@ -1623,7 +1623,7 @@
 
             "item": { "kind": "Dialog", "dialog": "item_display", "xy": [25,49], "dimensions": [50,50] },
 
-            "name": { "kind": "TextField", "xy": [90,44], "dimensions": [330,65], "text_size": 13, "text_style": "bold",
+            "name": { "kind": "TextField", "xy": [90,44], "dimensions": [330,65], "text_size": 13, "text_style": "bold", "drop_shadow": 1,
                       "text_hjustify": "left", "text_vjustify": "top"},
             "description": { "kind": "RichTextField", "xy": [90,66], "dimensions": [330,60], "text_size": 13, "text_style": "normal",
                              "max_lines": 3, "ui_name_seemore": " ... [color=#ffff00][u]See More[/u][/color]",
