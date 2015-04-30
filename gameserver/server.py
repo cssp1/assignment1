@@ -14969,6 +14969,17 @@ class GAMEAPI(resource.Resource):
                                     gamesite.nosql_client.drop_map_feature(session.player.home_region, base_id)
                                     session.forget_base_lock(base_id)
 
+                            if 1:
+                                # kick any additional squads at or inbound to here back to home base
+                                # this finds any squads that were not in the original defending_squads query, like ones that were on the way but not arrived yet
+                                defense_features = [x for x in gamesite.nosql_client.get_map_features_by_loc(session.player.home_region, session.viewing_base.base_map_loc, reason='complete_attack(victory/defending_squads)') if x.get('base_type',None)=='squad']
+                                for feature in defense_features:
+                                    self.broadcast_map_attack(session.player.home_region, feature['base_id'], session.player.user_id, session.viewing_player.user_id,
+                                                              None,
+                                                              [self.get_player_cache_props(u,p) for u,p in ((session.user,session.player),(session.viewing_user,session.viewing_player))],
+                                                              msg = "REGION_MAP_ATTACK_DIVERT")
+                                    gamesite.nosql_client.drop_map_feature(session.player.home_region, feature['base_id'])
+
                 elif session.viewing_base.base_type == 'hive':
                     template = gamedata['hives']['templates'].get(session.viewing_base.base_template, None)
 
@@ -15365,7 +15376,8 @@ class GAMEAPI(resource.Resource):
                         self.broadcast_map_attack(summary['base_region'], summary['base_id'],
                                                   summary['attacker_id'], summary['defender_id'],
                                                   summary,
-                                                  [self.get_player_cache_props(u,p) for u,p in ((session.user,session.player),(session.viewing_user,session.viewing_player))])
+                                                  [self.get_player_cache_props(u,p) for u,p in ((session.user,session.player),(session.viewing_user,session.viewing_player))],
+                                                  msg = "REGION_MAP_ATTACK_COMPLETE")
 
             session.player.send_history_update(retmsg)
 
@@ -19030,7 +19042,8 @@ class GAMEAPI(resource.Resource):
                 if session.viewing_player is not session.player:
                     self.broadcast_map_attack(session.viewing_base.base_region, session.viewing_base.base_id,
                                               session.player.user_id, session.viewing_player.user_id, None, # no summary -> attack start
-                                              [self.get_player_cache_props(u,p) for u,p in ((session.user,session.player),(session.viewing_user,session.viewing_player))])
+                                              [self.get_player_cache_props(u,p) for u,p in ((session.user,session.player),(session.viewing_user,session.viewing_player))],
+                                              msg = "REGION_MAP_ATTACK_START")
 
             elif session.viewing_player.is_human():
                 # attack against a human home base
@@ -25141,7 +25154,8 @@ class GAMEAPI(resource.Resource):
             gamesite.chat_mgr.send('CONTROL', {'secret':SpinConfig.config['proxy_api_secret'],
                                                'server':spin_server_name,
                                                'method':'broadcast_map_attack',
-                                               'args': { 'region_id': region_id, 'base_id': base_id,
+                                               'args': { 'msg': msg,
+                                                         'region_id': region_id, 'base_id': base_id,
                                                          'attacker_id': attacker_id, 'defender_id': defender_id,
                                                          'summary': summary, 'pcache_info': pcache_info,
                                                          'server': spin_server_name },
