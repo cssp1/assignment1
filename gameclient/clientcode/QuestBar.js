@@ -189,6 +189,7 @@ QuestBar.update = function(dialog) {
                 dialog.widgets['frame'+wname].alpha = 1;
             }
             dialog.widgets['frame'+wname].onclick = (function (_quest) { return function(w) {
+                player.record_feature_use('quest_bar');
                 var mis = invoke_missions_dialog(true, _quest);
                 if(mis) {
                     if(player.can_complete_quest(_quest)) {
