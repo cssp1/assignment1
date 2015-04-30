@@ -402,6 +402,8 @@
         "enable_pixel_manipulation": true,
         "enable_pixel_manipulation_in_low_gfx": true, // even in low_gfx mode
 
+        "enable_canvas_oversample": true, // highDPI/Retina support
+
         // default visual effects
         "vfx":
 #include "$GAME_ID/$GAME_ID_client_vfx.json"
