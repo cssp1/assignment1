@@ -2055,6 +2055,14 @@ SPUI.ActionButton.prototype.onleave = function() {
     }
 };
 
+SPUI.ActionButton.prototype.destroy = function() {
+    // stop dripper if we own it
+    if(this.dripper_cb && SPUI.dripper.cb === this.dripper_cb) {
+        SPUI.dripper.stop();
+    }
+    goog.base(this, 'destroy');
+};
+
 SPUI.ActionButton.prototype.on_mouseup = function(uv, offset, button) {
     if(!this.show) { return false; }
 
