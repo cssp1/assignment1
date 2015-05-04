@@ -81,7 +81,7 @@ BattleLog.attacker = function(met, is_mine) { // is_mine here means "is friendly
     var dat = gamedata['units'][kind] || gamedata['buildings'][kind];
     var tx = dat['ui_name'];
     var level = met['attacker_level'] || 0;
-    if(level && (level > 0) && (is_mine || gamedata['battle_log_detail'])) {
+    if(level && (level > 0) && (is_mine || dat['battle_log_detail'] || gamedata['battle_log_detail'])) {
         tx += ' (L'+level.toString()+')';
     }
 
@@ -89,7 +89,7 @@ BattleLog.attacker = function(met, is_mine) { // is_mine here means "is friendly
         var head_spec = ItemDisplay.get_inventory_item_spec(met['attacker_turret_head']);
         var head_name = ItemDisplay.strip_inventory_item_ui_name_level_suffix(ItemDisplay.get_inventory_item_ui_name(head_spec));
         var head_level = head_spec['level'];
-        if(head_level && (head_level > 0) && (is_mine || gamedata['battle_log_detail'])) {
+        if(head_level && (head_level > 0) && (is_mine || head_spec['battle_log_detail'] || gamedata['battle_log_detail'])) {
             head_name += ' (L'+head_spec['level'].toString()+')';
         }
         tx = tx + ' / ' + head_name;
