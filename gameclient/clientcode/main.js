@@ -14321,6 +14321,12 @@ function init_chat_frame() {
         // play a click effect
         var state = GameArt.assets['action_button_134px'].states['normal'];
         if(state.audio) { state.audio.play(client_time); }
+
+        // client-side predict for quest purposes
+        player.history['chat_messages_sent'] = (player.history['chat_messages_sent'] || 0) + 1;
+        if(player.history['chat_messages_sent'] < 2) { // avoid this calculation after many have been sent
+            player.invalidate_quest_cache();
+        }
     };
     chat_frame_size(dialog, false, false);
     return dialog;

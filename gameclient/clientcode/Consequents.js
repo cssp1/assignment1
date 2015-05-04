@@ -532,6 +532,22 @@ OpenURLConsequent.prototype.execute = function(state) {
 
 /** @constructor
   * @extends Consequent */
+function FocusChatGUIConsequent(data) {
+    goog.base(this, data);
+    this.tab = data['tab'] || null;
+}
+goog.inherits(FocusChatGUIConsequent, Consequent);
+FocusChatGUIConsequent.prototype.execute = function(state) {
+    if('chat_frame' in desktop_dialogs) {
+        chat_frame_size(desktop_dialogs['chat_frame'], true, true);
+        if(this.tab) {
+            change_chat_tab(desktop_dialogs['chat_frame'], this.tab);
+        }
+    }
+};
+
+/** @constructor
+  * @extends Consequent */
 function DailyTipUnderstoodConsequent(data) {
     goog.base(this, data);
     this.name_from_context = data['name_from_context'] || null;
@@ -737,6 +753,7 @@ function read_consequent(data) {
     else if(kind === 'INVITE_FRIENDS_PROMPT') { return new InviteFriendsPromptConsequent(data); }
     else if(kind === 'FACEBOOK_PERMISSIONS_PROMPT') { return new FacebookPermissionsPromptConsequent(data); }
     else if(kind === 'OPEN_URL') { return new OpenURLConsequent(data); }
+    else if(kind === 'FOCUS_CHAT_GUI') { return new FocusChatGUIConsequent(data); }
     else if(kind === 'DAILY_TIP_UNDERSTOOD') { return new DailyTipUnderstoodConsequent(data); }
     else if(kind === 'DISPLAY_DAILY_TIP') { return new DisplayDailyTipConsequent(data); }
     else if(kind === 'ENABLE_COMBAT_RESOURCE_BARS') { return new EnableCombatResourceBarsConsequent(data); }
