@@ -188,6 +188,7 @@ SPAudio.BuzzDriver.prototype.create_sample = function(url, kind, success_cb, fai
 
 /** @constructor */
 SPAudio.BuzzSample = function(url, success_cb, fail_cb) {
+    this.url = url;
     this.buzz_sound = new buzz.sound(url, {preload:true});
     this.duration = -1;
     this.end_time = -1;
@@ -221,13 +222,23 @@ SPAudio.BuzzSample.prototype.play = function(time, volume) {
         // this.buzz_sound.sound.cloneNode().play();
     } else {
         this.end_time = time + this.duration;
-        this.buzz_sound.play();
+        try {
+            this.buzz_sound.play();
+        } catch (ex) {
+            log_exception(ex, 'buzz.play "'+this.url+'"');
+        }
     }
     return true;
 };
 SPAudio.BuzzSample.prototype.stop = function(t) { this.buzz_sound.stop(); };
 SPAudio.BuzzSample.prototype.setTime = function(t) { this.buzz_sound.setTime(t); };
-SPAudio.BuzzSample.prototype.fadeTo = function(v, start, t) { this.buzz_sound.fadeTo(v, t); };
+SPAudio.BuzzSample.prototype.fadeTo = function(v, start, t) {
+    try {
+        this.buzz_sound.fadeTo(v, t);
+    } catch (ex) {
+        log_exception(ex, 'buzz.fadeTo "'+this.url+'"');
+    }
+};
 
 ////////////////////////////////////////////////////////////////////////////////////////
 // AudioContext (WebKit/Chrome) DRIVER
