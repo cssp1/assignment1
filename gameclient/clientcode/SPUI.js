@@ -3150,6 +3150,7 @@ SPUI.ScrollingTextField.prototype.append_text = function(text, user_data) {
 
 SPUI.ScrollingTextField.prototype.revise_text = function(node, text) {
     if(!node.prev || !node.next) { throw Error('revise_text on bad node '+node.toString()); }
+    if(text === null) { throw Error('null text!'); }
     node.text = text;
     this.update_text();
     return node;
@@ -3164,6 +3165,7 @@ SPUI.ScrollingTextField.prototype.remove_text = function(node) {
 SPUI.ScrollingTextField.prototype.revise_all_text = function(mutator) {
     for(var node = this.head.next; node != this.head; node = node.next) {
         node.text = mutator(node.text, node.user_data);
+        if(node.text === null) { throw Error('null text!'); }
     }
     this.update_text();
 };
@@ -3185,6 +3187,8 @@ SPUI.ScrollingTextField.prototype.update_text = function() {
 
     var sblines = [];
     while(sblines.length < disp_lines && node !== this.head) {
+        if(node.text === null) { throw Error('encountered invalid text node'); }
+
         var s_n = SPText.break_lines(node.text, this.wh[0], this.font);
         if(sblines.length + s_n.length > disp_lines) {
             // can't fit
