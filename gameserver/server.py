@@ -3426,8 +3426,8 @@ class Session(object):
         self.damage_log = None
 
     def log_attack_units(self, owner_id, obj_list, event_name, props = None):
-        for obj in obj_list:
-            if obj.is_mobile() or obj.spec.history_category == "turrets":
+        for obj in sorted(obj_list, key = lambda obj: (obj.spec.kind, obj.spec.name)):
+            if obj.is_mobile() or obj.spec.history_category in ('turrets','turret_emplacements'):
                 self.log_attack_unit(owner_id, obj, event_name, props = props)
     def log_attack_unit(self, owner_id, obj, event_name, props = None, fake_xy = None, killer_info = None):
         if props is None:
@@ -3442,6 +3442,15 @@ class Session(object):
         props['level'] = obj.level
         props['hp'] = obj.hp
         props['obj_id'] = obj.obj_id
+
+        # record turret head info
+        if obj.is_building():
+            for item in Equipment.equip_iter(obj.equipment):
+                spec = gamedata['items'].get(item['spec'], None)
+                if spec:
+                    if Equipment.is_turret_head_item_spec(spec):
+                        props['turret_head'] = item
+                        break
 
         attacker_user_id = -1
 

@@ -43,11 +43,20 @@ BattleLog.compass_direction = function(ncells, coords) { // OK
     return direction;
 };
 
-BattleLog.one_unit = function(kind, level, is_mine) {
+BattleLog.one_unit = function(kind, level, is_mine, props) {
     var dat = gamedata['units'][kind] || gamedata['buildings'][kind];
     var tx = dat['ui_name'];
     if(level && (level > 0) && (is_mine || gamedata['battle_log_detail'])) {
         tx += ' (L'+level.toString()+')';
+    }
+    if(props && props['turret_head'] && props['turret_head']['spec'] in gamedata['items']) {
+        var head_spec = ItemDisplay.get_inventory_item_spec(props['turret_head']['spec']);
+        var head_name = ItemDisplay.strip_inventory_item_ui_name_level_suffix(ItemDisplay.get_inventory_item_ui_name(head_spec));
+        var head_level = props['turret_head']['level'] || head_spec['level'];
+        if(head_level && (head_level > 0) && (is_mine || head_spec['battle_log_detail'] || gamedata['battle_log_detail'])) {
+            head_name += ' (L'+head_level.toString()+')';
+        }
+        tx += ' / ' + head_name;
     }
     return tx;
 };
@@ -57,15 +66,20 @@ BattleLog.unit = function(met, is_mine) {
         var ret = [];
         for(var key in met['multi_units']) {
             var count = met['multi_units'][key];
-            var kind_level = key.split(':');
-            var kind = kind_level[0];
-            var level = parseInt(kind_level[1],10);
-            var tx = BattleLog.one_unit(kind, level, is_mine);
+            var kind_level_props = key.split('|');
+            var kind = kind_level_props[0];
+            var level = parseInt(kind_level_props[1],10);
+            var props = (kind_level_props.length >= 3 ? JSON.parse(kind_level_props[2]) : null);
+            var tx = BattleLog.one_unit(kind, level, is_mine, props);
             ret.push(count.toString()+'x '+tx);
         }
         return ret.join(', ');
     } else {
-        return BattleLog.one_unit(met['unit_type'], met['level'], is_mine);
+        var props = {};
+        if('turret_head' in met) {
+            props['turret_head'] = met['turret_head'];
+        }
+        return BattleLog.one_unit(met['unit_type'], met['level'], is_mine, props);
     }
 };
 
@@ -90,7 +104,7 @@ BattleLog.attacker = function(met, is_mine) { // is_mine here means "is friendly
         var head_name = ItemDisplay.strip_inventory_item_ui_name_level_suffix(ItemDisplay.get_inventory_item_ui_name(head_spec));
         var head_level = head_spec['level'];
         if(head_level && (head_level > 0) && (is_mine || head_spec['battle_log_detail'] || gamedata['battle_log_detail'])) {
-            head_name += ' (L'+head_spec['level'].toString()+')';
+            head_name += ' (L'+head_level.toString()+')';
         }
         tx = tx + ' / ' + head_name;
     }
@@ -107,12 +121,16 @@ BattleLog.compress_group = function(group) {
     var units = {};
     for(var i = 0; i < group.length; i++) {
         var met = group[i];
-        var key = met['unit_type']+':'+met['level'].toString();
+        var key = met['unit_type']+'|'+met['level'].toString();
+        if(met['turret_head']) {
+            var props = {'turret_head': met['turret_head']};
+            key += '|'+JSON.stringify(props);
+        }
         units[key] = (units[key] || 0) + 1;
     }
     var met = {};
     for(var prop in group[0]) {
-        if(prop == 'unit_type' || prop == 'level') {
+        if(prop == 'unit_type' || prop == 'level' || prop == 'turret_head') {
             continue;
         }
         met[prop] = group[0][prop];
@@ -266,7 +284,7 @@ BattleLog.parse = function(my_id, summary, metlist) {
         } else if(met['event_name'] == '3970_security_team_spawned' || met['event_name'] == '3971_security_team_spawned_from_unit') {
             pr = (met['user_id'] == my_id) ? props.good : props.bad;
             line.push(new SPText.ABlock(poss[met['user_id']]+' ', pr.normal));
-            line.push(new SPText.ABlock(BattleLog.one_unit(met['source_obj_specname'],met['source_obj_level'],myrole==='defender'), pr.hi));
+            line.push(new SPText.ABlock(BattleLog.one_unit(met['source_obj_specname'],met['source_obj_level'],myrole==='defender',null), pr.hi));
             var msg = {'3970_security_team_spawned':'spawns guards',
                        '3971_security_team_spawned_from_unit':'unloads guards'}[met['event_name']];
             line.push(new SPText.ABlock(' '+msg+': ', pr.normal));

@@ -125,3 +125,12 @@ class Equipment (object):
             if ('min_level' in crit) and (my_level < crit['min_level']): continue
             return True
         return False
+
+    @staticmethod
+    def is_turret_head_item_spec(spec):
+        if 'equip' in spec:
+            if 'effects' in spec['equip']:
+                for effect in spec['equip']['effects']:
+                    if effect['code'] == 'modstat' and effect['stat'] == 'weapon':
+                        return True
+        return False
