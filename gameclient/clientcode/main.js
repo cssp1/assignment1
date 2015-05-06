@@ -25369,6 +25369,7 @@ function invoke_achievement_brag(ach) {
     }
 
     FBShare.invoke({name: viral['ui_post_headline'].replace('%PLAYER',player.facebook_name).replace('%ACHIEVEMENT',ach['ui_name']),
+                    description: ach['ui_description'],
                     picture: picture_url,
                     ref:'cheeve'});
 }
