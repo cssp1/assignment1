@@ -61,7 +61,7 @@
     },
 
     "achievement_brag": {
-        "ui_post_headline": "%PLAYER earned an achievement: \"%ACHIEVEMENT\" in Example Game"
+        "ui_post_headline": "%PLAYER earned \"%ACHIEVEMENT\" in Example Game"
     },
 
     "level_advancement": {
