@@ -16,6 +16,7 @@ import copy
 import getopt
 import KISSmetrics
 import xml.dom.minidom
+from cgi import escape as cgi_escape
 
 # on Linux, try to use Twisted's high-performance epoll reactor
 if sys.platform == 'linux2':
@@ -12227,12 +12228,12 @@ class OGPAPI(resource.Resource):
             ret += '<meta property="og:type"   content="%s" />\n' % (my_og_type if my_og_type else '%s:%s' % (ns, type))
             #ret += '<meta property="og:url"    content="http://apps.facebook.com/%s?spin_campaign=open_graph" />\n' % (SpinConfig.config['facebook_app_namespace'])
             ret += '<meta property="og:url"    content="%s" />\n' % my_url
-            ret += u'<meta property="og:title"  content="'+my_ui_name+u'" />\n'
+            ret += u'<meta property="og:title"  content="'+cgi_escape(my_ui_name,True)+u'" />\n'
 
             if my_ui_description:
-                ret += u'<meta property="og:description"  content="'+my_ui_description+u'" />\n'
+                ret += u'<meta property="og:description"  content="'+cgi_escape(my_ui_description,True)+u'" />\n'
             if my_ui_determiner is not None:
-                ret += u'<meta property="og:determiner"  content="'+my_ui_determiner+u'" />\n'
+                ret += u'<meta property="og:determiner"  content="'+cgi_escape(my_ui_determiner,True)+u'" />\n'
 
             if not image_url:
                 # add image file, either from in-game art asset (200x200px minimum!),
@@ -12256,9 +12257,9 @@ class OGPAPI(resource.Resource):
             ret += '<meta property="og:image"  content="%s" />\n' % image_url
 
             for key, val in extra_props.iteritems():
-                ret += '<meta property="%s:%s"  content="%s" />\n' % (ns, key, str(val))
+                ret += '<meta property="%s:%s"  content="%s" />\n' % (ns, key, cgi_escape(str(val),True))
             for key, val in extra_raw_props:
-                ret += '<meta property="%s"  content="%s" />\n' % (key, str(val))
+                ret += '<meta property="%s"  content="%s" />\n' % (key, cgi_escape(str(val),True))
 
             if not my_spin_ref:
                 my_spin_ref = 'open_graph_'+type
