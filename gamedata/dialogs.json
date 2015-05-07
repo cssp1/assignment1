@@ -5052,11 +5052,11 @@
         "default_button": "repair_instant_button",
         "widgets": {
             "sunken": {"kind": "StaticImage", "xy":[8,35], "dimensions":[754,418], "asset": "dialog_sunken_754x418" },
-            "splash_bg": { "kind": "SolidRect", "xy": [331,55], "dimensions": [410,338], "color": [0,0,0,1] },
-            "splash": {"kind": "StaticImage", "xy":[332,56], "dimensions":[408,336], "asset": "splash_defense" },
+            "splash_bg": { "kind": "SolidRect", "xy": [331,49], "dimensions": [410,338], "color": [0,0,0,1] },
+            "splash": {"kind": "StaticImage", "xy":[332,50], "dimensions":[408,336], "asset": "splash_defense" },
             "divider": { "kind": "Line", "xy": [306, 56], "dimensions": [0, 383], "color": [0,0,0,0.5], "stroke_width": 1 },
 
-            "screenshot_button": {"show": 0, "kind": "ActionButton", "xy":[261,54], "dimensions":[23,23], "bg_image": "photo_button", "push_bg_image": 1,
+            "screenshot_button": {"show": 0, "kind": "ActionButton", "xy":[261,48], "dimensions":[23,23], "bg_image": "photo_button", "push_bg_image": 1,
                                   "ui_caption": "%PLAYER - Attack Log"},
 
             // x-157 y+31
