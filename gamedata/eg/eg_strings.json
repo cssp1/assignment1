@@ -5,6 +5,7 @@
 {
     // UI strings for various in-game things
     "game_name": "Example Game",
+    "game_www_url": "www.example.com",
 
     "alliance": "Clan", // what alliances are called
 

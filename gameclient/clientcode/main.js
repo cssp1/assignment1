@@ -14465,7 +14465,8 @@ function invoke_you_were_attacked_dialog(recent_attacks) {
             var dialog = w.parent;
             invoke_post_screenshot(dialog, /* reason = */ dialog.user_data['dialog'],
                                    make_post_screenshot_caption(dialog.data['widgets']['screenshot_button']['ui_caption'],
-                                                                player.get_player_cache_props()));
+                                                                player.get_player_cache_props()),
+                                  false);
         };
     }
 
@@ -15313,21 +15314,42 @@ function make_post_screenshot_caption(caption, info) {
     @param {SPUI.Dialog|null} dialog to capture - otherwise captures full screen
     @param {string} reason
     @param {string|null=} caption_prefix
+    @param {boolean=} add_watermark
 */
-function invoke_post_screenshot(dialog, reason, caption_prefix) {
+function invoke_post_screenshot(dialog, reason, caption_prefix, add_watermark) {
     if(!canvas) { throw Error('no canvas'); }
     var codec = Screenshot.Codec.JPEG;
     var filename = 'SCREENSHOT.jpg';
     if(!caption_prefix) { caption_prefix = null; }
 
+    /** @type {Screenshot.Watermark|null} */
+    var watermark = null;
+    if(add_watermark || (typeof(add_watermark) === 'undefined')) {
+        var wm = gamedata['virals']['post_screenshot']['ui_watermark'];
+        wm = wm.replace('%GAME_NAME', gamedata['strings']['game_name']);
+        wm = wm.replace('%GAME_WWW_URL', gamedata['strings']['game_www_url']);
+        wm = wm.replace('%CAPTION', caption_prefix);
+        wm = goog.string.trim(wm);
+        watermark = new Screenshot.Watermark(wm);
+    }
+
     var dataURI;
     if(dialog) {
-        var xy = dialog.get_absolute_xy();
-        var topleft = vec_scale(canvas_oversample, xy);
-        var dimensions = vec_scale(canvas_oversample, dialog.wh);
-        dataURI = Screenshot.capture_subimage(canvas, topleft, dimensions, codec);
+        var abs_xy = dialog.get_absolute_xy();
+        var clip_to;
+        if(dialog.data['screenshot_clip_to']) {
+            clip_to = [dialog.data['screenshot_clip_to'][0] + abs_xy[0],
+                       dialog.data['screenshot_clip_to'][1] + abs_xy[1],
+                       dialog.data['screenshot_clip_to'][2],
+                       dialog.data['screenshot_clip_to'][3]];
+        } else {
+            clip_to = [abs_xy[0], abs_xy[1], dialog.wh[0], dialog.wh[1]];
+        }
+        var topleft = vec_scale(canvas_oversample, [clip_to[0], clip_to[1]]);
+        var dimensions = vec_scale(canvas_oversample, [clip_to[2], clip_to[3]]);
+        dataURI = Screenshot.capture_subimage(canvas, topleft, dimensions, codec, watermark);
     } else {
-        dataURI = Screenshot.capture_full(canvas, codec);
+        dataURI = Screenshot.capture_full(canvas, codec, watermark);
     }
 
     if(dataURI === null) {
@@ -15352,7 +15374,7 @@ function invoke_post_screenshot_dialog(data, filename, reason, caption_prefix) {
     dialog.user_data['image_data'] = data;
     dialog.user_data['image_filename'] = filename;
     dialog.user_data['reason'] = reason;
-    dialog.user_data['caption_prefix'] = caption_prefix;
+    dialog.user_data['caption_prefix'] = ''; // disabled due to FB no-pre-fill policy caption_prefix;
     dialog.user_data['privacy'] = player.preferences['fb_post_privacy'] || FBUploadPhoto.Privacy.EVERYONE;
     dialog.user_data['ui_locker'] = null;
     install_child_dialog(dialog);
@@ -15383,7 +15405,7 @@ function invoke_post_screenshot_dialog(data, filename, reason, caption_prefix) {
                                                                            dialog.data['widgets']['image_bg']['xy'])));
 
     dialog.widgets['close_button'].onclick = dialog.widgets['cancel_button'].onclick = close_parent_dialog;
-    dialog.widgets['caption_prefix'].str = caption_prefix;
+    dialog.widgets['caption_prefix'].str = caption_prefix; // dialog.user_data['caption_prefix'];
 
     //dialog.widgets['caption_input'].str = caption_prefix || '';
 

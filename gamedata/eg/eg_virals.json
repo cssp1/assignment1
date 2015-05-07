@@ -137,7 +137,9 @@
     },
 
     "post_screenshot": {
-        "ui_caption": "Take a shot at the hottest strategy game on Facebook! Join me: https://apps.facebook.com/thunderrun/?spin_campaign=spin_screenshot",
-        "ui_caption_custom": "%PLAYER_CAPTION\nJoin me: https://apps.facebook.com/thunderrun/?spin_campaign=spin_screenshot"
+        // FB policy says no premade captions :(
+        "ui_watermark": "%CAPTION\n%GAME_NAME\n%GAME_WWW_URL",
+        "ui_caption": "", // "Take a shot at the hottest strategy game on Facebook! Join me: https://apps.facebook.com/thunderrun/?spin_campaign=spin_screenshot",
+        "ui_caption_custom": "%PLAYER_CAPTION" // "%PLAYER_CAPTION\nJoin me: https://apps.facebook.com/thunderrun/?spin_campaign=spin_screenshot"
     }
 }

@@ -5047,6 +5047,7 @@
     "you_were_attacked_dialog": {
         "bg_image": "dialog_770x485_bg",
         "dimensions": [770,515], // leave extra vertical space (+30px) for "halt" message
+        "screenshot_clip_to": [0,0,770,485],
         "clip_children": 0,
         "default_button": "repair_instant_button",
         "widgets": {
