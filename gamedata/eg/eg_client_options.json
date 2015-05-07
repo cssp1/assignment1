@@ -4,6 +4,8 @@
 
 "friend_invite_prompt_interval": 1814400, // interval between (on login) prompts to invite Facebook friends
 
+"enable_post_screenshot": 1, // enable Post Screenshot (on Facebook) feature
+
 "max_astar_queries_per_tick": 2,
 
 // max number of iterations for A* search, stops pathological cases (units trying to path outside of locked "corrals")
