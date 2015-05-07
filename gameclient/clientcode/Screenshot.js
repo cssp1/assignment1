@@ -89,9 +89,9 @@ Screenshot.apply_watermark = function(canvas, context, watermark) {
     /** @type {!Array.<number>} */
     var SHADOW_OFFSET = [2,2];
     var shadow_color = 'rgba(0,0,0,1)';
-    var fill_color = 'rgba(255,255,255,1)';
+    var fill_color = 'rgba(255,255,64,1)';
 
-    context.font = size.toString()+'px sans-serif bold';
+    context.font = 'bold '+size.toString()+'px sans-serif';
     context.strokeStyle = 'rgba(0,0,0,1)';
 
     var max_width = 0;
