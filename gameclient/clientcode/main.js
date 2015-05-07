@@ -15285,6 +15285,10 @@ function invoke_invite_friends_dialog(reason) {
 /** Check if screenshot posting is available
     @return {boolean} */
 function post_screenshot_enabled() {
+    if(spin_demographics['browser_name'] == "Chrome" && spin_demographics['browser_version'] < 17) { return false; }
+    if(spin_demographics['browser_name'] == "Explorer" && spin_demographics['browser_version'] < 10) { return false; }
+    if(spin_demographics['browser_name'] == "Firefox" && spin_demographics['browser_version'] < 9) { return false; }
+
     return player.get_any_abtest_value('enable_post_screenshot', gamedata['client']['enable_post_screenshot']) &&
         (spin_frame_platform == 'fb') && FBUploadPhoto.supported() && Screenshot.supported() &&
         !!gamedata['virals']['post_screenshot'] && !!gamedata['strings']['post_screenshot_success'];
