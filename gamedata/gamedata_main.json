@@ -546,7 +546,6 @@
 
     "enable_mod_techs": 0,
 
-    "enable_lottery": 0,
     "lottery_reseed_cooldown": 64800, // reseed lottery on a long cooldown, to avoid exploits
     "lottery_free_interval": 86400, // how often you get a free lottery scan
 

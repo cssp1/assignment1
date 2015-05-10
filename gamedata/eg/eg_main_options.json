@@ -132,6 +132,7 @@
 "enable_travel": 1,
 "enable_region_map": 1,
 "enable_transmitter": 1,
+"enable_lottery": 0,
 
 "continent_assignment": "main",
 
