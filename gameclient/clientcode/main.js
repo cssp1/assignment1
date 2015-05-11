@@ -15290,6 +15290,7 @@ function post_screenshot_enabled() {
     if(spin_demographics['browser_name'] == "Firefox" && spin_demographics['browser_version'] < 9) { return false; }
 
     return player.get_any_abtest_value('enable_post_screenshot', gamedata['client']['enable_post_screenshot']) &&
+        (player.tutorial_state == 'COMPLETE') &&
         (spin_frame_platform == 'fb') && FBUploadPhoto.supported() && Screenshot.supported() &&
         !!gamedata['virals']['post_screenshot'] && !!gamedata['strings']['post_screenshot_success'];
 }
@@ -15676,6 +15677,13 @@ function invoke_level_up_dialog() {
     dialog.widgets['prog_bar2'].show =
     dialog.widgets['prog_bar3'].show =
         dialog.widgets['new_achievement'].show = true;
+
+    dialog.widgets['screenshot_button'].show = post_screenshot_enabled();
+    dialog.widgets['screenshot_button'].onclick = function(w) {
+        var dialog = w.parent;
+        invoke_post_screenshot(dialog, /* reason = */ dialog.user_data['dialog'],
+                               make_post_screenshot_caption(dialog.data['widgets']['screenshot_button']['ui_caption'], player.get_player_cache_props()));
+    };
 
     play_level_up_sound(null);
     invoke_ui_locker();
