@@ -32887,24 +32887,31 @@ function missions_dialog_select_mission(dialog, row) {
     }
 
     var reward_units = null;
+    var reward_consequent = quest['reward_consequent'] || null;
+
+    // hack
+    if(reward_consequent && reward_consequent['consequent'] == 'AND') {
+        reward_consequent = reward_consequent['subconsequents'][0];
+    }
+
     if('reward_give_units' in quest) {
         reward_units = quest['reward_give_units'];
-    } else if (('reward_consequent' in quest) && (quest['reward_consequent']['consequent'] == 'GIVE_UNITS')) {
-        reward_units = quest['reward_consequent']['units'];
-    } else if (('reward_consequent' in quest) && (quest['reward_consequent']['consequent'] == 'GIVE_LOOT') &&
-               (quest['reward_consequent']['loot'].length > 0)) {
+    } else if (reward_consequent && (reward_consequent['consequent'] == 'GIVE_UNITS')) {
+        reward_units = reward_consequent['units'];
+    } else if (('reward_consequent' in quest) && (reward_consequent['consequent'] == 'GIVE_LOOT') &&
+               (reward_consequent['loot'].length > 0)) {
 
         // XXX this is a special-case hack - we don't have a general-purpose way to display arbitrary loot tables
         // instead, abuse reward_unit_icon to display a loot item
 
-        if(('spec' in quest['reward_consequent']['loot'][0]) &&
-           (quest['reward_consequent']['loot'][0]['spec'].indexOf('packaged_') == 0) &&
-           (quest['reward_consequent']['loot'][0]['spec'].slice(9) in gamedata['units'])) {
+        if(('spec' in reward_consequent['loot'][0]) &&
+           (reward_consequent['loot'][0]['spec'].indexOf('packaged_') == 0) &&
+           (reward_consequent['loot'][0]['spec'].slice(9) in gamedata['units'])) {
             reward_units = {};
-            reward_units[quest['reward_consequent']['loot'][0]['spec'].slice(9)] = quest['reward_consequent']['loot'][0]['stack'] || 1;
-        } else if(('multi' in quest['reward_consequent']['loot'][0]) && (quest['reward_consequent']['loot'][0]['multi'][0]['table'] == 'sexy_unlocked_unit')) {
+            reward_units[reward_consequent['loot'][0]['spec'].slice(9)] = reward_consequent['loot'][0]['stack'] || 1;
+        } else if(('multi' in reward_consequent['loot'][0]) && (reward_consequent['loot'][0]['multi'][0]['table'] == 'sexy_unlocked_unit')) {
             reward_units = {};
-            var stack = (quest['reward_consequent']['loot'][0]['multi_stack'] || 1);
+            var stack = (reward_consequent['loot'][0]['multi_stack'] || 1);
 
             // manually check the loot table to see what we're going to get
             var cond = gamedata['loot_tables_client']['sexy_unlocked_unit']['loot'][0]['cond'];
@@ -32918,10 +32925,10 @@ function missions_dialog_select_mission(dialog, row) {
                     break;
                 }
             }
-        } else if('spec' in quest['reward_consequent']['loot'][0]) {
+        } else if('spec' in reward_consequent['loot'][0]) {
             // display an arbitrary item
             dialog.widgets['reward_unit_icon'].show = dialog.widgets['reward_unit_icon_stack'].show = true;
-            var item = quest['reward_consequent']['loot'][0]; // fake item for tooltip
+            var item = reward_consequent['loot'][0]; // fake item for tooltip
             var spec = ItemDisplay.get_inventory_item_spec(item['spec']);
             ItemDisplay.set_inventory_item_asset(dialog.widgets['reward_unit_icon'], spec);
             ItemDisplay.set_inventory_item_stack(dialog.widgets['reward_unit_icon_stack'], spec, item);
