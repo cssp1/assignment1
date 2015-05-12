@@ -46248,6 +46248,29 @@ function set_playfield_draw_transform(context) {
     }
 }
 
+/** @typedef {{text: string,
+               pos: !Array.<number>,
+               color: (string|null|undefined),
+               drop_shadow: (boolean|undefined)}} */
+var PlayfieldText = {};
+
+function draw_playfield_text(text_list) {
+    goog.array.forEach(text_list, function(text) {
+        if(text.color) {
+            ctx.save();
+            ctx.fillStyle = text.color;
+        }
+        if(text.drop_shadow) {
+            draw_centered_text_with_shadow(ctx, text.text, text.pos);
+        } else {
+            draw_centered_text(ctx, text.text, text.pos);
+        }
+        if(text.color) {
+            ctx.restore();
+        }
+    });
+}
+
 function do_draw() {
     if(forced_draw_timer) { window.clearTimeout(forced_draw_timer); forced_draw_timer = null; }
 
@@ -46650,6 +46673,9 @@ function do_draw() {
                 });
                 scene.sort(sort_scene_objects);
 
+                /** @type {!Array.<!PlayfieldText>} */
+                var playfield_text_list = [];
+
                 for(var i = 0; i < scene.length; i++) {
                     var obj = scene[i];
                     if(obj.is_mobile()) {
@@ -46663,12 +46689,14 @@ function do_draw() {
                             }
                         }
                     } else if(obj.is_building() || obj.is_inert()) {
-                        draw_building_or_inert(obj, powerfac);
+                        playfield_text_list = playfield_text_list.concat(draw_building_or_inert(obj, powerfac));
                     }
                 }
 
                 // draw special effects
                 SPFX.draw_over();
+
+                draw_playfield_text(playfield_text_list);
 
                 // draw A* debug info
                 if(PLAYFIELD_DEBUG) {
@@ -47647,7 +47675,13 @@ Building.prototype.get_idle_state_advanced = function() {
             'can_upgrade': can_upgrade};
 };
 
+/** Draw a building or inert object
+    @param {!GameObject} obj
+    @param {number} powerfac
+    @return {!Array.<!PlayfieldText>} */
 function draw_building_or_inert(obj, powerfac) {
+    /** @type {!Array.<!PlayfieldText>} */
+    var text_list = [];
     var xy = draw_quantize(playfield_to_draw(obj.playfield_xy()));
 
     var icon;
@@ -47755,7 +47789,7 @@ function draw_building_or_inert(obj, powerfac) {
     }
 
     if(obj.is_invisible() && obj.team !== 'player' && !obj.is_destroyed()) {
-        return; // hidden building!
+        return text_list; // hidden building!
     }
 
     if(obj.is_building() && obj.is_repairing()) {
@@ -48109,10 +48143,10 @@ function draw_building_or_inert(obj, powerfac) {
                 alliance_name = alliance_display_name(info);
             }
         }
-        //console.log(" ID "+alliance_id+" "+alliance_name);
+
         if(alliance_name) {
             var s = gamedata['strings']['alliance_building_tag'].replace('%s', alliance_name);
-            draw_centered_text_with_shadow(ctx, s, vec_add(xy, obj.spec['show_alliance_at']));
+            text_list.push({text: s, pos: vec_add(xy, obj.spec['show_alliance_at']), drop_shadow: true});
         }
     }
 
@@ -48159,26 +48193,14 @@ function draw_building_or_inert(obj, powerfac) {
             var text_xy = [xy[0], xy[1]-status_text_height+6-0*SPUI.desktop_font.size];
             var LINEHEIGHT = 20;
 
-            // draw drop shadow
-            ctx.save();
-            ctx.fillStyle = 'rgba(0,0,0,1)';
             for(var i = 0; i < status_text.length; i++) {
-                draw_centered_text(ctx, status_text[i], [text_xy[0]+1,text_xy[1]+1+i*LINEHEIGHT]);
-            }
-            ctx.restore();
-
-            // draw main text
-            // color top line white, lower lines gray (to indicate paused actions)
-            for(var i = 0; i < status_text.length; i++) {
+                var text = {text: status_text[i], pos: [text_xy[0], text_xy[1]+i*LINEHEIGHT], drop_shadow: true};
+                // color top line white, lower lines gray (to indicate paused actions)
                 var paused = (i != 0) || (obj.is_damaged() && !obj.is_repairing());
                 if(paused) {
-                    ctx.save();
-                    ctx.fillStyle = 'rgba(200,200,200,1)';
+                    text.color = 'rgba(200,200,200,1)';
                 }
-                draw_centered_text(ctx, status_text[i], [text_xy[0], text_xy[1]+i*LINEHEIGHT]);
-                if(paused) {
-                    ctx.restore();
-                }
+                text_list.push(text);
             }
         }
     }
@@ -48215,7 +48237,7 @@ function draw_building_or_inert(obj, powerfac) {
             var icon_sprite = GameArt.assets[appearance.asset].states['normal'];
 
             if(appearance.text_str) {
-                draw_centered_text_with_shadow(ctx, appearance.text_str, playfield_to_draw(appearance.text_pos));
+                text_list.push({text: appearance.text_str, pos: playfield_to_draw(appearance.text_pos), drop_shadow: true});
             }
 
             var has_state = false;
@@ -48234,11 +48256,6 @@ function draw_building_or_inert(obj, powerfac) {
 
     if(CLICK_DETECTION_DEBUG) { draw_click_detection(obj); }
 
-    if(0 /*PLAYFIELD_DEBUG*/) {
-        // draw text label
-        draw_centered_text(ctx, obj.spec['ui_name'] + ' (' + obj.team + ')', [xy[0], xy[1]-18]);
-    }
-
     if(AI_DEBUG && obj.is_building() && obj.is_shooter()) {
         // draw ai state
         draw_centered_text(ctx, control_state_names[obj.control_state], [xy[0],xy[1]+30]);
@@ -48246,6 +48263,7 @@ function draw_building_or_inert(obj, powerfac) {
     }
 
     obj.update_permanent_effect();
+    return text_list;
 }
 
 /**
