@@ -492,15 +492,15 @@
         "highlight": { "images": ["art/ui/menu_buttons12.png"], "dimensions": [14,80], "origins": [176,668], "audio": "art/soundfx/menu_click.$AUDIO_CODEC", "volume": 0.25, "load_priority": 25 }
     } },
 
-
-
     "tutorial_arrow_up": { "states": { "normal": { "images": ["art/ui/tutorial_arrows2.png"], "dimensions": [46,69], "origins": [0,0], "load_priority": 100 } } },
     "tutorial_arrow_down": { "states": { "normal": { "images": ["art/ui/tutorial_arrows2.png"], "dimensions": [46,69], "origins": [0,69], "load_priority": 100 } } },
-    "tutorial_arrow_up_big": { "states": { "normal": { "subassets": [{"name": "tutorial_arrow_up", "scale": 1.33}] } } },
-    "tutorial_arrow_down_big": { "states": { "normal": { "subassets": [{"name": "tutorial_arrow_down", "scale": 1.33}] } } },
-
     "tutorial_arrow_left": { "states": { "normal": { "images": ["art/ui/tutorial_arrows2.png"], "dimensions": [69,46], "origins": [46,0], "load_priority": 90 } } },
     "tutorial_arrow_right": { "states": { "normal": { "images": ["art/ui/tutorial_arrows2.png"], "dimensions": [69,46], "origins": [46,46], "load_priority": 90 } } },
+
+    "tutorial_arrow_up_big": { "states": { "normal": { "subassets": [{"name": "tutorial_arrow_up", "scale": 1.33}] } } },
+    "tutorial_arrow_down_big": { "states": { "normal": { "subassets": [{"name": "tutorial_arrow_down", "scale": 1.33}] } } },
+    "tutorial_arrow_left_big": { "states": { "normal": { "subassets": [{"name": "tutorial_arrow_left", "scale": 1.33}] } } },
+    "tutorial_arrow_right_big": { "states": { "normal": { "subassets": [{"name": "tutorial_arrow_right", "scale": 1.33}] } } },
 
     "tutorial_slideshow_dialog_bg": { "states": { "normal": { "images": ["art/ui/menu_buttons12.png"], "origins": [152,572],
                                                               "style": "corners", "corner_width": 16,

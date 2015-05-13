@@ -16819,20 +16819,41 @@ function update_tutorial_arrow_for_button(_dialog, _parent_path, _widget_name, _
         var arrow_dims = dialog.data['widgets']['arrow']['dimensions'];
 
         var xy = vec_add(vec_add(parent.xy, parent_offset), btn.xy);
-        xy[0] += Math.floor(btn.wh[0]/2);
-        if(direction == 'down') {
-            xy[1] -= arrow_dims[1]; // move the dialog up so that the tip of the downward arrow is pointing at the target
+        // point at center of widget
+        xy = vec_floor(vec_add(xy, vec_scale(0.5, btn.wh)));
+
+        if(direction == 'left' || direction == 'right') {
+            xy[1] -= Math.floor(arrow_dims[1]/2); // point at vertical center
+
+            // leave a little space between the arrow tip and target
+            if(direction == 'left') {
+                xy[0] += Math.floor(0.1*arrow_dims[0]);
+            } else {
+                xy[0] -= arrow_dims[0] + Math.floor(0.1*arrow_dims[0]); // move dialog so tip points at target
+            }
         } else {
-            xy[1] += Math.floor(0.3*arrow_dims[1]); // move the dialog down to leave a little space between the arrow tip and target
+            xy[0] -= Math.floor(arrow_dims[0]/2); // point at horizontal center
+            if(direction == 'down') {
+                xy[1] -= arrow_dims[1]; // move dialog so tip points at target
+            } else { // assume "up"
+                xy[1] += Math.floor(0.1*arrow_dims[1]); // move the dialog down to leave a little space between the arrow tip and target
+            }
         }
 
-        dialog.xy = [xy[0] - Math.floor(arrow_dims[0]/2), xy[1]];
+        dialog.xy = xy;
         if(dialog.parent) { // might be ok to do this unconditionally
             dialog.xy = vec_sub(dialog.xy, dialog.parent.get_absolute_xy());
         }
 
         // animate the arrow moving up and down
-        var wave = Math.floor((dialog.user_data['wave_amplitude']||10)*(Math.sin(4*client_time)+(direction=='down'?-0.25:0.25)));
+        var wave = [0,0];
+        if(direction == 'left' || direction == 'right') {
+            // left/right
+            wave[0] = Math.floor((dialog.user_data['wave_amplitude']||10)*(Math.sin(4*client_time)+(direction=='down'?-0.25:0.25)));
+        } else {
+            // up or down
+            wave[1] = Math.floor((dialog.user_data['wave_amplitude']||10)*(Math.sin(4*client_time)+(direction=='down'?-0.25:0.25)));
+        }
 
         var tip_y_canvas = dialog.get_absolute_xy()[1] + (direction == 'down' ? dialog.wh[1] + 10 : 10);
         var tip_y_client = canvas_div_offsetTop + tip_y_canvas;
@@ -16868,14 +16889,14 @@ function update_tutorial_arrow_for_button(_dialog, _parent_path, _widget_name, _
                 dialog.widgets['arrow'].show = true;
             }
             dialog.xy[1] -= (tip_y_client - client_height) - 10;
-            wave *= 0.25; // less motion
+            wave = vec_scale(0.25, wave); // less motion
         } else {
             dialog.widgets['scroll'].show = dialog.widgets['scroll_bg'].show = false;
             if('scroll_arrow' in dialog.widgets) { dialog.widgets['scroll_arrow'].show = false; }
             dialog.widgets['arrow'].show = true;
         }
 
-        dialog.xy[1] = Math.floor(dialog.xy[1] + wave);
+        dialog.xy = vec_floor(vec_add(dialog.xy, wave));
 
     }; })(_dialog, _parent_path, _widget_name, _direction);
 }

@@ -4960,7 +4960,6 @@
     },
 
     "tutorial_arrow_up": {
-        "bg_image": "",
         "dimensions": [62,92],
         "transparent_to_mouse": 1,
         "widgets": {
@@ -4969,12 +4968,10 @@
             "scroll": { "show": 0, "kind": "TextField", "xy": [-36,-38], "dimensions": [134,23], "text_size": 17, "drop_shadow": 1, "ui_name": "SCROLL DOWN" },
             "scroll_arrow": { "show":0, "kind": "StaticImage", "xy":[0,-138], "dimensions": [62,92], "asset": "tutorial_arrow_down_big"},
 
-            //"arrow": { "kind": "StaticImage", "xy":[0,0], "dimensions": [46,69], "asset": "tutorial_arrow_up"}
             "arrow": { "kind": "StaticImage", "xy":[0,0], "dimensions": [62,92], "asset": "tutorial_arrow_up_big"}
         }
     },
     "tutorial_arrow_down": {
-        "bg_image": "",
         "dimensions": [62,92],
         "transparent_to_mouse": 1,
         "widgets": {
@@ -4984,9 +4981,33 @@
             "scroll_down_hack": { "show":0, "kind": "StaticImage", "xy":[7,-108], "dimensions": [62,92],
                                   "alpha": 0.66, "asset": "tutorial_arrow_down", "array": [1,3], "array_offset": [0, -110] },
 
-
-            //"arrow": { "kind": "StaticImage", "xy":[0,0], "dimensions": [46,69], "asset": "tutorial_arrow_down"},
             "arrow": { "kind": "StaticImage", "xy":[0,0], "dimensions": [62,92], "asset": "tutorial_arrow_down_big"}
+        }
+    },
+    "tutorial_arrow_left": {
+        "dimensions": [62,92],
+        "transparent_to_mouse": 1,
+        "widgets": {
+            "scroll_bg": { "show": 0, "kind": "SolidRect", "xy": [-36,-28], "dimensions": [134,23], "bevel": 2, "color": [0,0,0,0.5] },
+            "scroll": { "show": 0, "kind": "TextField", "xy": [-36,-28], "dimensions": [134,23], "text_size": 17, "drop_shadow": 1, "ui_name": "SCROLL DOWN" },
+
+            "scroll_down_hack": { "show":0, "kind": "StaticImage", "xy":[7,-108], "dimensions": [62,92],
+                                  "alpha": 0.66, "asset": "tutorial_arrow_down", "array": [1,3], "array_offset": [0, -110] },
+
+            "arrow": { "kind": "StaticImage", "xy":[0,0], "dimensions": [92,62], "asset": "tutorial_arrow_left_big"}
+        }
+    },
+    "tutorial_arrow_right": {
+        "dimensions": [62,92],
+        "transparent_to_mouse": 1,
+        "widgets": {
+            "scroll_bg": { "show": 0, "kind": "SolidRect", "xy": [-36,-28], "dimensions": [134,23], "bevel": 2, "color": [0,0,0,0.5] },
+            "scroll": { "show": 0, "kind": "TextField", "xy": [-36,-28], "dimensions": [134,23], "text_size": 17, "drop_shadow": 1, "ui_name": "SCROLL DOWN" },
+
+            "scroll_down_hack": { "show":0, "kind": "StaticImage", "xy":[7,-108], "dimensions": [62,92],
+                                  "alpha": 0.66, "asset": "tutorial_arrow_down", "array": [1,3], "array_offset": [0, -110] },
+
+            "arrow": { "kind": "StaticImage", "xy":[0,0], "dimensions": [92,62], "asset": "tutorial_arrow_right_big"}
         }
     },
     // dummy arrow - this is for landscape targets that want reticles but not "click here" arrows
