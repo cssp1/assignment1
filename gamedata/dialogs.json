@@ -6289,12 +6289,12 @@
                              "text_leading": 16, "text_hjustify": "left", "text_vjustify": "top" },
 
             "prev_button": { "kind": "ActionButton", "xy": [16,422], "dimensions": [134,28], "text_size": 13, "text_style": "bold",
-                             "bg_image": "menu_button_134px", "text_color": [0,0,0,1], "ui_name": "Previous" },
+                             "bg_image": "menu_button_134px", "ui_name": "Previous" },
             "link_button": { "show": 0, "kind": "ActionButton", "xy": [164,422], "dimensions": [134,28], "text_size": 13, "text_style": "bold",
                              "ui_tooltip": "", "tooltip_delay": 0,
                              "bg_image": "menu_button_134px", "text_color": [0,0,0,1], "ui_name": "Learn More" },
             "next_button": { "kind": "ActionButton", "xy": [312,422], "dimensions": [134,28], "text_size": 13, "text_style": "bold",
-                             "bg_image": "menu_button_134px", "bg_image_active": "action_button_134px", "text_color": [0,0,0,1], "ui_name": "Next", "ui_name_close": "Dismiss" },
+                             "bg_image": "menu_button_134px", "ui_name": "Next", "ui_name_close": "Dismiss" },
             "close_button": { "kind": "ActionButton", "xy": [428,1], "dimensions": [19,22], "bg_image": "close_button_small", "push_bg_image": 1 }
         }
     },
