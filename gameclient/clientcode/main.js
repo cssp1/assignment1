@@ -34905,9 +34905,20 @@ function do_invoke_cc_upgrade_dialog(mode) {
         level = cc.level + 1;
     }
 
-    var dialog = new SPUI.Dialog(gamedata['dialogs']['cc_upgrade_congrats']);
+    var dialog = new SPUI.Dialog(gamedata['dialogs']['cc_upgrade_congrats_dialog']);
+    dialog.user_data['dialog'] = 'cc_upgrade_congrats_dialog';
+
     if(mode == 'congrats') {
         change_selection_ui(dialog);
+
+        // show a "click me" arrow on the close button for initial appearance
+        if(level <= 2) {
+            read_consequent({'consequent':'TUTORIAL_ARROW', 'child': 1,
+                             'arrow_type':'button',
+                             'direction':'up',
+                             'dialog_name':'cc_upgrade_congrats_dialog',
+                             'widget_name':'close_button'}).execute();
+        }
     } else {
         install_child_dialog(dialog);
     }
@@ -34978,7 +34989,8 @@ function do_invoke_cc_upgrade_dialog(mode) {
 
 function invoke_generic_upgrade_congrats(small_asset, alt_bg, sound_name, title, level, text, asset, cloaked, viral_name, viral_props) {
     change_selection(null);
-    var dialog = new SPUI.Dialog(gamedata['dialogs']['unit_upgrade_congrats']);
+    var dialog = new SPUI.Dialog(gamedata['dialogs']['unit_upgrade_congrats_dialog']);
+    dialog.user_data['dialog'] = 'unit_upgrade_congrats_dialog';
     change_selection_ui(dialog);
     dialog.auto_center();
     dialog.modal = true;

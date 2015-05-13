@@ -7224,7 +7224,7 @@
     },
 
 
-    "cc_upgrade_congrats": {
+    "cc_upgrade_congrats_dialog": {
         "bg_image": "dialog_736x423_bg",
         "dimensions": [736,423],
         "default_button": "ok_button",
@@ -7264,7 +7264,7 @@
         }
     },
 
-    "unit_upgrade_congrats": {
+    "unit_upgrade_congrats_dialog": {
         "bg_image": "",
         "dimensions": [770,485],
         "default_button": "ok_button",
