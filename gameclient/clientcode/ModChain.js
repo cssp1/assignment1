@@ -108,6 +108,41 @@ ModChain.get_stat = function(modchain, default_value) {
     return default_value;
 };
 
+/** Same as add_mod(), but if a matching kind/source exists, replace it instead of appending
+    @param {ModChain.ModChain} modchain
+    @param {string} method
+    @param {?} strength
+    @param {string} kind
+    @param {string} source
+    @param {Object=} props */
+ModChain.add_or_replace_mod = function(modchain, method, strength, kind, source, props) {
+    var existing_index = (modchain ? goog.array.findIndex(modchain['mods'], function(mod) {
+        return (mod['kind'] === kind) && (mod['source'] === source);
+    }) : -1);
+
+    if(existing_index >= 0) {
+        // rebuild the chain, skipping the step at "index"
+        var new_chain = {'val': modchain['mods'][0]['val'], 'mods': [modchain['mods'][0]]};
+        for(var i = 1; i < modchain['mods'].length; i++) {
+            var mod = modchain['mods'][i];
+            var new_props = {};
+            goog.array.forEach(ModChain.persistent_props, function(p) {
+                if(p in mod) { new_props[p] = mod[p]; }
+            });
+            var new_strength = mod['strenghth'];
+            if(i == existing_index) {
+                if(mod['method'] !== method) { throw Error('method does not match'); }
+                new_strength = strength; // use provided updated strength
+                new_props = props; // use provided props
+            }
+            ModChain.add_mod(new_chain, mod['method'], new_strength, mod['kind'], mod['source'], new_props);
+        }
+        return new_chain;
+    } else {
+        return ModChain.add_mod(modchain, method, strength, kind, source, props);
+    }
+};
+
 /** @param {?} base_val
     @param {Object=} props
     @return {ModChain.ModChain} */
@@ -117,6 +152,9 @@ ModChain.make_chain = function(base_val, props) {
     return {'val':base_val, 'mods':[mod]};
 };
 
+// names of chain step properties to copy when copying to duplicate a chain
+ModChain.persistent_props = ['level', 'end_time', 'effect'];
+
 // apply the same stat modifiers in a chain to a new base value
 ModChain.recompute_with_new_base_val = function(old_chain, new_base, new_base_level) {
     var new_chain = ModChain.make_chain(new_base, {'level':new_base_level});
@@ -124,7 +162,7 @@ ModChain.recompute_with_new_base_val = function(old_chain, new_base, new_base_le
     for(var i = 1; i < old_chain['mods'].length; i++) {
         var mod = old_chain['mods'][i];
         var props = {};
-        goog.array.forEach(['level','end_time','effect'], function(p) {
+        goog.array.forEach(ModChain.persistent_props, function(p) {
             if(p in mod) { props[p] = mod[p]; }
         });
         ModChain.add_mod(new_chain, mod['method'], mod['strength'], mod['kind'], mod['source'], props);

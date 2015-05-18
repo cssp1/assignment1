@@ -2411,14 +2411,11 @@
             //"features": { "kind": "TextField", "xy": [31,82], "dimensions": [170,21], "text_size": 13, "text_style": "thick", "text_hjustify": "left", "ui_name": "FEATURES" },
 
             "header": { "kind": "TextField", "xy": [116,75], "dimensions": [58,26], "text_size": 13, "text_hjustify": "left",
-                        "ui_name_base": "Base",
+                        "ui_name_unmodified": "No Mod", "ui_name_mod": "Mod L%d",
                         "ui_name": "Level %d",
                         "array": [2,1], "array_offset": [67,0] },
             "upgrade_info_button": {"kind": "ActionButton", "xy":[234,75], "dimensions":[23,23], "bg_image": "question_button", "push_bg_image": 1, "show": 0 },
 
-            "mod_header": { "kind": "TextField", "xy": [232,75], "dimensions": [58,26], "text_size": 13, "text_hjustify": "left", "ui_name": "Modifications",
-                            "show": 0
-                          },
 
             "col0,": { "kind": "TextField", "xy": [50,100], "dimensions": [58,18], "text_size": 13, "text_hjustify": "right", "delta_color": [1.0,0.5,0.05,1],
                        "ui_tooltip": "", "tooltip_delay": 0, "fixed_tooltip_offset": [35,132],
@@ -2463,18 +2460,18 @@
             "equip_loading_spinner": { "kind": "StaticImage", "xy":[75,276], "dimensions":[16,16], "asset":"loading_spinner",
                                        "show": 0, "array": [5,1], "array_offset": [60,0] },
 
-            "mod_bar": { "kind": "ProgressBar", "xy": [216, 102], "dimensions": [61, 15], "outline_width": 1,
+            "mod_bar": { "kind": "ProgressBar", "xy": [222, 102], "dimensions": [55, 15], "outline_width": 1,
                          "full_color": [0.05,0.21,0.10,1],
                          //"full_mouseover_color": [0.1,0.71,0.20,1],
                          "empty_color": [0.025,0.025,0.025,1], "outline_color": [0.02,0.02,0.02,1],
                          "array": [1,8], "array_offset": [0,19], "show": 0
                        },
-            "mod_text": { "kind": "TextField", "xy": [216,102], "dimensions": [60,15], "text_size": 13, "text_style": "normal", "text_hjustify": "center", "text_color": [0,1,0,1], "ui_name": "+3%", "ui_name_none": "None",
-                          "ui_tooltip": "", "tooltip_delay": 0,
+            "mod_text": { "kind": "ActionButton", "xy": [222,102], "dimensions": [55,15], "text_size": 13, "text_style": "normal", "text_hjustify": "center", "text_color": [0,1,0,1], "ui_name": "Modify", "ui_name_none": "None",
+                          "ui_tooltip": "", "tooltip_delay": 0, "drop_shadow": 1,
                           "array": [1,8], "array_offset": [0,19], "show": 0
                         },
-            "mod_button": { "kind": "ActionButton", "xy": [278,102], "dimensions": [22,20], "bg_image": "resource_bar_add_button",
-                            "array": [1,8], "array_offset": [0,19], "state": "disabled",
+            "mod_button": { "kind": "ActionButton", "xy": [278,101], "dimensions": [22,20], "bg_image": "resource_bar_add_button",
+                            "array": [1,8], "array_offset": [0,19], "state": "normal",
                             "ui_tooltip": "Click to modify", "tooltip_delay": 0,"fixed_tooltip_offset": [268,133],
                             "show": 0
                           },

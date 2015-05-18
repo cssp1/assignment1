@@ -38774,6 +38774,11 @@ function update_upgrade_dialog(dialog) {
             }
         } else if('associated_building' in tech) {
             feature_list.push('limit:'+tech['associated_building']);
+        } else if('affects_unit' in tech && tech['effects']) { // mod techs
+            if(tech['effects'].length != 1 || tech['effects'][0]['code'] !== 'modstat') {
+                throw Error('do not know how to parse these effects: '+JSON.stringify(tech['effects']));
+            }
+            feature_list.push(tech['effects'][0]['stat']);
         }
     } else {
         // BUILDING
@@ -38914,6 +38919,9 @@ function update_upgrade_dialog(dialog) {
         }
     }
 
+    // mod techs need to show stats for "Level 0" unresearched state
+    var show_level_0 = (tech && tech['affects_unit']);
+
     var grid_y = 0;
     var delta_color = SPUI.make_colorv(dialog.data['widgets']['col0,']['delta_color']);
 
@@ -38955,10 +38963,16 @@ function update_upgrade_dialog(dialog) {
 
         var spec = null;
         var old_spell_level = old_level, new_spell_level = new_level; // levels keying the auto_spell stats we are displaying
+        var old_chain_level = old_level, new_chain_level = new_level; // levels for the (spec's) stats at the base of the modchain
+
         if(!tech) {
             spec = unit.spec;
         } else if('associated_unit' in tech) {
             spec = gamedata['units'][tech['associated_unit']];
+        } else if('affects_unit' in tech) {
+            spec = gamedata['units'][tech['affects_unit']];
+            // modchain base stats should be derived from the unit's level, not the mod tech's level
+            old_chain_level = new_chain_level = old_spell_level = new_spell_level = Math.max(player.tech[spec['level_determined_by_tech']] || 0, 1);
         } else if('associated_item' in tech) {
             spec = ItemDisplay.get_inventory_item_spec(get_leveled_quantity(tech['associated_item'], Math.min(new_level, max_level))); // note! doesn't handle item type changing!
         } else if('associated_building' in tech) {
@@ -38972,15 +38986,18 @@ function update_upgrade_dialog(dialog) {
             modchain = unit.modstats[stat_name] || null;
         } else if('associated_unit' in tech) {
             modchain = (player.stattab['units'][tech['associated_unit']] || {})[stat_name] || null;
+        } else if('affects_unit' in tech) {
+            modchain = (player.stattab['units'][tech['affects_unit']] || {})[stat_name] || null;
         }
 
         var old_chain = null, new_chain = null;
-        if(old_level > 0) {
+        if(old_level > 0 || show_level_0) {
             old_chain = modchain;
         }
+
         if(new_level <= max_level) {
-            var new_base_value = ModChain.get_base_value(stat_name, spec, new_level);
-            new_chain = (modchain ? ModChain.recompute_with_new_base_val(modchain, new_base_value, new_level) : ModChain.make_chain(new_base_value, {'level':new_level}));
+            var new_base_value = ModChain.get_base_value(stat_name, spec, new_chain_level);
+            new_chain = (modchain ? ModChain.recompute_with_new_base_val(modchain, new_base_value, new_chain_level) : ModChain.make_chain(new_base_value, {'level':new_chain_level}));
         }
 
         // some special cases that rebase mod chains
@@ -38997,13 +39014,33 @@ function update_upgrade_dialog(dialog) {
             if(new_level <= max_level) { rebase_new = Math.floor(gamedata['deployable_unit_space']*get_leveled_quantity(spec['provides_space'], new_level)); }
         }
 
-        if(rebase_old !== null) { old_chain = (old_chain ? ModChain.recompute_with_new_base_val(old_chain, rebase_old, old_level) : ModChain.make_chain(rebase_old, {'level':old_level})); }
-        if(rebase_new !== null) { new_chain = (new_chain ? ModChain.recompute_with_new_base_val(new_chain, rebase_new, new_level) : ModChain.make_chain(rebase_new, {'level':new_level})); }
+        if(rebase_old !== null) { old_chain = (old_chain ? ModChain.recompute_with_new_base_val(old_chain, rebase_old, old_chain_level) : ModChain.make_chain(rebase_old, {'level':old_chain_level})); }
+        if(rebase_new !== null) { new_chain = (new_chain ? ModChain.recompute_with_new_base_val(new_chain, rebase_new, new_chain_level) : ModChain.make_chain(rebase_new, {'level':new_chain_level})); }
+
+        // incorporate effects of mod techs
+        if(tech && tech['affects_unit']) {
+            var effect = tech['effects'][0];
+            var method = effect['method'];
+            var kind = 'tech';
+            var source = tech['name'];
+            if(old_level > 0) {
+                if(!old_chain) {
+                    old_chain = ModChain.make_chain(ModChain.get_base_value(stat_name, spec, old_chain_level), {'level':old_chain_level});
+                }
+                old_chain = ModChain.add_or_replace_mod(old_chain, method, get_leveled_quantity(effect['strength'], old_level), kind, source, {'level':old_level});
+            }
+            if(new_level <= max_level) {
+                if(!new_chain) {
+                    new_chain = ModChain.make_chain(ModChain.get_base_value(stat_name, spec, new_chain_level), {'level':new_chain_level});
+                }
+                new_chain = ModChain.add_or_replace_mod(new_chain, method, get_leveled_quantity(effect['strength'], new_level), kind, source, {'level':new_level});
+            }
+        }
 
         var new_column = -1;
         var old_auto_spell, new_auto_spell;
         if(tech) {
-            if('associated_unit' in tech) {
+            if('associated_unit' in tech || 'affects_unit' in tech) {
                 old_auto_spell = new_auto_spell = get_auto_spell_for_unit(player, spec);
             } else if('associated_item' in tech) {
                 old_auto_spell = get_auto_spell_for_item(ItemDisplay.get_inventory_item_spec(get_leveled_quantity(tech['associated_item'], Math.max(1,old_level))));
