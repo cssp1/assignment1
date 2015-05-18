@@ -35124,7 +35124,7 @@ function invoke_tech_upgrade_congrats(spec_name) {
     var sound_name = null;
 
     var dialog = invoke_generic_upgrade_congrats(get_leveled_quantity(unit_spec['art_asset'], level), alt_bg, sound_name,
-                                                 ui_tech_name, level, text, get_leveled_quantity(unit_spec['splash_image'] || unit_spec['art_asset'], level),
+                                                 ui_tech_name, level, text, get_leveled_quantity(tech_spec['splash_image'] || unit_spec['splash_image'] || unit_spec['art_asset'], level),
                                                  get_leveled_quantity(unit_spec['cloaked'] || 0, level),
                                                  null, null);
 

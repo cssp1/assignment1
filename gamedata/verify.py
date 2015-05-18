@@ -545,8 +545,8 @@ def check_tech(specname, keyname, spec, maxlevel):
             for a in asset_list:
                 error |= require_art_asset(a, specname+':'+ASSET)
 
-    if ('associated_unit' not in spec) and ('icon' not in spec):
-        error |= 1; print '%s: needs either an associated_unit or icon for display purposes' % (specname)
+    if ('associated_unit' not in spec) and ('splash_image' not in spec) and ('icon' not in spec):
+        error |= 1; print '%s: needs either an associated_unit, splash_image, or icon for display purposes' % (specname)
 
     if not isinstance(spec['research_time'], list):
         error |= 1
