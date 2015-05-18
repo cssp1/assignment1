@@ -653,7 +653,7 @@ TurretHeadDialog.set_stats_display = function(dialog, emplacement_obj, name, rel
             var modchain = ModChain.make_chain(ModChain.get_base_value(stat, spec, spec['level'] || 1), {'level':spec['level'] || 1});
             var relative_modchain = (relative_to ? ModChain.make_chain(ModChain.get_base_value(stat, relative_spec, relative_spec['level'] || 1), {'level':relative_spec['level'] || 1}) : null);
 
-            ModChain.display_label_widget(left, stat, spell);
+            ModChain.display_label_widget(left, stat, spell, true);
 
             if(stat == 'anti_missile') { // needs special handling because it is a stat of the building, not the weapon spell
                 modchain = TurretHeadDialog._add_anti_missile_mod(modchain, spec);

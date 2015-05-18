@@ -29731,8 +29731,8 @@ function manufacture_dialog_select_unit(dialog, name) {
     goog.array.forEach(features, function(stat) {
         var modchain = (player.stattab['units'][spec['name']] || {})[stat] || null;
         dialog.widgets['feature_value'+row.toString()].show = dialog.widgets['feature_label'+row.toString()].show = true;
-        ModChain.display_widget(dialog.widgets['feature_value'+row.toString()], stat, modchain, spec, Math.max(level, 1), auto_spell, auto_spell_level);
-        ModChain.display_label_widget(dialog.widgets['feature_label'+row.toString()], stat, auto_spell);
+        ModChain.display_widget(dialog.widgets['feature_value'+row.toString()], stat, modchain, spec, Math.max(level, 1), auto_spell, auto_spell_level, true);
+        ModChain.display_label_widget(dialog.widgets['feature_label'+row.toString()], stat, auto_spell, true);
         row += 1;
     });
     while(row < dialog.data['widgets']['feature_label']['array'][1]) {
@@ -30661,9 +30661,9 @@ function crafting_dialog_select_recipe_mines(dialog, specname, recipe) {
             var stat = statlist[i];
             var modchain = null;
             // hack - get the .str for the label, then reset the widget to be the stat value display, get the .str, and combine them
-            ModChain.display_label_widget(dialog.widgets[wname], stat, stat_spell);
+            ModChain.display_label_widget(dialog.widgets[wname], stat, stat_spell, true);
             var label_str = dialog.widgets[wname].str;
-            ModChain.display_widget(dialog.widgets[wname], stat, modchain, stat_spec, stat_level, stat_spell, stat_spell_level);
+            ModChain.display_widget(dialog.widgets[wname], stat, modchain, stat_spec, stat_level, stat_spell, stat_spell_level, true);
             var value_str = dialog.widgets[wname].str;
             dialog.widgets[wname].str = label_str + ': ' + value_str;
         } else {
@@ -30709,9 +30709,9 @@ function crafting_dialog_select_recipe_missiles(dialog, specname, recipe) {
                 var stat = statlist[i];
                 var modchain = null;
                 // hack - get the .str for the label, then reset the widget to be the stat value display, get the .str, and combine them
-                ModChain.display_label_widget(dialog.widgets[wname], stat, stat_spell);
+                ModChain.display_label_widget(dialog.widgets[wname], stat, stat_spell, true);
                 var label_str = dialog.widgets[wname].str;
-                ModChain.display_widget(dialog.widgets[wname], stat, modchain, stat_spec, stat_level, stat_spell, stat_spell_level);
+                ModChain.display_widget(dialog.widgets[wname], stat, modchain, stat_spec, stat_level, stat_spell, stat_spell_level, true);
                 var value_str = dialog.widgets[wname].str;
                 dialog.widgets[wname].str = label_str + ': ' + value_str;
             } else {
@@ -39017,26 +39017,57 @@ function update_upgrade_dialog(dialog) {
             old_auto_spell = new_auto_spell = unit.get_auto_spell();
         }
 
-        feature_widget(dialog, grid_y, 0).show = true;
-        ModChain.display_label_widget(feature_widget(dialog, grid_y, 0), stat_name, old_auto_spell);
+        // XXX hack to prevent tooltip show-through into child dialog
+        var enable_tooltip = true;
+        if(dialog.children[dialog.children.length-1].modal) { enable_tooltip = false; }
 
-        if(old_level <= 0) {
+        feature_widget(dialog, grid_y, 0).show = true;
+        ModChain.display_label_widget(feature_widget(dialog, grid_y, 0), stat_name, old_auto_spell, enable_tooltip);
+
+        if(old_level <= 0 && !show_level_0) {
             feature_widget(dialog, grid_y, 1).show = true;
             feature_widget(dialog, grid_y, 2).show = false;
-            ModChain.display_widget(feature_widget(dialog, grid_y, 1), stat_name, new_chain, spec, new_level, new_auto_spell, new_spell_level);
+            ModChain.display_widget(feature_widget(dialog, grid_y, 1), stat_name, new_chain, spec, new_chain_level, new_auto_spell, new_spell_level, enable_tooltip);
         } else if(new_level > max_level) {
             feature_widget(dialog, grid_y, 1).show = true;
             feature_widget(dialog, grid_y, 2).show = false;
-            ModChain.display_widget(feature_widget(dialog, grid_y, 1), stat_name, old_chain, spec, old_level, old_auto_spell, old_spell_level);
+            ModChain.display_widget(feature_widget(dialog, grid_y, 1), stat_name, old_chain, spec, old_chain_level, old_auto_spell, old_spell_level, enable_tooltip);
         } else {
             feature_widget(dialog, grid_y, 1).show = true;
             feature_widget(dialog, grid_y, 2).show = true;
-            ModChain.display_widget(feature_widget(dialog, grid_y, 1), stat_name, old_chain, spec, old_level, old_auto_spell, old_spell_level);
-            ModChain.display_widget(feature_widget(dialog, grid_y, 2), stat_name, new_chain, spec, new_level, new_auto_spell, new_spell_level); // sets text color
+            ModChain.display_widget(feature_widget(dialog, grid_y, 1), stat_name, old_chain, spec, old_chain_level, old_auto_spell, old_spell_level, enable_tooltip);
+            ModChain.display_widget(feature_widget(dialog, grid_y, 2), stat_name, new_chain, spec, new_chain_level, new_auto_spell, new_spell_level, enable_tooltip); // sets text color
             if(feature_widget(dialog, grid_y, 2).str != feature_widget(dialog, grid_y, 1).str) {
                 feature_widget(dialog, grid_y, 2).text_color = delta_color;
             }
         }
+        }
+
+        var mod_tech = null;
+
+        // XXXXXX inefficient
+        if(tech) {
+            for(var other_name in gamedata['tech']) {
+                var other_tech = gamedata['tech'][other_name];
+                if(other_tech['associated_tech'] == tech['name'] &&
+                   other_tech['effects'] && other_tech['effects'][0]['stat'] == stat_name &&
+                   (!other_tech['show_if'] || read_predicate(other_tech['show_if']).is_satisfied(player,null))) {
+                    mod_tech = other_tech;
+                    break;
+                }
+            }
+        }
+
+        dialog.widgets['mod_bar'+grid_y.toString()].show =
+            dialog.widgets['mod_text'+grid_y.toString()].show =
+            dialog.widgets['mod_button'+grid_y.toString()].show = !!mod_tech;
+        if(mod_tech) {
+            dialog.widgets['mod_button'+grid_y.toString()].onclick =
+                dialog.widgets['mod_text'+grid_y.toString()].onclick =(function (_mod_tech) { return function(w) {
+                invoke_upgrade_tech_dialog(_mod_tech['name']);
+            }; })(mod_tech);
+            dialog.widgets['mod_bar'+grid_y.toString()].progress = (player.tech[mod_tech['name']]||0) / get_max_ui_level(mod_tech);
+            dialog.widgets['mod_button'+grid_y.toString()].tooltip.str = (enable_tooltip ? dialog.data['widgets']['mod_button']['ui_tooltip'] : null);
         }
 
         grid_y += 1;
@@ -39045,21 +39076,24 @@ function update_upgrade_dialog(dialog) {
         feature_widget(dialog, grid_y, 0).show =
             feature_widget(dialog, grid_y, 1).show =
             feature_widget(dialog, grid_y, 2).show = false;
+        dialog.widgets['mod_bar'+grid_y.toString()].show =
+            dialog.widgets['mod_text'+grid_y.toString()].show =
+            dialog.widgets['mod_button'+grid_y.toString()].show = false;
         grid_y += 1;
     }
 
     if(feature_list.length < 1) {
         dialog.widgets['header0'].show =
             dialog.widgets['header1'].show = false;
-    } else if(old_level <= 0) {
-        dialog.widgets['header0'].str = dialog.widgets['header0'].data['ui_name'].replace('%d', new_level);
+    } else if(old_level <= 0 && !show_level_0) {
+        dialog.widgets['header0'].str = dialog.widgets['header0'].data[(tech && tech['affects_unit']) ? 'ui_name_mod' : 'ui_name'].replace('%d', new_level);
         dialog.widgets['header1'].show = false;
     } else if(new_level > max_level) {
-        dialog.widgets['header0'].str = dialog.widgets['header0'].data['ui_name'].replace('%d', old_level);
+        dialog.widgets['header0'].str = dialog.widgets['header0'].data[(old_level <= 0 ? 'ui_name_unmodified' : (tech && tech['affects_unit']) ? 'ui_name_mod' : 'ui_name')].replace('%d', old_level);
         dialog.widgets['header1'].show = false;
     } else {
-        dialog.widgets['header0'].str = dialog.widgets['header0'].data['ui_name'].replace('%d', old_level);
-        dialog.widgets['header1'].str = dialog.widgets['header1'].data['ui_name'].replace('%d', new_level);
+        dialog.widgets['header0'].str = dialog.widgets['header0'].data[(old_level <= 0 ? 'ui_name_unmodified' : (tech && tech['affects_unit']) ? 'ui_name_mod' : 'ui_name')].replace('%d', old_level);
+        dialog.widgets['header1'].str = dialog.widgets['header1'].data[(tech && tech['affects_unit']) ? 'ui_name_mod' : 'ui_name'].replace('%d', new_level);
         if(unit && unit.spec['name'] == gamedata['townhall']) {
             dialog.widgets['upgrade_info_button'].show = true;
             dialog.widgets['upgrade_info_button'].onclick = function(w) { invoke_cc_upgrade_info(); };

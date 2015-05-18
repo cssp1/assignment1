@@ -381,8 +381,9 @@ ModChain.display_tooltip = function(stat, modchain, show_base, ui_data) {
 /** Set a SPUI TextWidget to display the right text label and tooltip for a stat
     @param {!SPUI.TextWidget} widget
     @param {string} stat
-    @param {Object?=} auto_spell */
-ModChain.display_label_widget = function(widget, stat, auto_spell) {
+    @param {Object?} auto_spell
+    @param {boolean} enable_tooltip */
+ModChain.display_label_widget = function(widget, stat, auto_spell, enable_tooltip) {
     // flip over to a different variant for one-shot weapons
     if(stat == 'weapon_damage' && auto_spell['kills_self']) {
         stat = 'weapon_damage_kills_self';
@@ -392,7 +393,7 @@ ModChain.display_label_widget = function(widget, stat, auto_spell) {
 
     widget.str = ui_data['ui_name'];
     if(widget.tooltip) {
-        widget.tooltip.str = ui_data['ui_tooltip'];
+        widget.tooltip.str = (enable_tooltip ? ui_data['ui_tooltip'] : null);
     }
 };
 
@@ -477,10 +478,11 @@ ModChain.display_value_detailed = function(stat, modchain, spec, level, auto_spe
     @param {number} level
     @param {Object} auto_spell
     @param {number} auto_spell_level
+    @param {boolean} enable_tooltip
 */
-ModChain.display_widget = function(widget, stat, modchain, spec, level, auto_spell, auto_spell_level) {
+ModChain.display_widget = function(widget, stat, modchain, spec, level, auto_spell, auto_spell_level, enable_tooltip) {
     var detail = ModChain.display_value_detailed(stat, modchain, spec, level, auto_spell, auto_spell_level);
     widget.str = detail.str;
-    widget.tooltip.str = detail.tooltip;
+    widget.tooltip.str = (enable_tooltip ? detail.tooltip : null);
     widget.text_color = detail.color;
 };
