@@ -5318,8 +5318,8 @@
                                     "bg_image": "action_button_206px", "text_color": [0,0,0,1], "ui_name": "Inform Earth" },
             "spam_button_invite": { "kind": "ActionButton", "on_after": 1.5, "xy": [226,260], "dimensions": [206,40], "text_size": 13, "text_style": "bold",
                                     "bg_image": "action_button_206px", "text_color": [0,0,0,1], "ui_name": "Invite Friends" },
-           "screenshot_button": {"show": 0, "kind": "ActionButton", "xy":[308,13], "dimensions":[23,23], "bg_image": "photo_button", "push_bg_image": 1,
-                                 "ui_caption": "%PLAYER - Level Up"},
+            "screenshot_button": {"show": 0, "kind": "ActionButton", "xy":[308,13], "dimensions":[23,23], "bg_image": "photo_button", "push_bg_image": 1,
+                                  "ui_caption": "%PLAYER - Level Up"},
             "new_achievement": { "show": 0, "off_after": 1.5,
                                  "kind": "TextField", "xy": [186,66], "dimensions": [272, 43], "text_size": 30, "text_style": "thick", "drop_shadow":1,
                                  "text_hjustify": "center", "ui_name": "New Milestone!" },
@@ -8285,7 +8285,7 @@
                          "randomize_period_normal": -1, "randomize_period_scanning": -1,
                          "array": [5,2], "array_offset":[75,75] },
             "goodies_spinner": { "show":0, "kind": "StaticImage", "asset": "loading_spinner", "xy": [286,150], "dimensions": [16,16],
-                         "array": [5,2], "array_offset":[75,75] },
+                                 "array": [5,2], "array_offset":[75,75] },
 
             "cursor": { "show": 0, "kind": "StaticImage", "xy":[-25,-25], "dimensions":[100,100],
                         "asset": "dialog_glow_resizable",
@@ -8303,13 +8303,13 @@
                                 "ui_name_loading": "Loading...",
                                 "ui_tooltip": "", "tooltip_delay": 0 }
 
-//            "separator": {"kind": "Line", "xy": [50,354], "dimensions": [636,0], "color":  [0.063,0.176,0.36,0.5], "stroke_width": 2},
-//            "history_label": { "kind": "TextField", "xy": [58,326], "dimensions": [659,33], "text_size": 13,
-//                               "text_hjustify": "left",
-//                               "ui_name": "Discovered this session:"
-//                             },
-//            "history": { "show":0, "kind": "Dialog", "dialog": "item_display", "xy": [68,363], "dimensions": [50,50],
-//                         "array": [10,1], "array_offset":[60,60] }
+            //            "separator": {"kind": "Line", "xy": [50,354], "dimensions": [636,0], "color":  [0.063,0.176,0.36,0.5], "stroke_width": 2},
+            //            "history_label": { "kind": "TextField", "xy": [58,326], "dimensions": [659,33], "text_size": 13,
+            //                               "text_hjustify": "left",
+            //                               "ui_name": "Discovered this session:"
+            //                             },
+            //            "history": { "show":0, "kind": "Dialog", "dialog": "item_display", "xy": [68,363], "dimensions": [50,50],
+            //                         "array": [10,1], "array_offset":[60,60] }
         }
     },
 
