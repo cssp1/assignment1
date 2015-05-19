@@ -4838,7 +4838,9 @@
             "sale_bg": { "show": 0, "kind": "SolidRect", "xy": [0,0], "dimensions": [1,1], "color": [0.8,0,0,1],
                          "path": [[10,248], [33,225], [62,225], [13,273], [11,272], [10,270], [10,236]] },
             "sale_label": { "show": 0, "kind": "TextField", "xy": [28,206], "dimensions": [20,100], "color": [1,1,1,1],
-                            "text_style": "bold", "text_size": 15, "text_hjustify": "center", "text_angle": -45, "ui_name": "SALE", "xy_shift": { "NEW": [0,-1] } },
+                            "text_style": "bold", "text_size": 15, "text_hjustify": "center", "text_angle": -45, "ui_name": "SALE",
+                            "tweaks": { "NEW": {"xy_shift": [0,-1] },
+                                        "UPDATED": {"xy_shift": [2,5], "text_size": 10} } },
 
             "jewel": { "kind": "Dialog", "xy": [182,20], "dimensions": [17,14], "dialog": "notification_jewel" }
         }

@@ -36594,8 +36594,11 @@ function invoke_new_store_category(catdata, parent_catdata, scroll_to_sku_name, 
         var banner_text = ('ui_banner' in skudata ? eval_cond_or_literal(skudata['ui_banner'], player, null) : null);
         d.widgets['sale_bg'].show = d.widgets['sale_label'].show = (!!banner_text && (banner_text.length > 0));
         d.widgets['sale_label'].str = banner_text;
-        if(banner_text in d.data['widgets']['sale_label']['xy_shift']) {
-            d.widgets['sale_label'].xy = vec_add(d.data['widgets']['sale_label']['xy'], d.data['widgets']['sale_label']['xy_shift'][banner_text]);
+        if(banner_text in d.data['widgets']['sale_label']['tweaks']) {
+            var tweak = d.data['widgets']['sale_label']['tweaks'][banner_text];
+            d.widgets['sale_label'].xy = vec_add(d.data['widgets']['sale_label']['xy'], tweak['xy_shift']);
+            var text_size = tweak['text_size'] || d.data['widgets']['sale_label']['text_size'];
+            d.widgets['sale_label'].font = SPUI.make_font(text_size, text_size+3, d.data['widgets']['sale_label']['text_style']);
         }
 
         d.widgets['icon_frame'].onclick = null;
