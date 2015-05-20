@@ -38468,6 +38468,17 @@ function update_upgrade_dialog(dialog) {
     var unit = dialog.user_data['unit'];
     var tech = dialog.user_data['tech'];
 
+    // XXXXXX hack to prevent tooltip show-through into child dialog
+    var enable_tooltip = true;
+    var p = dialog;
+    while(p.parent) {
+        if(p.children[p.children.length-1] !== dialog && p.children[p.children.length-1].modal) {
+            enable_tooltip = false;
+            break;
+        }
+        p = p.parent;
+    }
+
     var old_level, max_level;
 
     if(techname != 'BUILDING') {
@@ -38639,7 +38650,7 @@ function update_upgrade_dialog(dialog) {
     if(new_level > max_level) {
         // don't show resource costs if already at max level
         if(dialog.widgets['cost_power'].show) {
-            dialog.widgets['cost_power'].tooltip.str = dialog.data['widgets']['cost_power']['ui_tooltip_maxlevel'];
+            dialog.widgets['cost_power'].tooltip.str = (enable_tooltip ? dialog.data['widgets']['cost_power']['ui_tooltip_maxlevel'] : null);
             dialog.widgets['cost_power'].fixed_tooltip_offset = dialog.data['widgets']['cost_power']['fixed_tooltip_offset_maxlevel'];
             dialog.widgets['cost_power'].text_color = SPUI.default_text_color;
             dialog.widgets['cost_power'].str = pretty_print_number(get_leveled_quantity(unit.spec['consumes_power'], unit.level));
@@ -38678,7 +38689,7 @@ function update_upgrade_dialog(dialog) {
                     dialog.widgets['resource_'+res+'_icon'].show = (cost > 0);
                 }
                 widget.str = pretty_print_qty_brief(cost);
-                widget.tooltip.str = widget.data['ui_tooltip'].replace('%RES', resdata['ui_name']).replace('%QTY', pretty_print_number(cost));
+                widget.tooltip.str = (enable_tooltip ? widget.data['ui_tooltip'].replace('%RES', resdata['ui_name']).replace('%QTY', pretty_print_number(cost)) : null);
                 if(cost > 0 && player.resource_state[res][1] < cost) {
                     widget.text_color = SPUI.error_text_color;
                     // don't show button for topup, since the main "Use Resources" button will take care of it
@@ -38697,7 +38708,7 @@ function update_upgrade_dialog(dialog) {
             var old_cost = get_leveled_quantity(unit.spec['consumes_power'], unit.level);
             cost = get_leveled_quantity(unit.spec['consumes_power'], unit.level+1);
 
-            dialog.widgets['cost_power'].tooltip.str = dialog.data['widgets']['cost_power']['ui_tooltip'].replace('%CUR', pretty_print_number(old_cost)).replace('%DURING', pretty_print_number(get_leveled_quantity(unit.spec['consumes_power_while_building'], unit.level+1)));
+            dialog.widgets['cost_power'].tooltip.str = (enable_tooltip ? dialog.data['widgets']['cost_power']['ui_tooltip'].replace('%CUR', pretty_print_number(old_cost)).replace('%DURING', pretty_print_number(get_leveled_quantity(unit.spec['consumes_power_while_building'], unit.level+1))) : null);
             dialog.widgets['cost_power'].fixed_tooltip_offset = dialog.data['widgets']['cost_power']['fixed_tooltip_offset'];
 
             dialog.widgets['cost_power'].str = pretty_print_number(cost);
@@ -38955,13 +38966,13 @@ function update_upgrade_dialog(dialog) {
             // special case for XP gain
             feature_widget(dialog, grid_y, 0).show = true;
             feature_widget(dialog, grid_y, 0).str = gamedata['strings']['modstats']['stats']['xp']['ui_name'];
-            feature_widget(dialog, grid_y, 0).tooltip.str = gamedata['strings']['modstats']['stats']['xp']['ui_tooltip'];
+            feature_widget(dialog, grid_y, 0).tooltip.str = (enable_tooltip ? gamedata['strings']['modstats']['stats']['xp']['ui_tooltip'] : null);
             var xp_col = (new_level == 1 ? 1 : 2);
             feature_widget(dialog, grid_y, (xp_col == 1 ? 2 : 1)).show = false;
             feature_widget(dialog, grid_y, xp_col).show = true;
             feature_widget(dialog, grid_y, xp_col).str = '+'+pretty_print_number(xp_amount)+' XP';
             feature_widget(dialog, grid_y, xp_col).text_color = delta_color;
-            feature_widget(dialog, grid_y, xp_col).tooltip.str = gamedata['strings']['modstats']['stats']['xp']['ui_tooltip'];
+            feature_widget(dialog, grid_y, xp_col).tooltip.str = (enable_tooltip ? gamedata['strings']['modstats']['stats']['xp']['ui_tooltip'] : null);
         } else {
 
         var spec = null;
@@ -39057,10 +39068,6 @@ function update_upgrade_dialog(dialog) {
             old_auto_spell = new_auto_spell = unit.get_auto_spell();
         }
 
-        // XXX hack to prevent tooltip show-through into child dialog
-        var enable_tooltip = true;
-        if(dialog.children[dialog.children.length-1].modal) { enable_tooltip = false; }
-
         feature_widget(dialog, grid_y, 0).show = true;
         ModChain.display_label_widget(feature_widget(dialog, grid_y, 0), stat_name, old_auto_spell, enable_tooltip);
 
@@ -39142,9 +39149,6 @@ function update_upgrade_dialog(dialog) {
 
     // set up equipment widgets
     if(equip_slots) {
-            // horrible hack to deal with tooltip overlap
-            var child_dialog = (dialog.children[dialog.children.length-1].user_data && dialog.children[dialog.children.length-1].user_data['dialog'] &&
-                                dialog.children[dialog.children.length-1].user_data['dialog'] != 'upgrade_bar');
             equip_slots = get_leveled_quantity(equip_slots, Math.max(old_level, 1));
             var last_label = null, slot_i = 0;
 
@@ -39225,7 +39229,7 @@ function update_upgrade_dialog(dialog) {
                     dialog.widgets['equip_slot'+slot_i].state = 'locked';
                     dialog.widgets['equip_slot'+slot_i].show = true;
                     dialog.widgets['equip_slot'+slot_i].onclick = null;
-                    dialog.widgets['equip_slot'+slot_i].tooltip.str = (!child_dialog ? dialog.data['widgets']['equip_slot']['ui_tooltip_unlocks_at'].replace('%d', unlocks_at.toString()) : null);
+                    dialog.widgets['equip_slot'+slot_i].tooltip.str = (enable_tooltip ? dialog.data['widgets']['equip_slot']['ui_tooltip_unlocks_at'].replace('%d', unlocks_at.toString()) : null);
                     slot_i++;
                 }
             }
@@ -39402,7 +39406,7 @@ function update_upgrade_dialog(dialog) {
         dialog.widgets['use_resources_button'].state = 'disabled';
         if(tooltip_req_use_resources.length > 0) {
             dialog.widgets['use_resources_button'].tooltip.text_color = SPUI.error_text_color;
-            dialog.widgets['use_resources_button'].tooltip.str = tooltip_req_use_resources.join('\n');
+            dialog.widgets['use_resources_button'].tooltip.str = (enable_tooltip ? tooltip_req_use_resources.join('\n') : null);
         }
 
         // search for appropriate "+" button to get help
@@ -39484,14 +39488,14 @@ function update_upgrade_dialog(dialog) {
     widget.bg_image = player.get_any_abtest_value('price_display_asset', gamedata['store']['price_display_asset']);
     widget.state = Store.get_user_currency();
     widget.str = Store.display_user_currency_price(price); // PRICE
-    widget.tooltip.str = Store.display_user_currency_price_tooltip(price);
+    widget.tooltip.str = (enable_tooltip ? Store.display_user_currency_price_tooltip(price) : null);
 
     if(price < 0) {
         // cannot make a purchase because tech requirements are not fulfilled
         dialog.widgets['instant_credits'].onclick = null;
         dialog.widgets['instant_button'].state = 'disabled';
         if(tooltip_req_instant.length > 0) {
-            dialog.widgets['instant_button'].tooltip.str = tooltip_req_instant.join('\n');
+            dialog.widgets['instant_button'].tooltip.str = (enable_tooltip ? tooltip_req_instant.join('\n') : null);
             dialog.widgets['instant_button'].tooltip.text_color = SPUI.error_text_color;
         }
 
