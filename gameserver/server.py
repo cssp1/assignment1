@@ -4835,6 +4835,9 @@ class TechSpec(Spec):
         self.kind = 'tech'
         self.table[self.name] = self
 
+    def compute_maxlevel(self):
+        return len(self.research_time)
+
     # return the spec of the unit this tech unlocks, if nany
     def unlocks_unit(self):
         if self.associated_unit:
