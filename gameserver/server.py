@@ -18850,8 +18850,9 @@ class GAMEAPI(resource.Resource):
                 retmsg.append(["ERROR", "REQUIREMENTS_NOT_SATISFIED",remove_spec['equip']['unequip_requires']])
                 return False
 
-        # check warehouse availability
-        if (not force) and session.player.warehouse_is_busy():
+        # check warehouse availability for pulling any item out or putting a non-fragile item back in
+        if (not force) and (add_spec or (remove_spec and remove_spec.get('remove_fragility',0) < 1)) and \
+           session.player.warehouse_is_busy():
             retmsg.append(["ERROR", "WAREHOUSE_IS_BUSY"])
             return False
 
