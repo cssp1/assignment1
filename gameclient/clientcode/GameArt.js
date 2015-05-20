@@ -1006,6 +1006,13 @@ GameArt.Image.prototype.check_delay_load = function() {
 };
 
 GameArt.Image.prototype.check_for_badness = function() {
+    // seems to be a bug or undocumented behavior change
+    if((spin_demographics['browser_name'] == "Firefox" && spin_demographics['browser_version'] >= 38) &&
+       !this.img.complete) {
+        // try again next frame
+        return true;
+    }
+
     if(!this.img.complete || this.img.width < 1 || this.img.height < 1) {
         this.data_loaded = false;
         GameArt.report_asset_load_fail(this.entry.filename, (!this.img.complete ? 'draw_but_not_complete': 'draw_but_bad_dimensions'));
