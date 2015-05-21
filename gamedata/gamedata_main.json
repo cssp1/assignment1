@@ -124,6 +124,7 @@
         "art_download_timeout": { "image": 180, "audio": 360 },
 
         "proxy_portraits": 1, // enable proxying of FB/KG profile pictures to avoid tainting the Canvas
+        "portrait_proxy_cache_rev": "2", // cache "version" tag for forcing refreshes
 
         "min_speak_interval": 1.5, // don't repeat same unit speech sound effect within this many seconds
 

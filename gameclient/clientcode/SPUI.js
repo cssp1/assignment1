@@ -2373,7 +2373,7 @@ SPUI.get_facebook_portrait_url = function(facebook_id) {
         return SPUI.get_anonymous_portrait_url(facebook_id === spin_facebook_user);
     } else {
         if(gamedata['client']['proxy_portraits']) {
-            return GameArt.art_url('fb_portrait/'+facebook_id+'/picture', false);
+            return GameArt.art_url('fb_portrait/'+facebook_id+'/picture?v='+gamedata['client']['portrait_proxy_cache_rev'], false); // "v" version is to rev the cache
         } else {
             return SPFB.versioned_graph_endpoint('user/picture', facebook_id+'/picture');
         }
@@ -2384,7 +2384,7 @@ SPUI.get_kongregate_portrait_url = function(kg_id, avatar_url) {
         return SPUI.get_anonymous_portrait_url(kg_id === spin_kongregate_user);
     } else {
         if(gamedata['client']['proxy_portraits']) {
-            return GameArt.art_url('kg_portrait/?avatar_url='+encodeURIComponent(avatar_url), false);
+            return GameArt.art_url('kg_portrait/?avatar_url='+encodeURIComponent(avatar_url)+'&v='+gamedata['client']['portrait_proxy_cache_rev'], false);
         } else {
             return avatar_url;
         }

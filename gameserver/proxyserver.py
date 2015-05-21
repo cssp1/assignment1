@@ -2213,8 +2213,14 @@ class PortraitProxy(twisted.web.resource.Resource):
     def getChildWithDefault(self, path, request): return self
 
     def set_cdn_headers(self, request):
+        # Cache for 24hrs by default
+        max_age = SpinConfig.config['proxyserver'].get('portraits_max_cache_age', 24*60*60)
+        request.setHeader('Cache-Control', 'max-age='+str(max_age))
+        if SpinConfig.config['proxyserver'].get('cdn_expires_header', False):
+            request.setHeader('Expires', format_http_time(proxy_time + max_age))
+
         # note! this means that requests MUST have a unique ?origin=whatever in the URL!
-        SpinHTTP.set_access_control_headers_for_cdn(request, -1) # no max_age
+        SpinHTTP.set_access_control_headers_for_cdn(request, max_age)
 
     def render_OPTIONS(self, request):
         self.parse_request(request) # just to assert it is a valid request
@@ -2272,7 +2278,11 @@ class FBPortraitProxy(PortraitProxy):
         assert path_fields[3] == 'picture'
         assert (not parts.params) and (not parts.fragment)
         qs = urlparse.parse_qs(parts.query)
-        assert len(qs) == 1 and ('spin_origin' in qs)
+        assert ('spin_origin' in qs)
+        for key, val in qs.iteritems():
+            if key not in ('v', 'spin_origin'):
+                exception_log.event(proxy_time, 'unrecognized FB portrait URL: %s' % repr(parts))
+                assert False # force fail
         return SpinFacebook.versioned_graph_endpoint('user/picture', '%s/picture' % fbid)
 
 class KGPortraitProxy(PortraitProxy):
@@ -2293,7 +2303,11 @@ class KGPortraitProxy(PortraitProxy):
         assert path_fields[0] == '' and path_fields[2] == ''
         assert (not parts.params) and (not parts.fragment)
         qs = urlparse.parse_qs(parts.query)
-        assert len(qs) == 2 and ('spin_origin' in qs) and ('avatar_url' in qs)
+        assert ('spin_origin' in qs) and ('avatar_url' in qs)
+        for key, val in qs.iteritems():
+            if key not in ('spin_origin', 'avatar_url', 'v'):
+                exception_log.event(proxy_time, 'unrecognized KG portrait qs: %s' % repr(parts))
+                assert False # force fail
         avatar_url = qs['avatar_url'][-1]
         avatar_parts = urlparse.urlparse(avatar_url)
         if not (avatar_parts.netloc.endswith('kongcdn.com') or avatar_parts.netloc.endswith('insnw.net')):
