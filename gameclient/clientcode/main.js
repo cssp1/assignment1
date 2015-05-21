@@ -33737,7 +33737,8 @@ function map_dialog_change_page(dialog, chapter, page) {
             dialog.widgets['row_bg'+row].color = SPUI.make_colorv(dialog.data['widgets']['row_bg'][('color_'+chapter in dialog.data['widgets']['row_bg'] ? 'color_'+chapter : 'color')]);
             dialog.widgets['row_portrait_outline'+row].show = true;
             dialog.widgets['row_portrait_outline'+row].outline_color = SPUI.make_colorv(dialog.data['widgets']['row_portrait_outline'][('outline_color_'+chapter in dialog.data['widgets']['row_portrait_outline'] ? 'outline_color_'+chapter : 'outline_color')]);
-            dialog.widgets['row_challenge_icon'+row].show = false;
+            dialog.widgets['row_challenge_icon_bg'+row].show =
+                dialog.widgets['row_challenge_icon'+row].show = false;
 
             for(var h = 0; h < dialog.data['widgets']['row_star_holes']['array'][0]; h++) {
                 dialog.widgets[SPUI.get_array_widget_name('row_stars', dialog.data['widgets']['row_stars']['array'], [h,row])].show = false;
@@ -33858,8 +33859,8 @@ function map_dialog_change_page(dialog, chapter, page) {
                 dialog.widgets['row_name'+row].str = display_name;
 
                 dialog.widgets['row_info_button'+row].show = false;
-
-                if(base && gamedata['client']['map_dialog_battle_stars_column'] && ('ui_battle_stars_key' in base)) {
+                var show_battle_stars = (base && gamedata['client']['map_dialog_battle_stars_column'] && ('ui_battle_stars_key' in base));
+                if(show_battle_stars) {
                     dialog.widgets['row_ai_difficulty'+row].show =
                         dialog.widgets['row_level'+row].show = false;
                     for(var h = 0; h < dialog.data['widgets']['row_star_holes']['array'][0]; h++) {
@@ -33936,9 +33937,28 @@ function map_dialog_change_page(dialog, chapter, page) {
                         }
                     }
 
-                    if(base && ('challenge_icon' in base)) {
-                        dialog.widgets['row_challenge_icon'+row].show = true;
-                        dialog.widgets['row_challenge_icon'+row].asset = base['challenge_icon'];
+                    if(base && (base['challenge_icon'] || base['challenge_item'])) {
+                        goog.array.forEach(['row_challenge_icon','row_challenge_icon_bg'], function(wname) {
+                            dialog.widgets[wname+row].xy = vec_add(dialog.data['widgets'][wname][show_battle_stars ? 'xy_stars' : 'xy'], vec_scale(row, dialog.data['widgets'][wname]['array_offset']));
+                        });
+                        if(base['challenge_item']) {
+                            var item = eval_cond_or_literal(base['challenge_item'], player, null);
+                            if(item) {
+                                dialog.widgets['row_challenge_icon'+row].show = true;
+                                dialog.widgets['row_challenge_icon_bg'+row].show = true;
+                                var spec = ItemDisplay.get_inventory_item_spec(item['spec']);
+                                ItemDisplay.set_inventory_item_asset(dialog.widgets['row_challenge_icon'+row], spec);
+                                ItemDisplay.attach_inventory_item_tooltip(dialog.widgets['row_challenge_icon'+row], item, dialog);
+                            }
+                        } else if(base['challenge_icon']) {
+                            var icon = eval_cond_or_literal(base['challenge_icon'], player, null);
+                            if(icon) {
+                                dialog.widgets['row_challenge_icon'+row].show = true;
+                                dialog.widgets['row_challenge_icon_bg'+row].show = false;
+                                ItemDisplay.remove_inventory_item_tooltip(dialog.widgets['row_challenge_icon'+row]);
+                                dialog.widgets['row_challenge_icon'+row].asset = icon;
+                            }
+                        }
                     }
                 }
 
@@ -33967,6 +33987,7 @@ function map_dialog_change_page(dialog, chapter, page) {
             dialog.widgets['row_portrait_outline'+row].show =
             dialog.widgets['row_name'+row].show =
             dialog.widgets['row_level'+row].show =
+            dialog.widgets['row_challenge_icon_bg'+row].show =
             dialog.widgets['row_challenge_icon'+row].show =
             dialog.widgets['row_ai_difficulty'+row].show =
             dialog.widgets['row_info_button'+row].show =

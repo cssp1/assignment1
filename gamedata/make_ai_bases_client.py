@@ -38,7 +38,7 @@ if __name__ == '__main__':
         for FIELD in ('kind', 'show_if', 'persistent', 'attack_time', 'base_resource_loot',
                       'ui_priority', 'ui_category', 'ui_info', 'ui_info_url', 'ui_resets', 'ui_instance_cooldown', 'ui_spy_button', 'ui_map_name', 'ui_progress',
                       'ui_battle_stars_key', 'ui_fancy_victory_text',
-                      'challenge_icon',
+                      'challenge_icon', 'challenge_item',
                       ):
             if FIELD in base: client_base[FIELD] = base[FIELD]
 

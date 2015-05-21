@@ -3678,7 +3678,14 @@
             "row_stars": { "show": 0, "kind": "StaticImage", "xy": [313,114], "dimensions": [30,30], "asset": "battle_star",
                            "array": [3,5], "array_offset": [40,56] },
 
-            "row_challenge_icon": { "kind": "StaticImage", "xy": [382,105], "dimensions": [50,50],
+            "row_challenge_icon_bg": { "kind": "SolidRect", "xy": [382,105], "dimensions": [50,50],
+                                       "xy_stars": [447,105],
+                                       "color": [0,0,0,0],
+                                       "outline_color": [0.8,0.8,0.8,1], "outline_width": 2,
+                                       "array": [1,5], "array_offset": [0,56], "show": 0 },
+            "row_challenge_icon": { "kind": "StaticImage", "xy": [382,105],
+                                    "xy_stars": [447,105],
+                                    "dimensions": [50,50],
                                     "array": [1,5], "array_offset": [0,56], "show": 0 },
 
             "row_progress": { "show": 0, "kind": "ProgressBar", "xy": [402,110], "dimensions": [100, 13],

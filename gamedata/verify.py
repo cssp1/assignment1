@@ -2306,6 +2306,10 @@ def check_ai_base(strid, base):
 
     error |= require_art_asset(base['portrait'], 'AI base %s:portrait' % strid)
 
+    for challenge in ('challenge_item','challenge_icon'):
+        if challenge in base and type(base[challenge]) is list:
+            error |= check_cond_chain(base[challenge], reason = strid+':'+challenge)
+
     if 'item_loot' in base:
         error |= 1
         print 'ERROR: AI base %s has old-style item_loot table, please change it according to the instructions here: https://sites.google.com/a/spinpunch.com/developers/game-design/loot-tables' % strid
