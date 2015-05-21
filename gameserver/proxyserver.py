@@ -2244,7 +2244,9 @@ class PortraitProxy(twisted.web.resource.Resource):
         def on_response(self, body = None, headers = None, status = None):
             # forward a subset of applicable headers back to the client
             for HEADER in ('content-type', 'content-length', 'content-encoding',
-                           'expires', 'last-modified', 'cache-control', 'date'):
+                           'last-modified', 'date',
+                           #'expires', 'cache-control',
+                           ):
                 if HEADER in headers:
                     self.request.setHeader(HEADER, headers[HEADER][-1])
             self.d.callback(body)
