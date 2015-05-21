@@ -25172,11 +25172,15 @@ function leaderboard_change_page(dialog, period, mode, chapter, page) {
         dialog.widgets['your_rank_accent'].state = (pct >= 0.99 ? 'top' : 'normal');
         dialog.widgets['your_status'].show = (pct >= 0.5);
         dialog.widgets['your_status'].str = percentile_ui_status(rank, pct, true);
-        dialog.widgets['inform_button'].show = (pct >= 0.5) && (brag_reason != null) && (mode != 'friends') && get_facebook_viral('leaderboard_brag');
-        dialog.widgets['inform_button'].state = 'normal';
-        dialog.widgets['inform_button'].onclick = (function (_rank, _percentile, _reason) { return function() {
-            invoke_leaderboard_brag(_rank-1, _percentile, _reason);
-        }; })(rank, pct, brag_reason);
+        var viral = get_facebook_viral('leaderboard_brag');
+        dialog.widgets['inform_button'].show = (pct >= 0.5) && (brag_reason != null) && (mode != 'friends') && viral;
+        if(viral) {
+            dialog.widgets['inform_button'].str = viral['ui_button_text'];
+            dialog.widgets['inform_button'].state = 'normal';
+            dialog.widgets['inform_button'].onclick = (function (_rank, _percentile, _reason) { return function() {
+                invoke_leaderboard_brag(_rank-1, _percentile, _reason);
+            }; })(rank, pct, brag_reason);
+        }
     }
 
     // fill in rankings
@@ -25314,6 +25318,7 @@ function notify_achievements() {
 
     if(get_facebook_viral('achievement_brag')) {
         dialog.widgets['inform_button'].onclick = (function (_ach) { return function(w) { invoke_achievement_brag(_ach); }; })(ach_list[0]);
+        dialog.widgets['inform_button'].str = get_facebook_viral('achievement_brag')['ui_button_text'];
     } else {
         dialog.widgets['inform_button'].show = false;
     }

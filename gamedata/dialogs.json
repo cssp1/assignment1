@@ -5320,7 +5320,7 @@
             "close_button": { "kind": "ActionButton", "xy": [463,1], "dimensions": [19,22], "bg_image": "close_button_small", "push_bg_image": 1 },
 
             "spam_button_inform": { "kind": "ActionButton", "on_after": 1.5, "xy": [226,260], "dimensions": [206,40], "text_size": 13, "text_style": "bold",
-                                    "bg_image": "action_button_206px", "text_color": [0,0,0,1], "ui_name": "Inform Earth" },
+                                    "bg_image": "action_button_206px", "text_color": [0,0,0,1] },
             "spam_button_invite": { "kind": "ActionButton", "on_after": 1.5, "xy": [226,260], "dimensions": [206,40], "text_size": 13, "text_style": "bold",
                                     "bg_image": "action_button_206px", "text_color": [0,0,0,1], "ui_name": "Invite Friends" },
             "screenshot_button": {"show": 0, "kind": "ActionButton", "xy":[308,13], "dimensions":[23,23], "bg_image": "photo_button", "push_bg_image": 1,
@@ -5610,8 +5610,8 @@
             "your_status":   { "kind": "TextField", "xy": [52,342], "dimensions": [134, 28], "text_size": 15, "text_style": "bold",
                                "text_hjustify": "center", "ui_name": "-" },
             "inform_button": { "kind": "ActionButton", "xy": [52,390], "dimensions": [134,28], "text_size": 13, "text_style": "bold",
-                               "bg_image": "action_button_134px", "text_color": [0,0,0,1], "ui_name": "Inform Earth",
-                               "ui_tooltip": "Post achievement to your Facebook wall", "show": 0
+                               "bg_image": "action_button_134px", "text_color": [0,0,0,1],
+                               "ui_tooltip": "Post achievement to your Facebook timeline", "show": 0
                              },
             "divider": { "kind": "Line", "xy": [201, 141], "dimensions": [0, 280], "color": [0.7,0.7,0.7,0.5], "stroke_width": 1 },
 
@@ -5664,8 +5664,8 @@
                        "drop_shadow": 1 },
 
             "inform_button": { "on_after": 1.5, "kind": "ActionButton", "xy": [155,190], "dimensions": [134,28], "text_size": 13, "text_style": "bold",
-                               "bg_image": "action_button_134px", "text_color": [0,0,0,1], "ui_name": "Inform Earth",
-                               "ui_tooltip": "Post achievement to your Facebook wall"
+                               "bg_image": "action_button_134px", "text_color": [0,0,0,1],
+                               "ui_tooltip": "Post achievement to your Facebook timeline"
                              },
             "close_button": { "on_after": 1.5, "kind": "ActionButton", "xy": [305,190], "dimensions": [134,28], "text_size": 13, "text_style": "bold",
                               "bg_image": "menu_button_134px", "text_color": [0,0,0,1], "ui_name": "Dismiss"

@@ -52,6 +52,7 @@
     },
 
     "leaderboard_brag": {
+        "ui_button_text": "Share",
         "ui_post_headline": "%PLAYER achieved a new rank: %RANK in Example Game for %REASON",
         "ui_post_text": "Demonstrating skills superior to %PCT% of players in the game"
     },
@@ -61,17 +62,18 @@
     },
 
     "achievement_brag": {
+        "ui_button_text": "Share",
         "ui_post_headline": "%PLAYER earned \"%ACHIEVEMENT\" in Example Game"
     },
 
     "level_advancement": {
-        "ui_button_text": "Tell your followers",
+        "ui_button_text": "Share",
         "ui_post_headline": "%NAME has just advanced a level in Example Game!",
         "ui_post_text": "%FIRSTNAME grows more powerful by the day."
     },
 
     "build_academy": {
-        "ui_button_text": "Tell your friends",
+        "ui_button_text": "Share",
         "ui_post_headline": "%NAME completed construction of a Academy in Example Game!",
         "ui_post_text": "A strong and powerful robot army is taking shape."
     },
@@ -131,7 +133,7 @@
     },
 
     "defeat_facebook_friend": {
-        "ui_button_text": "Brag",
+        "ui_button_text": "Share",
         "ui_post_headline": "%NAME just defeated %ENEMY (L%ENEMY_LEVEL) in Example Game!",
         "ui_post_text": "Not even friendship stands in the way of the quest to rule."
     },
