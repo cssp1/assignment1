@@ -38479,6 +38479,14 @@ function update_upgrade_dialog(dialog) {
         p = p.parent;
     }
 
+    // offset dialog position so that mod techs don't appear exactly on top of the parent regular tech
+    if(tech && tech['affects_unit']) {
+        dialog.wh = vec_sub(dialog.data['dimensions'], dialog.data['mod_tech_offset']);
+    } else {
+        dialog.wh = dialog.data['dimensions'];
+    }
+    dialog.auto_center();
+
     var old_level, max_level;
 
     if(techname != 'BUILDING') {
@@ -39116,7 +39124,6 @@ function update_upgrade_dialog(dialog) {
             var mod_text_mode = 'ui_name';
             var mod_text_color = 'text_color';
             if(builder && (builder.is_damaged() || builder.time_until_finish() > 0)) {
-                console.log(builder.research_item); console.log(mod_tech['name']);
                 if(builder.research_item === mod_tech['name']) {
                     mod_text_mode = 'ui_name_busy';
                     mod_text_color = 'text_color_busy';

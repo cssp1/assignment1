@@ -2372,6 +2372,7 @@
     "upgrade_dialog": {
         "bg_image": "dialog_736x423_bg",
         "dimensions": [736, 423],
+        "mod_tech_offset": [24,24], // pixel offset of mod techs so they don't appear exactly on top of the parent regular tech
         "clip_children": 0,
         "default_button": "instant_button",
         "widgets": {
