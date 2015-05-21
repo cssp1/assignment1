@@ -38188,6 +38188,11 @@ function get_requirements_help(kind, arg, options) {
         goog.array.forEach(arg, function(item) {
             var spec = ItemDisplay.get_inventory_item_spec(item['spec']);
             item_list.push(ItemDisplay.get_inventory_item_stack_prefix(spec, item['stack']||1) + ItemDisplay.get_inventory_item_ui_name_long(spec, item['level']));
+            if(spec['helper'] == 'invite_friends') {
+                // send player to invite friends
+                noun = 'friends';
+                verb = 'invite_for_ingredients';
+            }
         });
         ui_arg_s = item_list.join(', ');
     } else if(kind == 'speedup' || kind == 'repair') {
