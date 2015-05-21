@@ -539,8 +539,8 @@
     "enable_leaderboard": true, // default setting for leaderboard, if no A/B test applies
 
     "enable_inventory": 1,
-    "inventory_available_during_warehouse_upgrade": false,
-    "inventory_available_during_warehouse_repair": false,
+//    "inventory_available_during_warehouse_upgrade": false,
+//    "inventory_available_during_warehouse_repair": false,
 
     "enable_item_loot": 1,
     "modal_looting": 1,
@@ -550,8 +550,8 @@
     "lottery_reseed_cooldown": 64800, // reseed lottery on a long cooldown, to avoid exploits
     "lottery_free_interval": 86400, // how often you get a free lottery scan
 
-    "lottery_available_during_scanner_upgrade": false,
-    "lottery_available_during_scanner_repair": false,
+//    "lottery_available_during_scanner_upgrade": false,
+//    "lottery_available_during_scanner_repair": false,
 
     "player_aura_limit": 4, // maximum number of player auras that can be active simultaneously
 

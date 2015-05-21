@@ -8298,8 +8298,8 @@ class Player(AbstractPlayer):
          if self.get_any_abtest_value('enable_inventory', gamedata['enable_inventory']):
              warehouse = self.find_object_by_type(gamedata['inventory_building'])
              if (not warehouse) or \
-                ((warehouse.is_under_construction() or warehouse.is_upgrading()) and (not self.get_any_abtest_value('inventory_available_during_warehouse_upgrade', gamedata['inventory_available_during_warehouse_upgrade']))) or \
-                (warehouse.is_damaged() and (not self.get_any_abtest_value('inventory_available_during_warehouse_repair', gamedata['inventory_available_during_warehouse_repair']))):
+                ((warehouse.is_under_construction() or warehouse.is_upgrading()) and (not self.get_any_abtest_value('inventory_available_during_warehouse_upgrade', gamedata.get('inventory_available_during_warehouse_upgrade',False)))) or \
+                (warehouse.is_damaged() and (not self.get_any_abtest_value('inventory_available_during_warehouse_repair', gamedata.get('inventory_available_during_warehouse_repair',False)))):
                  return True
          return False
     def squad_bay_is_busy(self):
@@ -8313,8 +8313,8 @@ class Player(AbstractPlayer):
     def lottery_is_busy(self, scanner):
          if self.get_any_abtest_value('enable_lottery', gamedata['enable_lottery']):
              if (not scanner) or \
-                ((scanner.is_under_construction() or scanner.is_upgrading()) and (not self.get_any_abtest_value('lottery_available_during_scanner_upgrade', gamedata['lottery_available_during_scanner_upgrade']))) or \
-                (scanner.is_damaged() and (not self.get_any_abtest_value('lottery_available_during_scanner_repair', gamedata['lottery_available_during_scanner_repair']))):
+                ((scanner.is_under_construction() or scanner.is_upgrading()) and (not self.get_any_abtest_value('lottery_available_during_scanner_upgrade', gamedata.get('lottery_available_during_scanner_upgrade',False)))) or \
+                (scanner.is_damaged() and (not self.get_any_abtest_value('lottery_available_during_scanner_repair', gamedata.get('lottery_available_during_scanner_repair',False)))):
                  return True
          return False
 
