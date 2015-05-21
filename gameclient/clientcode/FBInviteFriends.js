@@ -198,20 +198,24 @@ FBInviteFriends.FBInviteFriendsDialogV2.receive_invitable_friends = function(dia
 
         dialog.user_data['rowdata'] = response['data'].slice(0, 9999); // should there be a length limit?
 
-        if(!dialog.user_data['instant']) { // sort alphabetically
-            dialog.user_data['rowdata'].sort(function (a,b) {
-                if(a['name'] < b['name']) {
-                    return -1;
-                } else if(a['name'] > b['name']) {
-                    return 1;
-                } else if(a['id'] < b['id']) {
-                    return -1;
-                } else if(a['id'] > b['id']) {
-                    return 1;
-                } else {
-                    return 0;
-                }
-            });
+        if(!dialog.user_data['instant']) {
+            // sort alphabetically
+            var sort_order = gamedata['client']['friend_invite_prompt_sort_order'] || 'alphabetical';
+            if(sort_order == 'alphabetical') {
+                dialog.user_data['rowdata'].sort(function (a,b) {
+                    if(a['name'] < b['name']) {
+                        return -1;
+                    } else if(a['name'] > b['name']) {
+                        return 1;
+                    } else if(a['id'] < b['id']) {
+                        return -1;
+                    } else if(a['id'] > b['id']) {
+                        return 1;
+                    } else {
+                        return 0;
+                    }
+                });
+            }
         }
 
         dialog.widgets['select_all'].state = 'normal';
