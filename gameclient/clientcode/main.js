@@ -39113,6 +39113,21 @@ function update_upgrade_dialog(dialog) {
                 dialog.widgets['mod_text'+grid_y.toString()].onclick =(function (_mod_tech) { return function(w) {
                 invoke_upgrade_tech_dialog(_mod_tech['name']);
             }; })(mod_tech);
+            var mod_text_mode = 'ui_name';
+            var mod_text_color = 'text_color';
+            if(builder && (builder.is_damaged() || builder.time_until_finish() > 0)) {
+                console.log(builder.research_item); console.log(mod_tech['name']);
+                if(builder.research_item === mod_tech['name']) {
+                    mod_text_mode = 'ui_name_busy';
+                    mod_text_color = 'text_color_busy';
+                } else {
+                    mod_text_mode = 'ui_name_other_busy';
+                    mod_text_color = 'text_color_other_busy';
+                }
+            }
+
+            dialog.widgets['mod_text'+grid_y.toString()].str = dialog.data['widgets']['mod_text'][mod_text_mode];
+            dialog.widgets['mod_text'+grid_y.toString()].text_color = SPUI.make_colorv(dialog.data['widgets']['mod_text'][mod_text_color]);
             dialog.widgets['mod_bar'+grid_y.toString()].progress = (player.tech[mod_tech['name']]||0) / get_max_ui_level(mod_tech);
             dialog.widgets['mod_button'+grid_y.toString()].tooltip.str = (enable_tooltip ? dialog.data['widgets']['mod_button']['ui_tooltip'] : null);
         }
