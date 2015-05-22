@@ -480,7 +480,7 @@ class ChangeTitleConsequent(Consequent):
         Consequent.__init__(self, data)
         self.name = data['name']
         self.force = data.get('force', False) # skips predicate checks
-        self.chat_announce = data.get('chat_announce', True)
+        self.chat_announce = data.get('chat_announce', False)
     def execute(self, session, player, retmsg, context=None):
         session.change_player_title(self.name, retmsg, force = self.force, chat_announce = self.chat_announce)
 
