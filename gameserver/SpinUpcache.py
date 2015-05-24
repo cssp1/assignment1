@@ -1111,6 +1111,9 @@ def update_upcache_entry(user_id, driver, entry, time_now, gamedata, user_mtime 
             if 'home_region' in data:
                 obj['home_region'] = data['home_region']
 
+            if data.get('known_alt_accounts'):
+                obj['known_alt_accounts'] = data['known_alt_accounts']
+
             if data.has_key('history'):
                 history = data['history']
 
