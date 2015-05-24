@@ -331,6 +331,15 @@ def do_slave(input):
                     cur.execute("INSERT INTO "+sql_util.sym(input['ltv_table']) + " (user_id, est_90d) VALUES (%s,%s) ON DUPLICATE KEY UPDATE user_id=user_id;",
                                 (user['user_id'], ltv_est))
 
+            # alts table
+            if input['do_alts']:
+                alt_accounts = user.get('known_alt_accounts', None)
+                if alt_accounts and type(alt_accounts) is dict:
+                    cur.executemany("INSERT INTO "+sql_util.sym(input['alts_table']) + \
+                                    " (user_id, other_id, logins, attacks)",
+                                    [(user['user_id'], int(alt_sid), alt.get('logins',1), alt.get('attacks',1)) \
+                                     for alt_sid, alt in alt_accounts.iteritems()])
+
             batch += 1
             total += 1
             if input['commit_interval'] > 0 and batch >= input['commit_interval']:
@@ -357,6 +366,7 @@ if __name__ == '__main__':
     do_sessions = False # taken over by sessions_to_sql.py
     do_activity = False # taken over by activity_to_sql.py
     do_ltv = True
+    do_alts = True
 
     opts, args = getopt.gnu_getopt(sys.argv[1:], 'g:c:q', ['parallel=','lite','sessions','activity'])
 
@@ -426,6 +436,7 @@ if __name__ == '__main__':
             activity_table = cfg['table_prefix']+game_id+'_activity_5min'
             facebook_campaign_map_table = cfg['table_prefix']+game_id+'_facebook_campaign_map'
             ltv_table = cfg['table_prefix']+game_id+'_user_ltv'
+            alts_table = cfg['table_prefix']+game_id+'_alt_accounts'
 
             # these are the tables that are replaced entirely each run
             atomic_tables = [upcache_table,facebook_campaign_map_table] + \
@@ -435,7 +446,8 @@ if __name__ == '__main__':
                             ([upgrade_achievement_table] if (do_tech or do_buildings) else []) + \
                             ([buildings_table] if do_buildings else []) + \
                             ([tech_table] if do_tech else []) + \
-                            ([ltv_table] if do_ltv else [])
+                            ([ltv_table] if do_ltv else []) + \
+                            ([alts_table] if do_alts else [])
 
             for TABLE in atomic_tables:
                 # get rid of temp tables
@@ -513,12 +525,19 @@ if __name__ == '__main__':
                                       {'fields': [('user_id','INT4 NOT NULL PRIMARY KEY'),
                                                   ('est_90d','FLOAT4 NOT NULL')]})
 
+            if do_alts:
+                sql_util.ensure_table(cur, alts_table+'_temp',
+                                      {'fields': [('user_id','INT4 NOT NULL PRIMARY KEY'),
+                                                  ('other_id','INT4 NOT NULL'),
+                                                  ('logins','INT4'),
+                                                  ('attacks','INT4')]})
             con.commit()
 
             try:
                 tasks = [{'game_id':game_id, 'cache_info':cache.info, 'dbconfig':cfg,
                           'do_townhall': do_townhall, 'do_sessions': do_sessions, 'do_tech': do_tech, 'do_buildings': do_buildings, 'do_activity': do_activity,
                           'do_ltv': do_ltv, 'ltv_table': ltv_table+'_temp',
+                          'do_alts': do_alts, 'alts_table': alts_table+'_temp',
                           'upcache_table': upcache_table+'_temp',
                           'sessions_table': sessions_table+'_temp',
                           'townhall_table': townhall_table+'_temp',
