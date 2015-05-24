@@ -21090,7 +21090,9 @@ function scrollable_dialog_change_page(dialog, page) {
         var first_on_page = page * items_per_page;
         var last_on_page = (page+1)*items_per_page - 1;
         last_on_page = Math.max(0, Math.min(last_on_page, chapter_items-1));
-        dialog.widgets['scroll_text'].str = dialog.data['widgets']['scroll_text']['ui_name'].replace('%d1',(first_on_page+1).toString()).replace('%d2',(last_on_page+1).toString()).replace('%d3',chapter_items.toString());
+        if('scroll_text' in dialog.widgets) {
+            dialog.widgets['scroll_text'].str = dialog.data['widgets']['scroll_text']['ui_name'].replace('%d1',(first_on_page+1).toString()).replace('%d2',(last_on_page+1).toString()).replace('%d3',chapter_items.toString());
+        }
         for(var i = first_on_page; i <= last_on_page; i++) {
             var coord = (cols_per_page == 1 ? row : [col,row]);
             rowfunc(dialog, coord, dialog.user_data['rowdata'][i]);
@@ -21110,7 +21112,9 @@ function scrollable_dialog_change_page(dialog, page) {
             }
         }
     } else {
-        dialog.widgets['scroll_text'].str = dialog.data['widgets']['scroll_text']['ui_name'].replace('%d1',(0).toString()).replace('%d2',(0).toString()).replace('%d3',(0).toString());
+        if('scroll_text' in dialog.widgets) {
+            dialog.widgets['scroll_text'].str = dialog.data['widgets']['scroll_text']['ui_name'].replace('%d1',(0).toString()).replace('%d2',(0).toString()).replace('%d3',(0).toString());
+        }
     }
 
     while(item_num < items_per_page) { // hide remaining rows
@@ -21595,7 +21599,6 @@ function invoke_loot_dialog(msg) {
 
     var dialog = new SPUI.Dialog(gamedata['dialogs']['loot_dialog']);
     dialog.user_data['dialog'] = 'loot_dialog';
-    dialog.user_data['context'] = null;
     dialog.user_data['pending'] = 0;
     dialog.user_data['anim_data'] = {};
     install_child_dialog(dialog);
@@ -21622,6 +21625,11 @@ function invoke_loot_dialog(msg) {
                                          close_parent_dialog(_w);
                                      }; })(w)});
     };
+    init_inventory_grid(dialog);
+
+    // scroll to final page on first open
+    dialog.user_data['page'] = Math.floor(player.inventory.length / (dialog.user_data['rows_per_page'] * dialog.user_data['cols_per_page']));
+
     dialog.ondraw = update_loot_dialog;
 
     var warehouse = find_object_by_type(gamedata['inventory_building']);
@@ -21697,7 +21705,7 @@ function warehouse_busy_helper(warehouse) {
 
 function update_loot_dialog(dialog) {
     // reuse inventory code
-    update_inventory_dialog(dialog);
+    update_inventory_grid(dialog);
 
     var warehouse = dialog.user_data['warehouse'];
     var warehouse_busy = player.warehouse_is_busy();
@@ -21811,6 +21819,8 @@ function update_loot_dialog(dialog) {
                     } else {
                         _d.user_data['anim_data'][wname] = make_loot_dialog_anim_data(_d, w, _asset);
                     }
+                    // scroll to final page upon "take" action
+                    dialog.user_data['page'] = Math.floor(player.inventory.length / (dialog.user_data['rows_per_page'] * dialog.user_data['cols_per_page']));
                 }
             }; })(wname, dialog.widgets['loot_item'+wname].asset, slot, item, can_fit_item[slot], helper);
 
@@ -21917,19 +21927,33 @@ function invoke_inventory_dialog(force) {
 
     var dialog = new SPUI.Dialog(gamedata['dialogs']['inventory_dialog']);
     dialog.user_data['dialog'] = 'inventory_dialog';
-    dialog.user_data['context'] = null;
     change_selection_ui(dialog);
     dialog.auto_center();
     dialog.modal = true;
-    dialog.widgets['close_button'].onclick = function() { change_selection_ui(null); };
-    dialog.ondraw = update_inventory_dialog;
+    dialog.widgets['close_button'].onclick = close_parent_dialog;
+    init_inventory_grid(dialog);
+    dialog.ondraw = update_inventory_grid;
     return dialog;
 }
-function update_inventory_dialog(dialog) {
+
+// the "inventory grid" functions are used by both inventory_dialog and loot_dialog
+function init_inventory_grid(dialog) {
+    dialog.user_data['context'] = null;
+    dialog.user_data['rows_per_page'] = dialog.data['widgets']['item']['array'][1];
+    dialog.user_data['cols_per_page'] = dialog.data['widgets']['item']['array'][0];
+    // updating is done through the dialog's update_inventory_grid(), not rowfunc.
+    dialog.user_data['rowfunc'] = function (dialog, data) { };
+    dialog.user_data['roworder'] = 'left_right_top_bottom';
+    dialog.user_data['rowdata'] = [];
+    dialog.user_data['page'] = -1;
+    scrollable_dialog_change_page(dialog, dialog.user_data['page']);
+}
+
+function update_inventory_grid(dialog) {
     var any_expiring = false;
 
     var provides = gamedata['buildings'][gamedata['inventory_building']]['provides_inventory'];
-    var max_possible_slots = provides[provides.length-1];
+    var max_possible_slots = (typeof(provides) === 'number' ? provides : provides[provides.length-1]);
     var warehouse_busy = player.warehouse_is_busy();
 
     var craft_products = [], craft_product_i = 0;
@@ -21945,11 +21969,25 @@ function update_inventory_dialog(dialog) {
         }
     }
 
+    // need to update scrolling per-frame as player.inventory changes
+    var slots_per_page = dialog.user_data['rows_per_page'] * dialog.user_data['cols_per_page'];
+    // add as many rowdata entries as necessary to fill the final page, but not beyond that
+    var shown_slots = Math.max(max_possible_slots, slots_per_page - player.max_usable_inventory() % slots_per_page);
+
+    // note: rowdata here is just a placeholder null (so that scrollable_dialog_change_page() works)
+    // the actual data is in player.inventory
+    if(dialog.user_data['rowdata'].length != shown_slots) {
+        dialog.user_data['rowdata'] = [];
+        for(var s = 0; s < shown_slots; s++) { dialog.user_data['rowdata'].push(null); }
+    }
+    scrollable_dialog_change_page(dialog, dialog.user_data['page']);
+    dialog.widgets['custom_scroll_text'].str = dialog.data['widgets']['custom_scroll_text']['ui_name'].replace('%d1', pretty_print_number((slots_per_page * dialog.user_data['page'])+1)).replace('%d2', pretty_print_number(Math.min(slots_per_page * (dialog.user_data['page']+1), player.max_usable_inventory()))).replace('%d3', pretty_print_number(player.max_usable_inventory()));
+
     var cols = dialog.data['widgets']['slot']['array'][0];
     for(var y = 0; y < dialog.data['widgets']['slot']['array'][1]; y++) {
         for(var x = 0; x < cols; x++) {
             var wname = x.toString()+','+y.toString();
-            var slot = y*cols + x;
+            var slot = y*cols + x + dialog.user_data['page'] * slots_per_page;
             dialog.widgets['item'+wname].show =
                 dialog.widgets['slot'+wname].show =
                 dialog.widgets['stack'+wname].show =
@@ -22355,13 +22393,10 @@ function invoke_inventory_context(inv_dialog, parent_widget, slot, item, show_dr
     // initialize button drop-down
     dialog.user_data['anim_start'] = (show_dropdown ? client_time : -1);
 
-    var make_button_cb = function (_slot, _item, _i) { return function(w) {
-        if(!w.parent) { return; }
-        var butt = w.parent.user_data['buttons'][_i];
-
-        if(butt.spellname === "SPEEDUP") {
+    var make_button_cb = function (_slot, _item, _butt) { return function(w) {
+        if(_butt.spellname === "SPEEDUP") {
             warehouse_busy_helper(find_object_by_type(gamedata['inventory_building']));
-        } else if(butt.spellname === "EQUIP_UNIT") {
+        } else if(_butt.spellname === "EQUIP_UNIT") {
             var spec = ItemDisplay.get_inventory_item_spec(item['spec']);
             var unit_name = spec['equip']['name'];
             var d = invoke_upgrade_tech_dialog(gamedata['units'][unit_name]['level_determined_by_tech'], null);
@@ -22391,9 +22426,9 @@ function invoke_inventory_context(inv_dialog, parent_widget, slot, item, show_dr
                 }
             }
 
-        } else if(inventory_action(_item, _slot, butt.spellname, {trigger_gcd: session.has_deployed, // trigger GCD during combat only
-                                                                  max_count: butt.max_count})) {
-            w.str = butt.ui_name_pending;
+        } else if(inventory_action(_item, _slot, _butt.spellname, {trigger_gcd: session.has_deployed, // trigger GCD during combat only
+                                                                  max_count: _butt.max_count})) {
+            w.str = _butt.ui_name_pending;
             w.state = 'disabled';
 
             // disable all other buttons
@@ -22487,7 +22522,7 @@ function invoke_inventory_context(inv_dialog, parent_widget, slot, item, show_dr
             widget.str = (item['pending'] && item['pending_action'] == butt.spellname ? butt.ui_name_pending : butt.ui_name);
             widget.state = ((item['pending'] || ((butt.spellname.indexOf("INVENTORY_USE")==0)&&!can_cast)) ? 'disabled' : 'normal');
             widget.bg_image = dialog.data['widgets']['button']['bg_image_'+butt.state];
-            var cb = make_button_cb(slot, item, i);
+            var cb = make_button_cb(slot, item, butt);
             if(butt.spellname.indexOf("INVENTORY_USE")==0 && !can_cast) { // add tooltip
                 var tooltip_str = SPUI.break_lines(can_cast_detailed[1], SPUI.desktop_font, widget.data['max_tooltip_dimensions'])[0];
                 widget.tooltip.str = tooltip_str;
@@ -42985,21 +43020,24 @@ function handle_server_message(data) {
                 invoke_inventory_context(dialog, null, -1, null, false);
             }
             if(success) {
-                var cols = selection.ui.data['widgets']['slot']['array'][0];
-                var x = (index % cols), y = Math.floor(index / cols);
-                var str = (count > 1 ? ItemDisplay.get_inventory_item_stack_prefix(spec, count) : '') + ItemDisplay.get_inventory_item_ui_name(spec);
-                var color = [0.6,0.6,0.6,1];
-                if(msg == "INVENTORY_TRASH_RESULT") {
-                    str += ' '+gamedata['strings']['combat_messages']['discarded'];
-                } else if(msg == "INVENTORY_REFUND_RESULT") {
-                    str += ' '+gamedata['strings']['combat_messages']['refunded'];
-                } else if(msg == "INVENTORY_USE_RESULT") {
-                    selection.ui.widgets['glow'].show = true;
-                    selection.ui.widgets['glow'].reset_fx();
-                    str += ' '+gamedata['strings']['combat_messages']['activated'];
-                    color = [1,1,0.3,1];
+                var shown_index = index - dialog.user_data['page']*(dialog.user_data['rows_per_page']*dialog.user_data['cols_per_page']);
+                if(shown_index >= 0 && shown_index < dialog.user_data['rows_per_page']*dialog.user_data['cols_per_page']) {
+                    var x = (shown_index % dialog.user_data['cols_per_page']), y = Math.floor(shown_index / dialog.user_data['cols_per_page']);
+                    var str = (count > 1 ? ItemDisplay.get_inventory_item_stack_prefix(spec, count) : '') + ItemDisplay.get_inventory_item_ui_name(spec);
+                    console.log('x '+x.toString()+' y '+y.toString());
+                    var color = [0.6,0.6,0.6,1];
+                    if(msg == "INVENTORY_TRASH_RESULT") {
+                        str += ' '+gamedata['strings']['combat_messages']['discarded'];
+                    } else if(msg == "INVENTORY_REFUND_RESULT") {
+                        str += ' '+gamedata['strings']['combat_messages']['refunded'];
+                    } else if(msg == "INVENTORY_USE_RESULT") {
+                        selection.ui.widgets['glow'].show = true;
+                        selection.ui.widgets['glow'].reset_fx();
+                        str += ' '+gamedata['strings']['combat_messages']['activated'];
+                        color = [1,1,0.3,1];
+                    }
+                    ItemDisplay.add_inventory_item_effect(selection.ui.widgets['slot'+x.toString()+','+y.toString()], str, color);
                 }
-                ItemDisplay.add_inventory_item_effect(selection.ui.widgets['slot'+x.toString()+','+y.toString()], str, color);
             }
         }
     } else if(msg == "EQUIP_BUILDING_RESULT") {

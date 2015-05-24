@@ -8007,7 +8007,7 @@
                             "ui_name": "Click to store loot\nin Warehouse",
                             "text_color": [1,1,1,1], "text_hjustify": "left", "text_vjustify": "top" },
 
-            "warehouse_label": { "kind": "TextField", "xy": [200,68], "dimensions": [490,32], "text_size": 13, "ui_name": "Warehouse (Level %d)",
+            "warehouse_label": { "kind": "TextField", "xy": [200,69], "dimensions": [490,32], "text_size": 13, "ui_name": "Warehouse (Level %d)",
                                  "text_color": [1,1,1,1], "text_hjustify": "center", "text_vjustify": "center" },
 
             "help_button": {"kind": "ActionButton", "xy":[659,72], "dimensions":[23,23], "bg_image": "question_button", "push_bg_image": 1,
@@ -8028,27 +8028,34 @@
 
             // the slot only gets clicked on empty/locked spaces, otherwise the click goes to "frame"
             "slot": { "kind": "ActionButton", "xy": [220,124], "dimensions": [50,50], "bg_image": "inventory_slot",
-                      "array": [8,4], "array_offset": [59,74] },
+                      "array": [8,3], "array_offset": [59,74] },
             "item": { "kind": "StaticImage", "xy": [220,124], "dimensions": [50,50],
-                      "array": [8,4], "array_offset": [59,74] },
+                      "array": [8,3], "array_offset": [59,74] },
             "stack": { "kind": "TextField", "xy": [240,152], "dimensions": [24,19], "text_size": 17, "text_size_fungible3": 17, "text_size_fungible4": 14, "text_size_fungible5": 11,
                        "text_style": "thick", "drop_shadow": 1,
                        "text_hjustify": "right",
-                       "array": [8,4], "array_offset": [59,74]},
+                       "array": [8,3], "array_offset": [59,74]},
             "frame": { "kind": "ActionButton", "xy": [220,124], "dimensions": [50,50], "bg_image": "inventory_frame",
-                       "array": [8,4], "array_offset": [59,74] },
+                       "array": [8,3], "array_offset": [59,74] },
             "pending": { "kind": "StaticImage", "xy":[237,141], "dimensions":[16,16], "asset":"loading_spinner",
-                         "array": [8,4], "array_offset": [59,74] },
+                         "array": [8,3], "array_offset": [59,74] },
 
             "timer_icon": { "kind": "StaticImage", "xy": [224,177], "dimensions": [13,13], "asset": "pacman_icon",
-                            "array": [8,4], "array_offset": [59,74] },
+                            "array": [8,3], "array_offset": [59,74] },
             "timer": { "kind": "TextField", "xy": [235,176], "dimensions": [35,15], "ui_name": "99m", "text_size": 13,
                        "drop_shadow": 1, "text_style": "thick", "text_color": [1,0,0,1],
                        "text_hjustify": "center", "text_vjustify": "center",
-                       "array": [8,4], "array_offset": [59,74] },
+                       "array": [8,3], "array_offset": [59,74] },
+
+            "scroll_left": { "kind": "ActionButton", "xy": [8,182], "dimensions": [22,100], "bg_image": "dialog_scroll_arrow_left",
+                             "push_bg_image": 1},
+            "scroll_right": { "kind": "ActionButton", "xy": [708,182], "dimensions": [22,100], "bg_image": "dialog_scroll_arrow_right",
+                              "push_bg_image": 1},
+            // don't use "scroll_text" since scrollable_dialog_change_page() doesn't do the right thing
+            "custom_scroll_text": { "kind": "TextField", "xy": [340,350], "dimensions": [600,19], "text_size": 13, "text_hjustify": "left", "ui_name": "Showing slots %d1-%d2 of %d3", "text_color": [0.66,0.66,0.66,1]},
 
             "upgrade_level": { "kind": "TextField", "xy": [335,366], "dimensions": [200,28], "text_size": 13,
-                               "ui_name": "Add %SLOT slot%plural at Warehouse Level %NEXT", "text_color": [0.66,0.66,0.66,1],
+                               "ui_name": "Warehouse Level %NEXT adds %SLOT slot%plural", "text_color": [0.66,0.66,0.66,1],
                                "text_hjustify": "right" },
 
             "upgrade_button": { "kind": "ActionButton", "xy": [550,365], "dimensions": [134,28],
@@ -8132,6 +8139,13 @@
                        "drop_shadow": 1, "text_style": "thick", "text_color": [1,0,0,1],
                        "text_hjustify": "center", "text_vjustify": "center",
                        "array": [11,3], "array_offset": [59,74] },
+
+            "scroll_left": { "kind": "ActionButton", "xy": [8,182], "dimensions": [22,100], "bg_image": "dialog_scroll_arrow_left",
+                             "push_bg_image": 1},
+            "scroll_right": { "kind": "ActionButton", "xy": [708,182], "dimensions": [22,100], "bg_image": "dialog_scroll_arrow_right",
+                              "push_bg_image": 1},
+            // don't use "scroll_text" since scrollable_dialog_change_page() doesn't do the right thing
+            "custom_scroll_text": { "kind": "TextField", "xy": [340,350], "dimensions": [600,19], "text_size": 13, "text_hjustify": "left", "ui_name": "Showing slots %d1-%d2 of %d3", "text_color": [0.66,0.66,0.66,1]},
 
             "upgrade_level": { "kind": "TextField", "xy": [335,366], "dimensions": [200,28], "text_size": 13,
                                "ui_name": "Add %SLOT slot%plural at Warehouse Level %NEXT", "text_color": [0.66,0.66,0.66,1],
