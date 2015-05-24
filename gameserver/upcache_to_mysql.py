@@ -528,10 +528,15 @@ if __name__ == '__main__':
 
             if do_alts:
                 sql_util.ensure_table(cur, alts_table+'_temp',
-                                      {'fields': [('user_id','INT4 NOT NULL PRIMARY KEY'),
+                                      {'fields': [('user_id','INT4 NOT NULL'),
                                                   ('other_id','INT4 NOT NULL'),
                                                   ('logins','INT4'),
-                                                  ('attacks','INT4')]})
+                                                  ('attacks','INT4')],
+                                       'indices': {'by_user_id': {'keys': [('user_id','ASC')]},
+                                                   #'by_logins': {'keys': [('logins','ASC')]},
+                                                   #'by_attacks': {'keys': [('attacks','ASC')]},
+                                                   }
+                                       })
             con.commit()
 
             try:
