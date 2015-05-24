@@ -336,7 +336,8 @@ def do_slave(input):
                 alt_accounts = user.get('known_alt_accounts', None)
                 if alt_accounts and type(alt_accounts) is dict:
                     cur.executemany("INSERT INTO "+sql_util.sym(input['alts_table']) + \
-                                    " (user_id, other_id, logins, attacks)",
+                                    " (user_id, other_id, logins, attacks)" + \
+                                    " VALUES (%s,%s,%s,%s)",
                                     [(user['user_id'], int(alt_sid), alt.get('logins',1), alt.get('attacks',1)) \
                                      for alt_sid, alt in alt_accounts.iteritems()])
 
