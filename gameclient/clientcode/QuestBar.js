@@ -170,10 +170,12 @@ QuestBar.update = function(dialog) {
             dialog.widgets['frame'+wname].state = (player.quest_tracked == quest ? 'highlight' : dialog.data['widgets']['frame']['state']);
             dialog.widgets['icon'+wname].asset = quest['icon'] || 'inventory_unknown';
 
-            dialog.widgets['icon_gamebucks'+wname].show = dialog.widgets['icon_gamebucks_amount'+wname].show = ('reward_gamebucks' in quest);
-            if('reward_gamebucks' in quest) {
+            var bucks = quest['reward_gamebucks'] || 0;
+
+            dialog.widgets['icon_gamebucks'+wname].show = dialog.widgets['icon_gamebucks_amount'+wname].show = (bucks > 0);
+            if(bucks > 0) {
                 dialog.widgets['icon_gamebucks'+wname].asset = player.get_any_abtest_value('gamebucks_resource_icon', gamedata['store']['gamebucks_resource_icon']);
-                dialog.widgets['icon_gamebucks_amount'+wname].str = Store.display_user_currency_amount(quest['reward_gamebucks'], 'compact');
+                dialog.widgets['icon_gamebucks_amount'+wname].str = Store.display_user_currency_amount(bucks, 'compact');
             }
 
             dialog.widgets['checkmark'+wname].show = can_complete;
