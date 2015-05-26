@@ -12,6 +12,7 @@ goog.require('SPUI');
 goog.require('GameArt');
 goog.require('PlayerInfoDialog');
 goog.require('goog.array');
+goog.require('goog.string');
 
 // note: this references some stuff from main.js (player.travel_state etc)
 
@@ -1357,16 +1358,25 @@ RegionMap.RegionMap.update_feature_popup = function(dialog) {
         }
     } else if(ftype == 'hive') {
         var template = (('base_template' in feature) ? (gamedata['hives_client']['templates'][feature['base_template']] || null) : null);
-        if(template && template['ui_tokens']) {
-            descr = gamedata['strings']['regional_map']['hive_with_tokens'].replace('%s',feature['base_ui_name']).replace('%d', template['ui_tokens'].toString());
-        } else if(template && template['kill_points']) {
-            var points = template['kill_points'];
-            if('hive_kill_point_scale' in mapwidget.region.data) {
-                points = Math.max(1, Math.floor(points * mapwidget.region.data['hive_kill_point_scale']));
+        if(template) {
+            // default
+            descr = gamedata['strings']['regional_map']['hive_descr'].replace('%s',feature['base_ui_name']);
+            var ls = [];
+            if(template['ui_tokens']) {
+                ls.push(gamedata['strings']['regional_map']['with_tokens'].replace('%d', (typeof(template['ui_tokens']) === 'number' ? pretty_print_number(template['ui_tokens']) : template['ui_tokens'])));
             }
-            descr = gamedata['strings']['regional_map']['hive_with_kill_points'].replace('%s',feature['base_ui_name']).replace('%d', points);
-        } else {
-            descr = gamedata['strings']['regional_map']['hive'].replace('%s',feature['base_ui_name']);
+            if(template['kill_points']) {
+                var points = template['kill_points'];
+                if('hive_kill_point_scale' in mapwidget.region.data) {
+                    points = Math.max(1, Math.floor(points * mapwidget.region.data['hive_kill_point_scale']));
+                }
+                if(points > 0) {
+                    ls.push(gamedata['strings']['regional_map']['with_kill_points'].replace('%d', pretty_print_number(points)));
+                }
+            }
+            if(ls.length > 0) {
+                descr = descr + ' ('+ls.join(', ')+')';
+            }
         }
     } else if(ftype == 'base') {
         descr = gamedata['strings']['regional_map']['mystery'];
@@ -2144,10 +2154,29 @@ RegionMap.RegionMap.prototype.draw_feature = function(feature) {
                     }
                 }
             } else if(feature['base_type'] == 'hive' && ('base_template' in feature) &&
-                      gamedata['hives_client']['templates'][feature['base_template']] &&
-                      gamedata['hives_client']['templates'][feature['base_template']]['ui_tokens']) {
-                subtitle = gamedata['strings']['regional_map']['hive_with_tokens_subtitle'].replace('%s',feature['base_ui_name']).replace('%d', gamedata['hives_client']['templates'][feature['base_template']]['ui_tokens'].toString());
+                      gamedata['hives_client']['templates'][feature['base_template']]) {
+                var template = gamedata['hives_client']['templates'][feature['base_template']];
+                // default
+                subtitle = gamedata['strings']['regional_map']['hive_label'].replace('%s',feature['base_ui_name']);
+
+                var ls = [];
+                if(template['ui_tokens']) {
+                    ls.push(gamedata['strings']['regional_map']['with_tokens'].replace('%d', (typeof(template['ui_tokens']) === 'number' ? pretty_print_number(template['ui_tokens']) : template['ui_tokens'])));
+                }
+                if(template['kill_points']) {
+                    var points = template['kill_points'];
+                    if('hive_kill_point_scale' in this.region.data) {
+                        points = Math.max(1, Math.floor(points * this.region.data['hive_kill_point_scale']));
+                    }
+                    if(points > 0) {
+                        ls.push(gamedata['strings']['regional_map']['with_kill_points'].replace('%d', pretty_print_number(points)));
+                    }
+                }
+                if(ls.length > 0) {
+                    subtitle = goog.string.trim(subtitle + ' ' + ls.join(', '));
+                }
             }
+
             if(subtitle) {
                 this.draw_feature_label([label_xy[0] + gamedata['territory']['cell_size'][0]/2,
                                          label_xy[1] + gamedata['territory']['cell_size'][1] + 1.25*this.font.leading*size + label_height],
