@@ -11182,6 +11182,12 @@ class LivePlayer(Player):
                 for mail in to_remove:
                     self.mailbox.remove(mail)
 
+        # fix TR token item expiration time (ai_piper week 157 had incorrect expiration time without the +2day buffer)
+        if gamedata['game_id'] == 'tr' and server_time < 1433005200:
+            for item in self.inventory + self.loot_buffer:
+                if item.get('expire_time',None) == 1432832400:
+                    item['expire_time'] = 1433005200
+
         self.send_inventory_intro_mail(session, None)
         self.reseed_lottery(session, force = False)
 
