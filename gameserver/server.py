@@ -17078,7 +17078,7 @@ class GAMEAPI(resource.Resource):
 
         elif spell.get('code') == 'change_title':
             new_title_name = spellarg[0]
-            return session.change_player_title(new_title_name, retmsg, force = False, chat_announce = gamedata['server'].get('chat_title_changes',False)) 
+            return session.change_player_title(new_title_name, retmsg, force = False, chat_announce = gamedata['server'].get('chat_title_changes',False))
 
         else:
             raise Exception('unknown spell '+spellname)
