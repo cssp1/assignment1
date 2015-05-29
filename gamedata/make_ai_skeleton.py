@@ -897,6 +897,9 @@ if __name__ == '__main__':
         def make_ui_priority_for_time(i, start_time, end_time):
             priority = data['map_ui_priority'][diff]
             default_priority = {'mf':300}.get(game_id,100)
+            if len(data['difficulties']) > 1:
+                # ensure difficulties appear in correct order
+                default_priority += 1 - 0.1*data['difficulties'].index(diff)
             if priority != default_priority:
                 raise Exception('event %s should have map_ui_priority = %d' % (data['event_name'], default_priority))
 
@@ -1083,10 +1086,19 @@ if __name__ == '__main__':
             assert len(act_pred['subpredicates']) > 0
             json += [("activation", act_pred)]
 
+            # get cutscenes
+            cutscenes = None
+            if 'cutscenes' in data:
+                if type(data['cutscenes']) is dict and (diff in data['cutscenes']):
+                    cutscenes = data['cutscenes'][diff] # per-difficulty cutscenes
+                else:
+                    cutscenes = data['cutscenes'] # same cutscenes for each difficulty
+
+
             # get on_visit cutscene consequents
             on_visit_cutscene = None
-            if 'cutscenes' in data:
-                on_visit_cutscene = data['cutscenes'][i].get('on_visit', None)
+            if cutscenes:
+                on_visit_cutscene = cutscenes[i].get('on_visit', None)
 
             speaker_msg = []
             if on_visit_cutscene:
@@ -1295,8 +1307,8 @@ if __name__ == '__main__':
 
             # get completion cutscene consequents
             completion_cutscene = []
-            if 'cutscenes' in data:
-                completion_cutscene += data['cutscenes'][i].get('completion', [])
+            if cutscenes:
+                completion_cutscene += cutscenes[i].get('completion', [])
 
             # append auto_cutscenes after any manually-defined cutscenes
             if auto_cutscenes:
