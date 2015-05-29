@@ -1232,7 +1232,16 @@ def check_item(itemname, spec):
 
     for COND_CHAIN in ('force_expire_by', 'ui_description'):
         if COND_CHAIN in spec and type(spec[COND_CHAIN]) is list:
-            error |= check_cond_chain(spec[COND_CHAIN], reason = 'item %s: %s' % (itemname, COND_CHAIN))
+            expect_absolute_time_end = None
+            if spec['name'] == 'token':
+                # ensure that ABSOLUTE_TIME predicates, and actual expire times, end 2 days after a weekly multiple of the week origin
+                expect_absolute_time_end = {'origin': gamedata['matchmaking']['week_origin'], 'offset': 2*86400, 'interval': 7*86400}
+                if COND_CHAIN == 'force_expire_by':
+                    for pred, val in spec[COND_CHAIN]:
+                        if ((val - expect_absolute_time_end['origin']) % expect_absolute_time_end['interval']) != expect_absolute_time_end['offset']:
+                            error |= 1; print '%s: incorrect force_expire_by time %d, must agree with %r' % (itemname, val, expect_absolute_time_end)
+
+            error |= check_cond_chain(spec[COND_CHAIN], reason = 'item %s: %s' % (itemname, COND_CHAIN), expect_absolute_time_end = expect_absolute_time_end)
 
     if 'associated_tech' in spec and spec['associated_tech'] not in gamedata['tech']:
         error |= 1; print '%s: associated_tech "%s" not found in tech.json' % (itemname, spec['associated_tech'])
@@ -1370,14 +1379,14 @@ def check_loot_table(table, reason = '', expire_time = -1, duration = -1, max_sl
             print '%s: bad loot table entry - missing "spec", "multi", "cond", "table", or "nothing": %s' % (reason, repr(entry))
     return error
 
-def check_cond_or_literal(chain, reason = ''):
+def check_cond_or_literal(chain, **kwargs):
     if type(chain) is list:
-        return check_cond_chain(chain, reason=reason)
+        return check_cond_chain(chain, **kwargs)
     return 0
-def check_cond_chain(chain, reason = ''):
+def check_cond_chain(chain, **kwargs):
     error = 0
     for pred, val in chain:
-        error |= check_predicate(pred, reason=reason)
+        error |= check_predicate(pred, **kwargs)
     return error
 
 PREDICATE_TYPES = set(['AND', 'OR', 'NOT', 'ALWAYS_TRUE', 'ALWAYS_FALSE', 'TUTORIAL_COMPLETE', 'ACCOUNT_CREATION_TIME',
@@ -1402,8 +1411,9 @@ PREDICATE_TYPES = set(['AND', 'OR', 'NOT', 'ALWAYS_TRUE', 'ALWAYS_FALSE', 'TUTOR
 # expect_items: for HAS_ITEM predicates, expect that items named will be a member of this list/set
 # expect_items_unique_equipped: for HAS_ITEM predicates, expect that items named will be members of a unique_equipped set in this list/set
 # expect_item_sets: for HAS_ITEM_SET predicates, expect that item_sets named will be a member of this list/set
+# expect_absolute_time_end: for ABSOLUTE_TIME predicates, expect specific end time ({'origin': xxx, 'offset': yyy})
 def check_predicate(pred, reason = '', context = None, context_data = None,
-                    expect_items = None, expect_items_unique_equipped = None, expect_library_preds = None, expect_player_history_keys = None, expect_item_sets = None):
+                    expect_items = None, expect_items_unique_equipped = None, expect_library_preds = None, expect_player_history_keys = None, expect_item_sets = None, expect_absolute_time_end = None):
     error = 0
 
     if ('predicate' not in pred) or (pred['predicate'] not in PREDICATE_TYPES):
@@ -1542,6 +1552,10 @@ def check_predicate(pred, reason = '', context = None, context_data = None,
         if pred['level'] > len(gamedata['player_xp']['level_xp'])-1:
             error |= 1; print '%s: %s predicate "level" %d is greater than the max level (%d)' % (reason, pred['predicate'], pred['level'],
                                                                                                   len(gamedata['player_xp']['level_xp'])-1)
+    elif pred['predicate'] == 'ABSOLUTE_TIME':
+        if expect_absolute_time_end is not None:
+            if ((pred['range'][1] - expect_absolute_time_end['origin']) % expect_absolute_time_end['interval']) != expect_absolute_time_end['offset']:
+                error |= 1; print '%s: %s predicate has incorrect end time (%d). Must agree with %r' % (reason, pred['predicate'], pred['range'][1], expect_absolute_time_end)
     return error
 
 # check old-style "logic" blocks which are if/then/else compositions of predicates and consequents (used for quest tips)
@@ -1810,13 +1824,13 @@ def check_showcase_hack(cons, reason = ''):
                         error |= check_item_name(entry['spec'], reason + ':' + cons['consequent'] + ':' + ITEM_FIELD)
         for COND_FIELD in ('feature_random_item_count', 'ui_final_reward_bbcode', 'ui_final_reward_subtitle', 'ui_random_rewards_text'):
             if COND_FIELD in sc and type(sc[COND_FIELD]) is list:
-                error |= check_cond_chain(sc[COND_FIELD], reason + ':' + cons['consequent'] + ':' + COND_FIELD)
+                error |= check_cond_chain(sc[COND_FIELD], reason = reason + ':' + cons['consequent'] + ':' + COND_FIELD)
         for CONS_FIELD in ('ok_button_consequent',):
             if CONS_FIELD in sc:
-                error |= check_consequent(sc[CONS_FIELD], reason + ':' + cons['consequent'] + ':' + CONS_FIELD)
+                error |= check_consequent(sc[CONS_FIELD], reason = reason + ':' + cons['consequent'] + ':' + CONS_FIELD)
         for ASSET in ('villain_asset', 'corner_ai_asset'):
             if ASSET in sc:
-                error |= require_art_asset(sc[ASSET], reason+':'+ASSET)
+                error |= require_art_asset(sc[ASSET], reason = reason+':'+ASSET)
         for FIELD in ('ui_villain_name',):
             if FIELD not in sc:
                 error |= 1; print '%s: %s showcase consequent is missing mandatory field %s' % (reason, cons['consequent'], FIELD)
