@@ -33058,7 +33058,7 @@ function missions_dialog_select_mission(dialog, row) {
         reward_xp = ('reward_xp' in quest ? Math.max(Math.floor(quest['reward_xp']*gamedata['player_xp']['quests']), gamedata['player_xp']['quests_min']) : 0);
     }
 
-    if(('reward_gamebucks' in quest) && player.get_any_abtest_value('currency', gamedata['currency']) == 'gamebucks') {
+    if(('reward_gamebucks' in quest) && quest['reward_gamebucks'] > 0 && player.get_any_abtest_value('currency', gamedata['currency']) == 'gamebucks') {
         dialog.widgets['reward_gamebucks_amount'].show =
             dialog.widgets['reward_gamebucks_icon'].show = true;
         dialog.widgets['reward_gamebucks_amount'].str = Store.display_user_currency_amount(quest['reward_gamebucks'], 'compact');
