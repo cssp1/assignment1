@@ -897,11 +897,11 @@ if __name__ == '__main__':
         def make_ui_priority_for_time(i, start_time, end_time):
             priority = data['map_ui_priority'][diff]
             default_priority = {'mf':300}.get(game_id,100)
-            if len(data['difficulties']) > 1:
-                # ensure difficulties appear in correct order
-                default_priority += 1 - 0.1*data['difficulties'].index(diff)
             if priority != default_priority:
                 raise Exception('event %s should have map_ui_priority = %d' % (data['event_name'], default_priority))
+            if len(data['difficulties']) > 1:
+                # ensure difficulties appear in correct order
+                priority += 1 - 0.1*data['difficulties'].index(diff)
 
             if start_time > 0: # append the starting week number as a fractional part to the ui_priority so the "freshest" event wins ties.
                 priority += 0.001 * SpinConfig.get_pvp_week(gamedata['matchmaking']['week_origin'], start_time)
@@ -939,7 +939,7 @@ if __name__ == '__main__':
 
             json += [
                 ("ui_name", data['villain_ui_name']),
-                ("ui_map_name", data['event_ui_name'] + (" (%s)" % diff if diff != data['difficulties'][0] else '')),
+                ("ui_map_name", data['event_ui_name'] + (" (%s)" % diff if len(data['difficulties']) > 1 else '')),
                 ("ui_info", "%s%s%s\nBase %d of %d\nReward: %s%s" % \
                 (data['event_ui_name'], (' (%s difficulty)' % diff if len(data['difficulties'])>1 else ''),
                  "\nAI Enemy: %s" % data['villain_ui_name'] if data['villain_ui_name'] != data['event_ui_name'] else '', unskipped_count+1, num_unskipped_bases,
@@ -995,8 +995,8 @@ if __name__ == '__main__':
                 elif diff == 'Epic':
                     show_pred['subpredicates'] += [
                         { "predicate": "BUILDING_LEVEL", "building_type": gamedata['townhall'], "trigger_level": data['cc_level_to_see'][diff] },
-                        { "predicate": "PLAYER_HISTORY", "ui_name": "Complete %s on Heroic difficulty" % data['event_ui_name'],
-                          "key": "ai_"+data['event_name']+"_heroic_progress", "method": ">=", "value": data['bases_per_difficulty'] },
+#                        { "predicate": "PLAYER_HISTORY", "ui_name": "Complete %s on Heroic difficulty" % data['event_ui_name'],
+#                          "key": "ai_"+data['event_name']+"_heroic_progress", "method": ">=", "value": data['bases_per_difficulty'] },
                         ]
                 else:
                     raise Exception('unhandled case')
@@ -1474,7 +1474,7 @@ if __name__ == '__main__':
 
         json = [
             ("ui_name", data['villain_ui_name']),
-            ("ui_map_name", data['event_ui_name'] + (" (%s)" % diff if diff != data['difficulties'][0] else '')),
+            ("ui_map_name", data['event_ui_name'] + (" (%s)" % diff if len(data['difficulties']) > 1 else '')),
             ("ui_priority", ui_priority),
             ("portrait", data['villain_portrait'][diff]),
             ("resources", { "player_level": data['starting_ai_level'][diff], "water": 0, "iron": 0 }),
