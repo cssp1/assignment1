@@ -13128,7 +13128,14 @@ function invoke_combat_item_bar() {
     var dialog = new SPUI.Dialog(dialog_data);
     dialog.user_data['dialog'] = 'combat_item_bar';
     dialog.user_data['context'] = null;
+    dialog.user_data['scroll_pos'] = 0;
     dialog.transparent_to_mouse = true;
+    dialog.widgets['scroll_left'].widgets['scroll_left'].onclick = function(w) {
+        w.parent.parent.user_data['scroll_pos'] -= 1;
+    };
+    dialog.widgets['scroll_right'].widgets['scroll_right'].onclick = function(w) {
+        w.parent.parent.user_data['scroll_pos'] += 1;
+    };
     dialog.ondraw = update_combat_item_bar;
     return dialog;
 }
@@ -13194,12 +13201,6 @@ function update_combat_item_bar(dialog) {
     var item_list = [], slot_list = [], stack_count_list = [];
 
     var add_item = function(item, i) { // "i" is integer for ordinary inventory items, and {'obj_id':..., 'slot_type':..., 'slot_index':...} for equipped items
-        if(item_list.length >=
-           gamedata['dialogs']['combat_item_bar']['widgets']['item']['array'][0]*gamedata['dialogs']['combat_item_bar']['widgets']['item']['array'][1]) {
-            //console.log("not enough combat_item_bar slots!");
-            return;
-        }
-
         if(inventory_item_is_usable_in_combat(ItemDisplay.get_inventory_item_spec(item['spec']), session)) {
             if(item['spec'] in indices_by_spec) {
                 // group with items of identical specs
@@ -13233,25 +13234,49 @@ function update_combat_item_bar(dialog) {
         dialog.show = true;
     }
 
-    dialog.xy = dialog.data['xy'];
-    //canvas_height_half - Math.floor(dialog.wh[1]/2)];
-    dialog.wh[1] = dialog.data['widgets']['item']['array_offset'][1] * item_list.length;
-    dialog.widgets['bgrect'].wh[1] = dialog.wh[1];
+    dialog.xy = vec_copy(dialog.data['xy']);
+
+    // show as many rows as will fit
+    var show_rows = Math.max(1, Math.min(item_list.length, Math.min(dialog.data['widgets']['item']['array'][1], Math.floor((canvas_height - dialog.xy[1] - dialog.data['dimensions'][1] - dialog.data['widgets']['item']['array_offset'][1])/dialog.data['widgets']['item']['array_offset'][1]))));
+    dialog.user_data['show_rows'] = show_rows;
+
+    dialog.wh = [dialog.data['dimensions'][0],
+                 dialog.data['dimensions'][1] + dialog.data['widgets']['item']['array_offset'][1] * (show_rows-1)];
+    dialog.widgets['bgrect'].wh = [dialog.data['widgets']['bgrect']['dimensions'][0],
+                                   dialog.data['widgets']['bgrect']['dimensions'][1] + (show_rows - 1) * dialog.data['widgets']['item']['array_offset'][1]];
+
+    var max_scroll = Math.max(0, item_list.length - show_rows); // Math.floor((item_list.length - 1) / show_rows);
+    dialog.user_data['scroll_pos'] = Math.min(dialog.user_data['scroll_pos'], max_scroll)
+    dialog.user_data['scroll_pos'] = Math.max(dialog.user_data['scroll_pos'], 0);
+    dialog.widgets['scroll_left'].widgets['scroll_left'].state = (dialog.user_data['scroll_pos'] > 0 ? 'normal' : 'disabled');
+    var scroll_data = gamedata['dialogs'][dialog.data['widgets']['scroll_left']['dialog']]['widgets']['scroll_left_bg'];
+    dialog.widgets['scroll_left'].widgets['scroll_left_bg'].fade_unless_hover = (dialog.user_data['scroll_pos'] > 0 ? scroll_data['fade_unless_hover'] : 0);
+    dialog.widgets['scroll_left'].widgets['scroll_left_bg'].alpha = (dialog.user_data['scroll_pos'] > 0 ? 1 : scroll_data['alpha_disabled']);
+    dialog.widgets['scroll_right'].widgets['scroll_right'].state = (dialog.user_data['scroll_pos'] < max_scroll ? 'normal' : 'disabled');
+    dialog.widgets['scroll_right'].widgets['scroll_right_bg'].fade_unless_hover = (dialog.user_data['scroll_pos'] < max_scroll ? scroll_data['fade_unless_hover'] : 0);
+    dialog.widgets['scroll_right'].widgets['scroll_right_bg'].alpha = (dialog.user_data['scroll_pos'] < max_scroll ? 1 : scroll_data['alpha_disabled']);
+
+    dialog.widgets['scroll_right'].xy = [dialog.data['widgets']['scroll_right']['xy'][0],
+                                         dialog.data['widgets']['scroll_right']['xy'][1] + (show_rows - 1) * dialog.data['widgets']['item']['array_offset'][1]];
 
     for(var y = 0; y < dialog.data['widgets']['item']['array'][1]; y++) {
         for(var x = 0; x < dialog.data['widgets']['item']['array'][0]; x++) {
+            // widget index
             var i = y * dialog.data['widgets']['item']['array'][0] + x;
 
-            if(i < dialog.user_data['item_list'].length) {
+            if(i < dialog.user_data['item_list'].length && y < show_rows) {
                 dialog.widgets['item'+i].show =
                     dialog.widgets['stack'+i].show =
                     dialog.widgets['frame'+i].show =
                     dialog.widgets['clock'+i].show = true;
 
                 dialog.widgets['frame'+i].tooltip.str = null;
-                var item = dialog.user_data['item_list'][i];
-                var slot = dialog.user_data['slot_list'][i];
-                var stack_count = dialog.user_data['stack_count_list'][i];
+
+                // item index
+                var item_i = i + dialog.user_data['scroll_pos'];
+                var item = dialog.user_data['item_list'][item_i];
+                var slot = dialog.user_data['slot_list'][item_i];
+                var stack_count = dialog.user_data['stack_count_list'][item_i];
                 var spec = ItemDisplay.get_inventory_item_spec(item['spec']);
                 dialog.widgets['item'+i].show = true;
                 ItemDisplay.set_inventory_item_asset(dialog.widgets['item'+i], spec);

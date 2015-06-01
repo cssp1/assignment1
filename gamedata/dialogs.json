@@ -1759,7 +1759,7 @@
         "widgets": {
             "scroll_left_bg": { "kind": "SolidRect", "xy": [12,4], "dimensions": [26,10], "color": [1,1,1,1], "alpha": 0.86,
                                 "path": [[0,10], [13,0], [26,10], [0,10]],
-                                "fade_unless_hover": 0.5 },
+                                "fade_unless_hover": 0.5, "alpha_disabled": 0.3 },
             "scroll_left": { "kind": "ActionButton", "xy": [0,0], "dimensions": [50,18] }
         }
     },
@@ -1768,7 +1768,7 @@
         "widgets": {
             "scroll_right_bg": { "kind": "SolidRect", "xy": [12,5], "dimensions": [26,10], "color": [1,1,1,1], "alpha": 0.86,
                                  "path": [[0,0], [26,0], [13,10], [0,0]],
-                                 "fade_unless_hover": 0.5 },
+                                 "fade_unless_hover": 0.5, "alpha_disabled": 0.3 },
             "scroll_right": { "kind": "ActionButton", "xy": [0,0], "dimensions": [50,18] }
         }
     },
@@ -7895,24 +7895,27 @@
     },
 
     "combat_item_bar": {
-        "dimensions": [60,240],
+        "dimensions": [60,87],
         "xy": [10,346],
         "clip_children": 0,
         "widgets": {
-            "bgrect": { "kind":"SolidRect", "xy":[0,0], "dimensions": [60,240], "color": [0.005,0.01,0.03,0.75], "bevel": 2 },
+            "bgrect": { "kind":"SolidRect", "xy":[0,0], "dimensions": [60,87], "color": [0.005,0.01,0.03,0.75], "bevel": 2 },
 
-            "item": { "kind": "StaticImage", "xy": [5,5], "dimensions": [50,50],
-                      "array": [1,7], "array_offset": [60,60] },
-            "stack": { "kind": "TextField", "xy": [25,33], "dimensions": [24,19], "text_size": 17, "text_size_fungible3": 17, "text_size_fungible4": 14, "text_size_fungible5": 11,
+            "scroll_left": { "kind": "Dialog", "dialog": "crafting_dialog_scroll_left", "xy": [5,0], "dimensions": [50,16] },
+            "scroll_right": { "kind": "Dialog", "dialog": "crafting_dialog_scroll_right", "xy": [5,69], "dimensions": [50,16] },
+
+            "item": { "kind": "StaticImage", "xy": [5,19], "dimensions": [50,50],
+                      "array": [1,10], "array_offset": [60,60] },
+            "stack": { "kind": "TextField", "xy": [25,46], "dimensions": [24,19], "text_size": 17, "text_size_fungible3": 17, "text_size_fungible4": 14, "text_size_fungible5": 11,
                        "text_style": "thick", "drop_shadow": 1,
                        "text_hjustify": "right",
-                       "array": [1,7], "array_offset": [60,60]},
-            "frame": { "kind": "ActionButton", "xy": [5,5], "dimensions": [50,50], "bg_image": "inventory_frame",
-                       "array": [1,7], "array_offset": [60,60],
+                       "array": [1,10], "array_offset": [60,60]},
+            "frame": { "kind": "ActionButton", "xy": [5,19], "dimensions": [50,50], "bg_image": "inventory_frame",
+                       "array": [1,10], "array_offset": [60,60],
                        "ui_tooltip": "", "ui_tooltip_warehouse_offline": "Warehouse offline",
                        "tooltip_delay": 0 },
-            "clock": { "kind": "CooldownClock", "xy": [5,5], "dimensions": [50,50],
-                       "array": [1,7], "array_offset": [60,60] }
+            "clock": { "kind": "CooldownClock", "xy": [5,19], "dimensions": [50,50],
+                       "array": [1,10], "array_offset": [60,60] }
         }
     },
 
