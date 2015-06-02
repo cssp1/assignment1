@@ -5285,7 +5285,7 @@
     },
 
     "level_up_dialog": {
-        "bg_image": "",
+        "clip_children": 0,
         "dimensions": [487,337],
         "default_button": "spam_button_inform",
         "widgets": {
