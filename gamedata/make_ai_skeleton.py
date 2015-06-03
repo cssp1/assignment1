@@ -303,22 +303,22 @@ def _generate_showcase_consequent(game_id, event_dirname, data, atom):
                 last_random_loot_end = entry['ends_at']
 
         # set up the text that is displayed on milestone and progression screens
-        DEFAULT_PROGRESSION_TEXT_NO_TOKENS = "Continue fighting %AI from your home base to win %FINAL_REWARD and other rewards."
         DEFAULT_PROGRESSION_TEXT_TOKENS = "Continue fighting %AI from your home base or on the Map to win %TOKEN and other rewards.\n\nUse %TOKEN to unlock epic rewards in the %PLUS_STORE_CATEGORY Store."
+        DEFAULT_PROGRESSION_TEXT_UNIT = "Continue fighting %AI from your home base to win %FINAL_REWARD and other rewards."
+        DEFAULT_PROGRESSION_TEXT_OTHER = "Continue fighting %AI from your home base to win special rewards."
 
         if has_tokens:
             progression_text = data['showcase'].get('progression_text', DEFAULT_PROGRESSION_TEXT_TOKENS).replace('%AI', data['villain_ui_name'])
-        else:
-            progression_text = data['showcase'].get('progression_text', DEFAULT_PROGRESSION_TEXT_NO_TOKENS).replace('%AI', data['villain_ui_name'])
-            # assume that all immortals have a unit as the final reward (with a bonus item pack as an alternate reward) because they currently all do
-            if final_loot_unit:
-                already_obtained_unit_predicate = {"predicate": "OR", "subpredicates": [{"predicate": "LIBRARY", "name": final_loot_unit+"_unlocked"},
-                                                                                        {"predicate": "HAS_ITEM", "item_name": final_loot_unit+"_blueprint"}]}
+        elif final_loot_unit:
+            progression_text = data['showcase'].get('progression_text', DEFAULT_PROGRESSION_TEXT_UNIT).replace('%AI', data['villain_ui_name'])
+            already_obtained_unit_predicate = {"predicate": "OR", "subpredicates": [{"predicate": "LIBRARY", "name": final_loot_unit+"_unlocked"},
+                                                                                    {"predicate": "HAS_ITEM", "item_name": final_loot_unit+"_blueprint"}]}
 
-                progression_text = [[already_obtained_unit_predicate, progression_text.replace('%FINAL_REWARD', 'a bonus item pack')], \
-                                    [{"predicate": "ALWAYS_TRUE"}, progression_text.replace('%FINAL_REWARD', 'blueprints for the %s' % gamedata['units'][final_loot_unit]['ui_name'])]]
-            else:
-                raise Exception('error: immortal event %s doesn\'t have a unit as the final reward' % data['event_name'])
+            progression_text = [[already_obtained_unit_predicate, progression_text.replace('%FINAL_REWARD', 'a bonus item pack')], \
+                                [{"predicate": "ALWAYS_TRUE"}, progression_text.replace('%FINAL_REWARD', 'blueprints for the %s' % gamedata['units'][final_loot_unit]['ui_name'])]]
+        else:
+            # most immortal events reward a unit as the final reward, so just use a generic message as a final fallback option
+            progression_text = data['showcase'].get('progression_text', DEFAULT_PROGRESSION_TEXT_OTHER).replace('%AI', data['villain_ui_name'])
 
         # SHOWCASE
         showcase = { "enable": 1, "ui_title": data['event_ui_name'].upper(),
