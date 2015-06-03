@@ -330,7 +330,7 @@ def _generate_showcase_consequent(game_id, event_dirname, data, atom):
                      "progress_key_cooldown": "ai_"+data['event_name']+suffix+"_instance", # this cooldown must be active in order for the progress_key to be valid
                      "achievement_keys": ["ai_"+data['event_name']+suffix+"_progress"] + (["ai_"+data['event_name']+extra_suffix+"_progress"] if extra_suffix else [])
                      }
-        if 'skip' in data:
+        if 'skip' in data and any(data['skip'][diff]): # only emit if some entries are nonzero
             showcase['level_skip'] = copy.deepcopy(data['skip'][diff])
 
         if has_tokens:
