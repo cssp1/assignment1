@@ -267,10 +267,18 @@ def _generate_showcase_consequent(game_id, event_dirname, data, atom):
                 #sys.stderr.write("Final loot sample (blueprint already obtained): "+repr(sample)+"\n")
                 final_loot_unit_substitute_items = sample[0:3]
 
+        # returns a value contained in a dictionary keyed with the provided difficulty or the value itself
+        # if it is not such a dictionary
+        def get_for_difficulty(value, diff):
+            if isinstance(value, dict):
+                return value[diff] if diff in value else None # XXXXXX add code to prevent silent failure on typo
+            else:
+                return value
+
         # allow manual override of final loot
-        if 'final_reward_unit' in data['showcase']: final_loot_unit = data['showcase']['final_reward_unit']
-        if 'final_reward_item_set' in data['showcase']: final_loot_item_set = data['showcase']['final_reward_item_set']
-        if 'final_reward_items' in data['showcase']: final_loot_item_list = data['showcase']['final_reward_items']
+        if 'final_reward_unit' in data['showcase']: final_loot_unit = get_for_difficulty(data['showcase']['final_reward_unit'], diff)
+        if 'final_reward_item_set' in data['showcase']: final_loot_item_set = get_for_difficulty(data['showcase']['final_reward_item_set'], diff)
+        if 'final_reward_items' in data['showcase']: final_loot_item_list = get_for_difficulty(data['showcase']['final_reward_items'], diff)
 
         if not (final_loot_unit or final_loot_item_set or final_loot_item_list):
             raise Exception('Error generating showcase. Cannot figure out what kind of final loot this event drops.')
@@ -370,15 +378,15 @@ def _generate_showcase_consequent(game_id, event_dirname, data, atom):
 
             final_reward_items_title = data['showcase'].get('final_reward_items_title', None)
             if isinstance(final_reward_items_title, list):
-                showcase['ui_final_reward_title_bbcode'] = make_per_run_cond_chain(data, lambda i, start_time, end_time: final_reward_items_title[i])
+                showcase['ui_final_reward_title_bbcode'] = make_per_run_cond_chain(data, lambda i, start_time, end_time: get_for_difficulty(final_reward_items_title[i], diff))
             else:
-                showcase['ui_final_reward_title_bbcode'] = final_reward_items_title
+                showcase['ui_final_reward_title_bbcode'] = get_for_difficulty(final_reward_items_title, diff)
 
             final_reward_items_subtitle = data['showcase'].get('final_reward_items_subtitle', None)
             if isinstance(final_reward_items_subtitle, list):
-                showcase['ui_final_reward_subtitle_bbcode'] = make_per_run_cond_chain(data, lambda i, start_time, end_time: final_reward_items_subtitle[i])
+                showcase['ui_final_reward_subtitle_bbcode'] = make_per_run_cond_chain(data, lambda i, start_time, end_time: get_for_difficulty(final_reward_items_subtitle[i], diff))
             else:
-                showcase['ui_final_reward_subtitle_bbcode'] = final_reward_items_subtitle
+                showcase['ui_final_reward_subtitle_bbcode'] = get_for_difficulty(final_reward_items_subtitle, diff)
         elif final_loot_item_set:
             showcase['final_reward_items'] = [{'spec':name} for name in gamedata['item_sets'][final_loot_item_set]['members']]
             showcase['ui_final_reward_title_bbcode'] = "[color=#ffff08]%s[/color]" % gamedata['item_sets'][final_loot_item_set]['ui_name']
@@ -590,6 +598,8 @@ def _generate_showcase_consequent(game_id, event_dirname, data, atom):
                                           "then": progression_showcase_cons }
             dump_json_toplevel(progression_showcase_cons, fd = atom.fd)
 
+        if diff != data['difficulties'][-1]:
+            atom.fd.write(',')
         atom.fd.write('\n')
 
 # return a consequent for the "Fight Now" button on the event login announcement

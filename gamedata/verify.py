@@ -1809,9 +1809,27 @@ def check_showcase_hack(cons, reason = ''):
         sc = cons['showcase_hack']
         for UNIT_FIELD in ('final_reward_unit', 'token_reward_unit'):
             if UNIT_FIELD in sc:
-                error |= check_unit_name(sc[UNIT_FIELD], reason + ':' + cons['consequent'] + ':' + UNIT_FIELD)
+                if isinstance(sc[UNIT_FIELD], dict):
+                    # unit field is keyed on difficulty so loop through each difficulty's unit
+                    for diff, unit in sc[UNIT_FIELD]:
+                        error |= check_unit_name(unit, reason + ':' + cons['consequent'] + ':' + UNIT_FIELD)
+                else:
+                    error |= check_unit_name(sc[UNIT_FIELD], reason + ':' + cons['consequent'] + ':' + UNIT_FIELD)
         for ITEM_FIELD in ('feature_random_items', 'final_reward_items', 'token_reward_items'):
             if ITEM_FIELD in sc:
+                def check_showcase_item_field(cons, value, reason = ''):
+                    error = 0
+                    if isinstance(value, dict):
+                        # item field is keyed on difficulty so loop through each difficulty's item(s)
+                        for diff in value:
+                            for entry in value[diff]:
+                                error |= check_item_name(entry['spec'], reason + ':' + cons['consequent'] + ':' + ITEM_FIELD)
+                    else:
+                        # literal item list
+                        for entry in value:
+                            error |= check_item_name(entry['spec'], reason + ':' + cons['consequent'] + ':' + ITEM_FIELD)
+                    return error
+
                 if type(sc[ITEM_FIELD]) is list and type(sc[ITEM_FIELD][0]) is list:
                     # cond chain
                     for pred, item_list in sc[ITEM_FIELD]:
@@ -1819,9 +1837,7 @@ def check_showcase_hack(cons, reason = ''):
                         for entry in item_list:
                             error |= check_item_name(entry['spec'], reason + ':' + cons['consequent'] + ':' + ITEM_FIELD)
                 else:
-                    # literal item list
-                    for entry in sc[ITEM_FIELD]:
-                        error |= check_item_name(entry['spec'], reason + ':' + cons['consequent'] + ':' + ITEM_FIELD)
+                    error |= check_showcase_item_field(cons, sc[ITEM_FIELD], reason)
         for COND_FIELD in ('feature_random_item_count', 'ui_final_reward_bbcode', 'ui_final_reward_subtitle', 'ui_random_rewards_text'):
             if COND_FIELD in sc and type(sc[COND_FIELD]) is list:
                 error |= check_cond_chain(sc[COND_FIELD], reason = reason + ':' + cons['consequent'] + ':' + COND_FIELD)
