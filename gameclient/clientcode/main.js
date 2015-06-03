@@ -15521,6 +15521,7 @@ function do_post_screenshot(data, filename, player_caption, privacy, reason, lau
         if(success) {
             var s = gamedata['strings']['post_screenshot_success'];
             invoke_child_message_dialog(s['ui_title'], s['ui_description']);
+            player.record_feature_use('post_screenshot');
         }
     }; })(finish_callback);
 
