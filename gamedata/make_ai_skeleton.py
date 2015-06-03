@@ -842,7 +842,7 @@ if __name__ == '__main__':
                     for reward in progression_reward_items:
                         level = reward['level'] - 1
 
-                        if level > 1: # level before the loot drop
+                        if unskipped_count > 8 and level > 1: # level before the loot drop, but only if difficulty has >8 levels
                             auto_cutscenes[diff][level_map[level - 1]].append({'speaker': 'progression_showcase'})
                         if level > 0 and level < last_unskipped: # level after the loot drop, if it's not the very last progression level of the event
                             auto_cutscenes[diff][level_map[level]].append({'speaker': 'progression_showcase'})
