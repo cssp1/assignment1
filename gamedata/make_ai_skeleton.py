@@ -271,7 +271,15 @@ def _generate_showcase_consequent(game_id, event_dirname, data, atom):
         # if it is not such a dictionary
         def get_for_difficulty(value, diff):
             if isinstance(value, dict):
-                return value[diff] if diff in value else None # XXXXXX add code to prevent silent failure on typo
+                if diff in value:
+                    return value[diff]
+                else:
+                    # confirm that the difficulty value in value is actually missing and hasn't just been mistyped
+                    for key in value:
+                        if key not in data['difficulties']:
+                            raise Exception('Invalid difficulty %s specified in %r' % (key, value))
+
+                    return None
             else:
                 return value
 
