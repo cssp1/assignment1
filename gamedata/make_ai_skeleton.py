@@ -344,7 +344,7 @@ def _generate_showcase_consequent(game_id, event_dirname, data, atom):
                      "total_levels": data['bases_per_difficulty'],
                      "progress_key": "ai_"+data['event_name']+suffix+"_progress_now",
                      "progress_key_cooldown": "ai_"+data['event_name']+suffix+"_instance", # this cooldown must be active in order for the progress_key to be valid
-                     "achievement_keys": ["ai_"+data['event_name']+suffix+"_progress"] + (["ai_"+data['event_name']+extra_suffix+"_progress"] if extra_suffix else [])
+                     "achievement_keys": generate_achievement_keys(data, has_tokens)
                      }
         if 'skip' in data and any(data['skip'][diff]): # only emit if some entries are nonzero
             showcase['level_skip'] = copy.deepcopy(data['skip'][diff])
@@ -353,7 +353,6 @@ def _generate_showcase_consequent(game_id, event_dirname, data, atom):
             showcase['token_item'] = 'token'
             showcase['corner_token_mode'] = 'token_progress'
             showcase['conquest_key'] = 'ai_'+data['event_name']+extra_suffix+'_conquests'
-            showcase['achievement_keys'] += ["ai_"+data['event_name']+suffix+"_conquests"] + (["ai_"+data['event_name']+extra_suffix+"_conquests"] if extra_suffix else [])
             showcase['ui_final_reward_label'] = 'NEW:'
             showcase['plus_store_category'] = 'event_prizes'
         else:
@@ -609,6 +608,25 @@ def _generate_showcase_consequent(game_id, event_dirname, data, atom):
         if diff != data['difficulties'][-1]:
             atom.fd.write(',')
         atom.fd.write('\n')
+
+# returns a list of player history keys for an event that will be used for the achievement counter in the showcase dialog
+def generate_achievement_keys(data, has_tokens):
+    achievement_keys = []
+
+    for diff in data['difficulties']:
+        suffix = data['key_suffix'][diff]
+        extra_suffix = data.get('extra_key_suffix',{}).get(diff,None)
+
+        # note that these may be duplicated if multiple difficulties share the same suffix or extra suffix
+        achievement_keys += ["ai_"+data['event_name']+suffix+"_progress"] + (["ai_"+data['event_name']+extra_suffix+"_progress"] if extra_suffix else [])
+        if has_tokens:
+            achievement_keys += ["ai_"+data['event_name']+suffix+"_conquests"] + (["ai_"+data['event_name']+extra_suffix+"_conquests"] if extra_suffix else [])
+
+        if diff in data.get('speedrun_time', {}):
+            achievement_keys += ["ai_"+data['event_name']+suffix+"_speedrun"]
+
+    # eliminate any duplicates that may have come up due to multiple difficulties sharing the same extra suffix
+    return list(set(achievement_keys))
 
 # return a consequent for the "Fight Now" button on the event login announcement
 def make_fight_now_consequent(data, has_tokens):
