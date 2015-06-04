@@ -180,6 +180,11 @@ var BrowserDetect = {
                 string: navigator.userAgent,
                 subString: "iPod",
                 identity: "iPod"
+            },
+            {
+                string: navigator.userAgent,
+                subString: "Windows Phone",
+                identity: "Windows Phone"
             }
         ]
 };

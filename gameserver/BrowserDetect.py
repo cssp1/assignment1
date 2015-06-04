@@ -67,6 +67,8 @@ def get_browser(ag):
     elif ('Trident/' in ag):
         name = 'Explorer'
         os = 'Windows'
+        if 'Windows Phone' in ag:
+            hardware = 'Windows Phone'
         ver = get_version(ag, 'rv')
     elif ('Firefox' in ag):
         name = 'Firefox'
