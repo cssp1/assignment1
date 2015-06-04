@@ -1137,6 +1137,17 @@ BrowserOSPredicate.prototype.is_satisfied = function(player, qdata) {
 
 /** @constructor
   * @extends Predicate */
+function BrowserHardwarePredicate(data) {
+    goog.base(this, data);
+    this.hardware = data['hardware'];
+}
+goog.inherits(BrowserHardwarePredicate, Predicate);
+BrowserHardwarePredicate.prototype.is_satisfied = function(player, qdata) {
+    return goog.array.contains(this.hardware, spin_demographics['browser_hardware']);
+};
+
+/** @constructor
+  * @extends Predicate */
 function FramePlatformPredicate(data) {
     goog.base(this, data);
     this.platform = data['platform'];
@@ -1717,6 +1728,8 @@ function read_predicate(data) {
         return new BrowserVersionPredicate(data);
     } else if(kind === 'BROWSER_OS') {
         return new BrowserOSPredicate(data);
+    } else if(kind === 'BROWSER_HARDWARE') {
+        return new BrowserHardwarePredicate(data);
     } else if(kind === 'SELECTED') {
         return new SelectedPredicate(data);
     } else if(kind === 'UI_CLEAR') {
