@@ -10,12 +10,12 @@ function usage {
     echo "  help or any other wrong command - print this list"
     echo ""
     echo "  ** General Commands **"
-    echo "  game [<game]> - gets or sets the current game"
+    echo "  game [<game>] - gets or sets the current game"
     echo "  player <playerid> - edit the given player's playerdb file for the current game"
     echo "  refresh - refresh the gamedata"
     echo "  restart - refresh the gamedata and then restart the server"
-    echo "  recompile - recompile all clientside code"
-    echo "  make-ai-skeleton <ai> or make_ai_skeleton <ai>- calls make_ai_skeleton.py for the specified ai and the current game"
+    echo "  recompile - recompile clientside code"
+    echo "  make <ai> or make_ai_skeleton <ai> - calls make_ai_skeleton.py for the specified ai and the current game"
     echo "  log - tail the server's exception logs"
     echo ""
     echo "  ** Hive/Quarry Commands **"
@@ -27,14 +27,20 @@ function usage {
     echo "  patch apply <patch-name> - re-applies a stored patch to the working copy"
     echo "  patch view <patch-name> - shows the contents of a stored patch"
     echo "  patch list - list all stored patches"
-        echo ""
-        echo "  ** Misc Commands **"
-        echo "  cleanup - removes all *.rej and *.orig files left over from using the unix patch program"
+    echo ""
+    echo "  ** Misc Commands **"
+    echo "  cleanup - removes all *.rej and *.orig files left over from using the unix patch program"
 
     return 1
 }
 
 function make_ai_skeleton {
+    # make sure a skeleton has actually been entered
+    if [ "$2" == "" ] ; then
+        echo "gm: An event name must be provided to make_ai_skeleton"
+        return 1
+    fi
+
     SKELETON=${game}/${game}_ai_bases_${2}.skel
     SKELETONPATH=${GAMEDIR}/gamedata/${SKELETON}
 
@@ -50,14 +56,30 @@ function make_ai_skeleton {
 }
 
 function manage_hives {
-    if [ $# == 2 ] ; then
-        cd "$GAMEDIR/gameserver" &&
-        ./maptool.py ${region1} ${1} ${2} --yes-i-am-sure
-    elif [ $# == 3 ] ; then
-        cd "$GAMEDIR/gameserver" &&
-        ./maptool.py ${region1} ${1} ${2} --yes-i-am-sure --event-time-override ${3}
+    # find the region that the first test user is in
+    ids="1112 1113 1114 1115 1116"
+    for id in $ids ; do
+        if [ -f "$GAMEDIR/gameserver/playerdb/${id}_${game}test.txt" ] ; then
+            region=`cat "$GAMEDIR/gameserver/playerdb/${id}_${game}test.txt" 2> /dev/null | grep "\"home_region\":" | cut -d "\"" -f 4`
+
+            if [ $region != "" ] ; then
+                break
+            fi
+        fi
+    done
+
+    if [ "${region}" != "" ] ; then
+        if [ $# == 2 ] ; then
+            cd "$GAMEDIR/gameserver" &&
+            ./maptool.py ${region} ${1} ${2} --yes-i-am-sure
+        elif [ $# == 3 ] ; then
+            cd "$GAMEDIR/gameserver" &&
+            ./maptool.py ${region} ${1} ${2} --yes-i-am-sure --event-time-override ${3}
+        else
+            usage
+        fi
     else
-        usage
+        echo "gm: Unable to find a region any test users in which to ${2} ${1}."
     fi
 }
 
@@ -66,8 +88,6 @@ if [ "$GAMEDIR" == "" ] ; then
 fi
 
 game=`cat "$GAMEDIR/gameserver/config.json" | grep "\"game_id\":\"\(tr\|mf\|mf2\|bfm\|dv\|sg\)test\"" | grep -oh "\(tr\|mf\|mf2\|bfm\|dv\|sg\)"`
-region1=`cat "$GAMEDIR/gameserver/playerdb/1112_${game}test.txt" | grep "\"home_region\":" | cut -d "\"" -f 4`
-region2=`cat "$GAMEDIR/gameserver/playerdb/1113_${game}test.txt" | grep "\"home_region\":" | cut -d "\"" -f 4`
 
 if [ $# == 0 ] || [ "$1" == "help" ] ; then
     usage
