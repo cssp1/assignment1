@@ -2508,7 +2508,7 @@ if __name__ == '__main__':
 
 
         elif mode == 'winners':
-            assert tournament_stat in ('trophies_pvp', 'trophies_pve', 'trophies_pvv', 'strongpoint_resources')
+            assert tournament_stat in ('trophies_pvp', 'trophies_pve', 'trophies_pvv', 'strongpoint_resources', 'hive_kill_points')
 
             if s2:
                 top_alliances = s2.alliance_scores2_get_leaders([stat_axes], 5)[0]
