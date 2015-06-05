@@ -18675,7 +18675,7 @@ function add_regional_map_button(buttons) {
     if(can_view_quarries) {
         buttons.push(new ContextMenuButton({ui_name: gamedata['spells']['SHOW_REGIONAL_MAP']['ui_name'], onclick: function() { change_selection_ui(null); invoke_region_map(); }, asset: 'menu_button_resizable'}));
     } else {
-        buttons.push(new ContextMenuButton({ui_name: gamedata['spells']['SHOW_REGIONAL_MAP']['ui_name'], onclicK: get_requirements_help(pred), state: 'disabled_clickable',
+        buttons.push(new ContextMenuButton({ui_name: gamedata['spells']['SHOW_REGIONAL_MAP']['ui_name'], onclick: get_requirements_help(pred), state: 'disabled_clickable',
                                             ui_tooltip: gamedata['spells']['SHOW_REGIONAL_MAP']['ui_tooltip_unmet'].replace('%s',pred.ui_describe(player)), asset: 'menu_button_resizable'}));
     }
 }
