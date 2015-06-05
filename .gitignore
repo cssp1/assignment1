@@ -3,3 +3,4 @@ spinpunch-private
 *.pid
 git-sync.txt
 .DS_Store
+*.swp
