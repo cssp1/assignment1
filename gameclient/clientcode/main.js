@@ -21998,7 +21998,7 @@ function update_inventory_grid(dialog) {
     // need to update scrolling per-frame as player.inventory changes
     var slots_per_page = dialog.user_data['rows_per_page'] * dialog.user_data['cols_per_page'];
     // add as many rowdata entries as necessary to fill the final page, but not beyond that
-    var shown_slots = Math.max(max_possible_slots, slots_per_page - player.max_usable_inventory() % slots_per_page);
+    var shown_slots = Math.min(max_possible_slots, slots_per_page * Math.floor((player.max_usable_inventory()-1)/slots_per_page)+ slots_per_page - player.max_usable_inventory() % slots_per_page);
 
     // note: rowdata here is just a placeholder null (so that scrollable_dialog_change_page() works)
     // the actual data is in player.inventory
@@ -22008,6 +22008,8 @@ function update_inventory_grid(dialog) {
     }
     scrollable_dialog_change_page(dialog, dialog.user_data['page']);
     dialog.widgets['custom_scroll_text'].str = dialog.data['widgets']['custom_scroll_text']['ui_name'].replace('%d1', pretty_print_number((slots_per_page * dialog.user_data['page'])+1)).replace('%d2', pretty_print_number(Math.min(slots_per_page * (dialog.user_data['page']+1), player.max_usable_inventory()))).replace('%d3', pretty_print_number(player.max_usable_inventory()));
+    // hide scroll text if beyond end of usable slots
+    dialog.widgets['custom_scroll_text'].show = (slots_per_page * dialog.user_data['page'])+1 <= player.max_usable_inventory();
 
     var cols = dialog.data['widgets']['slot']['array'][0];
     for(var y = 0; y < dialog.data['widgets']['slot']['array'][1]; y++) {
