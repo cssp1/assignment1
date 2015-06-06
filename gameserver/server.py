@@ -20827,11 +20827,7 @@ class GAMEAPI(resource.Resource):
 
         r = self.make_response(session, retmsg)
 
-        if request.__class__ is WSFakeRequest: # XXXXXX nasty
-            request.write(r)
-            return
-
-        # standard HTTP request
+        # works for both standard HTTP request and WSFakeRequest
         if hasattr(request, '_disconnected') and request._disconnected: return
         request.write(r)
         request.finish()
@@ -20848,11 +20844,9 @@ class GAMEAPI(resource.Resource):
                             'msg': msg})
         session.outgoing_serial += 1
 
-        if request.__class__ is WSFakeRequest: # XXXXXX nasty
-            request.write(r)
-            return
-
-        if sync: return r
+        if sync:
+            assert request.__class__ is not WSFakeRequest
+            return r
         if hasattr(request, '_disconnected') and request._disconnected: return
         request.write(r)
         request.finish()
@@ -25779,6 +25773,7 @@ class WSFakeRequest(object):
     def write(self, buf):
         if self.proto.connected:
             self.proto.transport.write(buf)
+    def finish(self): pass
 
 class WS_GAMEAPI_Protocol(protocol.Protocol):
     def __init__(self, gameapi, addr):
