@@ -20651,11 +20651,6 @@ class GAMEAPI(resource.Resource):
         if not session:
             return SpinJSON.dumps({'serial':-1, 'clock': server_time, 'msg': retmsg})
 
-        # start with any pending deferred messages
-        if len(session.deferred_messages) > 0:
-            retmsg += session.deferred_messages
-            session.deferred_messages = []
-
         # look through the message buffer for a processable message bundle
         i = 0
         start_time = -1
@@ -20783,6 +20778,11 @@ class GAMEAPI(resource.Resource):
             retmsg.append(["PLAYER_TITLES_UPDATE", session.player.title])
             retmsg.append(["PLAYER_CACHE_UPDATE", [self.get_player_cache_props(session.user, session.player)]])
 
+        # prepend any pending deferred messages
+        if (not session.is_async) and (retmsg is not session.deferred_messages) and len(session.deferred_messages) > 0:
+            retmsg += session.deferred_messages
+            del session.deferred_messages[:] # note: do not create a new array, since outstanding deferred requests may reference it
+
         if gamesite.raw_log:
             client_str = 'sid %s' % pretty_print_session(session.session_id)
             log.msg(('to   client (%s:%d): ' % (client_str, session.outgoing_serial))+repr(retmsg))
@@ -20815,8 +20815,8 @@ class GAMEAPI(resource.Resource):
         request.finish()
 
     def complete_longpoll(self, request, session, sync = False):
-        msg = session.deferred_messages
-        session.deferred_messages = []
+        msg = session.deferred_messages[:]
+        del session.deferred_messages[:] # note: do not create a new array, since in-flight async requests may reference it
 
         if len(msg) == 0: # must send something
             msg.append(["NOMESSAGE"])
