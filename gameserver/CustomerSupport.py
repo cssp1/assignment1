@@ -120,12 +120,28 @@ class HandleClearLockout(Handler):
         return ReturnValue(result = 'ok')
 
 class HandleClearAlias(Handler):
+    def update_player_cache_ui_name(self, new_ui_name):
+        self.gamesite.pcache_client.player_cache_update(self.user_id, {'ui_name': new_ui_name,
+                                                                       'ui_name_searchable': new_ui_name.lower()})
+
     # Note: this does NOT release it in the unique aliases database!
     def do_exec_online(self, session, retmsg):
         session.player.alias = None
+        new_ui_name = session.user.get_real_name()
+        self.update_player_cache_ui_name(new_ui_name)
         return ReturnValue(result = 'ok')
     def do_exec_offline(self, user, player):
         if 'alias' in player: del player['alias']
+        # needs to match User.get_real_name()
+        if user.get('kg_username'):
+            new_ui_name = user['kg_username']
+        elif user.get('facebook_first_name'):
+            new_ui_name = user['facebook_first_name']
+        elif user.get('facebook_name'):
+            new_ui_name = user['facebook_name'].split(' ')[0]
+        else:
+            new_ui_name = 'Unknown(user)'
+        self.update_player_cache_ui_name(new_ui_name)
         return ReturnValue(result = 'ok')
 
 class HandleMarkUninstalled(Handler):
