@@ -25695,7 +25695,7 @@ class GameSite(server.Site):
                 session.attack_finish_time = -1
                 # change_session will unlock the victim's state for us
                 session.visit_base_in_progress = True
-                self.gameapi.change_session(None, session, session.deferred_messages, dest_user_id = session.user.user_id, force = True)
+                session.is_async = self.gameapi.change_session(None, session, session.deferred_messages, dest_user_id = session.user.user_id, force = True)
 
             if (session.idle_check_time > 0) and (server_time >= (session.idle_check_time + gamedata['server']['idle_check_timeout'])):
                 self.gameapi.do_idle_check_response(session, session.deferred_messages)
