@@ -20797,10 +20797,18 @@ class GAMEAPI(resource.Resource):
         if session:
             session.is_async = False
 
-        # sometimes this is called from a non-request context (e.g. bgtask calling complete_attack() on a timed-out session)
-        # if so, do nothing
-        if request is None: return
+        if request is None:
+            assert (retmsg is session.deferred_messages)
 
+        # sometimes this is called from a non-request context (e.g. bgtask calling complete_attack() on a timed-out session)
+        # if so, don't run the normal path. But flush deferred messages.
+        if request is None:
+            session.flush_deferred_messages()
+            # XXXXXX need to process any new messages that came in while deferred
+            # need to call the inner part of handle_message_buffer() to add to retmsg without actually generating a response
+            return
+
+        # process any new messages that came in while deferred
         r = self.handle_message_buffer(request, session, retmsg)
         if r is server.NOT_DONE_YET:
             return
