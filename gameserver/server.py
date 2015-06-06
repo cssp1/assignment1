@@ -20641,16 +20641,18 @@ class GAMEAPI(resource.Resource):
                 session.longpoll_request = http_request
                 session.longpoll_request_time = -1 # no need to force a keepalive, and reuse this request multiple times
 
-        return self.handle_message_buffer(http_request, session, retmsg)
+        is_async = self.handle_message_buffer(http_request, session, retmsg)
+        if is_async:
+            return server.NOT_DONE_YET
+        if session and (not session.is_async): # could have been set async by a previous request
+            self.run_deferred_actions(session, retmsg)
+        return self.make_response(session, retmsg)
 
     # process as many bundles of AJAX messages on a session as possible
     # may terminate early if bundles are out of order, or may go asynchronous
+    # returns True if going asynchronous, otherwise False.
 
     def handle_message_buffer(self, request, session, retmsg):
-        # can happen on async login failure
-        if not session:
-            return SpinJSON.dumps({'serial':-1, 'clock': server_time, 'msg': retmsg})
-
         # look through the message buffer for a processable message bundle
         i = 0
         start_time = -1
@@ -20711,7 +20713,7 @@ class GAMEAPI(resource.Resource):
                             # go asynchronous, breaking out of message processing here
                             # eventually the relevant async callback should call complete_deferred_request()
                             session.is_async = True
-                            return server.NOT_DONE_YET
+                            return True
 
                     except Exception:
                         gamesite.exception_log.event(server_time, 'handle_message_guts exception %s msg %s: %s' % (session.dump_exception_state(), latency_tag, traceback.format_exc()))
@@ -20731,6 +20733,10 @@ class GAMEAPI(resource.Resource):
             else:
                 i += 1
 
+        return False
+
+    # we're about to send a response to the client. Run any pending batched actions.
+    def run_deferred_actions(self, session, retmsg):
         if session.deferred_ping_squads:
             session.deferred_ping_squads = False
             session.player.ping_squads_and_send_update(session, retmsg, originator = session.player.user_id, reason='deferred_ping_squads(sync)')
@@ -20778,9 +20784,14 @@ class GAMEAPI(resource.Resource):
             retmsg.append(["PLAYER_TITLES_UPDATE", session.player.title])
             retmsg.append(["PLAYER_CACHE_UPDATE", [self.get_player_cache_props(session.user, session.player)]])
 
-        # prepend any pending deferred messages
+    def make_response(self, session, retmsg):
+        # can happen on async login failure
+        if not session:
+            return SpinJSON.dumps({'serial':-1, 'clock': server_time, 'msg': retmsg})
+
+        # send any pending deferred messages
         if (not session.is_async) and (retmsg is not session.deferred_messages) and len(session.deferred_messages) > 0:
-            retmsg += session.deferred_messages
+            retmsg = session.deferred_messages + retmsg # prepend or append? not sure...
             del session.deferred_messages[:] # note: do not create a new array, since outstanding deferred requests may reference it
 
         if gamesite.raw_log:
@@ -20794,24 +20805,27 @@ class GAMEAPI(resource.Resource):
         return r
 
     def complete_deferred_request(self, request, session, retmsg):
+        assert (request is not None) or (session and (retmsg is session.deferred_messages))
+
+        # session can be None on an async login failure
+
         if session:
             session.is_async = False
 
-        if request is None:
-            assert (retmsg is session.deferred_messages)
+            # process any new pending messages
+            self.handle_message_buffer(request, session, retmsg)
+            if session.is_async: # hmm, if another request set this to async, we might miss the response?
+                return
+
+            self.run_deferred_actions(session, retmsg)
 
         # sometimes this is called from a non-request context (e.g. bgtask calling complete_attack() on a timed-out session)
         # if so, don't run the normal path. But flush deferred messages.
         if request is None:
             session.flush_deferred_messages()
-            # XXXXXX need to process any new messages that came in while deferred
-            # need to call the inner part of handle_message_buffer() to add to retmsg without actually generating a response
             return
 
-        # process any new messages that came in while deferred
-        r = self.handle_message_buffer(request, session, retmsg)
-        if r is server.NOT_DONE_YET:
-            return
+        r = self.make_response(session, retmsg)
 
         if request.__class__ is WSFakeRequest: # XXXXXX nasty
             request.write(r)
