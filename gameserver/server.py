@@ -21932,7 +21932,7 @@ class GAMEAPI(resource.Resource):
             # then continue with log_out_async2
             def continue_log_out(self, session, method, cb, force, outcome, old_battle_summary, is_sync):
                 self.log_out_async2(session, method, cb, force = force)
-            self.complete_attack(session, [], functools.partial(continue_log_out, self, session, method, cb, force), reason='log_out_async')
+            self.complete_attack(session, session.deferred_messages, functools.partial(continue_log_out, self, session, method, cb, force), reason='log_out_async')
 
     def log_out_async2(self, session, method, cb, force = False):
         ascdebug('log_out_async2 %d' % (session.user.user_id))
