@@ -12455,10 +12455,24 @@ class CONTROLAPI(resource.Resource):
                 except:
                     gamesite.exception_log.event(server_time, 'CustomerSupport ONLINE exception player %d: %s' % (user_id, traceback.format_exc()))
                     val = CustomerSupport.ReturnValue(error = traceback.format_exc())
-                if val.kill_session:
-                    ret = self.kill_session(request, session, body = val.as_body())
+
+                if val.async:
+                    assert isinstance(val.async, defer.Deferred) # sanity check
+                    ret = server.NOT_DONE_YET
+
+                    def after_async(self, request, session, async_result):
+                        # note: only handles one asynchronous step; if more are needed, this would have to recurse
+                        session.flush_deferred_messages()
+                        self.complete_deferred_request(async_result.as_body(), request)
+                    val.async.addBoth(functools.partial(after_async, self, request, session))
+
                 else:
-                    ret = val.as_body()
+                    if val.kill_session:
+                        ret = self.kill_session(request, session, body = val.as_body())
+                    else:
+                        ret = val.as_body()
+
+                session.flush_deferred_messages()
 
             else:
                 # OFFLINE edit

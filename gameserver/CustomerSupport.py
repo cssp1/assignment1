@@ -13,17 +13,22 @@
 
 import SpinJSON
 import random
+import functools
+from twisted.internet import defer
 
 # encapsulate the return value from CONTROLAPI support calls, to be interpreted by cgipcheck.html JavaScript
 # basically, we return a JSON dictionary that either has a "result" (for successful calls) or an "error" (for failures).
 # there is also a "kill_session" option that tells the server to (asynchronously) log the player out after we return.
+# and an "async" Deferred to hold the CONTROLAPI request until an async operation finishes
 class ReturnValue(object):
-    def __init__(self, result = None, error = None, kill_session = False):
-        assert result or error
+    def __init__(self, result = None, error = None, kill_session = False, async = None):
+        assert result or error or async
         self.result = result
         self.error = error
         self.kill_session = kill_session
+        self.async = async
     def as_body(self):
+        assert not self.async
         if self.error:
             ret = {'error':self.error}
         else:
