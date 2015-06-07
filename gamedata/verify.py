@@ -35,9 +35,9 @@ def require_art_file(name):
 
 # never allow upgrades to cost more than this much resources, since the player cannot hold as much even with max storage!
 # CC L6 = 4*L10 storage = 24400000
-# CC L7 = 5*L10 storage = 30500000
+# CC L8 = 4*L12 storage = 34000000
 
-MAX_RESOURCE_COST = 30500000
+MAX_RESOURCE_COST = 34000000
 MAX_STORAGE = None
 
 # parse a single predicate for minimum CC level requirement
