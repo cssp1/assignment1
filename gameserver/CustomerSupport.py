@@ -15,6 +15,7 @@ import SpinJSON
 import random
 import functools
 from twisted.internet import defer
+from Region import Region
 
 # encapsulate the return value from CONTROLAPI support calls, to be interpreted by cgipcheck.html JavaScript
 # basically, we return a JSON dictionary that either has a "result" (for successful calls) or an "error" (for failures).
@@ -384,8 +385,189 @@ class HandleChangeRegion(Handler):
             ret = ReturnValue(error = 'change_region failed')
         self.d.callback(ret)
 
+    # the offline implementation is complex because it needs to do
+    # everything Player.change_region() does, including careful trial
+    # placement in the new region, recall of old squads, etc.
+
+    # this must match Base.get_cache_props() in server
+    def get_cache_props(self, player):
+        props = { 'base_id': 'h'+str(self.user_id),
+                  'base_landlord_id': self.user_id,
+                  'base_type': 'home',
+                  'base_map_loc': player['base_map_loc']}
+        for FIELD in ('base_ncells','base_creation_time','base_size',):
+            if FIELD in player:
+                props[FIELD] = player[FIELD]
+
+        townhall_level = player['history'].get(self.gamedata['townhall']+'_level', 1)
+        if townhall_level > 0: props[self.gamedata['townhall']+'_level'] = townhall_level
+        return props
+
+    def recall_squad(self, player, region_id, squad_id):
+        base_id = 's'+str(self.user_id)+'_'+str(squad_id)
+        feature = self.gamesite.nosql_client.get_map_feature_by_base_id(region_id, base_id)
+        if not feature: return
+        if self.gamesite.nosql_client.map_feature_lock_acquire(region_id, base_id, self.user_id) != 2: # BEING_ATTACKED
+            # squad is locked, do nothing
+            return
+
+        try:
+            squad_units = self.gamesite.nosql_client.get_mobile_objects_by_base(region_id, base_id)
+            self.refund_units(player, feature, squad_units)
+            self.gamesite.nosql_client.drop_mobile_objects_by_base(region_id, base_id)
+        except:
+            self.gamesite.nosql_client.map_feature_lock_release(region_id, base_id, self.user_id)
+            raise
+
+        self.gamesite.nosql_client.drop_map_feature(region_id, base_id) # gets rid of the lock
+
+    def refund_units(self, player, feature, objlist):
+        to_add = []
+        squad_id = int(feature['base_id'].split('_')[1])
+        for obj in objlist:
+            if obj['spec'] not in self.gamedata['units']: continue
+            props = {'spec': obj['spec'],
+                     'xy': [90,90],
+                     'squad_id': squad_id}
+            for FIELD in ('obj_id', 'hp_ratio', 'level', 'equipment'):
+                if FIELD in obj:
+                    props[FIELD] = obj[FIELD]
+            to_add.append(props)
+
+        # force items with squad_ids not in player.squads into reserves, to avoid accidentally giving the player more squads than allowed
+        player_squads = player.get('squads',{})
+        for item in to_add:
+            if str(item['squad_id']) not in player_squads:
+                item['squad_id'] = -1
+
+        player['my_base'] += to_add
+
     def do_exec_offline(self, user, player):
-        raise Exception('XXXXXX unimplemented')
+        # can't execute predicates on offline player (to choose a region), so require a specific destination region
+        assert self.new_region in self.gamedata['regions']
+
+        # this should do the same things that Player.change_region() does
+
+        if player.get('home_region'):
+            assert player['base_region'] == player['home_region']
+            old_region = player['home_region']
+            old_loc = player['base_map_loc']
+        else:
+            old_region = old_loc = None
+
+        new_region = self.new_region
+        new_loc = None
+
+        base_id = 'h'+str(self.user_id) # copy of server.py: home_base_id()
+
+        if old_region:
+            if self.gamesite.nosql_client.map_feature_lock_acquire(old_region, base_id, self.user_id) != 2: # BEING_ATTACKED
+                # base is locked
+                return ReturnValue(error = 'change_region failed: base is locked')
+
+        if new_region:
+            random.seed(self.user_id + self.gamedata['territory']['map_placement_gen'] + int(100*random.random()))
+
+            map_dims = self.gamedata['regions'][new_region]['dimensions']
+            BORDER = self.gamedata['territory']['border_zone_player']
+
+            # radius: how far from the center of the map we can place the player
+            radius = [map_dims[0]//2 - BORDER, map_dims[1]//2 - BORDER]
+
+            # rectangle within which we can place the player
+            placement_range = [[map_dims[0]//2 - radius[0], map_dims[0]//2 + radius[0]],
+                               [map_dims[1]//2 - radius[1], map_dims[1]//2 + radius[1]]]
+            trials = map(lambda x: (min(max(placement_range[0][0] + int((placement_range[0][1]-placement_range[0][0])*random.random()), 2), map_dims[0]-2),
+                                    min(max(placement_range[1][0] + int((placement_range[1][1]-placement_range[1][0])*random.random()), 2), map_dims[1]-2)), xrange(100))
+
+            trials = filter(lambda x: not Region(self.gamedata, new_region).obstructs_bases(x), trials)
+
+            i = 0
+            for tr in trials:
+                i += 1
+                player['base_region'] = new_region
+                player['base_map_loc'] = tr
+                props = self.get_cache_props(player)
+
+                if (new_region == old_region):
+                    success = self.gamesite.nosql_client.move_map_feature(new_region, base_id, props, old_loc = old_loc,
+                                                                          exclusive = self.gamedata['territory']['exclusive_zone_player'], originator=self.user_id, reason='CustomerSupport')
+                else:
+                    success = self.gamesite.nosql_client.create_map_feature(new_region, base_id, props,
+                                                                            exclusive = self.gamedata['territory']['exclusive_zone_player'], originator=self.user_id, reason='CustomerSupport')
+                if success:
+                    break
+                else:
+                    player['base_region'] = old_region
+                    player['base_map_loc'] = old_loc
+                # note! temporarily leave player['home_region'] pointing to the old region, so that we can clear the squads out
+
+            if (not player['base_region']) or ((player['base_region'] == old_region) and (player['base_map_loc'] == old_loc)):
+                if not new_loc: # don't print this warning when player deliberately tries to enter a crowded neighborhood
+                    self.gamesite.exception_log.event(self.time_now, 'map: failed to place player %d in region %s after %d trials' % (self.user_id, new_region, i))
+                if old_region:
+                    self.gamesite.nosql_client.map_feature_lock_release(old_region, base_id, self.user_id)
+                return ReturnValue(error = 'change_region failed: too crowded')
+
+        elif old_region:
+            # just remove from the map, do not add to a new region
+            player['base_region'] = None
+            player['base_map_loc'] = None
+
+        if player['base_region']:
+            player['base_climate'] = Region(self.gamedata, player['base_region']).read_climate_name(player['base_map_loc'])
+        elif 'base_climate' in player:
+            del player['base_climate']
+
+        # just get rid of all scenery
+        to_remove = []
+        for obj in player['my_base']:
+            if obj['spec'] in self.gamedata['inert']:
+                spec = self.gamedata['inert'][obj['spec']]
+                if spec.get('auto_spawn', False):
+                    to_remove.append(obj)
+        for obj in to_remove:
+            player['my_base'].remove(obj)
+
+        if old_region:
+            # recall squads
+            for squad_sid, squad in player.get('squads',{}).iteritems():
+                squad_id = int(squad_sid)
+                if 'map_loc' in squad: # is deployed
+                    self.recall_squad(player, old_region, squad_id)
+                    for FIELD in ('map_loc', 'map_path'):
+                        if FIELD in squad:
+                            del squad[FIELD]
+
+            # drop all remaining units
+            self.gamesite.nosql_client.drop_mobile_objects_by_owner(old_region, self.user_id)
+
+            if player['base_region'] != old_region:
+                # remove home base from old region (drops old lock as well)
+                self.gamesite.nosql_client.drop_map_feature(old_region, base_id, originator=self.user_id, reason='CustomerSupport')
+
+                # skip modifying ladder scores and on_enter consequent
+            else:
+                # changed location within one region - no need to drop old stuff
+                pass
+
+        player['history']['map_placement_gen'] = self.gamedata['territory']['map_placement_gen'] if player['base_region'] else -1
+        player['home_region'] = player['base_region']
+
+        # update player cache
+        self.gamesite.pcache_client.player_cache_update(self.user_id, {'home_region':player['home_region'], 'home_base_loc':player['base_map_loc']}, reason ='CustomerSupport')
+
+        self.gamesite.metrics_log.event(self.time_now, {'user_id': self.user_id,
+                                                        'event_name': '4701_change_region_success',
+                                                        'request_region':new_region, 'request_loc':new_loc,
+                                                        'new_region': player['base_region'], 'new_loc': player['base_map_loc'],
+                                                        'old_region':old_region, 'old_loc':old_loc, 'reason':'CustomerSupport'})
+        # drop lock from create_map_feature()
+        if new_region and (new_region != old_region):
+            self.gamesite.nosql_client.map_feature_lock_release(new_region, base_id, self.user_id)
+
+        return ReturnValue(result = 'ok')
+
 methods = {
     'get_raw_player': HandleGetRawPlayer,
     'get_raw_user': HandleGetRawUser,

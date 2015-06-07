@@ -6315,6 +6315,7 @@ class Base(object):
         return 0
 
     def get_cache_props(self, extra_props = None):
+        # note: some of this is duplicated in CustomerSupport.ChangeRegionHandler, so make updates there too.
         props = { 'base_id': self.base_id,
                   'base_landlord_id': self.base_landlord_id }
         assert self.base_type
