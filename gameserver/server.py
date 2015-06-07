@@ -11392,7 +11392,7 @@ class LivePlayer(Player):
 
         if self.history.get('map_placement_gen', 0) < gamedata['territory']['map_placement_gen'] and \
            (self.eligible_for_quarries() or (force_region is not None)):
-            success, removed, added = self.change_region(force_region if (force_region is not None) else None, None, session, retmsg, reason='update_map_placement')
+            success = self.change_region(force_region if (force_region is not None) else None, None, session, retmsg, reason='update_map_placement')
             if success and retmsg:
                 self.send_history_update(retmsg)
 
@@ -11411,10 +11411,12 @@ class LivePlayer(Player):
         return True
 
 
+    # main region-change function
     # pass None to get a random region
+    # returns whether it succeeded or not
     def change_region(self, request_region, request_loc, session, retmsg, reason = ''):
         if (not gamesite.nosql_client):
-            return False, [], []
+            return False
 
         new_region = request_region
         new_region_pop = None
@@ -11453,7 +11455,7 @@ class LivePlayer(Player):
 
             if len(regions) < 1:
                 gamesite.exception_log.event(server_time, 'map: no regions for player %d (all disabled or hard-capped) - pops: %s' % (self.user_id, repr(populations)))
-                return False, [], []
+                return False
 
             new_region = regions[0]
             new_region_pop = populations.get(new_region, 0)
@@ -11473,9 +11475,9 @@ class LivePlayer(Player):
         if (new_region not in gamedata['regions']):
             if gamedata['server']['log_map']:
                 gamesite.exception_log.event(server_time, 'map: player %d change_region picked invalid region %s' % (self.user_id, repr(new_region)))
-            return False, [], []
+            return False
         if gamedata['regions'][new_region].get('developer_only',0) and (not session.player.is_developer()):
-            return False, [], []
+            return False
 
         # get population
         if new_region_pop is None:
@@ -11560,7 +11562,7 @@ class LivePlayer(Player):
         if (not self.my_home.base_region) or ((self.my_home.base_region == old_region) and (self.my_home.base_map_loc == old_loc)):
             if not new_loc: # don't print this warning when player deliberately tries to enter a crowded neighborhood
                 gamesite.exception_log.event(server_time, 'map: failed to place player %d in region %s after %d trials' % (self.user_id, new_region, i))
-            return False, [], []
+            return False
 
         session.player_base_lock = (self.my_home.base_region, self.my_home.base_id)
         self.my_home.base_climate = Region(gamedata, self.my_home.base_region).read_climate_name(self.my_home.base_map_loc)
@@ -11606,12 +11608,22 @@ class LivePlayer(Player):
 
         self.home_region = self.my_home.base_region
         self.travel_begin(None, 0) # reset travel
-        if retmsg is not None:
+
+        if retmsg is not None: # only run this code OUTSIDE the pre-first-session-change login path
             retmsg.append(["REGION_CHANGE", self.home_region, self.my_home.base_map_loc, False, self.my_home.base_climate])
             if self.home_region and gamedata['regions'][self.home_region].get('enable_turf_control',False):
                 retmsg.append(["REGION_TURF_UPDATE", self.home_region, gamesite.nosql_client.alliance_turf_get_by_region(self.home_region, reason = 'change_region')])
             retmsg.append(["PLAYER_TRAVEL_UPDATE", self.travel_state])
             retmsg.append(["SQUADS_UPDATE", self.squads])
+
+            session.init_region_chat(session.player.home_region, retmsg)
+
+            # note: objects only added/removed to session when this is triggered OUTSIDE the login path
+            retmsg += [["OBJECT_REMOVED2", session.rem_object(obj.obj_id).obj_id] for obj in scenery_removed if session.has_object(obj.obj_id)]
+            retmsg += [["OBJECT_CREATED2", session.add_object(obj).serialize_state()] for obj in scenery_added]
+
+            if session.player.get_daily_messages(session, retmsg): # may trigger message
+                session.player.send_mailbox_update(retmsg)
 
         # update player cache
         gamesite.pcache_client.player_cache_update(self.user_id, {'home_region':self.home_region, 'home_base_loc':self.my_home.base_map_loc}, reason ='change_region')
@@ -11621,7 +11633,7 @@ class LivePlayer(Player):
                                                                         'ladder_reset': ladder_reset,
                                                                         'old_region':old_region, 'old_loc':old_loc, 'reason':reason})
 
-        return True, scenery_removed, scenery_added
+        return True
 
     # returns a list of "waves" where each wave is a dictionary of {unit_spec:quantity},
     # based on the "wave_table" that calibrates units against what the player has unlocked
@@ -16773,20 +16785,14 @@ class GAMEAPI(resource.Resource):
             reason = 'player_request'
             metric_event_coded(session.user.user_id, '4700_change_region_request', {'request_region':new_region, 'request_loc':new_loc,
                                                                                     'old_region':session.player.home_region, 'old_loc':session.player.my_home.base_map_loc, 'reason':reason})
-            success, scenery_removed, scenery_added = session.player.change_region(new_region, new_loc, session, retmsg, reason=reason)
+            success = session.player.change_region(new_region, new_loc, session, retmsg, reason=reason)
 
             if success:
-                session.init_region_chat(session.player.home_region, retmsg) # originally this had no catchup
                 session.player.cooldown_trigger(cdname, spell['cooldown'])
                 retmsg.append(["COOLDOWNS_UPDATE", session.player.cooldowns])
-                retmsg += [["OBJECT_REMOVED2", session.rem_object(obj.obj_id).obj_id] for obj in scenery_removed if session.has_object(obj.obj_id)]
-                retmsg += [["OBJECT_CREATED2", session.add_object(obj).serialize_state()] for obj in scenery_added]
-
-                if session.player.get_daily_messages(session, retmsg): # may trigger message
-                    session.player.send_mailbox_update(retmsg)
-
             else:
                 retmsg.append(["ERROR", "CANNOT_CHANGE_REGION_DESTINATION_OCCUPIED"])
+
             return success
 
         elif spellname == "APPLY_AURA":
