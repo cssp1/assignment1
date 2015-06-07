@@ -356,6 +356,36 @@ class HandleSendMessage(MessageSender):
                 'subject':self.args.get('message_subject', 'Customer Support'),
                 'body': self.args['message_body']}
 
+class HandleChangeRegion(Handler):
+    def __init__(self, *pargs, **pkwargs):
+        Handler.__init__(self, *pargs, **pkwargs)
+        self.new_region = self.args.get('new_region', 'ANY')
+        if self.new_region == 'ANY':
+            self.new_region = None
+        assert (self.new_region is None or self.new_region in self.gamedata['regions'])
+
+    # the online handler has to first end any ongoing attack, which may go asynchronous, and then
+    # a synchronous return to home base, and finally the region change
+    def do_exec_online(self, session, retmsg):
+        self.d = defer.Deferred() # for the asynchronous callback
+        self.gamesite.gameapi.complete_attack(session, retmsg, functools.partial(self.do_exec_online2, session, retmsg),
+                                              reason = 'CustomerSupport')
+        return ReturnValue(async = self.d)
+
+    # then after complete_attack...
+    def do_exec_online2(self, session, retmsg, outcome, old_battle_summary, is_sync):
+        # force a synchronous session change back to home base
+        if session.viewing_base is not session.player.my_home:
+            self.gamesite.gameapi.change_session_complete(None, session, retmsg, self.user_id, session.user, session.player, None, None, None, outcome, old_battle_summary, None, {}, {})
+        success = session.player.change_region(self.new_region, None, session, retmsg, reason = 'CustomerSupport')
+        if success:
+            ret = ReturnValue(result = 'ok')
+        else:
+            ret = ReturnValue(error = 'change_region failed')
+        self.d.callback(ret)
+
+    def do_exec_offline(self, user, player):
+        raise Exception('XXXXXX unimplemented')
 methods = {
     'get_raw_player': HandleGetRawPlayer,
     'get_raw_user': HandleGetRawUser,
@@ -376,5 +406,6 @@ methods = {
     'chat_gag': HandleChatGag,
     'chat_ungag': HandleChatUngag,
     'give_item': HandleGiveItem,
-    'send_message': HandleSendMessage
+    'send_message': HandleSendMessage,
+    'change_region': HandleChangeRegion,
 }
