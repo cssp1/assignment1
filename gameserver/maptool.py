@@ -396,7 +396,7 @@ def refund_units(db, region_id, feature, objlist, user_id, days_to_claim = 7, ui
             props = {'spec': obj['spec'],
                      'xy': [90,90],
                      'squad_id': squad_id}
-            for FIELD in ('obj_id', 'hp_ratio', 'level'):
+            for FIELD in ('obj_id', 'hp_ratio', 'level', 'equipment'):
                 if FIELD in obj:
                     props[FIELD] = obj[FIELD]
             to_add.append(props)
@@ -689,6 +689,8 @@ def spawn_quarry(quarries, map_cache, db, lock_manager, region_id, id_num, id_se
                 obj['orders'].append(order)
 
         if 'patrol' in p: obj['patrol'] = p['patrol']
+        if 'equipment' in p:
+            obj['equipment'] = copy.deepcopy(p['equipment'])
         base_data['my_base'].append(obj)
 
     for p in template.get('scenery',[]):
