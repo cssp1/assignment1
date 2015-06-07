@@ -48,6 +48,8 @@ def parse_predicate(gamedata, pred):
 
 # get basic requirement list for one level of a given spec
 def do_get_requirements(gamedata, spec, level):
+    if type(spec['requires']) is list and len(spec['requires']) < level:
+        raise Exception('%s "requires" array is too short, needs to have at least %d entries' % (spec['name'], level))
     return prune_array(parse_predicate(gamedata, GameDataUtil.get_leveled_quantity(spec['requires'], level)))
 
 # get basic requirement lists for all levels of a given spec
