@@ -43,7 +43,7 @@ Congrats.cc_upgrade = function(cc, level) {
 
     var sep = new SPText.ABlock('\n', Congrats.props.normal);
 
-    if('provides_space' in cc.spec) {
+    if('provides_space' in cc.spec && (cc.spec['provides_space'][level-2] != cc.spec['provides_space'][level-1])) {
         ret.push([[new SPText.ABlock(gamedata['strings']['cc_upgrade_congrats']['unit_space']['ui_name'].toUpperCase(), Congrats.props.bold)]]);
         ret.push([Congrats.item(gamedata['strings']['cc_upgrade_congrats']['unit_space']['ui_name'],
                                 gamedata['strings']['cc_upgrade_congrats']['unit_space']['ui_before'],
@@ -69,6 +69,21 @@ Congrats.cc_upgrade = function(cc, level) {
                 } else {
                     ui_name = spec['ui_name'];
                 }
+
+                ret.push([Congrats.item(ui_name,
+                                        gamedata['strings']['cc_upgrade_congrats']['max_number']['ui_before'],
+                                        gamedata['strings']['cc_upgrade_congrats']['max_number']['ui_after'],
+                                        start, end)]);
+            }
+        }
+    }
+
+    if('provides_limited_equipped' in cc.spec) {
+        for(var key in cc.spec['provides_limited_equipped']) {
+            var arr = cc.spec['provides_limited_equipped'][key];
+            var start = arr[level-2], end = arr[level-1];
+            if(start != end) {
+                var ui_name = gamedata['strings']['modstats']['stats']['provides_limited_equipped:'+key]['ui_name'];
 
                 ret.push([Congrats.item(ui_name,
                                         gamedata['strings']['cc_upgrade_congrats']['max_number']['ui_before'],
