@@ -158,7 +158,13 @@ GameArt.init = function(time, canvas, ctx, art_json, dl_callback, audio_driver_n
     if(GameArt.enable_audio) {
         if(audio_driver_name == 'AudioContext') {
             if(typeof(AudioContext) != 'undefined' || typeof(webkitAudioContext) != 'undefined') {
-                GameArt.audio_driver = new SPAudio.ACDriver(time);
+                try {
+                    GameArt.audio_driver = new SPAudio.ACDriver(time);
+                } catch(e) {
+                    //  usually NotSupportedError: Failed to construct 'AudioContext': The number of hardware contexts provided (6) is greater than or equal to the maximum bound (6).
+                    console.log('AudioContext initialization failed - falling back to sm2');
+                    audio_driver_name = 'sm2';
+                }
             } else {
                 console.log('AudioContext audio driver requested, but (webkit)AudioContext is undefined - falling back to sm2');
                 audio_driver_name = 'sm2';
