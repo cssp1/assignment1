@@ -96,43 +96,59 @@ Congrats.cc_upgrade = function(cc, level) {
     ret.push([[sep]]);
     ret.push([[new SPText.ABlock(gamedata['strings']['cc_upgrade_congrats']['max_level']['ui_name'].toUpperCase(), Congrats.props.bold)]]);
     for(var name in gamedata['buildings']) {
-        var os = gamedata['buildings'][name];
-        // ignore developer_only if in production
-        if(os['developer_only'] && (spin_secure_mode || !player.is_developer())) {
-            continue;
-        }
-        var start = 0, end = 0;
-        if('requires' in os) {
-            // horrible hack... need to evaluate predicates at old and new CC levels
-            var save_level = cc.level;
-            cc.level = level - 1;
-            var max_os_level = os['build_time'].length;
-            for(var i = 1; i <= max_os_level; i++) {
-                if(read_predicate(get_leveled_quantity(os['requires'], i)).is_satisfied(player, null)) {
-                    start = i;
-                } else {
-                    break;
-                }
-            }
-
-            cc.level = level;
-            for(var i = 1; i <= max_os_level; i++) {
-                if(read_predicate(get_leveled_quantity(os['requires'], i)).is_satisfied(player, null)) {
-                    end = i;
-                } else {
-                    break;
-                }
-            }
-            if(start != end) {
-                ret.push([Congrats.item(os['ui_name'],
-                                        gamedata['strings']['cc_upgrade_congrats']['max_level']['ui_before'],
-                                        gamedata['strings']['cc_upgrade_congrats']['max_level']['ui_after'],
-                                        start, end)]);
-            }
-            cc.level = save_level;
+        var item = Congrats.building_level_gain(cc.spec, level, gamedata['buildings'][name]);
+        if(item) {
+            ret.push([item]);
         }
     }
 
     //console.log(ret);
     return ret;
+};
+
+// given a gamedata['buildings'] spec, see if upgrading source_building to source_level unlocks a higher level for it
+// if so, return a Congrats.item.
+// Originally, this mutated the source_building and checked predicates using is_satisfied(), but this misses upgrades
+// that have additional unsatisfied requirements. So for now, reach manually into the predicates and parse out BUILDING_LEVEL.
+Congrats.building_level_gain = function(source_spec, source_level, spec) {
+
+    // ignore developer_only if in production
+    if(spec['developer_only'] && (spin_secure_mode || !player.is_developer())) { return null; }
+    if(spec['show_if'] && !read_predicate(spec['show_if']).is_satisfied(player, null)) { return null; }
+    if(!spec['requires'] || !(0 in spec['requires'])) { return null; } // missing or non-array-valued "requires"
+
+    var start = 0, end = 0;
+    for(var i = 0; i < spec['requires'].length; i++) {
+        if(Congrats.building_level_predicate_is_satisfied(spec['requires'][i], source_spec['name'], source_level-1)) {
+            start = i+1;
+        }
+        if(Congrats.building_level_predicate_is_satisfied(spec['requires'][i], source_spec['name'], source_level)) {
+            end = i+1;
+        }
+    }
+
+    if(start != end) {
+        return Congrats.item(spec['ui_name'],
+                             gamedata['strings']['cc_upgrade_congrats']['max_level']['ui_before'],
+                             gamedata['strings']['cc_upgrade_congrats']['max_level']['ui_after'],
+                             start, end);
+    }
+    return null;
+};
+
+Congrats.building_level_predicate_is_satisfied = function(pred, specname, level) {
+    if(pred['predicate'] === 'AND') {
+        for(var i = 0; i < pred['subpredicates'].length; i++) {
+            if(!Congrats.building_level_predicate_is_satisfied(pred['subpredicates'][i], specname, level)) {
+                return false;
+            }
+        }
+        return true;
+    } else if(pred['predicate'] === 'BUILDING_LEVEL') {
+        if(pred['building_type'] === specname) {
+            return level >= pred['trigger_level'];
+        }
+    }
+    // ignore all other predicates
+    return true;
 };
