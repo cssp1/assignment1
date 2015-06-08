@@ -160,6 +160,11 @@ UpgradeBar.update_contents = function(dialog, kind, specname, new_level, obj_id)
             var recipe = gamedata['crafting']['recipes'][goody['crafting_recipe']];
             if(recipe['developer_only'] && !player.is_developer()) { return; }
             if(('show_if' in recipe) && !read_predicate(recipe['show_if']).is_satisfied(player,null)) { return; }
+
+            // skip turret head crafting recipes, because there isn't a natural destination for the click,
+            // and it's redundant to say "MG Tower L2 (tech) unlocks MG Tower L2 (crafting recipe)"
+            if(recipe['crafting_category'] === 'turret_heads') { return; }
+
             var n;
             if('ui_name' in recipe) {
                 n = recipe['ui_name'];
