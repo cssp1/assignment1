@@ -237,6 +237,9 @@ def check_mandatory_fields(specname, spec, kind):
         for provides_name, provides_array in spec['provides_limited_equipped'].iteritems():
             if type(provides_array) is list and len(provides_array) != max_level:
                 error |= 1; print '%s %s "provides_limited_equipped": "%s" array length (%d) does not match max level (%d)' % (kind, specname, provides_name, len(provides_array), max_level)
+            stat_key = 'provides_limited_equipped:'+provides_name
+            if stat_key not in gamedata['strings']['modstats']['stats']:
+                error |= 1; print 'gamedata.strings.modstats.stats is missing "%s"' % stat_key
 
     for lev in xrange(1,max_level+1):
         cc_requirement = get_cc_requirement(spec['requires'], lev) if ('requires' in spec) else 0
