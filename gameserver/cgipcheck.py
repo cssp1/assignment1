@@ -6,7 +6,7 @@
 
 # CGI script for customer support and server management
 
-import os, sys, subprocess, traceback, time, re
+import os, sys, subprocess, traceback, time, re, copy
 import cgi, cgitb
 import urllib, urllib2
 import SpinFacebook
@@ -101,8 +101,9 @@ def do_gui(spin_token_data, spin_token_raw, spin_token_cookie_name, my_endpoint,
         '$GAMEBUCKS_NAME$': gamedata['store']['gamebucks_ui_name'],
         '$GAMEBUCKS_ITEM$': 'alloy' if SpinConfig.game() == 'mf' else 'gamebucks',
         '$SPIN_GIVEABLE_ITEMS$': SpinJSON.dumps(sorted([{'name':name, 'ui_name':data['ui_name']} for name, data in gamedata['items'].iteritems() if item_is_giveable(gamedata, data)], key = lambda x: x['ui_name'])),
-        '$SPIN_AI_BASE_IDS$': SpinJSON.dumps(sorted([int(strid) for strid in gamedata['ai_bases_client']['bases'].iterkeys()])),
         '$SPIN_REGION_NAMES$': SpinJSON.dumps(gamedata['regions'].keys()),
+        '$SPIN_REGIONS$': SpinJSON.dumps(get_regions(gamedata)),
+        '$SPIN_AI_BASE_IDS$': SpinJSON.dumps(sorted([int(strid) for strid in gamedata['ai_bases_client']['bases'].iterkeys()])),
         '$SPIN_SSL_AVAILABLE$': 'true' if ssl_available else 'false',
         '$SPIN_WSS_AVAILABLE$': 'true' if ssl_available else 'false',
         '$SPIN_PUBLIC_S3_BUCKET$': SpinConfig.config['public_s3_bucket'],
@@ -110,6 +111,16 @@ def do_gui(spin_token_data, spin_token_raw, spin_token_cookie_name, my_endpoint,
     expr = re.compile('|'.join([key.replace('$','\$') for key in replacements]))
     template = open('cgipcheck.html').read()
     return expr.sub(lambda match: replacements[match.group(0)], template)
+
+# return list of regions, adding missing "name" field if necessary
+def get_regions(gamedata):
+    ret = []
+    for key, val in gamedata['regions'].iteritems():
+        val = copy.copy(val)
+        val['name'] = key
+        ret.append(val)
+    ret.sort(key = lambda x: x['ui_name'])
+    return ret
 
 def check_role(spin_token_data, want_role):
     if (want_role not in spin_token_data['roles']):
@@ -148,7 +159,7 @@ def do_action(path, method, args, spin_token_data, nosql_client):
             if method == 'lookup':
                 result = {'result':do_lookup(control_args)}
             elif method in ('give_item','send_message','chat_gag','chat_ungag','chat_block','chat_unblock','apply_aura','remove_aura','get_raw_player','ban','unban',
-                            'make_developer','unmake_developer','clear_alias','chat_official','chat_unofficial','clear_lockout','clear_cooldown'):
+                            'make_developer','unmake_developer','clear_alias','chat_official','chat_unofficial','clear_lockout','clear_cooldown','change_region'):
                 result = do_CONTROLAPI(control_args)
             else:
                 raise Exception('unknown player method '+method)

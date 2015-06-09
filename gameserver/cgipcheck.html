@@ -31,6 +31,7 @@ var spin_url = '$SPIN_URL$'; var spin_game_id = '$SPIN_GAME_ID$';
 var spin_token_cookie_name = '$SPIN_TOKEN_COOKIE_NAME$';
 var spin_token_domain = '$SPIN_TOKEN_DOMAIN$';
 var spin_giveable_items = $SPIN_GIVEABLE_ITEMS$;
+var spin_regions = $SPIN_REGIONS$;
 var spin_ai_base_ids = $SPIN_AI_BASE_IDS$;
 var spin_region_names = $SPIN_REGION_NAMES$;
 var spin_log_bookmark = $SPIN_LOG_BOOKMARK$;
@@ -233,6 +234,14 @@ var method_remove_aura = function(aura_name) {
     var ui_reason = check_ui_reason($("#chat_reason")[0].value);
     if(ident && aura_name && ui_reason) {
         send_request('player', 'remove_aura', $.extend(ident, {'aura_name':aura_name, 'ui_reason':ui_reason}), function(result) { alert("Success!"); });
+    }
+};
+var method_change_region = function() {
+    var ident = get_ident();
+    var new_region = $("#change_region_destination")[0].value;
+    var ui_reason = check_ui_reason($("#change_region_reason")[0].value);
+    if(ident && new_region && ui_reason) {
+        send_request('player', 'change_region', $.extend(ident, {'new_region':new_region, 'ui_reason':ui_reason}), function(result) { alert("Success! Remember to send the player a message explaining what happened!"); });
     }
 };
 var method_give_item = function() {
@@ -1141,6 +1150,8 @@ $(function() {
         $('#player_tools_send_message_header').remove();
         $('#player_tools_clear_cooldown').remove();
         $('#player_tools_clear_cooldown_header').remove();
+        $('#player_tools_change_region').remove();
+        $('#player_tools_change_region_header').remove();
     }
 
     if(spin_token_data['roles'].indexOf('ADMIN') == -1) {
@@ -1178,6 +1189,9 @@ $(function() {
     $('#item_to_give_qty').spinner({max:50, min:1, step:1});
     spin_giveable_items.forEach(function(entry) {
         $('#item_to_give').append('<option value="'+entry['name']+'">'+entry['ui_name']+'</option>');
+    });
+    spin_regions.forEach(function(entry) {
+        $('#change_region_destination').append('<option value="'+entry['name']+'">'+entry['ui_name']+'</option>');
     });
     $('#skynet_query').bind('enterKey', method_skynet_query);
     $('#skynet_query').keyup(function(e) { if(e.keyCode == 13) { $(this).trigger('enterKey'); } });
@@ -1244,6 +1258,7 @@ $(function() {
     <li><a href="#player_tools_chat_gag" id="player_tools_chat_gag_header">Chat Tools</a></li>
     <li><a href="#player_tools_send_message" id="player_tools_send_message_header">Send Message</a></li>
     <li><a href="#player_tools_clear_cooldown" id="player_tools_clear_cooldown_header">Cooldowns</a></li>
+    <li><a href="#player_tools_change_region" id="player_tools_change_region_header">Map Region</a></li>
     <li><a href="#player_tools_ban" id="player_tools_ban_header">Ban</a></li>
     <li><a href="#player_tools_developer" id="player_tools_developer_header">Developer</a></li>
   </ul>
@@ -1313,6 +1328,18 @@ $(function() {
       Reason for this action:
       <br>
       <input type="text" id="cooldown_reason" style="width:500px;">
+    </div>
+
+    <div id="player_tools_change_region">
+      Force player to move to region:
+      <p>
+      <select id="change_region_destination" name="change_region_destination" class="spin_select"></select>
+      <p>
+      <button onclick="method_change_region()" class="spin_button">Apply</button>
+      <p>
+      Reason for this action:
+      <br>
+      <input type="text" id="change_region_reason" style="width:500px;">
     </div>
 
     <div id="player_tools_ban">
