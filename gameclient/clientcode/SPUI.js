@@ -3102,6 +3102,11 @@ SPUI.ScrollingTextField = function(data) {
 };
 goog.inherits(SPUI.ScrollingTextField, SPUI.DialogWidget);
 
+SPUI.ScrollingTextField.prototype.set_text = function(text, user_data) {
+    this.clear_text();
+    this.append_text(text, user_data);
+};
+
 SPUI.ScrollingTextField.prototype.clear_text = function() {
     var next;
     for(var node = this.head.next; node != this.head; node = next) {
