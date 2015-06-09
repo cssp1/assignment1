@@ -86,4 +86,5 @@ echo "MISSING: mysql config for analytics (or RDS - if local, use /usr/bin/mysql
 # grant select, insert, drop, alter, create temporary tables, lock tables, execute, create view, show view on skynet.* to 'username'@'%';
 
 echo "MISSING: easy_install pymongo - then see setup-there-mongo.sh for MongoDB setup instructions"
+echo "MISSING: easy_install asana - for Ship Schedule integration"
 echo "MISSING: /etc/aliases: add 'root: awstech@example.com' mail alias"

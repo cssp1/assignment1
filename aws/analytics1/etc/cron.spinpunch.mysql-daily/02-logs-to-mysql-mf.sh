@@ -31,3 +31,4 @@ GAME_DIR=/home/ec2-user/marsfrontier
 (cd $GAME_DIR/gameserver && nice ./alliance_events_to_sql.py -q --prune) > /dev/null
 (cd $GAME_DIR/gameserver && nice ./alliance_state_to_sql.py -q) > /dev/null
 (cd $GAME_DIR/gameserver && nice ./skynet_conversion_pixels_to_sql.py -q)
+(cd $GAME_DIR/gameserver && nice ./schedule_to_sql.py --workspace 'spinpunch.com' --project 'SHIP Schedule' --project 'Market Research' -q) > /dev/null
