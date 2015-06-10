@@ -220,6 +220,9 @@ def _generate_showcase_consequent(game_id, event_dirname, data, atom):
 
     randgen = random.Random(1234) # fix random number seed for loot-table sampling
 
+    has_multiple_difficulties = len(data['difficulties']) > 1
+    highest_difficulty = data['difficulties'][-1]
+
     print_auto_gen_warning(fd = atom.fd)
     for diff in data['difficulties']:
         suffix = data['key_suffix'][diff]
@@ -357,7 +360,10 @@ def _generate_showcase_consequent(game_id, event_dirname, data, atom):
             showcase['plus_store_category'] = 'event_prizes'
         else:
             showcase['show_progress_bar'] = 'small'
-            showcase['ui_final_reward_label'] = 'FINAL REWARDS:'
+            if has_multiple_difficulties:
+                showcase['ui_final_reward_label'] = '%s DIFFICULTY REWARDS:' % highest_difficulty.upper()
+            else:
+                showcase['ui_final_reward_label'] = 'FINAL REWARDS:'
 
         if final_loot_unit:
             showcase['final_reward_unit'] = final_loot_unit
