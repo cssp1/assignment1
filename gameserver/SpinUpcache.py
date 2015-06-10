@@ -1262,6 +1262,7 @@ def update_upcache_entry(user_id, driver, entry, time_now, gamedata, user_mtime 
                              "ai_giancarlo5_attempted","ai_giancarlo5_progress","ai_giancarlo5_times_started","ai_giancarlo5_times_completed",
                              "ai_giancarlo6_attempted","ai_giancarlo6_progress","ai_giancarlo6_times_started","ai_giancarlo6_times_completed",
                              "ai_giancarlo7_attempted","ai_giancarlo7_progress","ai_giancarlo7_times_started","ai_giancarlo7_times_completed",
+                             "ai_giancarlo8_attempted","ai_giancarlo8_progress","ai_giancarlo8_times_started","ai_giancarlo8_times_completed",
                              "ai_maximilien_progress","ai_maximilien_times_started","ai_maximilien_times_completed",
                              "ai_maximilien2_attempted","ai_maximilien2_progress","ai_maximilien2_times_started","ai_maximilien2_times_completed",
                              "ai_maximilien3_attempted","ai_maximilien3_progress","ai_maximilien3_times_started","ai_maximilien3_times_completed",
