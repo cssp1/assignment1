@@ -7391,7 +7391,7 @@
             "levels_text": { "show": 0, "kind": "TextField", "xy": [24,345], "dimensions": [175, 25], "text_size": 13, "text_style": "normal", "text_hjustify": "left", "drop_shadow": 1, "text_color": [0.9, 0.55, 0.2, 1], "ui_name": "Levels Complete: %d1/%d2" },
             "achievements_text": { "show": 0, "kind": "ScrollingTextField", "xy": [24,364], "dimensions": [175, 25], "text_size": 13,
                                    "text_style": "normal", "text_hjustify": "left", "drop_shadow": 1, "text_color": [0.9, 0.55, 0.2, 1],
-                                   "ui_name": "Achievements: %s", "link_color": [0.916, 0.549, 0.0015, 1] },
+                                   "ui_name_achievements": "Achievements: [achievements][color=#f4bc09][u]%d1/%d2[/u][/color][/achievements]" },
             "tokens_text": { "show": 0, "kind": "TextField", "xy": [24,383], "dimensions": [175, 25], "text_size": 13, "text_style": "normal", "text_hjustify": "left", "drop_shadow": 1, "text_color": [0.9, 0.55, 0.2, 1], "ui_name": "%s Stored: %d" },
             "map_victory_text": { "show": 0, "kind": "TextField", "xy": [24,402], "dimensions": [175, 25], "text_size": 13, "text_style": "normal", "text_hjustify": "left", "drop_shadow": 1, "text_color": [0.9, 0.55, 0.2, 1], "ui_name": "Map Victories: %d" },
 

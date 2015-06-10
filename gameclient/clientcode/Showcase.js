@@ -175,22 +175,21 @@ Showcase.apply_showcase_hacks = function(dialog, hack) {
     if('achievement_keys' in hack) {
         dialog.widgets['achievements_text'].show = 1;
 
-        var count_text = '%d1/%d2';
-        var total_complete = Showcase.count_achievements(hack['achievement_keys']);
-        count_text = count_text.replace('%d1', total_complete[1].toString()).replace('%d2', total_complete[0].toString());
+        var text = dialog.data['widgets']['achievements_text']['ui_name_achievements'];
 
-        var text = dialog.data['widgets']['achievements_text']['ui_name'];
-        var link_color = SPUI.make_colorv(dialog.data['widgets']['achievements_text']['link_color']).hex();
-        text = text.replace('%s', '[color=#' + link_color + '][u][achievements]' + count_text + '[/achievements][/u][/color]');
+        var total_complete = Showcase.count_achievements(hack['achievement_keys']);
+        text = text.replace('%d1', total_complete[1].toString()).replace('%d2', total_complete[0].toString());
 
         // find an achievement containing these keys so that we can link to it (preferring incomplete ones)
         var achievement = null;
         for (var name in gamedata['achievements']) {
             var ach = gamedata['achievements'][name];
             var cat = gamedata['achievement_categories'][ach['category']];
-            
+
             if('activation' in cat && !read_predicate(cat['activation']).is_satisfied(player, null)) { continue; }
+            if('show_if' in cat && !read_predicate(cat['show_if']).is_satisfied(player, null)) { continue; }
             if('activation' in ach && !read_predicate(ach['activation']).is_satisfied(player, null)) { continue; }
+            if('show_if' in ach && !read_predicate(ach['show_if']).is_satisfied(player, null)) { continue; }
 
             if(Showcase.predicate_reads_keys(ach['goal'], hack['achievement_keys'])) {
                 if (!goog.object.containsKey(player.achievements, name)) {
@@ -586,7 +585,9 @@ Showcase.count_achievements = function(keylist) {
     goog.object.forEach(gamedata['achievements'], function(ach) {
         var cat = gamedata['achievement_categories'][ach['category']];
         if('activation' in cat && !read_predicate(cat['activation']).is_satisfied(player,null)) { return; }
+        if('show_if' in cat && !read_predicate(cat['show_if']).is_satisfied(player,null)) { return; }
         if('activation' in ach && !read_predicate(ach['activation']).is_satisfied(player,null)) { return; }
+        if('show_if' in ach && !read_predicate(ach['show_if']).is_satisfied(player,null)) { return; }
         if(Showcase.predicate_reads_keys(ach['goal'], keylist)) {
             total += 1;
             if(ach['name'] in player.achievements) {
