@@ -341,7 +341,6 @@ def _generate_showcase_consequent(game_id, event_dirname, data, atom):
 
         # SHOWCASE
         showcase = { "enable": 1, "ui_title": data['event_ui_name'].upper(),
-                     "ui_subtitle": "SPECIAL EVENT" if has_tokens else "SINGLE PLAYER",
                      "villain_asset": data['villain_attack_portrait'],
                      "ui_villain_name": data['villain_ui_name'],
                      "total_levels": data['bases_per_difficulty'],
@@ -358,12 +357,15 @@ def _generate_showcase_consequent(game_id, event_dirname, data, atom):
             showcase['conquest_key'] = 'ai_'+data['event_name']+extra_suffix+'_conquests'
             showcase['ui_final_reward_label'] = 'NEW:'
             showcase['plus_store_category'] = 'event_prizes'
+            showcase['ui_subtitle'] = 'SPECIAL EVENT'
         else:
             showcase['show_progress_bar'] = 'small'
             if has_multiple_difficulties:
                 showcase['ui_final_reward_label'] = '%s DIFFICULTY REWARDS:' % highest_difficulty.upper()
+                showcase['ui_subtitle'] = '%s DIFFICULTY' % diff.upper()
             else:
                 showcase['ui_final_reward_label'] = 'FINAL REWARDS:'
+                showcase['ui_subtitle'] = 'SINGLE PLAYER'
 
         if final_loot_unit:
             showcase['final_reward_unit'] = final_loot_unit
