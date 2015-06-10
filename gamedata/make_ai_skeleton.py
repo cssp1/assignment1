@@ -821,6 +821,7 @@ if __name__ == '__main__':
     gamedata['item_sets'] = SpinConfig.load(SpinConfig.gamedata_component_filename('item_sets.json', override_game_id = game_id))
     gamedata['loot_tables'] = SpinConfig.load(SpinConfig.gamedata_component_filename('loot_tables.json', override_game_id = game_id))
     gamedata['matchmaking'] = SpinConfig.load(SpinConfig.gamedata_component_filename('matchmaking.json', override_game_id = game_id))
+    gamedata['achievements'] = SpinConfig.load(SpinConfig.gamedata_component_filename('achievements.json', override_game_id = game_id))
 
     if args[1] in event_data: # event data hard-coded in this file
         data = event_data[args[1]]
@@ -1074,9 +1075,20 @@ if __name__ == '__main__':
                           "key": "ai_"+data['event_name']+"_progress", "method": ">=", "value": data['bases_per_difficulty'] },
                         ]
                 elif diff == 'Epic':
+                    speedrun_key = "ai_%s_heroic_speedrun" % data['event_name']
+                    speedrun_achievement_name = 'Heroic Blitz at %s' % data['event_ui_name']
+
+                    # get the name of the speedrun achievement for display in the event's tooltip
+                    for achievement in gamedata['achievements'].values():
+                        # ignore nested achievement requirements since all existing speed run achievements have the speedrun key as the only requirement
+                        goal = achievement.get('goal', {})
+                        if goal.get('predicate', '') == 'PLAYER_HISTORY' and goal.get('key', '') == speedrun_key:
+                            speedrun_achievement_name = achievement['ui_name']
+                            break
+
                     act_pred['subpredicates'] += [
                         { "predicate": "BUILDING_LEVEL", "building_type": gamedata['townhall'], "trigger_level": data['cc_level_to_play'][diff] },
-                        { "predicate": "PLAYER_HISTORY", "ui_name": "Earn Heroic Blitz at "+data['event_ui_name']+" achievement\nby completing Heroic difficulty in less than "+data['speedrun_ui_time']['Heroic'], "key": "ai_"+data['event_name']+"_heroic_speedrun", "method": ">=", "value": 1 },
+                        { "predicate": "PLAYER_HISTORY", "ui_name": "Earn "+speedrun_achievement_name+" achievement\nby completing Heroic difficulty in less than "+data['speedrun_ui_time']['Heroic'], "key": speedrun_key, "method": ">=", "value": 1 },
                         ]
 
             if kind == 'ai_attack':
