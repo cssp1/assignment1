@@ -361,7 +361,7 @@ def _generate_showcase_consequent(game_id, event_dirname, data, atom):
         else:
             showcase['show_progress_bar'] = 'small'
             if has_multiple_difficulties:
-                showcase['ui_final_reward_label'] = '%s DIFFICULTY REWARDS:' % highest_difficulty.upper()
+                showcase['ui_final_reward_label'] = '%s REWARDS:' % highest_difficulty.upper()
                 showcase['ui_subtitle'] = '%s DIFFICULTY' % diff.upper()
             else:
                 showcase['ui_final_reward_label'] = 'FINAL REWARDS:'
