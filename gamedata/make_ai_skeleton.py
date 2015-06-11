@@ -220,6 +220,9 @@ def _generate_showcase_consequent(game_id, event_dirname, data, atom):
 
     randgen = random.Random(1234) # fix random number seed for loot-table sampling
 
+    has_multiple_difficulties = len(data['difficulties']) > 1
+    highest_difficulty = data['difficulties'][-1]
+
     print_auto_gen_warning(fd = atom.fd)
     for diff in data['difficulties']:
         suffix = data['key_suffix'][diff]
@@ -338,7 +341,6 @@ def _generate_showcase_consequent(game_id, event_dirname, data, atom):
 
         # SHOWCASE
         showcase = { "enable": 1, "ui_title": data['event_ui_name'].upper(),
-                     "ui_subtitle": "SPECIAL EVENT" if has_tokens else "SINGLE PLAYER",
                      "villain_asset": data['villain_attack_portrait'],
                      "ui_villain_name": data['villain_ui_name'],
                      "total_levels": data['bases_per_difficulty'],
@@ -355,9 +357,15 @@ def _generate_showcase_consequent(game_id, event_dirname, data, atom):
             showcase['conquest_key'] = 'ai_'+data['event_name']+extra_suffix+'_conquests'
             showcase['ui_final_reward_label'] = 'NEW:'
             showcase['plus_store_category'] = 'event_prizes'
+            showcase['ui_subtitle'] = 'SPECIAL EVENT'
         else:
             showcase['show_progress_bar'] = 'small'
-            showcase['ui_final_reward_label'] = 'FINAL REWARDS:'
+            if has_multiple_difficulties:
+                showcase['ui_final_reward_label'] = '%s DIFFICULTY REWARDS:' % highest_difficulty.upper()
+                showcase['ui_subtitle'] = '%s DIFFICULTY' % diff.upper()
+            else:
+                showcase['ui_final_reward_label'] = 'FINAL REWARDS:'
+                showcase['ui_subtitle'] = 'SINGLE PLAYER'
 
         if final_loot_unit:
             showcase['final_reward_unit'] = final_loot_unit
@@ -821,6 +829,7 @@ if __name__ == '__main__':
     gamedata['item_sets'] = SpinConfig.load(SpinConfig.gamedata_component_filename('item_sets.json', override_game_id = game_id))
     gamedata['loot_tables'] = SpinConfig.load(SpinConfig.gamedata_component_filename('loot_tables.json', override_game_id = game_id))
     gamedata['matchmaking'] = SpinConfig.load(SpinConfig.gamedata_component_filename('matchmaking.json', override_game_id = game_id))
+    gamedata['achievements'] = SpinConfig.load(SpinConfig.gamedata_component_filename('achievements.json', override_game_id = game_id))
 
     if args[1] in event_data: # event data hard-coded in this file
         data = event_data[args[1]]
@@ -1074,9 +1083,20 @@ if __name__ == '__main__':
                           "key": "ai_"+data['event_name']+"_progress", "method": ">=", "value": data['bases_per_difficulty'] },
                         ]
                 elif diff == 'Epic':
+                    speedrun_key = "ai_%s_heroic_speedrun" % data['event_name']
+                    speedrun_achievement_name = 'Heroic Blitz at %s' % data['event_ui_name']
+
+                    # get the name of the speedrun achievement for display in the event's tooltip
+                    for achievement in gamedata['achievements'].values():
+                        # ignore nested achievement requirements since all existing speed run achievements have the speedrun key as the only requirement
+                        goal = achievement.get('goal', {})
+                        if goal.get('predicate', '') == 'PLAYER_HISTORY' and goal.get('key', '') == speedrun_key:
+                            speedrun_achievement_name = achievement['ui_name']
+                            break
+
                     act_pred['subpredicates'] += [
                         { "predicate": "BUILDING_LEVEL", "building_type": gamedata['townhall'], "trigger_level": data['cc_level_to_play'][diff] },
-                        { "predicate": "PLAYER_HISTORY", "ui_name": "Earn Heroic Blitz at "+data['event_ui_name']+" achievement\nby completing Heroic difficulty in less than "+data['speedrun_ui_time']['Heroic'], "key": "ai_"+data['event_name']+"_heroic_speedrun", "method": ">=", "value": 1 },
+                        { "predicate": "PLAYER_HISTORY", "ui_name": "Earn "+speedrun_achievement_name+" achievement\nby completing Heroic difficulty in less than "+data['speedrun_ui_time']['Heroic'], "key": speedrun_key, "method": ">=", "value": 1 },
                         ]
 
             if kind == 'ai_attack':
