@@ -1096,7 +1096,7 @@ if __name__ == '__main__':
 
                     act_pred['subpredicates'] += [
                         { "predicate": "BUILDING_LEVEL", "building_type": gamedata['townhall'], "trigger_level": data['cc_level_to_play'][diff] },
-                        { "predicate": "PLAYER_HISTORY", "ui_name": "Earn "+speedrun_achievement_name+" achievement\nby completing Heroic difficulty in less than "+data['speedrun_ui_time']['Heroic'], "key": speedrun_key, "method": ">=", "value": 1 },
+                        { "predicate": "PLAYER_HISTORY", "ui_name": "Earn the \""+speedrun_achievement_name+"\" achievement\nby completing Heroic difficulty in less than "+data['speedrun_ui_time']['Heroic'], "key": speedrun_key, "method": ">=", "value": 1 },
                         ]
 
             if kind == 'ai_attack':
