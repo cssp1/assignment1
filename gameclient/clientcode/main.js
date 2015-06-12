@@ -30594,8 +30594,9 @@ function crafting_dialog_change_category(dialog, category, page) {
             if(spec['developer_only'] && (spin_secure_mode || !player.is_developer())) { continue; }
             if('show_if' in spec && !read_predicate(spec['show_if']).is_satisfied(player, null)) { continue; }
             if('activation' in spec && !read_predicate(spec['activation']).is_satisfied(player, null)) { continue; }
-            dialog.user_data['recipes'].push(name);
-            if(!preselect) { preselect = name; }
+            var rec = {'spec': name};
+            dialog.user_data['recipes'].push(rec);
+            if(!preselect) { preselect = rec; }
         }
     }
 
@@ -30685,11 +30686,13 @@ function crafting_dialog_scroll(dialog, page) {
 
     player.quest_tracked_dirty = true;
 }
-function crafting_dialog_select_recipe(dialog, specname) {
-    dialog.parent.user_data['selected_recipe'] = specname;
+function crafting_dialog_select_recipe(dialog, rec) {
+
+    dialog.parent.user_data['selected_recipe'] = rec;
     dialog.parent.user_data['on_use_recipe'] = null; // will be set by an ondraw update
 
-    if(!specname) { dialog.show = false; return; }
+    if(!rec) { dialog.show = false; return; }
+    var specname = rec['spec'];
 
     var recipe = gamedata['crafting']['recipes'][specname];
     dialog.show = true;
@@ -30823,7 +30826,7 @@ function crafting_dialog_select_recipe_leaders(dialog, specname, recipe) {
 
 
 function update_crafting_dialog_recipe_common(dialog) {
-    var specname = dialog.parent.user_data['selected_recipe'];
+    var specname = dialog.parent.user_data['selected_recipe']['spec'];
     var recipe = gamedata['crafting']['recipes'][specname];
     var builder = dialog.parent.user_data['builder'];
     dialog.show = true;
@@ -30875,7 +30878,7 @@ function update_crafting_dialog_recipe_missiles(dialog) {
 }
 function update_crafting_dialog_recipe_leaders(dialog) {
     update_crafting_dialog_recipe_common(dialog);
-    var specname = dialog.parent.user_data['selected_recipe'];
+    var specname = dialog.parent.user_data['selected_recipe']['spec'];
     var recipe = gamedata['crafting']['recipes'][specname];
 
     var can_craft = true;
@@ -30928,7 +30931,8 @@ function update_crafting_dialog(dialog) {
         var first_recipe_on_page = page * recipes_per_page;
         var last_recipe_on_page = Math.max(0, Math.min((page+1)*recipes_per_page-1, chapter_recipes-1));
         for(var i = first_recipe_on_page; i <= last_recipe_on_page; i++) {
-            var name = dialog.user_data['recipes'][i];
+            var rec = dialog.user_data['recipes'][i];
+            var name = rec['spec'];
             var spec = gamedata['crafting']['recipes'][name];
             var wname = grid[0].toString() +',' + grid[1].toString();
             dialog.user_data['recipes_by_widget'][wname] = name;
@@ -30953,19 +30957,19 @@ function update_crafting_dialog(dialog) {
                 }
             }
 
-            dialog.widgets['recipe_frame'+wname].onclick = (function (_name) { return function(w) {
-                if(w.parent.user_data['selected_recipe'] == _name) {
+            dialog.widgets['recipe_frame'+wname].onclick = (function (_rec) { return function(w) {
+                if(w.parent.user_data['selected_recipe'] === _rec) {
                     if(w.parent.user_data['on_use_recipe']) {
                         // note: assumes on_use_recipe has been set up by an ondraw update
                         w.parent.user_data['on_use_recipe'](w.parent);
                     }
                 } else {
-                    crafting_dialog_select_recipe(w.parent.widgets['recipe'], _name);
+                    crafting_dialog_select_recipe(w.parent.widgets['recipe'], _rec);
                 }
-            }; })(name);
+            }; })(rec);
 
             dialog.widgets['recipe_gray_outer'+wname].show = !can_craft;
-            dialog.widgets['recipe_frame'+wname].state = (name == dialog.user_data['selected_recipe'] ? 'highlight' : 'normal');
+            dialog.widgets['recipe_frame'+wname].state = (rec === dialog.user_data['selected_recipe'] ? 'highlight' : 'normal');
 
             if(can_craft) {
             } else {
@@ -31282,7 +31286,8 @@ function update_crafting_dialog_status_mines_and_missiles(dialog) {
     var builder = dialog.parent.user_data['builder'];
     var category = dialog.parent.user_data['category'];
     var catspec = gamedata['crafting']['categories'][category];
-    var selected_recipe = dialog.parent.user_data['selected_recipe'];
+    var selected_rec = dialog.parent.user_data['selected_recipe'];
+    var selected_recipe = (selected_rec ? dialog.parent.user_data['selected_recipe']['spec'] : null);
     var selected_recipe_spec = (selected_recipe ? gamedata['crafting']['recipes'][selected_recipe] : null);
     var selected_mine = (selected_recipe_spec ? ItemDisplay.get_crafting_recipe_product_spec(selected_recipe_spec)['name'] : null);
     var selected_mine_spec = (selected_mine ? ItemDisplay.get_inventory_item_spec(selected_mine) : null);
@@ -31577,7 +31582,8 @@ function update_crafting_dialog_status_mines_and_missiles(dialog) {
 
 function update_crafting_dialog_status_leaders(dialog) {
     var builder = dialog.parent.user_data['builder'];
-    var selected_recipe = dialog.parent.user_data['selected_recipe'];
+    var selected_rec = dialog.parent.user_data['selected_recipe'];
+    var selected_recipe = (selected_rec ? selected_rec['spec'] : null);
     var selected_recipe_spec = (selected_recipe ? gamedata['crafting']['recipes'][selected_recipe] : null);
     var selected_leader = (selected_recipe_spec ? ItemDisplay.get_crafting_recipe_product_spec(selected_recipe_spec)['name'] : null);
     var selected_leader_spec = (selected_leader ? ItemDisplay.get_inventory_item_spec(selected_leader) : null);
