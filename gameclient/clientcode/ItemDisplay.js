@@ -61,9 +61,16 @@ ItemDisplay.get_inventory_item_weapon_spell = function(spec) {
 /** For a crafting recipe that deterministically yields only one item, return the spec of that item.
     If the crafting recipe doesn't fit that description, throw exception.
     @param {Object} recipe
+    @param {number=} level
     @return {Object} the product spec */
-ItemDisplay.get_crafting_recipe_product_spec = function(recipe) {
-    var product_list = recipe['product'];
+ItemDisplay.get_crafting_recipe_product_spec = function(recipe, level) {
+    level = level || 1;
+    var product_list;
+    if(0 in recipe['product'] && (0 in recipe['product'][0])) { // per-level list
+        product_list = get_leveled_quantity(recipe['product'], level);
+    } else {
+        product_list = recipe['product'];
+    }
     if(product_list.length == 1 && ('spec' in product_list[0]) &&
        (product_list[0]['spec'] in gamedata['items'])) { // note: do not use get_inventory_item_spec() because we want to fail for unknown items
         return gamedata['items'][product_list[0]['spec']];

@@ -4562,6 +4562,20 @@ class Spec(object):
             return qty[level-1]
         return qty
 
+    # these can be arrays-of-arrays and need to be handled specially
+    @classmethod
+    def get_crafting_recipe_ingredients_list(cls, recipe, level):
+        if ('ingredients' in recipe) and (type(recipe['ingredients'][0]) is list):
+            return cls.get_leveled_quantity(recipe['ingredients'], level)
+        else:
+            return recipe.get('ingredients', [])
+    @classmethod
+    def get_crafting_recipe_product_list(cls, recipe, level):
+        if ('product' in recipe) and (type(recipe['product'][0]) is list):
+            return cls.get_leveled_quantity(recipe['product'], level)
+        else:
+            return recipe.get('product', [])
+
     def __init__(self, name, data):
         self.name = name
 
@@ -7160,7 +7174,7 @@ class Player(AbstractPlayer):
                         recipe_name = bus.craft_state['recipe']
                         recipe = gamedata['crafting']['recipes'].get(recipe_name, None)
                         if recipe:
-                            for prod in recipe['product']:
+                            for prod in GameObjectSpec.get_crafting_recipe_product_list(recipe, bus.craft_state.get('level', 1)):
                                 if ('spec' in prod): # only works with deterministic products!
                                     item_spec = gamedata['items'][prod['spec']]
                                     if item_spec.get('limited_equipped',None) == tag:
@@ -7194,7 +7208,7 @@ class Player(AbstractPlayer):
                         recipe_name = bus.craft_state['recipe']
                         recipe = gamedata['crafting']['recipes'].get(recipe_name, None)
                         if recipe:
-                            for prod in recipe['product']:
+                            for prod in GameObjectSpec.get_crafting_recipe_product_list(recipe, bus.craft_state.get('level', 1)):
                                 if ('spec' in prod) and prod['spec'] == name and (level is None or prod.get('level',1) == level): # only works with deterministic products!
                                     count += prod.get('stack',1)
                                     if count >= min_count:
@@ -17729,7 +17743,7 @@ class GAMEAPI(resource.Resource):
 
             # anti-race check #2 - check if destination slot is already full
             dest_addr = (arg.delivery_address['slot_type'],arg.delivery_address.get('slot_index',0))
-            for product in recipe['product']:
+            for product in GameObjectSpec.get_crafting_recipe_product_list(recipe, arg.recipe_level):
                 if 'spec' in product: # only for deterministic products
                     product_spec = gamedata['items'][product['spec']]
 
@@ -17794,7 +17808,7 @@ class GAMEAPI(resource.Resource):
 
         # check resource cost
         if take_resources and ('cost' in recipe):
-            for res, amount_list in recipe['cost'].iteritems():
+            for res, amount_list in GameObjectSpec.get_leveled_quantity(recipe['cost'], arg.recipe_level).iteritems():
                 amount = GameObjectSpec.get_leveled_quantity(amount_list, arg.recipe_level)
                 if (not player.is_cheater) and (getattr(player.resources, res) < amount):
                     if retmsg is not None: retmsg.append(["ERROR", "INSUFFICIENT_"+res.upper(), amount])
@@ -17813,7 +17827,8 @@ class GAMEAPI(resource.Resource):
         if take_ingredients and ('ingredients' in recipe):
             # have to pre-sum by specname in case there are multiple entries in the array with the same specname
             by_specname_and_level = {}
-            for entry in recipe['ingredients']:
+            ingr_list = GameObjectSpec.get_crafting_recipe_ingredients_list(recipe, arg.recipe_level)
+            for entry in ingr_list:
                 key = (entry['spec'], entry.get('level',None))
                 by_specname_and_level[key] = by_specname_and_level.get(key,0) + entry.get('stack',1)
             for specname_level, qty in by_specname_and_level.iteritems():
@@ -17869,7 +17884,7 @@ class GAMEAPI(resource.Resource):
 
         # subtract resources
         if take_resources and recipe.get('cost'):
-            cost = dict((res,GameObjectSpec.get_leveled_quantity(amount, arg.recipe_level)) for res, amount in recipe['cost'].iteritems())
+            cost = dict((res,GameObjectSpec.get_leveled_quantity(amount, arg.recipe_level)) for res, amount in GameObjectSpec.get_leveled_quantity(recipe['cost'], arg.recipe_level).iteritems())
             negative_cost = dict((res,-cost[res]) for res in cost)
             player.resources.gain_res(negative_cost, reason='crafting')
             admin_stats.econ_flow_res(player, recipe.get('econ_category','crafting'), 'crafting', negative_cost)
@@ -17878,7 +17893,8 @@ class GAMEAPI(resource.Resource):
 
         # subtract ingredients (note: no recipe_level dependence)
         if take_ingredients and ('ingredients' in recipe):
-            for entry in recipe['ingredients']:
+            ingr_list = GameObjectSpec.get_crafting_recipe_ingredients_list(recipe, arg.recipe_level)
+            for entry in ingr_list:
                 player.inventory_remove_by_type(entry['spec'], entry.get('stack',1), '5130_item_activated', level = entry.get('level',None), reason='crafting')
             if player is session.player:
                 session.player.send_inventory_update(retmsg)
@@ -17886,7 +17902,7 @@ class GAMEAPI(resource.Resource):
         if take_time:
             # reduce craft time by structure speed bonus
             speed = object.get_stat('crafting_speed', object.get_leveled_quantity(object.spec.crafting_speed))
-            craft_time = max(1, int(recipe['craft_time'] / speed))
+            craft_time = max(1, int(GameObjectSpec.get_leveled_quantity(recipe['craft_time'], arg.recipe_level) / speed))
         else:
             craft_time = -1
 
@@ -17895,7 +17911,8 @@ class GAMEAPI(resource.Resource):
             object.crafting = Business.QueuedBusiness(Business.CraftingBusiness)
 
         state = {'recipe':recipe['name'], 'cost':cost, 'attempt_id': generate_mail_id()}
-        if take_ingredients and ('ingredients' in recipe): state['ingredients'] = copy.deepcopy(recipe['ingredients'])
+        if arg.recipe_level: state['level'] = arg.recipe_level
+        if take_ingredients and ('ingredients' in recipe): state['ingredients'] = copy.deepcopy(ingr_list)
         if arg.delivery_address: state['delivery'] = arg.delivery_address
         if arg.ui_tag: state['ui_tag'] = arg.ui_tag
         delay = 0
@@ -18028,7 +18045,8 @@ class GAMEAPI(resource.Resource):
                 ref_time = bus.creation_time + bus.total_time
             else:
                 ref_time = session.player.get_absolute_time()
-            loot = session.get_loot_items(session.player, recipe['product'], -1, -1, duration_ref_time = ref_time)
+            prod_list = GameObjectSpec.get_crafting_recipe_product_list(recipe, bus.craft_state.get('level', 1))
+            loot = session.get_loot_items(session.player, prod_list, -1, -1, duration_ref_time = ref_time)
             delivery_method = recipe.get('delivery', gamedata['crafting']['categories'][recipe['crafting_category']].get('delivery', None))
 
             for item in loot:

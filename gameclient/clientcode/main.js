@@ -1480,6 +1480,8 @@ function get_max_level(spec) {
         return spec['build_time'].length;
     } else if('research_time' in spec) {
         return spec['research_time'].length;
+    } else if('craft_time' in spec) {
+        return spec['craft_time'].length;
     } else {
         return 1;
     }
@@ -7111,22 +7113,46 @@ function inventory_items_can_all_fit(items, inventory, max_usable_inventory) {
     return true;
 }
 
-function get_crafting_recipe_ui_name(spec) { // XXXXXX move to ItemDisplay.js
+/** @param {!Object} spec
+    @param {number=} level
+    @return {!Array.<!Object>} */
+function get_crafting_recipe_product_list(spec, level) { // XXXXXX move to ItemDisplay.js
+    // need to manually check for array-of-arrays, since get_leveled_quantity() won't do it right
+    return ((0 in spec['product'] && (0 in spec['product'][0])) ? get_leveled_quantity(spec['product'], level || 1) : spec['product']);
+}
+
+/** @param {!Object} spec
+    @param {number=} level
+    @return {!Array.<!Object>} */
+function get_crafting_recipe_ingredients_list(spec, level) { // XXXXXX move to ItemDisplay.js
+    // need to manually check for array-of-arrays, since get_leveled_quantity() won't do it right
+    return ((spec['ingredients'] && (0 in spec['ingredients']) && (0 in spec['ingredients'][0])) ? get_leveled_quantity(spec['ingredients'], level || 1) : spec['ingredients'] || []);
+}
+
+/** @param {!Object} spec
+    @param {number=} level */
+function get_crafting_recipe_ui_name(spec, level) { // XXXXXX move to ItemDisplay.js
+    level = level || 1;
     if('ui_name' in spec) {
-        return spec['ui_name'];
+        return get_leveled_quantity(spec['ui_name'], level);
     }
-    if(spec['product'][0]['spec']) {
-        return ItemDisplay.get_inventory_item_ui_name(ItemDisplay.get_inventory_item_spec(spec['product'][0]['spec']));
+    var product_list = get_crafting_recipe_product_list(spec, level);
+    if(product_list[0]['spec']) {
+        return ItemDisplay.get_inventory_item_ui_name(ItemDisplay.get_inventory_item_spec(product_list[0]['spec']));
     }
     throw Error('cannot determine ui_name for crafting recipe '+spec['name']);
-
 }
-function get_crafting_recipe_icon(spec) { // XXXXXX move to ItemDisplay.js
+
+/** @param {!Object} spec
+    @param {number=} level */
+function get_crafting_recipe_icon(spec, level) { // XXXXXX move to ItemDisplay.js
+    level = level || 1;
     if('icon' in spec) {
-        return spec['icon'];
+        return get_leveled_quantity(spec['icon'], level);
     }
-    if(spec['product'][0]['spec']) {
-        return ItemDisplay.get_inventory_item_spec(spec['product'][0]['spec'])['icon'];
+    var product_list = get_crafting_recipe_product_list(spec, level);
+    if(product_list[0]['spec']) {
+        return ItemDisplay.get_inventory_item_spec(product_list[0]['spec'])['icon'];
     }
     throw Error('cannot determine icon for crafting recipe '+spec['name']);
 }
@@ -30595,6 +30621,28 @@ function crafting_dialog_change_category(dialog, category, page) {
             if('show_if' in spec && !read_predicate(spec['show_if']).is_satisfied(player, null)) { continue; }
             if('activation' in spec && !read_predicate(spec['activation']).is_satisfied(player, null)) { continue; }
             var rec = {'spec': name};
+
+            if((spec['max_level'] || 1) > 1) {
+                if(spec['associated_item']) {
+                    // this recipe upgrades an existing item. Show only if the item is available in inventory.
+                    var max_existing_level = -1;
+                    player.stored_item_iter(function (entry) {
+                        if(entry['spec'] === spec['associated_item']) {
+                            max_existing_level = Math.max(max_existing_level, entry['level'] || 1);
+                        }
+                    });
+                    if(max_existing_level < 1) {
+                        continue; // no item
+                    }
+                    if(max_existing_level >= spec['max_level']) {
+                        continue; // item already maxed
+                    }
+                    rec['level'] = max_existing_level+1;
+                } else {
+                    throw Error('leveled crafting recipe without associated_item');
+                }
+            }
+
             dialog.user_data['recipes'].push(rec);
             if(!preselect) { preselect = rec; }
         }
@@ -30702,10 +30750,10 @@ function crafting_dialog_select_recipe(dialog, rec) {
     } else if(recipe['crafting_category'] == 'missiles') {
         crafting_dialog_select_recipe_missiles(dialog, specname, recipe);
     } else if(recipe['crafting_category'] == 'leaders') {
-        crafting_dialog_select_recipe_leaders(dialog, specname, recipe);
+        crafting_dialog_select_recipe_leaders(dialog, specname, rec); // full dictionary, not recipe
     }
 }
-function crafting_dialog_select_recipe_mines(dialog, specname, recipe) {
+function crafting_dialog_select_recipe_mines(dialog, specname, recipe) { // XXX does not handle recipe_level
     dialog.widgets['name'].str = get_crafting_recipe_ui_name(recipe);
     dialog.widgets['icon'].asset = get_crafting_recipe_icon(recipe);
     dialog.widgets['frame'].onclick = function(w) {
@@ -30742,7 +30790,7 @@ function crafting_dialog_select_recipe_mines(dialog, specname, recipe) {
         }
     });
 }
-function crafting_dialog_select_recipe_missiles(dialog, specname, recipe) {
+function crafting_dialog_select_recipe_missiles(dialog, specname, recipe) { // XXX does not handle recipe_level
     var product_spec = ItemDisplay.get_crafting_recipe_product_spec(recipe);
     dialog.widgets['name'].str = ItemDisplay.get_inventory_item_ui_name_long(product_spec);
     dialog.widgets['description'].set_text_with_linebreaking(product_spec['ui_description']); // XXX overflow?
@@ -30792,17 +30840,30 @@ function crafting_dialog_select_recipe_missiles(dialog, specname, recipe) {
     }
 }
 
-function crafting_dialog_select_recipe_leaders(dialog, specname, recipe) {
-    var leader_spec = ItemDisplay.get_crafting_recipe_product_spec(recipe);
-    var set_spec = gamedata['item_sets'][leader_spec['item_set']];
-    var ui_item_set = set_spec['ui_name'];
-    var ui_level = leader_spec['level'] || 1;
-    var ui_index = set_spec['members'].indexOf(leader_spec['name']) + 1;
-    var ui_members = set_spec['members'].length;
+function crafting_dialog_select_recipe_leaders(dialog, specname, rec) {
+    var recipe = gamedata['crafting']['recipes'][rec['spec']];
+    var level = rec['level'] || 1;
+
+    var leader_spec = ItemDisplay.get_crafting_recipe_product_spec(recipe, level);
+    var ui_level = leader_spec['level'] || rec['level'] || 1;
+
+    // set topinfo text
     var ui_subtitle = ItemDisplay.get_inventory_item_ui_subtitle(leader_spec);
-    dialog.widgets['topinfo'].set_text_bbcode(dialog.data['widgets']['topinfo']['ui_name'].replace('%ITEM_SET', ui_item_set).replace('%INDEX', ui_index.toString()).replace('%MEMBERS', ui_members.toString()).replace('%SUBTITLE', ui_subtitle).replace('%LEVEL', ui_level.toString()));
-    ItemDisplay.display_item(dialog.widgets['item'], {'spec':leader_spec['name']}, {context_parent: dialog.parent});
-    ItemDisplay.attach_inventory_item_tooltip(dialog.widgets['item'].widgets['frame'], {'spec':leader_spec['name']}, dialog.parent);
+    var topinfo_bbcode;
+    if(leader_spec['item_set']) {
+        var set_spec = gamedata['item_sets'][leader_spec['item_set']];
+        var ui_item_set = set_spec['ui_name'];
+        var ui_index = set_spec['members'].indexOf(leader_spec['name']) + 1;
+        var ui_members = set_spec['members'].length;
+        topinfo_bbcode = dialog.data['widgets']['topinfo']['ui_name_set'].replace('%ITEM_SET', ui_item_set).replace('%INDEX', ui_index.toString()).replace('%MEMBERS', ui_members.toString()).replace('%SUBTITLE', ui_subtitle).replace('%LEVEL', ui_level.toString());
+    } else {
+        topinfo_bbcode = dialog.data['widgets']['topinfo']['ui_name'].replace('%SUBTITLE', ui_subtitle).replace('%LEVEL', ui_level.toString());
+    }
+    dialog.widgets['topinfo'].set_text_bbcode(topinfo_bbcode);
+
+    var virtual_item = {'spec':leader_spec['name'], 'level': rec['level'] || 1};
+    ItemDisplay.display_item(dialog.widgets['item'], virtual_item, {context_parent: dialog.parent});
+    ItemDisplay.attach_inventory_item_tooltip(dialog.widgets['item'].widgets['frame'], virtual_item, dialog.parent);
     dialog.widgets['item'].widgets['frame'].onclick = function(w) {
         if(w.parent.parent.parent) {
             var func = w.parent.parent.parent.user_data['on_use_recipe'];
@@ -30814,11 +30875,11 @@ function crafting_dialog_select_recipe_leaders(dialog, specname, recipe) {
     dialog.widgets['name'].text_color = ItemDisplay.get_inventory_item_color(leader_spec);
 
     // work on line breaking
-    var bbtext = ItemDisplay.get_inventory_item_ui_description({'spec': leader_spec['name']}, {hide_item_set:true}); // XXXXXX level
+    var bbtext = ItemDisplay.get_inventory_item_ui_description(virtual_item, {hide_item_set:true});
     dialog.widgets['description'].set_text_bbcode(bbtext);
     if(dialog.widgets['description'].clip_to_max_lines(dialog.data['widgets']['description']['max_lines'], dialog.data['widgets']['description']['ui_name_seemore'])) {
         // there was an overflow, add tooltip
-        ItemDisplay.attach_inventory_item_tooltip(dialog.widgets['description'], {'spec':leader_spec['name']}, dialog.parent);
+        ItemDisplay.attach_inventory_item_tooltip(dialog.widgets['description'], virtual_item, dialog.parent);
     } else {
         ItemDisplay.remove_inventory_item_tooltip(dialog.widgets['description']);
     }
@@ -30827,6 +30888,7 @@ function crafting_dialog_select_recipe_leaders(dialog, specname, recipe) {
 
 function update_crafting_dialog_recipe_common(dialog) {
     var specname = dialog.parent.user_data['selected_recipe']['spec'];
+    var recipe_level = dialog.parent.user_data['selected_recipe']['level'] || 1;
     var recipe = gamedata['crafting']['recipes'][specname];
     var builder = dialog.parent.user_data['builder'];
     dialog.show = true;
@@ -30834,7 +30896,7 @@ function update_crafting_dialog_recipe_common(dialog) {
 
     goog.object.forEach(gamedata['resources'], function(resdata, resname) {
         var wname = grid[0].toString()+','+grid[1].toString();
-        var cost = recipe['cost'][resname] || 0;
+        var cost = get_leveled_quantity(get_leveled_quantity(recipe['cost'], recipe_level)[resname] || 0, recipe_level) || 0;
         dialog.widgets['requirements_icon'+wname].show =
             dialog.widgets['requirements_value'+wname].show = (cost > 0);
         if(cost > 0) {
@@ -30862,7 +30924,7 @@ function update_crafting_dialog_recipe_common(dialog) {
         grid[0] += 1;
     }
 
-    var cost_time = recipe['craft_time'];
+    var cost_time = get_leveled_quantity(recipe['craft_time'], recipe_level);
     if(builder) {
         var speed = builder.get_stat('crafting_speed', builder.get_leveled_quantity(builder.spec['crafting_speed'] || 1.0));
         cost_time = Math.max(1, Math.floor(cost_time / speed));
@@ -30880,16 +30942,18 @@ function update_crafting_dialog_recipe_leaders(dialog) {
     update_crafting_dialog_recipe_common(dialog);
     var specname = dialog.parent.user_data['selected_recipe']['spec'];
     var recipe = gamedata['crafting']['recipes'][specname];
+    var recipe_level = dialog.parent.user_data['selected_recipe']['level'] || 1;
 
     var can_craft = true;
     // note: like the main crafting_dialog recipe update, only gray out if a predicate is false, not if there is resource/ingredient trouble
     // can_craft = dialog.user_data['builder'] && can_cast_spell(dialog.user_data['builder'].id, 'CRAFT_FOR_FREE', [{'recipe': specname}]);
-    can_craft = !(('requires' in recipe) && !player.is_cheater && !read_predicate(recipe['requires']).is_satisfied(player, null));
+    can_craft = !(('requires' in recipe) && !player.is_cheater && !read_predicate(get_leveled_quantity(recipe['requires'], recipe_level)).is_satisfied(player, null));
 
     dialog.widgets['item'].widgets['frame'].state = (can_craft ? 'normal' : 'disabled_clickable');
 
 
-    var ingr_list = recipe['ingredients'] || [];
+    var ingr_list = get_crafting_recipe_ingredients_list(recipe, recipe_level);
+
     ItemDisplay.display_item_array(dialog, 'requirements_item', ingr_list, {context_parent: dialog.parent,
                                                                             hide_tooltip: true});
     var by_specname = {};
@@ -30898,11 +30962,17 @@ function update_crafting_dialog_recipe_leaders(dialog) {
             var ingr = ingr_list[i];
             var ingr_spec = gamedata['items'][ingr['spec']];
             var ingr_stack = ('stack' in ingr ? ingr['stack'] : 1);
-            var ui_ingr = ItemDisplay.get_inventory_item_stack_prefix(ingr_spec, ingr_stack) + ItemDisplay.get_inventory_item_ui_name_long(ingr_spec);
+            var ingr_level = ('level' in ingr ? ingr['level'] : null);
+            var ui_ingr = ItemDisplay.get_inventory_item_stack_prefix(ingr_spec, ingr_stack) + ItemDisplay.get_inventory_item_ui_name_long(ingr_spec, ingr_level);
             dialog.widgets['requirements_item'+i.toString()].widgets['frame'].tooltip.str =
                 dialog.data['widgets']['requirements_item']['ui_tooltip'].replace('%ITEM', ui_ingr);
-            var has_it = player.inventory_item_quantity(ingr['spec']) - (by_specname[ingr['spec']] || 0) >= ingr_stack;
-            by_specname[ingr['spec']] = (by_specname[ingr['spec']]||0) + ingr_stack;
+
+            // group items by spec/level for the tooltip
+            var key = ingr['spec'];
+            if(ingr_level) { key += ':L'+ingr_level.toString(); }
+
+            var has_it = player.inventory_item_quantity(ingr['spec'], ingr['level']) - (by_specname[key] || 0) >= ingr_stack;
+            by_specname[key] = (by_specname[key]||0) + ingr_stack;
             dialog.widgets['requirements_item'+i.toString()].widgets['frame'].state = (has_it ? 'normal_nohighlight' : 'disabled');
             dialog.widgets['requirements_item_status'+i.toString()].show = true;
             dialog.widgets['requirements_item_status'+i.toString()].color = SPUI.make_colorv(dialog.data['widgets']['requirements_item_status'][(has_it ? 'color_present' : 'color_missing')]);
@@ -30942,8 +31012,8 @@ function update_crafting_dialog(dialog) {
                 dialog.widgets['recipe_frame'+wname].show = true;
             var can_craft = true;
 
-            tooltip_text.push(get_crafting_recipe_ui_name(spec));
-            dialog.widgets['recipe_icon'+wname].asset = get_crafting_recipe_icon(spec);
+            tooltip_text.push(get_crafting_recipe_ui_name(spec, rec['level'] || 1));
+            dialog.widgets['recipe_icon'+wname].asset = get_crafting_recipe_icon(spec, rec['level'] || 1);
 
             // get list of any unsatisfied requirements
             var pred = null, req = null;
@@ -31173,10 +31243,11 @@ function make_unique_id() { return server_time.toFixed(0)+'-'+(10000*Math.random
 function start_crafting(_builder, _build_recipe_spec, extra_params) {
     // come up with a unique tag for this bus
     var ui_tag = make_unique_id();
+    var level = (extra_params && ('level' in extra_params) ? extra_params['level'] : 1);
 
     var params = {'recipe':_build_recipe_spec['name'], 'ui_tag': ui_tag};
     if(extra_params) {
-        goog.array.forEach(['delivery','ui_index'], function(n) {
+        goog.array.forEach(['delivery','ui_index','level'], function(n) {
             if(n in extra_params) { params[n] = extra_params[n]; }
         });
     }
@@ -31185,7 +31256,7 @@ function start_crafting(_builder, _build_recipe_spec, extra_params) {
     var _craft_queue = _builder.start_client_prediction('crafting.queue', _builder.crafting ? _builder.crafting['queue'] : []);
 
     // client-side predict what will happen
-    var cost_time = Math.max(1, Math.floor(_build_recipe_spec['craft_time'] / _builder.get_stat('crafting_speed', _builder.get_leveled_quantity(_builder.spec['crafting_speed'] || 1.0))));
+    var cost_time = Math.max(1, Math.floor(get_leveled_quantity(_build_recipe_spec['craft_time'], level) / _builder.get_stat('crafting_speed', _builder.get_leveled_quantity(_builder.spec['crafting_speed'] || 1.0))));
 
     var delay = 0;
     for(var i = 0; i < _craft_queue.length; i++) {
@@ -31387,7 +31458,7 @@ function update_crafting_dialog_status_mines_and_missiles(dialog) {
                 var build_error_ui_text = null;
 
                 if(build_recipe_spec) {
-                    var can_cast = can_cast_spell_detailed(builder.id, 'CRAFT_FOR_FREE', [{'recipe': build_recipe_spec['name'],
+                    var can_cast = can_cast_spell_detailed(builder.id, 'CRAFT_FOR_FREE', [{'recipe': build_recipe_spec['name'], // XXX level
                                                                                            'delivery': {'obj_id':obj.id, 'slot_type':delivery_slot_type, 'slot_index': delivery_slot_index}}]);
                     if(can_cast[0]) {
                         // the real build function
@@ -31613,19 +31684,20 @@ function update_crafting_dialog_status_leaders(dialog) {
     var build_cb = null;
     var build_error_ui_text = null;
 
-    if(builder) {
-        var can_cast = can_cast_spell_detailed(builder.id, 'CRAFT_FOR_FREE', [{'recipe': selected_recipe}]);
+    if(builder && selected_recipe) {
+        var can_cast = can_cast_spell_detailed(builder.id, 'CRAFT_FOR_FREE', [{'recipe': selected_rec['spec'],
+                                                                               'level': selected_rec['level'] || 1}]);
         if(can_cast[0]) {
             // the real build function
-            build_cb = (function (_builder, _selected_recipe_spec) { return function() {
-                start_crafting(_builder, _selected_recipe_spec, {});
+            build_cb = (function (_builder, _selected_recipe_spec, _selected_rec_level) { return function() {
+                start_crafting(_builder, _selected_recipe_spec, {'level': _selected_rec_level});
                 // play sound effect
                 if(1) {
                     var state = GameArt.assets['action_button_134px'].states['normal'];
                     if(state.audio) { state.audio.play(client_time); }
                 }
                 return true;
-            }; })(builder, selected_recipe_spec);
+            }; })(builder, selected_recipe_spec, selected_rec['level'] || 1);
         } else {
             build_error_ui_text = can_cast[1];
             // get helper function
@@ -31827,6 +31899,7 @@ function update_fishing_dialog_row(parent_dialog, row, rowdata) {
 
     var builder = dialog.parent.user_data['builder'];
     var recipe = rowdata['recipe'];
+    var recipe_level = 1;
     var cat = gamedata['crafting']['categories'][recipe['crafting_category']];
     var bus = rowdata['bus'] || null;
 
@@ -31927,7 +32000,7 @@ function update_fishing_dialog_row(parent_dialog, row, rowdata) {
     }
     dialog.widgets['progress_bar'].show = (state == 'inprogress' || state == 'complete' || state == 'collecting');
     if(dialog.widgets['progress_bar'].show) {
-        var prog = ((state == 'complete' || state == 'collecting') ? 1 : 1 - builder.crafting_time_left_one()/recipe['craft_time']);
+        var prog = ((state == 'complete' || state == 'collecting') ? 1 : 1 - builder.crafting_time_left_one()/get_leveled_quantity(recipe['craft_time'], recipe_level));
         dialog.widgets['progress_bar'].progress = 0.2 + 0.8 * prog; // artificially boost by 20% at start
     }
 
@@ -32096,7 +32169,7 @@ function update_fishing_dialog_row(parent_dialog, row, rowdata) {
         } else {
             dialog.widgets['start_button'].tooltip.str = null;
         }
-        dialog.widgets['start_button'].str = dialog.data['widgets']['start_button']['ui_name'].replace('%TIME', pretty_print_time_brief(recipe['craft_time']));
+        dialog.widgets['start_button'].str = dialog.data['widgets']['start_button']['ui_name'].replace('%TIME', pretty_print_time_brief(get_leveled_quantity(recipe['craft_time'], recipe_level)));
         if(state == 'idle') {
             dialog.widgets['start_button'].state = 'normal';
             dialog.widgets['start_button'].onclick = (function (_builder, _recipe) { return function(w) {
@@ -40319,14 +40392,16 @@ function can_cast_spell_detailed(unit_id, spellname, spellarg) {
     } else if(spellname == "CRAFT_FOR_FREE") {
         var builder = session.cur_objects.objects[unit_id];
         var recipe_name = spellarg[0]['recipe'];
+        var recipe_level = spellarg[0]['level'] || 1;
         var recipe_spec = gamedata['crafting']['recipes'][recipe_name];
+
         var ret = null;
         if(!player.is_cheater) {
             // check predicate requirements
             goog.array.forEach(['show_if','requires'], function(predname) {
                 if(ret) { return; } // already found a reason we cannot proceed
                 if(predname in recipe_spec) {
-                    var pred = read_predicate(recipe_spec[predname]);
+                    var pred = read_predicate(get_leveled_quantity(recipe_spec[predname], recipe_level));
                     if(!pred.is_satisfied(player, null)) {
                         ret = [false, gamedata['errors']['REQUIREMENTS_NOT_SATISFIED']['ui_name'], [pred]];
                     }
@@ -40337,9 +40412,9 @@ function can_cast_spell_detailed(unit_id, spellname, spellarg) {
             // check resource requirements
             var resources_needed = {};
             for(var res in gamedata['resources']) {
-                var cost = recipe_spec['cost'][res]||0;
+                var cost = get_leveled_quantity(recipe_spec['cost'], recipe_level)[res]||0;
                 if(player.resource_state[res][1] < cost) {
-                    resources_needed[res] = cost;
+                    resources_needed[res] = cost - player.resource_state[res][1];
                 }
             }
             if(goog.object.getCount(resources_needed) > 0) {
@@ -40350,7 +40425,8 @@ function can_cast_spell_detailed(unit_id, spellname, spellarg) {
             if('ingredients' in recipe_spec) {
                 // have to pre-sum by specname and level in case there are multiple matching entries
                 var by_specname_and_level = {};
-                goog.array.forEach(recipe_spec['ingredients'], function(ingr) {
+                var ingr_list = get_crafting_recipe_ingredients_list(recipe_spec, recipe_level);
+                goog.array.forEach(ingr_list, function(ingr) {
                     var stack = ('stack' in ingr ? ingr['stack'] : 1);
                     var key = ingr['spec'];
                     if('level' in ingr) {
@@ -40825,20 +40901,21 @@ Store.get_base_price = function(unit_id, spell, spellarg, ignore_error) {
                 for(var res in gamedata['resources']) {
                     var resdata = gamedata['resources'][res];
                     if(('allow_instant' in resdata) && !resdata['allow_instant']) {
-                        if(get_leveled_quantity(recipe['cost'][res] || 0, recipe_level) > 0) {
+                        if((get_leveled_quantity(get_leveled_quantity(recipe['cost'], recipe_level)[res] || 0, recipe_level)) > 0) {
                             return [-1, p_currency]; // requires rare resource
                         }
                     }
                 }
                 var pred_fail = false;
                 goog.array.forEach(['show_if','requires','activation'], function(predname) {
-                    if(predname in recipe && !read_predicate(recipe[predname]).is_satisfied(player, null)) { pred_fail = true; };
+                    if(predname in recipe && !read_predicate(get_leveled_quantity(recipe[predname], recipe_level)).is_satisfied(player, null)) { pred_fail = true; };
                 });
                 if(pred_fail) { return [-1, p_currency]; }
 
                 var limited_or_unique_equipped_fail = false;
                 if(!ignore_error && delivery && delivery['obj_id']) {
-                    goog.array.forEach(recipe['product'], function(my_product) {
+                    var product_list = get_crafting_recipe_product_list(recipe, recipe_level);
+                    goog.array.forEach(product_list, function(my_product) {
                         var delivery_address = new BuildingEquipSlotAddress(delivery['obj_id'], delivery['slot_type'], delivery['slot_index']);
                         if(my_product['spec']) {
                             if(player.would_violate_limited_equipped(ItemDisplay.get_inventory_item_spec(my_product['spec']), delivery_address) ||
@@ -48068,7 +48145,12 @@ function draw_building_or_inert(obj, powerfac) {
                 // pending collection
                 progress = 0;
             } else if(progress < 1 || obj.team == 'player') {
-                status_text.push(get_crafting_recipe_ui_name(recipe) + ': '+pretty_print_time(obj.crafting_time_left_one()));
+                var ui_recipe = get_crafting_recipe_ui_name(recipe);
+                var bus = obj.get_crafting_queue()[0]['craft'];
+                if(recipe['max_level'] > 1 && (bus['level'] || 1) > 1) {
+                    ui_recipe += ' L'+bus['level'].toString();
+                }
+                status_text.push(ui_recipe + ': '+pretty_print_time(obj.crafting_time_left_one()));
             }
         } else if(obj.is_manufacturing()) {
             var item = obj.manuf_queue[0];
