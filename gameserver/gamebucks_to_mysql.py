@@ -57,8 +57,8 @@ def store_schema(sql_util):
             'indices': {'by_time': {'keys': [('time','ASC')]}}
             }
 
-def store_summary_schema(sql_util):
-    return {'fields': [('day', 'INT8 NOT NULL')] + \
+def store_summary_schema(sql_util, interval):
+    return {'fields': [(interval, 'INT8 NOT NULL')] + \
                       sql_util.summary_out_dimensions() + \
                       [('currency', 'VARCHAR(16)'),
                        ('category', 'VARCHAR(64)'),
@@ -69,7 +69,10 @@ def store_summary_schema(sql_util):
                        ('count', 'INT8'),
                        ('total_price', 'INT8'),
                        ('total_stack', 'INT8')],
-            'indices': {'master': {'unique':True, 'keys': [('day','ASC')] + [(dim,'ASC') for dim, kind in sql_util.summary_out_dimensions()] + [('currency','ASC'),('category','ASC'),('subcategory','ASC'),('level','ASC'),('item','ASC')]}},
+            'indices': {'master': {'keys': [(interval,'ASC')] # + \
+                                   # [(dim,'ASC') for dim, kind in sql_util.summary_out_dimensions()] + \
+                                   # [('currency','ASC'),('category','ASC'),('subcategory','ASC'),('level','ASC'),('item','ASC')]
+                                   }},
             }
 
 # track user_ids of players with top spend in each summary segment
@@ -148,6 +151,7 @@ if __name__ == '__main__':
     con = MySQLdb.connect(*cfg['connect_args'], **cfg['connect_kwargs'])
     store_table = cfg['table_prefix']+game_id+'_store'
     store_daily_summary_table = cfg['table_prefix']+game_id+'_store_daily_summary'
+    store_hourly_summary_table = cfg['table_prefix']+game_id+'_store_hourly_summary'
     store_top_spenders_28d_table = cfg['table_prefix']+game_id+'_store_top_spenders_28d'
     unit_cost_table = cfg['table_prefix']+game_id+'_unit_cost'
     unit_cost_daily_summary_table = cfg['table_prefix']+game_id+'_unit_cost_daily_summary'
@@ -156,7 +160,8 @@ if __name__ == '__main__':
 
     cur = con.cursor(MySQLdb.cursors.DictCursor)
     sql_util.ensure_table(cur, store_table, store_schema(sql_util))
-    sql_util.ensure_table(cur, store_daily_summary_table, store_summary_schema(sql_util))
+    sql_util.ensure_table(cur, store_daily_summary_table, store_summary_schema(sql_util, 'day'))
+    sql_util.ensure_table(cur, store_hourly_summary_table, store_summary_schema(sql_util, 'hour'))
     sql_util.ensure_table(cur, store_top_spenders_28d_table, store_top_spenders_schema(sql_util, 'day'))
     if do_unit_cost:
         sql_util.ensure_table(cur, unit_cost_table, unit_cost_schema(sql_util))
@@ -178,6 +183,7 @@ if __name__ == '__main__':
     batch = 0
     total = 0
     affected_days = set()
+    affected_hours = set()
 
     qs = {'time':{'$gt':start_time, '$lt':end_time}}
 
@@ -260,6 +266,7 @@ if __name__ == '__main__':
         batch += 1
         total += 1
         affected_days.add(86400*(row['time']//86400))
+        affected_hours.add(3600*(row['time']//3600))
 
         if commit_interval > 0 and batch >= commit_interval:
             batch = 0
@@ -267,7 +274,7 @@ if __name__ == '__main__':
             if verbose: print total, 'inserted'
 
     con.commit()
-    if verbose: print 'total', total, 'inserted', 'affecting', len(affected_days), 'day(s)'
+    if verbose: print 'total', total, 'inserted', 'affecting', len(affected_days), 'day(s)', len(affected_hours), 'hour(s)'
 
 
     # update summary
@@ -279,8 +286,8 @@ if __name__ == '__main__':
         store_range = None
 
     def update_store_summary(cur, table, interval, day_start, dt):
-        cur.execute("INSERT INTO "+sql_util.sym(store_daily_summary_table) + \
-                    "SELECT 86400*FLOOR(store.time/86400.0) AS day," + \
+        cur.execute("INSERT INTO "+sql_util.sym(table) + \
+                    "SELECT %s*FLOOR(store.time/%s) AS "+interval+"," + \
                     "       store.frame_platform AS frame_platform," + \
                     "       store.country_tier AS country_tier," + \
                     "       store.townhall_level AS townhall_level," + \
@@ -294,8 +301,8 @@ if __name__ == '__main__':
                     "       SUM(price) AS total_price, " + \
                     "       SUM(stack) AS total_stack " + \
                     "FROM " + sql_util.sym(store_table) + " store " + \
-                    "WHERE store.time >= %s AND store.time < %s+86400 AND (store.category IS NOT NULL OR store.item IS NOT NULL)" + \
-                    "GROUP BY 86400*FLOOR(store.time/86400.0), frame_platform, country_tier, townhall_level, spend_bracket, currency, category, subcategory, level, item ORDER BY NULL", [day_start,]*2)
+                    "WHERE store.time >= %s AND store.time < %s+%s AND (store.category IS NOT NULL OR store.item IS NOT NULL)" + \
+                    "GROUP BY "+interval+", frame_platform, country_tier, townhall_level, spend_bracket, currency, category, subcategory, level, item ORDER BY NULL", [dt,dt,day_start,day_start,dt])
 
     def update_unit_cost_summary(cur, table, interval, day_start, dt):
         cur.execute("INSERT INTO "+sql_util.sym(unit_cost_daily_summary_table) + \
@@ -312,8 +319,11 @@ if __name__ == '__main__':
                     "WHERE cost.time >= %s AND cost.time < %s+86400 " + \
                     "GROUP BY 86400*FLOOR(cost.time/86400.0), frame_platform, country_tier, townhall_level, spend_bracket, specname, location ORDER BY NULL", [day_start,]*2)
 
-    SpinETL.update_summary(sql_util, con, cur, store_daily_summary_table, affected_days, store_range, 'day', 86400,
-                           verbose = verbose, resummarize_tail = 86400, execute_func = update_store_summary)
+    for table, interval, dt, affected in ((store_hourly_summary_table, 'hour', 3600, affected_hours),
+                                          (store_daily_summary_table, 'day', 86400, affected_days)):
+        SpinETL.update_summary(sql_util, con, cur, table, affected, store_range, interval, dt,
+                               verbose = verbose, resummarize_tail = dt, execute_func = update_store_summary)
+
     if do_unit_cost:
         SpinETL.update_summary(sql_util, con, cur, unit_cost_daily_summary_table, affected_days, store_range, 'day', 86400,
                                verbose = verbose, resummarize_tail = 86400, execute_func = update_unit_cost_summary)
