@@ -148,20 +148,6 @@ WHERE method = 'fb_guest_page' AND
        (event_name = '0032_request_permission_prompt_success'))
 ;
 
--- ------------
--- UNIT COST --
--- ------------
-
--- -- v_unit_cost: add townhall_level
--- CREATE OR REPLACE VIEW v_unit_cost AS
--- SELECT *,
---        (SELECT IF(MAX(townhall_at_time.townhall_level) IS NOT NULL, MAX(townhall_at_time.townhall_level), 1)
---         FROM $GAME_ID_townhall_at_time townhall_at_time
---         WHERE townhall_at_time.user_id = unit_cost.user_id AND
---            townhall_at_time.time < unit_cost.time) AS townhall_level
--- FROM $GAME_ID_unit_cost unit_cost;
--- -- test: SELECT * FROM v_unit_cost WHERE user_id < 100000 LIMIT 10;
-
 -- --------------
 -- PURCHASE UI --
 -- --------------
