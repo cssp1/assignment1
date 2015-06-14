@@ -4,7 +4,7 @@
 # Use of this source code is governed by an MIT-style license that can be
 # found in the LICENSE file.
 
-# AFTER dumping "battles", "ai_bases/analytics_tags" and "store" table, compute derived risk/reward analysis
+# AFTER dumping "battles", "ai_bases/analytics_tags" and "store" table (for recent gamebucks spend), compute derived risk/reward analysis
 
 import sys, time, getopt
 import SpinConfig
