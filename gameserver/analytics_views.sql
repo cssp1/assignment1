@@ -2,6 +2,9 @@
 -- Use of this source code is governed by an MIT-style license that can be
 -- found in the LICENSE file.
 
+-- This should run AFTER all the raw event data and summaries are available in SQL.
+-- It depends on all other ETL scripts being run first, EXCEPT for upcache and anything that is derived from upcache.
+
 -- note: this script is run through a string substitution to replace $GAME_ID with "mf" "tr" etc
 
 -- -------------------
@@ -48,60 +51,6 @@ SELECT metrics.time,
        IF(metrics.event_name = '0399_tutorial_complete',1,NULL) AS tut_complete
 FROM $GAME_ID_metrics metrics
 WHERE metrics.event_name IN ('0140_tutorial_oneway_ticket', '0140_tutorial_start', '0399_tutorial_complete');
-
--- the daily/hourly views below here are obsoleted by sessions_to_sql.py, which builds a summary incrementally and is much more efficient.
-
--- -- v_sessions_daily: cross-join sessions with day-start timestamps for days overlapped by each session, add columns country_tier, townhall_level, and collapse per user
--- -- OUTPUT: one row per user per day
--- CREATE OR REPLACE VIEW v_sessions_daily AS
--- SELECT t AS day,
---        sessions.user_id,
---        COUNT(*) AS num_logins,
---        SUM(IF(sessions.end < t+dt, sessions.end, t+dt) - IF(sessions.start > t, sessions.start, t)) AS playtime -- clip playtime to the range [t,t+dt]
--- FROM u_daily_series
--- CROSS JOIN $GAME_ID_sessions sessions ON (sessions.start < t+dt AND sessions.end >= t)
--- GROUP BY day, sessions.user_id ORDER BY NULL;
-
--- CREATE OR REPLACE VIEW v_sessions_hourly AS -- same but hourly instead of daily
--- SELECT t AS hour,
---        sessions.user_id,
---        COUNT(*) AS num_logins,
---        SUM(IF(sessions.end < t+dt, sessions.end, t+dt) - IF(sessions.start > t, sessions.start, t)) AS playtime -- clip playtime to the range [t,t+dt]
--- FROM u_hourly_series
--- CROSS JOIN $GAME_ID_sessions sessions ON (sessions.start < t+dt AND sessions.end >= t)
--- GROUP BY hour, sessions.user_id ORDER BY NULL;
--- -- test: SELECT * FROM v_sessions_daily LIMIT 10;
-
--- -- v_sessions_daily_summary: aggregate DAU stats
--- -- OUTPUT: one row per tier/townhall per day
--- CREATE OR REPLACE VIEW v_sessions_daily_summary AS
--- SELECT day,
---        day + 7*86400 AS day_week_ahead,
---        IFNULL(upcache.country_tier, '4') AS country_tier,
---        IFNULL((SELECT MAX(th.townhall_level) FROM $GAME_ID_townhall_at_time th WHERE th.user_id = v_sessions_daily.user_id AND th.time < day+86400),1) AS townhall_level, -- find max townhall level during interval
---        COUNT(*) AS dau,
---        SUM(num_logins) AS num_logins,
---        SUM(playtime) AS playtime
--- FROM v_sessions_daily
--- LEFT JOIN $UPCACHE_TABLE upcache ON upcache.user_id = v_sessions_daily.user_id
--- GROUP BY day, country_tier, townhall_level ORDER BY NULL;
-
--- CREATE OR REPLACE VIEW v_sessions_hourly_summary AS -- same but hourly instead of daily
--- SELECT hour,
---        hour + 7*86400 AS hour_week_ahead,
---        IFNULL(upcache.country_tier, '4') AS country_tier,
---        IFNULL((SELECT MAX(th.townhall_level) FROM $GAME_ID_townhall_at_time th WHERE th.user_id = v_sessions_hourly.user_id AND th.time < hour+3600),1) AS townhall_level, -- find max townhall level during interval
---        COUNT(*) AS hau,
---        SUM(num_logins) AS num_logins,
---        SUM(playtime) AS playtime
--- FROM v_sessions_hourly
--- LEFT JOIN $UPCACHE_TABLE upcache ON upcache.user_id = v_sessions_hourly.user_id
--- GROUP BY hour, country_tier, townhall_level ORDER BY NULL;
--- -- test: SELECT * FROM v_sessions_daily_summary_raw LIMIT 10;
-
--- -- update materialized view
--- DROP TABLE IF EXISTS v_sessions_daily_summary_cache; CREATE TABLE v_sessions_daily_summary_cache SELECT * FROM v_sessions_daily_summary; -- MF2: 9 minutes
--- DROP TABLE IF EXISTS v_sessions_hourly_summary_cache; CREATE TABLE v_sessions_hourly_summary_cache SELECT * FROM v_sessions_hourly_summary; -- MF2: 2 minutes
 
 -- ----------------------------
 -- FACEBOOK CAMPAIGN PARSING --
@@ -163,22 +112,6 @@ BEGIN
         END IF;
 END $$
 DELIMITER ;
-
--- OBSOLETE: this was replaced by acquisitions_to_sql.py, which creates the summary as an incremental materialized view.
--- -- This provides a daily summary with acquisitions grouped by acq_class > acq_source > acq_detail (ordered from least to most specific)
--- CREATE OR REPLACE VIEW v_acquisitions_daily AS
--- SELECT 86400*FLOOR(account_creation_time/86400.0) AS day,
---        IFNULL(frame_platform, 'fb') AS platform,
---        IFNULL(country_tier, '4') AS tier,
---        classify_acquisition_campaign(IFNULL(frame_platform, 'fb'), acquisition_campaign) AS acq_class,
---        IF(frame_platform IS NULL OR frame_platform = 'fb', remap_facebook_campaigns(acquisition_campaign), acquisition_campaign) AS acq_source,
---        acquisition_campaign AS acq_detail,
---        COUNT(1) AS n_users
--- FROM $UPCACHE_TABLE upcache
--- WHERE account_creation_time IS NOT NULL
--- GROUP BY day, platform, tier, acq_class, acq_source, acq_detail
--- HAVING acq_class IS NOT NULL -- exclude users where classify_acquisition_campaign returns NULL
--- ORDER BY NULL;
 
 -- -------------------------
 -- FACEBOOK NOTIFICATIONS --
@@ -243,25 +176,26 @@ FROM $GAME_ID_credits credits;
 -- test: SELECT count(1), is_first_purchase FROM v_credits GROUP BY is_first_purchase;
 
 -- v_purchase_ui_daily_summary: for Chartio
-CREATE OR REPLACE VIEW v_purchase_ui_daily_summary AS
-SELECT 86400*FLOOR(purchase_ui.time/86400.0) AS day,
-       SUM(IF(event_name = '4410_buy_gamebucks_dialog_open',1,0)) AS buy_gamebucks_dialog_opens,
-       SUM(IF(event_name = '4440_buy_gamebucks_init_payment',1,0)) AS payment_inits,
-       SUM(IF(event_name = '4450_buy_gamebucks_payment_complete',1,0)) AS payment_completes,
-       SUM(IF(event_name = '4440_buy_gamebucks_init_payment',1,0))/SUM(IF(event_name = '4410_buy_gamebucks_dialog_open',1,0)) AS payment_init_rate,
-       SUM(IF(event_name = '4450_buy_gamebucks_payment_complete',1,0))/SUM(IF(event_name = '4440_buy_gamebucks_init_payment',1,0)) AS payment_complete_rate,
-       SUM(IF(event_name = '4450_buy_gamebucks_payment_complete',1,0)) AS num_purchases,
-       SUM(IF(event_name = '4450_buy_gamebucks_payment_complete',gamebucks,0)) AS gamebucks_purchased,
-       IF(upcache.country_tier IS NOT NULL, upcache.country_tier, '4') AS country_tier,
-       IF(upcache.money_spent IS NOT NULL AND upcache.money_spent>0,1,0) AS is_payer,
-       IF(gui_version IS NOT NULL, gui_version, 1) AS gui_version
-FROM $GAME_ID_purchase_ui purchase_ui
-LEFT JOIN $UPCACHE_TABLE upcache ON upcache.user_id = purchase_ui.user_id
-GROUP BY 86400*FLOOR(purchase_ui.time/86400.0),
-         IF(upcache.country_tier IS NOT NULL, upcache.country_tier, '4'),
-         IF(upcache.money_spent IS NOT NULL AND upcache.money_spent>0,1,0),
-         IF(gui_version IS NOT NULL, gui_version, 1)
-ORDER BY NULL;
+-- XXXXXX this needs to be made independent of upcache by using denormalized summary dimensinos
+-- CREATE OR REPLACE VIEW v_purchase_ui_daily_summary AS
+-- SELECT 86400*FLOOR(purchase_ui.time/86400.0) AS day,
+--        SUM(IF(event_name = '4410_buy_gamebucks_dialog_open',1,0)) AS buy_gamebucks_dialog_opens,
+--        SUM(IF(event_name = '4440_buy_gamebucks_init_payment',1,0)) AS payment_inits,
+--        SUM(IF(event_name = '4450_buy_gamebucks_payment_complete',1,0)) AS payment_completes,
+--        SUM(IF(event_name = '4440_buy_gamebucks_init_payment',1,0))/SUM(IF(event_name = '4410_buy_gamebucks_dialog_open',1,0)) AS payment_init_rate,
+--        SUM(IF(event_name = '4450_buy_gamebucks_payment_complete',1,0))/SUM(IF(event_name = '4440_buy_gamebucks_init_payment',1,0)) AS payment_complete_rate,
+--        SUM(IF(event_name = '4450_buy_gamebucks_payment_complete',1,0)) AS num_purchases,
+--        SUM(IF(event_name = '4450_buy_gamebucks_payment_complete',gamebucks,0)) AS gamebucks_purchased,
+--        IF(upcache.country_tier IS NOT NULL, upcache.country_tier, '4') AS country_tier,
+--        IF(upcache.money_spent IS NOT NULL AND upcache.money_spent>0,1,0) AS is_payer,
+--        IF(gui_version IS NOT NULL, gui_version, 1) AS gui_version
+-- FROM $GAME_ID_purchase_ui purchase_ui
+-- LEFT JOIN $UPCACHE_TABLE upcache ON upcache.user_id = purchase_ui.user_id
+-- GROUP BY 86400*FLOOR(purchase_ui.time/86400.0),
+--          IF(upcache.country_tier IS NOT NULL, upcache.country_tier, '4'),
+--          IF(upcache.money_spent IS NOT NULL AND upcache.money_spent>0,1,0),
+--          IF(gui_version IS NOT NULL, gui_version, 1)
+-- ORDER BY NULL;
 
 -- ---------------------
 -- BATTLE RISK/REWARD --
