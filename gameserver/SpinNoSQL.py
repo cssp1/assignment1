@@ -589,18 +589,21 @@ class NoSQLClient (object):
             coll.ensure_index([('time',pymongo.ASCENDING)])
             self.seen_logs[name] = 1
         return coll
-    def log_record(self, log_name, t, data, safe = False, log_ident = True, reason=''):
-        return self.instrument('log_record(%s)'%(log_name+':'+reason), self._log_record, (log_name, t, data, safe, log_ident))
-    def _log_record(self, log_name, t, data, safe, log_ident):
+    def log_record(self, log_name, t, data, safe = False, log_ident = True, id_key = None, reason=''):
+        return self.instrument('log_record(%s)'%(log_name+':'+reason), self._log_record, (log_name, t, data, safe, log_ident, id_key))
+    def _log_record(self, log_name, t, data, safe, log_ident, id_key):
         has_time = ('time' in data)
         has_ident = ('ident' in data)
         if not has_time: data['time'] = t
         if not has_ident and log_ident: data['ident'] = self.ident
+        if id_key is not None: data['_id'] = id_key # manually set primary key
         try:
-            self.log_buffer_table(log_name).insert(data, w = 1 if safe else 0)
+            # note: if id_key is specified, this can overwrite an existing entry
+            self.log_buffer_table(log_name).save(data, w = 1 if safe else 0)
         finally:
             if not has_time: del data['time']
             if not has_ident and log_ident: del data['ident']
+            if id_key is not None: del data['_id']
 
     def log_bookmark_set(self, user_name, key, ts, reason=''):
         return self.instrument('log_boomkark_set', self._log_bookmark_set, (user_name, key, ts))

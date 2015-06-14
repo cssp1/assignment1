@@ -21432,6 +21432,8 @@ class GAMEAPI(resource.Resource):
             player.history['sessions'] = []
         player.history['sessions'].append([server_time,-1])
 
+        self.log_record_session(session, session.login_time, -1, 'CLIENT_HELLO')
+
         needs_daily_attack = False
 
         if player.tutorial_state == "COMPLETE" and \
@@ -21738,12 +21740,7 @@ class GAMEAPI(resource.Resource):
         if gamesite.nosql_client and gamedata['server'].get('log_dau_in_nosql', True):
             gamesite.nosql_client.dau_record(session.login_time, session.user.user_id, session.player.country_tier, playtime)
 
-        if gamesite.nosql_client and gamedata['server'].get('log_sessions_in_nosql', True):
-            props = {'user_id': session.user.user_id,
-                     'in':session.login_time,
-                     'out': logout_time}
-            props.update(session.player.get_denormalized_summary_props('brief'))
-            gamesite.nosql_client.log_record('log_sessions', server_time, props, reason='log_out_preflush')
+        self.log_record_session(session, session.login_time, logout_time, 'log_out_preflush')
 
         # add up play time
         session.increment_player_metric('time_in_game', playtime, time_series = False, bucket = True)
@@ -21777,6 +21774,20 @@ class GAMEAPI(resource.Resource):
         # update all leaderboard stats - legacy only (scores2 gets updated on the fly)
         if not session.player.isolate_pvp:
             session.player.publish_scores1(alliance_id = alliance_id, reason = 'log_out_preflush')
+
+    # record login/logout in MongoDB log
+    # if recording logins (that are still active), set logout_time = -1
+    # upon logout, call this again with the proper logout_time, and it will overwrite the entry.
+    def log_record_session(self, session, login_time, logout_time, reason):
+        assert (logout_time == -1) or (logout_time >= login_time)
+        if gamesite.nosql_client and gamedata['server'].get('log_sessions_in_nosql', True):
+            props = {'user_id': session.user.user_id,
+                     'in': login_time,
+                     'out': logout_time}
+            props.update(session.player.get_denormalized_summary_props('brief'))
+            # unique tuple for each session
+            id_key = '%d:%d:%s' % (session.user.user_id, login_time, session.session_id[0:4])
+            gamesite.nosql_client.log_record('log_sessions', server_time, props, id_key=id_key, reason=reason)
 
     def send_fb_achievements(self, session):
         if not session.user.facebook_id: return
