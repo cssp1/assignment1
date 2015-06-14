@@ -11,8 +11,8 @@
 
 # run metrics cache updates
 
-# every hour at 0:05, 1:05, 2:05, ...
-# XXX enable manually 5 * * * * ec2-user run-parts /etc/cron.spinpunch.highfreq
+# every other hour at 0:05, 2:05, 4:05, ...
+# XXX enable manually 5 0,2,4,6,8,10,12,14,16,18,20,22 * * * ec2-user run-parts /etc/cron.spinpunch.highfreq
 
 # send memory statistics to CloudWatch every minute
 * * * * * ec2-user /usr/local/bin/ec2-send-memory-metrics.py
