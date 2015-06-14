@@ -566,7 +566,6 @@ def read_consequent(data):
     elif kind == 'FIND_AND_REPLACE_OBJECTS': return FindAndReplaceObjectsConsequent(data)
     elif kind == 'CHAT_SEND': return ChatSendConsequent(data)
     elif kind == 'MARK_BIRTHDAY': return MarkBirthdayConsequent(data)
-    elif kind == 'UNLOCK_TITLE': return UnlockTitleConsequent(data)
     elif kind == 'CHANGE_TITLE': return ChangeTitleConsequent(data)
     elif kind == 'DISPLAY_DAILY_TIP': return DisplayDailyTipConsequent(data)
     elif kind == 'HEAL_ALL_UNITS': return HealAllUnitsConsequent(data)
