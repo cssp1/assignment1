@@ -39290,10 +39290,11 @@ function update_upgrade_dialog(dialog) {
             dialog.widgets['mod_text'+grid_y.toString()].show =
             dialog.widgets['mod_button'+grid_y.toString()].show = !!mod_tech;
         if(mod_tech) {
-            dialog.widgets['mod_button'+grid_y.toString()].onclick =
-                dialog.widgets['mod_text'+grid_y.toString()].onclick =(function (_mod_tech) { return function(w) {
+            // handler for click on "Modify" button
+            var mod_onclick = (function (_mod_tech) { return function(w) {
                 invoke_upgrade_tech_dialog(_mod_tech['name']);
             }; })(mod_tech);
+
             var mod_text_mode = 'ui_name';
             var mod_text_color = 'text_color';
             if((player.tech[mod_tech['name']]||0) >= get_max_ui_level(mod_tech)) {
@@ -39303,12 +39304,18 @@ function update_upgrade_dialog(dialog) {
                 if(builder.research_item === mod_tech['name']) {
                     mod_text_mode = 'ui_name_busy';
                     mod_text_color = 'text_color_busy';
+                    mod_onclick = (function (_builder) { return function(w) {
+                        change_selection_unit(_builder);
+                        invoke_child_speedup_dialog('research');
+                    }; })(builder);
                 } else {
                     mod_text_mode = 'ui_name_other_busy';
                     mod_text_color = 'text_color_other_busy';
                 }
             }
 
+            dialog.widgets['mod_button'+grid_y.toString()].onclick =
+                dialog.widgets['mod_text'+grid_y.toString()].onclick = mod_onclick;
             dialog.widgets['mod_text'+grid_y.toString()].str = dialog.data['widgets']['mod_text'][mod_text_mode];
             dialog.widgets['mod_text'+grid_y.toString()].text_color = SPUI.make_colorv(dialog.data['widgets']['mod_text'][mod_text_color]);
             dialog.widgets['mod_bar'+grid_y.toString()].progress = (player.tech[mod_tech['name']]||0) / get_max_ui_level(mod_tech);
