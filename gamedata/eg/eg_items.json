@@ -136,6 +136,14 @@
     "icon": "inventory_already_collected"
 },
 
+// this is for showcase dialogs only
+"random_loot": {
+    "name": "random_loot",
+    "ui_name": "Random Loot",
+    "ui_description": "A random item will be rewarded after completing this level.",
+    "icon": "inventory_random"
+},
+
 // this is for the store tooltip ONLY
 "change_region_for_free": {
     "name": "change_region_for_free",
