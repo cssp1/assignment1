@@ -2470,7 +2470,9 @@
                        },
             "mod_text": { "kind": "ActionButton", "xy": [222,102], "dimensions": [55,15], "text_size": 11, "text_style": "normal", "text_hjustify": "center",
                           "text_color": [0,1,0,1], "text_color_busy": [1,1,0,1], "text_color_other_busy": [1,1,0,1],
+                          "text_color_maxed": [0.66,0.66,0.66,1],
                           "ui_name": "Modify", "ui_name_busy": "Working...", "ui_name_other_busy": "Busy", "ui_name_none": "None",
+                          "ui_name_maxed": "Maxed",
                           "ui_tooltip": "", "tooltip_delay": 0, "drop_shadow": 1,
                           "array": [1,8], "array_offset": [0,19], "show": 0
                         },

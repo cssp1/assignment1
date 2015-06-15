@@ -39296,7 +39296,10 @@ function update_upgrade_dialog(dialog) {
             }; })(mod_tech);
             var mod_text_mode = 'ui_name';
             var mod_text_color = 'text_color';
-            if(builder && (builder.is_damaged() || builder.time_until_finish() > 0)) {
+            if((player.tech[mod_tech['name']]||0) >= get_max_ui_level(mod_tech)) {
+                mod_text_mode = 'ui_name_maxed';
+                mod_text_color = 'text_color_maxed';
+            } else if(builder && (builder.is_damaged() || builder.time_until_finish() > 0)) {
                 if(builder.research_item === mod_tech['name']) {
                     mod_text_mode = 'ui_name_busy';
                     mod_text_color = 'text_color_busy';
