@@ -560,7 +560,9 @@ def _generate_showcase_consequent(game_id, event_dirname, data, atom):
         if data['showcase'].get('progression_reward_items',False):
 
             atom.fd.write(',\n\n')
-            progression_reward_items = get_progression_reward_items(data['loot'][diff], data['showcase'].get('include_resource_boosts_in_progression', False))
+            progression_reward_items = get_progression_reward_items(data['loot'][diff],
+                                                                    data['showcase'].get('include_resource_boosts_in_progression', False),
+                                                                    data['showcase'].get('include_random_loot_in_progression', False))
 
             # PROGRESSION_INTRO_SHOWCASE
             # shows progression reward items PLUS final reward items and corner_token instruction (shown at the first level)
@@ -713,20 +715,29 @@ def check_one_time_loot(event_name, data):
 
 # given the array of loot tables for an event difficulty (one per level),
 # return a list of the special progression reward items, suitable for including in showcase['progression_reward_items']
-def get_progression_reward_items(loot, include_resource_boosts):
-    # gets a copy of the given loot table where only items that satisfy func are included
-    # and where {"table": ...} entries are expanded to show their contents
-    def filter_loot(loot, item_func = None, table_func = None):
+def get_progression_reward_items(loot, include_resource_boosts, include_random_loot):
+    # Returns a loot table transformed so that it contains notable loot drops at each level of progression. This involves
+    # expanding loot table references into a list of items and removing loot considered boring (eg resources or random drops).
+    def filter_progression_loot(loot):
         if not loot or 'nothing' in loot:
             return None
         elif 'spec' in loot:
-            if not item_func or item_func(loot):
+            # this level drops an item so filter out any tokens or resource boosts
+            if loot['spec'] == 'token':
+                return None
+            elif any(loot['spec'].startswith('boost_%s_' % resource) for resource in gamedata['resources']):
+                if not include_resource_boosts:
+                    return None
+                else:
+                    return loot
+            else:
                 return loot
         elif isinstance(loot, list):
+            # this level drops one of many things so filter all of them
             new_loot = []
 
             for entry in loot:
-                new_entry = filter_loot(entry, item_func, table_func)
+                new_entry = filter_progression_loot(entry)
 
                 if new_entry:
                     new_loot.append(new_entry)
@@ -736,10 +747,11 @@ def get_progression_reward_items(loot, include_resource_boosts):
             else:
                 return new_loot
         elif 'multi' in loot:
+            # this level drops multiple things so filter all of them
             new_loot = []
 
             for entry in loot['multi']:
-                new_entry = filter_loot(entry, item_func, table_func)
+                new_entry = filter_progression_loot(entry)
 
                 if new_entry:
                     new_loot.append(new_entry)
@@ -752,42 +764,29 @@ def get_progression_reward_items(loot, include_resource_boosts):
             else:
                 return None
         elif 'table' in loot:
-            if not table_func or table_func(loot):
-                return filter_loot(gamedata['loot_tables'][loot['table']]['loot'], item_func, table_func)
+            # this level contains drops from a loot table that we need to expand
+            table_name = loot['table']
+
+            if not table_name.startswith('event_loot_'):
+                return filter_progression_loot(gamedata['loot_tables'][table_name]['loot'])
             else:
-                return None
+                # only include guarenteed random loot drops (event_loot_*_item) if specified in the skeleton
+                if include_random_loot and table_name.endswith('_item'):
+                    return {'spec': 'random_loot'}
+                else:
+                    return None
         elif 'cond' in loot:
-            new_loot = {'cond': []}
-
-            for entry in loot['cond']:
-                new_loot['cond'].append([entry[0], filter_loot(entry[1], item_func, table_func)])
-
-            return new_loot
+            # still return a conditional so that players see the correct loot for themselves
+            return {'cond': [(pred, filter_progression_loot(value)) for pred, value in loot['cond']]}
         else:
             raise Exception('error: invalid loot %s' % loot)
-
-    # returns true for items that are not tokens or resource boosts
-    def not_resources_or_token(loot):
-        if loot['spec'] != 'token':
-            if not include_resource_boosts:
-                for resource in gamedata['resources']:
-                    if loot['spec'].startswith('boost_%s_' % resource):
-                        return False
-
-            return True
-        else:
-            return False
-
-    # returns true for loot tables that aren't random event loot tables
-    def not_random_event_loot(loot_table):
-        return not loot_table['table'].startswith('event_loot_')
 
     ret = []
 
     for i in xrange(len(loot)):
         level = i + 1
 
-        filtered_loot = filter_loot(loot[i], not_resources_or_token, not_random_event_loot)
+        filtered_loot = filter_progression_loot(loot[i])
         if filtered_loot:
             ret.append({'level': level, 'loot': filtered_loot})
 
@@ -884,7 +883,9 @@ if __name__ == '__main__':
 
                 # add progression showcases before and after major loot drops
                 if data['showcase'].get('progression_reward_items',False):
-                    progression_reward_items = get_progression_reward_items(data['loot'][diff], data['showcase'].get('include_resource_boosts_in_progression', False))
+                    progression_reward_items = get_progression_reward_items(data['loot'][diff],
+                                                                            data['showcase'].get('include_resource_boosts_in_progression', False),
+                                                                            data['showcase'].get('include_random_loot_in_progression', False))
                     for reward in progression_reward_items:
                         level = reward['level'] - 1
 
