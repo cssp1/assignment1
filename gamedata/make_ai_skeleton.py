@@ -946,12 +946,14 @@ if __name__ == '__main__':
             default_priority = {'mf':300}.get(game_id,100)
             if priority != default_priority:
                 raise Exception('event %s should have map_ui_priority = %d' % (data['event_name'], default_priority))
-            if len(data['difficulties']) > 1:
-                # ensure difficulties appear in correct order
-                priority += 1 - 0.1*data['difficulties'].index(diff)
 
             if start_time > 0: # append the starting week number as a fractional part to the ui_priority so the "freshest" event wins ties.
                 priority += 0.001 * SpinConfig.get_pvp_week(gamedata['matchmaking']['week_origin'], start_time)
+
+            if len(data['difficulties']) > 1:
+                # ensure difficulties appear in correct order
+                priority += 0.0001*(1 - 0.1*data['difficulties'].index(diff))
+
             return priority
         ui_priority = make_per_run_cond_chain(data, make_ui_priority_for_time)
 
