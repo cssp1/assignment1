@@ -22584,7 +22584,12 @@ function invoke_inventory_context(inv_dialog, parent_widget, slot, item, show_dr
                 if(!can_cast_detailed[0] && can_cast_detailed[2]) {
                     var helper = get_requirements_help(can_cast_detailed[2][0], can_cast_detailed[2][1], can_cast_detailed[2][2] || null);
                     if(helper) {
-                        widget.onclick = helper;
+                        widget.onclick = (function (_inv_dialog, _helper) { return function(w) {
+                            // clear the context menu before invoking helper, since player state may change as a result of the helper
+                            // before the context menu is otherwise closed.
+                            invoke_inventory_context(_inv_dialog, null, -1, null, false);
+                            _helper();
+                            }; })(inv_dialog, helper);
                         widget.state = 'disabled_clickable';
                     }
                 }
