@@ -94,6 +94,9 @@ def get_fb_notification_fields(gamedata):
 def get_lab_names(gamedata):
     return [name for name, data in gamedata['buildings'].iteritems() if ('research_categories' in data)]
 
+def get_unit_names(gamedata):
+    return gamedata['units'].keys()
+
 def get_building_names(gamedata):
     return gamedata['buildings'].keys()
 
@@ -1431,19 +1434,47 @@ def update_upcache_entry(user_id, driver, entry, time_now, gamedata, user_mtime 
 
             buildings = set(get_building_names(gamedata))
             building_counts = {}
+            units = set(get_unit_names(gamedata))
 
             obj['foreman_concurrency'] = 0
             obj['research_concurrency'] = 0
             obj['manuf_concurrency'] = 0
 
+            obj['unit_counts'] = {}
+            obj['building_counts'] = {}
+            obj['equipment_counts'] = {}
+
+            # returns a key that will be used to reference items in the equipment_counts and inventory_counts dictionaries
+            def make_item_key(item):
+                if isinstance(item, dict):
+                    if item.get('level', 1) > 1:
+                        return '%s:L%d' % (item['spec'], item['level'])
+                    else:
+                        return item['spec']
+                else:
+                    return item
+
+            # counts equipped items on a building/unit of the given spec
+            def count_equipment(spec, items):
+                for item in items:
+                    key = make_item_key(item)
+
+                    if spec not in obj['equipment_counts']:
+                        obj['equipment_counts'][spec] = {}
+                    obj['equipment_counts'][spec][key] = obj['equipment_counts'][spec].get(key, 0) + 1
+
             for p in my_base:
-                if p['spec'] in buildings:
-                    building_counts[p['spec']] = building_counts.get(p['spec'],0) + 1
-                    if building_counts[p['spec']] > 1:
+                name = p['spec']
+                if name in buildings:
+                    key = '%s:L%d' % (name, p.get('level', 1))
+                    obj['building_counts'][key] = obj['building_counts'].get(key, 0) + 1
+
+                    building_counts[name] = building_counts.get(name,0) + 1
+                    if building_counts[name] > 1:
                         # only bother recording this if >1, to save space in the trivial case
-                        obj[p['spec']+'_num'] = max(obj.get(p['spec']+'_num',0), building_counts[p['spec']])
-                    obj[p['spec']+'_level'] = max(obj.get(p['spec']+'_level',0), p.get('level',1))
-                    spec = gamedata['buildings'][p['spec']]
+                        obj[name+'_num'] = max(obj.get(name+'_num',0), building_counts[name])
+                    obj[name+'_level'] = max(obj.get(name+'_level',0), p.get('level',1))
+                    spec = gamedata['buildings'][name]
                     if 'provides_inventory' in spec:
                         obj['inventory_slots_total'] += spec['provides_inventory'][p.get('level',1)-1]
                     if 'research_start_time' in p:
@@ -1452,6 +1483,38 @@ def update_upcache_entry(user_id, driver, entry, time_now, gamedata, user_mtime 
                         obj['manuf_concurrency'] += 1
                     if ('build_start_time' in p) or ('upgrade_start_time' in p):
                         obj['foreman_concurrency'] += 1
+
+                    # track the usage of equipment on the player's buildings
+                    if 'equipment' in p:
+                        for slot_type in p['equipment']:
+                            count_equipment(name, p['equipment'][slot_type])
+                elif name in units:
+                    # count the number of each type of unit being used in different places
+                    squad_id = p.get('squad_id', 0)
+                    if squad_id == 0: # base defenders
+                        squad_name = 'squad0'
+                    elif squad_id < 0: # reserves
+                        squad_name = 'squad-1'
+                    else: # other squads
+                        squad_name = 'squadN'
+
+                    key = '%s:L%d' % (name, p.get('level', 1))
+                    if squad_name not in obj['unit_counts']:
+                        obj['unit_counts'][squad_name] = {}
+                    obj['unit_counts'][squad_name][key] = obj['unit_counts'].get(squad_name, {}).get(key, 0) + 1
+
+            # track the usage of equipment on the player's units
+            if 'unit_equipment' in data:
+                for unit_specname, slots in data['unit_equipment'].iteritems():
+                    for slot_type, items in slots.iteritems():
+                        count_equipment(unit_specname, items)
+
+            # count the number of each type of item in the player's inventory and loot buffer
+            obj['inventory_counts'] = {}
+
+            for item in data.get('inventory', []) + data.get('loot_buffer', []):
+                key = make_item_key(item)
+                obj['inventory_counts'][key] = obj['inventory_counts'].get(key, 0) + item.get('stack', 1)
 
             # get A/B test cohort membership
             if 'abtests' in data:
