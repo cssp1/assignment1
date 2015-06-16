@@ -1,7 +1,5 @@
 {
-    "developer_user_id_list": [1111, 1112, 1114, 1113],
-
-    "game_id":"mf2test",  // "trtest" for Thunder Run, "mf2test" for War Star Empire
+    "game_id":"trtest",  // "trtest" for Thunder Run, "mf2test" for War Star Empire
 
     // directories (relative to gameserver) for storing user state
     "playerdb_dir":"playerdb",
