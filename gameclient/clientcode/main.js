@@ -5401,6 +5401,7 @@ player.donated_units_max_space = function() {
 
 // same as player.mailbox on the server
 player.mailbox = [];
+player.mailbox_sync_marker = Synchronizer.INIT; // for client-side prediction of the mailbox contents
 
 // same as player.map_bookmarks on server
 player.map_bookmarks = {};
@@ -21440,6 +21441,13 @@ function mail_dialog_select_mail(dialog, row) {
     dialog.widgets['delete_button'].onclick = (function (_mail) { return function(w) {
         var deleter = (function(__mail) { return function() {
             player.mailbox_remove(__mail);
+            // note: we really should do full client-side
+            // prediction of mailbox contents. But because MAIL_DELETE is the
+            // only way the mailbox gets mutated (other than tweaks
+            // to "read" flag or attachments on existing mails),
+            // we can get away with just throwing away any MAIL_UPDATEs that
+            // come in while we have another request in flight.
+            player.mailbox_sync_marker = synchronizer.request_sync();
             send_to_server.func(["MAIL_DELETE", __mail['msg_id']]);
             update_mail_dialog(w.parent, false);
         }; })(_mail);
@@ -43030,7 +43038,7 @@ function handle_server_message(data) {
         player.tutorial_state = data[1];
     } else if(msg == "MAIL_UPDATE") {
         var msg_id = data[1];
-        if(msg_id) {
+        if(msg_id) { // update one individual mail
             for(var i = 0; i < player.mailbox.length; i++) {
                 var mail = player.mailbox[i];
                 if(mail['msg_id'] === msg_id) {
@@ -43039,7 +43047,11 @@ function handle_server_message(data) {
                 }
             }
         } else {
-            // full replacement
+            // full replacement of entire mailbox
+            if(!synchronizer.is_in_sync(player.mailbox_sync_marker)) {
+                // IGNORE this update - we have a MAIL_DELETE in flight
+                return;
+            }
             player.mailbox = data[2];
             if(selection.ui && selection.ui.user_data && selection.ui.user_data['dialog'] === 'mail_dialog') {
                 update_mail_dialog(selection.ui, false);
