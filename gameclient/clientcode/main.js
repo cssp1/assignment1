@@ -5862,6 +5862,10 @@ player.mailbox_count = function() {
     player.mailbox_iter(function(mail) { count += 1; });
     return count;
 };
+
+/** Get the "Nth" visible mail in the player's mailbox
+    @param {number} n
+    @return {!Object} - note, return cannot be null */
 player.mailbox_nth = function(n) {
     var ret = null;
     player.mailbox_iter(function(mail, i) { if(i == n) { ret = mail; return true } });
@@ -5870,6 +5874,16 @@ player.mailbox_nth = function(n) {
     }
     return ret;
 };
+
+/** Get a mail from the mailbox by its msg_id
+    @param {string} msg_id
+    @return {Object|null} - note, null if mail not found */
+player.get_mail_by_msg_id = function(msg_id) {
+    var ret = null;
+    player.mailbox_iter(function(mail, i) { if(mail['msg_id'] === msg_id) { ret = mail; return true } });
+    return ret;
+};
+
 player.has_unread_mail = function() {
     if(!player.get_any_abtest_value('enable_inventory', gamedata['enable_inventory'])) { return 0; }
     var count = 0;
@@ -21202,6 +21216,7 @@ function invoke_mail_dialog(do_animation) {
     dialog.user_data['dialog'] = 'mail_dialog';
     dialog.user_data['anim_start_time'] = (do_animation ? client_time : -1);
     dialog.user_data['selected_row'] = -1; // index of selected row in UI
+    dialog.user_data['selected_msg_id'] = null; // ID of selected mail message
     dialog.user_data['visible_rows'] = dialog.data['widgets']['row']['array'][1]; // # visible rows in UI
     dialog.user_data['first_row'] = 0; // index of top row that appears in UI
     dialog.user_data['attach_page'] = 0; // scroll page for list of attachments
@@ -21218,12 +21233,16 @@ function invoke_mail_dialog(do_animation) {
 
     dialog.ondraw = animate_valentina_dialog;
     dialog.ondraw = frame_update_mail_dialog;
-    update_mail_dialog(dialog);
+    update_mail_dialog(dialog, true);
 
     return dialog;
 }
 
-function update_mail_dialog(dialog) {
+/** player.mailbox has mutated - update the dialog accordingly
+    @param {!SPUI.Dialog} dialog
+    @param {boolean} is_first_open - true on initial open. Controls whether we immediately jump to next unread message.
+*/
+function update_mail_dialog(dialog, is_first_open) {
     player.prune_expired_mail();
 
     dialog.widgets['pending_missions_icon'].show =
@@ -21231,16 +21250,32 @@ function update_mail_dialog(dialog) {
     dialog.widgets['pending_messages_icon'].show =
         dialog.widgets['pending_messages_icon_glow'].show = player.has_unread_mail();
 
-    var pre_select = -1;
-    // first look for uncollected important attachments
-    player.mailbox_iter(function(mail, i) {
-        if(player.mail_message_has_money(mail)) {
-            pre_select = i;
-            return true;
-        }
-    });
+    var pre_select = -1; // index of mail to pre-select
 
-    if(pre_select === -1) {
+    // if the currently-selected mail is still visible, maintain the selection
+    if(dialog.user_data['selected_msg_id']) {
+        var found = player.get_mail_by_msg_id(dialog.user_data['selected_msg_id']);
+        player.mailbox_iter(function(mail, i) {
+            if(mail === found) {
+                pre_select = i;
+                return true;
+            }
+        });
+    }
+
+    // if currently-selected mail disappeared, or there wasn't one before...
+    if(pre_select < 0 && is_first_open) {
+        // first look for uncollected important attachments (only on initial open)
+        player.mailbox_iter(function(mail, i) {
+            if(player.mail_message_has_money(mail)) {
+                pre_select = i;
+                return true;
+            }
+        });
+    }
+
+    if(pre_select < 0 && is_first_open) {
+        // then look for first unread mail (only on initial open)
         player.mailbox_iter(function(mail, i) {
             if(!mail['read']) {
                 pre_select = i;
@@ -21249,16 +21284,21 @@ function update_mail_dialog(dialog) {
         });
     }
 
+    if(pre_select < 0 && !is_first_open) {
+        // stay at same rough visual position as before
+        pre_select = dialog.user_data['selected_row'];
+    }
+
     var first_row = 0;
-    if(pre_select != -1) {
+    if(pre_select >= 0) {
         // adjust scroll position up or down to make sure the pre-selected mail is visible
         if(pre_select < first_row) { first_row = pre_select; }
         else if(pre_select >= first_row + dialog.user_data['visible_rows']) { first_row = pre_select; }
     } else {
-        // no pre-selection yet - just use row 0
+        // no pre-selection yet
         pre_select = first_row;
     }
-    dialog.user_data['selected_row'] = pre_select;
+    dialog.user_data['selected_row'] = pre_select; // mail_dialog_scroll() -> mail_dialog_select_message() will update selected_msg_id
     dialog.user_data['first_row'] = first_row;
     mail_dialog_scroll(dialog, dialog.user_data['first_row']);
 }
@@ -21367,11 +21407,12 @@ function mail_dialog_select_mail(dialog, row) {
     }
 
     var mail = player.mailbox_nth(dialog.user_data['selected_row']);
+    dialog.user_data['selected_msg_id'] = mail['msg_id'];
 
     dialog.widgets['delete_button'].show = dialog.widgets['body'].show && player.mail_message_is_discardable(mail);
 
     if('expire_time' in mail && mail['expire_time'] > 0 && server_time >= mail['expire_time']) {
-        update_mail_dialog(dialog);
+        update_mail_dialog(dialog, false);
         return;
     }
 
@@ -21400,7 +21441,7 @@ function mail_dialog_select_mail(dialog, row) {
         var deleter = (function(__mail) { return function() {
             player.mailbox_remove(__mail);
             send_to_server.func(["MAIL_DELETE", __mail['msg_id']]);
-            update_mail_dialog(w.parent);
+            update_mail_dialog(w.parent, false);
         }; })(_mail);
 
         // only ask for confirmation if it has attachments
@@ -43001,7 +43042,7 @@ function handle_server_message(data) {
             // full replacement
             player.mailbox = data[2];
             if(selection.ui && selection.ui.user_data && selection.ui.user_data['dialog'] === 'mail_dialog') {
-                update_mail_dialog(selection.ui);
+                update_mail_dialog(selection.ui, false);
             }
         }
         player.invalidate_quest_cache();
