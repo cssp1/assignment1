@@ -59,7 +59,7 @@ ItemDisplay.get_inventory_item_weapon_spell = function(spec) {
 };
 
 /** For a crafting recipe that deterministically yields only one item, return the spec of that item.
-    If the crafting recipe doesn't fit that description, throw exception.
+    Otherwise, return the spec of unknown_crafting_product.
     @param {Object} recipe
     @param {number=} level
     @return {Object} the product spec */
@@ -75,7 +75,7 @@ ItemDisplay.get_crafting_recipe_product_spec = function(recipe, level) {
        (product_list[0]['spec'] in gamedata['items'])) { // note: do not use get_inventory_item_spec() because we want to fail for unknown items
         return gamedata['items'][product_list[0]['spec']];
     }
-    throw Error('crafting recipe does not deterministically yield one item: '+recipe['name']);
+    return gamedata['items']['unknown_crafting_product'];
 };
 
 /** given a 50x50 SPUI.StaticImage widget, set the widget's asset/state/alpha to show the item indicated by 'spec' (a spec from gamedata['items'])

@@ -30903,22 +30903,36 @@ function crafting_dialog_select_recipe_leaders(dialog, specname, rec) {
     var ui_level = leader_spec['level'] || rec['level'] || 1;
 
     // set topinfo text
-    var ui_subtitle = ItemDisplay.get_inventory_item_ui_subtitle(leader_spec);
     var topinfo_bbcode;
-    if(leader_spec['item_set']) {
+
+    if(recipe['ui_subtitle']) { // allow recipe to override topinfo
+        topinfo_bbcode = recipe['ui_subtitle'];
+    } else if(leader_spec['item_set']) {
         var set_spec = gamedata['item_sets'][leader_spec['item_set']];
         var ui_item_set = set_spec['ui_name'];
         var ui_index = set_spec['members'].indexOf(leader_spec['name']) + 1;
         var ui_members = set_spec['members'].length;
-        topinfo_bbcode = dialog.data['widgets']['topinfo']['ui_name_set'].replace('%ITEM_SET', ui_item_set).replace('%INDEX', ui_index.toString()).replace('%MEMBERS', ui_members.toString()).replace('%SUBTITLE', ui_subtitle).replace('%LEVEL', ui_level.toString());
+        topinfo_bbcode = dialog.data['widgets']['topinfo']['ui_name_set'].replace('%ITEM_SET', ui_item_set).replace('%INDEX', ui_index.toString()).replace('%MEMBERS', ui_members.toString()).replace('%SUBTITLE', ItemDisplay.get_inventory_item_ui_subtitle(leader_spec)).replace('%LEVEL', ui_level.toString());
     } else {
-        topinfo_bbcode = dialog.data['widgets']['topinfo']['ui_name'].replace('%SUBTITLE', ui_subtitle).replace('%LEVEL', ui_level.toString());
+        topinfo_bbcode = dialog.data['widgets']['topinfo']['ui_name'].replace('%SUBTITLE', ItemDisplay.get_inventory_item_ui_subtitle(leader_spec)).replace('%LEVEL', ui_level.toString());
     }
     dialog.widgets['topinfo'].set_text_bbcode(topinfo_bbcode);
 
     var virtual_item = {'spec':leader_spec['name'], 'level': rec['level'] || 1};
     ItemDisplay.display_item(dialog.widgets['item'], virtual_item, {context_parent: dialog.parent});
-    ItemDisplay.attach_inventory_item_tooltip(dialog.widgets['item'].widgets['frame'], virtual_item, dialog.parent);
+
+    //dialog.widgets['item'].widgets['frame'].tooltip.str = null;
+    ItemDisplay.remove_inventory_item_tooltip(dialog.widgets['item'].widgets['frame']);
+
+    if(recipe['ui_description']) { // manual override
+        //dialog.widgets['item'].widgets['frame'].tooltip.str = recipe['ui_description']; // no way to attach a tooltip inside the item_display widget
+    } else {
+        ItemDisplay.attach_inventory_item_tooltip(dialog.widgets['item'].widgets['frame'], virtual_item, dialog.parent);
+    }
+
+    dialog.widgets['name'].str = recipe['ui_name'] || ItemDisplay.get_inventory_item_ui_name_long(leader_spec);
+    dialog.widgets['name'].text_color = ItemDisplay.get_inventory_item_color(leader_spec);
+
     dialog.widgets['item'].widgets['frame'].onclick = function(w) {
         if(w.parent.parent.parent) {
             var func = w.parent.parent.parent.user_data['on_use_recipe'];
@@ -30926,17 +30940,18 @@ function crafting_dialog_select_recipe_leaders(dialog, specname, rec) {
         }
     };
 
-    dialog.widgets['name'].str = ItemDisplay.get_inventory_item_ui_name_long(leader_spec);
-    dialog.widgets['name'].text_color = ItemDisplay.get_inventory_item_color(leader_spec);
-
     // work on line breaking
-    var bbtext = ItemDisplay.get_inventory_item_ui_description(virtual_item, {hide_item_set:true});
+    var bbtext = recipe['ui_description'] || ItemDisplay.get_inventory_item_ui_description(virtual_item, {hide_item_set:true});
     dialog.widgets['description'].set_text_bbcode(bbtext);
+    dialog.widgets['description'].tooltip.str = null;
+    ItemDisplay.remove_inventory_item_tooltip(dialog.widgets['description']);
     if(dialog.widgets['description'].clip_to_max_lines(dialog.data['widgets']['description']['max_lines'], dialog.data['widgets']['description']['ui_name_seemore'])) {
         // there was an overflow, add tooltip
-        ItemDisplay.attach_inventory_item_tooltip(dialog.widgets['description'], virtual_item, dialog.parent);
-    } else {
-        ItemDisplay.remove_inventory_item_tooltip(dialog.widgets['description']);
+        if(recipe['ui_description']) { // manual override
+            dialog.widgets['description'].tooltip.str = recipe['ui_description'];
+        } else {
+            ItemDisplay.attach_inventory_item_tooltip(dialog.widgets['description'], virtual_item, dialog.parent);
+        }
     }
 }
 
@@ -31708,16 +31723,11 @@ function update_crafting_dialog_status_mines_and_missiles(dialog) {
 
 function update_crafting_dialog_status_leaders(dialog) {
     var builder = dialog.parent.user_data['builder'];
-    var selected_rec = dialog.parent.user_data['selected_recipe'];
-    var selected_recipe = (selected_rec ? selected_rec['spec'] : null);
-    var selected_recipe_spec = (selected_recipe ? gamedata['crafting']['recipes'][selected_recipe] : null);
-    var selected_leader = (selected_recipe_spec ? ItemDisplay.get_crafting_recipe_product_spec(selected_recipe_spec)['name'] : null);
-    var selected_leader_spec = (selected_leader ? ItemDisplay.get_inventory_item_spec(selected_leader) : null);
-
+    var pending = (builder && !builder.is_in_sync());
     var craft_queue = (builder ? builder.get_crafting_queue() : []);
 
     dialog.parent.user_data['on_use_recipe'] = null; // default action when clicking the recipe on the left
-    var pending = (builder && !builder.is_in_sync());
+
     var in_progress_recipe = null, in_progress_bus = null, in_progress_togo = -1;
     goog.array.forEach(craft_queue, function(entry) {
         if(gamedata['crafting']['recipes'][entry['craft']['recipe']]['crafting_category'] == 'leaders') {
@@ -31730,6 +31740,10 @@ function update_crafting_dialog_status_leaders(dialog) {
             }
         }
     });
+
+    var selected_rec = dialog.parent.user_data['selected_recipe'];
+    var selected_recipe = (selected_rec ? selected_rec['spec'] : null);
+    var selected_recipe_spec = (selected_recipe ? gamedata['crafting']['recipes'][selected_recipe] : null);
 
     dialog.widgets['leader_icon'].show =
         dialog.widgets['leader_frame'].show =
@@ -31762,6 +31776,9 @@ function update_crafting_dialog_status_leaders(dialog) {
             }
         }
     }
+
+    // note that this may be unknown_crafting_product for randomized recipes
+    var selected_leader_spec = (selected_recipe_spec ? ItemDisplay.get_crafting_recipe_product_spec(selected_recipe_spec) : null);
 
     if(in_progress_recipe) {
         dialog.widgets['leader_icon'].asset = get_crafting_recipe_icon(gamedata['crafting']['recipes'][in_progress_recipe]);

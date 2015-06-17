@@ -1629,6 +1629,7 @@
                       "text_hjustify": "left", "text_vjustify": "top"},
             "description": { "kind": "RichTextField", "xy": [90,66], "dimensions": [330,60], "text_size": 13, "text_style": "normal",
                              "max_lines": 3, "ui_name_seemore": " ... [color=#ffff00][u]See More[/u][/color]",
+                             "ui_tooltip": "", "tooltip_delay": 0,
                              "text_hjustify": "left", "text_vjustify": "top"},
 
             "requirements_label": { "kind": "TextField", "xy": [25,131], "dimensions": [75,50], "text_size": 13, "text_style": "normal",

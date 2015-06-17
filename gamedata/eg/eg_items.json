@@ -65,6 +65,15 @@
     "icon": "inventory_unknown"
 },
 
+// this is a placeholder for the crafting_dialog
+"unknown_crafting_product": {
+    "name": "unknown_crafting_product",
+    "ui_name": "Random Result",
+    "name_color": [0.8,0.05,0.33],
+    "ui_description": "The result of this action is random, and will be revealed when it is complete!",
+    "icon": "inventory_random"
+},
+
 // SPECIAL unit item for the tutorial that disregards normal unit space requirement
 "packaged_tutorial_droid": {
     "name": "packaged_tutorial_droid",
