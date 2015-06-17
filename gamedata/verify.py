@@ -1024,13 +1024,14 @@ def check_item(itemname, spec):
 
     max_level = spec.get('max_level', 1)
 
-    if 'associated_crafting_recipe' in spec:
-        if spec['associated_crafting_recipe'] not in gamedata['crafting']['recipes']:
-            error |=1; print '%s: associated_crafting_recipe % not found' % (recname, spec['associated_crafting_recipe'])
-        else:
-            recipe_spec = gamedata['crafting']['recipes'][spec['associated_crafting_recipe']]
-            if max_level != recipe_spec.get('max_level',1):
-                error |=1; print '%s: max_level %d does not match associated_crafting_recipe %s max_level %d' % (itemname, max_level, spec['associated_crafting_recipe'], recipe_spec.get('max_level',1))
+    if 'associated_crafting_recipes' in spec:
+        for asc in spec['associated_crafting_recipes']:
+            if asc not in gamedata['crafting']['recipes']:
+                error |=1; print '%s: associated_crafting_recipe %s not found' % (itemname, asc)
+            else:
+                recipe_spec = gamedata['crafting']['recipes'][asc]
+                if 'max_level' in recipe_spec and recipe_spec['max_level'] != max_level:
+                    error |=1; print '%s: max_level %d does not match associated_crafting_recipe %s max_level %d' % (itemname, max_level, asc, recipe_spec.get('max_level',1))
 
 
     matches = level_re.match(itemname)

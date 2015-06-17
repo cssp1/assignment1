@@ -22319,7 +22319,9 @@ function update_inventory_grid(dialog) {
              ui_name_pending: string,
              state: (string|undefined),
              spellname: string,
-             max_count: (number|undefined)}} props */
+             max_count: (number|undefined),
+             associated_recipe_name: (string|undefined),
+             associated_recipe_level: (number|undefined)}} props */
 var InventoryContextButton = function(props) {
     this.ui_name = props.ui_name;
     this.ui_name_pending = props.ui_name_pending;
@@ -22327,6 +22329,8 @@ var InventoryContextButton = function(props) {
     if(!goog.array.contains(['active','passive'], this.state)) { throw Error('bad state '+this.state); }
     this.spellname = props.spellname;
     this.max_count = props.max_count || 1;
+    this.associated_recipe_name = props.associated_recipe_name || null;
+    this.associated_recipe_level = props.associated_recipe_level || 1;
 }
 
 /** @param {SPUI.Dialog} inv_dialog
@@ -22500,6 +22504,17 @@ function invoke_inventory_context(inv_dialog, parent_widget, slot, item, show_dr
     var make_button_cb = function (_slot, _item, _butt) { return function(w) {
         if(_butt.spellname === "SPEEDUP") {
             warehouse_busy_helper(find_object_by_type(gamedata['inventory_building']));
+        } else if(_butt.spellname === "CRAFT_FOR_FREE") {
+            var rec_spec = gamedata['crafting']['recipes'][_butt.associated_recipe_name];
+            var dialog = invoke_crafting_dialog(rec_spec['crafting_category'], rec_spec['associated_item_set'] || null);
+            if(dialog) {
+                var rec = goog.array.find(dialog.user_data['recipes'], function(entry) {
+                    return (entry['spec'] === _butt.associated_recipe_name && (entry['level']||1) === _butt.associated_recipe_level);
+                });
+                if(rec) {
+                    crafting_dialog_select_recipe(dialog.widgets['recipe'], rec);
+                }
+            }
         } else if(_butt.spellname === "EQUIP_UNIT") {
             var spec = ItemDisplay.get_inventory_item_spec(item['spec']);
             var unit_name = spec['equip']['name'];
@@ -22568,6 +22583,23 @@ function invoke_inventory_context(inv_dialog, parent_widget, slot, item, show_dr
                                                                              ui_name_pending:gamedata['strings']['inventory']['activate_all_button_pending'],
                                                                              state:'active',
                                                                              spellname:"INVENTORY_USE", max_count: item['stack']}));
+            }
+        }
+
+        if(spec['associated_crafting_recipes']) { // upgradable item
+            for(var i = 0; i < spec['associated_crafting_recipes'].length; i++) {
+                var rec_name = spec['associated_crafting_recipes'][i];
+                var rec_spec = gamedata['crafting']['recipes'][rec_name];
+                var rec_level = ('max_level' in rec_spec ? (item['level'] || 1) + 1 : 1); // assume recipe level is item level + 1, if recipe is leveled
+                if('max_level' in rec_spec && rec_level >= rec_spec['max_level']) { continue; }
+                if('show_if' in rec_spec && !read_predicate(get_leveled_quantity(rec_spec['show_if'], rec_level)).is_satisfied(player, null)) { continue; }
+                dialog.user_data['buttons'].push(new InventoryContextButton({ui_name:gamedata['crafting']['categories'][rec_spec['crafting_category']]['ui_verb'],
+                                                                             ui_name_pending:gamedata['strings']['inventory']['pending'],
+                                                                             state:'active',
+                                                                             spellname:"CRAFT_FOR_FREE",
+                                                                             associated_recipe_name:rec_name,
+                                                                             associated_recipe_level:rec_level}));
+                break;
             }
         }
 
