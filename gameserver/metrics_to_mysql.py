@@ -85,6 +85,10 @@ if __name__ == '__main__':
         if 'user_id' not in row: continue # server_restart etc
 
         _id = nosql_client.decode_object_id(row['_id'])
+
+        if 'code' not in row: # fix missing codes
+            row['code'] = int(row['event_name'][0:4])
+
         keyvals = [('_id',_id),
                    ('time',row['time']),
                    ('user_id',row['user_id']),
