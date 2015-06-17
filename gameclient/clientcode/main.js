@@ -30675,31 +30675,31 @@ function crafting_dialog_change_category(dialog, category, page) {
             if(spec['developer_only'] && (spin_secure_mode || !player.is_developer())) { continue; }
             if('show_if' in spec && !read_predicate(spec['show_if']).is_satisfied(player, null)) { continue; }
             if('activation' in spec && !read_predicate(spec['activation']).is_satisfied(player, null)) { continue; }
-            var rec = {'spec': name};
 
             if((spec['max_level'] || 1) > 1) {
                 if(spec['associated_item']) {
                     // this recipe upgrades an existing item. Show only if the item is available in inventory.
-                    var max_existing_level = -1;
+                    var seen_levels = {};
                     player.stored_item_iter(function (entry) {
                         if(entry['spec'] === spec['associated_item']) {
-                            max_existing_level = Math.max(max_existing_level, entry['level'] || 1);
+                            var existing_level = entry['level'] || 1;
+                            if(existing_level < spec['max_level'] && !(existing_level.toString() in seen_levels)) {
+                                // item not already maxed, we can upgrade it
+                                seen_levels[existing_level.toString()] = 1; // mark seen
+                                var rec_this_level = {'spec': name, 'level': existing_level + 1}
+                                dialog.user_data['recipes'].push(rec_this_level);
+                                if(!preselect) { preselect = rec_this_level; }
+                            }
                         }
                     });
-                    if(max_existing_level < 1) {
-                        continue; // no item
-                    }
-                    if(max_existing_level >= spec['max_level']) {
-                        continue; // item already maxed
-                    }
-                    rec['level'] = max_existing_level+1;
                 } else {
                     throw Error('leveled crafting recipe without associated_item');
                 }
+            } else {
+                var rec = {'spec': name};
+                dialog.user_data['recipes'].push(rec);
+                if(!preselect) { preselect = rec; }
             }
-
-            dialog.user_data['recipes'].push(rec);
-            if(!preselect) { preselect = rec; }
         }
     }
 
