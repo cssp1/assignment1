@@ -10430,8 +10430,9 @@ function update_notification_jewel(dialog) {
     dialog.widgets['num_bg'].show = dialog.widgets['num'].show = (count || text);
     if(dialog.widgets['num'].show) {
         dialog.widgets['num'].str = text || pretty_print_number(count);
-        dialog.widgets['num_bg'].xy = dialog.widgets['num_bg'].data['xy' + (count >= 10 ? '_wide' : '' )];
-        dialog.widgets['num_bg'].wh = dialog.widgets['num_bg'].data['dimensions' + (count >= 10 ? '_wide' : '' )];
+        var suffix = (count >= 100 ? '_wide100' : (count >= 10 ? '_wide10' : ''));
+        dialog.widgets['num_bg'].xy = dialog.widgets['num_bg'].data['xy' + suffix];
+        dialog.widgets['num_bg'].wh = dialog.widgets['num_bg'].data['dimensions' + suffix];
     }
 }
 

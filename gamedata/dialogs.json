@@ -1098,7 +1098,8 @@
         "widgets": {
             "num_bg": { "kind": "SolidRect",
                         "xy": [2,-1], "dimensions": [12,16],
-                        "xy_wide": [-3,-1], "dimensions_wide": [20,16],
+                        "xy_wide10": [-3,-1], "dimensions_wide10": [20,16],
+                        "xy_wide100": [-6,-1], "dimensions_wide100": [28,16],
                         "color": [0.7,0,0,1], "bevel": 2 },
             "num": { "kind": "TextField", "xy": [2,0], "dimensions": [12,14], "text_size": 13, "text_style": "thick", "ui_name": "1" }
         }
