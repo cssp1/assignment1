@@ -134,15 +134,15 @@ def setup_field(gamedata, key, val, field_mode = None):
     else: # not a recognized data type
         return None
 
-def open_cache(game_id, info = None, use_local = False):
+def open_cache(game_id, info = None, use_local = False, skip_developer = True):
     if use_local:
-        return SpinUpcacheIO.LocalReader('logs/%s-upcache' % SpinConfig.game_id_long(game_id), verbose=False, info=info)
+        return SpinUpcacheIO.LocalReader('logs/%s-upcache' % SpinConfig.game_id_long(game_id), verbose=False, info=info, skip_developer=skip_developer)
     else:
         bucket, name = SpinConfig.upcache_s3_location(game_id)
-        return SpinUpcacheIO.S3Reader(SpinS3.S3(SpinConfig.aws_key_file()), bucket, name, verbose=False, info=info)
+        return SpinUpcacheIO.S3Reader(SpinS3.S3(SpinConfig.aws_key_file()), bucket, name, verbose=False, info=info, skip_developer=skip_developer)
 
 def do_slave(input):
-    cache = open_cache(input['game_id'], input['cache_info'], input['use_local'])
+    cache = open_cache(input['game_id'], input['cache_info'], input['use_local'], input['skip_developer'])
     batch = 0
     total = 0
 
@@ -372,8 +372,9 @@ if __name__ == '__main__':
     do_ltv = True
     do_alts = True
     use_local = False
+    skip_developer = True
 
-    opts, args = getopt.gnu_getopt(sys.argv[1:], 'g:c:q', ['parallel=','lite','sessions','activity','use-local'])
+    opts, args = getopt.gnu_getopt(sys.argv[1:], 'g:c:q', ['parallel=','lite','sessions','activity','use-local','include-developers'])
 
     for key, val in opts:
         if key == '-g': game_id = val
@@ -391,12 +392,13 @@ if __name__ == '__main__':
         elif key == '--activity': do_activity = True
         elif key == '--sessions': do_sessions = True
         elif key == '--use-local': use_local = True
+        elif key == '--include-developers': skip_developer = False
 
     sql_util = SpinSQLUtil.MySQLUtil()
     if not verbose: sql_util.disable_warnings()
 
     with SpinSingletonProcess.SingletonProcess('upcache_to_mysql-%s' % game_id):
-        cache = open_cache(game_id, use_local=use_local)
+        cache = open_cache(game_id, use_local=use_local, skip_developer=skip_developer)
 
         # mapping of upcache fields to MySQL
         fields = {}
@@ -405,7 +407,8 @@ if __name__ == '__main__':
         if 1:
             tasks = [{'game_id':game_id, 'cache_info':cache.info,
                       'mode':'get_fields', 'field_mode': field_mode, 'segnum':segnum,
-                      'commit_interval':commit_interval, 'verbose':verbose, 'use_local':use_local} for segnum in range(0, cache.num_segments())]
+                      'commit_interval':commit_interval, 'verbose':verbose, 'use_local':use_local,
+                      'skip_developer':skip_developer} for segnum in range(0, cache.num_segments())]
 
             if parallel <= 1:
                 output = [do_slave(task) for task in tasks]
@@ -558,7 +561,8 @@ if __name__ == '__main__':
                           'activity_table': activity_table+'_temp',
                           'mode':'get_rows', 'sorted_field_names':sorted_field_names,
                           'segnum':segnum,
-                          'commit_interval':commit_interval, 'verbose':verbose, 'use_local':use_local} for segnum in range(0, cache.num_segments())]
+                          'commit_interval':commit_interval, 'verbose':verbose, 'use_local':use_local,
+                          'skip_developer':skip_developer} for segnum in range(0, cache.num_segments())]
 
                 if parallel <= 1:
                     output = [do_slave(task) for task in tasks]
