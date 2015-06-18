@@ -481,10 +481,11 @@ if __name__ == '__main__':
     do_ltv = True
     do_alts = True
     do_army_composition = True
+    do_prune = False
     use_local = False
     skip_developer = True
 
-    opts, args = getopt.gnu_getopt(sys.argv[1:], 'g:c:q', ['parallel=','lite','sessions','activity','use-local','include-developers'])
+    opts, args = getopt.gnu_getopt(sys.argv[1:], 'g:c:q', ['parallel=','lite','sessions','activity','use-local','include-developers','prune'])
 
     for key, val in opts:
         if key == '-g': game_id = val
@@ -504,6 +505,7 @@ if __name__ == '__main__':
         elif key == '--sessions': do_sessions = True
         elif key == '--use-local': use_local = True
         elif key == '--include-developers': skip_developer = False
+        elif key == '--prune': do_prune = True
 
     sql_util = SpinSQLUtil.MySQLUtil()
     if not verbose: sql_util.disable_warnings()
@@ -730,5 +732,15 @@ if __name__ == '__main__':
                 #cur.execute("ALTER TABLE "+sql_util.sym(buildings_table)+" ADD INDEX lev_then_time (user_id, building, max_level, time)")
 
             con.commit()
+
+            if do_prune:
+                if verbose: print 'pruning', army_composition_table
+
+                KEEP_DAYS = 999
+                old_limit = time_now - KEEP_DAYS * 86400
+
+                # prune the army composition table
+                cur.execute("DELETE FROM "+sql_util.sym(army_composition_table)+" WHERE time < %s", old_limit)
+                con.commit()
 
             if verbose: print 'all done.'
