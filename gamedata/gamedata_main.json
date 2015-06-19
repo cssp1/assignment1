@@ -485,7 +485,7 @@
 
     // "territory" refers to the base-control metagame (regional map)
     "territory":
-#include "territory.json"
+#include "$GAME_ID/$GAME_ID_territory.json"
     ,
 
     "continents":
