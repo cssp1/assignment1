@@ -116,6 +116,10 @@ if __name__ == '__main__':
             keyvals += [('spec', item['spec']),
                         ('level', item.get('level',None)),
                         ('stack', item.get('stack',1))]
+        elif 'spec' in row:
+            keyvals += [('spec', row['spec']),
+                        ('level', row.get('level', None)),
+                        ('stack', row.get('stack', 1))]
 
         if not dry_run:
             sql_util.do_insert(cur, lottery_table, keyvals)
