@@ -1274,6 +1274,7 @@ def update_upcache_entry(user_id, driver, entry, time_now, gamedata, user_mtime 
                              "ai_kim4_attempted", "ai_kim4_progress","ai_kim4_times_started","ai_kim4_times_completed",
                              "ai_kim5_attempted", "ai_kim5_progress","ai_kim5_times_started","ai_kim5_times_completed",
                              "ai_kim6_attempted", "ai_kim6_progress","ai_kim6_times_started","ai_kim6_times_completed",
+                             "ai_kim7_attempted", "ai_kim7_progress","ai_kim7_times_started","ai_kim7_times_completed",
                              "ai_segvec_progress","ai_segvec_times_started","ai_segvec_times_completed",
                              "ai_segvec2_progress","ai_segvec2_times_started","ai_segvec2_times_completed",
                              "ai_segvec3_attempted","ai_segvec3_progress","ai_segvec3_times_started","ai_segvec3_times_completed",
