@@ -972,6 +972,8 @@ if __name__ == '__main__':
             skip = ('skip' in data) and data['skip'][diff][i]
             is_first_base = unskipped_count == 0
 
+            ui_map_name = data['event_ui_name'] + (" (%s)" % diff if len(data['difficulties']) > 1 else '')
+
             print '''
 ////////////////////////////////////////////////////////////
 //
@@ -992,7 +994,7 @@ if __name__ == '__main__':
 
             json += [
                 ("ui_name", data['villain_ui_name']),
-                ("ui_map_name", data['event_ui_name'] + (" (%s)" % diff if len(data['difficulties']) > 1 else '')),
+                ("ui_map_name", ui_map_name),
                 ("ui_info", "%s%s%s\nBase %d of %d\nReward: %s%s" % \
                 (data['event_ui_name'], (' (%s difficulty)' % diff if len(data['difficulties'])>1 else ''),
                  "\nAI Enemy: %s" % data['villain_ui_name'] if data['villain_ui_name'] != data['event_ui_name'] else '', unskipped_count+1, num_unskipped_bases,
@@ -1538,7 +1540,7 @@ if __name__ == '__main__':
 
         json = [
             ("ui_name", data['villain_ui_name']),
-            ("ui_map_name", data['event_ui_name'] + (" (%s)" % diff if len(data['difficulties']) > 1 else '')),
+            ("ui_map_name", ui_map_name),
             ("ui_priority", ui_priority),
             ("portrait", data['villain_portrait'][diff]),
             ("resources", { "player_level": data['starting_ai_level'][diff], "water": 0, "iron": 0 }),
@@ -1555,7 +1557,7 @@ if __name__ == '__main__':
                  ("ui_spy_button","Defeated"),
                  ("ui_instance_cooldown",instance_cdname),
                  ("show_if", show_pred),
-                 ("activation", {"predicate": "ALWAYS_FALSE", "ui_name": "Refresh page to access" }),
+                 ("activation", {"predicate": "ALWAYS_FALSE", "ui_name": "You've already completed %s this week" % ui_map_name }),
                  ("tech",{}),
                  ("buildings", [{"xy":[90,90],"spec":gamedata['townhall']}]),
                  ("units",[])]
