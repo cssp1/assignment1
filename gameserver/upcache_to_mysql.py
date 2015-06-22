@@ -156,19 +156,28 @@ def setup_field(gamedata, sql_util, key, val, field_mode = None):
 level_identifier_pattern = re.compile('_L([0-9]+)')
 
 # parses an Upcache entry key to determine the name and level of an item which are returned in a tuple
+# if None is returned as the name, ignore this entry
 def get_item_spec_level(gamedata, item):
+    assert type(item) in (str,unicode)
     if ':L' in item:
         name, level_str = item.split(':L')
-        return name, int(level_str)
-    elif 'level' in gamedata['items'][item]:
-        return item, gamedata['items'][item]['level']
+        level = int(level_str)
     else:
-        match = level_identifier_pattern.match(item)
-
-        if match:
-            return item, int(match.group(0))
+        name = item
+        if 'level' in gamedata['items'].get(name,{}):
+            level = gamedata['items'][name]['level']
         else:
-            return item, 1
+            match = level_identifier_pattern.match(name)
+
+            if match:
+                level = int(match.group(0))
+            else:
+                level = 1
+
+    if name == 'None': # compatibility with buggy upcache entries
+        return None, level
+
+    return name, level
 
 def open_cache(game_id, info = None, use_local = False, skip_developer = True):
     if use_local:
@@ -439,6 +448,7 @@ def do_slave(input):
                 for game_object in user.get('equipment_counts', {}):
                     for item, count in user['equipment_counts'][game_object].iteritems():
                         spec, level = get_item_spec_level(gamedata, item)
+                        if spec is None: continue
 
                         if game_object in gamedata['buildings']:
                             location = 'building'
@@ -451,6 +461,7 @@ def do_slave(input):
 
                 for item, count in user.get('inventory_counts', {}).iteritems():
                     spec, level = get_item_spec_level(gamedata, item)
+                    if spec is None: continue
                     if 'equip' in gamedata['items'].get(spec, {}):
                         update_army_composition_entry('equipment', spec, level, 'inventory', count)
 
