@@ -18,8 +18,6 @@ import SpinParallel
 import SpinSingletonProcess
 import MySQLdb
 
-time_now = int(time.time())
-
 def field_column(key, val):
     return "`%s` %s" % (key, val)
 
@@ -183,6 +181,8 @@ def do_slave(input):
     gamedata = SpinJSON.load(open(SpinConfig.gamedata_filename(override_game_id = input['game_id'])))
     gamedata['ai_bases'] = SpinJSON.load(open(SpinConfig.gamedata_component_filename('ai_bases_compiled.json', override_game_id = input['game_id'])))
     gamedata['loot_tables'] = SpinJSON.load(open(SpinConfig.gamedata_component_filename('loot_tables.json', override_game_id = input['game_id'])))
+
+    time_now = input['time_now']
 
     if input['mode'] == 'get_fields':
         fields = {'money_spent': 'FLOAT4', # force this column into existence because analytics_views.sql depends on it
@@ -468,6 +468,8 @@ if __name__ == '__main__':
         SpinParallel.slave(do_slave)
         sys.exit(0)
 
+    time_now = int(time.time())
+
     game_id = SpinConfig.game()
     commit_interval = 1000
     verbose = True
@@ -521,7 +523,7 @@ if __name__ == '__main__':
             tasks = [{'game_id':game_id, 'cache_info':cache.info,
                       'mode':'get_fields', 'field_mode': field_mode, 'segnum':segnum,
                       'commit_interval':commit_interval, 'verbose':verbose, 'use_local':use_local,
-                      'skip_developer':skip_developer} for segnum in range(0, cache.num_segments())]
+                      'skip_developer':skip_developer, 'time_now':time_now} for segnum in range(0, cache.num_segments())]
 
             if parallel <= 1:
                 output = [do_slave(task) for task in tasks]
@@ -681,7 +683,7 @@ if __name__ == '__main__':
                           'mode':'get_rows', 'sorted_field_names':sorted_field_names,
                           'segnum':segnum,
                           'commit_interval':commit_interval, 'verbose':verbose, 'use_local':use_local,
-                          'skip_developer':skip_developer} for segnum in range(0, cache.num_segments())]
+                          'skip_developer':skip_developer, 'time_now':time_now} for segnum in range(0, cache.num_segments())]
 
                 if parallel <= 1:
                     output = [do_slave(task) for task in tasks]
