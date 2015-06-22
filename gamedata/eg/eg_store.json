@@ -67,7 +67,7 @@
     "gamebucks_per_fbcredit": 10,
     "gamebucks_per_kgcredit": 10,
 
-    // prices to quote to Facebook Open Graph API for the in-game currency object
+    // prices to quote to Facebook Open Graph API and the Xsolla virual currency API for the in-game currency object
     // note that this is independent of the SKU slates in make_country_skus2.py!
     "gamebucks_open_graph_prices": [
         ["USD", "0.01"], // USD MUST be first since it's the default currency
