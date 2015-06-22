@@ -22,10 +22,11 @@ def field_column(key, val):
     return "`%s` %s" % (key, val)
 
 def achievement_table_schema(sql_util):
+    # note: indexed fields need to be NOT NULL or else ON DUPLICATE KEY UPDATE will not work
     return {'fields': sql_util.summary_out_dimensions()  + \
               [('kind', 'VARCHAR(16) NOT NULL'),
                ('spec', 'VARCHAR(64) NOT NULL'),
-               ('level', 'INT2'),
+               ('level', 'INT2 NOT NULL'),
                ('is_maxed', sql_util.bit_type()+' NOT NULL'), # flag that this is the max level of the spec
                ('num_players', 'INT8 NOT NULL')
                ],
@@ -37,12 +38,13 @@ def army_composition_summary_dimensions(sql_util):
     return [(name, datatype) for name, datatype in sql_util.summary_out_dimensions() if name not in ('frame_platform', 'country_tier')]
 
 def army_composition_table_schema(sql_util):
+    # note: indexed fields need to be NOT NULL or else ON DUPLICATE KEY UPDATE will not work
     return {'fields': [('time','INT8 NOT NULL')] + \
                        army_composition_summary_dimensions(sql_util) + \
                       [('kind','VARCHAR(16) NOT NULL'),
-                       ('spec','VARCHAR(255)'),
-                       ('level','INT1'),
-                       ('location','VARCHAR(32)'),
+                       ('spec','VARCHAR(255) NOT NULL'),
+                       ('level','INT1 NOT NULL'),
+                       ('location','VARCHAR(32) NOT NULL'),
                        ('total_count','INT4 NOT NULL')],
             'indices': {
                 'master': {'unique': True, 'keys': [('time','ASC')] + \
@@ -351,7 +353,7 @@ def do_slave(input):
                         upgrade_achievement_counters[k] = upgrade_achievement_counters.get(k,0) + 1
                         if is_maxed:
                             # one row for "any" maxed tech
-                            km = summary_vals + ('tech', 'ANY', None, 1)
+                            km = summary_vals + ('tech', 'ANY', -1, 1)
                             upgrade_achievement_counters[km] = upgrade_achievement_counters.get(km,0) + 1
 
             # parse building upgrade timing
@@ -371,7 +373,7 @@ def do_slave(input):
                         upgrade_achievement_counters[k] = upgrade_achievement_counters.get(k,0) + 1
                         if is_maxed:
                             # one row for "any" maxed building
-                            km = summary_vals + ('building', 'ANY', None, 1)
+                            km = summary_vals + ('building', 'ANY', -1, 1)
                             upgrade_achievement_counters[km] = upgrade_achievement_counters.get(km,0) + 1
 
             # parse sessions
@@ -421,7 +423,8 @@ def do_slave(input):
             ARMY_COMPOSITION_RECENCY = 7*86400 # only include players active more recently than this
             if input['do_army_composition'] and time_now - user.get('last_login_time', 0) < ARMY_COMPOSITION_RECENCY:
                 def update_army_composition_entry(kind, spec, level, location, count):
-                    key = army_composition_summary_vals + (kind, spec, level, location)
+                    # note: use non-NULL defaults so that the ON DUPLICATE KEY UPDATE will work
+                    key = army_composition_summary_vals + (kind, spec or '', level or 0, location or '')
                     army_composition[key] = army_composition.get(key, 0) + count
 
                 # track number of players
