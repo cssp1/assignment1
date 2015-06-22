@@ -32,18 +32,22 @@ def achievement_table_schema(sql_util):
     'indices': {'master': {'unique': True, 'keys': [(x[0],'ASC') for x in sql_util.summary_out_dimensions()] + [('kind','ASC'),('spec','ASC'),('level','ASC')]}}
     }
 
+# to optimize space usage of the army composition table, collapse some summary dimensions
+def army_composition_summary_dimensions(sql_util):
+    return [(name, datatype) for name, datatype in sql_util.summary_out_dimensions() if name not in ('frame_platform', 'country_tier')]
+
 def army_composition_table_schema(sql_util):
     return {'fields': [('time','INT8 NOT NULL')] + \
-                       sql_util.summary_out_dimensions() + \
+                       army_composition_summary_dimensions(sql_util) + \
                       [('kind','VARCHAR(16) NOT NULL'),
                        ('spec','VARCHAR(255) NOT NULL'),
                        ('level','INT1 NOT NULL'),
                        ('location','VARCHAR(32)'),
-                       ('num_players','INT4 NOT NULL'),
-                       ('total_count','INT4 NOT NULL')],
+                       ('num_players','INT2 NOT NULL'),
+                       ('total_count','INT2 NOT NULL')],
             'indices': {
                 'master': {'unique': True, 'keys': [('time','ASC')] + \
-                                                   [(x[0],'ASC') for x in sql_util.summary_out_dimensions()] + \
+                                                   [(x[0],'ASC') for x in army_composition_summary_dimensions(sql_util)] + \
                                                    [('kind','ASC'),('spec','ASC'),('level','ASC'),('location','ASC')]}
             }
     }
@@ -224,8 +228,8 @@ def do_slave(input):
         # store batch totals for army composition
         army_composition = {}
 
-        # store the number of players with each combination of summary dimension values
-        summary_group_population = {}
+        # store the number of players with each combination of army composition summary dimension values
+        army_composition_summary_group_population = {}
 
         def flush():
             con.commit() # commit other tables first
@@ -255,14 +259,14 @@ def do_slave(input):
             while True:
                 try:
                     # get the summary group size for a given army composition key
-                    def get_summary_group_count(key):
-                        return summary_group_population[key[0:4]]
+                    def get_army_composition_summary_group_count(key):
+                        return army_composition_summary_group_population[key[0:len(army_composition_summary_dimensions(sql_util))]]
 
                     cur.executemany("INSERT INTO "+sql_util.sym(input['army_composition_table']) + \
-                                    " (time, " + ','.join([x[0] for x in sql_util.summary_out_dimensions()]) + ", kind, spec, level, location, num_players, total_count) " + \
-                                    " VALUES (%s, " + ','.join(['%s'] * len(sql_util.summary_out_dimensions())) + ", %s, %s, %s, %s, %s, %s) " + \
+                                    " (time, " + ','.join([x[0] for x in army_composition_summary_dimensions(sql_util)]) + ", kind, spec, level, location, num_players, total_count) " + \
+                                    " VALUES (%s, " + ','.join(['%s'] * len(army_composition_summary_dimensions(sql_util))) + ", %s, %s, %s, %s, %s, %s) " + \
                                     " ON DUPLICATE KEY UPDATE num_players = %s, total_count = total_count + %s",
-                                    [(time_now,) + k + (get_summary_group_count(k), v, get_summary_group_count(k), v) for k,v in army_composition.iteritems()])
+                                    [(time_now,) + k + (get_army_composition_summary_group_count(k), v, get_army_composition_summary_group_count(k), v) for k,v in army_composition.iteritems()])
                     con.commit()
 
                     # don't completely clear army_composition because we still need to update num_players on existing entries
@@ -314,11 +318,13 @@ def do_slave(input):
                         [user_id,] + values)
 
             # we need the summary dimensions for achievement and army composition tables
-            summary_keyvals = [('frame_platform', user.get('frame_platform',None)),
-                               ('country_tier', str(user['country_tier']) if user.get('country_tier',None) else None),
-                               ('townhall_level', user.get(gamedata['townhall']+'_level',1)),
-                               ('spend_bracket', sql_util.get_spend_bracket(user.get('money_spent',0)))]
-            summary_vals = tuple(x[1] for x in summary_keyvals)
+            summary_keyvals = {'frame_platform': user.get('frame_platform',None),
+                               'country_tier': str(user['country_tier']) if user.get('country_tier',None) else None,
+                               'townhall_level': user.get(gamedata['townhall']+'_level',1),
+                               'spend_bracket': sql_util.get_spend_bracket(user.get('money_spent',0))}
+            # ordered tuples of summary coordinates
+            summary_vals = tuple(summary_keyvals[key] for key, datatype in sql_util.summary_out_dimensions())
+            army_composition_summary_vals = tuple(summary_keyvals[key] for key, datatype in army_composition_summary_dimensions(sql_util))
 
             # parse townhall progression
             if input['do_townhall'] and ('account_creation_time' in user):
@@ -412,9 +418,10 @@ def do_slave(input):
                                      for alt_sid, alt in alt_accounts.iteritems()])
 
             # army composition table
-            if input['do_army_composition'] and time_now - user.get('last_login_time', 0) <= 604800:
+            ARMY_COMPOSITION_RECENCY = 7*86400 # only include players active more recently than this
+            if input['do_army_composition'] and time_now - user.get('last_login_time', 0) < ARMY_COMPOSITION_RECENCY:
                 def update_army_composition_entry(kind, spec, level, location, count):
-                    key = summary_vals + (kind, spec, level, location)
+                    key = army_composition_summary_vals + (kind, spec, level, location)
                     army_composition[key] = army_composition.get(key, 0) + count
 
                 # track unit composition
@@ -451,7 +458,7 @@ def do_slave(input):
                 for tech, level in user.get('tech', {}).iteritems():
                     update_army_composition_entry('tech', tech, level, None, 1)
 
-            summary_group_population[summary_vals] = summary_group_population.get(summary_vals, 0) + 1
+            army_composition_summary_group_population[army_composition_summary_vals] = army_composition_summary_group_population.get(army_composition_summary_vals, 0) + 1
 
             batch += 1
             total += 1
