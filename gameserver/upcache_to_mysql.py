@@ -18,8 +18,6 @@ import SpinParallel
 import SpinSingletonProcess
 import MySQLdb
 
-time_now = int(time.time())
-
 def field_column(key, val):
     return "`%s` %s" % (key, val)
 
@@ -33,6 +31,23 @@ def achievement_table_schema(sql_util):
                ],
     'indices': {'master': {'unique': True, 'keys': [(x[0],'ASC') for x in sql_util.summary_out_dimensions()] + [('kind','ASC'),('spec','ASC'),('level','ASC')]}}
     }
+
+def army_composition_table_schema(sql_util):
+    return {'fields': [('time','INT8 NOT NULL')] + \
+                       sql_util.summary_out_dimensions() + \
+                      [('kind','VARCHAR(16) NOT NULL'),
+                       ('spec','VARCHAR(255) NOT NULL'),
+                       ('level','INT1 NOT NULL'),
+                       ('location','VARCHAR(32)'),
+                       ('num_players','INT4 NOT NULL'),
+                       ('total_count','INT4 NOT NULL')],
+            'indices': {
+                'master': {'unique': True, 'keys': [('time','ASC')] + \
+                                                   [(x[0],'ASC') for x in sql_util.summary_out_dimensions()] + \
+                                                   [('kind','ASC'),('spec','ASC'),('level','ASC'),('location','ASC')]}
+            }
+    }
+
 
 # detect A/B test names
 abtest_filter = re.compile('^T[0-9]+')
@@ -134,18 +149,40 @@ def setup_field(gamedata, key, val, field_mode = None):
     else: # not a recognized data type
         return None
 
-def open_cache(game_id, info = None):
-    bucket, name = SpinConfig.upcache_s3_location(game_id)
-    return SpinUpcacheIO.S3Reader(SpinS3.S3(SpinConfig.aws_key_file()), bucket, name, verbose=False, info=info)
+level_identifier_pattern = re.compile('_L([0-9]+)')
+
+# parses an Upcache entry key to determine the name and level of an item which are returned in a tuple
+def get_item_spec_level(gamedata, item):
+    if ':L' in item:
+        name, level_str = item.split(':L')
+        return name, int(level_str)
+    elif 'level' in gamedata['items'][item]:
+        return item, gamedata['items'][item]['level']
+    else:
+        match = level_identifier_pattern.match(item)
+
+        if match:
+            return item, int(match.group(0))
+        else:
+            return item, 1
+
+def open_cache(game_id, info = None, use_local = False, skip_developer = True):
+    if use_local:
+        return SpinUpcacheIO.LocalReader('logs/%s-upcache' % SpinConfig.game_id_long(game_id), verbose=False, info=info, skip_developer=skip_developer)
+    else:
+        bucket, name = SpinConfig.upcache_s3_location(game_id)
+        return SpinUpcacheIO.S3Reader(SpinS3.S3(SpinConfig.aws_key_file()), bucket, name, verbose=False, info=info, skip_developer=skip_developer)
 
 def do_slave(input):
-    cache = open_cache(input['game_id'], input['cache_info'])
+    cache = open_cache(input['game_id'], input['cache_info'], input['use_local'], input['skip_developer'])
     batch = 0
     total = 0
 
     gamedata = SpinJSON.load(open(SpinConfig.gamedata_filename(override_game_id = input['game_id'])))
     gamedata['ai_bases'] = SpinJSON.load(open(SpinConfig.gamedata_component_filename('ai_bases_compiled.json', override_game_id = input['game_id'])))
     gamedata['loot_tables'] = SpinJSON.load(open(SpinConfig.gamedata_component_filename('loot_tables.json', override_game_id = input['game_id'])))
+
+    time_now = input['time_now']
 
     if input['mode'] == 'get_fields':
         fields = {'money_spent': 'FLOAT4', # force this column into existence because analytics_views.sql depends on it
@@ -184,11 +221,17 @@ def do_slave(input):
         # buffer up keyvals to be updated in the achievement tables
         upgrade_achievement_counters = {}
 
+        # store batch totals for army composition
+        army_composition = {}
+
+        # store the number of players with each combination of summary dimension values
+        summary_group_population = {}
+
         def flush():
             con.commit() # commit other tables first
 
             # MySQL often throws deadlock exceptions when doing upserts that reference existing rows (!)
-            # in the upgrade_achievements table, so we need to loop on committing these updates
+            # in the upgrade_achievements and army_composition tables, so we need to loop on committing these updates
             deadlocks = 0
 
             while True:
@@ -200,6 +243,32 @@ def do_slave(input):
                                     [k + (v,v) for k,v in upgrade_achievement_counters.iteritems()])
                     con.commit()
                     upgrade_achievement_counters.clear()
+                    break
+                except MySQLdb.OperationalError as e:
+                    if e.args[0] == 1213: # deadlock
+                        con.rollback()
+                        deadlocks += 1
+                        continue
+                    else:
+                        raise
+
+            while True:
+                try:
+                    # get the summary group size for a given army composition key
+                    def get_summary_group_count(key):
+                        return summary_group_population[key[0:4]]
+
+                    cur.executemany("INSERT INTO "+sql_util.sym(input['army_composition_table']) + \
+                                    " (time, " + ','.join([x[0] for x in sql_util.summary_out_dimensions()]) + ", kind, spec, level, location, num_players, total_count) " + \
+                                    " VALUES (%s, " + ','.join(['%s'] * len(sql_util.summary_out_dimensions())) + ", %s, %s, %s, %s, %s, %s) " + \
+                                    " ON DUPLICATE KEY UPDATE num_players = %s, total_count = total_count + %s",
+                                    [(time_now,) + k + (get_summary_group_count(k), v, get_summary_group_count(k), v) for k,v in army_composition.iteritems()])
+                    con.commit()
+
+                    # don't completely clear army_composition because we still need to update num_players on existing entries
+                    for key in army_composition:
+                        army_composition[key] = 0
+
                     break
                 except MySQLdb.OperationalError as e:
                     if e.args[0] == 1213: # deadlock
@@ -244,11 +313,12 @@ def do_slave(input):
                         " VALUES (%s, "+', '.join(['%s'] * len(values)) +")",
                         [user_id,] + values)
 
-            # we need the summary dimensions for achievement tables
+            # we need the summary dimensions for achievement and army composition tables
             summary_keyvals = [('frame_platform', user.get('frame_platform',None)),
                                ('country_tier', str(user['country_tier']) if user.get('country_tier',None) else None),
                                ('townhall_level', user.get(gamedata['townhall']+'_level',1)),
                                ('spend_bracket', sql_util.get_spend_bracket(user.get('money_spent',0)))]
+            summary_vals = tuple(x[1] for x in summary_keyvals)
 
             # parse townhall progression
             if input['do_townhall'] and ('account_creation_time' in user):
@@ -271,11 +341,11 @@ def do_slave(input):
                 for spec, level in user.get('tech',{}).iteritems():
                     if spec in gamedata['tech']:
                         is_maxed = 1 if (len(gamedata['tech'][spec]['research_time']) > 1 and level >= len(gamedata['tech'][spec]['research_time'])) else 0
-                        k = tuple(x[1] for x in summary_keyvals) + ('tech', spec, level, is_maxed)
+                        k = summary_vals + ('tech', spec, level, is_maxed)
                         upgrade_achievement_counters[k] = upgrade_achievement_counters.get(k,0) + 1
                         if is_maxed:
                             # one row for "any" maxed tech
-                            km = tuple(x[1] for x in summary_keyvals) + ('tech', 'ANY', None, 1)
+                            km = summary_vals + ('tech', 'ANY', None, 1)
                             upgrade_achievement_counters[km] = upgrade_achievement_counters.get(km,0) + 1
 
             # parse building upgrade timing
@@ -291,11 +361,11 @@ def do_slave(input):
                     level = max(user.get('building:'+spec+':max_level_at_time',{'asdf':0}).itervalues())
                     if level >= 1:
                         is_maxed = 1 if (len(gamedata['buildings'][spec]['build_time']) > 1 and level >= len(gamedata['buildings'][spec]['build_time'])) else 0
-                        k = tuple(x[1] for x in summary_keyvals) + ('building', spec, level, is_maxed)
+                        k = summary_vals + ('building', spec, level, is_maxed)
                         upgrade_achievement_counters[k] = upgrade_achievement_counters.get(k,0) + 1
                         if is_maxed:
                             # one row for "any" maxed building
-                            km = tuple(x[1] for x in summary_keyvals) + ('building', 'ANY', None, 1)
+                            km = summary_vals + ('building', 'ANY', None, 1)
                             upgrade_achievement_counters[km] = upgrade_achievement_counters.get(km,0) + 1
 
             # parse sessions
@@ -341,6 +411,48 @@ def do_slave(input):
                                     [(user['user_id'], int(alt_sid), alt.get('logins',1), alt.get('attacks',1)) \
                                      for alt_sid, alt in alt_accounts.iteritems()])
 
+            # army composition table
+            if input['do_army_composition'] and time_now - user.get('last_login_time', 0) <= 604800:
+                def update_army_composition_entry(kind, spec, level, location, count):
+                    key = summary_vals + (kind, spec, level, location)
+                    army_composition[key] = army_composition.get(key, 0) + count
+
+                # track unit composition
+                for squad in user.get('unit_counts', {}):
+                    for unit, count in user['unit_counts'][squad].iteritems():
+                        spec, level_str = unit.split(':L')
+                        update_army_composition_entry('unit', spec, int(level_str), squad, count)
+
+                # track building composition
+                for building, count in user.get('building_counts', {}).iteritems():
+                    spec, level_str = building.split(':L')
+                    update_army_composition_entry('building', spec, int(level_str), 'home', count)
+
+                # track equipment composition
+                for game_object in user.get('equipment_counts', {}):
+                    for item, count in user['equipment_counts'][game_object].iteritems():
+                        spec, level = get_item_spec_level(gamedata, item)
+
+                        if game_object in gamedata['buildings']:
+                            location = 'building'
+                        elif game_object in gamedata['units']:
+                            location = 'unit'
+                        else:
+                            location = 'unknown'
+
+                        update_army_composition_entry('equipment', spec, level, location, count)
+
+                for item, count in user.get('inventory_counts', {}).iteritems():
+                    spec, level = get_item_spec_level(gamedata, item)
+                    if 'equip' in gamedata['items'].get(spec, {}):
+                        update_army_composition_entry('equipment', spec, level, 'inventory', count)
+
+                # track tech composition
+                for tech, level in user.get('tech', {}).iteritems():
+                    update_army_composition_entry('tech', tech, level, None, 1)
+
+            summary_group_population[summary_vals] = summary_group_population.get(summary_vals, 0) + 1
+
             batch += 1
             total += 1
             if input['commit_interval'] > 0 and batch >= input['commit_interval']:
@@ -356,6 +468,8 @@ if __name__ == '__main__':
         SpinParallel.slave(do_slave)
         sys.exit(0)
 
+    time_now = int(time.time())
+
     game_id = SpinConfig.game()
     commit_interval = 1000
     verbose = True
@@ -368,8 +482,12 @@ if __name__ == '__main__':
     do_activity = False # taken over by activity_to_sql.py
     do_ltv = True
     do_alts = True
+    do_army_composition = True
+    do_prune = False
+    use_local = False
+    skip_developer = True
 
-    opts, args = getopt.gnu_getopt(sys.argv[1:], 'g:c:q', ['parallel=','lite','sessions','activity'])
+    opts, args = getopt.gnu_getopt(sys.argv[1:], 'g:c:q', ['parallel=','lite','sessions','activity','use-local','include-developers','prune'])
 
     for key, val in opts:
         if key == '-g': game_id = val
@@ -384,14 +502,18 @@ if __name__ == '__main__':
             #do_buildings = False
             do_activity = False
             #do_ltv = False
+            do_army_composition = False
         elif key == '--activity': do_activity = True
         elif key == '--sessions': do_sessions = True
+        elif key == '--use-local': use_local = True
+        elif key == '--include-developers': skip_developer = False
+        elif key == '--prune': do_prune = True
 
     sql_util = SpinSQLUtil.MySQLUtil()
     if not verbose: sql_util.disable_warnings()
 
     with SpinSingletonProcess.SingletonProcess('upcache_to_mysql-%s' % game_id):
-        cache = open_cache(game_id)
+        cache = open_cache(game_id, use_local=use_local, skip_developer=skip_developer)
 
         # mapping of upcache fields to MySQL
         fields = {}
@@ -400,7 +522,8 @@ if __name__ == '__main__':
         if 1:
             tasks = [{'game_id':game_id, 'cache_info':cache.info,
                       'mode':'get_fields', 'field_mode': field_mode, 'segnum':segnum,
-                      'commit_interval':commit_interval, 'verbose':verbose} for segnum in range(0, cache.num_segments())]
+                      'commit_interval':commit_interval, 'verbose':verbose, 'use_local':use_local,
+                      'skip_developer':skip_developer, 'time_now':time_now} for segnum in range(0, cache.num_segments())]
 
             if parallel <= 1:
                 output = [do_slave(task) for task in tasks]
@@ -438,6 +561,7 @@ if __name__ == '__main__':
             facebook_campaign_map_table = cfg['table_prefix']+game_id+'_facebook_campaign_map'
             ltv_table = cfg['table_prefix']+game_id+'_user_ltv'
             alts_table = cfg['table_prefix']+game_id+'_alt_accounts'
+            army_composition_table = cfg['table_prefix']+game_id+'_active_player_army_composition'
 
             # these are the tables that are replaced entirely each run
             atomic_tables = [upcache_table,facebook_campaign_map_table] + \
@@ -537,6 +661,10 @@ if __name__ == '__main__':
                                                    #'by_attacks': {'keys': [('attacks','ASC')]},
                                                    }
                                        })
+
+            if do_army_composition:
+                sql_util.ensure_table(cur, army_composition_table, army_composition_table_schema(sql_util))
+
             con.commit()
 
             try:
@@ -551,9 +679,11 @@ if __name__ == '__main__':
                           'upgrade_achievement_table': upgrade_achievement_table+'_temp',
                           'buildings_table': buildings_table+'_temp',
                           'activity_table': activity_table+'_temp',
+                          'do_army_composition': do_army_composition, 'army_composition_table': army_composition_table,
                           'mode':'get_rows', 'sorted_field_names':sorted_field_names,
                           'segnum':segnum,
-                          'commit_interval':commit_interval, 'verbose':verbose} for segnum in range(0, cache.num_segments())]
+                          'commit_interval':commit_interval, 'verbose':verbose, 'use_local':use_local,
+                          'skip_developer':skip_developer, 'time_now':time_now} for segnum in range(0, cache.num_segments())]
 
                 if parallel <= 1:
                     output = [do_slave(task) for task in tasks]
@@ -604,5 +734,15 @@ if __name__ == '__main__':
                 #cur.execute("ALTER TABLE "+sql_util.sym(buildings_table)+" ADD INDEX lev_then_time (user_id, building, max_level, time)")
 
             con.commit()
+
+            if do_prune:
+                if verbose: print 'pruning', army_composition_table
+
+                KEEP_DAYS = 999
+                old_limit = time_now - KEEP_DAYS * 86400
+
+                # prune the army composition table
+                cur.execute("DELETE FROM "+sql_util.sym(army_composition_table)+" WHERE time < %s", old_limit)
+                con.commit()
 
             if verbose: print 'all done.'
