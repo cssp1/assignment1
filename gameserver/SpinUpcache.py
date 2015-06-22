@@ -1446,23 +1446,33 @@ def update_upcache_entry(user_id, driver, entry, time_now, gamedata, user_mtime 
             obj['equipment_counts'] = {}
 
             # returns a key that will be used to reference items in the equipment_counts and inventory_counts dictionaries
+            # return None for unrecognized items.
             def make_item_key(item):
                 if isinstance(item, dict):
-                    if item.get('level', 1) > 1:
-                        return '%s:L%d' % (item['spec'], item['level'])
-                    else:
-                        return item['spec']
+                    specname = item['spec']
+                    level = item.get('level', 1)
+                elif type(item) in (str, unicode):
+                    specname = item
+                    level = 1
                 else:
-                    return item
+                    return None
+
+                if not specname or (specname not in gamedata['items']):
+                    return None
+
+                if level > 1:
+                    return '%s:L%d' % (specname, level)
+                else:
+                    return '%s' % specname
 
             # counts equipped items on a building/unit of the given spec
             def count_equipment(spec, items):
                 for item in items:
                     key = make_item_key(item)
-
-                    if spec not in obj['equipment_counts']:
-                        obj['equipment_counts'][spec] = {}
-                    obj['equipment_counts'][spec][key] = obj['equipment_counts'][spec].get(key, 0) + 1
+                    if key is not None:
+                        if spec not in obj['equipment_counts']:
+                            obj['equipment_counts'][spec] = {}
+                        obj['equipment_counts'][spec][key] = obj['equipment_counts'][spec].get(key, 0) + 1
 
             for p in my_base:
                 name = p['spec']
@@ -1515,7 +1525,8 @@ def update_upcache_entry(user_id, driver, entry, time_now, gamedata, user_mtime 
 
             for item in data.get('inventory', []) + data.get('loot_buffer', []):
                 key = make_item_key(item)
-                obj['inventory_counts'][key] = obj['inventory_counts'].get(key, 0) + item.get('stack', 1)
+                if key is not None:
+                    obj['inventory_counts'][key] = obj['inventory_counts'].get(key, 0) + item.get('stack', 1)
 
             # get A/B test cohort membership
             if 'abtests' in data:
