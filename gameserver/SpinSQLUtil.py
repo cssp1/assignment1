@@ -11,6 +11,7 @@ class SQLUtil(object):
     def disable_warnings(self): pass
     def sym(self, s):
         return '"'+s+'"'
+    def bit_type(self): return 'BIT(1)'
     def do_insert(self, cur, table_name, keyvals):
         cur.execute("INSERT INTO " + self.sym(table_name) + \
                     "("+', '.join([self.sym(x[0]) for x in keyvals])+")"+ \

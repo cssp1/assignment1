@@ -26,7 +26,7 @@ def achievement_table_schema(sql_util):
               [('kind', 'VARCHAR(16) NOT NULL'),
                ('spec', 'VARCHAR(64) NOT NULL'),
                ('level', 'INT2'),
-               ('is_maxed', 'TINYINT(1) NOT NULL'), # flag that this is the max level of the spec
+               ('is_maxed', sql_util.bit_type()+' NOT NULL'), # flag that this is the max level of the spec
                ('num_players', 'INT8 NOT NULL')
                ],
     'indices': {'master': {'unique': True, 'keys': [(x[0],'ASC') for x in sql_util.summary_out_dimensions()] + [('kind','ASC'),('spec','ASC'),('level','ASC')]}}
@@ -80,7 +80,7 @@ lite_accept_filter = re.compile('|'.join('^'+x+'$' for x in \
                                           'chat_messages_sent',
                                           ]))
 
-def setup_field(gamedata, key, val, field_mode = None):
+def setup_field(gamedata, sql_util, key, val, field_mode = None):
     # always accept A/B tests that are still ongoing
     if abtest_filter.search(key) and \
        key in gamedata['abtests'] and \
@@ -93,7 +93,7 @@ def setup_field(gamedata, key, val, field_mode = None):
         return 'INT1'
 
     # always accept developer flag
-    if key == 'developer': return 'TINYINT(1)'
+    if key == 'developer': return sql_util.bit_type()
 
     # check reject filter
     if field_mode == 'lite':
@@ -116,7 +116,7 @@ def setup_field(gamedata, key, val, field_mode = None):
         elif key.endswith('_time') or key == 'time_in_game' or ('time_reacquired' in key) or ('stolen' in key) or ('harvested' in key) or ('looted' in key) or key.startswith('peak_'):
             return 'INT8' # times / big resource amounts
         elif key.startswith('likes_') or key.startswith('returned_'):
-            return 'TINYINT(1)' # booleans
+            return sql_util.bit_type() # booleans
         elif key.endswith('_level') or key.endswith('_level_started') or ('_townhall_L' in key):
             return 'INT1' # level numbers
         elif key.endswith('_concurrency'):
@@ -187,6 +187,7 @@ def do_slave(input):
     gamedata['loot_tables'] = SpinJSON.load(open(SpinConfig.gamedata_component_filename('loot_tables.json', override_game_id = input['game_id'])))
 
     time_now = input['time_now']
+    sql_util = SpinSQLUtil.MySQLUtil()
 
     if input['mode'] == 'get_fields':
         fields = {'money_spent': 'FLOAT4', # force this column into existence because analytics_views.sql depends on it
@@ -204,7 +205,7 @@ def do_slave(input):
         for user in cache.iter_segment(input['segnum']):
             for key, val in user.iteritems():
                 if key not in fields:
-                    field = setup_field(gamedata, key, val, field_mode = input['field_mode'])
+                    field = setup_field(gamedata, sql_util, key, val, field_mode = input['field_mode'])
                     if field is not None:
                         fields[key] = field
             batch += 1
@@ -215,7 +216,6 @@ def do_slave(input):
         return fields
 
     elif input['mode'] == 'get_rows':
-        sql_util = SpinSQLUtil.MySQLUtil()
         if not input['verbose']: sql_util.disable_warnings()
         sorted_field_names = input['sorted_field_names']
         cfg = input['dbconfig']
