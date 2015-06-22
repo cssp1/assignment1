@@ -40,11 +40,10 @@ def army_composition_table_schema(sql_util):
     return {'fields': [('time','INT8 NOT NULL')] + \
                        army_composition_summary_dimensions(sql_util) + \
                       [('kind','VARCHAR(16) NOT NULL'),
-                       ('spec','VARCHAR(255) NOT NULL'),
-                       ('level','INT1 NOT NULL'),
+                       ('spec','VARCHAR(255)'),
+                       ('level','INT1'),
                        ('location','VARCHAR(32)'),
-                       ('num_players','INT2 NOT NULL'),
-                       ('total_count','INT2 NOT NULL')],
+                       ('total_count','INT4 NOT NULL')],
             'indices': {
                 'master': {'unique': True, 'keys': [('time','ASC')] + \
                                                    [(x[0],'ASC') for x in army_composition_summary_dimensions(sql_util)] + \
@@ -234,11 +233,8 @@ def do_slave(input):
         # buffer up keyvals to be updated in the achievement tables
         upgrade_achievement_counters = {}
 
-        # store batch totals for army composition
+        # accumulate batch totals for army composition
         army_composition = {}
-
-        # store the number of players with each combination of army composition summary dimension values
-        army_composition_summary_group_population = {}
 
         def flush():
             con.commit() # commit other tables first
@@ -267,20 +263,15 @@ def do_slave(input):
 
             while True:
                 try:
-                    # get the summary group size for a given army composition key
-                    def get_army_composition_summary_group_count(key):
-                        return army_composition_summary_group_population[key[0:len(army_composition_summary_dimensions(sql_util))]]
-
                     cur.executemany("INSERT INTO "+sql_util.sym(input['army_composition_table']) + \
-                                    " (time, " + ','.join([x[0] for x in army_composition_summary_dimensions(sql_util)]) + ", kind, spec, level, location, num_players, total_count) " + \
-                                    " VALUES (%s, " + ','.join(['%s'] * len(army_composition_summary_dimensions(sql_util))) + ", %s, %s, %s, %s, %s, %s) " + \
-                                    " ON DUPLICATE KEY UPDATE num_players = %s, total_count = total_count + %s",
-                                    [(time_now,) + k + (get_army_composition_summary_group_count(k), v, get_army_composition_summary_group_count(k), v) for k,v in army_composition.iteritems()])
+                                    " (time, " + ','.join([x[0] for x in army_composition_summary_dimensions(sql_util)]) + ", kind, spec, level, location, total_count) " + \
+                                    " VALUES (%s, " + ','.join(['%s'] * len(army_composition_summary_dimensions(sql_util))) + ", %s, %s, %s, %s, %s) " + \
+                                    " ON DUPLICATE KEY UPDATE total_count = total_count + %s",
+                                    [(time_now,) + k + (v, v) for k,v in army_composition.iteritems()])
                     con.commit()
 
-                    # don't completely clear army_composition because we still need to update num_players on existing entries
-                    for key in army_composition:
-                        army_composition[key] = 0
+                    # clear accumulator
+                    army_composition.clear()
 
                     break
                 except MySQLdb.OperationalError as e:
@@ -433,6 +424,9 @@ def do_slave(input):
                     key = army_composition_summary_vals + (kind, spec, level, location)
                     army_composition[key] = army_composition.get(key, 0) + count
 
+                # track number of players
+                update_army_composition_entry('player', None, None, None, 1)
+
                 # track unit composition
                 for squad in user.get('unit_counts', {}):
                     for unit, count in user['unit_counts'][squad].iteritems():
@@ -463,13 +457,12 @@ def do_slave(input):
                     spec, level = get_item_spec_level(gamedata, item)
                     if spec is None: continue
                     if 'equip' in gamedata['items'].get(spec, {}):
+                        # note: for now, we only track EQUIPPABLE items in inventory
                         update_army_composition_entry('equipment', spec, level, 'inventory', count)
 
                 # track tech composition
                 for tech, level in user.get('tech', {}).iteritems():
                     update_army_composition_entry('tech', tech, level, None, 1)
-
-            army_composition_summary_group_population[army_composition_summary_vals] = army_composition_summary_group_population.get(army_composition_summary_vals, 0) + 1
 
             batch += 1
             total += 1
