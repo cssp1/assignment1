@@ -339,6 +339,12 @@ def _generate_showcase_consequent(game_id, event_dirname, data, atom):
             # most immortal events reward a unit as the final reward, so just use a generic message as a final fallback option
             progression_text = data['showcase'].get('progression_text', DEFAULT_PROGRESSION_TEXT_OTHER).replace('%AI', data['villain_ui_name'])
 
+        # set up the text that is displayed as a title on intro and progression screens
+        if has_multiple_difficulties:
+            progression_title = '%s PROGRESSION REWARDS:' % diff.upper()
+        else:
+            progression_title = 'PROGRESSION REWARDS:'
+
         # SHOWCASE
         showcase = { "enable": 1, "ui_title": data['event_ui_name'].upper(),
                      "villain_asset": data['villain_attack_portrait'],
@@ -359,9 +365,8 @@ def _generate_showcase_consequent(game_id, event_dirname, data, atom):
             showcase['plus_store_category'] = 'event_prizes'
             showcase['ui_subtitle'] = 'SPECIAL EVENT'
         else:
-            showcase['show_progress_bar'] = 'small'
             if has_multiple_difficulties:
-                showcase['ui_final_reward_label'] = '%s REWARDS:' % highest_difficulty.upper()
+                showcase['ui_final_reward_label'] = '%s DIFFICULTY REWARDS:' % highest_difficulty.upper()
                 showcase['ui_subtitle'] = '%s DIFFICULTY' % diff.upper()
             else:
                 showcase['ui_final_reward_label'] = 'FINAL REWARDS:'
@@ -426,7 +431,6 @@ def _generate_showcase_consequent(game_id, event_dirname, data, atom):
                 if len(random_loot_phases) > 1:
                     ui_text += " (%s DIFFICULTY)" % (random_loot_phases[phase_num]['ui_name'].upper())
                 ui_text += ":"
-                showcase["ui_random_rewards_text"].append([pred, ui_text])
                 showcase["feature_random_items"].append([pred, random_loot_phases[phase_num]['items']])
                 showcase["feature_random_item_count"].append([pred, random_loot_phases[phase_num]['show_max_items']])
 
@@ -577,7 +581,7 @@ def _generate_showcase_consequent(game_id, event_dirname, data, atom):
                 intro_showcase['corner_ai_asset'] = data['villain_attack_portrait'].replace('attack_portrait', 'console')
 
             intro_showcase['progression_reward_items'] = progression_reward_items
-            intro_showcase['ui_random_rewards_text'] = 'PROGRESSION REWARDS:'
+            intro_showcase['ui_random_rewards_text'] = progression_title
 
             intro_showcase_cons = { "consequent": "DISPLAY_MESSAGE", "dialog": "showcase",
                                     "event_countdown_hack": { "enable": 1,
@@ -601,7 +605,7 @@ def _generate_showcase_consequent(game_id, event_dirname, data, atom):
                 progression_showcase['show_plus_text'] = 0 # disable SALE/PLUS text
             progression_showcase['progression_reward_items'] = progression_reward_items
             progression_showcase['ui_progression_text'] = progression_text
-            progression_showcase['ui_random_rewards_text'] = 'PROGRESSION REWARDS:'
+            progression_showcase['ui_random_rewards_text'] = progression_title
             progression_showcase['show_progress_bar'] = 'large'
 
             progression_showcase_cons = { "consequent": "DISPLAY_MESSAGE", "dialog": "showcase",
