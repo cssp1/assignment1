@@ -11,6 +11,7 @@ import SpinS3
 import os, sys, glob, time, subprocess, getopt
 
 SAVE_RECENT = 7*24*60*60 #  save most files less than a week old
+SAVE_EXCEPTIONS = 60*24*60*60 #  save server exception logs two months
 ARCHIVE_BATTLES = 30*24*60*60 # archive battles older than one month
 SAVE_BATTLES = False
 
@@ -41,9 +42,12 @@ def handle(filename, dry_run = True, battle_archive_s3_bucket = None):
        filename.endswith('-liniad.json'):
             print 'keeping vital', filename
 
+    elif filename.endswith('-exceptions.txt'):
+        if os.path.getmtime(filename) >= (time_now - SAVE_EXCEPTIONS):
+            print 'keeping recent', filename
+
     elif filename.endswith('-dbserver.txt') or \
          filename.endswith('-proxyserver.txt') or \
-         filename.endswith('-exceptions.txt') or \
          filename.endswith('-traces.txt') or \
          filename.endswith('-facebook.txt') or \
          filename.endswith('-hives.txt') or \
