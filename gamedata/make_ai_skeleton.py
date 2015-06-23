@@ -339,6 +339,12 @@ def _generate_showcase_consequent(game_id, event_dirname, data, atom):
             # most immortal events reward a unit as the final reward, so just use a generic message as a final fallback option
             progression_text = data['showcase'].get('progression_text', DEFAULT_PROGRESSION_TEXT_OTHER).replace('%AI', data['villain_ui_name'])
 
+        # set up the text that is displayed as a title on intro and progression screens
+        if has_multiple_difficulties:
+            progression_title = '%s PROGRESSION REWARDS:' % diff.upper()
+        else:
+            progression_title = 'PROGRESSION REWARDS:'
+
         # SHOWCASE
         showcase = { "enable": 1, "ui_title": data['event_ui_name'].upper(),
                      "villain_asset": data['villain_attack_portrait'],
@@ -359,9 +365,8 @@ def _generate_showcase_consequent(game_id, event_dirname, data, atom):
             showcase['plus_store_category'] = 'event_prizes'
             showcase['ui_subtitle'] = 'SPECIAL EVENT'
         else:
-            showcase['show_progress_bar'] = 'small'
             if has_multiple_difficulties:
-                showcase['ui_final_reward_label'] = '%s REWARDS:' % highest_difficulty.upper()
+                showcase['ui_final_reward_label'] = '%s DIFFICULTY REWARDS:' % highest_difficulty.upper()
                 showcase['ui_subtitle'] = '%s DIFFICULTY' % diff.upper()
             else:
                 showcase['ui_final_reward_label'] = 'FINAL REWARDS:'
@@ -426,7 +431,6 @@ def _generate_showcase_consequent(game_id, event_dirname, data, atom):
                 if len(random_loot_phases) > 1:
                     ui_text += " (%s DIFFICULTY)" % (random_loot_phases[phase_num]['ui_name'].upper())
                 ui_text += ":"
-                showcase["ui_random_rewards_text"].append([pred, ui_text])
                 showcase["feature_random_items"].append([pred, random_loot_phases[phase_num]['items']])
                 showcase["feature_random_item_count"].append([pred, random_loot_phases[phase_num]['show_max_items']])
 
@@ -577,7 +581,7 @@ def _generate_showcase_consequent(game_id, event_dirname, data, atom):
                 intro_showcase['corner_ai_asset'] = data['villain_attack_portrait'].replace('attack_portrait', 'console')
 
             intro_showcase['progression_reward_items'] = progression_reward_items
-            intro_showcase['ui_random_rewards_text'] = 'PROGRESSION REWARDS:'
+            intro_showcase['ui_random_rewards_text'] = progression_title
 
             intro_showcase_cons = { "consequent": "DISPLAY_MESSAGE", "dialog": "showcase",
                                     "event_countdown_hack": { "enable": 1,
@@ -601,7 +605,7 @@ def _generate_showcase_consequent(game_id, event_dirname, data, atom):
                 progression_showcase['show_plus_text'] = 0 # disable SALE/PLUS text
             progression_showcase['progression_reward_items'] = progression_reward_items
             progression_showcase['ui_progression_text'] = progression_text
-            progression_showcase['ui_random_rewards_text'] = 'PROGRESSION REWARDS:'
+            progression_showcase['ui_random_rewards_text'] = progression_title
             progression_showcase['show_progress_bar'] = 'large'
 
             progression_showcase_cons = { "consequent": "DISPLAY_MESSAGE", "dialog": "showcase",
@@ -968,6 +972,8 @@ if __name__ == '__main__':
             skip = ('skip' in data) and data['skip'][diff][i]
             is_first_base = unskipped_count == 0
 
+            ui_map_name = data['event_ui_name'] + (" (%s)" % diff if len(data['difficulties']) > 1 else '')
+
             print '''
 ////////////////////////////////////////////////////////////
 //
@@ -988,7 +994,7 @@ if __name__ == '__main__':
 
             json += [
                 ("ui_name", data['villain_ui_name']),
-                ("ui_map_name", data['event_ui_name'] + (" (%s)" % diff if len(data['difficulties']) > 1 else '')),
+                ("ui_map_name", ui_map_name),
                 ("ui_info", "%s%s%s\nBase %d of %d\nReward: %s%s" % \
                 (data['event_ui_name'], (' (%s difficulty)' % diff if len(data['difficulties'])>1 else ''),
                  "\nAI Enemy: %s" % data['villain_ui_name'] if data['villain_ui_name'] != data['event_ui_name'] else '', unskipped_count+1, num_unskipped_bases,
@@ -1534,7 +1540,7 @@ if __name__ == '__main__':
 
         json = [
             ("ui_name", data['villain_ui_name']),
-            ("ui_map_name", data['event_ui_name'] + (" (%s)" % diff if len(data['difficulties']) > 1 else '')),
+            ("ui_map_name", ui_map_name),
             ("ui_priority", ui_priority),
             ("portrait", data['villain_portrait'][diff]),
             ("resources", { "player_level": data['starting_ai_level'][diff], "water": 0, "iron": 0 }),
@@ -1546,12 +1552,16 @@ if __name__ == '__main__':
 
         assert unskipped_count == num_unskipped_bases
         assert (not (('skip' in data) and data['skip'][diff][-1])) # if last base is skipped, then we need to change our show_if predicate
-
+        
+        # Dummy base "activation" predicate message can show for two cases:
+        # 1. Player has already completed the event this week, and needs to wait for next week.
+        # 2. While still logged in, a week boundary passes. The engine currently doesn't update the
+        # available AI list in this case, so the player will still see last week's dummy base. XXX needs fix.
         json += [("ui_progress", {"cur": unskipped_count, "max": num_unskipped_bases }),
                  ("ui_spy_button","Defeated"),
                  ("ui_instance_cooldown",instance_cdname),
                  ("show_if", show_pred),
-                 ("activation", {"predicate": "ALWAYS_FALSE", "ui_name": "Refresh page to access" }),
+                 ("activation", {"predicate": "ALWAYS_FALSE", "ui_name": "You've already completed %s this week" % ui_map_name }),
                  ("tech",{}),
                  ("buildings", [{"xy":[90,90],"spec":gamedata['townhall']}]),
                  ("units",[])]
