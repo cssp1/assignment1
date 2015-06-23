@@ -1552,7 +1552,11 @@ if __name__ == '__main__':
 
         assert unskipped_count == num_unskipped_bases
         assert (not (('skip' in data) and data['skip'][diff][-1])) # if last base is skipped, then we need to change our show_if predicate
-
+        
+        # Dummy base "activation" predicate message can show for two cases:
+        # 1. Player has already completed the event this week, and needs to wait for next week.
+        # 2. While still logged in, a week boundary passes. The engine currently doesn't update the
+        # available AI list in this case, so the player will still see last week's dummy base. XXX needs fix.
         json += [("ui_progress", {"cur": unskipped_count, "max": num_unskipped_bases }),
                  ("ui_spy_button","Defeated"),
                  ("ui_instance_cooldown",instance_cdname),
