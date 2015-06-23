@@ -22508,7 +22508,7 @@ function invoke_inventory_context(inv_dialog, parent_widget, slot, item, show_dr
             var rec_spec = gamedata['crafting']['recipes'][_butt.associated_recipe_name];
             var dialog = invoke_crafting_dialog(rec_spec['crafting_category'], rec_spec['associated_item_set'] || null);
             if(dialog) {
-                var rec = goog.array.find(dialog.user_data['recipes'], function(entry) {
+                var rec = goog.array.find(dialog.user_data['recipes'] || [], function(entry) {
                     return (entry['spec'] === _butt.associated_recipe_name && (entry['level']||1) === _butt.associated_recipe_level);
                 });
                 if(rec) {
@@ -30534,7 +30534,7 @@ function invoke_crafting_table_of_contents_dialog(category) {
 
     if(!builder && !player.is_cheater) {
         // workshop not present
-        dialog.widgets['coverup_text'].str = dialog.data['widgets']['coverup_text']['ui_name'].replace('%s1', catspec['ui_name']).replace('%s2', gamedata['buildings'][builder_type]['ui_name_indefinite']);
+        dialog.widgets['coverup_text'].str = dialog.data['widgets']['coverup_text']['ui_name'].replace('%s1', catspec['ui_name']).replace('%verb', catspec['ui_verb']).replace('%s2', gamedata['buildings'][builder_type]['ui_name_indefinite']);
         dialog.widgets['coverup_icon'].asset = get_leveled_quantity(gamedata['buildings'][builder_type]['art_asset'], 1);
         // special-case because some buildings are really tall
         dialog.widgets['coverup_icon'].xy = vec_add(dialog.data['widgets']['coverup_icon']['xy'], (gamedata['buildings'][builder_type]['hero_icon_pos'] || [0,0]));
@@ -30649,7 +30649,9 @@ function crafting_dialog_change_category(dialog, category, page) {
         dialog.widgets[wname].xy[0] = Math.floor(dialog.data['widgets'][wname]['xy'][0] + (dialog.user_data['recipe_columns'] - 1)/2 * dialog.data['widgets']['recipe_icon']['array_offset'][0]);
     });
 
-    var category_ui_name = null;
+    var category_ui_name = gamedata['crafting']['categories'][category]['ui_name'];
+    var category_ui_verb = gamedata['crafting']['categories'][category]['ui_verb'];
+
     var cats = dialog.user_data['categories'];
     for(var i = 0; i < dialog.data['widgets']['category_button']['array'][0]; i++) {
         dialog.widgets['category_button'+i.toString()].show = (i < cats.length);
@@ -30661,7 +30663,6 @@ function crafting_dialog_change_category(dialog, category, page) {
             dialog.widgets['category_button'+i.toString()].str = entry['ui_name'];
             dialog.widgets['category_button'+i.toString()].text_color = (category === entry['name'] ? SPUI.default_text_color : SPUI.disabled_text_color);
             dialog.widgets['category_button'+i.toString()].state = (category === entry['name'] ? 'active' : 'normal');
-            if(category === entry['name']) { category_ui_name = entry['ui_name']; }
             dialog.widgets['category_button'+i.toString()].onclick = (function (_name) { return function(w) { crafting_dialog_change_category(w.parent, _name); }; })(entry['name']);
         }
     }
@@ -30686,7 +30687,7 @@ function crafting_dialog_change_category(dialog, category, page) {
         dialog.widgets['btmbar'].show =
             dialog.widgets['price_display'].show =
             dialog.widgets['finish_button'].show = false;
-        dialog.widgets['coverup_text'].str = dialog.data['widgets']['coverup_text']['ui_name'].replace('%s1', category_ui_name).replace('%s2', gamedata['buildings'][builder_type]['ui_name_indefinite']);
+        dialog.widgets['coverup_text'].str = dialog.data['widgets']['coverup_text']['ui_name'].replace('%s1', category_ui_name).replace('%verb', category_ui_verb).replace('%s2', gamedata['buildings'][builder_type]['ui_name_indefinite']);
         dialog.widgets['coverup_icon'].asset = get_leveled_quantity(gamedata['buildings'][builder_type]['art_asset'], 1);
         // special-case because some buildings are really tall
         dialog.widgets['coverup_icon'].xy = vec_add(dialog.data['widgets']['coverup_icon']['xy'], (gamedata['buildings'][builder_type]['hero_icon_pos'] || [0,0]));
@@ -31777,11 +31778,15 @@ function update_crafting_dialog_status_leaders(dialog) {
     var selected_recipe = (selected_rec ? selected_rec['spec'] : null);
     var selected_recipe_spec = (selected_recipe ? gamedata['crafting']['recipes'][selected_recipe] : null);
 
-    dialog.widgets['leader_icon'].show =
-        dialog.widgets['leader_frame'].show =
-        dialog.widgets['leader_cancel'].show = true;
     dialog.widgets['leader_icon'].state = 'normal';
     dialog.widgets['leader_timer'].show = false;
+
+    dialog.widgets['arrow'].show =
+        dialog.widgets['leader_prompt'].show =
+        dialog.widgets['leader_slot'].show =
+        dialog.widgets['leader_icon'].show =
+        dialog.widgets['leader_frame'].show = !!builder;
+
     var build_cb = null;
     var build_error_ui_text = null;
 
@@ -31818,6 +31823,7 @@ function update_crafting_dialog_status_leaders(dialog) {
         dialog.widgets['leader_frame'].onclick = null;
         dialog.widgets['leader_frame'].tooltip.str = dialog.data['widgets']['leader_frame']['ui_tooltip_inprogress'].replace('%s', ItemDisplay.get_inventory_item_ui_name_long(ItemDisplay.get_crafting_recipe_product_spec(gamedata['crafting']['recipes'][in_progress_recipe])));
         dialog.widgets['leader_frame'].tooltip.text_color = SPUI.default_text_color;
+        dialog.widgets['leader_cancel'].show = true;
         dialog.widgets['leader_cancel'].tooltip.str = dialog.data['widgets']['leader_cancel']['ui_tooltip_cancel'];
         dialog.widgets['leader_cancel'].onclick = (function (_builder, _in_progress_bus) { return function(w) {
             do_cancel_crafting(_builder, _in_progress_bus);
@@ -31836,9 +31842,7 @@ function update_crafting_dialog_status_leaders(dialog) {
             dialog.parent.user_data['on_use_recipe'] = build_cb;
         }
     } else {
-        dialog.widgets['leader_icon'].show =
-            dialog.widgets['leader_frame'].show =
-            dialog.widgets['leader_cancel'].show = false;
+        dialog.widgets['leader_cancel'].show = false;
     }
 
     // if out of sync, show spinner and disable clicks
