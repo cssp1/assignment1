@@ -90,6 +90,8 @@ if __name__ == '__main__':
             buff_kinds += ['damage_resist_equip','damage_boost_equip','range_boost_equip']
         if game_id != 'bfm':
             buff_kinds += ['radcold']
+        if game_id == 'tr':
+            buff_kinds += ['repair_speedup_equip']
         for kind in buff_kinds:
             for unit_name, unit_data in units.iteritems():
                 if unit_name == 'repair_droid': continue
