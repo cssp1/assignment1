@@ -43189,7 +43189,7 @@ function handle_server_message(data) {
 
     } else if(msg == "LOOT_BUFFER_UPDATE") {
         player.loot_buffer = data[1];
-        var immediate = data[2] && selection.ui && selection.ui.user_data && goog.array.contains(['inventory_dialog','crafting_dialog'], selection.ui.user_data['dialog']);
+        var immediate = data[2] && selection.ui && selection.ui.user_data && goog.array.contains(['inventory_dialog','crafting_dialog','crafting_table_of_contents_dialog'], selection.ui.user_data['dialog']);
         if(player.loot_buffer.length > 0 && session.home_base) {
             if(immediate) {
                 invoke_loot_dialog();
