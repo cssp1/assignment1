@@ -30965,14 +30965,18 @@ function crafting_dialog_select_recipe_leaders(dialog, specname, rec) {
     var recipe = gamedata['crafting']['recipes'][rec['spec']];
     var level = rec['level'] || 1;
 
+    var recipe_ui_name = get_leveled_quantity(recipe['ui_name'] || null, level);
+    var recipe_ui_subtitle = get_leveled_quantity(recipe['ui_subtitle'] || null, level);
+    var recipe_ui_description = get_leveled_quantity(recipe['ui_description'] || null, level);
+
     var leader_spec = ItemDisplay.get_crafting_recipe_product_spec(recipe, level);
     var ui_level = leader_spec['level'] || rec['level'] || 1;
 
     // set topinfo text
     var topinfo_bbcode;
 
-    if(recipe['ui_subtitle']) { // allow recipe to override topinfo
-        topinfo_bbcode = recipe['ui_subtitle'];
+    if(recipe_ui_subtitle) { // allow recipe to override topinfo
+        topinfo_bbcode = '[b]'+recipe_ui_subtitle+'[/b]';
     } else if(leader_spec['item_set']) {
         var set_spec = gamedata['item_sets'][leader_spec['item_set']];
         var ui_item_set = set_spec['ui_name'];
@@ -30990,13 +30994,13 @@ function crafting_dialog_select_recipe_leaders(dialog, specname, rec) {
     //dialog.widgets['item'].widgets['frame'].tooltip.str = null;
     ItemDisplay.remove_inventory_item_tooltip(dialog.widgets['item'].widgets['frame']);
 
-    if(recipe['ui_description']) { // manual override
-        //dialog.widgets['item'].widgets['frame'].tooltip.str = recipe['ui_description']; // no way to attach a tooltip inside the item_display widget
+    if(recipe_ui_description) { // manual override
+        //dialog.widgets['item'].widgets['frame'].tooltip.str = recipe_ui_description; // no way to attach a tooltip inside the item_display widget :(
     } else {
         ItemDisplay.attach_inventory_item_tooltip(dialog.widgets['item'].widgets['frame'], virtual_item, dialog.parent);
     }
 
-    dialog.widgets['name'].str = recipe['ui_name'] || ItemDisplay.get_inventory_item_ui_name_long(leader_spec);
+    dialog.widgets['name'].str = recipe_ui_name || ItemDisplay.get_inventory_item_ui_name_long(leader_spec);
     dialog.widgets['name'].text_color = ItemDisplay.get_inventory_item_color(leader_spec);
 
     dialog.widgets['item'].widgets['frame'].onclick = function(w) {
@@ -31007,14 +31011,14 @@ function crafting_dialog_select_recipe_leaders(dialog, specname, rec) {
     };
 
     // work on line breaking
-    var bbtext = recipe['ui_description'] || ItemDisplay.get_inventory_item_ui_description(virtual_item, {hide_item_set:true});
+    var bbtext = recipe_ui_description || ItemDisplay.get_inventory_item_ui_description(virtual_item, {hide_item_set:true, hide_level:true});
     dialog.widgets['description'].set_text_bbcode(bbtext);
     dialog.widgets['description'].tooltip.str = null;
     ItemDisplay.remove_inventory_item_tooltip(dialog.widgets['description']);
     if(dialog.widgets['description'].clip_to_max_lines(dialog.data['widgets']['description']['max_lines'], dialog.data['widgets']['description']['ui_name_seemore'])) {
         // there was an overflow, add tooltip
-        if(recipe['ui_description']) { // manual override
-            dialog.widgets['description'].tooltip.str = recipe['ui_description'];
+        if(recipe_ui_description) { // manual override
+            dialog.widgets['description'].tooltip.str = SPText.bbcode_strip(recipe_ui_description);
         } else {
             ItemDisplay.attach_inventory_item_tooltip(dialog.widgets['description'], virtual_item, dialog.parent);
         }

@@ -303,7 +303,8 @@ ItemDisplay.get_inventory_item_ui_subtitle = function(spec) {
 
 /** return displayable description for item of given spec, using BBCode
     @param {Object} item
-    @param {{hide_item_set:(boolean|undefined)
+    @param {{hide_item_set:(boolean|undefined),
+             hide_level:(boolean|undefined)
             }=} opts
     @returns {string} BBCode result */
 ItemDisplay.get_inventory_item_ui_description = function(item, opts) {
@@ -314,7 +315,7 @@ ItemDisplay.get_inventory_item_ui_description = function(item, opts) {
 
     var descr = '';
 
-    if('max_level' in spec) {
+    if('max_level' in spec && !(opts && opts.hide_level)) {
         descr += gamedata['strings']['cursors']['level_x_of_y'].replace('%cur', pretty_print_number(level)).replace('%max',pretty_print_number(spec['max_level']))+'\n\n';
     }
 

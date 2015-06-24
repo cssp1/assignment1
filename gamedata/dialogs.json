@@ -1620,7 +1620,7 @@
             "topinfo": { "kind": "RichTextField", "xy": [12,2], "dimensions": [426,30], "text_size": 13, "text_style": "thick",
                          "text_hjustify": "left", "text_vjustify": "center",
                          "ui_name_set": "[b]%ITEM_SET (%INDEX of %MEMBERS)[/b] - %SUBTITLE", //  - Level %LEVEL"
-                         "ui_name": "[b]%SUBTITLE[/b] - Level %LEVEL"
+                         "ui_name": "[b]%SUBTITLE[/b] - Upgrade to Level %LEVEL"
                        },
 
             "item": { "kind": "Dialog", "dialog": "item_display", "xy": [25,49], "dimensions": [50,50] },
