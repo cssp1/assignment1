@@ -1282,13 +1282,16 @@
         "security_team": "Spawns %units",
         "security_team_unit": "%qtyx %name",
         "stats": {
+            // "better" is the sign for the direction that makes the stat strength better for the player (defaults to 1, but some stats get better with lower strength)
+
             // for GUI only
             "xp": {"ui_name": "XP Gain", "ui_tooltip": "XP you will earn by completing this upgrade", "display": "integer" },
+            "foreman_speed": { "ui_name": "Construction Speed", "ui_tooltip": "Bonus to building construction and upgrade speed", "display": "pct.1" },
 
             "armor": { "ui_name": "Armor", "ui_tooltip": "Subtracted from damage taken on each hit", "display": "integer" },
             "consumes_space": { "ui_name": "Space", "ui_tooltip": "Space occupied by this unit.\nUpgrade Tactical Ops Center and Reserves Bay to increase limit.", "display": "integer" },
-            "damage_taken": { "ui_name": "Damage Resist", "ui_tooltip": "Reduces all damage taken by a percentage", "display": "one_minus_pct" },
-            "anti_missile": { "ui_name": "Missile Defense", "ui_tooltip": "Percentage chance to intercept a missile\nbefore it lands within this building's weapon range.", "display": "one_minus_pct" },
+            "damage_taken": { "ui_name": "Damage Resist", "ui_tooltip": "Reduces all damage taken by a percentage", "better": -1, "display": "one_minus_pct.1" },
+            "anti_missile": { "ui_name": "Anti-Missile", "ui_tooltip": "Percentage chance to intercept a missile\nbefore it lands within this building's weapon range.", "better": -1, "display": "one_minus_pct" },
 
             // well, we could use on_destroy for other things, like self-destructs...
             "on_destroy": { "ui_name": "Security Team", "ui_tooltip": "Temporary units that spawn when this object is destroyed.\nSecurity team fights for revenge until the battle is over.", "display": "on_destroy" },
@@ -1297,12 +1300,12 @@
             "deployable_unit_space": { "ui_name": "Attack Size", "ui_tooltip": "Unit space that can be deployed into battle at once", "display": "integer" },
 
             // properties of the FACTORY
-            "manufacture_speed": { "ui_name": "Train Speed", "ui_tooltip": "Bonus to unit production speed", "display": "pct" },
-            "unit_repair_speed": { "ui_name": "Repair Speed", "ui_tooltip": "Bonus to unit healing/repair speed", "display": "pct" },
-            "crafting_speed": { "ui_name": "Production Rate", "ui_tooltip": "Bonus to item production speed", "display": "pct" },
+            "manufacture_speed": { "ui_name": "Train Speed", "ui_tooltip": "Bonus to unit production speed", "display": "pct.1" },
+            "unit_repair_speed": { "ui_name": "Healing Speed", "ui_tooltip": "Bonus to unit healing/repair speed", "display": "pct.1" },
+            "crafting_speed": { "ui_name": "Production Rate", "ui_tooltip": "Bonus to item production speed", "display": "pct.1" },
 
             // properties of the UNIT or BUILDING itself
-            "repair_speed": { "ui_name": "Repair Speed", "ui_tooltip": "Bonus to healing/repair speed", "display": "pct" },
+            "repair_speed": { "ui_name": "Repair Speed", "ui_tooltip": "Bonus to healing/repair speed of this building or unit", "display": "pct.1" },
 
             // for GUI only - display build limits on townhall
             "limit:storages": { "ui_name": "Depots", "check_spec": "supply_depot", // which spec whose "limit" to check
@@ -1313,6 +1316,22 @@
                                "ui_tooltip": "Number of Generators allowed" },
             "limit:turrets": { "ui_name": "Turrets", "check_spec": "mg_tower",
                                "ui_tooltip": "Number of Heavy MG Towers and Mortar Emplacements allowed (each)" },
+            "limit:emplacements": { "ui_name": "Emplacements", "check_spec": "turret_emplacement",
+                                    "ui_tooltip": "Number of Turret Emplacements allowed" },
+            "provides_limited_equipped:turret_head_mg": { "ui_name": "MG Towers", "check_spec": "turret_emplacement",
+                                                          "ui_tooltip": "Number of Heavy MG Towers allowed" },
+            "provides_limited_equipped:turret_head_mortar": { "ui_name": "Mortars", "check_spec": "turret_emplacement",
+                                                              "ui_tooltip": "Number of Mortars allowed" },
+            "provides_limited_equipped:turret_head_tow": { "ui_name": "TOWs", "check_spec": "turret_emplacement",
+                                                           "ui_tooltip": "Number of TOW Launchers allowed" },
+            "provides_limited_equipped:turret_head_hel_laser": { "ui_name": "HELs", "check_spec": "turret_emplacement",
+                                                                 "ui_tooltip": "Number of HE Lasers allowed" },
+            "provides_limited_equipped:turret_head_artillery": { "ui_name": "Howitzers", "check_spec": "turret_emplacement",
+                                                                 "ui_tooltip": "Number of M777 Howitzers allowed" },
+            "provides_limited_equipped:turret_head_fascam": { "ui_name": "FASCAMs", "check_spec": "turret_emplacement",
+                                                              "ui_tooltip": "Number of FASCAMs allowed" },
+            "provides_limited_equipped:turret_head_quadmount": { "ui_name": "Quadmounts", "check_spec": "turret_emplacement",
+                                                                 "ui_tooltip": "Number of M45 Quadmounts allowed" },
             "limit:barriers": { "ui_name": "Barriers", "check_spec": "barrier",
                                 "ui_tooltip": "Number of HESCO Barriers allowed"},
             "limit:minefield": { "ui_name": "Mines", "check_spec": "minefield", "check_method": "limit_requires",
@@ -1322,9 +1341,9 @@
             "max_hp": { "ui_name": "Health", "ui_tooltip": "Amount of damage that can be taken before being destroyed", "display": "integer" },
 
             "production_capacity": { "ui_name": "Capacity", "ui_tooltip": "Storage space for resources awaiting collection", "display": "integer" },
-            "produces_iron": { "ui_name": "Gather Rate", "ui_tooltip": "Rate at which resources build up", "display": "pct" },
-            "produces_water": { "ui_name": "Gather Rate", "ui_tooltip": "Rate at which resources build up", "display": "pct" },
-            "produces_res3": { "ui_name": "Gather Rate", "ui_tooltip": "Rate at which hardware builds up", "display": "pct" },
+            "produces_iron": { "ui_name": "Gather Rate", "ui_tooltip": "Rate at which resources build up", "display": "pct.1" },
+            "produces_water": { "ui_name": "Gather Rate", "ui_tooltip": "Rate at which resources build up", "display": "pct.1" },
+            "produces_res3": { "ui_name": "Gather Rate", "ui_tooltip": "Rate at which hardware builds up", "display": "pct.1" },
 
             "provides_donated_space": { "ui_name": "Donations", "ui_tooltip": "Total space for one-time use reinforcement units donated by your clanmates", "display": "integer" },
             "max_individual_donation_space": { "ui_name": "Send Size", "ui_tooltip": "Maximum space of a unit you can donate to your clanmates", "display": "integer" },
@@ -1343,12 +1362,15 @@
             "storage_res3": { "ui_name": "Capacity", "ui_tooltip": "Storage capacity", "display": "integer" },
 
             "research_level": { "ui_name": "Research Level", "ui_tooltip": "Ability to unlock new units and upgrade existing ones", "display": "integer" },
-            "research_speed": { "ui_name": "Research Rate", "ui_tooltip": "Bonus to unlock and upgrade speed", "display": "pct" },
+            "research_speed": { "ui_name": "Research Rate", "ui_tooltip": "Bonus to unlock and upgrade speed", "display": "pct.1" },
 
             "crafting_level": { "ui_name": "Workshop Level", "ui_tooltip": "Ability to create more powerful items", "display": "integer" },
             "crafting_queue_space": { "ui_name": "Operations", "ui_tooltip": "Storage for completed and in-progress operation rewards", "display": "integer" },
 
             "weapon": { "ui_name": "Weapon", "ui_tooltip": "Type of main armament", "display": "spellname" },
+            "continuous_cast": { "ui_name": "Continuous Cast", "ui_tooltip": "Spell casted non-stop by this unit/building", "display": null },
+            "weapon_level": { "ui_name": "Weapon Level", "ui_tooltip": "Level of main armament", "display": "integer" },
+            "weapon_asset": { "ui_name": "Weapon Asset", "ui_tooltip": "3D Asset for main armament", "display": null },
 
             "permanent_auras": { "ui_name": "Effects", "ui_tooltip": "Passive effects", "display": "auras" },
 
@@ -1367,14 +1389,14 @@
             "accuracy": { "ui_name": "Accuracy", "ui_tooltip": "Chance to hit a target within effective weapon range. Degrades at longer distances.", "display": "pct" },
             "rate_of_fire": { "ui_name": "Rate of Fire", "ui_tooltip": "Bonus to main weapon firing speed", "display": "pct" },
             "splash_range": { "ui_name": "Splash", "ui_tooltip": "Radius of explosion around point of impact.\nTargets far from the impact point take less damage.", "display": "integer" },
-            "min_range": { "ui_name": "Min Range", "ui_tooltip": "Cannot fire at enemies closer than this distance.", "display": "integer" },
+            "min_range": { "ui_name": "Min Range", "ui_tooltip": "Cannot fire at enemies closer than this distance.", "better": -1, "display": "integer" },
 
-            "ice_effects": { "ui_name": "Ice Shield", "ui_tooltip": "Reduces movement-slowing effect when in blizzard conditions", "display": "one_minus_pct" },
-            "swamp_effects": { "ui_name": "Amphibious", "ui_tooltip": "Reduces movement-slowing effect when driving through swamps", "display": "one_minus_pct" },
-            "damage_taken_from:radiation": { "ui_name": "Rad Shield", "ui_tooltip": "Reduces damage taken from radioactive sources", "display": "one_minus_pct" },
-            "damage_taken_from:aoefire": { "ui_name": "FASCAM Shield", "ui_tooltip": "Reduces damage taken from FASCAM Emplacements", "display": "one_minus_pct" },
-            "damage_taken_from:mine": { "ui_name": "Mine Shield", "ui_tooltip": "Reduces damage taken from landmines", "display": "one_minus_pct" },
-            "damage_taken_from:lava_climate": { "ui_name": "Heat Shield", "ui_tooltip": "Reduces damage taken in extremely hot climates", "display": "one_minus_pct" },
+            "ice_effects": { "ui_name": "Ice Shield", "ui_tooltip": "Reduces movement-slowing effect when in blizzard conditions", "better": -1, "display": "one_minus_pct" },
+            "swamp_effects": { "ui_name": "Amphibious", "ui_tooltip": "Reduces movement-slowing effect when driving through swamps", "better": -1, "display": "one_minus_pct" },
+            "damage_taken_from:radiation": { "ui_name": "Rad Shield", "ui_tooltip": "Reduces damage taken from radioactive sources", "better": -1, "display": "one_minus_pct" },
+            "damage_taken_from:aoefire": { "ui_name": "FASCAM Shield", "ui_tooltip": "Reduces damage taken from FASCAM Emplacements", "better": -1, "display": "one_minus_pct" },
+            "damage_taken_from:mine": { "ui_name": "Mine Shield", "ui_tooltip": "Reduces damage taken from landmines", "better": -1, "display": "one_minus_pct" },
+            "damage_taken_from:lava_climate": { "ui_name": "Heat Shield", "ui_tooltip": "Reduces damage taken in extremely hot climates", "better": -1, "display": "one_minus_pct" },
             "weapon_damage_vs:tank": { "ui_name": "Anti-Tank", "ui_tooltip": "Extra damage against Main Battle Tank units", "display": "pct" },
             "weapon_damage_vs:transport": { "ui_name": "Anti-Armor", "ui_tooltip": "Extra damage against all Armor units", "display": "pct" }
         }

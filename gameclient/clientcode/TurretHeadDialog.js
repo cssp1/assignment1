@@ -678,11 +678,11 @@ TurretHeadDialog.set_stats_display = function(dialog, emplacement_obj, name, rel
                 var delta_sign = (detail.value - relative_detail.value >= 0 ? 1 : -1);
                 var is_worse = (detail.value < relative_detail.value);
                 var ui_stat = gamedata['strings']['modstats']['stats'][stat];
-                if(ui_stat['display'] == 'cooldown' || ui_stat['display'] == 'one_minus_pct' || stat == 'min_range') {
-                    is_worse = !is_worse;
+                if((ui_stat['better']||1) < 0) {
+                    is_worse = !is_worse; // flip sign of better vs. worse
                 }
                 var ui_delta;
-                if(ui_stat['display'] == 'one_minus_pct') {
+                if(ui_stat['display'] && ui_stat['display'].indexOf('one_minus_pct') === 0) {
                     ui_delta = pretty_print_number(100.0*Math.abs(detail.value - relative_detail.value)) + '%';
                     delta_sign *= -1;
                 } else {
