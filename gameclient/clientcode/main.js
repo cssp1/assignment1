@@ -22164,6 +22164,12 @@ function update_inventory_grid(dialog) {
 
                     dialog.widgets['frame'+wname].onenter = (function (_slot, _item) { return function(w) {
                         var inv_dialog = w.parent;
+                        // XXX awkward hack to do nothing if another dialog is obscuring this one
+                        if(inv_dialog.children[inv_dialog.children.length-1] instanceof SPUI.Dialog &&
+                           inv_dialog.children[inv_dialog.children.length-1].user_data['dialog']) {
+                            return;
+                        }
+
                         if(inv_dialog.user_data['context']) {
                             // do not switch if context for this item is already up
                             if(inv_dialog.user_data['context'].user_data['slot'] === _slot &&
