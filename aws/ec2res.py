@@ -51,7 +51,14 @@ def rds_product_engine_match(product, engine):
 
 def rds_res_match(res, inst, rds_offerings):
     # note: RDS uses slightly different terminology for the reservation "product" and the instance "engine"
-    product = rds_offerings[res['ReservedDBInstancesOfferingId']]['ProductDescription']
+    if 'ProductDescription' in res:
+        product = res['ProductDescription']
+    elif res['ReservedDBInstancesOfferingId'] in rds_offerings:
+        product = rds_offerings[res['ReservedDBInstancesOfferingId']]['ProductDescription']
+    else:
+        # no way to find the "product" type
+        return False
+
     engine = inst['Engine']
     return res['DBInstanceClass'] == inst['DBInstanceClass'] and \
            rds_product_engine_match(product, engine) and \
@@ -103,8 +110,11 @@ def pretty_print_rds_res(res, rds_offerings, override_count = None, my_index = N
     else:
         instance_count = override_count if override_count is not None else res['DBInstanceCount']
         count = ' (x%d)' % instance_count if (instance_count!=1 or override_count is not None) else ''
-    offer = rds_offerings[res['ReservedDBInstancesOfferingId']]
-    return '%s %-22s %-12s %10s  %3d days left' % (pretty_print_multiaz(res['MultiAZ']), res['DBInstanceClass']+count, offer['ProductDescription'], pretty_print_rds_offering_price(offer), days)
+    #offer = rds_offerings.get(res['ReservedDBInstancesOfferingId'])
+    return '%s %-22s %-12s %10s  %3d days left' % (pretty_print_multiaz(res['MultiAZ']), res['DBInstanceClass']+count,
+                                                   res['ProductDescription'], # offer['ProductDescription'] if offer else 'UNKNOWN'),
+                                                   pretty_print_rds_offering_price(res), # pretty_print_rds_offering_price(offer) if offer else '?',
+                                                   days)
 
 def pretty_print_rds_instance(inst):
     return '%-16s %-10s %s %-16s %-12s' % (inst['DBInstanceIdentifier'], inst['AvailabilityZone'], pretty_print_multiaz(inst['MultiAZ']), inst['DBInstanceClass'], inst['Engine'])
