@@ -1632,20 +1632,20 @@
                              "ui_tooltip": "", "tooltip_delay": 0,
                              "text_hjustify": "left", "text_vjustify": "top"},
 
-            "requirements_label": { "kind": "TextField", "xy": [25,131], "dimensions": [75,50], "text_size": 13, "text_style": "normal",
+            "requirements_label": { "kind": "TextField", "xy": [20,131], "dimensions": [75,50], "text_size": 13, "text_style": "normal",
                                     "text_hjustify": "left", "text_vjustify": "top", "ui_name": "Requirements:",
                                     "text_color": [0.8,0.8,0.8,1]},
-            "requirements_separator": {"kind": "Line", "xy": [135,141], "dimensions": [250,0], "color":  [0.5,0.5,0.5,1],
+            "requirements_separator": {"kind": "Line", "xy": [130,141], "dimensions": [255,0], "color":  [0.5,0.5,0.5,1],
                                        "stroke_width": 2 },
 
-            "requirements_icon": { "kind": "StaticImage", "xy": [14,162], "dimensions": [21,21], "asset": "resource_icon_water",
-                                   "array": [2,2], "array_offset": [80,27] },
-            "requirements_value": { "kind": "TextField", "xy": [35,162], "dimensions": [40,21], "text_size": 13, "text_hjustify": "right",
+            "requirements_icon": { "kind": "StaticImage", "xy": [19,162], "dimensions": [21,21], "asset": "resource_icon_water",
+                                   "array": [2,2], "array_offset": [95,27] },
+            "requirements_value": { "kind": "TextField", "xy": [40,162], "dimensions": [50,21], "text_size": 13, "text_hjustify": "right",
                                     "ui_tooltip": "%qty %res required to manufacture", "tooltip_delay": 0,
-                                    "array": [2,2], "array_offset": [80,27] },
+                                    "array": [2,2], "array_offset": [95,27] },
 
-            "requirements_time_icon": { "kind": "StaticImage", "xy": [92,189], "dimensions": [21,21], "asset": "resource_icon_combat_time" },
-            "requirements_time_value": { "kind": "TextField", "xy": [115,189], "dimensions": [53,21], "text_size": 13, "text_hjustify": "right",
+            "requirements_time_icon": { "kind": "StaticImage", "xy": [114,189], "dimensions": [21,21], "asset": "resource_icon_combat_time" },
+            "requirements_time_value": { "kind": "TextField", "xy": [135,189], "dimensions": [50,21], "text_size": 13, "text_hjustify": "right",
                                          "ui_tooltip": "Time required to train", "tooltip_delay": 0 },
 
             "requirements_item_status": { "kind": "SolidRect", "xy": [213,158], "dimensions": [54,54],
