@@ -11,8 +11,7 @@
 
 import SpinJSON # JSON reading/writing library
 import SpinConfig
-import AtomicFileWrite # little library for safely overwriting files atomically
-import sys, copy, getopt, os, random # import some misc. Python libraries
+import sys, getopt, random # import some misc. Python libraries
 import tr_base_generator_helper as bgh
 
 
@@ -273,8 +272,6 @@ if __name__ == '__main__':
                 insertCluster(cluster, pickSector())
 
     def protect(thingprotectingPos, maxPosList, offset=2):
-        x = thingprotectingPos[0]
-        y = thingprotectingPos[0]
         xmax = maxPosList[1]+offset
         xmin = maxPosList[0]-offset
         ymax = maxPosList[2]+offset
@@ -396,7 +393,6 @@ if __name__ == '__main__':
         Ylist = sorted(coordsWithGridsize, key = lambda x:x[1],reverse =True)
         bigY = Ylist[0][1]
         littleY = Ylist[-1][1]
-        gridsize = [bigX-littleX,bigY-littleY]
 #         print "bigX:",bigX
 #         print "littleX:",littleX
 #         print "bigY:",bigY
@@ -408,7 +404,6 @@ if __name__ == '__main__':
 
     def guaranteeGeneratorStrength():
         powerplants = []
-        ret = base['buildings']
         for building in base["buildings"]:
                 if building["spec"]=="generator":
                     #print building
@@ -427,14 +422,12 @@ if __name__ == '__main__':
                         if 'consumes_power' in spec:
                             power_consumed += get_leveled_quantity(spec['consumes_power'], obj['force_level'])
                 if power_consumed <= power_produced: break
-                incr = False
                 for obj in powerplants:
                     #print "obj['spec']:",obj['spec']
                     if obj['force_level'] >= len(gamedata['buildings'][obj['spec']]['build_time']):
                         # can't go up any more
                         pass
                     else:
-                        incr = True
                         obj['force_level'] += 1
 
 

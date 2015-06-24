@@ -9,7 +9,7 @@
 import SpinConfig
 import SpinJSON
 import AtomicFileWrite
-import sys, re, traceback, os, getopt
+import sys, os, getopt
 
 # converts a boost duration to how it appears at the end of an item name (eg. 1800 becomes _30min and 129600 becomes _1d12h)
 def get_name_duration(duration):
@@ -63,8 +63,6 @@ def get_ui_description_duration(duration):
 
 # converts a boost duration to a human-readable string for use in a boost's ui_name (eg. 1800 becomes 30m and 129600 becomes 1.5d)
 def get_ui_name_duration(duration):
-    s = ''
-
     days = int(duration / 86400)
     hours = int((duration % 86400) / 3600)
     minutes = int((duration % 3600) / 60)

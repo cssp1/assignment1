@@ -11,7 +11,7 @@
 import SpinJSON # JSON reading/writing library
 import SpinConfig
 import ResPrice
-import sys, getopt, math, csv, copy
+import sys, getopt, csv, copy
 
 PAGE_BUGS = False # reproduce bugs in Page's original script to ensure identical output
 
@@ -32,6 +32,34 @@ def get_leveled_quantity(qty, level):
 # how many buildings of a given type have been built
 def get_building_quantity(s, buildType):
     return len(filter(lambda x: x['spec'] == buildType, s['base']))
+
+# parse a single predicate for minimum CC level requirement
+def get_cc_requirement_predicate(pred):
+    if pred['predicate'] == 'BUILDING_LEVEL':
+        if pred['building_type'] == gamedata['townhall']:
+            if pred['trigger_level'] > len(gamedata['buildings'][gamedata['townhall']]['build_time']):
+                raise Exception('requirement of CC > max level '+repr(pred))
+            return pred['trigger_level']
+        else:
+            if pred['trigger_level'] > len(gamedata['buildings'][pred['building_type']]['requires']):
+                raise Exception('requirement of %s > max level: ' % pred['building_type'] + repr(pred))
+            return get_cc_requirement_predicate(gamedata['buildings'][pred['building_type']]['requires'][pred['trigger_level']-1])
+    elif pred['predicate'] == 'TECH_LEVEL':
+        return get_cc_requirement_predicate(gamedata['tech'][pred['tech']]['requires'][pred['min_level']-1])
+    elif pred['predicate'] == 'AND':
+        ls = [get_cc_requirement_predicate(subpred) for subpred in pred['subpredicates']]
+        if -1 in ls: return -1
+        return max(ls)
+    elif pred['predicate'] == 'ALWAYS_FALSE':
+        return -1
+    elif pred['predicate'] == 'LIBRARY':
+        return get_cc_requirement_predicate(gamedata['predicate_library'][pred['name']])
+    elif pred['predicate'] in ('ALWAYS_TRUE', 'ANY_ABTEST', 'OR', 'BUILDING_QUANTITY', 'HOME_REGION',
+                               'LADDER_PLAYER', 'PLAYER_HISTORY', 'ABSOLUTE_TIME', 'QUEST_COMPLETED'):
+        pass
+    else:
+        raise Exception('unhandled upgrade requirement: %s' % repr(pred))
+    return 0
 
 # parse a predicate (list) for a minimum CC level requirement for level 'level' of this object
 def get_cc_requirement(req, level):

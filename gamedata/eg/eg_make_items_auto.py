@@ -9,7 +9,7 @@
 import SpinConfig
 import SpinJSON
 import AtomicFileWrite
-import sys, re, traceback, os, getopt
+import sys, os, getopt
 
 if __name__ == '__main__':
     opts, args = getopt.gnu_getopt(sys.argv[1:], '', [])

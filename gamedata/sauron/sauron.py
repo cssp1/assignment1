@@ -8,7 +8,7 @@
 
 import SpinJSON
 import SpinConfig
-import sys, getopt, os, time, datetime, math
+import sys, getopt, time, datetime
 
 # XXX need to add all games
 GAME_IDS = ['bfm', 'tr'] #'sg', 'mf', 'mf2', 'gg', 'dv']
@@ -218,7 +218,6 @@ def collect_event_data(game_id):
 def collect_event_base_data(event):
     bases_touched = []
     for base_id in event['bases']:
-        has_progress = True
         if str(base_id) in basedata['bases']:
             base = basedata['bases'][str(base_id)]
             event['bases'][base_id] = prepare_base_data(base)

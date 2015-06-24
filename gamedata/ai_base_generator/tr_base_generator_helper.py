@@ -4,7 +4,6 @@
 # Use of this source code is governed by an MIT-style license that can be
 # found in the LICENSE file.
 
-import random
 import SpinJSON # JSON reading/writing library
 import SpinConfig
 gamedata = SpinJSON.load(open(SpinConfig.gamedata_filename()))

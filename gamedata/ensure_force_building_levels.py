@@ -9,7 +9,7 @@
 import SpinJSON
 import SpinConfig
 import AtomicFileWrite
-import sys, getopt, random
+import sys, getopt
 
 gamedata = SpinJSON.load(open(SpinConfig.gamedata_filename()))
 
