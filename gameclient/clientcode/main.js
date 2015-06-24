@@ -30819,13 +30819,19 @@ function crafting_dialog_scroll(dialog, page) {
     var recipes_per_page = dialog.user_data['recipe_columns']*dialog.data['widgets']['recipe_icon']['array'][1];
     var chapter_pages = dialog.user_data['chapter_pages'] = Math.floor((chapter_recipes+recipes_per_page-1)/recipes_per_page);
     dialog.user_data['page'] = page = (chapter_recipes === 0 ? 0 : clamp(page, 0, chapter_pages-1));
-
+    dialog.widgets['scroll_left'].show = dialog.widgets['scroll_right'].show = (chapter_recipes > 0);
     player.quest_tracked_dirty = true;
 }
 function crafting_dialog_select_recipe(dialog, rec) {
 
     dialog.parent.user_data['selected_recipe'] = rec;
     dialog.parent.user_data['on_use_recipe'] = null; // will be set by an ondraw update
+
+    // show instructions for empty recipe list
+    dialog.parent.widgets['no_recipes'].show = (!!dialog.parent.user_data['builder'] && (!dialog.parent.user_data['recipes'] || dialog.parent.user_data['recipes'].length < 1));
+    if(dialog.parent.widgets['no_recipes'].show) {
+        dialog.parent.widgets['no_recipes'].str = gamedata['crafting']['categories'][dialog.parent.user_data['category']]['ui_no_recipes'];
+    }
 
     if(!rec) { dialog.show = false; return; }
     var specname = rec['spec'];
@@ -31785,7 +31791,7 @@ function update_crafting_dialog_status_leaders(dialog) {
         dialog.widgets['leader_prompt'].show =
         dialog.widgets['leader_slot'].show =
         dialog.widgets['leader_icon'].show =
-        dialog.widgets['leader_frame'].show = !!builder;
+        dialog.widgets['leader_frame'].show = (!!builder && dialog.parent.user_data['recipes'] && dialog.parent.user_data['recipes'].length > 0);
 
     var build_cb = null;
     var build_error_ui_text = null;

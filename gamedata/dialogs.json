@@ -1857,6 +1857,8 @@
 
             "scroll_text": { "kind": "TextField", "xy": [26,377], "dimensions": [181,20], "text_size": 13, "text_hjustify": "left", "ui_name": "Showing %d1-%d2 of %d3", "text_color": [0.4,0.4,0.4,1] },
 
+            "no_recipes": { "show": 0, "kind": "TextField", "xy":[51,96], "dimensions": [636,254], "text_size": 15, "text_style": "normal" },
+
             "coverup_all": { "show": 0, "kind": "SolidRect", "xy": [20,105], "dimensions": [698,303], "color": [0.0354,0.0517,0.0797,1] },
             "coverup_icon": { "show": 0, "kind": "StaticImage", "xy": [190,135], "dimensions": [372,238], "bg_image_offset": [0,25],
                               "state": "hero", "bg_image_justify": "center" },
