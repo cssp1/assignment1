@@ -1743,7 +1743,7 @@
             "leader_slot": { "kind": "ActionButton", "xy": [653,176], "dimensions": [50,50], "bg_image": "inventory_slot" },
             "leader_prompt": { "kind": "TextField", "xy": [653,176], "dimensions": [50,50], "text_size": 13, "drop_shadow": 1, "ui_name": "Train" },
             "leader_icon": { "kind": "StaticImage", "xy": [653,176], "dimensions": [50,50] },
-            "leader_timer": { "kind": "TextField", "xy": [653,206], "dimensions": [50,17], "text_size": 13, "text_hjustify": "center", "text_vjustify": "center", "drop_shadow":1 },
+            "leader_timer": { "kind": "TextField", "xy": [653,206], "dimensions": [50,17], "text_size": 12, "text_hjustify": "center", "text_vjustify": "center", "drop_shadow":1, "text_offset": [1,0] },
             "leader_frame": { "kind": "ActionButton", "xy": [653,176], "dimensions": [50,50], "bg_image": "inventory_frame",
                               "ui_tooltip": "", "tooltip_delay": 0.5,
                               "ui_tooltip_armed": "Armed with: %s",
