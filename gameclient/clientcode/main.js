@@ -22022,6 +22022,9 @@ function update_loot_dialog(dialog) {
     }
 }
 
+/** @type {!Array.<function()>} list of callbacks listening for INVENTORY_UPDATE */
+var inventory_update_receivers = [];
+
 /** @param {boolean=} force it to open even away from home */
 function invoke_inventory_dialog(force) {
     if(!player.get_any_abtest_value('enable_inventory', gamedata['enable_inventory'])) { return null; }
@@ -30633,6 +30636,24 @@ function invoke_crafting_dialog(newcategory, newsubcategory, newpage) {
     dialog.widgets['scroll_right'].widgets['scroll_right'].onclick = function(w) { var dialog = w.parent.parent; dialog.user_data['scrolled'] = true; crafting_dialog_scroll(dialog, dialog.user_data['page']+1); };
 
     dialog.ondraw = update_crafting_dialog;
+
+    // listen for inventory updates, because they affect the crafting recipe list
+    dialog.user_data['inventory_update_receiver'] = (function (_dialog) { return function() {
+        // run change_category() to update the recipe list, but try to return to the same page
+        var old_rec = _dialog.user_data['selected_recipe'];
+        crafting_dialog_change_category(_dialog, _dialog.user_data['category'], _dialog.user_data['page']);
+        if(old_rec) {
+            var new_rec = goog.array.find(_dialog.user_data['recipes'], function(rec) {
+                return rec['spec'] === old_rec['spec']; // note: match regardless of level
+            });
+            if(new_rec) {
+                crafting_dialog_select_recipe(_dialog.widgets['recipe'], new_rec);
+            }
+        }
+    }; })(dialog);
+    inventory_update_receivers.push(dialog.user_data['inventory_update_receiver']);
+    dialog.on_destroy = function(dialog) { goog.array.remove(inventory_update_receivers, dialog.user_data['inventory_update_receiver']); };
+
     crafting_dialog_change_category(dialog, newcategory, newpage || 0);
     return dialog;
 }
@@ -31794,10 +31815,11 @@ function update_crafting_dialog_status_leaders(dialog) {
     dialog.widgets['leader_timer'].show = false;
 
     dialog.widgets['arrow'].show =
-        dialog.widgets['leader_prompt'].show =
-        dialog.widgets['leader_slot'].show =
+        dialog.widgets['leader_prompt'].show = (!!builder && dialog.parent.user_data['recipes'] && dialog.parent.user_data['recipes'].length > 0);
+
+    dialog.widgets['leader_slot'].show =
         dialog.widgets['leader_icon'].show =
-        dialog.widgets['leader_frame'].show = (!!builder && dialog.parent.user_data['recipes'] && dialog.parent.user_data['recipes'].length > 0);
+        dialog.widgets['leader_frame'].show =(!!builder && ((dialog.parent.user_data['recipes'] && dialog.parent.user_data['recipes'].length > 0) || in_progress_recipe));
 
     var build_cb = null;
     var build_error_ui_text = null;
@@ -43162,6 +43184,9 @@ function handle_server_message(data) {
         player.max_inventory = data[1];
         player.inventory = data[2];
         player.reserved_inventory = data[3];
+
+        goog.array.forEach(inventory_update_receivers, function(cb) { cb(); });
+
     } else if(msg == "LOOT_BUFFER_UPDATE") {
         player.loot_buffer = data[1];
         var immediate = data[2] && selection.ui && selection.ui.user_data && goog.array.contains(['inventory_dialog','crafting_dialog'], selection.ui.user_data['dialog']);
