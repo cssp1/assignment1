@@ -2507,11 +2507,14 @@ def check_quests(quests):
             error |= check_logic(data['tips'], reason = 'quest:'+key+':tips')
 
         if not (('reward_consequent' in data) or \
-                data.get('reward_xp',0) > 0 or \
+                (data.get('reward_xp',0) > 0 and gamedata['player_xp']['quests'] > 0) or \
                 data.get('reward_gamebucks',0) > 0 or \
                 sum((data.get('reward_'+res,0) for res in gamedata['resources']),0) > 0):
             error |= 1
-            print 'quest %s has no rewards' % key
+            if data.get('reward_xp',0) > 0:
+                print 'quest %s has no rewards (reward_xp does not work if gamedata.player_xp.quests is 0!)' % key
+            else:
+                print 'quest %s has no rewards' % key
 
         # this already happens in a bunch of quests, and we haven't done anything about it...
 #        if data.get('reward_xp',0) > 0 and data.get('reward_gamebucks',0) > 0:
