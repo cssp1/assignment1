@@ -594,13 +594,14 @@ def ai_base_timings(gamedata, base): # return list of [start_time, end_time, rep
 # utility function to parse AI hive JSON to obtain list of start/end times
 def hive_timings(gamedata, template):
     start_end_times = []
+    max_duration = gamedata['hives']['duration'] # extend hive end_time by the max duration, since spawned hives can last that long
     for entry in gamedata['hives']['spawn']:
         if entry['template'] == template:
             if not entry.get('active',True): continue
             if 'spawn_times' in entry:
-                start_end_times += [[x[0],x[1]] for x in entry['spawn_times']]
+                start_end_times += [[x[0],x[1]+max_duration] for x in entry['spawn_times']]
             elif 'start_time' in entry:
-                start_end_times.append([entry['start_time'], entry['end_time']])
+                start_end_times.append([entry['start_time'], entry['end_time']+max_duration])
             else:
                 start_end_times.append([-1,-1]) # unrestricted
     return start_end_times
