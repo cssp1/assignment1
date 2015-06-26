@@ -1846,7 +1846,7 @@
             "price_display": { "kind": "ActionButton", "xy": [460,378], "dimensions": [120,32], "text_offset": [8,0], "text_size": 13, "text_style": "thick",
                                "bg_image": "price_display", "ui_tooltip": "", "tooltip_delay": 0 }, // PRICE
             "finish_button": { "kind": "ActionButton", "xy": [584,380], "dimensions": [134,28], "text_offset": [0,0], "text_size": 13,
-                               "bg_image": "action_button_134px", "text_color": [0,0,0,1], "text_style": "bold",
+                               "bg_image": "action_button_134px", "text_style": "bold",
                                "ui_name": "Finish", "ui_name_pending": "Processing...", "ui_name_repair": "Repair Factory",
                                "ui_tooltip": "", "tooltip_delay": 0 },
             "price_spinner": { "kind": "StaticImage", "xy":[520,387], "dimensions":[16,16], "asset":"loading_spinner" },
