@@ -300,7 +300,9 @@ PURCHASE_CATEGORY_MAP = {'MAKE_DROIDS': 'manufacturing', # dummy entry for produ
                          'BUY_RANDOM_PREMIUM_ITEM': 'random_items',
                          'BUY_RANDOM_PREMIUM_ITEM_SALE': 'random_items',
                          'BUY_ITEM': 'specific_items',
+                         'LOTTERY_SCAN': 'lottery',
                          'FB_TRIALPAY_GAMEBUCKS': 'FB TrialPay In-App Currency Offers',
+                         'FB_XSOLLA_GAMEBUCKS': 'Xsolla Virtual Currency Purchases',
                          'FB_PROMO_GAMEBUCKS': 'Facebook In-App Currency Promotions',
                          'FB_GAMEBUCKS_PAYMENT': 'Facebook In-App Currency Promotions'
                        }
