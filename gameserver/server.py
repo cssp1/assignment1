@@ -22477,7 +22477,7 @@ class GAMEAPI(resource.Resource):
             spellname = arg[2]
             d = gamesite.xsapi.get_token(session, retmsg, spellname)
             if d:
-                # let's try doing this synchronously...
+                # let's try doing this asynchronously to the other session traffic...
                 d.addBoth(lambda result, _session = session, _tag = tag: \
                           _session.send_deferred_message(["XSOLLA_GET_TOKEN_RESULT", _tag, result], flush_now = True))
             return # do not go async
