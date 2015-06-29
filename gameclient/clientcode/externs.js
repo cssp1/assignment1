@@ -74,6 +74,9 @@ var gameclient_build_date; // from compiled-client.js.date
 
 var console;
 
+/** @type {boolean} from XsollaSDK.js */
+var spin_xsolla_sdk_loaded;
+
 // Facebook API
 var FB = {
     "ui": function() {},
@@ -108,6 +111,14 @@ var TRIALPAY = {
     "fb": {
         "show_overlay": function() {}
     }
+};
+
+// Xsolla API
+var XPayStationWidget = {
+    "init": function() {},
+    "open": function() {},
+    "on": function() {},
+    "off": function() {}
 };
 
 // HTML5 audio stuff

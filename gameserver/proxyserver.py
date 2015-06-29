@@ -151,7 +151,8 @@ def reload_static_includes():
     global static_includes
     STATIC_INCLUDE_FILES = ['proxy_index.html', 'index_body_fb.html', 'index_body_kg.html', 'kg_guest.html', 'fb_guest.html',
                             'BrowserDetect.js', 'SPLWMetrics.js',
-                            'FacebookSDK.js', 'KongregateSDK.js', 'facebookexternalhit.html']
+                            'FacebookSDK.js', 'KongregateSDK.js', 'facebookexternalhit.html',
+                            'XsollaSDK.js']
     new_includes = dict([(basename, str(open('../gameclient/'+basename).read())) for basename in STATIC_INCLUDE_FILES])
     static_includes = new_includes
 def get_static_include(name):
@@ -1611,6 +1612,8 @@ class GameProxy(proxy.ReverseProxyResource):
 
             '$FACEBOOK_SDK$': get_static_include('FacebookSDK.js') if (visitor.frame_platform == 'fb' and SpinConfig.config.get('enable_facebook',0)) else '',
             '$KONGREGATE_SDK$': get_static_include('KongregateSDK.js') if (visitor.frame_platform == 'kg' and SpinConfig.config.get('enable_kongregate',0)) else '',
+            # XXX probably need a frame platform restriction on loading Xsolla
+            '$XSOLLA_SDK$': get_static_include('XsollaSDK.js') if (SpinConfig.config.get('enable_xsolla',0)) else '',
             '$LOADING_SCREEN_NAME$': screen_name,
             '$LOADING_SCREEN_DATA$': SpinJSON.dumps(screen_data),
             '$INDEX_BODY$': get_static_include('index_body_%s.html' % visitor.frame_platform),

@@ -5,21 +5,25 @@ goog.provide('SPay');
 // found in the LICENSE file.
 
 /** @fileoverview
+    Some common interfaces for payments backends.
+
     @suppress {reportUnknownTypes} XXX we are not typesafe yet
 */
 
 goog.require('SPFB');
 goog.require('SPKongregate');
 
-// Note: assumes Facebook client-side JavaScript SDK has been included
-// see https://developers.facebook.com/docs/creditsapi/
-
 // global namespace
 SPay = {
+    /** @type {string|null} */
     api: null
 };
 
+/** @param {string} api - "fbpayments", "kgcredits", or "xsolla" */
 SPay.set_api = function(api) {
+    if(!goog.array.contains(['fbpayments', 'kgcredits', 'xsolla'], api)) {
+        throw Error('invalid SPay API '+api);
+    }
     SPay.api = api;
 };
 
@@ -61,6 +65,14 @@ SPay.offer_payer_promo = function(currency_url, callback) {
              //'package_name': 'zero_promo',
              'quantity': 300,
              'product': currency_url}, callback);
+};
+
+// Xsolla API - see http://developers.xsolla.com/api.html#virtual-currency
+
+SPay.xsolla_available = function() {
+    if(!spin_xsolla_sdk_loaded /* from XsollaSDK.js */ ||
+       typeof XPayStationWidget === 'undefined') { return false; }
+    return true;
 };
 
 // TrialPay API - see http://help.trialpay.com/facebook/offer-wall/
