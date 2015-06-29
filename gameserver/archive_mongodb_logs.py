@@ -49,7 +49,10 @@ TABLES = {
     'pcheck': { 's3_name': 'pcheck', 'table_name': 'log_pcheck', 'compression': 'zip', 'retain_for': 30*86400 },
 
     # fbrtapi call log
-    'fbrtapi': { 's3_name': 'fbrtapi', 'table_name': 'log_fbrtapi', 'compression': 'zip', 'retain_for': 30*86400 },
+    'fbrtapi': { 's3_name': 'fbrtapi', 'table_name': 'log_fbrtapi', 'compression': 'zip', 'retain_for': 90*86400 },
+
+    # xsapi call log
+    'xsapi': { 's3_name': 'xsapi', 'table_name': 'log_xsapi', 'compression': 'zip', 'retain_for': 90*86400 },
 
     # game event logs
     'metrics': { 's3_name': 'metrics', 'table_name': 'log_metrics', 'compression': 'zip', 'retain_for': 30*86400 },

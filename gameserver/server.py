@@ -13514,6 +13514,16 @@ class Store:
             network_id = session.user.facebook_id
             dollar_amount = Store.promo_gamebucks_to_dollars(credits_amount)
 
+        # Xsolla order
+        elif my_data.get('spellname') == 'FB_XSOLLA_GAMEBUCKS':
+            assert session
+            assert currency == 'gamebucks'
+            unit_id = GameObject.VIRTUAL_ID
+            spellname = 'FB_XSOLLA_GAMEBUCKS'
+            spellarg = credits_amount
+            network_id = session.user.get_xsolla_id()
+            dollar_amount = my_data['usd_receipts']
+
         else:
             if session is None:
                 session = session_table[my_data['session_id']]
@@ -14007,9 +14017,9 @@ class Store:
             session.increment_player_metric('resource_boosts_purchased', 1)
             session.increment_player_metric(record_spend_type+'_spent_on_resource_boosts', record_amount)
 
-        elif spellname.startswith("BUY_GAMEBUCKS_") or spellname in ("FB_PROMO_GAMEBUCKS", "FB_TRIALPAY_GAMEBUCKS", "FB_GAMEBUCKS_PAYMENT"):
+        elif spellname.startswith("BUY_GAMEBUCKS_") or spellname in ("FB_PROMO_GAMEBUCKS", "FB_TRIALPAY_GAMEBUCKS", "FB_XSOLLA_GAMEBUCKS", "FB_GAMEBUCKS_PAYMENT"):
             spell = gamedata['spells'][spellname]
-            if spellname in ("FB_PROMO_GAMEBUCKS", "FB_TRIALPAY_GAMEBUCKS", "FB_GAMEBUCKS_PAYMENT", "BUY_GAMEBUCKS_TOPUP"):
+            if spellname in ("FB_PROMO_GAMEBUCKS", "FB_TRIALPAY_GAMEBUCKS", "FB_XSOLLA_GAMEBUCKS", "FB_GAMEBUCKS_PAYMENT", "BUY_GAMEBUCKS_TOPUP"):
                 bucks = int(spellarg)
             else:
                 bucks = spell['quantity']
@@ -14495,7 +14505,7 @@ class TRIALPAYAPI(resource.Resource):
         # verify hash
         our_hash = hmac.new(str(SpinConfig.config['trialpay_notification_key']), msg=str(request_body), digestmod=hashlib.md5).hexdigest()
         if their_hash != our_hash:
-            gamesite.exception_log.event(server_time, 'TRIALPAYAPI hash mismatch: theirs %s ours %s body %r' % (their_hash, our_hash, request_body))
+            raise Exception('TRIALPAYAPI hash mismatch: theirs %s ours %s body %r' % (their_hash, our_hash, request_body))
 
         gamebucks_amount = int(request_args['reward_amount'][0])
 
@@ -14533,6 +14543,7 @@ class XSAPI(resource.Resource):
     def render_GET(self, request):
         return self.render_POST(request)
     def render_POST(self, request):
+        SpinHTTP.set_access_control_headers(request)
         try:
             start_time = time.time()
             ret = self.handle_request(request)
@@ -14543,23 +14554,79 @@ class XSAPI(resource.Resource):
             text = traceback.format_exc()
             gamesite.exception_log.event(server_time, 'XSAPI Exception: '+text)
         request.setResponseCode(http.BAD_REQUEST)
-        return 'spinpunch error'
+        return SpinJSON.dumps({'error': {'code':'FATAL_ERROR', 'message': text}})
+
     def handle_request(self, request):
-        SpinHTTP.set_access_control_headers(request)
+        request_body = request.content.read()
+
+        # check signature
+        their_sig = SpinHTTP.get_twisted_header(request, 'Authorization')[len('Signature '):]
+        our_sig = SpinXsolla.make_signature(SpinConfig.config, request_body)
+        if their_sig != our_sig:
+            gamesite.exception_log.event(server_time, 'XSAPI hash mismatch: theirs %s ours %s body %r' % (their_sig, our_sig, request_body))
+            request.setResponseCode(http.BAD_REQUEST)
+            return SpinJSON.dumps({'error': {'code':'INVALID_SIGNATURE', 'message': 'XSAPI hash mismatch'}})
+
+        request_data = SpinJSON.loads(request_body)
+
         # find session
-        user_id = int(request.args['order_info'][0]) # XXXXXX
+        xs_id = request_data['user']['id']
         session = None
         for s in session_table.itervalues():
-            if s.user.user_id == user_id:
+            if s.user.get_xsolla_id() == xs_id and (not s.logout_in_progress):
                 session = s
                 break
         if not session:
-            raise Exception('session not found for XSAPI order (user_id %d)' % user_id)
-        return self.handle_payment(request, session,
-                                   request.args,
-                                   request.content.read()) # XXXXXX
+            gamesite.exception_log.event(server_time, 'session not found for XSAPI order (xs_id %s)' % xs_id)
+            request.setResponseCode(http.BAD_REQUEST)
+            return SpinJSON.dumps({'error': {'code':'INVALID_USER', 'message': 'session not found'}})
 
-    # not part of the API handler, this is called via GAMEAPI
+        if request_data['notification_type'] == 'user_validation':
+            # since we found the session, the user is already considered valid
+            pass
+        elif request_data['notification_type'] == 'payment':
+            return self.handle_payment(request, session, request_data)
+        else:
+            raise Exception('unknown XSAPI notification_type '+request_data['notification_type'])
+
+        request.setResponseCode(http.NO_CONTENT)
+        return ''
+
+    def handle_payment(self, request, session, request_data):
+        gamebucks_amount = int(request_data['purchase']['virtual_currency']['quantity'])
+        if request_data['transaction'].get('dry_run',0) and spin_secure_mode:
+            raise Exception('sandbox purchases not allowed in secure mode')
+
+        if gamebucks_amount > 0:
+            # we (ab)use the credit order path here to share all of its metrics output
+            assert request_data['payment_details']['payout']['currency'] == 'USD'
+            Store.execute_credit_order(request_data['transaction']['id'], self.gameapi, request, session,
+                                       request_data['user']['id'], request_data['user']['id'],
+                                       'gamebucks', gamebucks_amount,
+                                       # awkward syntax here
+                                       # XXXXXX reconstruct the source SKU from request_data['purchase']['virtual_currency'] ?
+                                       {'spellname': 'FB_XSOLLA_GAMEBUCKS',
+                                        'session_id': session.session_id,
+                                        'usd_receipts': request_data['payment_details']['payout']['amount']})
+
+            # do not return HTTP response until player state is fully flushed
+            def complete_settlement(request, session):
+                # send mtime/spend update to player cache so upcache will pick it up immediately
+                gamesite.pcache_client.player_cache_update(session.user.user_id,
+                                                           {'last_mtime': server_time,
+                                                            'money_spent': session.player.history.get('money_spent',0.0)}, reason = 'purchase')
+                if request:
+                    request.setResponseCode(http.NO_CONTENT)
+                    request.write('')
+                    request.finish()
+
+            player_table.store_async(session.player, functools.partial(complete_settlement, request, session), True, 'XSAPI')
+            return server.NOT_DONE_YET
+
+        request.setResponseCode(http.NO_CONTENT)
+        return ''
+
+    # not part of the API handler - this is called on behalf of the client via GAMEAPI
     def get_token(self, session, retmsg, spellname, spellarg): # spellname being an fbpayments gamebucks SKU
         spell = gamedata['spells'][spellname]
         assert spell['currency'].startswith('fbpayments:')

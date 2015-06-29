@@ -68,6 +68,8 @@ facebook_log = None
 kongregate_log = None
 fbrtapi_raw_log = None
 fbrtapi_json_log = None
+xsapi_raw_log = None
+xsapi_json_log = None
 proxy_time = -1
 
 def update_time():
@@ -1775,6 +1777,24 @@ class GameProxy(proxy.ReverseProxyResource):
             if not session: raise Exception('cannot find session for KGAPI call: '+repr(request_data))
             return self.render_via_proxy(session.gameserver_fwd, request)
 
+        elif self.path == '/XSAPI':
+            # note: we don't check the signature here - that needs to be done by the gameserver
+            request_body = request.content.read()
+            xsapi_raw_log.event(proxy_time, request_body)
+            request_data = SpinJSON.loads(request_body)
+            xsapi_json_log.event(proxy_time, request_data)
+
+            session = None
+            if 'user' in request_data and 'id' in request_data['user']:
+                xs_id = request_data['user']['id']
+                # note: assume we are using social_id as the Xsolla ID
+                session = self.session_emulate(db_client.session_get_by_social_id(xs_id, reason=self.path))
+            else:
+                raise Exception('invalid XSAPI call: '+log_request(request)+' body '+repr(request_data))
+
+            if not session: raise Exception('cannot find session for XSAPI call: '+repr(request_data))
+            return self.render_via_proxy(session.gameserver_fwd, request)
+
         elif self.path == '/CREDITAPI':
             # extract session from the custom order_info the client passed to Facebook
             method = request.args['method'][0]
@@ -1982,7 +2002,7 @@ class GameProxy(proxy.ReverseProxyResource):
                 ret = self.render_ROOT(request, frame_platform = 'fb')
             elif self.path == '/KGROOT':
                 ret = self.render_ROOT(request, frame_platform = 'kg')
-            elif self.path in ('/GAMEAPI', '/CREDITAPI', '/TRIALPAYAPI', '/KGAPI', '/CONTROLAPI', '/METRICSAPI', '/ADMIN/', '/PING', '/OGPAPI', '/FBRTAPI', '/FBDEAUTHAPI'):
+            elif self.path in ('/GAMEAPI', '/CREDITAPI', '/TRIALPAYAPI', '/KGAPI', '/XSAPI', '/CONTROLAPI', '/METRICSAPI', '/ADMIN/', '/PING', '/OGPAPI', '/FBRTAPI', '/FBDEAUTHAPI'):
                 ret = self.render_API(request)
             else:
                 ret = str('error')
@@ -2395,7 +2415,7 @@ class ProxyRoot(TwistedNoResource):
                 self.static_resources[srcfile] = UncachedJSFile('../gameclient/'+srcfile)
 
         self.proxied_resources = {}
-        for chnam in ('', 'KGROOT', 'GAMEAPI', 'METRICSAPI', 'CREDITAPI', 'TRIALPAYAPI', 'KGAPI', 'CONTROLAPI', 'ADMIN', 'OGPAPI', 'FBRTAPI', 'FBDEAUTHAPI', 'PING'):
+        for chnam in ('', 'KGROOT', 'GAMEAPI', 'METRICSAPI', 'CREDITAPI', 'TRIALPAYAPI', 'KGAPI', 'XSAPI', 'CONTROLAPI', 'ADMIN', 'OGPAPI', 'FBRTAPI', 'FBDEAUTHAPI', 'PING'):
             res = GameProxy('/'+chnam)
 
             # configure auth on canvas page itself (OPTIONAL now, only for demoing game outside of company)
@@ -2565,6 +2585,9 @@ def do_main():
     global fbrtapi_raw_log, fbrtapi_json_log
     fbrtapi_raw_log = SpinLog.DailyRawLog(proxy_log_dir+'/', '-fbrtapi.txt')
     fbrtapi_json_log = SpinNoSQLLog.NoSQLJSONLog(db_client, 'log_fbrtapi')
+    global xsapi_raw_log, xsapi_json_log
+    xsapi_raw_log = SpinLog.DailyRawLog(proxy_log_dir+'/', '-xsapi.txt')
+    xsapi_json_log = SpinNoSQLLog.NoSQLJSONLog(db_client, 'log_xsapi')
     global raw_log
     raw_log = SpinLog.DailyRawLog(proxy_log_dir+'/', '-proxyserver.txt')
 

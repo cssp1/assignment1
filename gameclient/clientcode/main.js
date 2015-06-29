@@ -41825,7 +41825,7 @@ Store.do_place_xsolla_order = function(token, on_finish, options) {
         if(_on_fail) { _on_fail(); }
     }; })(state, on_fail));
 
-    goog.array.forEach(['open', 'load', 'status', 'status-invoice', 'status-delivering'],
+    goog.array.forEach(['open', 'load', 'status-invoice', 'status-delivering'],
                        function(cbtype) {
                            XPayStationWidget.on(cbtype, (function (_cbtype) { return function(event, data) {
                                console.log('XPayStationWidget '+_cbtype+': '+event.toString()+' data '+JSON.stringify(data));// XXXXXX metrics

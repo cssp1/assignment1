@@ -33,6 +33,7 @@ def handle(filename, dry_run = True, battle_archive_s3_bucket = None):
        filename.endswith('-metrics.json') or \
        filename.endswith('-credits.json') or \
        filename.endswith('-fbrtapi.txt') or \
+       filename.endswith('-xsapi.txt') or \
        filename.endswith('-fb_conversion_pixels.json') or \
        filename.endswith('-fb_app_events.json') or \
        filename.endswith('-adotomi.json') or \

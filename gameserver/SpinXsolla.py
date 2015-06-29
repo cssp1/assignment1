@@ -6,7 +6,7 @@
 
 import SpinJSON
 import time
-import base64
+import base64, hashlib
 
 #
 # XSOLLA API tools - see http://developers.xsolla.com/
@@ -24,6 +24,10 @@ def make_headers(config):
     return {'Content-Type': 'application/json',
             'Accept': 'application/json',
             'Authorization': 'Basic '+str(base64.b64encode(str(config['xsolla_merchant_id'])+':'+str(config['xsolla_api_key'])))}
+
+# return the API signature for a given HTTP body
+def make_signature(config, body):
+    return hashlib.sha1(str(body)+str(config['xsolla_project_key'])).hexdigest()
 
 # return the (url,method,headers,body) for a request to update the Xsolla virtual currency settings for this game.
 # This tells Xsolla about all the possible SKUs (including predicate-based discounts, which are protected by
