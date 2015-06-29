@@ -547,7 +547,7 @@
 
             // CHICKLET BUTTONS
             "trialpay_button": { "kind": "ActionButton", "xy": [325,32], "dimensions": [23,23], "bg_image": "trialpay_button", "push_bg_image": 1,
-                                 "ui_tooltip": "Earn Facebook Credits", "fixed_tooltip_offset": [362, 44] },
+                                 "ui_tooltip": "Earn in-game currency with offers", "fixed_tooltip_offset": [362, 44] },
 
             "alliances_button": { "kind": "ActionButton", "xy": [217,3], "dimensions": [23,23], "bg_image": "alliances_button", "push_bg_image": 1,
                                   "ui_tooltip": "Alliances", "fixed_tooltip_offset": [254, 15] },
@@ -627,7 +627,7 @@
                                         "ui_tooltip_facebook_credits": "%s Available: %d",
                                         "ui_tooltip_facebook_credits_badapi": "%s Available: (Facebook error)",
                                         "ui_tooltip_gamebucks": "%gamebucks provides speed-ups, resources,\nand instant upgrades and unlocks.\n\nClick \"+\" to purchase %gamebucks using\nFacebook Credits. (You currently\nhave %fbcredits Facebook Credits)",
-                                        "ui_tooltip_gamebucks_badapi": "%gamebucks provides speed-ups, resources,\nand instant upgrades and unlocks.\n\nClick \"+\" to purchase %gamebucks using\nFacebook Credits.",
+                                        "ui_tooltip_gamebucks_badapi": "%gamebucks provides speed-ups, resources,\nand instant upgrades and unlocks.\n\nClick \"+\" to purchase %gamebucks.",
                                         "ui_tooltip_kgcredits": "%gamebucks provides speed-ups, resources,\nand instant upgrades and unlocks.\n\nClick \"+\" to purchase %gamebucks using\nKongregate Kreds.",
                                         "tooltip_delay": 0, "fixed_tooltip_offset": [601,45], "fixed_tooltip_offset_facebook_credits": [600,47], "fixed_tooltip_offset_gamebucks": [520,47] },
             "resource_bar_fbcredits_icon": { "show": 1, "kind": "StaticImage", "xy": [651,4], "dimensions": [21,21], "asset": "resource_icon_fbcredits" },

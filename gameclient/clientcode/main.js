@@ -35647,7 +35647,7 @@ function invoke_buy_gamebucks_dialog1(reason, amount, order) {
     dialog.modal = true;
 
     var go_away = function(w) {
-        metric_event('4410_buy_gamebucks_dialog_close', {'purchase_ui_event': true, 'client_time': Math.floor(client_time)});
+        metric_event('4410_buy_gamebucks_dialog_close', {'purchase_ui_event': true, 'api':SPay.api, 'client_time': Math.floor(client_time)});
         close_parent_dialog(w);
     };
 
@@ -35663,7 +35663,7 @@ function invoke_buy_gamebucks_dialog1(reason, amount, order) {
     }
     var default_spellname = spell_list[default_selection];
     metric_event('4410_buy_gamebucks_dialog_open', {'purchase_ui_event': true, 'client_time': Math.floor(client_time),
-                                                    'sku': default_spellname,
+                                                    'sku': default_spellname, 'api':SPay.api,
                                                     'gamebucks': gamedata['spells'][default_spellname]['quantity'],
                                                     'currency': gamedata['spells'][default_spellname]['currency'],
                                                     'currency_price': gamedata['spells'][default_spellname]['price'],
@@ -36090,7 +36090,7 @@ function invoke_buy_gamebucks_dialog23(ver, reason, amount, order) {
         dialog.widgets['scroll_right'].state = (dialog.user_data['scroll_goal'] >= dialog.user_data['scroll_limits'][1] ? 'disabled' : 'normal');
         if(incr > 0 && !dialog.user_data['scrolled']) {
             dialog.user_data['scrolled'] = true;
-            metric_event('4431_buy_gamebucks_dialog_scroll', {'gui_version': dialog.user_data['ver'], 'purchase_ui_event': true, 'client_time': Math.floor(client_time)});
+            metric_event('4431_buy_gamebucks_dialog_scroll', {'gui_version': dialog.user_data['ver'], 'api':SPay.api, 'purchase_ui_event': true, 'client_time': Math.floor(client_time)});
         }
     }; };
     dialog.widgets['scroll_left'].onclick = scroller(-1);
@@ -36122,7 +36122,7 @@ function invoke_buy_gamebucks_dialog23(ver, reason, amount, order) {
     }
 
     var go_away = function(w) {
-        metric_event('4410_buy_gamebucks_dialog_close', {'gui_version': w.parent.user_data['ver'], 'purchase_ui_event': true, 'client_time': Math.floor(client_time)});
+        metric_event('4410_buy_gamebucks_dialog_close', {'gui_version': w.parent.user_data['ver'], 'api':SPay.api, 'purchase_ui_event': true, 'client_time': Math.floor(client_time)});
         close_parent_dialog(w);
     };
 
@@ -36134,7 +36134,7 @@ function invoke_buy_gamebucks_dialog23(ver, reason, amount, order) {
     if((player.history['money_spent'] || 0) <= 0) {
         player.record_client_history('purchase_ui_opens_preftd', 1);
     }
-    metric_event('4410_buy_gamebucks_dialog_open', {'gui_version': dialog.user_data['ver'], 'purchase_ui_event': true, 'client_time': Math.floor(client_time), 'method': reason});
+    metric_event('4410_buy_gamebucks_dialog_open', {'gui_version': dialog.user_data['ver'], 'api':SPay.api, 'purchase_ui_event': true, 'client_time': Math.floor(client_time), 'method': reason});
     SPFB.AppEvents.logEvent('SP_PURCHASE_DIALOG_OPEN');
     return dialog;
 }
@@ -36220,7 +36220,7 @@ function update_buy_gamebucks_sku2(dialog) {
     }
 
     var display_currency = null;
-    if(SPay.api == 'fbpayments') {
+    if(SPay.api == 'fbpayments' || SPay.api == 'xsolla') {
         // display_currency will be set on a per-spell basis
     } else if(SPay.api == 'kgcredits') {
         display_currency = 'Kongregate Kreds';
@@ -36234,7 +36234,7 @@ function update_buy_gamebucks_sku2(dialog) {
     var spellarg = (spell['price_formula'] == 'gamebucks_topup' ? dialog.parent.user_data['topup_bucks'] : null);
 
     var payment_currency = ('currency' in spell ? spell['currency'] : 'fbcredits');
-    if(SPay.api == 'fbpayments') {
+    if(SPay.api == 'fbpayments' || SPay.api == 'xsolla') {
         if(payment_currency.indexOf('fbpayments:') != 0) { throw Error('bad payment_currency '+payment_currency); }
         display_currency = payment_currency.split(':')[1];
     }
@@ -40203,7 +40203,7 @@ Store.display_real_currency_amount = function (display_currency, price, price_cu
         curr_prefix = template['prefix'] || '';
         curr_suffix = template['suffix'] || '';
 
-        if(SPay.api == 'fbpayments' && player.facebook_currency && player.facebook_currency['user_currency'] != display_currency && !abbreviate) {
+        if((SPay.api == 'fbpayments' || SPay.api == 'xsolla') && player.facebook_currency && player.facebook_currency['user_currency'] != display_currency && !abbreviate) {
             // when showing prices in a currency that is not the player's own currency, be very explicit about what we are showing
             // because it might be e.g. an Australian user seeing a US Dollar price
             if(curr_prefix.indexOf(display_currency) === -1 && curr_suffix.indexOf(display_currency) === -1) {
@@ -41286,11 +41286,12 @@ Store.force_order_cleanup = function() {
 
 // NOTE: cb is a UI cleanup callback that will be called ONLY for gamebucks purchases, not for FB credits purchases!
 // FB credits purchases always have to kill the entire UI because the FB script callback is unreliable
+// cb is called on success only with no parameter. To catch failures, pass another callback as props.on_fail.
 
 /** @param {GameObjectId} unit_id
     @param {string} spellname
     @param {?} spellarg
-    @param {function(boolean)|null=} cb (called with true for success or false for failure)
+    @param {function()|null=} cb
     @param {Object|null=} props */
 Store.place_user_currency_order = function(unit_id, spellname, spellarg, cb, props) {
     return Store.place_order(Store.get_user_currency(), unit_id, spellname, spellarg, cb, props);
@@ -41300,7 +41301,7 @@ Store.place_user_currency_order = function(unit_id, spellname, spellarg, cb, pro
     @param {GameObjectId} unit_id
     @param {string} spellname
     @param {?} spellarg
-    @param {function(boolean)|null=} cb (called with true for success or false for failure)
+    @param {function()|null=} cb
     @param {Object|null=} props */
 Store.place_order = function(currency, unit_id, spellname, spellarg, cb, props) {
     var no_clear = props && props['no_clear'];
@@ -41324,7 +41325,11 @@ Store.place_order = function(currency, unit_id, spellname, spellarg, cb, props) 
         return false;
     } else if(currency.indexOf('fbpayments:') === 0) {
         if(!no_clear) { change_selection(null); }
-        Store.place_fbpayments_order(currency, price, unit_id, spellname, spellarg, cb, props);
+        if(SPay.api == 'xsolla') {
+            Store.place_xsolla_order(spellname, spellarg, cb, props);
+        } else {
+            Store.place_fbpayments_order(currency, price, unit_id, spellname, spellarg, cb, props);
+        }
         return false;
     } else if(currency == 'gamebucks') {
         return Store.place_gamebucks_order(price, unit_id, spellname, spellarg, cb);
@@ -41745,6 +41750,88 @@ Store.place_fbpayments_order = function(fbpayments_currency, price, unit_id, spe
     }
     metric_event('4071_fbpayments_order_prompt', props);
     return true;
+};
+
+/** @type {!Object.<string, string>} - map from spellname to Xsolla token */
+Store.xsolla_token_cache = {};
+Store.xsolla_token_receivers = {};
+Store.xsolla_token_serial = 0;
+
+/** @param {string} spellname
+    @param {number|null=} spellarg - for spells that specify a quantity in the spellarg
+    @return {string} */
+Store.xsolla_token_cache_key = function(spellname, spellarg) {
+    var ret = spellname;
+    if(spellarg) { ret += ':' + spellarg.toString();}
+    return ret;
+};
+
+/** Open the purchase GUI for a SKU - this needs an asynchronous round-trip to get the per-SKU "access token"
+    @param {string} spellname
+    @param {number|null} spellarg - for spells that specify a quantity in the spellarg
+    @param {function()|null=} on_finish
+    @param {Object|null=} options */
+Store.place_xsolla_order = function(spellname, spellarg, on_finish, options) {
+    var key = Store.xsolla_token_cache_key(spellname, spellarg);
+    if(key in Store.xsolla_token_cache) {
+        Store.do_place_xsolla_order(Store.xsolla_token_cache[key], on_finish, options);
+        return;
+    }
+    var tag = 'xgt'+Store.xsolla_token_serial.toString();
+    Store.xsolla_token_serial += 1;
+    send_to_server.func(['XSOLLA_GET_TOKEN', tag, spellname, spellarg || null]);
+
+    var ui_locker_arr = [null]; // need to pass the UI locker dialog to the callback AFTER query is launched, so stuff it inside an array
+
+    Store.xsolla_token_receivers[tag] = (function (_key, _on_finish, _options, _ui_locker_arr) { return function(token) {
+        close_dialog(_ui_locker_arr[0]);
+        Store.xsolla_token_cache[_key] = token;
+        Store.do_place_xsolla_order(token, on_finish, options);
+    }; })(key, on_finish, options, ui_locker_arr);
+
+    // block GUI
+    ui_locker_arr[0] = invoke_ui_locker_until_closed();
+};
+
+/** Open the purchase GUI, once we have a token
+    @param {string} token
+    @param {function()|null=} on_finish
+    @param {Object|null=} options */
+Store.do_place_xsolla_order = function(token, on_finish, options) {
+    if(!SPay.xsolla_available()) { throw Error('Xsolla initialization failed'); }
+    var on_fail = options['fail_cb'] || null;
+
+    var state = {'fail': false, 'success': false}; // track state so we only call each callback once
+
+    XPayStationWidget.init({'access_token': token, 'sandbox': !spin_secure_mode});
+
+    XPayStationWidget.on('close', (function (_state, _on_fail) { return function(event, data) {
+        XPayStationWidget.off(); // detach remaining event handlers
+        if(!_state['success'] && !_state['fail']) {
+            _state['fail'] = true;
+            if(_on_fail) { _on_fail(); }
+        }
+    }; })(state, on_fail));
+
+    XPayStationWidget.on('status-done', (function (_state, _on_finish) { return function(event, data) {
+        console.log('XPayStationWidget status-done: '+event.toString()+' data '+JSON.stringify(data)); // XXXXXX metrics
+        _state['success'] = true;
+        _on_finish();
+    }; })(state, on_finish));
+
+    XPayStationWidget.on('status-troubled', (function (_state, _on_fail) { return function(event, data) {
+        console.log('XPayStationWidget status-troubled: '+event.toString()+' data '+JSON.stringify(data));// XXXXXX metrics
+        _state['fail'] = true;
+        if(_on_fail) { _on_fail(); }
+    }; })(state, on_fail));
+
+    goog.array.forEach(['open', 'load', 'status', 'status-invoice', 'status-delivering'],
+                       function(cbtype) {
+                           XPayStationWidget.on(cbtype, (function (_cbtype) { return function(event, data) {
+                               console.log('XPayStationWidget '+_cbtype+': '+event.toString()+' data '+JSON.stringify(data));// XXXXXX metrics
+                           }; })(cbtype));
+                       });
+    XPayStationWidget.open();
 };
 
 Store.buy_more_fbcredits = function() {
@@ -44408,6 +44495,13 @@ function handle_server_message(data) {
             var cb = Store.fbpayments_order_receivers[tag];
             delete Store.fbpayments_order_receivers[tag];
             cb();
+        }
+    } else if(msg == "XSOLLA_GET_TOKEN_RESULT") {
+        var tag = data[1], token = data[2];
+        if(tag in Store.xsolla_token_receivers) {
+            var cb = Store.xsolla_token_receivers[tag];
+            delete Store.xsolla_token_receivers[tag];
+            cb(token);
         }
     } else if(msg == "UNIT_REPAIR_UPDATE") {
         receive_unit_repair_update(data[1]);

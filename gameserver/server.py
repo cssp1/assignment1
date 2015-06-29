@@ -14560,7 +14560,7 @@ class XSAPI(resource.Resource):
                                    request.content.read()) # XXXXXX
 
     # not part of the API handler, this is called via GAMEAPI
-    def get_token(self, session, retmsg, spellname): # spellname being an fbpayments gamebucks SKU
+    def get_token(self, session, retmsg, spellname, spellarg): # spellname being an fbpayments gamebucks SKU
         spell = gamedata['spells'][spellname]
         assert spell['currency'].startswith('fbpayments:')
         for PRED in ('show_if', 'requires'):
@@ -22475,11 +22475,12 @@ class GAMEAPI(resource.Resource):
         elif arg[0] == "XSOLLA_GET_TOKEN":
             tag = arg[1]
             spellname = arg[2]
-            d = gamesite.xsapi.get_token(session, retmsg, spellname)
+            spellarg = arg[3]
+            d = gamesite.xsapi.get_token(session, retmsg, spellname, spellarg)
             if d:
                 # let's try doing this asynchronously to the other session traffic...
                 d.addBoth(lambda result, _session = session, _tag = tag: \
-                          _session.send_deferred_message(["XSOLLA_GET_TOKEN_RESULT", _tag, result], flush_now = True))
+                          _session.send_deferred_message([["XSOLLA_GET_TOKEN_RESULT", _tag, result]], flush_now = True))
             return # do not go async
 
         # pay with gamebucks
