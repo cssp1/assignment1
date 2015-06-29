@@ -50,6 +50,8 @@ def handle(filename, dry_run = True, battle_archive_s3_bucket = None):
          filename.endswith('-proxyserver.txt') or \
          filename.endswith('-traces.txt') or \
          filename.endswith('-facebook.txt') or \
+         filename.endswith('-kongregate.txt') or \
+         filename.endswith('-xsolla.txt') or \
          filename.endswith('-hives.txt') or \
          filename.endswith('-region-maint.txt') or \
          filename.endswith('-maint.txt') or \

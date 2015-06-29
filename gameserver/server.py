@@ -55,6 +55,7 @@ import SpinChatClient
 import SpinSSL
 import SpinFacebook
 import SpinKongregate
+import SpinXsolla
 import SpinGoogleAuth
 import SpinHTTP
 import SpinConfig
@@ -965,6 +966,15 @@ class User:
             # important: this should NOT include the title
             return player.alias.lower()
         return self.get_ui_name(player).lower()
+
+    def get_xsolla_id(self):
+        # return the unique ID for this user for the Xsolla API
+        return self.social_id
+
+    def get_email(self):
+        if self.facebook_profile:
+            return self.facebook_profile.get('email', None)
+        return None
 
     def chat_can_interact(self):
         if not self.active_session: return False
@@ -14513,6 +14523,65 @@ class TRIALPAYAPI(resource.Resource):
 
         return str('1')
 
+# Xsolla API endpoint
+
+class XSAPI(resource.Resource):
+    isLeaf = True
+    def __init__(self, gameapi):
+        resource.Resource.__init__(self)
+        self.gameapi = gameapi
+    def render_GET(self, request):
+        return self.render_POST(request)
+    def render_POST(self, request):
+        try:
+            start_time = time.time()
+            ret = self.handle_request(request)
+            end_time = time.time()
+            admin_stats.record_latency('XSAPI', end_time-start_time)
+            return ret
+        except Exception:
+            text = traceback.format_exc()
+            gamesite.exception_log.event(server_time, 'XSAPI Exception: '+text)
+        request.setResponseCode(http.BAD_REQUEST)
+        return 'spinpunch error'
+    def handle_request(self, request):
+        SpinHTTP.set_access_control_headers(request)
+        # find session
+        user_id = int(request.args['order_info'][0]) # XXXXXX
+        session = None
+        for s in session_table.itervalues():
+            if s.user.user_id == user_id:
+                session = s
+                break
+        if not session:
+            raise Exception('session not found for XSAPI order (user_id %d)' % user_id)
+        return self.handle_payment(request, session,
+                                   request.args,
+                                   request.content.read()) # XXXXXX
+
+    # not part of the API handler, this is called via GAMEAPI
+    def get_token(self, session, retmsg, spellname): # spellname being an fbpayments gamebucks SKU
+        spell = gamedata['spells'][spellname]
+        assert spell['currency'].startswith('fbpayments:')
+        for PRED in ('show_if', 'requires'):
+            if (PRED in spell) and (not Predicates.read_predicate(spell[PRED]).is_satisfied(session.player, None)):
+                retmsg.append(["ERROR", "REQUIREMENTS_NOT_SATISFIED", spell[PRED]])
+                return None
+        real_currency = spell['currency'].split(':')[1]
+        gamebucks_quantity = spell['quantity']
+        gamebucks_ui_description = Store.format_ui_string(session, spellname, None, spell, spell['ui_name'])
+        url, method, headers, body = SpinXsolla.make_token_request(SpinConfig.config,
+                                                                   session.user.get_xsolla_id(), session.user.get_email(),
+                                                                   real_currency,
+                                                                   session.user.country, session.user.locale.split('_')[0] if session.user.locale else 'en',
+                                                                   gamebucks_quantity, gamebucks_ui_description,
+                                                                   session.player.level(), session.user.account_creation_time)
+        d = defer.Deferred()
+        gamesite.AsyncHTTP_Xsolla.queue_request(server_time, url,
+                                                lambda result, _d=d: _d.callback(SpinJSON.loads(result)['token']),
+                                                method=method, headers=headers, postdata=body)
+        return d
+
 # handler for game client API calls
 class GAMEAPI(resource.Resource):
     isLeaf = True
@@ -22403,6 +22472,16 @@ class GAMEAPI(resource.Resource):
                     retmsg.append(["PLAYER_STATE_UPDATE", session.player.resources.calc_snapshot().serialize()])
                     return
 
+        elif arg[0] == "XSOLLA_GET_TOKEN":
+            tag = arg[1]
+            spellname = arg[2]
+            d = gamesite.xsapi.get_token(session, retmsg, spellname)
+            if d:
+                # let's try doing this synchronously...
+                d.addBoth(lambda result, _session = session, _tag = tag: \
+                          _session.send_deferred_message(["XSOLLA_GET_TOKEN_RESULT", _tag, result], flush_now = True))
+            return # do not go async
+
         # pay with gamebucks
         elif arg[0] == "GAMEBUCKS_ORDER":
             tag = arg[1]
@@ -25271,6 +25350,8 @@ class GameSite(server.Site):
         self.facebook_log.event(server_time, exc)
     def log_kongregate_exception(self, exc):
         self.kongregate_log.event(server_time, exc)
+    def log_xsolla_exception(self, exc):
+        self.xsolla_log.event(server_time, exc)
 
     # keep track of per-server-instance configuration variables here
     class Configuration(object):
@@ -25284,7 +25365,7 @@ class GameSite(server.Site):
             self.affinities = json.get('affinities',['default'])
             self.start_state = json.get('start_state', 'ok')
 
-    def __init__(self, config, root, gameapi, controlapi, trialpayapi):
+    def __init__(self, config, root, gameapi, controlapi, trialpayapi, xsapi):
 
         # set this here because setup_test_user() references gamesite
         global gamesite
@@ -25299,6 +25380,7 @@ class GameSite(server.Site):
         self.gameapi = gameapi
         self.controlapi = controlapi
         self.trialpayapi = trialpayapi
+        self.xsapi = xsapi
         self.player_table = player_table
         self.user_table = user_table
 
@@ -25333,6 +25415,14 @@ class GameSite(server.Site):
                                                                  max_tries = data['max_tries'],
                                                                  retry_delay = data['retry_delay'])
 
+        data = gamedata['server'].get('AsyncHTTP_Xsolla', gamedata['server']['AsyncHTTP_Facebook'])
+        self.AsyncHTTP_Xsolla = AsyncHTTP.AsyncHTTPRequester(data['concurrent_request_limit'],
+                                                             data['total_request_limit'],
+                                                             data['request_timeout'],
+                                                             spin_log_verbosity,
+                                                             self.log_xsolla_exception,
+                                                             max_tries = data['max_tries'],
+                                                             retry_delay = data['retry_delay'])
         self.nosql_id_generator = SpinNoSQLId.Generator()
 
         self.nosql_client = None
@@ -25404,6 +25494,7 @@ class GameSite(server.Site):
 
         self.facebook_log = SpinLog.DailyRawLog(spin_log_dir+'/', '-facebook.txt')
         self.kongregate_log = SpinLog.DailyRawLog(spin_log_dir+'/', '-kongregate.txt')
+        self.xsolla_log = SpinLog.DailyRawLog(spin_log_dir+'/', '-xsolla.txt')
         self.trace_log = SpinLog.DailyRawLog(spin_log_dir+'/', '-traces.txt')
 
         self.metrics_log.event(server_time, {'event_name':'1500_server_restart', 'code':1500, 'scm_version':SERVER_VERSION})
@@ -26406,10 +26497,12 @@ def do_main(pidfile, do_ai_setup, do_daemonize, cmdline_config):
     gameapi = GAMEAPI()
     controlapi = CONTROLAPI(gameapi)
     trialpayapi = TRIALPAYAPI(gameapi)
+    xsapi = XSAPI(gamedata)
 
     root.putChild("GAMEAPI",gameapi)
     root.putChild("CREDITAPI",CREDITAPI(gameapi))
     root.putChild("TRIALPAYAPI",trialpayapi)
+    root.putChild("XSAPI",xsapi)
     root.putChild("KGAPI",KGAPI(gameapi))
     root.putChild("METRICSAPI",METRICSAPI(gameapi))
     root.putChild("CONTROLAPI",controlapi)
@@ -26422,7 +26515,7 @@ def do_main(pidfile, do_ai_setup, do_daemonize, cmdline_config):
     io_system_init(instance_config.get('io', {}).copy())
 
     global gamesite
-    gamesite = GameSite(config, root, gameapi, controlapi, trialpayapi)
+    gamesite = GameSite(config, root, gameapi, controlapi, trialpayapi, xsapi)
 
     # optional memory profiling using Dowser library
     if SpinConfig.config.get('enable_dowser', 0):

@@ -25,7 +25,7 @@ def make_headers(config):
             'Accept': 'application/json',
             'Authorization': 'Basic '+str(base64.b64encode(str(config['xsolla_merchant_id'])+':'+str(config['xsolla_api_key'])))}
 
-# return the (method,headers,body) for a request to update the Xsolla virtual currency settings for this game.
+# return the (url,method,headers,body) for a request to update the Xsolla virtual currency settings for this game.
 # This tells Xsolla about all the possible SKUs (including predicate-based discounts, which are protected by
 # the server-side order path).
 # This currently steals the SKUs from the Facebook Open Graph virtual currency.
@@ -53,10 +53,10 @@ def make_virtual_currency_settings_update(config, gamedata):
                       'description': { 'en': data['ui_name'].replace('%GAMEBUCKS_QUANTITY', '%d' % data['quantity']).replace('%GAME_NAME', gamedata['strings']['game_name']).replace('%GAMEBUCKS_NAME', gamedata['store']['gamebucks_ui_name']) },
                       }
             body_json['packets'][currency].append(packet)
-    return 'PUT', make_headers(config), SpinJSON.dumps(body_json) # this must be an HTTP "PUT" to work
+    return 'https://api.xsolla.com/merchant/projects/%s/virtual_currency' % config['xsolla_project_id'], 'PUT', make_headers(config), SpinJSON.dumps(body_json) # this must be an HTTP "PUT" to work
 
 
-# return the (method,headers,body) for a request to generate an Xsolla "token" to start the purchase flow
+# return the (url, method,headers,body) for a request to generate an Xsolla "token" to start the purchase flow
 # @param config - from SpinConfig config.json
 def make_token_request(config,
                        user_xs_id, user_email, user_currency, user_country, user_language,
@@ -86,7 +86,7 @@ def make_token_request(config,
     if user_email:
         body_json['user']['email'] = { 'value': user_email }
 
-    return 'POST', make_headers(config), SpinJSON.dumps(body_json)
+    return 'https://api.xsolla.com/merchant/merchants/%s/token' % config['xsolla_merchant_id'], 'POST', make_headers(config), SpinJSON.dumps(body_json)
 
 if __name__ == '__main__':
     import SpinConfig
@@ -94,4 +94,4 @@ if __name__ == '__main__':
         print make_token_request(SpinConfig.config, 'xs1234', 'example@example.com',
                                  'USD', 'us', 'en', 100, '100 Gamebucks', 25, int(time.time()) - 10*86400)
     gamedata = SpinJSON.load(open(SpinConfig.gamedata_filename()))
-    print make_virtual_currency_settings_update(SpinConfig.config, gamedata)[2]
+    print make_virtual_currency_settings_update(SpinConfig.config, gamedata)[3]
