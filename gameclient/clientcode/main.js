@@ -35800,8 +35800,9 @@ function buy_gamebucks_dialog_select(dialog, num) {
         var alloy_qty = (spell['price_formula'] == 'gamebucks_topup' ? topup_bucks : spell['quantity']);
 
         var payment_currency = ('currency' in spell ? spell['currency'] : 'fbcredits');
-        if(SPay.api == 'fbpayments') {
-            if(payment_currency.indexOf('fbpayments:') != 0) { throw Error('bad payment_currency '+payment_currency); }
+
+        if(SPay.api == 'fbpayments' || SPay.api == 'xsolla') {
+            if(payment_currency.indexOf(SPay.api+':') != 0) { throw Error('bad payment_currency '+payment_currency); }
             display_currency = payment_currency.split(':')[1];
         }
 
@@ -35921,7 +35922,7 @@ function buy_gamebucks_dialog_select(dialog, num) {
             }
 
             metric_event('4440_buy_gamebucks_init_payment', {'purchase_ui_event': true, 'client_time': Math.floor(client_time),
-                                                             'sku': spname,
+                                                             'sku': spname, 'api': SPay.api,
                                                              'gamebucks': _alloy_qty,
                                                              'currency': _payment_currency,
                                                              'currency_price': _payment_price});
@@ -36012,6 +36013,9 @@ function invoke_buy_gamebucks_dialog23(ver, reason, amount, order) {
     for(var spellname in gamedata['spells']) {
         if(spellname.indexOf("BUY_GAMEBUCKS_") != -1 && spellname !== "BUY_GAMEBUCKS_TOPUP") {
             var spell = gamedata['spells'][spellname];
+
+            if(!spell['currency'] || spell['currency'].split(':')[0] !== SPay.api) { continue; } // skip spells with different API
+
             if('requires' in spell && !read_predicate(spell['requires']).is_satisfied(player, null)) {
                 continue;
             }
@@ -36235,7 +36239,7 @@ function update_buy_gamebucks_sku2(dialog) {
 
     var payment_currency = ('currency' in spell ? spell['currency'] : 'fbcredits');
     if(SPay.api == 'fbpayments' || SPay.api == 'xsolla') {
-        if(payment_currency.indexOf('fbpayments:') != 0) { throw Error('bad payment_currency '+payment_currency); }
+        if(payment_currency.indexOf(SPay.api+':') != 0) { throw Error('bad payment_currency '+payment_currency); }
         display_currency = payment_currency.split(':')[1];
     }
     var payment_price = Store.get_price(payment_currency, GameObject.VIRTUAL_ID, spell, spellarg, false);
@@ -36369,7 +36373,7 @@ function update_buy_gamebucks_sku2(dialog) {
             }
 
             metric_event('4440_buy_gamebucks_init_payment', {'gui_version': dialog.parent.user_data['ver'], 'purchase_ui_event': true, 'client_time': Math.floor(client_time),
-                                                             'sku': spname,
+                                                             'sku': spname, 'api': SPay.api,
                                                              'gamebucks': _alloy_qty,
                                                              'currency': _payment_currency,
                                                              'currency_price': _payment_price});
@@ -40194,7 +40198,7 @@ Store.display_user_currency_price = function(price, format) {
 
 // display a real-world currency amount (also handles Facebook Credit prices)
 // display_currency = the currency in which to display the final amount
-// price_currency = must be either fbcredits (for the old FB Credits API) or fbpayments:display_currency (for the new FB Payments API)
+// price_currency = must be either fbcredits (for the old FB Credits API) or fbpayments:display_currency (for the new FB Payments API) or xsolla:display_currency (for Xsolla)
 Store.display_real_currency_amount = function (display_currency, price, price_currency, abbreviate) {
     var curr_prefix, curr_suffix, curr_decimals;
     if(display_currency in gamedata['currencies']) {
@@ -40220,7 +40224,7 @@ Store.display_real_currency_amount = function (display_currency, price, price_cu
     }
 
     var display_price;
-    if(price_currency == display_currency || (price_currency.indexOf('fbpayments:') == 0 && price_currency.split(':')[1] == display_currency) ||
+    if(price_currency == display_currency || ((price_currency.indexOf('fbpayments:') == 0 || price_currency.indexOf('xsolla:') == 0) && price_currency.split(':')[1] == display_currency) ||
        (price_currency == 'fbcredits' && display_currency == 'Facebook Credits') ||
        (price_currency == 'kgcredits' && display_currency == 'Kongregate Kreds')) {
         display_price = price;
@@ -41308,7 +41312,7 @@ Store.place_order = function(currency, unit_id, spellname, spellarg, cb, props) 
 
     var price = Store.get_price(currency, unit_id, gamedata['spells'][spellname], spellarg, false);
 
-    if(price < 0 || (price == 0 && (currency == 'fbcredits' || currency.indexOf('fbpayments:') === 0))) {
+    if(price < 0 || (price == 0 && (currency == 'fbcredits' || currency.indexOf('fbpayments:') === 0 || currency.indexOf('xsolla:') === 0))) {
         change_selection(null);
         var msg = 'Error: invalid order, probably due to time delay, please try again.';
         user_log.msg(msg, new SPUI.Color(1,0,0,1));
@@ -41323,7 +41327,7 @@ Store.place_order = function(currency, unit_id, spellname, spellarg, cb, props) 
         if(!no_clear) { change_selection(null); }
         Store.place_kgcredits_order(price, unit_id, spellname, spellarg, cb, (props ? (props['fail_cb'] || null) : null));
         return false;
-    } else if(currency.indexOf('fbpayments:') === 0) {
+    } else if(currency.indexOf('fbpayments:') === 0 || currency.indexOf('xsolla:') === 0) {
         if(!no_clear) { change_selection(null); }
         if(SPay.api == 'xsolla') {
             Store.place_xsolla_order(spellname, spellarg, cb, props);

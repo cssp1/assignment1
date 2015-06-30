@@ -145,8 +145,10 @@
     // special SKU to represent in-app currency purchases
     "FB_PROMO_GAMEBUCKS": {  "paid": 1, "currency": "fbcredits", "price_formula": "fb_inapp_currency_fbcredits" }, // old Credits API
     "FB_TRIALPAY_GAMEBUCKS": {  "paid": 1, "currency": "gamebucks", "price_formula": "fb_inapp_currency_gamebucks" }, // TrialPay API
-    "FB_XSOLLA_GAMEBUCKS": {  "paid": 1, "currency": "gamebucks", "price_formula": "fb_inapp_currency_gamebucks" }, // Xsolla API
-    "FB_GAMEBUCKS_PAYMENT": {  "paid": 1, "currency": "fbpayments:*", "price_formula": "fb_inapp_currency_fbpayments" }, // new Payments API
+    "FB_GAMEBUCKS_PAYMENT": {  "paid": 1, "currency": "fbpayments:*", "price_formula": "arbitrary_real_currency" }, // new Payments API
+
+    // fallback SKU to represent an arbitrary Xsolla payment where we don't recognize the source SKU
+    "XSOLLA_PAYMENT": {  "paid": 1, "currency": "xsolla:*", "price_formula": "arbitrary_real_currency" }, // Xsolla API
 
     "BUY_GAMEBUCKS_TOPUP": { "ui_name": "%GAMEBUCKS_QUANTITY %GAMEBUCKS_NAME",
                              "ui_description": "%GAMEBUCKS_QUANTITY %GAMEBUCKS_NAME, which can be spent in game on speed-ups, resources, and special items",

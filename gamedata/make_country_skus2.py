@@ -10,7 +10,7 @@ import SpinJSON
 import SpinConfig
 import AtomicFileWrite
 
-import sys, re, os, getopt
+import sys, re, os, getopt, copy
 
 import locale # for pretty number printing only
 locale.setlocale(locale.LC_ALL, '')
@@ -1131,7 +1131,7 @@ if __name__ == '__main__':
                 'quantity': data['alloy'],
                 'ui_name': '%GAMEBUCKS_QUANTITY %GAME_NAME %GAMEBUCKS_NAME',
                 'ui_description': "%GAMEBUCKS_QUANTITY %GAME_NAME %GAMEBUCKS_NAME, which can be spent in game on speed-ups, resources, and special items",
-                'activation': 'instant', 'icon': 'store_icon_grow_perimeter',
+                'activation': 'instant', # 'icon': 'store_icon_grow_perimeter',
                 'paid': 1,
                 'currency': 'fbpayments:'+val['currency'],
                 'price_formula': 'constant',
@@ -1222,6 +1222,13 @@ if __name__ == '__main__':
             sku['requires'] = pred
 
             out[sku_name] = sku
+
+            # temporary hack - generate Xsolla SKUS as well
+            xsolla_sku_name = 'BUY_GAMEBUCKS_%d' % data['alloy'] + ('_UNITS' if unit_bonus else '') + '_XS_'+slate_name
+            xsolla_sku = copy.deepcopy(sku)
+            xsolla_sku['currency'] = 'xsolla:'+val['currency']
+            del xsolla_sku['open_graph_prices']
+            out[xsolla_sku_name] = xsolla_sku
 
     out_keys = sorted(out.keys(), key = lambda x: -int(x.split('_')[2]))
     for name in out_keys:

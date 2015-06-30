@@ -302,8 +302,8 @@ PURCHASE_CATEGORY_MAP = {'MAKE_DROIDS': 'manufacturing', # dummy entry for produ
                          'BUY_ITEM': 'specific_items',
                          'LOTTERY_SCAN': 'lottery',
                          'CHANGE_ALIAS': 'change_alias',
+                         'XSOLLA_PAYMENT': 'gamebucks', # same as BUY_GAMEBUCKS_*
                          'FB_TRIALPAY_GAMEBUCKS': 'FB TrialPay In-App Currency Offers',
-                         'FB_XSOLLA_GAMEBUCKS': 'Xsolla Virtual Currency Purchases',
                          'FB_PROMO_GAMEBUCKS': 'Facebook In-App Currency Promotions',
                          'FB_GAMEBUCKS_PAYMENT': 'Facebook In-App Currency Promotions'
                        }

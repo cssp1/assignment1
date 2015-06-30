@@ -1405,6 +1405,7 @@ class User:
         gamesite.AsyncHTTP_Facebook.queue_request(server_time, url, functools.partial(self.ping_fbpayment_complete, request, session, retmsg, request_id), max_tries = 4)
         return True # hold request async until the poll completes
 
+    # return the spellname, spellarg that corresponds to an FB payment on the Open Graph object "url" with quantity "item_quantity"
     def parse_fbpayment_product_url(self, url, item_quantity):
         qs = urlparse.parse_qs(urlparse.urlparse(str(url)).query)
         # look for a SKU slate order
@@ -1420,7 +1421,8 @@ class User:
             raise Exception('cannot parse product URL %s qty %d' % (url, item_quantity))
         return spellname, spellarg
 
-    def parse_gamebucks_spell(self, spellname, spellarg):
+    # return the quantity of gamebucks given by this spellname/spellarg pair
+    def parse_buy_gamebucks_spell_quantity(self, spellname, spellarg):
         if spellname == 'FB_GAMEBUCKS_PAYMENT':
             assert spellarg > 0
             return spellarg
@@ -1430,6 +1432,27 @@ class User:
             return int(spellname.split('_')[2])
         else:
             raise Exception('cannot parse spellname %s spellarg %s' % (spellname, repr(spellarg)))
+
+    # find the spellname, spellarg for a BUY_GAMEBUCKS spell applicable to the player with this currency and amount
+    # used to reconstruct the source spell when we lost it during the payments flow
+    def find_buy_gamebucks_spell(self, session, real_currency, real_currency_amount, gamebucks_amount):
+        for spellname, spell in gamedata['spells'].iteritems():
+            if spell.get('quantity',-1) == gamebucks_amount and \
+               spell.get('currency') == real_currency and \
+               spellname.startswith('BUY_GAMEBUCKS') and \
+               spell.get('price_formula') == 'constant':
+                match = True
+                for PRED in ('show_if','requires'):
+                    if PRED in spell and (not Predicates.read_predicate(spell[PRED]).is_satisfied(session.player, None)):
+                        match = False
+                if not match: continue
+
+                # check price equivalence approximately
+                if round(spell['price'], 2) != round(real_currency_amount, 2): continue
+
+                return spellname, None # match found!
+
+        return None, None
 
     # ping an already-completed FB payment to check for chargebacks
     def ping_fbpayment_check_refund(self, session, retmsg, payment_id, result):
@@ -1486,7 +1509,7 @@ class User:
                 usd_equivalent = 0.01*int(100*float(payment['payout_foreign_exchange_rate']) * refund_amount * 0.7 + 0.5) # post FB tax
                 item = payment['items'][0]
                 spellname, spellarg = self.parse_fbpayment_product_url(item['product'], item['quantity'])
-                gamebucks = self.parse_gamebucks_spell(spellname, spellarg)
+                gamebucks = self.parse_buy_gamebucks_spell_quantity(spellname, spellarg)
                 gift_order = entry.get('gift_order', None)
                 try:
                     time_struct = time.gmtime(SpinFacebook.parse_fb_time(paid_time_string or refund_time_string))
@@ -12750,7 +12773,9 @@ class Store:
         # only check for currency match when price > 0
         if (not (sale_currency.startswith('item:') or (sale_currency in gamedata['resources']))):
             spell_currency = spell.get('currency', session.player.get_any_abtest_value('currency', gamedata['currency']) if session else gamedata['currency'])
-            if spell_currency == 'fbpayments:*' and sale_currency.startswith('fbpayments:'):
+            # wildcard matches for unknown real currencies
+            if spell_currency == 'fbpayments:*' and sale_currency.startswith('fbpayments:') or \
+               spell_currency == 'xsolla:*' and sale_currency.startswith('xsolla:'):
                 pass
             elif sale_currency != spell_currency:
                 error_reason.append('buyer offered %s but spell can only be bought with %s' % (sale_currency, spell_currency))
@@ -12893,7 +12918,7 @@ class Store:
         elif formula == 'fb_inapp_currency_gamebucks':
             p_currency = 'gamebucks'
             return spellarg, p_currency
-        elif formula == 'fb_inapp_currency_fbpayments':
+        elif formula == 'arbitrary_real_currency':
             # NEW fbpayments method
             p_currency = sale_currency
             real_currency = str(sale_currency.split(':')[1])
@@ -13475,7 +13500,7 @@ class Store:
 
     @classmethod
     def execute_credit_order(cls, order_id, gameapi, request, session, buyer, receiver, currency, credits_amount, my_data):
-        assert currency in ('fbcredits', 'kgcredits', 'gamebucks')
+        assert currency in ('fbcredits', 'kgcredits', 'gamebucks') or currency.startswith('xsolla:')
         # note that gamebucks here is only used for platform offers that pay out in gamebucks, NOT in-game purchases
 
         tag = None
@@ -13514,16 +13539,6 @@ class Store:
             network_id = session.user.facebook_id
             dollar_amount = Store.promo_gamebucks_to_dollars(credits_amount)
 
-        # Xsolla order
-        elif my_data.get('spellname') == 'FB_XSOLLA_GAMEBUCKS':
-            assert session
-            assert currency == 'gamebucks'
-            unit_id = GameObject.VIRTUAL_ID
-            spellname = 'FB_XSOLLA_GAMEBUCKS'
-            spellarg = credits_amount
-            network_id = session.user.get_xsolla_id()
-            dollar_amount = my_data['usd_receipts']
-
         else:
             if session is None:
                 session = session_table[my_data['session_id']]
@@ -13531,8 +13546,15 @@ class Store:
             spellname = my_data['spellname']
             spellarg = my_data.get('spellarg', None)
             tag = my_data.get('tag', None)
-            network_id = {'fbcredits':session.user.facebook_id, 'kgcredits':session.user.kg_id}[currency]
-            dollar_amount = {'fbcredits':Store.fbcredits_to_dollars, 'kgcredits':Store.kgcredits_to_dollars}[currency](credits_amount)
+            if currency.startswith('xsolla:'):
+                network_id = session.user.get_xsolla_id()
+                dollar_amount = my_data['usd_receipts']
+            elif currency == 'fbcredits':
+                network_id = session.user.facebook_id
+                dollar_amount = Store.fbcredits_to_dollars(credits_amount)
+            elif currency == 'kgcredits':
+                network_id = session.user.kg_id
+                dollar_amount = Store.kgcredits_to_dollars(credits_amount)
 
         server_time_according_to_client = my_data.get('server_time_according_to_client', None)
 
@@ -13689,7 +13711,7 @@ class Store:
         # As of October 2014, Facebook is now sending us fbpayments orders with currencies other than those we publish via gamebucks_open_graph_prices.
         # According to the docs, they "invent" a currency->gamebucks exchange rate into the new currency based on the first published currency (always USD for us)
         # We have no choice but to trust that this is a fair amount (!)
-        if spell['price_formula'] == 'fb_inapp_currency_fbpayments' and \
+        if spell['price_formula'] == 'arbitrary_real_currency' and \
            currency.startswith('fbpayments:') and \
            (not any(str(currency.split(':')[1]) == curname for curname, srate in gamedata['store']['gamebucks_open_graph_prices'])):
             gamesite.exception_log.event(server_time, 'player %d making %s order (payment_id %r) with unknown currency %s amount %s, trusting Facebook that it is worth %d gamebucks!' % \
@@ -13742,7 +13764,7 @@ class Store:
             record_spend_type = 'money'
             record_price_type = 'kg_price'
             record_amount = Store.kgcredits_to_dollars(amount_willing_to_pay)
-        elif currency.startswith('fbpayments:'):
+        elif currency.startswith('fbpayments:') or currency.startswith('xsolla:'):
             record_spend_type = 'money'
             record_price_type = 'price'
             record_amount = usd_equivalent
@@ -14017,9 +14039,9 @@ class Store:
             session.increment_player_metric('resource_boosts_purchased', 1)
             session.increment_player_metric(record_spend_type+'_spent_on_resource_boosts', record_amount)
 
-        elif spellname.startswith("BUY_GAMEBUCKS_") or spellname in ("FB_PROMO_GAMEBUCKS", "FB_TRIALPAY_GAMEBUCKS", "FB_XSOLLA_GAMEBUCKS", "FB_GAMEBUCKS_PAYMENT"):
+        elif spellname.startswith("BUY_GAMEBUCKS_") or spellname in ("FB_PROMO_GAMEBUCKS", "FB_TRIALPAY_GAMEBUCKS", "XSOLLA_PAYMENT", "FB_GAMEBUCKS_PAYMENT"):
             spell = gamedata['spells'][spellname]
-            if spellname in ("FB_PROMO_GAMEBUCKS", "FB_TRIALPAY_GAMEBUCKS", "FB_XSOLLA_GAMEBUCKS", "FB_GAMEBUCKS_PAYMENT", "BUY_GAMEBUCKS_TOPUP"):
+            if spellname in ("FB_PROMO_GAMEBUCKS", "FB_TRIALPAY_GAMEBUCKS", "XSOLLA_PAYMENT", "FB_GAMEBUCKS_PAYMENT", "BUY_GAMEBUCKS_TOPUP"):
                 bucks = int(spellarg)
             else:
                 bucks = spell['quantity']
@@ -14032,7 +14054,7 @@ class Store:
                 # the other purchase_ui_log events are all client-side, but we have to do this on the server
                 # because Facebook's credit API callback is unreliable :(
                 gamesite.purchase_ui_log.event(server_time, {'code':4450, 'event_name': '4450_buy_gamebucks_payment_complete',
-                                                             'user_id': session.player.user_id, 'sku': spellname,
+                                                             'user_id': session.player.user_id, 'sku': spellname, 'api': currency.split(':')[0],
                                                              'gamebucks': bucks,
                                                              'currency': currency, 'currency_price': amount_willing_to_pay,
                                                              'usd_equivalent': usd_equivalent,
@@ -14593,19 +14615,29 @@ class XSAPI(resource.Resource):
         return ''
 
     def handle_payment(self, request, session, request_data):
-        gamebucks_amount = int(request_data['purchase']['virtual_currency']['quantity'])
         if request_data['transaction'].get('dry_run',0) and spin_secure_mode:
             raise Exception('sandbox purchases not allowed in secure mode')
+
+        gamebucks_amount = int(request_data['purchase']['virtual_currency']['quantity'])
+        real_currency = 'xsolla:'+request_data['purchase']['virtual_currency']['currency']
+        real_currency_amount = request_data['purchase']['virtual_currency']['amount']
+
+        # try to find the source SKU this purchase came from
+        spellname, spellarg = session.user.find_buy_gamebucks_spell(session, real_currency, real_currency_amount, gamebucks_amount)
+        if spellname is None: # fallback
+            spellname = 'XSOLLA_PAYMENT'
+            spellarg = gamebucks_amount
 
         if gamebucks_amount > 0:
             # we (ab)use the credit order path here to share all of its metrics output
             assert request_data['payment_details']['payout']['currency'] == 'USD'
+
             Store.execute_credit_order(request_data['transaction']['id'], self.gameapi, request, session,
                                        request_data['user']['id'], request_data['user']['id'],
-                                       'gamebucks', gamebucks_amount,
+                                       real_currency,
+                                       real_currency_amount,
                                        # awkward syntax here
-                                       # XXXXXX reconstruct the source SKU from request_data['purchase']['virtual_currency'] ?
-                                       {'spellname': 'FB_XSOLLA_GAMEBUCKS',
+                                       {'spellname': spellname, 'spellarg': spellarg, 'unit_id': GameObject.VIRTUAL_ID,
                                         'session_id': session.session_id,
                                         'usd_receipts': request_data['payment_details']['payout']['amount']})
 
@@ -14627,9 +14659,9 @@ class XSAPI(resource.Resource):
         return ''
 
     # not part of the API handler - this is called on behalf of the client via GAMEAPI
-    def get_token(self, session, retmsg, spellname, spellarg): # spellname being an fbpayments gamebucks SKU
+    def get_token(self, session, retmsg, spellname, spellarg): # spellname being an xsolla BUY_GAMEBUCKS SKU
         spell = gamedata['spells'][spellname]
-        assert spell['currency'].startswith('fbpayments:')
+        assert spell['currency'].startswith('xsolla:')
         for PRED in ('show_if', 'requires'):
             if (PRED in spell) and (not Predicates.read_predicate(spell[PRED]).is_satisfied(session.player, None)):
                 retmsg.append(["ERROR", "REQUIREMENTS_NOT_SATISFIED", spell[PRED]])
