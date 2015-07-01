@@ -41781,6 +41781,9 @@ Store.place_xsolla_order = function(spellname, spellarg, on_finish, options) {
         Store.do_place_xsolla_order(Store.xsolla_token_cache[key], on_finish, options);
         return;
     }
+
+    metric_event('4079_xsolla_order_get_token', {'spellname': spellname, 'spellarg': spellarg, 'purchase_ui_event': true, 'client_time': client_time});
+
     var tag = 'xgt'+Store.xsolla_token_serial.toString();
     Store.xsolla_token_serial += 1;
     send_to_server.func(['XSOLLA_GET_TOKEN', tag, spellname, spellarg || null]);
@@ -41797,6 +41800,14 @@ Store.place_xsolla_order = function(spellname, spellarg, on_finish, options) {
     ui_locker_arr[0] = invoke_ui_locker_until_closed();
 };
 
+// goog.object.extend operates in-place, we want a non-mutating extend
+var my_extend = function(a, b) {
+    var result = {};
+    for (var x in a) if (a.hasOwnProperty(x)) result[x] = a[x];
+    for (var x in b) if (b.hasOwnProperty(x)) result[x] = b[x];
+    return result;
+};
+
 /** Open the purchase GUI, once we have a token
     @param {string} token
     @param {function()|null=} on_finish
@@ -41805,7 +41816,11 @@ Store.do_place_xsolla_order = function(token, on_finish, options) {
     if(!SPay.xsolla_available()) { throw Error('Xsolla initialization failed'); }
     var on_fail = options['fail_cb'] || null;
 
-    var state = {'fail': false, 'success': false}; // track state so we only call each callback once
+    var state = {'fail': false, 'success': false, // track whether we have called each callback already
+                 // metric event properties
+                 'metric_props': {'purchase_ui_event': true, 'token': token}};
+
+    metric_event('4057_xsolla_order_prompt_init', my_extend(state['metric_props'], {'client_time': client_time}));
 
     XPayStationWidget.init({'access_token': token, 'sandbox': !spin_secure_mode});
 
@@ -41813,27 +41828,29 @@ Store.do_place_xsolla_order = function(token, on_finish, options) {
         XPayStationWidget.off(); // detach remaining event handlers
         if(!_state['success'] && !_state['fail']) {
             _state['fail'] = true;
+            metric_event('4059_xsolla_order_prompt_fail', my_extend(_state['metric_props'], {'method': 'close', 'client_time': client_time}));
             if(_on_fail) { _on_fail(); }
         }
     }; })(state, on_fail));
 
     XPayStationWidget.on('status-done', (function (_state, _on_finish) { return function(event, data) {
-        console.log('XPayStationWidget status-done: '+event.toString()+' data '+JSON.stringify(data)); // XXXXXX metrics
+        metric_event('4058_xsolla_order_prompt_success', my_extend(_state['metric_props'], {'client_time': client_time}));
         _state['success'] = true;
         _on_finish();
     }; })(state, on_finish));
 
     XPayStationWidget.on('status-troubled', (function (_state, _on_fail) { return function(event, data) {
-        console.log('XPayStationWidget status-troubled: '+event.toString()+' data '+JSON.stringify(data));// XXXXXX metrics
+        metric_event('4059_xsolla_order_prompt_fail', my_extend(_state['metric_props'], {'method': 'status-troubled: '+JSON.stringify(data), 'client_time': client_time}));
         _state['fail'] = true;
         if(_on_fail) { _on_fail(); }
     }; })(state, on_fail));
 
     goog.array.forEach(['open', 'load', 'status-invoice', 'status-delivering'],
                        function(cbtype) {
-                           XPayStationWidget.on(cbtype, (function (_cbtype) { return function(event, data) {
-                               console.log('XPayStationWidget '+_cbtype+': '+event.toString()+' data '+JSON.stringify(data));// XXXXXX metrics
-                           }; })(cbtype));
+                           XPayStationWidget.on(cbtype, (function (_state, _cbtype) { return function(event, data) {
+                               // might be unnecessary
+                               metric_event('4078_xsolla_order_prompt_update', my_extend(_state['metric_props'], {'method': _cbtype, 'client_time': client_time}));
+                           }; })(state, cbtype));
                        });
     XPayStationWidget.open();
 };
