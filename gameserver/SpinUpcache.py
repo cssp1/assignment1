@@ -158,7 +158,7 @@ def get_csv_fields(gamedata):
 
 # fields that should be stripped out of userdb before inserting into upcache (because they are large and irrelevant to metrics)
 # note that we do need to *read* the facebook_profile and facebook_likes to compute and store a few values before getting rid of them
-HOG_FIELDS = ["last_login_ip", "fb_hit_time", "kg_hit_time", "facebook_profile", "facebook_friends", "facebook_likes", "facebook_currency", "facebook_permissions", "acquisition_data", "preferences", "facebook_first_name", "facebook_friends_map", "browser_caps", "oauth_token", "fb_oauth_token", "fb_credit_balance", "fb_gamer_status", "kg_auth_token", "kg_friend_ids", "kg_avatar_url", "purchase_ui_log"]
+HOG_FIELDS = ["last_login_ip", "fb_hit_time", "kg_hit_time", "facebook_profile", "facebook_friends", "facebook_likes", "facebook_currency", "facebook_permissions", "acquisition_data", "preferences", "facebook_first_name", "facebook_friends_map", "browser_caps", "oauth_token", "fb_oauth_token", "fb_credit_balance", "fb_gamer_status", "kg_auth_token", "kg_friend_ids", "kg_avatar_url", "ag_avatar_url", "purchase_ui_log"]
 
 # fields that should be stripped out of upcache before writing CSV
 # in addition to these, any time-series field ending with "_at_time" is also stripped

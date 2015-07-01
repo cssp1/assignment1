@@ -292,17 +292,23 @@ if __name__ == '__main__':
             print fmt % ('Alias (Call Sign):', player['alias'])
 
         if user.get('frame_platform', None):
-            print fmt % ('Frame Platform:', {'fb':'Facebook','kg':'Kongregate'}[user['frame_platform']])
+            print fmt % ('Frame Platform:', {'fb':'Facebook','kg':'Kongregate','ag':'Armor Games'}[user['frame_platform']])
+
+        if user.get('ag_id', None):
+            print fmt % ('Armor Games ID:', '"'+str(user['ag_id'])+'"')
+        if user.get('ag_username', None):
+            print fmt % ('Armor Games Name:', '"'+str(user['ag_username'])+'"')
+
+        if user.get('kg_id', None):
+            print fmt % ('Kongregate ID:', '"'+str(user['kg_id'])+'"')
+        if user.get('kg_username', None):
+            print fmt % ('Kongregate Name:', '"'+str(user['kg_username'])+'"')
 
         if user.get('facebook_id', None):
             print fmt % ('Facebook ID:', '"'+str(user['facebook_id'])+'"')
         if user.get('facebook_name', None):
             print fmt % ('Facebook Name:', user['facebook_name'])
 
-        if user.get('kg_id', None):
-            print fmt % ('Kongregate ID:', '"'+str(user['kg_id'])+'"')
-        if user.get('kg_username', None):
-            print fmt % ('Kongregate Name:', '"'+str(user['kg_username'])+'"')
 
         print fmt % ('Level:', str(player['resources']['player_level']))
         print fmt % ('CC Level:', str(player['history'].get(gamedata['townhall']+'_level',1)))

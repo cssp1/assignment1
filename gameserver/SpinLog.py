@@ -402,6 +402,7 @@ def ClientTroubleLogFilter(child):
                                          '0649_client_died_from_ws_unknown_failure',
                                          '0650_client_died_from_facebook_api_error',
                                          '0651_client_died_from_kongregate_api_error',
+                                         '0652_client_died_from_armorgames_api_error',
                                          '0660_asset_load_fail',
                                          '0670_client_died_from_version_mismatch',
                                          '0671_client_died_from_proxy_signature_fail',

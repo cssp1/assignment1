@@ -89,15 +89,14 @@ def update_user(user_id, db_client):
 
         props = {}
 
-        if user.get('social_id', None):
-            props['social_id'] = user['social_id']
-        if user.get('facebook_id',None):
-            props['facebook_id'] = user['facebook_id']
-        if user.get('kg_avatar_url',None):
-            props['kg_avatar_url'] = user['kg_avatar_url']
+        for FIELD in ('social_id', 'facebook_id', 'kg_id', 'ag_id', 'ag_avatar_url', 'kg_avatar_url'):
+            if user.get(FIELD):
+                props[FIELD] = user[FIELD]
 
         if user.get('alias', None):
             props['ui_name'] = user['alias']
+        elif user.get('ag_username',None):
+            props['ui_name'] = user['ag_username']
         elif user.get('kg_username',None):
             props['ui_name'] = user['kg_username']
         elif user.get('facebook_first_name', None):
