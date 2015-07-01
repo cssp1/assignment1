@@ -69,7 +69,8 @@ def battles_risk_reward_summary_schema(sql_util, interval_name): return {
                ('total_gamebucks_spent_5min', 'INT8'),
                ('loot_items_value', 'INT8'),
                ('consumed_items_value', 'INT8'),
-               ('loot_res_value', 'INT8'),
+               ('loot_res_value', 'INT8'), # iron + water + res3
+               ('loot_res3_value', 'INT8'), # res3 only
                ('damage_res_value', 'INT8'),
                ('damage_time_value', 'INT8'),
                ('total_risk', 'INT8'),
@@ -92,7 +93,8 @@ def battles_risk_reward_summary_combined_schema(sql_util, interval_name): return
                ('total_gamebucks_spent_5min', 'INT8'),
                ('loot_items_value', 'INT8'),
                ('consumed_items_value', 'INT8'),
-               ('loot_res_value', 'INT8'),
+               ('loot_res_value', 'INT8'), # iron + water + res3
+               ('loot_res3_value', 'INT8'), # res3 only
                ('damage_res_value', 'INT8'),
                ('damage_time_value', 'INT8'),
                ('total_risk', 'INT8'),
@@ -294,6 +296,7 @@ if __name__ == '__main__':
                             "       SUM(loot_items_value) AS loot_items_value," + \
                             "       SUM(consumed_items_value) AS consumed_items_value," + \
                             "       SUM(loot_iron_value + loot_water_value + loot_res3_value) AS loot_res_value," + \
+                            "       SUM(loot_res3_value) AS loot_res3_value," + \
                             "       SUM(damage_iron_value + damage_water_value + damage_res3_value) AS damage_res_value," + \
                             "       SUM(damage_time_value) AS damage_time_value," + \
                             "       -1 * SUM(consumed_items_value + IF(loot_iron_value<0,loot_iron_value,0) + IF(loot_water_value<0,loot_water_value,0) + IF(loot_res3_value<0,loot_res3_value,0) + damage_iron_value + damage_water_value + damage_res3_value + damage_time_value) AS total_risk, -- negate to make it display positive\n" + \
@@ -354,6 +357,7 @@ if __name__ == '__main__':
                             "       SUM(loot_items_value) AS loot_items_value," + \
                             "       SUM(consumed_items_value) AS consumed_items_value," + \
                             "       SUM(loot_iron_value + loot_water_value + loot_res3_value) AS loot_res_value," + \
+                            "       SUM(loot_res3_value) AS loot_res3_value," + \
                             "       SUM(damage_iron_value + damage_water_value + damage_res3_value) AS damage_res_value," + \
                             "       SUM(damage_time_value) AS damage_time_value," + \
                             "       -1 * SUM(consumed_items_value + IF(loot_iron_value<0,loot_iron_value,0) + IF(loot_water_value<0,loot_water_value,0) + IF(loot_res3_value<0,loot_res3_value,0) + damage_iron_value + damage_water_value + damage_res3_value + damage_time_value) AS total_risk, -- negate to make it display positive\n" + \
