@@ -1450,14 +1450,14 @@ class User:
                 match = True
                 for PRED in ('show_if','requires'):
                     if PRED in spell and (not Predicates.read_predicate(spell[PRED]).is_satisfied(session.player, None)):
-                        match = False
+                        match = False; break
                 if not match: continue
 
                 # check price equivalence approximately
                 if round(spell['price'], 2) != round(real_currency_amount, 2): continue
 
                 return spellname, None # match found!
-
+        gamesite.exception_log.event(server_time, 'find_buy_gamebucks_spell failed for %s %r %d' % (real_currency, real_currency_amount, gamebucks_amount))
         return None, None
 
     # ping an already-completed FB payment to check for chargebacks
