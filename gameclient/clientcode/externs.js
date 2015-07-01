@@ -45,6 +45,10 @@ var spin_secure_mode;
 var spin_kissmetrics_enabled;
 var spin_frame_platform;
 var spin_social_id;
+/** @type {boolean} */
+var spin_armorgames_enabled;
+var spin_armorgames_user;
+/** @type {boolean} */
 var spin_kongregate_enabled;
 var spin_kongregate_user;
 /** @type {boolean} */
@@ -94,6 +98,13 @@ var FB = {
         "setAutoGrow": function() {},
         "getPageInfo": function() {}
     }
+};
+
+// Armor Games API
+var agi = {
+    "ping": function() {},
+    "updateUserQuest": function() {},
+    "setIframeDimensions": function() {}
 };
 
 // Kongregate API

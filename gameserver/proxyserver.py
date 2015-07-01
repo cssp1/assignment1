@@ -452,6 +452,10 @@ class KGVisitor(Visitor):
                                                                                                           'kongregate_game_id': [self.kongregate_game_id,],
                                                                                                           'kongregate_game_url': [self.kongregate_game_url,],
                                                                                                           })
+
+class AGVisitor(Visitor):
+    pass
+
 visitor_table = {}
 
 # Currently active GAMEAPI sessions
@@ -1599,9 +1603,11 @@ class GameProxy(proxy.ReverseProxyResource):
             '$KISSMETRICS_ENABLED$': 'true' if SpinConfig.config.get('enable_kissmetrics',0) else 'false',
             '$FACEBOOK_ENABLED$': 'true' if SpinConfig.config.get('enable_facebook',0) else 'false',
             '$KONGREGATE_ENABLED$': 'true' if SpinConfig.config.get('enable_kongregate',0) else 'false',
+            '$ARMORGAMES_ENABLED$': 'true' if SpinConfig.config.get('enable_armorgames',0) else 'false',
             '$FRAME_PLATFORM$': visitor.frame_platform,
             '$SOCIAL_ID$': visitor.social_id,
             '$FACEBOOK_ID$': "'"+visitor.facebook_id+"'" if isinstance(visitor, FBVisitor) else 'null',
+            '$ARMORGAMES_ID$': "'"+visitor.armorgames_id+"'" if isinstance(visitor, AGVisitor) else 'null',
             '$KONGREGATE_ID$': "'"+visitor.kongregate_id+"'" if isinstance(visitor, KGVisitor) else 'null',
             '$SIGNED_REQUEST$': "'"+visitor.raw_signed_request+"'" if isinstance(visitor, FBVisitor) else 'null',
             '$FACEBOOK_PERMISSIONS$': visitor.scope_string if (isinstance(visitor, FBVisitor) and visitor.scope_string) else '', # note: client may get more permissions later, this is just the set available upon login

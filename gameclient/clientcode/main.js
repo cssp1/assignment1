@@ -32,6 +32,8 @@ goog.require('SPText');
 goog.require('SPHTTP');
 goog.require('SPFX');
 goog.require('SPFB');
+goog.require('SPKongregate');
+goog.require('SPArmorGames');
 goog.require('Screenshot');
 goog.require('FBShare');
 goog.require('FBUploadPhoto');
@@ -9743,6 +9745,7 @@ function url_put_info(url, user_id, money_spent) {
     var replacements = {
         '__USER_ID__': user_id.toString(),
         '__SOCIAL_ID__': spin_social_id ? spin_social_id.toString() : '',
+        '__ARMORGAMES_ID__': spin_armorgames_user ? spin_armorgames_user.toString() : '',
         '__FACEBOOK_ID__': spin_facebook_user ? spin_facebook_user.toString() : '',
         '__KONGREGATE_ID__': spin_kongregate_user ? spin_kongregate_user.toString() : '',
         '__FRAME_PLATFORM__': spin_frame_platform.toString(),
@@ -13979,7 +13982,7 @@ AOEUICursor.prototype.draw = function(offset) {
 };
 
 function reload_game() {
-    if(false /*spin_facebook_enabled || spin_kongregate_enabled*/) {
+    if(false /*spin_facebook_enabled || spin_kongregate_enabled || spin_armorgames_enabled */) {
         // running inside of the real frame
         // XXX this doesn't work due to browser restrictions :(
         if(top.location.href == spin_game_container_url) {
@@ -35792,6 +35795,8 @@ function buy_gamebucks_dialog_select(dialog, num) {
     } else {
         display_currency = 'Facebook Credits';
     }
+
+    // XXX note: xsolla not supported here
 
     var i;
     for(i = 0; i < spell_list.length; i++) {

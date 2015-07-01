@@ -2379,6 +2379,17 @@ SPUI.get_facebook_portrait_url = function(facebook_id) {
         }
     }
 };
+SPUI.get_armorgames_portrait_url = function(ag_id, avatar_url) {
+    if(SPUI.force_anon_portraits || anon_mode || (ag_id && ag_id.indexOf('example') == 0)) { // anonymous mode or testing sandbox
+        return SPUI.get_anonymous_portrait_url(ag_id === spin_armorgames_user);
+    } else {
+        if(gamedata['client']['proxy_portraits']) {
+            return GameArt.art_url('ag_portrait/?avatar_url='+encodeURIComponent(avatar_url)+'&v='+gamedata['client']['portrait_proxy_cache_rev'], false);
+        } else {
+            return avatar_url;
+        }
+    }
+};
 SPUI.get_kongregate_portrait_url = function(kg_id, avatar_url) {
     if(SPUI.force_anon_portraits || anon_mode || (kg_id && kg_id.indexOf('example') == 0)) { // anonymous mode or testing sandbox
         return SPUI.get_anonymous_portrait_url(kg_id === spin_kongregate_user);
@@ -2421,6 +2432,7 @@ SPUI.FriendPortrait.prototype.update_display = function() {
             // now try social network portrait URLs
             var url = null;
             var urls = {'fb': (info['facebook_id'] ? SPUI.get_facebook_portrait_url(info['facebook_id']) : null),
+                        'ag': (info['ag_avatar_url'] ? SPUI.get_armorgames_portrait_url(info['ag_id'] || null, info['ag_avatar_url']) : null),
                         'kg': (info['kg_avatar_url'] ? SPUI.get_kongregate_portrait_url(info['kg_id'] || null, info['kg_avatar_url']) : null) };
 
             // first try current frame platform
