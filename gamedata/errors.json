@@ -241,7 +241,7 @@
     "CANNOT_CREATE_ALLIANCE_NAME_IN_USE": { "ui_title": "Alliance error", "ui_name": "This name is already taken.\nPlease choose a different name." },
     "CANNOT_CREATE_ALLIANCE_TAG_IN_USE": { "ui_title": "Alliance error", "ui_name": "This chat tag is already taken.\nPlease choose a different chat tag." },
     "CANNOT_CREATE_ALLIANCE_ON_COOLDOWN": { "ui_title": "Cannot create Alliance", "ui_name": "You are still on cooldown since leaving your last Alliance." },
-    "ALIAS_BAD": { "ui_title": "Call Sign error", "ui_name": "Call Signs must be between 4 and 15 characters, and may not contain spaces, or the following characters:\n\n. ; : + * < > [ ] ( ) { } \\ / | ' \" _ & ^ % $ # @ ! ~ ? ` \n\nOffensive language is not tolerated." },
+    "ALIAS_BAD": { "ui_title": "Call Sign error", "ui_name": "Call Signs must be between 4 and 15 characters, and may not contain spaces, graphical symbols, or the following characters:\n\n. ; : + * < > [ ] ( ) { } \\ / | ' \" _ & ^ % $ # @ ! ~ ? ` \n\nOffensive language is not tolerated." },
     "ALIAS_TAKEN": { "ui_title": "Call Sign taken", "ui_name": "Another player is already using this Call Sign. Please choose a different one." },
 
     "SCREENSHOT_FAILED": { "ui_name": "The game was unable to take a screenshot due to browser security settings. Please reload the page and try again.\n\nIf this problem persists, please use the \"Contact Support\" link at the bottom of the page to send us a support request.",

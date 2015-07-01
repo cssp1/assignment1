@@ -183,9 +183,15 @@ def is_valid_alliance_tag(tag):
     return True
 
 def is_valid_alias(name):
+    assert type(name) is unicode # make sure we're given Unicode input
     if len(name) < 4 or len(name) > 15: return False
     for c in name:
         if c in alias_disallowed_chars: return False
+        # disallow some Unicode special characters
+        # see https://en.wikipedia.org/wiki/Unicode_block
+        codepoint = ord(c)
+        if codepoint >= 0x2100 and codepoint <= 0x2bff:
+            return False
     if chat_filter.is_bad(name): return False
     if 'spinpunch' in name.lower(): return False
     return True
