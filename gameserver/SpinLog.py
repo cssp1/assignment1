@@ -413,7 +413,7 @@ def ClientTroubleLogFilter(child):
 
 # filter out uninteresting client and server exceptions so they do not bloat logs
 
-client_exception_filter = 'Context2D|NS_ERROR_FAILURE|setVol|ut of memory|ot enough st|createSo|measureText|lagerplads| ikke |kke nok minne|peicher|insuffisante|insuficiente|insufficiente|ukladacieho|opslagruimte|finns inte till|suficiente|tamamlamak|Slut p\\u00c3\\u00a5 minne|Memoria esaurita|etersiz bellek|Pro dokon|Object expected|Objeto esperado|Previsto oggetto|Objet attendu|esperaba un objeto|Onvoldoende geheugen|esgotada|Nesne bekleniyor|NS_ERROR_UNEXPECTED|0x805e0006|a presentation error|GetDeviceRemovedReason|concluir a opera|mpossibile completare|suorittamiseen|magazynie brak miejsca|ould not complete the operation due to err|HTMLMediaElement.currentTime is not a finite|number of hardware contexts reached maximum|init not called with valid version'
+client_exception_filter = 'Context2D|NS_ERROR_FAILURE|setVol|ut of memory|ot enough st|createSo|measureText|lagerplads| ikke |kke nok minne|peicher|insuffisante|insuficiente|insufficiente|ukladacieho|opslagruimte|finns inte till|suficiente|tamamlamak|Slut p\\u00c3\\u00a5 minne|Memoria esaurita|etersiz bellek|Pro dokon|Object expected|Objeto esperado|Previsto oggetto|Objet attendu|esperaba un objeto|Onvoldoende geheugen|esgotada|Nesne bekleniyor|NS_ERROR_UNEXPECTED|0x805e0006|a presentation error|GetDeviceRemovedReason|concluir a opera|mpossibile completare|suorittamiseen|magazynie brak miejsca|ould not complete the operation due to err|HTMLMediaElement.currentTime is not a finite|number of hardware contexts reached maximum|init not called with valid version|api\.dropbox\.com'
 
 class ClientExceptionLogFilter(Log):
     my_re = re.compile(client_exception_filter)
