@@ -630,6 +630,7 @@ class UserTable:
     WRITE_ONLY_FIELDS = [('user_id', int), # for reference/recovery only, not used as database key
                          ('fb_oauth_token', str),
                          ('kg_auth_token', str),
+                         ('ag_auth_token', str),
                          ]
 
     FIELDS = [('country', None),
@@ -661,9 +662,14 @@ class UserTable:
               ('kg_id', str),
               ('kg_hit_time', int),
               ('kg_username', None),
-              ('kg_birth_time', int),
               ('kg_avatar_url', str),
               ('kg_friend_ids', None),
+              ('ag_id', str),
+              ('ag_hit_time', int),
+              ('ag_profile', None),
+              ('ag_username', None),
+              ('ag_avatar_url', str),
+              ('ag_friend_ids', None),
               ('acquisition_data', None),
               ('acquisition_campaign', None),
               ('acquisition_secondary', None),
@@ -881,9 +887,18 @@ class User:
         # below fields are pulled asynchronously from the KG API
         self.kg_hit_time = -1
         self.kg_username = None
-        self.kg_birth_time = None
         self.kg_avatar_url = None
         self.kg_friend_ids = None
+
+        # Armor Games profile data
+        self.ag_auth_token = None # auth token from the proxyserver login
+        self.ag_id = None # set on login
+        # below fields are pulled asynchronously from the Armor Games API
+        self.ag_profile = None
+        self.ag_hit_time = -1
+        self.ag_username = None
+        self.ag_avatar_url = None
+        self.ag_friend_ids = None
 
         self.acquisition_data = []
         self.acquisition_campaign = ''
@@ -939,6 +954,7 @@ class User:
 
     def get_chat_name(self, player):
         if player.alias: return player.get_titled_alias()
+        if self.ag_username: return self.ag_username
         if self.kg_username: return self.kg_username
         if self.facebook_first_name:
             if self.facebook_name and len(self.facebook_name.split(' ')) >= 2:
@@ -956,6 +972,7 @@ class User:
 
     # return the "real" (platform-provided) name of the player
     def get_real_name(self):
+        if self.ag_username: return self.ag_username
         if self.kg_username: return self.kg_username
         if self.facebook_first_name: return self.facebook_first_name
         if self.facebook_name: return self.facebook_name.split(' ')[0]
@@ -980,6 +997,8 @@ class User:
     def get_email(self):
         if self.facebook_profile:
             return self.facebook_profile.get('email', None)
+        if self.ag_profile:
+            return self.ag_profile.get('email', None)
         return None
 
     def chat_can_interact(self):
@@ -1002,6 +1021,13 @@ class User:
                     return False
                 for friend in self.kg_friend_ids:
                     if str(friend) == kg_id:
+                        return True
+            elif social_id.startswith('ag'):
+                ag_id = social_id[2:]
+                if not self.ag_friend_ids:
+                    return False
+                for friend in self.ag_friend_ids:
+                    if str(friend) == ag_id:
                         return True
         return False
 
@@ -1229,7 +1255,7 @@ class User:
 
         self.repopulate_ai_list(retmsg)
 
-        if (self.facebook_friends is None) and (self.kg_friend_ids is None):
+        if (self.facebook_friends is None) and (self.kg_friend_ids is None) and (self.ag_friend_ids is None):
             return # probably still waiting on the API
 
         # batch query for SpinPunch IDs
@@ -1238,6 +1264,8 @@ class User:
             social_id_list += ['fb'+str(friend['id']) for friend in self.facebook_friends]
         if self.kg_friend_ids:
             social_id_list += ['kg'+str(x) for x in self.kg_friend_ids]
+        if self.ag_friend_ids:
+            social_id_list += ['ag'+str(x) for x in self.ag_friend_ids]
 
         friend_id_list = gamesite.social_id_table.social_id_to_spinpunch_batch(social_id_list)
 
@@ -1310,8 +1338,58 @@ class User:
         self.kg_friend_ids = data['friend_ids']
         if 'age' in data['user_vars'] and type(data['user_vars']['age'] is int):
             # go back N years and 6 months
-            self.kg_birth_time = int(server_time - (data['user_vars']['age']*365+180)*86400)
+            self.birthday = int(server_time - (data['user_vars']['age']*365+180)*86400)
         self.kg_hit_time = server_time
+
+        if retmsg is None:
+            if self.active_session:
+                retmsg = self.active_session.deferred_messages
+        if retmsg is not None:
+            retmsg.append(["PLAYER_CACHE_UPDATE", [gamesite.gameapi.get_player_cache_props(self, session.player)]])
+            retmsg.append(["PLAYER_UI_NAME_UPDATE", self.get_ui_name(session.player)])
+
+    def retrieve_ag_info(self, session, retmsg):
+        if (None not in (self.ag_username, self.ag_avatar_url, self.ag_friend_ids)) and \
+           ((server_time - self.ag_hit_time) < gamedata['server'].get('armorgames_cache_lifetime', 14400)):
+            # use cached data
+            return
+
+        # note: auth token not required
+
+        if SpinConfig.config.get('enable_armorgames',0):
+            self.retrieve_ag_info_start(session)
+        else:
+            # note: must match proxyserver.py test credentials
+            test_response = SpinJSON.dumps({'version': 1, 'code': 200, 'message': "OK", 'payload': {
+                'uid': "c3323c76c063636c91d2e8cb8f4dfcaf",
+                'username': "test_user",
+                'avatar': "http://armatars.armorgames.com/armatar_149_50.50_c.jpg",
+                'email': "test_user@test.com",
+                'birthday': "0000-00-00",
+                'gender':"Male",
+                'created_on': "1335466318" } })
+            reactor.callLater(0.01, lambda _self=self, _session=session, _retmsg=retmsg: _self.retrieve_ag_info_complete(_session, None, test_response))
+
+    def retrieve_ag_info_start(self, session):
+        gamesite.AsyncHTTP_ArmorGames.queue_request(server_time,
+                                                    'https://services.armorgames.com/services/rest/v1/users/%s.json?api_key=%s' % (self.ag_id, SpinConfig.config['armorgames_api_key']),
+                                                    lambda result, _session=session: self.retrieve_ag_info_complete(_session, None, result))
+    def retrieve_ag_info_complete(self, session, retmsg, result):
+        data = SpinJSON.loads(result)
+        assert data['code'] == 200
+        payload = data['payload']
+        assert payload['uid'] == self.ag_id
+
+        self.ag_profile = payload # store entire profile
+
+        self.ag_username = payload['username']
+        self.ag_avatar_url = payload['avatar']
+        self.ag_friend_ids = None # XXXXXX pull friends
+        if 'birthday' in payload:
+            y, m, d = map(int, payload['birthday'].split('-'))
+            if y != 0:
+                self.birthday = SpinConfig.cal_to_unix((y,m,d))
+        self.ag_hit_time = server_time
 
         if retmsg is None:
             if self.active_session:
@@ -13503,6 +13581,8 @@ class Store:
     # the customer has agreed to pay - perform the actions required by the order
     # return the session (to allow for flushing right after this is called)
     # throws exceptions to indicate order errors
+    # NOTE: this is only used for (old) FB Credits, Kongregate, Xsolla, and promo (in-kind) Gamebucks orders
+    # (new) FB Payments go through a different code path!
 
     @classmethod
     def execute_credit_order(cls, order_id, gameapi, request, session, buyer, receiver, currency, credits_amount, my_data):
@@ -14449,7 +14529,6 @@ class KGAPI(resource.Resource):
             raise Exception('bad signature: checksum verification failed')
 
         order_id = str(request_data['order_id'])
-        #recipient_social_id = 'kg'+str(request_data['recipient_id'])
         order_info = SpinFacebook.order_data_decode(request_data['order_info'])
         retmsg = {}
 
@@ -16597,8 +16676,10 @@ class GAMEAPI(resource.Resource):
                 'trophies_pvv': player.trophies_pvv()
                 }
         if user.facebook_id: ret['facebook_id'] = user.facebook_id
+        if user.ag_id: ret['ag_id'] = user.ag_id
         if user.kg_id: ret['kg_id'] = user.kg_id
         if user.social_id: ret['social_id'] = user.social_id
+        if user.ag_avatar_url: ret['ag_avatar_url'] = user.ag_avatar_url
         if user.kg_avatar_url: ret['kg_avatar_url'] = user.kg_avatar_url
         if alliance_id is not None: ret['alliance_id'] = alliance_id
         return ret
@@ -16608,10 +16689,10 @@ class GAMEAPI(resource.Resource):
         # only allow retrieval of a few user-visible fields
         manual_fields = (fields is not None)
         if fields is None:
-            fields = ['user_id', 'player_level', 'social_id', 'ui_name', 'real_name', 'kg_avatar_url', 'last_defense_time', 'last_login_time', 'uninstalled', # XXXXXX
+            fields = ['user_id', 'player_level', 'social_id', 'ui_name', 'real_name', 'kg_avatar_url', 'ag_avatar_url', 'last_defense_time', 'last_login_time', 'uninstalled', # XXXXXX
                       'units_donated_cur_alliance', 'home_region', 'home_base_loc', 'ladder_player', 'pvp_player',
                       'LOCK_STATE', 'LOCK_OWNER', 'protection_end_time', 'base_damage', 'base_repair_time',
-                      'facebook_id', 'kg_id',
+                      'facebook_id', 'kg_id', 'ag_id',
                       'facebook_name', 'facebook_first_name', # remove later
                       'alliance_id'] # note: alliance_id is cached, not ground truth
             if session.user.is_chat_mod(): fields.append('chat_gagged')
@@ -21252,7 +21333,7 @@ class GAMEAPI(resource.Resource):
             return None, None
 
         frame_platform = client_social_id[0:2]
-        assert frame_platform in ('fb','kg')
+        assert frame_platform in ('fb','kg','ag')
 
         # check gamedata against server version
         client_gamedata_date = client_gamedata_build_info.get('date','nodate') if client_gamedata_build_info else 'none'
@@ -21395,6 +21476,11 @@ class GAMEAPI(resource.Resource):
                 user.kg_conversion_pixels_context = user.kg_id
                 user.log_adnetwork_event('kg_conversion_pixels', {'user_id':user_id, 'kpi':'context_attached',
                                                                   'context':user.kg_conversion_pixels_context})
+        elif frame_platform == 'ag':
+            user.ag_auth_token = auth_token
+            user.ag_id = social_id[2:]
+            if not user.ag_username:
+                user.ag_username = '(waiting for Armor Games)'
 
         user.browser_name = str(user_demographics[0]) if user_demographics[0] != 'unknown' else None
         try:
@@ -21726,6 +21812,8 @@ class GAMEAPI(resource.Resource):
                 gamesite.exception_log.event(server_time, ('ping_fbpayments Exception on login for player %d: ' % user.user_id) + traceback.format_exc())
         elif session.user.frame_platform == 'kg':
             user.retrieve_kg_info(session, retmsg)
+        elif session.user.frame_platform == 'ag':
+            user.retrieve_ag_info(session, retmsg)
 
         # record acquisition or reacquisition
         acq_event_props = {'anon_id': metrics_anon_id,
@@ -22108,6 +22196,8 @@ class GAMEAPI(resource.Resource):
         if session.user.social_id: cache_props['social_id'] = session.user.social_id
         if session.user.frame_platform: cache_props['frame_platform'] = session.user.frame_platform
         if session.user.facebook_id: cache_props['facebook_id'] = session.user.facebook_id
+        if session.user.ag_id: cache_props['ag_id'] = session.user.ag_id
+        if session.user.ag_avatar_url: cache_props['ag_avatar_url'] = session.user.ag_avatar_url
         if session.user.kg_id: cache_props['kg_id'] = session.user.kg_id
         if session.user.kg_avatar_url: cache_props['kg_avatar_url'] = session.user.kg_avatar_url
 
@@ -25456,6 +25546,8 @@ class GameSite(server.Site):
         self.facebook_log.event(server_time, exc)
     def log_kongregate_exception(self, exc):
         self.kongregate_log.event(server_time, exc)
+    def log_armorgames_exception(self, exc):
+        self.armorgames_log.event(server_time, exc)
     def log_xsolla_exception(self, exc):
         self.xsolla_log.event(server_time, exc)
 
@@ -25520,7 +25612,14 @@ class GameSite(server.Site):
                                                                  self.log_kongregate_exception,
                                                                  max_tries = data['max_tries'],
                                                                  retry_delay = data['retry_delay'])
-
+        data = gamedata['server'].get('AsyncHTTP_ArmorGames', gamedata['server']['AsyncHTTP_Facebook'])
+        self.AsyncHTTP_ArmorGames = AsyncHTTP.AsyncHTTPRequester(data['concurrent_request_limit'],
+                                                                 data['total_request_limit'],
+                                                                 data['request_timeout'],
+                                                                 spin_log_verbosity,
+                                                                 self.log_armorgames_exception,
+                                                                 max_tries = data['max_tries'],
+                                                                 retry_delay = data['retry_delay'])
         data = gamedata['server'].get('AsyncHTTP_Xsolla', gamedata['server']['AsyncHTTP_Facebook'])
         self.AsyncHTTP_Xsolla = AsyncHTTP.AsyncHTTPRequester(data['concurrent_request_limit'],
                                                              data['total_request_limit'],
@@ -25599,6 +25698,7 @@ class GameSite(server.Site):
                                                SpinLog.ServerExceptionLogFilter(SpinNoSQLLog.NoSQLRawLog(self.nosql_client, 'log_exceptions'))])
 
         self.facebook_log = SpinLog.DailyRawLog(spin_log_dir+'/', '-facebook.txt')
+        self.armorgames_log = SpinLog.DailyRawLog(spin_log_dir+'/', '-armorgames.txt')
         self.kongregate_log = SpinLog.DailyRawLog(spin_log_dir+'/', '-kongregate.txt')
         self.xsolla_log = SpinLog.DailyRawLog(spin_log_dir+'/', '-xsolla.txt')
         self.trace_log = SpinLog.DailyRawLog(spin_log_dir+'/', '-traces.txt')
@@ -26438,12 +26538,8 @@ class AdminResource(resource.Resource):
             country = session.user.country + (' (%d)' % SpinConfig.country_tier_map.get(session.user.country, 4))
 
             years_old = -1
-            try:
-                m, d, y = map(int, session.user.facebook_profile['birthday'].split('/'))
-                birth_time = SpinConfig.cal_to_unix((y,m,d))
-                years_old = int((server_time - birth_time)/(365*24*60*60))
-            except:
-                pass
+            if session.user.birthday:
+                years_old = int((server_time - session.user.birthday)/(365*24*60*60))
             years_old = str(years_old) if years_old > 0 else '?'
 
             ip_addr = str(session.user.last_login_ip)
@@ -26531,6 +26627,9 @@ class AdminResource(resource.Resource):
         if SpinConfig.config.get('enable_kongregate',0):
             ret += '<hr><b>AsyncHTTP_Kongregate</b><p>'
             ret += gamesite.AsyncHTTP_Kongregate.get_stats_html(server_time)
+        if SpinConfig.config.get('enable_armorgames',0):
+            ret += '<hr><b>AsyncHTTP_ArmorGames</b><p>'
+            ret += gamesite.AsyncHTTP_ArmorGames.get_stats_html(server_time)
 
         if SpinConfig.config['enable_kissmetrics'] or SpinConfig.config.get('enable_adotomi', False) or SpinConfig.config.get('enable_dauup', False):
             ret += '<hr><b>AsyncHTTP_metrics</b><p>'
