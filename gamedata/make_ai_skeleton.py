@@ -297,29 +297,35 @@ def _generate_showcase_consequent(game_id, event_dirname, data, atom):
         # reverse-engineer the intermediate loot drops
         random_loot_phases = [] # list of [{'ends_at':, 'ui_name':X, 'items':[]},...]
         last_random_loot_end = 0
-        if 'progression_loot_phases' in data['showcase']:
-            for entry in data['showcase']['progression_loot_phases']:
-                items = set()
-                for level in xrange(last_random_loot_end+1, min(entry['ends_at']+1, data['bases_per_difficulty'])):
-                    for trial in xrange(100):
-                        for TABLE in ('loot', 'loot_once_only'):
-                            if TABLE not in data: continue
-                            my_loot = data[TABLE][diff][level-1]
-                            if not my_loot: continue
-                            sample = get_loot_sample(my_loot, randgen = randgen)
-                            #sys.stderr.write(("Progression loot sample for %s (L%d): " % (entry['ui_name'], level)) +repr(sample)+"\n")
-                            for item in sample:
-                                if (final_loot_unit_substitute_items and {'spec':item['spec']} in final_loot_unit_substitute_items) or \
-                                   (final_loot_item_set and item['spec'] in gamedata['item_sets'][final_loot_item_set]['members']) or \
-                                   (final_loot_item_list and item in final_loot_item_list): continue # don't overlap with the final items
-                                items.add(item['spec'])
-                if len(items) < 1:
-                    raise Exception('Error generating showcase. Cannot figure out progression loot for phase %s' % entry['ui_name'])
 
-                phase = {'ui_name': entry['ui_name'], 'ends_at': entry['ends_at'], 'show_max_items': entry['show_max_items'], 'items': [{'spec':x} for x in items]}
-                random_loot_phases.append(phase)
-                #sys.stderr.write(("Random loot phase %s: " % (entry['ui_name'])) +repr(phase['items'])+"\n")
-                last_random_loot_end = entry['ends_at']
+        if 'progression_loot_phases' in data['showcase']:
+            progression_loot_phases = data['showcase']['progression_loot_phases']
+        else:
+            # just treat the entire event as a single difficulty level if it has no loot phases specified
+            progression_loot_phases = [{'ui_name': diff, 'ends_at': data['bases_per_difficulty'], 'show_max_items': 20}]
+
+        for entry in progression_loot_phases:
+            items = set()
+            for level in xrange(last_random_loot_end+1, min(entry['ends_at']+1, data['bases_per_difficulty'])):
+                for trial in xrange(100):
+                    for TABLE in ('loot', 'loot_once_only'):
+                        if TABLE not in data: continue
+                        my_loot = data[TABLE][diff][level-1]
+                        if not my_loot: continue
+                        sample = get_loot_sample(my_loot, randgen = randgen)
+                        #sys.stderr.write(("Progression loot sample for %s (L%d): " % (entry['ui_name'], level)) +repr(sample)+"\n")
+                        for item in sample:
+                            if (final_loot_unit_substitute_items and {'spec':item['spec']} in final_loot_unit_substitute_items) or \
+                               (final_loot_item_set and item['spec'] in gamedata['item_sets'][final_loot_item_set]['members']) or \
+                               (final_loot_item_list and item in final_loot_item_list): continue # don't overlap with the final items
+                            items.add(item['spec'])
+            if len(items) < 1:
+                raise Exception('Error generating showcase. Cannot figure out progression loot for phase %s' % entry['ui_name'])
+
+            phase = {'ui_name': entry['ui_name'], 'ends_at': entry['ends_at'], 'show_max_items': entry['show_max_items'], 'items': [{'spec':x} for x in items]}
+            random_loot_phases.append(phase)
+            #sys.stderr.write(("Random loot phase %s: " % (entry['ui_name'])) +repr(phase['items'])+"\n")
+            last_random_loot_end = entry['ends_at']
 
         # set up the text that is displayed on milestone and progression screens
         DEFAULT_PROGRESSION_TEXT_TOKENS = "Continue fighting %AI from your home base or on the Map to win %TOKEN and other rewards.\n\nUse %TOKEN to unlock epic rewards in the %PLUS_STORE_CATEGORY Store."
