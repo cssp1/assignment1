@@ -36054,7 +36054,7 @@ function invoke_buy_gamebucks_dialog23(ver, reason, amount, order) {
     }
 
     if(spell_list.length < 1) {
-        log_exception(null, 'no gamebucks SKUs ('+spell_list.length.toString()+')! region '+player.price_region+' country '+player.country + 'in invoke_buy_gamebucks_dialog2');
+        log_exception(null, 'no gamebucks SKUs ('+spell_list.length.toString()+')! region '+player.price_region+' country '+player.country + ' in invoke_buy_gamebucks_dialog2');
     }
 
     dialog.user_data['spell_list'] = spell_list;

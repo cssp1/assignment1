@@ -66,6 +66,7 @@ metrics_log = None
 exception_log = None
 facebook_log = None
 kongregate_log = None
+armorgames_log = None
 fbrtapi_raw_log = None
 fbrtapi_json_log = None
 xsapi_raw_log = None
@@ -98,6 +99,13 @@ if SpinConfig.config.get('enable_kongregate', 0):
     config = SpinConfig.config['proxyserver'].get('AsyncHTTP_Kongregate', {})
     kg_async_http = AsyncHTTP.AsyncHTTPRequester(-1, -1, config.get('request_timeout',30), 0,
                                                  lambda x: kongregate_log.event(proxy_time, x) if kongregate_log else sys.stderr.write(x+'\n'),
+                                                 max_tries = config.get('max_tries',1),
+                                                 retry_delay = config.get('retry_delay',3))
+ag_async_http = None
+if SpinConfig.config.get('enable_armorgames', 0):
+    config = SpinConfig.config['proxyserver'].get('AsyncHTTP_ArmorGames', {})
+    ag_async_http = AsyncHTTP.AsyncHTTPRequester(-1, -1, config.get('request_timeout',30), 0,
+                                                 lambda x: armorgames_log.event(proxy_time, x) if armorgames_log else sys.stderr.write(x+'\n'),
                                                  max_tries = config.get('max_tries',1),
                                                  retry_delay = config.get('retry_delay',3))
 
@@ -151,9 +159,9 @@ class GameServer:
 static_includes = None
 def reload_static_includes():
     global static_includes
-    STATIC_INCLUDE_FILES = ['proxy_index.html', 'index_body_fb.html', 'index_body_kg.html', 'kg_guest.html', 'fb_guest.html',
+    STATIC_INCLUDE_FILES = ['proxy_index.html', 'index_body_fb.html', 'index_body_kg.html', 'index_body_ag.html', 'kg_guest.html', 'fb_guest.html',
                             'BrowserDetect.js', 'SPLWMetrics.js',
-                            'FacebookSDK.js', 'KongregateSDK.js', 'facebookexternalhit.html',
+                            'FacebookSDK.js', 'KongregateSDK.js', 'ArmorGamesSDK.js', 'facebookexternalhit.html',
                             'XsollaSDK.js']
     new_includes = dict([(basename, str(open('../gameclient/'+basename).read())) for basename in STATIC_INCLUDE_FILES])
     static_includes = new_includes
@@ -363,7 +371,7 @@ class Visitor(object):
         return props
 
     def __repr__(self):
-        print_dict = dict((k,v) for k,v in self.__dict__.iteritems() if k not in ('raw_signed_request', 'oauth_token', 'kongregate_auth_token'))
+        print_dict = dict((k,v) for k,v in self.__dict__.iteritems() if k not in ('raw_signed_request', 'oauth_token', 'kongregate_auth_token', 'armorgames_auth_token'))
         return self.anon_id + ' (active %ds ago): ' % (proxy_time-self.last_active_time) + repr(print_dict)
 
 class FBVisitor(Visitor):
@@ -454,7 +462,36 @@ class KGVisitor(Visitor):
                                                                                                           })
 
 class AGVisitor(Visitor):
-    pass
+    def __init__(self, *args, **kwargs):
+        Visitor.__init__(self, *args, **kwargs)
+        self.frame_platform = self.demographics['frame_platform'] = 'ag'
+        self.armorgames_id = None
+        self.armorgames_auth_token = None
+
+    def set_armorgames_id(self, agid):
+        self.armorgames_id = str(agid)
+        self.demographics['social_id'] = self.social_id = 'ag'+self.armorgames_id
+
+    def auth_token(self): return self.armorgames_auth_token
+    def immune_to_country_restrictions(self): return False
+    def must_go_away(self):
+        return ('go_away_whitelist' in SpinConfig.config) and (self.armorgames_id not in SpinConfig.config['go_away_whitelist'])
+
+    def set_game_container(self, request):
+        self.game_container = 'http://www.spinpunch.com' # punt :(
+
+    def canvas_url(self):
+        return self.server_protocol + self.server_host + ':' + self.server_port + '/AGROOT' + q_clean_qs(self.first_hit_uri,
+                                                                                                         {
+                                                                                                          # XXXXXXAG
+                                                                                                          })
+    def canvas_url_no_auth(self):
+        # send the browser the URL to redirect to after authorizing
+        return self.server_protocol + self.server_host + ':' + self.server_port + '/AGROOT' + q_clean_qs(self.first_hit_uri,
+                                                                                                         {
+                                                                                                          # XXXXXXAG
+                                                                                                          })
+
 
 visitor_table = {}
 
@@ -653,12 +690,12 @@ class GameProxy(proxy.ReverseProxyResource):
             #exception_log.event(proxy_time, 'proxyserver: NEW cookie '+anon_id)
 
         if anon_id not in visitor_table:
-            visitor_table[anon_id] = visitor = {'fb': FBVisitor, 'kg': KGVisitor}[frame_platform](request, anon_id)
+            visitor_table[anon_id] = visitor = {'fb': FBVisitor, 'kg': KGVisitor, 'ag': AGVisitor}[frame_platform](request, anon_id)
         else:
             visitor = visitor_table[anon_id]
 
         visitor.update_on_hit(request)
-        return {'fb': self.index_visit_fb, 'kg': self.index_visit_kg}[frame_platform](request, visitor)
+        return {'fb': self.index_visit_fb, 'kg': self.index_visit_kg, 'ag': self.index_visit_ag}[frame_platform](request, visitor)
 
     def index_visit_kg(self, request, visitor):
         # example hit:
@@ -780,6 +817,82 @@ class GameProxy(proxy.ReverseProxyResource):
             else:
                 return self.index_visit_go_away(request, visitor)
 
+        return self.index_visit_authorized(request, visitor)
+
+    def index_visit_ag(self, request, visitor):
+        # example hit:
+        # http://myserver.example.com:8005/AGROOT?user_id=0000abcd&auth_token=something
+
+        valid = True
+        skip_verify = False
+
+        for FIELD in ('user_id', 'auth_token'):
+            if FIELD not in request.args:
+                valid = False
+                break
+
+        if not valid:
+            # random non-game hit
+            if not SpinConfig.config.get('enable_armorgames',0) \
+               and (not SpinConfig.config.get('secure_mode',0)): # do not allow in secure mode
+                # use fake sandbox credentials
+                # note: match server.py retrieve_ag_info() test credentials
+                skip_verify = True
+                request.args['user_id'] = ['example1']
+                request.args['auth_token'] = ['123456789']
+            else:
+                request.setResponseCode(http.BAD_REQUEST)
+                return str('user_id and auth_token parameters required')
+
+        visitor.set_armorgames_id(request.args['user_id'][0])
+        visitor.armorgames_auth_token = str(request.args['auth_token'][0])
+
+        # geolocate country
+        visitor.demographics['country'] = geoip_client.get_country(request.getClientIP())
+
+        if self.the_pool_is_closed():
+            return self.index_visit_go_away(request, visitor)
+
+        metric_event_coded(visitor, '0020_page_view',
+                           visitor.add_demographics({#'Viewed URL': request.uri,
+                                                     'query_string': clean_qs(request.uri),
+                                                     'referer': SpinHTTP.get_twisted_header(request, 'referer') or 'unknown',
+                                                     'armorgames_user_id': visitor.armorgames_id
+                                                     }))
+        if skip_verify:
+            return self.index_visit_authorized(request, visitor)
+        else:
+            return self.index_visit_ag_verify(request, visitor)
+
+    def index_visit_ag_verify(self, request, visitor):
+        d = defer.Deferred()
+        d.addBoth(self.complete_deferred_request, request)
+        vc = self.AGVerifyCheck(self, request, visitor, d)
+        ag_async_http.queue_request(proxy_time,
+                                    'https://services.armorgames.com/services/rest/v1/authenticate/user.json?' + \
+                                    urllib.urlencode({'user_id':visitor.armorgames_id,
+                                                      'auth_token':visitor.armorgames_auth_token,
+                                                      'api_key':SpinConfig.config['armorgames_api_key']}),
+                                    vc.on_response, error_callback = vc.on_error)
+        return twisted.web.server.NOT_DONE_YET
+
+    class AGVerifyCheck:
+        def __init__(self, parent, request, visitor, d):
+            self.parent = parent
+            self.request = request
+            self.visitor = visitor
+            self.d = d
+        def on_response(self, response):
+            self.d.callback(self.parent.index_visit_ag_verify_response(self.request, self.visitor, response))
+        def on_error(self, reason):
+            self.d.callback(self.parent.index_visit_ag_verify_response(self.request, self.visitor, '{"payload":null,"message":"SpinPunch error"}'))
+
+    def index_visit_ag_verify_response(self, request, visitor, response):
+        r = SpinJSON.loads(response)
+        # ArmorGames docs say to use payload being null or non-null as the way to determine if a login is valid
+        # https://docs.google.com/document/pub?id=1oewk-9Y8yLTUohxCK5by-clEg7qy7-U05FVeC-lSRIc
+        if not r.get('payload',None):
+            return self.index_visit_go_away(request, visitor)
         return self.index_visit_authorized(request, visitor)
 
     def index_visit_fb(self, request, visitor):
@@ -1276,6 +1389,7 @@ class GameProxy(proxy.ReverseProxyResource):
         # apply auth to sandbox servers
         if (not SpinConfig.config.get('enable_facebook',0)) and \
            (not SpinConfig.config.get('enable_kongregate',0)) and \
+           (not SpinConfig.config.get('enable_armorgames',0)) and \
            (not SpinGoogleAuth.twisted_request_is_local(request)) and (SpinConfig.config['proxyserver'].get('require_google_auth',1)):
             auth_info = SpinGoogleAuth.twisted_do_auth(request, 'GAME', proxy_time)
             if not auth_info['ok']:
@@ -1620,6 +1734,7 @@ class GameProxy(proxy.ReverseProxyResource):
 
             '$FACEBOOK_SDK$': get_static_include('FacebookSDK.js') if (visitor.frame_platform == 'fb' and SpinConfig.config.get('enable_facebook',0)) else '',
             '$KONGREGATE_SDK$': get_static_include('KongregateSDK.js') if (visitor.frame_platform == 'kg' and SpinConfig.config.get('enable_kongregate',0)) else '',
+            '$ARMORGAMES_SDK$': get_static_include('ArmorGamesSDK.js') if (visitor.frame_platform == 'ag' and SpinConfig.config.get('enable_armorgames',0)) else '',
             # XXX probably need a frame platform restriction on loading Xsolla
             '$XSOLLA_SDK$': get_static_include('XsollaSDK.js') if (SpinConfig.config.get('enable_xsolla',0)) else '',
             '$LOADING_SCREEN_NAME$': screen_name,
@@ -2008,6 +2123,8 @@ class GameProxy(proxy.ReverseProxyResource):
                 ret = self.render_ROOT(request, frame_platform = 'fb')
             elif self.path == '/KGROOT':
                 ret = self.render_ROOT(request, frame_platform = 'kg')
+            elif self.path == '/AGROOT':
+                ret = self.render_ROOT(request, frame_platform = 'ag')
             elif self.path in ('/GAMEAPI', '/CREDITAPI', '/TRIALPAYAPI', '/KGAPI', '/XSAPI', '/CONTROLAPI', '/METRICSAPI', '/ADMIN/', '/PING', '/OGPAPI', '/FBRTAPI', '/FBDEAUTHAPI'):
                 ret = self.render_API(request)
             else:
@@ -2072,6 +2189,7 @@ class AdminStats(object):
         ret = ''
         for name, async in (('control_async_http', control_async_http),
                             ('fb_async_http', fb_async_http),
+                            ('ag_async_http', ag_async_http),
                             ('kg_async_http', kg_async_http)):
             if async:
                 ret += '<hr><b>%s</b><p>' % name
@@ -2321,7 +2439,7 @@ class KGPortraitProxy(PortraitProxy):
         # keep our own private requester to avoid disturbing the main API calls, and to operate when the platform is disabled
         config = SpinConfig.config['proxyserver'].get('AsyncHTTP_Kongregate', {})
         self.async_http = AsyncHTTP.AsyncHTTPRequester(-1, -1, config.get('request_timeout',30), 0,
-                                                       lambda x: kongregate_log.event(proxy_time, x) if facebook_log else sys.stderr.write(x+'\n'),
+                                                       lambda x: kongregate_log.event(proxy_time, x) if kongregate_log else sys.stderr.write(x+'\n'),
                                                        max_tries = config.get('max_tries',1),
                                                        retry_delay = config.get('retry_delay',3))
 
@@ -2343,6 +2461,37 @@ class KGPortraitProxy(PortraitProxy):
         avatar_parts = urlparse.urlparse(avatar_url)
         if not (avatar_parts.netloc.endswith('kongcdn.com') or avatar_parts.netloc.endswith('insnw.net')):
             exception_log.event(proxy_time, 'unrecognized KG portrait URL: %s' % repr(avatar_parts))
+            assert False # force fail
+        return avatar_url
+
+class AGPortraitProxy(PortraitProxy):
+    def __init__(self):
+        # keep our own private requester to avoid disturbing the main API calls, and to operate when the platform is disabled
+        config = SpinConfig.config['proxyserver'].get('AsyncHTTP_ArmorGames', {})
+        self.async_http = AsyncHTTP.AsyncHTTPRequester(-1, -1, config.get('request_timeout',30), 0,
+                                                       lambda x: armorgames_log.event(proxy_time, x) if armorgames_log else sys.stderr.write(x+'\n'),
+                                                       max_tries = config.get('max_tries',1),
+                                                       retry_delay = config.get('retry_delay',3))
+
+    def parse_request(self, request):
+        # sanity-check the URL we are about to proxy
+        parts = urlparse.urlparse(request.uri)
+        path_fields = parts.path.split('/')
+        assert len(path_fields) == 3
+        assert path_fields[1] == 'ag_portrait'
+        assert path_fields[0] == '' and path_fields[2] == ''
+        assert (not parts.params) and (not parts.fragment)
+        qs = urlparse.parse_qs(parts.query)
+        assert ('spin_origin' in qs) and ('avatar_url' in qs)
+        for key, val in qs.iteritems():
+            if key not in ('spin_origin', 'avatar_url', 'v'):
+                exception_log.event(proxy_time, 'unrecognized AG portrait qs: %s' % repr(parts))
+                assert False # force fail
+        avatar_url = qs['avatar_url'][-1]
+        avatar_parts = urlparse.urlparse(avatar_url)
+        # XXXXXXAG
+        if not (avatar_parts.netloc.endswith('kongcdn.com') or avatar_parts.netloc.endswith('insnw.net')):
+            exception_log.event(proxy_time, 'unrecognized AG portrait URL: %s' % repr(avatar_parts))
             assert False # force fail
         return avatar_url
 
@@ -2403,6 +2552,7 @@ class ProxyRoot(TwistedNoResource):
             'art': ArtFile('../gameclient/art'),
             'fb_portrait': FBPortraitProxy(),
             'kg_portrait': KGPortraitProxy(),
+            'ag_portrait': AGPortraitProxy(),
             'channel': channel_resource, 'channel.php': channel_resource,
             'crossdomain.xml': flash_xd_resource,
             'compiled-client.js': CachedJSFile('../gameclient/compiled-client.js'),
@@ -2421,7 +2571,7 @@ class ProxyRoot(TwistedNoResource):
                 self.static_resources[srcfile] = UncachedJSFile('../gameclient/'+srcfile)
 
         self.proxied_resources = {}
-        for chnam in ('', 'KGROOT', 'GAMEAPI', 'METRICSAPI', 'CREDITAPI', 'TRIALPAYAPI', 'KGAPI', 'XSAPI', 'CONTROLAPI', 'ADMIN', 'OGPAPI', 'FBRTAPI', 'FBDEAUTHAPI', 'PING'):
+        for chnam in ('', 'KGROOT', 'AGROOT', 'GAMEAPI', 'METRICSAPI', 'CREDITAPI', 'TRIALPAYAPI', 'KGAPI', 'XSAPI', 'CONTROLAPI', 'ADMIN', 'OGPAPI', 'FBRTAPI', 'FBDEAUTHAPI', 'PING'):
             res = GameProxy('/'+chnam)
 
             # configure auth on canvas page itself (OPTIONAL now, only for demoing game outside of company)
@@ -2588,6 +2738,8 @@ def do_main():
     facebook_log = SpinLog.DailyRawLog(proxy_log_dir+'/', '-facebook.txt')
     global kongregate_log
     kongregate_log = SpinLog.DailyRawLog(proxy_log_dir+'/', '-kongregate.txt')
+    global armorgames_log
+    armorgames_log = SpinLog.DailyRawLog(proxy_log_dir+'/', '-armorgames.txt')
     global fbrtapi_raw_log, fbrtapi_json_log
     fbrtapi_raw_log = SpinLog.DailyRawLog(proxy_log_dir+'/', '-fbrtapi.txt')
     fbrtapi_json_log = SpinNoSQLLog.NoSQLJSONLog(db_client, 'log_fbrtapi')

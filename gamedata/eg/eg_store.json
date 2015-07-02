@@ -97,6 +97,7 @@
 
     // Payments API: "fbcredits" is the old FB one, "fbpayments" is the new FB one
     "payments_api": [
+        [{"predicate": "FRAME_PLATFORM", "platform": "ag"}, "xsolla"],
         [{"predicate": "FRAME_PLATFORM", "platform": "kg"}, "kgcredits"],
         [{"predicate": "FRAME_PLATFORM", "platform": "fb"}, "fbpayments"]
     ],

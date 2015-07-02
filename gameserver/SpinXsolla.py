@@ -135,7 +135,7 @@ def make_token_request(config,
     if user_language:
         assert len(user_language) == 2
         body_json['settings']['language'] = user_language
-    if user_country:
+    if user_country and user_country != 'unknown':
         assert len(user_country) == 2
         body_json['user']['country'] = { 'value': user_country.upper(), 'allow_modify': False } # ?
 

@@ -1525,8 +1525,9 @@ def check_predicate(pred, reason = '', context = None, context_data = None,
         if 'chance' not in pred:
             error |= 1; print '%s: RANDOM predicate needs a "chance" 0-1' % (reason)
     elif pred['predicate'] == 'FRAME_PLATFORM':
-        if pred.get('platform',None) not in ('fb','kg'):
-            error |= 1; print '%s: FRAME_PLATFORM predicate needs a "platform" of "kg" or "fb"' % (reason)
+        VALID_PLATFORMS = ('fb','kg','ag')
+        if pred.get('platform',None) not in VALID_PLATFORMS:
+            error |= 1; print '%s: FRAME_PLATFORM predicate needs a "platform" in %r' % (reason, VALID_PLATFORMS)
     elif pred['predicate'] == 'PLAYER_HISTORY':
         if 'key' not in pred: error |= 1; print '%s: %s predicate missing "key"' % (reason, pred['predicate'])
         else:

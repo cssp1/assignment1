@@ -1361,7 +1361,7 @@ class User:
         else:
             # note: must match proxyserver.py test credentials
             test_response = SpinJSON.dumps({'version': 1, 'code': 200, 'message': "OK", 'payload': {
-                'uid': "c3323c76c063636c91d2e8cb8f4dfcaf",
+                'uid': "example1",
                 'username': "test_user",
                 'avatar': "http://armatars.armorgames.com/armatar_149_50.50_c.jpg",
                 'email': "test_user@test.com",
