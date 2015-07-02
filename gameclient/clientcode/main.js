@@ -10367,7 +10367,6 @@ function init_desktop_dialogs() {
             dialog.widgets['friend_bar'].user_data['transition_start_time'] = -1;
             dialog.widgets['friend_bar'].user_data['maximized'] = !('friend_bar_minimized' in player.preferences && player.preferences['friend_bar_minimized']);
 
-            get_preference_setting(player.preferences, 'enable_fishing_notifications')
             dialog.widgets['grow_toggle'].onclick = function(w) {
                 var dialog = w.parent;
                 dialog.widgets['friend_bar'].user_data['maximized'] = !dialog.widgets['friend_bar'].user_data['maximized'];
@@ -10644,9 +10643,6 @@ function scroll_friend_bar(dialog, page) {
 
 function update_friend_bar(dialog) {
     if(!dialog.parent) { return; } // dialog was closed
-
-    dialog.parent.widgets['grow_up'].show = !dialog.user_data['maximized'];
-    dialog.parent.widgets['grow_down'].show = !dialog.parent.widgets['grow_up'].show;
 
     var t = (dialog.user_data['transition_start_time'] > 0 ? clamp((client_time - dialog.user_data['transition_start_time']) / dialog.data['transition_time'], 0, 1) : 1);
     var base_xy_max = vec_add(dialog.parent.data['widgets']['friend_bar']['xy'], dialog.data['xy']);
@@ -12413,6 +12409,11 @@ function update_desktop_dialogs() {
         dialog.widgets['store_button'].state = (enable_store ? 'normal':'disabled');
 
         // friend bar
+        // visibility keyed off friend_bar.show from the dialog initialization
+        dialog.widgets['grow_toggle'].show = dialog.widgets['grow_bg'].show = dialog.widgets['friend_bar'].show;
+        dialog.widgets['grow_up'].show = dialog.widgets['friend_bar'].show && !dialog.widgets['friend_bar'].user_data['maximized'];
+        dialog.widgets['grow_down'].show = dialog.widgets['friend_bar'].show && !dialog.widgets['grow_up'].show;
+
         for(var i = 0; i < dialog.widgets['friend_bar'].data['widgets']['friend_icon']['array'][0]; i++) {
             dialog.widgets['friend_bar'].widgets['friend_icon'+i.toString()].state =
                 dialog.widgets['friend_bar'].widgets['add_friend_button'+i.toString()].state = (enable_friends? 'normal' : 'disabled');
