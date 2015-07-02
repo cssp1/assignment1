@@ -1228,6 +1228,8 @@ if __name__ == '__main__':
             xsolla_sku = copy.deepcopy(sku)
             xsolla_sku['currency'] = 'xsolla:'+val['currency']
             del xsolla_sku['open_graph_prices']
+            assert xsolla_sku['requires']['subpredicates'][0] == {'predicate':'FRAME_PLATFORM', 'platform': 'fb'}
+            xsolla_sku['requires']['subpredicates'].remove(xsolla_sku['requires']['subpredicates'][0])
             out[xsolla_sku_name] = xsolla_sku
 
     out_keys = sorted(out.keys(), key = lambda x: -int(x.split('_')[2]))
