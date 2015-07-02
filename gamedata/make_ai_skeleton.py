@@ -431,6 +431,7 @@ def _generate_showcase_consequent(game_id, event_dirname, data, atom):
                 if len(random_loot_phases) > 1:
                     ui_text += " (%s DIFFICULTY)" % (random_loot_phases[phase_num]['ui_name'].upper())
                 ui_text += ":"
+                showcase["ui_random_rewards_text"].append([pred, ui_text])
                 showcase["feature_random_items"].append([pred, random_loot_phases[phase_num]['items']])
                 showcase["feature_random_item_count"].append([pred, random_loot_phases[phase_num]['show_max_items']])
 
