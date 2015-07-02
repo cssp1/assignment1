@@ -481,17 +481,11 @@ class AGVisitor(Visitor):
         self.game_container = 'http://www.spinpunch.com' # punt :(
 
     def canvas_url(self):
-        return self.server_protocol + self.server_host + ':' + self.server_port + '/AGROOT' + q_clean_qs(self.first_hit_uri,
-                                                                                                         {
-                                                                                                          # XXXXXXAG
-                                                                                                          })
+        return self.server_protocol + self.server_host + ':' + self.server_port + '/AGROOT' + q_clean_qs(self.first_hit_uri, {})
+
     def canvas_url_no_auth(self):
         # send the browser the URL to redirect to after authorizing
-        return self.server_protocol + self.server_host + ':' + self.server_port + '/AGROOT' + q_clean_qs(self.first_hit_uri,
-                                                                                                         {
-                                                                                                          # XXXXXXAG
-                                                                                                          })
-
+        return self.server_protocol + self.server_host + ':' + self.server_port + '/AGROOT' + q_clean_qs(self.first_hit_uri, {})
 
 visitor_table = {}
 
@@ -2489,8 +2483,7 @@ class AGPortraitProxy(PortraitProxy):
                 assert False # force fail
         avatar_url = qs['avatar_url'][-1]
         avatar_parts = urlparse.urlparse(avatar_url)
-        # XXXXXXAG
-        if not (avatar_parts.netloc.endswith('kongcdn.com') or avatar_parts.netloc.endswith('insnw.net')):
+        if not avatar_parts.netloc.endswith('armorgames.com'):
             exception_log.event(proxy_time, 'unrecognized AG portrait URL: %s' % repr(avatar_parts))
             assert False # force fail
         return avatar_url
