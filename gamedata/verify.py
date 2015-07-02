@@ -2727,6 +2727,10 @@ def check_events(events):
                     print 'event %s has bad chain predicate' % (key)
                 if ('console_portrait' in ch):
                     error |= require_art_asset(ch['console_portrait'], key+':console_portrait')
+                # check for a common copy/paste typo
+                if ('ui_speech' in ch):
+                    if ' 1 more levels' in ch['ui_speech']:
+                        error |= 1; print 'event %s has ui_speech typo: %r' % (key, ch['ui_speech'])
                 if 'fight_button_action' in ch:
                     if 'visit_ladder_rival' in ch['fight_button_action']:
                         pass
