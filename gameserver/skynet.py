@@ -2408,6 +2408,7 @@ if __name__ == '__main__':
     use_regexp_ltv = False
     use_record = None
     min_clicks = 0
+    min_age = 0
     min_impressions = 0
     max_frequency = 0
     time_range = None
@@ -2416,7 +2417,7 @@ if __name__ == '__main__':
     lookalike_type = 'similarity'
     lookalike_ratio = None
 
-    opts, args = getopt.gnu_getopt(sys.argv[1:], 'g:', ['db=', 'game-id=', 'mode=', 'tactical=', 'image-file=', 'dry-run', 'min-clicks=', 'min-impressions=', 'max-frequency=',
+    opts, args = getopt.gnu_getopt(sys.argv[1:], 'g:', ['db=', 'game-id=', 'mode=', 'tactical=', 'image-file=', 'dry-run', 'min-clicks=', 'min-impressions=', 'max-frequency=', 'min-age=',
                                                       'bid=', 'coeff=', 'adgroup-name=', 'campaign-name=', 'campaign-group-name=', 'stgt=', 'filter=', 'group-by=',
                                                       'use-analytics=', 'use-regexp-ltv', 'use-record=', 'date-range=', 'time-range=', 'output-format=', 'output-frequency=',
                                                       'skip-reachestimates', 'enable-campaign-creation', 'disable-ad-creation', 'disable-bid-updates', 'custom-audience=', 'custom-audience-game-id=', 'origin-audience=', 'country=', 'lookalike-type=', 'lookalike-ratio=',
@@ -2431,6 +2432,7 @@ if __name__ == '__main__':
         elif key == '--ad-type': ad_type = int(val)
         elif key == '--dry-run': dry_run = True
         elif key == '--min-clicks': min_clicks = int(val)
+        elif key == '--min-age': min_age = int(val)
         elif key == '--min-impressions': min_impressions = int(val)
         elif key == '--max-frequency': max_frequency = float(val)
         elif key == '--bid': bid = int(val)
@@ -2578,7 +2580,7 @@ if __name__ == '__main__':
 
             # to close race condition, maintain a set of "recently seen" adgroups and add those to the query
             db.recent_adgroups.ensure_index('expire_time', expireAfterSeconds=0)
-            expire_time = datetime.datetime.utcnow() + datetime.timedelta(seconds=4*3600) # live for four hours to ensure all stats get recorded
+            expire_time = datetime.datetime.utcnow() + datetime.timedelta(seconds=60*3600) # live for 60 hours to ensure all stats get recorded
             for adgroup in adgroup_list:
                 # remember adgroup
                 update = adgroup.copy()
@@ -2694,6 +2696,8 @@ if __name__ == '__main__':
                                                   for adgroup in adgroup_list if stats[adgroup['id']]])
                 adgroup_list = filter(lambda adgroup: stats[adgroup['id']] and stats[adgroup['id']]['unique_impressions'] > 0 and \
                                       (stats[adgroup['id']]['impressions'] / float(stats[adgroup['id']]['unique_impressions'])) >= max_frequency, adgroup_list)
+            if min_age > 0:
+                adgroup_list = filter(lambda adgroup: 'created_time' in adgroup and time_now - SpinFacebook.parse_fb_time(adgroup['created_time']) >= min_age, adgroup_list)
 
         status_updates = []
         for adgroup in adgroup_list:
