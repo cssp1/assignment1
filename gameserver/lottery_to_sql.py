@@ -99,6 +99,7 @@ if __name__ == '__main__':
 
     for row in nosql_client.log_buffer_table('log_lottery').find(qs):
         if ('sum' in row) and row['sum'].get('developer',False): continue # skip events by developers
+        if 'user_id' not in row: continue # skip bogus log entries with missing user_id
 
         keyvals = [('time',row['time']),
                    ('user_id',row['user_id']),
