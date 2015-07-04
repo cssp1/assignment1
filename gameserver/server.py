@@ -10526,13 +10526,16 @@ class LivePlayer(Player):
         for tip in gamedata['daily_messages']:
             key = 'daily_msg:'+tip['name']
             if self.history.get(key, 0) and (not tip.get('recurring',False)): continue
-            if 'show_if' in tip and (not Predicates.read_predicate(tip['show_if']).is_satisfied(self, None)): continue
+
             if 'expire_at' in tip:
                 expire_time = tip['expire_at']
             elif 'expire_in' in tip:
                 expire_time = server_time + tip['expire_in']
             else:
                 expire_time = -1
+            if expire_time > 0 and server_time >= expire_time: continue
+
+            if 'show_if' in tip and (not Predicates.read_predicate(tip['show_if']).is_satisfied(self, None)): continue
             msg = {'type': 'mail',
                    'expire_time': expire_time,
                    'msg_id': generate_mail_id(),
