@@ -944,6 +944,20 @@ if __name__ == '__main__':
 
 
     base_id = data['starting_base_id']
+
+    # total index among unskipped bases across all difficulties
+    overall_unskipped_count = 0
+
+    # total number of unskipped bases across all difficulties
+    overall_num_unskipped_bases = 0
+    for diff in data['difficulties']:
+        if 'skip' in data:
+            skip = data['skip'][diff]
+            overall_num_unskipped_bases += data['bases_per_difficulty'] - sum(skip) # total number of unskipped bases this difficulty
+        else:
+            overall_num_unskipped_bases += data['bases_per_difficulty']
+
+
     for diff in data['difficulties']:
         instance_cdname = "ai_"+data['event_name']+data['key_suffix'][diff]+"_instance"
 
@@ -1006,7 +1020,11 @@ if __name__ == '__main__':
                 (data['event_ui_name'], (' (%s difficulty)' % diff if len(data['difficulties'])>1 else ''),
                  "\nAI Enemy: %s" % data['villain_ui_name'] if data['villain_ui_name'] != data['event_ui_name'] else '', unskipped_count+1, num_unskipped_bases,
                  data['final_reward_info'][diff], ('\n'+data['extra_ui_info']) if 'extra_ui_info' in data else '')),
-                ("ui_progress", {"cur": unskipped_count, "max": num_unskipped_bases }),
+                ("ui_progress", { # within difficulty
+                                  "cur": unskipped_count, "max": num_unskipped_bases,
+                                  # across all difficulties
+                                  "overall_cur": overall_unskipped_count, "overall_max": overall_num_unskipped_bases }),
+                ("ui_difficulty", diff),
                 ("ui_priority", ui_priority),
                 ("portrait", data['villain_portrait'][diff]),
                 ("resources", { "player_level": data['starting_ai_level'][diff]+ i * data['ai_level_gain_per_base'],
@@ -1532,7 +1550,9 @@ if __name__ == '__main__':
             print '},'
 
             base_id += 1
-            if not skip: unskipped_count += 1
+            if not skip:
+                unskipped_count += 1
+                overall_unskipped_count += 1
 
         # placeholder base
         print
@@ -1564,7 +1584,11 @@ if __name__ == '__main__':
         # 1. Player has already completed the event this week, and needs to wait for next week.
         # 2. While still logged in, a week boundary passes. The engine currently doesn't update the
         # available AI list in this case, so the player will still see last week's dummy base. XXX needs fix.
-        json += [("ui_progress", {"cur": unskipped_count, "max": num_unskipped_bases }),
+        json += [("ui_progress", { # within this difficulty
+                                   "cur": unskipped_count, "max": num_unskipped_bases,
+                                   # across all difficulties
+                                   "overall_cur": overall_unskipped_count, "overall_max": overall_num_unskipped_bases }),
+                 ("ui_difficulty", diff),
                  ("ui_spy_button","Defeated"),
                  ("ui_instance_cooldown",instance_cdname),
                  ("show_if", show_pred),
