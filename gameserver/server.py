@@ -12232,6 +12232,10 @@ class OGPAPI(resource.Resource):
         if gamedata['server']['log_fb_open_graph']:
             gamesite.exception_log.event(server_time, 'OGPAPI HIT: '+repr(request)+' args '+repr(request.args))
         SpinHTTP.set_access_control_headers(request)
+        if 'type' not in request.args:
+            # bad hit, like from a web crawler
+            request.setResponseCode(http.BAD_REQUEST)
+            return 'spinpunch error'
         try:
             ret = '<!DOCTYPE html>\n<html>\n'
             type = request.args['type'][0]
@@ -12432,7 +12436,8 @@ class OGPAPI(resource.Resource):
 
         except Exception:
             gamesite.exception_log.event(server_time, 'OGPAPI Exception: '+traceback.format_exc()+'while handling request '+repr(request)+' args '+repr(request.args))
-        return 'error'
+        request.setResponseCode(http.BAD_REQUEST)
+        return 'spinpunch error'
 
 OGPAPI_instance = OGPAPI()
 
