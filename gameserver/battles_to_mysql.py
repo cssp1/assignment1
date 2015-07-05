@@ -47,6 +47,9 @@ def ai_analytics_tag_assignments_schema(sql_util):
                        ('start_time', 'INT8'),
                        ('end_time', 'INT8'),
                        ('analytics_tag', 'VARCHAR(32)'),
+                       ('difficulty', 'VARCHAR(16)'), # "Normal"/"Heroic"/"Epic"
+                       ('difficulty_step', 'INT2'), # counts starts from 1 within each Normal/Heroic/Epic progression
+                       ('progression_step', 'INT2'), # counts from 1 and merges Normal/Heroic/Epic into a single progression
                        ],
             'indices': {'master':{'unique': True, 'keys':[('base_type','ASC'),('base_template','ASC'),('user_id','ASC'),('start_time','ASC')]}}
             }
@@ -54,6 +57,7 @@ def ai_analytics_tag_assignments_schema(sql_util):
 def ai_analytics_tag_info_schema(sql_util):
     return {'fields': [('analytics_tag', 'VARCHAR(32) NOT NULL PRIMARY KEY'),
                        ('event_type', 'VARCHAR(32)'),
+                       ('num_difficulties', 'INT1'), # number of difficulty progressions (3 for Normal/Heroic/Epic, 1 for Normal only, NULL for non-linear-progression events)
                        ('num_progression', 'INT4'),
                        ('num_hives', 'INT4'),
                        ('start_time', 'INT8'),
@@ -290,6 +294,8 @@ if __name__ == '__main__':
     for sid, data in gamedata['ai_bases']['bases'].iteritems():
         tag = data.get('analytics_tag', None)
         klass = SpinUpcache.classify_ai_base(gamedata, int(sid))
+        ui_difficulty = data.get('ui_difficulty', 'Normal')
+
         ai_bases_rows.append([('user_id',int(sid)),
                               ('kind', data.get('kind', 'ai_base')),
                               ('player_level', data['resources']['player_level']),
@@ -304,6 +310,7 @@ if __name__ == '__main__':
             if tag not in analytics_tag_info:
                 analytics_tag_info[tag] = {'analytics_tag': tag,
                                            'event_type': event_klass,
+                                           'difficulties': [],
                                            'base_ids': [],
                                            'hives': [],
                                            'start_end_times': None, # array of all applicable [start,end] times
@@ -312,6 +319,10 @@ if __name__ == '__main__':
                                            'repeat_interval': None}
             info = analytics_tag_info[tag]
             info['base_ids'].append(int(sid))
+
+            if ui_difficulty not in info['difficulties']:
+                info['difficulties'].append(ui_difficulty)
+
             # add timing info to existing entry
             start_end_times = SpinUpcache.ai_base_timings(gamedata, data)
             if start_end_times:
@@ -341,6 +352,7 @@ if __name__ == '__main__':
                 if tag not in analytics_tag_info:
                     analytics_tag_info[tag] = {'analytics_tag': tag,
                                                'event_type': event_klass,
+                                               'difficulties': [],
                                                'base_ids': [],
                                                'hives': [],
                                                'start_end_times': None, # array of all applicable [start,end] times
@@ -373,6 +385,7 @@ if __name__ == '__main__':
                     (','.join(["%s",] * len(analytics_tag_info)))+")", analytics_tag_info.keys())
         sql_util.do_insert_batch(cur, ai_analytics_tag_info_table, [(('analytics_tag',entry['analytics_tag']),
                                                                      ('event_type',entry['event_type']),
+                                                                     ('num_difficulties', len(entry['difficulties']) if entry['difficulties'] else None),
                                                                      ('num_progression', len(entry['base_ids'])),
                                                                      ('num_hives', len(entry['hives'])),
                                                                      ('start_time', entry['start_time']),
@@ -389,6 +402,16 @@ if __name__ == '__main__':
                 start_end_times = [[-1,-1]]
 
             for base_id in entry['base_ids']:
+                base = gamedata['ai_bases']['bases'][str(base_id)]
+                if 'ui_progress' in base:
+                    difficulty_step = base['ui_progress']['cur']
+                    if 'overall_cur' in base['ui_progress']: # detect updated events
+                        progression_step = base['ui_progress']['overall_cur']
+                    else:
+                        progression_step = None
+                else:
+                    difficulty_step = None
+
                 for start_time, end_time in start_end_times:
                     assignments_keys.append(('home', 'home', base_id, start_time))
                     assignments_rows.append((('base_type', 'home'),
@@ -396,7 +419,11 @@ if __name__ == '__main__':
                                              ('user_id', base_id),
                                              ('start_time', start_time),
                                              ('end_time', end_time),
-                                             ('analytics_tag', entry['analytics_tag'])))
+                                             ('analytics_tag', entry['analytics_tag']),
+                                             ('difficulty', base.get('ui_difficulty', 'Normal')),
+                                             ('difficulty_step', difficulty_step),
+                                             ('progression_step', progression_step),
+                                             ))
             for hive in entry['hives']:
                 for start_time, end_time in start_end_times:
                     assignments_keys.append(('hive', hive, -1, start_time))
@@ -405,7 +432,10 @@ if __name__ == '__main__':
                                              ('user_id', -1),
                                              ('start_time', start_time),
                                              ('end_time', end_time),
-                                             ('analytics_tag', entry['analytics_tag'])))
+                                             ('analytics_tag', entry['analytics_tag']),
+                                             ('difficulty', None),
+                                             ('difficulty_step', None),
+                                             ('progression_step', None)))
         cur.executemany("DELETE FROM "+sql_util.sym(ai_analytics_tag_assignments_table)+" WHERE base_type = %s AND base_template = %s AND user_id = %s AND start_time = %s",
                         assignments_keys)
         sql_util.do_insert_batch(cur, ai_analytics_tag_assignments_table, assignments_rows)
