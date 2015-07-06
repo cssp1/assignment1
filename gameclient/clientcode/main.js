@@ -47047,9 +47047,12 @@ function do_draw() {
                 session.incoming_attack_wave_pending = true;
                 send_to_server.func(["NEXT_AI_ATTACK_WAVE"]);
             }
-        } else if(player.tutorial_state === "COMPLETE" && (selection.ui === null || (selection.ui.user_data && selection.ui.user_data['dialog']=='region_map_dialog')) &&
+        } else {
+            // fire pending notification(s) - one at a time until a GUI dialog appears
+            while(notification_queue.pending() && player.tutorial_state === "COMPLETE" && (selection.ui === null || (selection.ui.user_data && selection.ui.user_data['dialog']=='region_map_dialog')) &&
                   (!session.has_attacked || (session.viewing_base.base_type == 'quarry' && session.viewing_base.base_landlord_id == session.user_id))) {
-            notification_queue.fire_next();
+                notification_queue.fire_next();
+            }
         }
 
         // trigger the daily attack sequence
