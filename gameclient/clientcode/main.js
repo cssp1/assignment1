@@ -16417,6 +16417,7 @@ function invoke_defense_end_dialog(battle_type, battle_base, battle_opponent_use
         }
     }
     init_dialog_repair_buttons(dialog, base_damage);
+    return dialog;
 };
 
 // tutorial UI elements don't use selection.ui because we need to
@@ -17805,6 +17806,7 @@ function invoke_battle_end_dialog(battle_type, battle_base, battle_opponent_user
                                   battle_opponent_name,
                                   outcome, loot, battle_summary, ladder_state)
 {
+    // home-base and hive victories go through the fancy version of this dialog
     if(outcome == 'victory' &&
        player.tutorial_state == "COMPLETE" &&
        (battle_base.base_type == 'home' || battle_base.base_type == 'hive' || !battle_base.base_type) &&
@@ -17812,6 +17814,10 @@ function invoke_battle_end_dialog(battle_type, battle_base, battle_opponent_user
         return invoke_fancy_victory_dialog(battle_type, battle_base, battle_opponent_user_id, battle_opponent_fbid, battle_opponent_level, battle_opponent_friend,
                                            battle_opponent_name,
                                            outcome, loot, battle_summary, ladder_state);
+    }
+
+    if(battle_type === 'squad' && player.tutorial_state === 'COMPLETE' && player.preferences['ignore_squad_battle_end_dialog']) {
+        return null; // player wants to skip
     }
 
     // do this first so it pops under
@@ -17862,22 +17868,38 @@ function invoke_battle_end_dialog(battle_type, battle_base, battle_opponent_user
         dialog.widgets['splash_image'].asset = 'splash_victory';
     }
 
-    for(var res in gamedata['resources']) {
-        if('loot_'+res+'_amount' in dialog.widgets) {
-            var amount;
-            if(gamedata['show_uncapped_loot']) {
-                amount = loot['looted_uncapped_'+res] || 0;
-            } else {
-                amount = loot[res] || 0;
-            }
-            dialog.widgets['loot_'+res+'_amount'].str = pretty_print_number(amount);
-            dialog.widgets['loot_'+res+'_icon'].asset = gamedata['resources'][res]['icon_small'];
-            if(amount) {
-                dialog.widgets['loot_'+res+'_amount'].show = dialog.widgets['loot_'+res+'_icon'].show = true;
+    var gained_anything = false;
+
+    if(battle_type === 'squad') {
+        dialog.widgets['squad_ignore_button'].show = true;
+        dialog.widgets['squad_ignore_button'].onclick = function(w) {
+            w.state = (w.state == 'active' ? 'normal' : 'active');
+            player.preferences['ignore_squad_battle_end_dialog'] = (w.state == 'active' ? 1 : 0);
+            send_to_server.func(["UPDATE_PREFERENCES", player.preferences]);
+        };
+    } else {
+        for(var res in gamedata['resources']) {
+            if('loot_'+res+'_amount' in dialog.widgets) {
+                var amount;
+                if(gamedata['show_uncapped_loot']) {
+                    amount = loot['looted_uncapped_'+res] || 0;
+                } else {
+                    amount = loot[res] || 0;
+                }
+                dialog.widgets['loot_'+res+'_amount'].str = pretty_print_number(amount);
+                dialog.widgets['loot_'+res+'_icon'].asset = gamedata['resources'][res]['icon_small'];
+                if(amount) {
+                    gained_anything = true;
+                    dialog.widgets['loot_'+res+'_amount'].show = dialog.widgets['loot_'+res+'_icon'].show = true;
+                }
             }
         }
+        if(loot['xp'] || 0 > 0) {
+            gained_anything = true;
+            dialog.widgets['loot_xp_amount'].str = pretty_print_number(loot['xp'] || 0);
+        }
     }
-    dialog.widgets['loot_xp_amount'].str = pretty_print_number(loot['xp'] || 0);
+    dialog.widgets['you_gained'].show = !!gained_anything;
 
     var trophy_delta = 0, trophy_type = null;
     goog.array.forEach(['pvp','pvv'], function(t) {

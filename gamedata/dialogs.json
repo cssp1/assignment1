@@ -3820,14 +3820,14 @@
                             "text_vjustify": "top",
                             "ui_name": "You Gained:" },
 
-            "loot_water_icon": { "kind": "StaticImage", "xy": [136,93], "dimensions": [21,21], "asset": "resource_icon_water" },
-            "loot_water_amount": { "kind": "TextField", "xy": [166,93], "dimensions": [65,19],"text_size": 13, "text_style": "bold" },
+            "loot_water_icon": { "show": 0, "kind": "StaticImage", "xy": [136,93], "dimensions": [21,21], "asset": "resource_icon_water" },
+            "loot_water_amount": { "show": 0, "kind": "TextField", "xy": [166,93], "dimensions": [65,19],"text_size": 13, "text_style": "bold" },
 
             "loot_xp_icon": { "show": 0, "kind": "StaticImage", "xy": [251,93], "dimensions": [21,21], "asset": "resource_icon_xp" },
             "loot_xp_amount": { "show": 0, "kind": "TextField", "xy": [281,93], "dimensions": [70,19],"text_size": 13, "text_style": "bold" },
 
-            "loot_iron_icon": { "kind": "StaticImage", "xy": [136,118], "dimensions": [21,21], "asset": "resource_icon_iron" },
-            "loot_iron_amount": { "kind": "TextField", "xy": [166,118], "dimensions": [65,19],"text_size": 13, "text_style": "bold" },
+            "loot_iron_icon": { "show": 0, "kind": "StaticImage", "xy": [136,118], "dimensions": [21,21], "asset": "resource_icon_iron" },
+            "loot_iron_amount": { "show": 0, "kind": "TextField", "xy": [166,118], "dimensions": [65,19],"text_size": 13, "text_style": "bold" },
 
             "loot_res3_icon": { "show": 0, "kind": "StaticImage", "xy": [136,143], "dimensions": [21,21], "asset": "resource_icon_res3" },
             "loot_res3_amount": { "show": 0, "kind": "TextField", "xy": [166,143], "dimensions": [65,19],"text_size": 13, "text_style": "bold" },
@@ -3845,6 +3845,14 @@
 
             "viral_button": { "kind": "ActionButton", "xy": [6,260], "dimensions": [134,28], "text_offset": [0,1], "show": 0,
                               "bg_image": "action_button_134px", "text_color": [0,0,0,1], "text_size": 13, "text_style": "bold", "ui_name": "Notify Earth" },
+
+            // note: applies only to squad battles
+            "squad_ignore_button": { "kind": "ActionButton", "xy": [135,75], "dimensions": [150,26], "bg_image_offset": [0,4], "push_text": 0,
+                                     "bg_image": "checkbox_button", "text_color": [0.5,0.5,0.5,1], "text_size": 13,
+                                     "ui_name": "Skip this message in the future",
+                                     "text_offset": [24,0],
+                                     "text_hjustify": "left", "text_vjustify": "center", "show": 0
+                                   },
 
             "ok_button": { "kind": "ActionButton", "xy": [227,260], "dimensions": [134,28], "text_offset": [0,1],
                            "bg_image": "action_button_134px", "text_color": [0,0,0,1], "text_size": 13, "text_style": "bold", "ui_name": "OK" }
