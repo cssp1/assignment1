@@ -235,7 +235,14 @@ UpgradeBar.update_contents = function(dialog, kind, specname, new_level, obj_id)
             } else {
                 dialog = invoke_crafting_dialog(recipe['crafting_category']);
             }
-            if(dialog) { crafting_dialog_select_recipe(dialog.widgets['recipe'], specname); }
+            if(dialog) {
+                var rec = goog.array.find(dialog.user_data['recipes'] || [], function(entry) {
+                    return (entry['spec'] === specname); // (ignore level)
+                });
+                if(rec) {
+                    crafting_dialog_select_recipe(dialog.widgets['recipe'], rec);
+                }
+            }
         }; } },
         'predicate': {'onclick': (function (_predicate_map) { return function(sindex) { return function(w, mloc) {
             var pred = _predicate_map[parseInt(sindex,10)];
