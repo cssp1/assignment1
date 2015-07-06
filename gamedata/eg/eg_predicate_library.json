@@ -44,7 +44,7 @@
     "quarry_play_requirement": {"predicate": "AND", "subpredicates": [
         // be sure to list all conditions that would prevent the regional map from opening
         { "predicate":"LIBRARY", "name": "quarry_requirement" },
-        { "predicate":"OBJECT_UNBUSY", "spec": "transmitter" }
+        { "predicate":"OBJECT_UNDAMAGED", "spec": "transmitter" }
     ] },
 
     // requirement to access the Change Region feature
