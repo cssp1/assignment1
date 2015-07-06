@@ -23,7 +23,7 @@
     "change_region_requirement": { "predicate": "LIBRARY", "name": "change_region_requirement" },
 
     // whether regional map is available when the transmitter building is under upgrade or repair
-    "region_map_available_during_transmitter_upgrade": false,
+    "region_map_available_during_transmitter_upgrade": true,
     "region_map_available_during_transmitter_repair": false,
 
     // if true, always refresh regional map when opening it after a session change
