@@ -9540,8 +9540,9 @@ function NotificationQueue() {
 }
 
 // fire the next notification message in the queue
+// return true if one was succesfully fired
 NotificationQueue.prototype.fire_next = function() {
-    if(this.hold_time > 0 && client_time < this.hold_time) { return; }
+    if(this.hold_time > 0 && client_time < this.hold_time) { return false; }
 
     var item = null, item_i = -1, prio = -1000;
 
@@ -9563,6 +9564,7 @@ NotificationQueue.prototype.fire_next = function() {
         item['cb']();
         player.quest_tracked_dirty = true;
     }
+    return !!item;
 };
 
 NotificationQueue.prototype.push = function(cb, params) {
@@ -47087,7 +47089,7 @@ function do_draw() {
             // fire pending notification(s) - one at a time until a GUI dialog appears
             while(notification_queue.pending() && player.tutorial_state === "COMPLETE" && (selection.ui === null || (selection.ui.user_data && selection.ui.user_data['dialog']=='region_map_dialog')) &&
                   (!session.has_attacked || (session.viewing_base.base_type == 'quarry' && session.viewing_base.base_landlord_id == session.user_id))) {
-                notification_queue.fire_next();
+                if(!notification_queue.fire_next()) { break; }
             }
         }
 
