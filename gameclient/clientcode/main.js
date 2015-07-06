@@ -30899,6 +30899,10 @@ function crafting_dialog_select_recipe(dialog, rec) {
     if(!rec) { dialog.show = false; return; }
     var specname = rec['spec'];
 
+    if(!specname || !(specname in gamedata['crafting']['recipes'])) {
+        throw Error('crafting recipe not found for rec: '+JSON.stringify(rec));
+    }
+
     var recipe = gamedata['crafting']['recipes'][specname];
     dialog.show = true;
     dialog.user_data['recipe'] = recipe;
