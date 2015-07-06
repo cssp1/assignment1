@@ -411,6 +411,7 @@ if __name__ == '__main__':
                         progression_step = None
                 else:
                     difficulty_step = None
+                    progression_step = None
 
                 for start_time, end_time in start_end_times:
                     assignments_keys.append(('home', 'home', base_id, start_time))
