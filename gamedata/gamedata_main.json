@@ -658,6 +658,8 @@
 
     "produce_to_reserves": true, // send unit production that overflows Base Defenders to reserves instead of failing. Only applies if squads are enabled.
 
+    "squads_available_during_squad_bay_upgrade": true,
+
     "daily_quest_reward_ratio": 0.33, // reduce daily quest rewards this much
 
     // minimum level for bonus reward units (from quests and gamebucks purchases)

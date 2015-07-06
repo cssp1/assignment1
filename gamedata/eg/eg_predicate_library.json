@@ -61,7 +61,7 @@
     "squad_play_requirement": {"predicate": "AND", "subpredicates": [
         // be sure to list all conditions that would prevent the regional map from opening
         { "predicate":"LIBRARY", "name": "squads_enabled" },
-        { "predicate":"OBJECT_UNBUSY", "spec": "squad_bay" }
+        { "predicate":"OBJECT_UNDAMAGED", "spec": "squad_bay" }
     ] },
 
     "ai_tutorial08_complete": { "predicate": "PLAYER_HISTORY", "key": "ai_tutorial08_progress", "method": ">=", "value": 8,

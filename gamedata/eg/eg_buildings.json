@@ -886,7 +886,7 @@
 
         "build_cost_iron": [285,735],
         "build_cost_water": [285,735],
-        "build_time": [28,112],
+        "build_time": [0,112],
         "repair_time": [5,5],
         "upgrade_credit_cost": [1,1],
 
@@ -968,7 +968,7 @@
         "upgrade_credit_cost": [1,1],
         "consumes_power": [0,25],
         "consumes_power_while_building": [0,12],
-        "build_time": [30,30],
+        "build_time": [0,30],
         "repair_time": [30,30],
         // how much unit space the building provides for RECEIVING donated units
         "provides_donated_space": [0,170],
