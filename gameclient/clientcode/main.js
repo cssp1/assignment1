@@ -17816,7 +17816,24 @@ function invoke_battle_end_dialog(battle_type, battle_base, battle_opponent_user
                                            outcome, loot, battle_summary, ladder_state);
     }
 
-    if(battle_type === 'squad' && player.tutorial_state === 'COMPLETE' && player.preferences['ignore_squad_battle_end_dialog']) {
+    var trophy_delta = 0, trophy_type = null;
+    goog.array.forEach(['pvp','pvv'], function(t) {
+        if((loot['trophies_'+t] || 0)) {
+            trophy_delta = loot['trophies_'+t];
+            trophy_type = t;
+        }
+    });
+
+    // skippable: any squad battle, any LOSS at a quarry, hive, or human home where no trophies were gained or lost
+    var skippable = (battle_type === 'squad' ||
+                     ((battle_base.base_type === 'quarry' ||
+                       battle_base.base_type === 'hive' ||
+                       (battle_base.base_type === 'home' && !is_ai_user_id_range(battle_base.base_landlord_id)))
+                      && outcome !== 'victory')) &&
+        (trophy_delta === 0) &&
+        (player.tutorial_state === 'COMPLETE');
+
+    if(skippable && player.preferences['ignore_squad_battle_end_dialog']) {
         return null; // player wants to skip
     }
 
@@ -17870,44 +17887,37 @@ function invoke_battle_end_dialog(battle_type, battle_base, battle_opponent_user
 
     var gained_anything = false;
 
-    if(battle_type === 'squad') {
+    if(skippable) {
         dialog.widgets['squad_ignore_button'].show = true;
         dialog.widgets['squad_ignore_button'].onclick = function(w) {
             w.state = (w.state == 'active' ? 'normal' : 'active');
             player.preferences['ignore_squad_battle_end_dialog'] = (w.state == 'active' ? 1 : 0);
             send_to_server.func(["UPDATE_PREFERENCES", player.preferences]);
         };
-    } else {
-        for(var res in gamedata['resources']) {
-            if('loot_'+res+'_amount' in dialog.widgets) {
-                var amount;
-                if(gamedata['show_uncapped_loot']) {
-                    amount = loot['looted_uncapped_'+res] || 0;
-                } else {
-                    amount = loot[res] || 0;
-                }
-                dialog.widgets['loot_'+res+'_amount'].str = pretty_print_number(amount);
-                dialog.widgets['loot_'+res+'_icon'].asset = gamedata['resources'][res]['icon_small'];
-                if(amount) {
-                    gained_anything = true;
-                    dialog.widgets['loot_'+res+'_amount'].show = dialog.widgets['loot_'+res+'_icon'].show = true;
-                }
+    }
+
+    for(var res in gamedata['resources']) {
+        if('loot_'+res+'_amount' in dialog.widgets) {
+            var amount;
+            if(gamedata['show_uncapped_loot']) {
+                amount = loot['looted_uncapped_'+res] || 0;
+            } else {
+                amount = loot[res] || 0;
+            }
+            dialog.widgets['loot_'+res+'_amount'].str = pretty_print_number(amount);
+            dialog.widgets['loot_'+res+'_icon'].asset = gamedata['resources'][res]['icon_small'];
+            if(amount) {
+                gained_anything = true;
+                dialog.widgets['loot_'+res+'_amount'].show = dialog.widgets['loot_'+res+'_icon'].show = true;
             }
         }
-        if(loot['xp'] || 0 > 0) {
-            gained_anything = true;
-            dialog.widgets['loot_xp_amount'].str = pretty_print_number(loot['xp'] || 0);
-        }
+    }
+    if(loot['xp'] || 0 > 0) {
+        gained_anything = true;
+        dialog.widgets['loot_xp_amount'].str = pretty_print_number(loot['xp'] || 0);
     }
     dialog.widgets['you_gained'].show = !!gained_anything;
 
-    var trophy_delta = 0, trophy_type = null;
-    goog.array.forEach(['pvp','pvv'], function(t) {
-        if((loot['trophies_'+t] || 0)) {
-            trophy_delta = loot['trophies_'+t];
-            trophy_type = t;
-        }
-    });
     if(trophy_delta != 0) {
         dialog.widgets['trophy_sunken'].show =
             dialog.widgets['trophy_icon'].show =

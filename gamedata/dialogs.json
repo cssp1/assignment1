@@ -3804,10 +3804,10 @@
     },
 
     "battle_dialog": {
-        "dimensions": [366, 296],
+        "dimensions": [366, 326],
         "default_button": "ok_button",
         "widgets": {
-            "bg": {"kind": "StaticImage", "xy":[0,0], "dimensions":[366,296], "asset":"dialog_resizable","bg_image_resizable":1,
+            "bg": {"kind": "StaticImage", "xy":[0,0], "dimensions":[366,326], "asset":"dialog_resizable","bg_image_resizable":1,
                    "sound": "success_sound_exploding_glass_01" },
             "sunken_left": {"kind": "StaticImage", "xy":[8,9], "dimensions":[116,121], "asset": "dialog_sunken_resizable", "bg_image_resizable": 1 },
             "valentina": { "kind": "StaticImage", "xy": [0,6], "dimensions": [143,155], "clip_to": [12,12,108,115], "asset": "valentina_143x155" },
@@ -3841,20 +3841,20 @@
             "trophy_shine": { "show": 0, "alpha": 0.85, "kind": "StaticImage", "xy": [244,106], "dimensions": [62,13], "asset": "button_shine" },
 
 
-            "splash_image": { "kind": "StaticImage", "xy": [6,171], "dimensions": [354,82], "asset": "splash_defeat" },
+            "splash_image": { "kind": "StaticImage", "xy": [6,201], "dimensions": [354,82], "asset": "splash_defeat" },
 
-            "viral_button": { "kind": "ActionButton", "xy": [6,260], "dimensions": [134,28], "text_offset": [0,1], "show": 0,
+            "viral_button": { "kind": "ActionButton", "xy": [6,290], "dimensions": [134,28], "text_offset": [0,1], "show": 0,
                               "bg_image": "action_button_134px", "text_color": [0,0,0,1], "text_size": 13, "text_style": "bold", "ui_name": "Notify Earth" },
 
             // note: applies only to squad battles
-            "squad_ignore_button": { "kind": "ActionButton", "xy": [135,75], "dimensions": [150,26], "bg_image_offset": [0,4], "push_text": 0,
+            "squad_ignore_button": { "kind": "ActionButton", "xy": [135,170], "dimensions": [150,26], "bg_image_offset": [0,4], "push_text": 0,
                                      "bg_image": "checkbox_button", "text_color": [0.5,0.5,0.5,1], "text_size": 13,
-                                     "ui_name": "Skip this message in the future",
+                                     "ui_name": "Don't show this message again",
                                      "text_offset": [24,0],
                                      "text_hjustify": "left", "text_vjustify": "center", "show": 0
                                    },
 
-            "ok_button": { "kind": "ActionButton", "xy": [227,260], "dimensions": [134,28], "text_offset": [0,1],
+            "ok_button": { "kind": "ActionButton", "xy": [227,290], "dimensions": [134,28], "text_offset": [0,1],
                            "bg_image": "action_button_134px", "text_color": [0,0,0,1], "text_size": 13, "text_style": "bold", "ui_name": "OK" }
         }
     },
