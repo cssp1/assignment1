@@ -381,14 +381,14 @@ class SpecificPvPResLoot(PvPResLoot):
         attacker_caps = dict((kind, dict((res, -1) for res in gamedata['resources'])) for kind in ('storage', 'producer'))
         defender_caps = dict((kind, dict((res, -1) for res in gamedata['resources'])) for kind in ('storage', 'producer'))
 
-        if type(gamedata['loot_attacker_gains'] is dict):
+        if type(gamedata['loot_attacker_gains']) is dict:
             for kind in attacker_caps:
                 for res in attacker_caps[kind]:
                     cap = Predicates.eval_cond_or_literal(gamedata['loot_attacker_gains'][res][kind], session, session.viewing_player).get('cap',-1) # note: evaluated on viewing_player, not player!
                     if cap >= 0:
                         attacker_caps[kind][res] = cap
 
-        if type(gamedata['loot_defender_loses'] is dict):
+        if type(gamedata['loot_defender_loses']) is dict:
             for kind in defender_caps:
                 for res in defender_caps[kind]:
                     cap = Predicates.eval_cond_or_literal(gamedata['loot_defender_loses'][res][kind], session, session.viewing_player).get('cap',-1) # note: evaluated on viewing_player, not player!
