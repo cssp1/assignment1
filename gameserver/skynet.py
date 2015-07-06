@@ -617,8 +617,9 @@ def _adstats_pull(db, adgroup_list, time_range = None):
                int(stat_end_time) != time_range[1] or \
                parsed_start_time != time_range[0] or \
                parsed_end_time != time_range[1]:
-                raise Exception('asked for time_range %r but got %r (parsed %r %r)' % \
-                                (time_range, x['id'], parsed_start_time, parsed_end_time))
+                raise Exception('asked for time_range %r %r %r but got %r (parsed %r %r %r %r)' % \
+                                (time_range, SpinFacebook.unparse_fb_time(time_range[0]), SpinFacebook.unparse_fb_time(time_range[1]),
+                                 x['id'], parsed_start_time, parsed_end_time, x['start_time'], x['end_time']))
 
         for FIELD in ('spent', 'impressions', 'clicks'):
             x[FIELD] = int(x[FIELD]) # sometimes Facebook returns numeric fields as a string :P
@@ -672,23 +673,57 @@ def adstats_pull(db, adgroup_list, time_range = None):
 def adstats_pull_dict(*args, **kwargs):
     return dict([(x[spin_field('adgroup_id')], x) for x in adstats_pull(*args, **kwargs)])
 
-ADGROUP_DATA_IS_HOURLY = False # Facebook change as of 2015 Feb 9, they only return daily data now
+# Facebook change as of 2015 Feb 9 - they only return daily data now
+# we have legacy data left over in the fb_adstats_hourly table, but will only update
+# fb_adstats_daily going forward.
+ADSTATS_PERIOD = 'day'
+def adstats_record_table(db):
+    if ADSTATS_PERIOD == 'hour':
+        return db.fb_adstats_hourly
+    else:
+        return db.fb_adstats_daily
+
+def adstats_quantize_time(t, round_up = False):
+    if ADSTATS_PERIOD == 'hour':
+        if round_up: t += 3600 - 1
+        return 3600*(t//3600)
+    elif ADSTATS_PERIOD == 'day':
+        if round_up: t += 86400 - 1
+        offs = utc_pacific_offset(t)
+        return 86400*((t+offs)//86400)-offs
+
+def adstats_record_verify_time_range(table, time_range, allow_multi_period = False):
+    if ADSTATS_PERIOD == 'hour':
+        for r in time_range:
+            if r % 3600 != 0: return False
+        delta = time_range[1] - time_range[0]
+        if allow_multi_period: delta = delta % 3600 + 3600
+        if delta != 3600:
+            return False
+    elif ADSTATS_PERIOD == 'day':
+        delta = time_range[1] - time_range[0]
+        if allow_multi_period: delta = delta % 86400 + 86400
+        if delta not in (86400, 86400-3600, 86400+3600): # allow daylight savings time
+            return False
+        for r in time_range:
+            ts = time.gmtime(pacific_to_utc(r))
+            # must be Pacific time midnight
+            if ts.tm_hour != 0 or ts.tm_min != 0 or ts.tm_sec != 0:
+                return False
+    return True
 
 def adstats_record(db, adgroup_list, time_range):
-    assert time_range[1]-time_range[0] == 3600
-    db.fb_adstats_hourly.ensure_index([('adgroup_id',pymongo.ASCENDING),('start_time',pymongo.ASCENDING)])
-    db.fb_adstats_hourly.ensure_index([('start_time',pymongo.ASCENDING)])
+    table = adstats_record_table(db)
+    table.ensure_index([('adgroup_id',pymongo.ASCENDING),('start_time',pymongo.ASCENDING)])
+    table.ensure_index([('start_time',pymongo.ASCENDING)])
 
-    if ADGROUP_DATA_IS_HOURLY:
-        pull_time_range = time_range
-    else: # ugly hack - cram all the day's data into the first hour, if only daily data is available
-        if (pacific_to_utc(time_range[0]) % 86400) != 0: # not the beginning of a Pacific time day
-            return -1 # "no data expected" for this time range
-        else:
-            pull_time_range = [time_range[0], time_range[0]+86400]
+    assert adstats_record_verify_time_range(table, time_range, allow_multi_period = False)
+
+    pull_time_range = time_range
 
     # use uncached version
     stats = _adstats_pull(db, adgroup_list, time_range = pull_time_range)
+    totals = {'spent': 0, 'impressions': 0, 'clicks': 0}
     count = 0
     for adgroup, stat in zip(adgroup_list, stats):
         if not stat: continue
@@ -714,28 +749,35 @@ def adstats_record(db, adgroup_list, time_range):
 
         for FIELD in ('spent', 'impressions', 'clicks'):
             obj[FIELD] = int(stat[FIELD]) # sometimes Facebook returns numeric fields as a string :P
+            totals[FIELD] += obj[FIELD]
 
         if obj['spent']+obj['impressions']+obj['clicks'] < 1: continue # don't record empty stats
 
         if verbose:
             print "STAT", stat
             print "RECORD", obj
-        db.fb_adstats_hourly.save(obj, manipulate=False)
+
+        table.save(obj, manipulate=False)
         count += 1
+
+    if verbose:
+        print "TOTALS", totals
+
     return count
 
 # get list of adgroups that had some activity during time_range
 def adstats_record_get_live_adgroups(db, match_qs, time_range):
-    start_time = (time_range[0]//3600)*3600
-    end_time = (time_range[1]//3600)*3600
-    default_created_time = SpinFacebook.unparse_fb_time(start_time)
+    default_created_time = SpinFacebook.unparse_fb_time(time_range[0])
     default_name = 'BAD - unknown'
 
-    match_qs['start_time' ] = {'$gte':start_time}
-    match_qs['end_time'] = {'$lte':end_time}
+    if not adstats_record_verify_time_range(adstats_record_table(db), time_range, allow_multi_period = True):
+        if not quiet: print 'warning: time range is not aligned to local time:', time_range
+
+    match_qs['start_time'] = {'$lt':time_range[1]}
+    match_qs['end_time'] = {'$gt':time_range[0]}
 
     result = [{'id': str(row['_id']), 'name': row['adgroup_name'] or default_name, 'created_time': row['created_time'] or default_created_time} for row in \
-              db.fb_adstats_hourly.aggregate([
+              adstats_record_table(db).aggregate([
         {'$match':match_qs},
         {'$group':{'_id':'$adgroup_id', 'adgroup_name':{'$last':'$adgroup_name'}, 'created_time':{'$max':'$created_time'}}}
         ])['result']]
@@ -756,25 +798,24 @@ def adstats_record_get_live_adgroups(db, match_qs, time_range):
                     if stgt and (not adgroup_name_is_bad(adgroup['name'])):
                         qs_set = {'$set': {'adgroup_name': adgroup['name'], 'dtgt': stgt_to_dtgt(stgt), 'campaign_id': str(adgroup['campaign_id']), 'created_time': adgroup['created_time']}}
                         if not dry_run:
-                            db.fb_adstats_hourly.update(qs, qs_set, w=0, multi=True, upsert=False)
+                            adstats_record_table(db).update(qs, qs_set, w=0, multi=True, upsert=False)
                     else:
                         if not quiet: print 'dropping stats for unknown adgroup named "%s"' % adgroup['name']
                         if 1:
-                            db.fb_adstats_hourly.remove(qs, multi=True, w=0)
+                            adstats_record_table(db).remove(qs, multi=True, w=0)
 
     return result
 
 def adstats_record_pull_dict(db, adgroup_list, time_range = None):
-    assert time_range
-    start_time = (time_range[0]//3600)*3600
-    end_time = (time_range[1]//3600)*3600
+    if not adstats_record_verify_time_range(adstats_record_table(db), time_range, allow_multi_period = True):
+        raise Exception('error: time range is not aligned to local time: %r' % time_range)
 
     # initialize with empty stats
     ret = dict([(str(adgroup['id']), {'spent':0,'impressions':0,'clicks':0}) for adgroup in adgroup_list])
 
     query = [{'$match':{'adgroup_id':{'$in':ret.keys()},
-                        'start_time':{'$gte':start_time},
-                        'end_time':{'$lte':end_time}}},
+                        'start_time':{'$lt':time_range[1]},
+                        'end_time':{'$gt':time_range[0]}}},
              {'$project':{'adgroup_id':1,'spent':1,'clicks':1,'impressions':1,'start_time':1,'end_time':1}},
              {'$group':{'_id':'$adgroup_id',
                         'spent':{'$sum':'$spent'},
@@ -786,7 +827,7 @@ def adstats_record_pull_dict(db, adgroup_list, time_range = None):
                         }}]
     if verbose: print 'adstat record query:', query
 
-    results = db.fb_adstats_hourly.aggregate(query)['result']
+    results = adstats_record_table(db).aggregate(query)['result']
     #if verbose: print "GOT", results
     for row in results:
         ret[row['_id']] = row
@@ -933,7 +974,7 @@ def adstats_analyze(db, min_clicks = 0, stgt_filter = None, group_by = None,
             #if stgt_filter: print "FILTER:", stgt_filter
             if time_range:
                 def hrs_ago(x): return (time_now - x)/3600.0
-                print "TIME RANGE:", time_range, "("+ ('-'.join(['%.1f' % hrs_ago(x) for x in time_range])) + " hrs ago)", "next", 3*3600+time_range[1],
+                print "TIME RANGE:", time_range, "("+ (' - '.join(['%.1f' % hrs_ago(x) for x in time_range])) + " hrs ago)", "next", adstats_quantize_time(3*3600+time_range[1], round_up=True),
             print "STATS FOR:", len(adgroup_list), "ads:", [len(adstats[s['ui_name']]) for s in time_samples]
 
     elif output_format == 'csv':
@@ -2532,13 +2573,17 @@ if __name__ == '__main__':
         dump_table(db.fb_adgroups)
 
     elif mode == 'adstats-analyze':
-        safe_limit = ((time_now-7200)//3600)*3600
+        safe_limit = time_now-7200
         if time_range:
             if time_range[1] > safe_limit:
-                #if not quiet: print 'limiting end_time to', safe_limit, '(2+ hours ago) to ensure reliable results'
+                if not quiet: print 'limiting end_time to', safe_limit, '(2+ hours ago) to ensure reliable results'
                 time_range[1] = safe_limit
         else:
-            time_range = [1, safe_limit]
+            time_range = [0, safe_limit]
+
+        if use_record:
+            time_range[0] = adstats_quantize_time(time_range[0])
+            time_range[1] = adstats_quantize_time(time_range[1], round_up = True)
 
         if time_range[0] >= time_range[1]:
             print 'time_range is empty:', time_range
@@ -2547,15 +2592,22 @@ if __name__ == '__main__':
                             use_regexp_ltv = use_regexp_ltv, use_record = use_record, output_format = output_format, output_frequency = output_frequency, tactical = tactical)
 
     elif mode == 'adstats-record':
+        table = adstats_record_table(db)
         if not time_range:
-            if ADGROUP_DATA_IS_HOURLY:
+            if ADSTATS_PERIOD == 'hour':
                 # find UNIX time interval covering one whole hour, two hours ago
                 # (if you query data too close to the present time, you'll get incomplete results)
                 time_range = [time_now-7200, time_now-3600]
-            else:
+            elif ADSTATS_PERIOD == 'day':
                 # query yesterday's data, and what we can of today's
-                beginning_of_today = 86400*(time_now//86400)
-                time_range = [beginning_of_today - 86400, beginning_of_today + 86400]
+                time_range = [time_now - 2*86400, time_now + 86400]
+            else:
+                raise Exception('unknown table')
+
+        # quantize time_range
+        print 'ORIGINAL', time_range
+        for i in xrange(len(time_range)):
+            time_range[i] = adstats_quantize_time(time_range[i])
 
         # note: this works on adgroups only, totally disregarding campaign distinctions
         if adgroup_name:
@@ -2593,21 +2645,22 @@ if __name__ == '__main__':
             if not quiet: print "Got", len(previous), "additional recent adgroups"
             adgroup_list += previous
 
-        # quantize (floor) time_range to hours
-        QUANT=3600
-        time_range = [(x//QUANT)*QUANT for x in time_range]
         interval_start = time_range[0]
-        interval_end = interval_start + QUANT
-        count = -1 # -1 means "no data expected", otherwise it's a count of the records added
+        count = 0
         while interval_start < time_range[1]:
+            if ADSTATS_PERIOD == 'hour':
+                interval_end = interval_start + 3600
+            elif ADSTATS_PERIOD == 'day':
+                # advance to next day, including daylight savings time
+                interval_end = adstats_quantize_time(interval_start + 86400 + 2*3600)
+
             if not quiet: print "Recording stats on %d non-deleted adgroups between %d-%d..." % (len(adgroup_list), interval_start, interval_end)
             if not dry_run:
                 this_count = adstats_record(db, adgroup_list, [interval_start, interval_end])
                 if this_count >= 0:
-                    if count < 0: count = 0
                     count += this_count
             interval_start = interval_end
-            interval_end += QUANT
+
         if len(adgroup_list) < 1:
             sys.stderr.write('WARNING: did not find any current adgroups to record!\n')
         if count == 0:
