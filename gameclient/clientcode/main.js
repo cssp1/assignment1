@@ -23574,15 +23574,15 @@ function request_unit_donation(alliance_building) {
     session.clear_building_idle_state_caches(); // for ALL buildings
 }
 
-function resolve_region_map_building_problem() { return resolve_building_problem(gamedata['region_map_building']); };
-function resolve_alliance_building_problem() { return resolve_building_problem(gamedata['alliance_building']); };
-function resolve_building_problem(specname) {
+function resolve_region_map_building_problem() { return resolve_building_problem(gamedata['region_map_building'], !!gamedata['territory']['region_map_available_during_transmitter_upgrade']); };
+function resolve_alliance_building_problem() { return resolve_building_problem(gamedata['alliance_building'], false); };
+function resolve_building_problem(specname, allow_upgrading) {
     var building = find_object_by_type(specname);
     if(!building) {
         var helper = get_requirements_help(read_predicate({'predicate': 'BUILDING_LEVEL', 'building_type': specname, 'trigger_level':1}), null);
         if(helper) { helper(); }
         return true;
-    } else if(building.is_under_construction() || building.is_damaged() || building.is_upgrading()) {
+    } else if(building.is_damaged() || (!allow_upgrading && (building.is_upgrading() || building.is_under_construction()))) {
         change_selection_unit(building);
         if(building.is_damaged() && !building.is_repairing()) {
             invoke_repair_dialog();
