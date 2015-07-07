@@ -27,6 +27,9 @@
         "facebook_iframe_resize_hack": true,
         "facebook_iframe_footer_peek": 30, // how many pixels to shrink the game canvas vertically to reveal the top of the footer
 
+        "armorgames_iframe_size_mode": "screen", // initialize AG iframe size based on screen dimensions at connect time
+        "armorgames_iframe_footer_peek": 30, // same as Facebook
+
         // true if the HTML5 fullscreen API is available
         "truefullscreen": {"predicate": "FRAME_PLATFORM", "platform":"fb"}, // true if the HTML5 fullscreen API is available
 

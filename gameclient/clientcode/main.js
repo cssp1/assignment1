@@ -42487,6 +42487,16 @@ function handle_server_message(data) {
 
         linkbar_put_id(session.user_id);
 
+        // on AG, set fixed canvas size based on browser dimensions
+        if(spin_frame_platform === 'ag' && spin_armorgames_enabled && gamedata['client']['armorgames_iframe_size_mode'] === 'screen') {
+            var height_buffer = (header ? header.clientHeight : 0) + gamedata['client']['armorgames_iframe_footer_peek'];
+            var width_buffer = 50;
+            var width = Math.max(736 + width_buffer, screen.availWidth - width_buffer);
+            var height = Math.max(425 + height_buffer, screen.availHeight - height_buffer);
+            SPArmorGames.setIframeDimensions({'width': width,
+                                              'height': height});
+        }
+
         // reflow in case the header height changed
         if(need_reflow || canvas_oversample !== 1) { on_resize_browser(null); }
 
