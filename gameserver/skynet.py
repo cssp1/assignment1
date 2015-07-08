@@ -602,8 +602,8 @@ def _adstats_pull(db, adgroup_list, time_range = None):
     do_store = (time_range is None) # don't store time-ranged results
 
     for adgroup, x in zip(adgroup_list,
-                          fb_api_batch(SpinFacebook.versioned_graph_endpoint('adgroup', ''), # adgroupstats?
-                                       [{'method':'GET', 'relative_url':adgroup['id']+'/adgroupstats'+('/%d/%d' % (time_range[0],time_range[1]) if time_range else '')} for adgroup in adgroup_list])):
+                          fb_api_batch(SpinFacebook.versioned_graph_endpoint('adgroup', ''),
+                                       [{'method':'GET', 'relative_url':adgroup['id']+'/stats'+('/%d/%d' % (time_range[0],time_range[1]) if time_range else '')} for adgroup in adgroup_list])):
         stat_id, junk, stat_start_time, stat_end_time = x['id'].split('/')
         # make sure we got data for the right ad
         assert str(stat_id) == str(adgroup['id'])
