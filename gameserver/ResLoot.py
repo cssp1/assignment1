@@ -335,22 +335,44 @@ class HardcorePvPResLoot(PvPResLoot):
             # count how many storage buildings the owning player has
             assert obj in self.base.iter_objects()
 
+            # legacy note: previously, we used "nbuild" (total number of ALL storage buildings) as the
+            # denominator in the loot distribution. This produces incorrect results (e.g. looting a single
+            # res3 storage when 4 other iron/water storages are present will result in 1/5th the expected loot).
+
+            # There is now an option to use a more proper calculation (dividing by the number of storage buildings
+            # of THIS resource, weighted by capacity), but since this is very much incompatible with current JSON
+            # numbers, we are enabling the "loot_storage_distribution_bug" in titles that haven't been updated yet.
+
             nbuild = 0
-            nsame = 0
+            weights = dict((res, 0) for res in gamedata['resources'])
+
             for p in self.base.iter_objects():
                 if p.is_building() and p.is_storage():
+                    # note: do not include building in weights if it was destroyed already
+                    if not p.is_destroyed():
+                        for res in gamedata['resources']:
+                            weights[res] += p.get_leveled_quantity(getattr(p.spec, 'storage_'+res))
+                    # but do include in nbuild even if destroyed, for legacy compatibility
                     nbuild += 1
-                if p.spec.name == obj.spec.name:
-                    nsame += 1
             assert nbuild > 0
-            assert nsame > 0
 
-            factor = (1.0/nbuild)
+
+            if gamedata.get('loot_storage_distribution_bug', False):
+                # legacy method for backwards compatibility
+                factors = dict((res, (1.0/nbuild)) for res in gamedata['resources'])
+            else:
+                factors = {}
+                for res in gamedata['resources']:
+                    if obj.get_leveled_quantity(getattr(obj.spec, 'storage_'+res)) > 0:
+                        assert weights[res] > 0
+                        factors[res] = (obj.get_leveled_quantity(getattr(obj.spec, 'storage_'+res))/float(weights[res]))
+                    else:
+                        factors[res] = 0
 
             for res in gamedata['resources']:
                 if obj.get_leveled_quantity(getattr(obj.spec, 'storage_'+res)) > 0:
-                    looted[res] = int(factor * loot_attacker_gains[res] * getattr(owning_player.resources,res))
-                    lost[res] = int(factor * loot_defender_loses[res] * getattr(owning_player.resources,res))
+                    looted[res] = int(factors[res] * loot_attacker_gains[res] * getattr(owning_player.resources,res))
+                    lost[res] = int(factors[res] * loot_defender_loses[res] * getattr(owning_player.resources,res))
 
             # loot is taken directly from the owner's stored resources
             owning_player.resources.gain_res(dict((res,-lost[res]) for res in lost), reason='looted_by_attacker')
@@ -399,7 +421,7 @@ class SpecificPvPResLoot(PvPResLoot):
         n_storages = dict((res, 0) for res in gamedata['resources'])
         total_storage_weight = dict((res, 0) for res in gamedata['resources'])
         for p in self.base.iter_objects():
-            if p.is_building() and p.is_storage():
+            if p.is_building() and p.is_storage(): # XXX (and not p.is_destroyed()) ?
                 for res in gamedata['resources']:
                     qty = p.get_leveled_quantity(getattr(p.spec, 'storage_'+res))
                     if qty > 0:
@@ -411,7 +433,7 @@ class SpecificPvPResLoot(PvPResLoot):
         self.storage_building_amounts = {}
 
         for p in self.base.iter_objects():
-            if p.is_building() and p.is_storage():
+            if p.is_building() and p.is_storage(): # XXX (and not p.is_destroyed()) ?
                 loot_amounts = {}
                 lost_amounts = {}
                 for res in gamedata['resources']:
