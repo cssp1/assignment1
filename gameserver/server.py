@@ -14806,6 +14806,8 @@ class XSAPI(resource.Resource):
                                                                    session.user.country, session.user.locale.split('_')[0] if session.user.locale else 'en',
                                                                    gamebucks_quantity, gamebucks_ui_description,
                                                                    session.player.level(), session.user.account_creation_time)
+        if gamedata['server'].get('log_xsolla', False):
+            gamesite.xsolla_log.event(server_time, SpinJSON.dumps({'url':url, 'method':method, 'headers':headers, 'body':body}))
         d = defer.Deferred()
         gamesite.AsyncHTTP_Xsolla.queue_request(server_time, url,
                                                 lambda result, _d=d: _d.callback(SpinJSON.loads(result)['token']),
