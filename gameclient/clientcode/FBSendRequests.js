@@ -15,7 +15,6 @@ goog.provide('FBSendRequests');
 goog.require('SPUI');
 goog.require('SPFB');
 goog.require('PlayerCache');
-goog.require('AllianceCache');
 goog.require('goog.array');
 goog.require('goog.object');
 

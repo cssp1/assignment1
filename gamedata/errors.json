@@ -193,7 +193,7 @@
     "INVALID_CHAT_CHANNEL": { "ui_name": "You do not have access to this chat channel" },
     "CHAT_THROTTLED": { "ui_name": "Chat spam detected, please wait %d seconds before sending another message." },
 
-    "NO_GIFTABLE_FRIENDS": { "ui_title": "Send more gifts", "ui_name": "You may send a gift to each friend once per day.\n\nInvite new friends to send more gifts.", "ui_button": "Invite" },
+    "NO_GIFTABLE_FRIENDS": { "ui_title": "Send more gifts", "ui_name": "You may send a gift to each friend once per day.\n\nInvite new friends to send more gifts.", "ui_button_invite": "Invite" },
     "CANNOT_REQUEST_UNIT_DONATION_NO_SPACE": { "ui_name": "No space for more reinforcements. Use your existing reinforcements first." },
     "CANNOT_DONATE_UNITS_NO_SPACE": { "ui_name": "Recipient has no space for more reinforcements.\n\nAnother player may have donated units ahead of you, or this request may be too old.\n\nYou have not donated any units." },
     "CANNOT_CREATE_SQUAD_LIMIT_REACHED": { "ui_name": "Maximum number of battalions already created." },

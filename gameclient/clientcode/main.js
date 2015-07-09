@@ -39,6 +39,7 @@ goog.require('FBShare');
 goog.require('FBUploadPhoto');
 goog.require('FBInviteFriends');
 goog.require('FBSendRequests');
+goog.require('AGSendRequests');
 goog.require('SPay');
 goog.require('SProbe');
 goog.require('SPWebsocket');
@@ -5951,7 +5952,9 @@ player.unit_micro_enabled = function() { return (!('enable_unit_micro' in gameda
 player.squads_enabled = function() { return read_predicate({'predicate':'LIBRARY', 'name': 'squads_enabled'}).is_satisfied(player, null); };
 player.unit_speedups_enabled = function() { return player.is_cheater || !('enable_unit_speedups' in gamedata) || gamedata['enable_unit_speedups']; };
 player.crafting_speedups_enabled = function() { return player.is_cheater || !('enable_crafting_speedups' in gamedata) || gamedata['enable_crafting_speedups']; };
-player.resource_gifts_enabled = function() { return (player.get_any_abtest_value('enable_resource_gifts', gamedata['enable_resource_gifts']) && (spin_frame_platform == 'fb')); };
+player.resource_gifts_enabled = function() { return (player.get_any_abtest_value('enable_resource_gifts', gamedata['enable_resource_gifts']) &&
+                                                     (spin_frame_platform == 'fb' ||
+                                                      spin_frame_platform == 'ag')); };
 player.upgrade_bar_enabled = function() { return player.get_any_abtest_value('enable_upgrade_bar', gamedata['client']['enable_upgrade_bar']) &&
                                           read_predicate({'predicate':'LIBRARY', 'name': 'extended_tutorial_complete'}).is_satisfied(player,null); };
 
@@ -10561,7 +10564,7 @@ function scroll_friend_bar(dialog, page) {
                     dialog.widgets['gift_button'].onclick = function(w) {
                         var uid = w.parent.user_data['user_id'];
                         change_selection_ui(null);
-                        FBSendRequests.invoke_send_gifts_dialog(uid, 'friend_bar');
+                        invoke_send_gifts_dialog(uid, 'friend_bar');
                     };
                 } else if(player.get_any_abtest_value('ungiftable_fallback_to_invite', gamedata['client']['ungiftable_fallback_to_invite'])) {
                     dialog.widgets['gift_button'].state = 'normal';
@@ -10571,16 +10574,18 @@ function scroll_friend_bar(dialog, page) {
                         // ANY giftable friends?
                         player.get_giftable_friend_info_list_async(function (ret) {
                             if(ret.length > 0) {
-                                FBSendRequests.invoke_send_gifts_dialog(null, 'friend_bar_fallback', ret);
+                                invoke_send_gifts_dialog(null, 'friend_bar_fallback', ret);
                             } else {
                                 var s = gamedata['errors']['NO_GIFTABLE_FRIENDS'];
-                                invoke_child_message_dialog(s['ui_title'], s['ui_name'],
-                                                            {'dialog': 'message_dialog_big',
-                                                             'ok_button_ui_name': s['ui_button'],
-                                                             'cancel_button': false,
-                                                             'on_ok': function() {
-                                                                 invoke_invite_friends_dialog('ungiftable_fallback');
-                                                             }});
+                                var options = {'dialog': 'message_dialog_big'};
+                                if(friend_invites_enabled()) {
+                                    options['ok_button_ui_name'] = s['ui_button_invite'];
+                                    options['cancel_button'] = false;
+                                    options['on_ok'] = function() {
+                                        invoke_invite_friends_dialog('ungiftable_fallback');
+                                    };
+                                }
+                                invoke_child_message_dialog(s['ui_title'], s['ui_name'], options);
                             }
                         });
                     };
@@ -15316,7 +15321,7 @@ function invoke_gift_received_dialog(override_ls) {
     dialog.widgets['send_button'].show = player.resource_gifts_enabled();
     dialog.widgets['send_button'].onclick = function() {
         change_selection(null);
-        FBSendRequests.invoke_send_gifts_dialog(null, 'gift_received_dialog');
+        invoke_send_gifts_dialog(null, 'gift_received_dialog');
     };
 };
 
@@ -15612,9 +15617,24 @@ function invoke_gift_prompt_dialog() {
 
         dialog.widgets['send_button'].onclick = (function (_info_list) { return function(w) {
             change_selection(null);
-            FBSendRequests.invoke_send_gifts_dialog(null, 'gift_prompt_dialog', _info_list);
+            invoke_send_gifts_dialog(null, 'gift_prompt_dialog', _info_list);
         }; })(ret);
     });
+};
+
+/** Start the send-gift process
+ * @param {(number|null)} to_user - user_id of a friend to auto-select (may be null)
+ * @param {string} reason for metrics purposes
+ * @param {(!Array.<Object>|null)=} info_list - list of PlayerCache entries for giftable friends (if null, we will query)
+ */
+var invoke_send_gifts_dialog = function(to_user, reason, info_list) {
+    if(spin_frame_platform === 'fb') {
+        return FBSendRequests.invoke_send_gifts_dialog(to_user, reason, info_list);
+    } else if(spin_frame_platform === 'ag') {
+        return AGSendRequests.invoke_send_gifts_dialog(to_user, reason, info_list || null);
+    } else {
+        throw Error('unhandled frame_platform '+spin_frame_platform);
+    }
 };
 
 function invoke_motd_dialog(motd) {
@@ -27299,16 +27319,18 @@ function alliance_info_member_rowfunc(dialog, row, rowdata) {
 
                                                            player.get_giftable_friend_info_list_async((function (__user_id) { return function (ret) {
                                                                if(ret.length > 0) {
-                                                                   FBSendRequests.invoke_send_gifts_dialog(__user_id, 'alliance_manage', ret);
+                                                                   invoke_send_gifts_dialog(__user_id, 'alliance_manage', ret);
                                                                } else {
                                                                    var s = gamedata['errors']['NO_GIFTABLE_FRIENDS'];
-                                                                   invoke_child_message_dialog(s['ui_title'], s['ui_name'],
-                                                                                               {'dialog': 'message_dialog_big',
-                                                                                                'ok_button_ui_name': s['ui_button'],
-                                                                                                'cancel_button': false,
-                                                                                                'on_ok': function() {
-                                                                                                    invoke_invite_friends_dialog('alliance_manage_ungiftable');
-                                                                                                }});
+                                                                   var options = {'dialog': 'message_dialog_big'};
+                                                                   if(friend_invites_enabled()) {
+                                                                       options['ok_button_ui_name'] = s['ui_button_invite'];
+                                                                       options['cancel_button'] = false;
+                                                                       options['on_ok'] = function() {
+                                                                           invoke_invite_friends_dialog('alliance_manage_ungiftable');
+                                                                       };
+                                                                   }
+                                                                   invoke_child_message_dialog(s['ui_title'], s['ui_name'], options);
                                                                }
                                                            }; })(_user_id));
 
@@ -38694,7 +38716,9 @@ function get_requirements_help(kind, arg, options) {
     } else if(verb == 'manage_base_defenders') {
         help_function = function() { invoke_squad_manage(SQUAD_IDS.BASE_DEFENDERS); }
     } else if(verb.indexOf('invite') == 0) {
-        help_function = function() { invoke_invite_friends_dialog('get_requirements_help'); };
+        if(friend_invites_enabled()) {
+            help_function = function() { invoke_invite_friends_dialog('get_requirements_help'); };
+        }
     } else if(verb == 'set' && noun == 'alias') {
         help_function = function() {
             change_selection_ui(null);
