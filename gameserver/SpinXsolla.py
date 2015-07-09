@@ -119,7 +119,7 @@ def make_token_request(config,
                        gamebucks_quantity, gamebucks_ui_description,
                        player_level, user_account_creation_time,
                        ):
-    is_sandbox = (not config.get('secure_mode', True))
+    is_sandbox = (not config.get('secure_mode', True)) or config.get('xsolla_sandbox_mode', False)
 
     body_json = {
         'user': { 'id': { 'value': user_xs_id, 'hidden': True } },

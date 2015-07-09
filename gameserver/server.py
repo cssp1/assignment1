@@ -14746,7 +14746,7 @@ class XSAPI(resource.Resource):
         return ''
 
     def handle_payment(self, request, session, request_data):
-        if request_data['transaction'].get('dry_run',0) and spin_secure_mode:
+        if request_data['transaction'].get('dry_run',0) and spin_secure_mode and not SpinConfig.config.get('xsolla_sandbox_mode', False):
             raise Exception('sandbox purchases not allowed in secure mode')
 
         gamebucks_amount = int(request_data['purchase']['virtual_currency']['quantity'])
