@@ -1910,7 +1910,7 @@ class GameProxy(proxy.ReverseProxyResource):
             if not session:
                 exception_log.event(proxy_time, 'cannot find session for XSAPI call: '+repr(request_data))
                 request.setResponseCode(http.BAD_REQUEST)
-                return SpinJSON.dumps({'error': {'code':'INVALID_USER', 'message': 'session not found'}})
+                return SpinJSON.dumps({'error': {'code':'INVALID_USER', 'message': 'session not found (by proxyserver)'}})
 
             return self.render_via_proxy(session.gameserver_fwd, request)
 

@@ -14732,7 +14732,7 @@ class XSAPI(resource.Resource):
         if not session:
             gamesite.exception_log.event(server_time, 'session not found for XSAPI order (xs_id %s)' % xs_id)
             request.setResponseCode(http.BAD_REQUEST)
-            return SpinJSON.dumps({'error': {'code':'INVALID_USER', 'message': 'session not found'}})
+            return SpinJSON.dumps({'error': {'code':'INVALID_USER', 'message': 'session not found (by server)'}})
 
         if request_data['notification_type'] == 'user_validation':
             # since we found the session, the user is already considered valid
