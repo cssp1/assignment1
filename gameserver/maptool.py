@@ -554,6 +554,9 @@ def spawn_all_quarries(db, lock_manager, region_id, force_rotation = False, dry_
         id_start = spawn_data['id_start']
         qty = spawn_data['num']
 
+        if 'region_pop' in quarries:
+            qty = int(quarries['region_pop'].get(region_id,1.0)*qty)
+
         # get list of start,end spawn times
         if 'spawn_times' in spawn_data:
             spawn_times = spawn_data['spawn_times']
