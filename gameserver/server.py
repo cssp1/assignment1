@@ -14762,6 +14762,11 @@ class XSAPI(resource.Resource):
         if gamebucks_amount > 0:
             # we (ab)use the credit order path here to share all of its metrics output
             assert request_data['payment_details']['payout']['currency'] == 'USD'
+            usd_receipts = request_data['payment_details']['payout']['amount']
+
+            # take out Armor Games' 40% revenue share from usd_receipts, since it's used for management reporting purposes
+            if session.user.frame_platform == 'ag':
+                usd_receipts = round(usd_receipts*0.6, 2)
 
             Store.execute_credit_order(request_data['transaction']['id'], self.gameapi, request, session,
                                        request_data['user']['id'], request_data['user']['id'],
@@ -14770,7 +14775,7 @@ class XSAPI(resource.Resource):
                                        # awkward syntax here
                                        {'spellname': spellname, 'spellarg': spellarg, 'unit_id': GameObject.VIRTUAL_ID,
                                         'session_id': session.session_id,
-                                        'usd_receipts': request_data['payment_details']['payout']['amount']})
+                                        'usd_receipts': usd_receipts})
 
             # do not return HTTP response until player state is fully flushed
             def complete_settlement(request, session):
