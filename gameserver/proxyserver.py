@@ -1907,7 +1907,11 @@ class GameProxy(proxy.ReverseProxyResource):
             else:
                 raise Exception('invalid XSAPI call: '+log_request(request)+' body '+repr(request_data))
 
-            if not session: raise Exception('cannot find session for XSAPI call: '+repr(request_data))
+            if not session:
+                exception_log.event(proxy_time, 'cannot find session for XSAPI call: '+repr(request_data))
+                request.setResponseCode(http.BAD_REQUEST)
+                return SpinJSON.dumps({'error': {'code':'INVALID_USER', 'message': 'session not found'}})
+
             return self.render_via_proxy(session.gameserver_fwd, request)
 
         elif self.path == '/CREDITAPI':
