@@ -1243,9 +1243,9 @@ class User:
 
 
     def populate_friends_who_play(self, retmsg):
-        if not retmsg:
+        if retmsg is None:
             retmsg = self.active_session.deferred_messages
-            assert retmsg
+            assert retmsg is not None
 
         assert self.active_session
 
@@ -1358,17 +1358,29 @@ class User:
 
         if SpinConfig.config.get('enable_armorgames',0):
             self.retrieve_ag_info_start(session)
+            self.retrieve_ag_friends_start(session)
         else:
             # note: must match proxyserver.py test credentials
             test_response = SpinJSON.dumps({'version': 1, 'code': 200, 'message': "OK", 'payload': {
-                'uid': "example1",
-                'username': "test_user",
+                'uid': self.ag_id,
+                'username': "test_user2" if self.ag_id == "example2" else "test_user",
                 'avatar': "http://armatars.armorgames.com/armatar_149_50.50_c.jpg",
                 'email': "test_user@test.com",
                 'birthday': "0000-00-00",
                 'gender':"Male",
                 'created_on': "1335466318" } })
             reactor.callLater(0.01, lambda _self=self, _session=session, _retmsg=retmsg: _self.retrieve_ag_info_complete(_session, None, test_response))
+            friends_response = SpinJSON.dumps({'version': 1, 'code': 200, 'message': "OK", 'payload': [
+                {
+                'uid':"example2" if self.ag_id == "example1" else "example1",
+                'username': "test_user2" if self.ag_id == "example1" else "test_user",
+                'avatar': "http://armatars.armorgames.com/armatar_119_50.50_c.jpg",
+                'email': "user_one@test.com",
+                'birthday': "1987-04-24",
+                'gender': "Female",
+                'created_on': "1198082452",
+                'plays_game': "1"}]})
+            reactor.callLater(0.01, lambda _self=self, _session=session, _retmsg=retmsg: _self.retrieve_ag_friends_complete(_session, None, friends_response))
 
     def retrieve_ag_info_start(self, session):
         gamesite.AsyncHTTP_ArmorGames.queue_request(server_time,
@@ -1384,7 +1396,6 @@ class User:
 
         self.ag_username = payload['username']
         self.ag_avatar_url = payload['avatar']
-        self.ag_friend_ids = None # XXXXXX pull friends
         if 'birthday' in payload:
             y, m, d = map(int, payload['birthday'].split('-'))
             if y != 0:
@@ -1397,6 +1408,33 @@ class User:
         if retmsg is not None:
             retmsg.append(["PLAYER_CACHE_UPDATE", [gamesite.gameapi.get_player_cache_props(self, session.player)]])
             retmsg.append(["PLAYER_UI_NAME_UPDATE", self.get_ui_name(session.player)])
+
+    def retrieve_ag_friends_start(self, session, offset = 0, previous_results = None):
+        limit = 1
+        gamesite.AsyncHTTP_ArmorGames.queue_request(server_time,
+                                                    'https://services.armorgames.com/services/rest/v1/friends/%s.json?api_key=%s&limit=%d&offset=%d' % (self.ag_id, SpinConfig.config['armorgames_api_key'], limit, offset),
+                                                    lambda result, _session=session, _previous_results=previous_results, _offset=offset, _limit=limit: self.retrieve_ag_friends_complete(_session, None, result, _previous_results, _offset, _limit))
+
+    def retrieve_ag_friends_complete(self, session, retmsg, result, previous_results = None, previous_offset = None, limit = None):
+        data = SpinJSON.loads(result)
+        assert data['code'] == 200
+        payload = data['payload']
+        if previous_results is None:
+            previous_results = payload
+        else:
+            previous_results += payload
+
+        if limit and len(payload) >= limit: # query again
+            self.retrieve_ag_friends_start(session, offset = previous_offset + limit, previous_results = previous_results)
+            return
+
+        # only include friends who play the game
+        self.ag_friend_ids = [str(friend['uid']) for friend in previous_results if int(friend['plays_game'])]
+        if retmsg is None:
+            if self.active_session:
+                retmsg = self.active_session.deferred_messages
+        if retmsg is not None:
+            self.populate_friends_who_play(retmsg)
 
     # try to obtain the user's Facebook profile, friends and likes
     # this is cached in user_table; if the cache is empty or stale,

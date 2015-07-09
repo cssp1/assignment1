@@ -832,7 +832,7 @@ class GameProxy(proxy.ReverseProxyResource):
                 # use fake sandbox credentials
                 # note: match server.py retrieve_ag_info() test credentials
                 skip_verify = True
-                request.args['user_id'] = ['example1']
+                request.args['user_id'] = ['example2' if 'james' in request.args else 'example1']
                 request.args['auth_token'] = ['123456789']
             else:
                 request.setResponseCode(http.BAD_REQUEST)
