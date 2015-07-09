@@ -222,6 +222,8 @@ FACEBOOK_CAMPAIGN_MAP = {
     'appcenter_search_typeahead': 'facebook_free',
     'appcenter_toplist': 'facebook_free',
 
+    'bgl_featured': 'facebook_free', # this is a new source for special features that Facebook runs for us manually
+
     # game-sourced viral acquisition
     'achievement_brag': 'game_viral',
     'appcenter_request': 'game_viral',
