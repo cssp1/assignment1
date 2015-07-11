@@ -70,12 +70,16 @@ ModChain.add_mod = function(modchain, method, strength, kind, source, props) {
     var lastval = modchain['val'];
     var newval;
     if(method == '*=(1-strength)') {
+        if(strength == 0) { return modchain; }
         newval = lastval*(1-strength);
     } else if(method == '*=(1+strength)') {
+        if(strength == 0) { return modchain; }
         newval = lastval*(1+strength);
     } else if(method == '*=strength') {
+        if(strength == 1) { return modchain; }
         newval = lastval*strength;
     } else if(method == '+=strength') {
+        if(strength == 0) { return modchain; }
         newval = lastval+strength;
     } else if(method == 'max') {
         newval = Math.max(lastval, strength);

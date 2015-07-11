@@ -34,12 +34,16 @@ def make_chain(base_val, props = None):
 def add_mod(modchain, method, strength, kind, source, props = None):
     lastval = modchain['val']
     if method == '*=(1-strength)':
+        if strength == 0: return modchain
         newval = lastval*(1-strength)
     elif method == '*=(1+strength)':
+        if strength == 0: return modchain
         newval = lastval*(1+strength)
     elif method == '*=strength':
+        if strength == 1: return modchain
         newval = lastval*strength
     elif method == '+=strength':
+        if strength == 0: return modchain
         newval = lastval+strength
     elif method == 'max':
         newval = max(lastval, strength)
