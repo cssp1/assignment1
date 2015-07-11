@@ -778,49 +778,123 @@ var setup_ai_base = function() {
     do_setup(id_list);
 }
 
+
+var game_server_port_range = [8002,8200];
+var game_server_name_prefix = 'server';
+var server_name_re = new RegExp(game_server_name_prefix + '([0-9]+)([A-Z]+)');
+
+/** @param {string} name
+    @return {[number, string]} generation, suffix
+    return (generation, suffix) from a game server name */
+var parse_server_name = function(name) {
+    var groups = server_name_re.exec(name);
+    if(!groups) { throw Error('bad server name '+name); }
+    return [parseInt(groups[1], 10), groups[2]];
+};
+
+// convert A, B, ... AA, BB, ... server name suffix to a 1-based index
+var suffix_to_num = function(s) {
+    var ret = 0;
+    for(var i = 0; i < s.length; i++) {
+        var c = s.charCodeAt(i) - 'A'.charCodeAt(0) + 1;
+        ret += Math.pow(26, s.length - 1 - i) * c;
+    }
+    return ret;
+};
+// inverse of above
+var num_to_suffix = function(n) {
+    var s = '';
+    while(n > 0) {
+        var rem = n % 26;
+        if(rem === 0) {
+            rem = 26;
+            n -= 1;
+        }
+        var next = String.fromCharCode('A'.charCodeAt(0) + rem - 1);
+        s = next + s;
+        n = Math.floor(n/26);
+    }
+    return s;
+};
+
+/** Greater-than operator for server suffixes
+    @param {string} a
+    @param {string} b
+    @return {boolean}
+*/
+var suffix_is_greater = function(a, b) {
+    return suffix_to_num(a) > suffix_to_num(b);
+};
+
+/** @param {!Array.<Object>} to_check - array of server config JSON to check against
+    @param {number} generation
+    @return {string}
+    return the next suffix to use for a new server of a particular generation
+    (greater than any previous suffix within this generation)
+    */
+var next_server_suffix = function(to_check, generation) {
+    var suffix = num_to_suffix(1); // start with A and advance according to conflicts detected
+    for(var i = 0; i < to_check.length; i++) {
+        var entry = to_check[i];
+        if(entry['server_name'].indexOf(game_server_name_prefix) !== 0) { continue; } // not a game server
+        var generation_suffix = parse_server_name(entry['server_name']);
+        var other_generation = generation_suffix[0], other_suffix = generation_suffix[1];
+        if(other_generation === generation &&
+           (other_suffix === suffix || suffix_is_greater(other_suffix, suffix))) {
+            // advance to next suffix after other_suffix
+            suffix = num_to_suffix(suffix_to_num(other_suffix) + 1);
+        }
+    }
+    return suffix;
+};
+
+/** @param {!Array.<Object>} to_check - array of server config JSON to check against
+    @param {number} generation
+    @return {number|null}
+    return the next available port PAIR for a new server
+    where the return value is the lower (even) number for non-SSL connections
+    and the next-higher (odd) number will be used for SSL connections.
+    */
+var next_server_port = function(to_check) {
+    var port = game_server_port_range[0];
+    while(port < game_server_port_range[1]) {
+        var conflict = false;
+        for(var i = 0; i < to_check.length; i++) {
+            var entry = to_check[i];
+            var iport = entry['external_http_port'] || entry['game_http_port'];
+            if(iport == port) {
+                conflict = true;
+                break;
+            }
+        }
+        if(!conflict) {
+            break;
+        }
+        port += 2;
+    }
+    if(port+1 > game_server_port_range[1]) {
+        return null;
+    }
+    return port;
+};
+
 var server_start = function() {
-    var generation = $("#server_start_gen")[0].value;
-    var qty = Math.min(Math.max(parseInt($("#server_start_qty")[0].value), 1), 20);
-    var port_range = [8002,8200];
+    var generation = parseInt($("#server_start_gen")[0].value, 10);
+    var qty = Math.min(Math.max(parseInt($("#server_start_qty")[0].value, 10), 1), 20);
 
     var configs = [];
     for(var n = 0; n < qty; n++) {
-        var port = port_range[0];
-        var start_letter = 'A';
 
+        // check suffix/port uniqueness against current servers
+        // PLUS proposed list of new servers to start
         var to_check = cur_server_status.concat(configs);
-        for(var i = 0; i < to_check.length; i++) {
-            var entry = to_check[i];
-            if(entry['server_name'].indexOf('server')==0 &&
-               entry['server_name'].slice(-3,-1) == generation) {
-                var last_letter = entry['server_name'].slice(-1);
-                if(start_letter <= last_letter) {
-                    start_letter = String.fromCharCode(last_letter.charCodeAt(0)+1);
-                }
-            }
-        }
 
-        while(port < port_range[1]) {
-            var conflict = false;
-            for(var i = 0; i < to_check.length; i++) {
-                var entry = to_check[i];
-                var iport = entry['external_http_port'] || entry['game_http_port'];
-                if(iport == port) {
-                    conflict = true;
-                    break;
-                }
-            }
-            if(!conflict) {
-                break;
-            }
-            port += 2;
-        }
-        if(port >= port_range[1]) {
-            display_error('no open ports');
-            return;
-        }
+        var suffix = next_server_suffix(to_check, generation);
+        var port = next_server_port(to_check);
 
-        var server_name = 'server'+generation+start_letter;
+        if(port === null) { display_error('no ports available'); return; }
+
+        var server_name = game_server_name_prefix+generation.toString()+suffix;
         var config = {'server_name':server_name,
                       'game_http_port':port, 'game_ssl_port': (spin_ssl_available ? port+1 : -1),
                       'game_ws_port': port, 'game_wss_port': (spin_ssl_available && spin_wss_available ? port+1 : -1)};
