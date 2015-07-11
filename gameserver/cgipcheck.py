@@ -600,7 +600,7 @@ def get_server_latency(nosql_client):
                                                                    'latency':{'$lte':0}},
                                                                   {'time':{'$gte':time_range[0],'$lt':time_range[1]},
                                                                    'latency':{'$gte':IGNORE_BELOW}}],
-                                                          }, {'time':1,'latency':1,'ident':1}).sort([('time',1)]))
+                                                          }, {'time':1,'latency':1,'ident':1}).sort([('time',-1)]).limit(2000))
     server_names = set(x['ident'] for x in rows)
     latency_series = [get_server_latency_series(server_name, filter(lambda datum: datum['ident']==server_name, rows)) for server_name in server_names]
     return {'graphs':[{'ui_name': 'Server Latency',
