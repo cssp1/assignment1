@@ -1281,6 +1281,26 @@
         "on_destroy_widget": "Yes",
         "security_team": "Spawns %units",
         "security_team_unit": "%qtyx %name",
+
+        // these BBCode strings are used to assemble ui_text for modstat effects of items and auras
+        "effect": "%affected: [color=#00ff00]%stat %delta[/color]",
+        "effect_worse": "%affected: [color=#ff0000]%stat %delta[/color]",
+        "affects": {
+            "player": "Base"
+        },
+        "affects_kind": {
+            "mobile": "All units",
+            "building": "All buildings"
+        },
+        "affects_building": {
+            "turret_emplacement,minefield,mg_tower,mortar_emplacement,tow_emplacement": "Turrets and mines",
+            "barracks,motor_pool,airfield": "All units", // followed by "repair" etc
+            "weapon_factory,leader_factory": "Weapons Factory and Leader Barracks",
+            "supply_yard": "Supply Yards",
+            "fuel_yard": "Fuel Yards",
+            "academy,maintenance_bay,flight_center,weapon_lab": "Research labs"
+        },
+
         "stats": {
             // "better" is the sign for the direction that makes the stat strength better for the player (defaults to 1, but some stats get better with lower strength)
 

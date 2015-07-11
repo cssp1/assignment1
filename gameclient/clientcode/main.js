@@ -23469,13 +23469,18 @@ function invoke_aura_context(inv_dialog, slot_xy, slot, aura, show_dropdown) {
         descr = descr.replace('%level', pretty_print_number(level));
     }
     if(descr.indexOf('%modstats') >= 0) {
-        var ui_modstat_list = [];
+        var ui_modstat_buff_list = [], ui_modstat_nerf_list = [];
         goog.array.forEach(spec['effects'], function(eff) {
-            var strength = get_leveled_quantity(eff['strength'], level);
-            if(strength) {
-                ui_modstat_list.push(ModChain.display_modstat_effect(eff, level));
+            var ui_effect = ModChain.display_modstat_effect(eff, level);
+            if(ui_effect.is_different) {
+                if(ui_effect.is_better) {
+                    ui_modstat_buff_list.push(ui_effect.ui_effect);
+                } else {
+                    ui_modstat_nerf_list.push(ui_effect.ui_effect);
+                }
             }
         });
+        var ui_modstat_list = ui_modstat_buff_list.concat(ui_modstat_nerf_list);
         descr = descr.replace('%modstats', ui_modstat_list.join('\n'));
     }
 

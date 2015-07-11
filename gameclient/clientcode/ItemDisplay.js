@@ -341,13 +341,18 @@ ItemDisplay.get_inventory_item_ui_description = function(item, opts) {
             }
         }
         if(effect_list) {
-            var ui_modstat_list = [];
+            var ui_modstat_buff_list = [], ui_modstat_nerf_list = [];
             goog.array.forEach(effect_list, function(eff) {
-                var strength = get_leveled_quantity(eff['strength'], level);
-                if(strength) {
-                    ui_modstat_list.push(ModChain.display_modstat_effect(eff, level));
+                var ui_effect = ModChain.display_modstat_effect(eff, level);
+                if(ui_effect.is_different) {
+                    if(ui_effect.is_better) {
+                        ui_modstat_buff_list.push(ui_effect.ui_effect);
+                    } else {
+                        ui_modstat_nerf_list.push(ui_effect.ui_effect);
+                    }
                 }
             });
+            var ui_modstat_list = ui_modstat_buff_list.concat(ui_modstat_nerf_list);
             descr = descr.replace('%modstats', ui_modstat_list.join('\n'));
         }
     }

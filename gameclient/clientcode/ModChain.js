@@ -261,7 +261,7 @@ ModChain.display_value = function(value, display_mode, context) {
     return ui_value;
 };
 
-/** Return a textural description of a percentage delta in a stat with appropriate precision
+/** Return a plain-text description of a percentage delta in a stat with appropriate precision
     @param {number} strength
     @param {number} min_precision
     @return {string} */
@@ -271,23 +271,32 @@ ModChain.display_delta_percent = function(strength, min_precision) {
     return (100*val).toFixed(precision)+'%';
 };
 
-/** Return a textual description of the CHANGE in a stat due to a mod
+/** Return a plain-text description of the CHANGE in a stat due to a mod, and a flag for whether it's better or worse after the delta
     @param {?} strength
     @param {string|null} display_mode - display_mode from strings.json
     @param {string} method - the modification method
     @param {?=} cur_value - current value on mod chain, for fallback case where we don't know the chain method
     @param {?=} prev_value - previous value on mod chain, just for showing concat as "+"
-    @return {string} */
+    @return {{ui_delta: string, is_better: boolean, is_different: boolean}}
+*/
 ModChain.display_delta = function(strength, display_mode, method, cur_value, prev_value) {
     var parsed = (display_mode ? ModChain.parse_display_mode(display_mode) : null);
     var ui_delta = '';
+    var is_better = true;
+    var is_different = true;
 
     if(method == '*=(1-strength)') {
-        ui_delta = (parsed.invert_sign*strength < 0 ? '+' : '-') + ModChain.display_delta_percent(strength, parsed.precision);
+        is_better = parsed.invert_sign*strength < 0;
+        is_different = (strength != 0);
+        ui_delta = (is_better ? '+' : '-') + ModChain.display_delta_percent(strength, parsed.precision);
     } else if(method == '*=(1+strength)') {
-        ui_delta = (parsed.invert_sign*strength >= 0 ? '+' : '-') + ModChain.display_delta_percent(strength, parsed.precision);
+        is_better = parsed.invert_sign*strength >= 0;
+        is_different = (strength != 0);
+        ui_delta = (is_better ? '+' : '-') + ModChain.display_delta_percent(strength, parsed.precision);
     } else if(method == '*=strength') {
-        ui_delta = (parsed.invert_sign*strength >= 0 ? '' : '-') + ModChain.display_delta_percent(strength, parsed.precision);
+        is_better = parsed.invert_sign*strength >= 0;
+        is_different = (strength != 1);
+        ui_delta = (is_better ? '' : '-') + ModChain.display_delta_percent(strength, parsed.precision);
     } else if(method == 'replace') {
         ui_delta = ModChain.display_value(strength, display_mode, 'tooltip');
     } else if(method == 'concat') {
@@ -295,15 +304,17 @@ ModChain.display_delta = function(strength, display_mode, method, cur_value, pre
     } else {
         if(cur_value === undefined || prev_value === undefined) { throw Error('unknown method '+method+' and no cur/prev values'); }
         var delta = cur_value - prev_value;
-        ui_delta = (delta >= 0 ? '+' : '-') + ModChain.display_value(Math.abs(delta), display_mode, 'tooltip'); // .toString();
+        is_better = delta >= 0;
+        is_different = (cur_value != prev_value);
+        ui_delta = (is_better ? '+' : '-') + ModChain.display_value(Math.abs(delta), display_mode, 'tooltip'); // .toString();
     }
-    return ui_delta;
+    return {ui_delta:ui_delta, is_better:is_better, is_different: is_different};
 };
 
-/** Given an (equip or aura) effect like {"code":"modstat", "stat":"foo", ...}, return a textural description of what the effect does.
+/** Given an (equip or aura) effect like {"code":"modstat", "stat":"foo", ...}, return a BBCode textual description of what the effect does.
     @param {!Object} effect
     @param {number} level
-    @return {string} */
+    @return {{ui_effect: string, is_better: boolean, is_different: boolean}} */
 ModChain.display_modstat_effect = function(effect, level) {
     if(effect['code'] != 'modstat') { throw Error('invalid effect code '+effect['code']); }
     if(!(effect['stat'] in gamedata['strings']['modstats']['stats'])) { throw Error('unknown stat '+effect['stat']); }
@@ -333,15 +344,14 @@ ModChain.display_modstat_effect = function(effect, level) {
 
     var ui_affected = affected_data[affected_key];
     var ui_stat = ui_data['ui_name'];
-    var ui_delta = ModChain.display_delta(strength, ui_data['display']||null, effect['method']);
+    var delta = ModChain.display_delta(strength, ui_data['display']||null, effect['method']);
 
-    var ret = gamedata['strings']['modstats']['effect'].replace('%affected', ui_affected).replace('%stat', ui_stat).replace('%delta', ui_delta);
-
-    return ret;
+    var ret = gamedata['strings']['modstats'][delta.is_better ? 'effect' : 'effect_worse'].replace('%affected', ui_affected).replace('%stat', ui_stat).replace('%delta', delta.ui_delta);
+    return {ui_effect: ret, is_better: delta.is_better, is_different: delta.is_different};
 };
 
 
-/** Return the full multi-line tooltip describing an entire modchain
+/** Return the full multi-line plain-text tooltip describing an entire modchain
     @param {string} stat
     @param {?} modchain
     @param {boolean} show_base
@@ -370,7 +380,7 @@ ModChain.display_tooltip = function(stat, modchain, show_base, ui_data) {
                     ls.push(gamedata['strings']['modstats']['bonuses']);
                 }
 
-                var ui_delta = ModChain.display_delta(mod['strength'], display_mode, mod['method'], mod['val'], modchain['mods'][i-1]['val']);
+                var ui_delta = ModChain.display_delta(mod['strength'], display_mode, mod['method'], mod['val'], modchain['mods'][i-1]['val']).ui_delta;
 
                 if(mod['kind'] == 'equipment') {
                     var espec = gamedata['items'][mod['source']];
