@@ -897,7 +897,7 @@
 #include "$GAME_ID/$GAME_ID_fb_open_graph.json"
     ,
 
-    "enable_fb_app_events": true, // enable use of FB App Events API
+    "enable_fb_app_events": false, // enable use of FB App Events API
 
     // if >0, then when doing Facebook friend invites with the v2+ API,
     // instantly invite this many of the top friends instead of showing selector (like Throne Rush)
