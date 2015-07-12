@@ -36709,6 +36709,7 @@ function invoke_new_store_dialog() {
     for(var i = 0; i < gamedata['store']['catalog'].length; i++) {
         var cat = gamedata['store']['catalog'][i];
         if('activation' in cat && !read_predicate(cat['activation']).is_satisfied(player,null)) { continue; }
+        if('show_if' in cat && !read_predicate(cat['show_if']).is_satisfied(player,null)) { continue; }
         dialog.user_data['categories'].push(cat);
     }
 
