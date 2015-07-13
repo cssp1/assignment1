@@ -171,35 +171,58 @@ class SpecificPvEResLoot(BaseResLoot):
         self.by_building_id = {}
 
         # compute total contribution coefficient of all buildings
-        total_contribution = {}
+
+        # for buildings that are capacity-weighted
+        total_contribution = {} # {resource: total_amount}
+
+        # for buildings that take a fraction of the total loot pool instead of being capacity-weighted
+        fractions_taken = {} # {resource: total_fraction}
+
         last_ids = {} # keep track of last building seen (per resource), to deposit rounded-off amounts on
+
         for p in self.base.iter_objects():
             if p.is_building() and (not p.is_destroyed()):
+                fraction = p.specific_pve_loot_fraction()
                 contrib = p.resource_loot_contribution()
-                if contrib:
-                    for res, amount in contrib.iteritems():
-                        total_contribution[res] = total_contribution.get(res,0) + amount
+                if fraction or contrib:
+                    for res in gamedata['resources']:
+                        if fraction and res in fraction:
+                            fractions_taken[res] = fractions_taken.get(res,0) + fraction[res]
+                        elif contrib and res in contrib:
+                            total_contribution[res] = total_contribution.get(res,0) + contrib[res]
+                        else:
+                            continue
                         last_ids[res] = p.obj_id
 
         # divide out starting loot among the buildings, weighted by each building's contribution coefficient
-        if total_contribution and last_ids:
+        if (fractions_taken or total_contribution) and last_ids:
             total_so_far = {} # keep track of how much resource loot was assigned so far
             # (we need to ensure it adds up to starting_base_resource_loot when all buildings are destroyed)
 
             for p in self.base.iter_objects():
                 if p.is_building() and (not p.is_destroyed()):
+                    fraction = p.specific_pve_loot_fraction()
                     contrib = p.resource_loot_contribution()
-                    if contrib:
+                    if fraction or contrib:
                         amount_by_res = {}
-                        for res in contrib:
-                            if p.obj_id is last_ids[res]:
+                        for res in gamedata['resources']:
+                            if res in last_ids and p.obj_id == last_ids[res]:
                                 # add any left-over amount from rounding remainders onto the last building for this resource type
                                 amount = self.starting_base_resource_loot.get(res,0) - total_so_far.get(res,0)
                             else:
                                 # note: this needs to multiply the base_loot the AI had at the *start* of the battle, not the current value
-                                amount = int( (contrib[res]/float(total_contribution[res])) * self.starting_base_resource_loot.get(res, 0) + 0.5)
+
+                                if fraction and res in fraction:
+                                    amount = int( fraction[res] * self.starting_base_resource_loot.get(res, 0) + 0.5)
+                                elif contrib and res in contrib:
+                                    # take what's left after fractions_taken is removed from available loot
+                                    amount = int( (contrib[res]/float(total_contribution[res])) * (1 - fractions_taken.get(res,0)) * self.starting_base_resource_loot.get(res, 0) + 0.5)
+                                else:
+                                    amount = 0
+
                                 total_so_far[res] = total_so_far.get(res,0) + amount
-                            if amount:
+
+                            if amount > 0:
                                 amount_by_res[res] = amount
                         if amount_by_res:
                             self.by_building_id[p.obj_id] = PerBuildingGradualLoot(gamedata, p, amount_by_res)
@@ -229,7 +252,7 @@ class SpecificPvEResLoot(BaseResLoot):
             for res in lost:
                 if lost[res] > 0:
                     # take the loot away from the base itself, so that less will be available next battle
-                    self.base.base_resource_loot[res] = max(0, self.base.base_resource_loot[res] - int(lost[res]/self.modifier + 0.5))
+                    self.base.base_resource_loot[res] = max(0, self.base.base_resource_loot.get(res,0) - int(lost[res]/self.modifier + 0.5))
 
         looted = copy.copy(lost)
         return looted, lost

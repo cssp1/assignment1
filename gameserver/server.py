@@ -4807,7 +4807,7 @@ class Spec(object):
         #print 'maxlevel for ', self.name, ' is ', self.maxlevel
         return maxlevel
 
-def resource_fields(name): return [[name+'_'+resname,0] for resname in gamedata['resources']]
+def resource_fields(name, default = 0): return [[name+'_'+resname, default] for resname in gamedata['resources']]
 
 class GameObjectSpec(Spec):
     # global table mapping object spec names to GameObjectSpec instances
@@ -4852,6 +4852,7 @@ class GameObjectSpec(Spec):
         ] + resource_fields("produces") + [
         ["production_capacity", 0],
         ] + resource_fields("storage") + [
+        ] + resource_fields("specific_pve_loot_fraction", default = -1) + [
         ["spells", []],
         ["level_determined_by_tech", None],
         ["limit", -1],
@@ -5754,6 +5755,16 @@ class Building(GameObject):
             if amount > 0:
                 if ret is None: ret = {}
                 ret[res] = ret.get(res,0) + amount
+        return ret
+
+    # for SpecificPvEResLoot, optionally take a fraction of the base's total loot instead of using a capacity-weighted contribution
+    def specific_pve_loot_fraction(self):
+        ret = None
+        for res in gamedata['resources']:
+            amount = self.get_leveled_quantity(getattr(self.spec, 'specific_pve_loot_fraction_'+res))
+            if amount >= 0: # note: treat -1 as "no effect", 0 as "fraction is zero"
+                if ret is None: ret = {}
+                ret[res] = amount
         return ret
 
     def affects_power(self):
