@@ -23181,8 +23181,9 @@ function invoke_equip_chooser(inv_dialog, parent_widget, tech, unit, slot_type, 
     for(var i = 0; i < player.inventory.length; i++) {
         var item = player.inventory[i];
         if(item['spec'] == equipped_now_specname && ((item['level']||1) == equipped_now_level)) { continue; } // don't list items the same type as what is already equipped
-        if(item['spec'] in seen_specs) { continue; } // don't list duplicates
-        seen_specs[item['spec']] = 1;
+        var seen_key = item['spec']+':L'+(item['level']||1).toString();
+        if(seen_key in seen_specs) { continue; } // don't list duplicates
+        seen_specs[seen_key] = 1;
         var espec = ItemDisplay.get_inventory_item_spec(item['spec']);
         if('equip' in espec) {
             var can_equip_at_any_level, can_equip_now;
