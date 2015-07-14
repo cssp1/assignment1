@@ -8187,28 +8187,28 @@
     },
 
     "inventory_context": {
-        "dimensions": [240,160], // note: this gets resized dynamically in height to fit all the body text
+        "dimensions": [250,160], // note: this gets resized dynamically in height to fit all the body text
         "widgets": {
-            "buttonbg": { "kind":"SolidRect", "xy":[40,500], "dimensions": [160,73], "color": [0.005,0.01,0.030,0.75]
+            "buttonbg": { "kind":"SolidRect", "xy":[45,500], "dimensions": [160,73], "color": [0.005,0.01,0.030,0.75]
                           //"outline_color":[1,0.7,0,1], "outline_width":1
                         },
-            "button": { "kind": "ActionButton", "xy": [53,506], "dimensions": [134,28], "text_offset": [0,1],
+            "button": { "kind": "ActionButton", "xy": [58,506], "dimensions": [134,28], "text_offset": [0,1],
                         "bg_image_active": "action_button_134px", "bg_image_passive": "menu_button_134px",
                         "text_size": 13, "text_style": "bold", "ui_tooltip":"", "tooltip_delay":0,
                         "max_tooltip_dimensions": [250,600],
                         "array": [1,4], "array_offset": [0,36] },
 
 
-            "bgrect": { "kind":"StaticImage", "xy":[0,0], "dimensions": [240,80], "asset": "inventory_tip_bg", "bg_image_resizable":1 },
-            "title": {"kind": "TextField", "xy":[10,7], "dimensions": [212,18],"text_size": 13, "text_hjustify":"left", "text_vjustify": "top",
+            "bgrect": { "kind":"StaticImage", "xy":[0,0], "dimensions": [250,80], "asset": "inventory_tip_bg", "bg_image_resizable":1 },
+            "title": {"kind": "TextField", "xy":[10,7], "dimensions": [222,18],"text_size": 13, "text_hjustify":"left", "text_vjustify": "top",
                       "text_style":"bold", "drop_shadow": 1 },
-            "subtitle": {"kind": "TextField", "xy":[10,24], "dimensions": [212,0],"text_size": 13, "text_hjustify":"left", "text_vjustify": "top",
+            "subtitle": {"kind": "TextField", "xy":[10,24], "dimensions": [222,0],"text_size": 13, "text_hjustify":"left", "text_vjustify": "top",
                          "text_style":"normal", "drop_shadow": 0, "text_color": [0.6,0.6,0.6,1],
                          "show": 0 },
-            "description": {"kind": "RichTextField", "xy":[10,26], "dimensions": [212,18], "resize_to_fit_text": 1,
+            "description": {"kind": "RichTextField", "xy":[10,26], "dimensions": [222,18], "resize_to_fit_text": 1,
                             "text_size": 13, "text_hjustify":"left", "text_vjustify": "top", "text_style":"normal"},
 
-            "expires": {"show": 0, "kind": "TextField", "xy":[10,26], "dimensions": [212,16],"text_size": 13, "text_hjustify":"left", "text_vjustify": "top",
+            "expires": {"show": 0, "kind": "TextField", "xy":[10,26], "dimensions": [222,16],"text_size": 13, "text_hjustify":"left", "text_vjustify": "top",
                         "text_style":"normal", "text_color": [1,0,0,1],
                         "ui_name_item": "Item expires in %s", "ui_name_aura": "Effect ends in %s",
                         "ui_name_melt_duration": "Item expires after %s" }
