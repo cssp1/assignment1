@@ -267,8 +267,16 @@ ModChain.display_value = function(value, display_mode, context) {
     @return {string} */
 ModChain.display_delta_percent = function(strength, min_precision) {
     var val = Math.abs(strength);
-    var precision = Math.max(min_precision, (val < 0.01 ? 1 : 0));
-    return (100*val).toFixed(precision)+'%';
+    // awkward: use additional precision, if necessary, to show deltas like 2.4%
+    var ret = (100*val).toFixed(min_precision);
+    for(var prec = min_precision+1; prec < 3; prec += 1) {
+        var v2 = (100*val).toFixed(prec);
+        if(v2[v2.length-1] == '0') {
+            break;
+        }
+        ret = v2;
+    }
+    return ret+'%';
 };
 
 /** Return a plain-text description of the CHANGE in a stat due to a mod, and a flag for whether it's better or worse after the delta
