@@ -217,32 +217,30 @@ ItemDisplay.get_inventory_item_ui_name_long = function(spec, level) {
     @param {Object} spec
     @returns {string} */
 ItemDisplay.get_inventory_item_ui_subtitle = function(spec) {
-    var subtitle = null;
+    var subtitle_list = []; // space-separated phrases
+
     if('ui_subtitle' in spec) {
-        subtitle = spec['ui_subtitle'];
+        subtitle_list.push(spec['ui_subtitle']);
     } else {
-        subtitle = '';
         if('rarity' in spec) {
-            subtitle += gamedata['strings']['rarities'][spec['rarity']+1];
+            subtitle_list.push(gamedata['strings']['rarities'][spec['rarity']+1]);
         }
         if('ui_category' in spec) {
-            subtitle += ' ' +spec['ui_category'];
+            subtitle_list.push(spec['ui_category']);
         } else if('category' in spec) {
-            subtitle += ' ' +gamedata['strings']['item_types'][spec['category']];
+            subtitle_list.push(gamedata['strings']['item_types'][spec['category']]);
         } else if(('use' in spec) && ('spellname' in spec['use'])) { // assumes spells with list use[]s specify category!
             var spellname = ('spellname' in spec['use'] ? spec['use']['spellname'] : null);
             var spell = ('spellname' in spec['use'] ? gamedata['spells'][spec['use']['spellname']] : null);
 
-            subtitle += ' ';
-
             if(spellname == 'GIVE_UNITS' || spellname == 'GIVE_UNITS_LIMIT_BREAK') {
-                subtitle += gamedata['strings']['item_types']['packaged_unit'];
+                subtitle_list.push(gamedata['strings']['item_types']['packaged_unit']);
             } else if(spell && (spell['code'] == 'projectile_attack' || spell['code'] == 'instant_repair' || spell['code'] == 'instant_combat_repair')) {
-                subtitle += gamedata['strings']['item_types']['battle_consumable'];
+                subtitle_list.push(gamedata['strings']['item_types']['battle_consumable']);
             } else if(spellname.indexOf("BUY_RANDOM_") == 0 || spellname.indexOf("FREE_RANDOM_") == 0) {
-                subtitle += gamedata['strings']['item_types']['expedition'];
+                subtitle_list.push(gamedata['strings']['item_types']['expedition']);
             } else {
-                subtitle += gamedata['strings']['item_types']['consumable'];
+                subtitle_list.push(gamedata['strings']['item_types']['consumable']);
             }
         } else if('equip' in spec) {
             var equip_type;
@@ -285,20 +283,20 @@ ItemDisplay.get_inventory_item_ui_subtitle = function(spec) {
                     equip_type = 'equip';
                 }
                 var slot_type = gamedata['strings']['equip_slots'][crit['slot_type']]['ui_name'];
-                subtitle += ' '+gamedata['strings']['item_types'][equip_type].replace('%SLOT', slot_type).replace('%NAME', name);
+                subtitle_list.push(gamedata['strings']['item_types'][equip_type].replace('%SLOT', slot_type).replace('%NAME', name));
                 break;
             }
         }
     }
 
-    if(gamedata['client']['item_tooltip_max_stack'] && subtitle) {
+    if(gamedata['client']['item_tooltip_max_stack'] && subtitle_list.length > 0) {
         var max_stack = ('max_stack' in spec ? spec['max_stack'] : 1);
         if(max_stack > 1) {
-            subtitle += ' (Max stack: '+pretty_print_number(max_stack)+')';
+            subtitle_list.push('(Max stack: '+pretty_print_number(max_stack)+')'); // XXXXXX ui_text
         }
     }
 
-    return subtitle;
+    return subtitle_list.join(' ');
 };
 
 /** return displayable description for item of given spec, using BBCode
