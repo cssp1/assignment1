@@ -1642,10 +1642,10 @@
                                    "array": [2,2], "array_offset": [95,27] },
             "requirements_value": { "kind": "TextField", "xy": [40,162], "dimensions": [50,21], "text_size": 13, "text_hjustify": "right",
                                     "ui_tooltip": "%qty %res required to manufacture", "tooltip_delay": 0,
-                                    "array": [2,2], "array_offset": [95,27] },
+                                    "array": [2,2], "array_offset": [100,27] },
 
             "requirements_time_icon": { "kind": "StaticImage", "xy": [114,189], "dimensions": [21,21], "asset": "resource_icon_combat_time" },
-            "requirements_time_value": { "kind": "TextField", "xy": [135,189], "dimensions": [50,21], "text_size": 13, "text_hjustify": "right",
+            "requirements_time_value": { "kind": "TextField", "xy": [140,189], "dimensions": [50,21], "text_size": 13, "text_hjustify": "right",
                                          "ui_tooltip": "Time required to train", "tooltip_delay": 0 },
 
             "requirements_item_status": { "kind": "SolidRect", "xy": [213,158], "dimensions": [54,54],
