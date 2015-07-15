@@ -34190,10 +34190,9 @@ function map_dialog_change_page(dialog, chapter, page) {
                 // portrait
                 dialog.widgets['row_portrait'+row].show = true;
                 var display_name = friend.get_ui_name();
-                dialog.widgets['row_portrait'+row].set_user(friend.user_id);
+                dialog.widgets['row_portrait'+row].set_user(friend.user_id, true); // override portrait with map_portrait, if applicable
 
                 var base = null;
-
                 if(friend.is_ai()) {
                     // AI
 

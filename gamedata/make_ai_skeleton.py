@@ -1031,6 +1031,9 @@ if __name__ == '__main__':
                                "water": 0, "iron": 0 }),
                 ]
 
+            if 'villain_map_portrait' in data:
+                json += [("map_portrait", data['villain_map_portrait'][diff])]
+                
             if 'base_resource_loot' in data and data['base_resource_loot'][diff][i] is not None:
                 json += [("base_resource_loot", data['base_resource_loot'][diff][i])]
                 if 'base_richness' in data and data['base_richness'][diff][i] is not None:
@@ -1573,6 +1576,9 @@ if __name__ == '__main__':
             ("resources", { "player_level": data['starting_ai_level'][diff], "water": 0, "iron": 0 }),
             ("auto_level", 1),
             ("ui_info", "VICTORY COMPLETE\n" + data['ui_resets'])]
+        
+        if 'villain_map_portrait' in data:
+            json += [("map_portrait", data['villain_map_portrait'][diff])]
 
         for FIELD in ('ui_info_url', 'analytics_tag'):
             if FIELD in data: json.append((FIELD, data[FIELD]))

@@ -39,6 +39,7 @@ if __name__ == '__main__':
                       'ui_priority', 'ui_category', 'ui_info', 'ui_info_url', 'ui_resets', 'ui_instance_cooldown', 'ui_spy_button', 'ui_map_name', 'ui_progress', 'ui_difficulty',
                       'ui_battle_stars_key', 'ui_fancy_victory_text',
                       'challenge_icon', 'challenge_item',
+                      'map_portrait'
                       ):
             if FIELD in base: client_base[FIELD] = base[FIELD]
 

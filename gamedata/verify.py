@@ -2328,8 +2328,10 @@ def check_ai_base(strid, base):
         print 'AI base %s missing "portrait"' % (strid)
     else:
         error |= require_art_asset(base['portrait'], reason = 'AI base %s:portrait' % strid)
-    if 'challenge_icon' in base:
-        error |= require_art_asset(base['challenge_icon'], reason = 'AI base %s:challenge_icon' % strid)
+
+    if 'map_portrait' in base:
+        error |= require_art_asset(base['map_portrait'], reason = 'AI base %s:map_portrait' % strid)
+
     if 'tech' not in base:
         error |= 1
         print 'AI base %s missing "tech"' % (strid)
@@ -2344,6 +2346,13 @@ def check_ai_base(strid, base):
     for challenge in ('challenge_item','challenge_icon'):
         if challenge in base and type(base[challenge]) is list:
             error |= check_cond_chain(base[challenge], reason = strid+':'+challenge)
+
+    # challenge_icon can be the result of a cond chain
+    if 'challenge_icon' in base:
+        challenge_icon_list = [value for pred, value in base['challenge_icon']] if type(base['challenge_icon']) is list else [base['challenge_icon'],]
+        for entry in challenge_icon_list:
+            if entry:
+                error |= require_art_asset(entry, reason = 'AI base %s:challenge_icon' % strid)
 
     if 'item_loot' in base:
         error |= 1

@@ -2356,7 +2356,15 @@ SPUI.FriendPortrait = function(data) {
     this.displayed_user_id = null;
 };
 goog.inherits(SPUI.FriendPortrait, SPUI.ActionButton);
-SPUI.FriendPortrait.prototype.set_user = function(user_id) { this.user_id = user_id; };
+
+/** @param {number} user_id
+  * @param {boolean=} use_map_portrait - if true, use the AI base "map_portrait" icon instead of "portrait"
+  */
+SPUI.FriendPortrait.prototype.set_user = function(user_id, use_map_portrait) {
+    this.user_id = user_id;
+    this.use_map_portrait = !!use_map_portrait;
+};
+
 SPUI.FriendPortrait.prototype.invalidate = function() { this.displayed_user_id = null; };
 
 SPUI.force_anon_portraits = false; // set by the main client if we want to disable off-origin portrait image loading
@@ -2423,7 +2431,9 @@ SPUI.FriendPortrait.prototype.update_display = function() {
                     console.log('lookup of undefined ai portrait: '+key);
                     this.bg_image = 'unknown_person_portrait';
                 } else {
-                    this.bg_image = gamedata['ai_bases_client']['bases'][key]['portrait'];
+                    var ai_base_data = gamedata['ai_bases_client']['bases'][key];
+                    var portrait_key = (this.use_map_portrait && 'map_portrait' in ai_base_data) ? 'map_portrait' : 'portrait';
+                    this.bg_image = ai_base_data[portrait_key];
                 }
                 this.displayed_user_id = this.user_id; // mark as up-to-date
                 return;
