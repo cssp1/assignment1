@@ -34580,7 +34580,7 @@ function invoke_daily_tip(tipname, skip_notification_queue) {
         }
         if(('link_button_url' in _tip) || ('link_button_consequent' in _tip)) {
 
-            var url = eval_cond_or_literal(_tip['link_button_url'], player, null);
+            var url = eval_cond_or_literal(_tip['link_button_url'] || null, player, null);
             if(url) { url = url_put_info(url, session.user_id, player.history['money_spent']||0) }
             var cons = (_tip['link_button_consequent'] || null);
             if(url || cons) {
