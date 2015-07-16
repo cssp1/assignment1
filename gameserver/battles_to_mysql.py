@@ -623,13 +623,7 @@ if __name__ == '__main__':
                         "       SUM(duration) AS duration," + \
                         "       AVG(framerate) AS framerate, " + \
                         "       MIN(framerate) AS framerate_min, " + \
-                        """     -- MySQL percentile trick
-                                SUBSTRING_INDEX(
-                                  SUBSTRING_INDEX(
-                                    GROUP_CONCAT(framerate ORDER BY framerate SEPARATOR ',')
-                                    , ','
-                                    ,  10/100 * COUNT(*) + 1
-                                    ), ',' , -1) + 0.0 AS framerate_10th, """ + \
+                        sql_util.percentile('framerate', 0.1) + " AS framerate_10th, " + \
                         "       SUM(IF(active_player_outcome='victory',1,0))/COUNT(1) AS victory_ratio," + \
                         "       "+",".join(['SUM('+sql_util.sym('loot:'+res)+')' for res in ('xp','iron','water','res3','iron_lost','water_lost','res3_lost')]) + \
                         "FROM "+sql_util.sym(battles_table)+" battles " + \

@@ -71,6 +71,9 @@ def battles_risk_reward_summary_schema(sql_util, interval_name): return {
                ('consumed_items_value', 'INT8'),
                ('loot_res_value', 'INT8'), # iron + water + res3
                ('loot_res3_value', 'INT8'), # res3 only
+               ('loot_iron_water_amount', 'INT8'), # iron + water only
+               ('loot_iron_water_amount_10th', 'INT8'), # iron + water only, 10th percentile
+               ('loot_iron_water_amount_90th', 'INT8'), # iron + water only, 90th percentile
                ('damage_res_value', 'INT8'),
                ('damage_time_value', 'INT8'),
                ('total_risk', 'INT8'),
@@ -95,6 +98,9 @@ def battles_risk_reward_summary_combined_schema(sql_util, interval_name): return
                ('consumed_items_value', 'INT8'),
                ('loot_res_value', 'INT8'), # iron + water + res3
                ('loot_res3_value', 'INT8'), # res3 only
+               ('loot_iron_water_amount', 'INT8'), # iron + water only
+               ('loot_iron_water_amount_10th', 'INT8'), # iron + water only, 10th percentile
+               ('loot_iron_water_amount_90th', 'INT8'), # iron + water only, 90th percentile
                ('damage_res_value', 'INT8'),
                ('damage_time_value', 'INT8'),
                ('total_risk', 'INT8'),
@@ -297,6 +303,9 @@ if __name__ == '__main__':
                             "       SUM(consumed_items_value) AS consumed_items_value," + \
                             "       SUM(loot_iron_value + loot_water_value + loot_res3_value) AS loot_res_value," + \
                             "       SUM(loot_res3_value) AS loot_res3_value," + \
+                            "       SUM(loot_iron_amount + loot_water_amount) AS loot_iron_water_amount," + \
+                            sql_util.percentile('IFNULL(loot_iron_amount,0)+IFNULL(loot_water_amount,0)', 0.1)+" AS loot_iron_water_amount_10th," + \
+                            sql_util.percentile('IFNULL(loot_iron_amount,0)+IFNULL(loot_water_amount,0)', 0.9)+" AS loot_iron_water_amount_90th," + \
                             "       SUM(damage_iron_value + damage_water_value + damage_res3_value) AS damage_res_value," + \
                             "       SUM(damage_time_value) AS damage_time_value," + \
                             "       -1 * SUM(consumed_items_value + IF(loot_iron_value<0,loot_iron_value,0) + IF(loot_water_value<0,loot_water_value,0) + IF(loot_res3_value<0,loot_res3_value,0) + damage_iron_value + damage_water_value + damage_res3_value + damage_time_value) AS total_risk, -- negate to make it display positive\n" + \
@@ -358,6 +367,9 @@ if __name__ == '__main__':
                             "       SUM(consumed_items_value) AS consumed_items_value," + \
                             "       SUM(loot_iron_value + loot_water_value + loot_res3_value) AS loot_res_value," + \
                             "       SUM(loot_res3_value) AS loot_res3_value," + \
+                            "       SUM(loot_iron_amount + loot_water_amount) AS loot_iron_water_amount," + \
+                            sql_util.percentile('IFNULL(loot_iron_amount,0)+IFNULL(loot_water_amount,0)', 0.1)+" AS loot_iron_water_amount_10th," + \
+                            sql_util.percentile('IFNULL(loot_iron_amount,0)+IFNULL(loot_water_amount,0)', 0.9)+" AS loot_iron_water_amount_90th," + \
                             "       SUM(damage_iron_value + damage_water_value + damage_res3_value) AS damage_res_value," + \
                             "       SUM(damage_time_value) AS damage_time_value," + \
                             "       -1 * SUM(consumed_items_value + IF(loot_iron_value<0,loot_iron_value,0) + IF(loot_water_value<0,loot_water_value,0) + IF(loot_res3_value<0,loot_res3_value,0) + damage_iron_value + damage_water_value + damage_res3_value + damage_time_value) AS total_risk, -- negate to make it display positive\n" + \

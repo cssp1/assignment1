@@ -65,6 +65,14 @@ class MySQLUtil(SQLUtil):
                               [(("UNIQUE " if idata.get('unique', False) else '') + "KEY %s (" % self.sym(name+'_'+iname)) + ",".join([self.sym(key)+" "+order for key, order in idata['keys']]) + ")" \
                                for iname, idata in schema.get('indices',{}).iteritems()]) + \
                     ") CHARACTER SET utf8")
+    # string-concat trick to get percentile aggregates
+    def percentile(self, expr, fraction):
+        return """SUBSTRING_INDEX(
+                    SUBSTRING_INDEX(
+                      GROUP_CONCAT(%s ORDER BY %s SEPARATOR ','),
+                      ',',
+                      %f * COUNT(*) + 1),
+                      ',' , -1) + 0.0""" % (expr, expr, fraction)
 
 class PostgreSQLUtil(SQLUtil):
     def ensure_table(self, cur, name, schema, temporary = False):
