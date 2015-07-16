@@ -28,19 +28,19 @@ def achievement_table_schema(sql_util):
                ('spec', 'VARCHAR(64) NOT NULL'),
                ('level', 'INT2 NOT NULL'),
                ('is_maxed', sql_util.bit_type()+' NOT NULL'), # flag that this is the max level of the spec
-               ('num_players', 'INT8 NOT NULL')
+               ('num_players', 'INT4 NOT NULL')
                ],
     'indices': {'master': {'unique': True, 'keys': [(x[0],'ASC') for x in sql_util.summary_out_dimensions()] + [('kind','ASC'),('spec','ASC'),('level','ASC')]}}
     }
 
-# to optimize space usage of the army composition table, collapse some summary dimensions
-def army_composition_summary_dimensions(sql_util):
+# to optimize space usage of time-series tables, collapse some summary dimensions
+def collapsed_summary_dimensions(sql_util):
     return [(name, datatype) for name, datatype in sql_util.summary_out_dimensions() if name not in ('frame_platform', 'country_tier')]
 
 def army_composition_table_schema(sql_util):
     # note: indexed fields need to be NOT NULL or else ON DUPLICATE KEY UPDATE will not work
     return {'fields': [('time','INT8 NOT NULL')] + \
-                       army_composition_summary_dimensions(sql_util) + \
+                       collapsed_summary_dimensions(sql_util) + \
                       [('kind','VARCHAR(16) NOT NULL'),
                        ('spec','VARCHAR(255) NOT NULL'),
                        ('level','INT1 NOT NULL'),
@@ -48,11 +48,25 @@ def army_composition_table_schema(sql_util):
                        ('total_count','INT4 NOT NULL')],
             'indices': {
                 'master': {'unique': True, 'keys': [('time','ASC')] + \
-                                                   [(x[0],'ASC') for x in army_composition_summary_dimensions(sql_util)] + \
+                                                   [(x[0],'ASC') for x in collapsed_summary_dimensions(sql_util)] + \
                                                    [('kind','ASC'),('spec','ASC'),('level','ASC'),('location','ASC')]}
             }
     }
 
+def resource_levels_table_schema(sql_util):
+    # note: indexed fields need to be NOT NULL or else ON DUPLICATE KEY UPDATE will not work
+    return {'fields': [('time','INT8 NOT NULL')] + \
+                      sql_util.summary_out_dimensions() + \
+                      [('resource', 'VARCHAR(64) NOT NULL'),
+                       ('total_amount','INT8 NOT NULL'),
+                       ('num_players','INT4 NOT NULL'),
+                       ],
+            'indices': {
+                'master': {'unique': True, 'keys': [('time','ASC')] + \
+                                                   [(x[0],'ASC') for x in sql_util.summary_out_dimensions()] + \
+                                                   [('resource','ASC')]}
+            }
+    }
 
 # detect A/B test names
 abtest_filter = re.compile('^T[0-9]+')
@@ -238,14 +252,17 @@ def do_slave(input):
         # accumulate batch totals for army composition
         army_composition = {}
 
+        # accumulate batch totals for resource levels
+        resource_levels = {}
+
         def flush():
             con.commit() # commit other tables first
 
-            # MySQL often throws deadlock exceptions when doing upserts that reference existing rows (!)
-            # in the upgrade_achievements and army_composition tables, so we need to loop on committing these updates
+            # MySQL often throws deadlock exceptions when doing upserts that reference existing rows (!),
+            # so we need to loop on committing these updates
             deadlocks = 0
 
-            while True:
+            while len(upgrade_achievement_counters) > 0:
                 try:
                     cur.executemany("INSERT INTO "+sql_util.sym(input['upgrade_achievement_table']) + \
                                     " (" + ','.join([x[0] for x in sql_util.summary_out_dimensions()]) + ", kind, spec, level, is_maxed, num_players) " + \
@@ -253,7 +270,7 @@ def do_slave(input):
                                     " ON DUPLICATE KEY UPDATE num_players = num_players + %s",
                                     [k + (v,v) for k,v in upgrade_achievement_counters.iteritems()])
                     con.commit()
-                    upgrade_achievement_counters.clear()
+                    upgrade_achievement_counters.clear()  # clear accumulator
                     break
                 except MySQLdb.OperationalError as e:
                     if e.args[0] == 1213: # deadlock
@@ -263,18 +280,34 @@ def do_slave(input):
                     else:
                         raise
 
-            while True:
+            while len(army_composition) > 0:
                 try:
                     cur.executemany("INSERT INTO "+sql_util.sym(input['army_composition_table']) + \
-                                    " (time, " + ','.join([x[0] for x in army_composition_summary_dimensions(sql_util)]) + ", kind, spec, level, location, total_count) " + \
-                                    " VALUES (%s, " + ','.join(['%s'] * len(army_composition_summary_dimensions(sql_util))) + ", %s, %s, %s, %s, %s) " + \
+                                    " (time, " + ','.join([x[0] for x in collapsed_summary_dimensions(sql_util)]) + ", kind, spec, level, location, total_count) " + \
+                                    " VALUES (%s, " + ','.join(['%s'] * len(collapsed_summary_dimensions(sql_util))) + ", %s, %s, %s, %s, %s) " + \
                                     " ON DUPLICATE KEY UPDATE total_count = total_count + %s",
                                     [(time_now,) + k + (v, v) for k,v in army_composition.iteritems()])
                     con.commit()
+                    army_composition.clear() # clear accumulator
+                    break
+                except MySQLdb.OperationalError as e:
+                    if e.args[0] == 1213: # deadlock
+                        con.rollback()
+                        deadlocks += 1
+                        continue
+                    else:
+                        raise
 
-                    # clear accumulator
-                    army_composition.clear()
-
+            while len(resource_levels) > 0:
+                try:
+                    cur.executemany("INSERT INTO "+sql_util.sym(input['resource_levels_table']) + \
+                                    " (time, " + ','.join([x[0] for x in sql_util.summary_out_dimensions()]) + ", resource, total_amount, num_players) " + \
+                                    " VALUES (%s, " + ','.join(['%s'] * len(sql_util.summary_out_dimensions())) + ", %s, %s, %s) " + \
+                                    " ON DUPLICATE KEY UPDATE total_amount = total_amount + %s, num_players = num_players + %s",
+                                    # note: "v" here is (amount, num_players) for each summary dimension combination
+                                    [(time_now,) + k + tuple(v) + tuple(v) for k,v in resource_levels.iteritems()])
+                    con.commit()
+                    resource_levels.clear() # clear accumulator
                     break
                 except MySQLdb.OperationalError as e:
                     if e.args[0] == 1213: # deadlock
@@ -326,7 +359,7 @@ def do_slave(input):
                                'spend_bracket': sql_util.get_spend_bracket(user.get('money_spent',0))}
             # ordered tuples of summary coordinates
             summary_vals = tuple(summary_keyvals[key] for key, datatype in sql_util.summary_out_dimensions())
-            army_composition_summary_vals = tuple(summary_keyvals[key] for key, datatype in army_composition_summary_dimensions(sql_util))
+            collapsed_summary_vals = tuple(summary_keyvals[key] for key, datatype in collapsed_summary_dimensions(sql_util))
 
             # parse townhall progression
             if input['do_townhall'] and ('account_creation_time' in user):
@@ -420,11 +453,11 @@ def do_slave(input):
                                      for alt_sid, alt in alt_accounts.iteritems()])
 
             # army composition table
-            ARMY_COMPOSITION_RECENCY = 7*86400 # only include players active more recently than this
-            if input['do_army_composition'] and time_now - user.get('last_login_time', 0) < ARMY_COMPOSITION_RECENCY:
+            ACTIVE_PLAYER_RECENCY = 7*86400 # only include players active more recently than this
+            if input['do_army_composition'] and time_now - user.get('last_login_time', 0) < ACTIVE_PLAYER_RECENCY:
                 def update_army_composition_entry(kind, spec, level, location, count):
                     # note: use non-NULL defaults so that the ON DUPLICATE KEY UPDATE will work
-                    key = army_composition_summary_vals + (kind, spec or '', level or 0, location or '')
+                    key = collapsed_summary_vals + (kind, spec or '', level or 0, location or '')
                     army_composition[key] = army_composition.get(key, 0) + count
 
                 # track number of players
@@ -467,6 +500,21 @@ def do_slave(input):
                 for tech, level in user.get('tech', {}).iteritems():
                     update_army_composition_entry('tech', tech, level, None, 1)
 
+            # current resource levels table
+            if input['do_resource_levels'] and time_now - user.get('last_login_time', 0) < ACTIVE_PLAYER_RECENCY:
+                def update_resource_levels_entry(resource, amount):
+                    assert resource
+                    key = summary_vals + (resource,)
+                    if key in resource_levels:
+                        resource_levels[key][0] += amount
+                        resource_levels[key][1] += 1 # N
+                    else:
+                        resource_levels[key] = [amount, 1]
+
+                update_resource_levels_entry('gamebucks', user.get('gamebucks_balance', 0))
+                for res in gamedata['resources']:
+                    update_resource_levels_entry(res, user.get(res, 0))
+
             batch += 1
             total += 1
             if input['commit_interval'] > 0 and batch >= input['commit_interval']:
@@ -497,6 +545,7 @@ if __name__ == '__main__':
     do_ltv = True
     do_alts = True
     do_army_composition = True
+    do_resource_levels = True
     do_prune = False
     use_local = False
     skip_developer = True
@@ -576,6 +625,7 @@ if __name__ == '__main__':
             ltv_table = cfg['table_prefix']+game_id+'_user_ltv'
             alts_table = cfg['table_prefix']+game_id+'_alt_accounts'
             army_composition_table = cfg['table_prefix']+game_id+'_active_player_army_composition'
+            resource_levels_table = cfg['table_prefix']+game_id+'_active_player_resource_levels'
 
             # these are the tables that are replaced entirely each run
             atomic_tables = [upcache_table,facebook_campaign_map_table] + \
@@ -678,6 +728,8 @@ if __name__ == '__main__':
 
             if do_army_composition:
                 sql_util.ensure_table(cur, army_composition_table, army_composition_table_schema(sql_util))
+            if do_resource_levels:
+                sql_util.ensure_table(cur, resource_levels_table, resource_levels_table_schema(sql_util))
 
             con.commit()
 
@@ -694,6 +746,7 @@ if __name__ == '__main__':
                           'buildings_table': buildings_table+'_temp',
                           'activity_table': activity_table+'_temp',
                           'do_army_composition': do_army_composition, 'army_composition_table': army_composition_table,
+                          'do_resource_levels': do_resource_levels, 'resource_levels_table': resource_levels_table,
                           'mode':'get_rows', 'sorted_field_names':sorted_field_names,
                           'segnum':segnum,
                           'commit_interval':commit_interval, 'verbose':verbose, 'use_local':use_local,
@@ -750,13 +803,13 @@ if __name__ == '__main__':
             con.commit()
 
             if do_prune:
-                if verbose: print 'pruning', army_composition_table
+                for table in army_composition_table, resource_levels_table:
+                    if verbose: print 'pruning', table
 
-                KEEP_DAYS = 999
-                old_limit = time_now - KEEP_DAYS * 86400
+                    KEEP_DAYS = 999
+                    old_limit = time_now - KEEP_DAYS * 86400
 
-                # prune the army composition table
-                cur.execute("DELETE FROM "+sql_util.sym(army_composition_table)+" WHERE time < %s", old_limit)
-                con.commit()
+                    cur.execute("DELETE FROM "+sql_util.sym(table)+" WHERE time < %s", old_limit)
+                    con.commit()
 
             if verbose: print 'all done.'
