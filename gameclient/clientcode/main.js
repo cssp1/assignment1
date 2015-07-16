@@ -33381,6 +33381,7 @@ function missions_dialog_select_mission(dialog, row) {
         reward_xp = ('reward_xp' in quest ? Math.max(Math.floor(quest['reward_xp']*gamedata['player_xp']['quests']), gamedata['player_xp']['quests_min']) : 0);
     }
 
+    // gamebucks and xp take up the same space, so only show one of them at a time
     if(('reward_gamebucks' in quest) && quest['reward_gamebucks'] > 0 && player.get_any_abtest_value('currency', gamedata['currency']) == 'gamebucks') {
         dialog.widgets['reward_gamebucks_amount'].show =
             dialog.widgets['reward_gamebucks_icon'].show = true;
@@ -33396,11 +33397,9 @@ function missions_dialog_select_mission(dialog, row) {
         dialog.widgets['reward_gamebucks_amount'].show =
             dialog.widgets['reward_gamebucks_icon'].show = false;
 
-        // gamebucks and xp take up the same space, so only show one of them at a time
+        dialog.widgets['reward_xp_amount'].show =
+            dialog.widgets['reward_xp_icon'].show = (reward_xp > 0);
         if(reward_xp > 0) {
-            dialog.widgets['reward_xp_amount'].show =
-                dialog.widgets['reward_xp_icon'].show = true;
-
             dialog.widgets['reward_xp_amount'].str = pretty_print_number(reward_xp);
         }
     }
