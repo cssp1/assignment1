@@ -7113,16 +7113,7 @@ class Player(AbstractPlayer):
         if cd_name in self.cooldowns:
             del self.cooldowns[cd_name]
 
-    def cooldown_togo(self, cd_name):
-        if cd_name in self.cooldowns:
-            ret = self.cooldowns[cd_name]['end'] - server_time
-            if ret <= 0:
-                del self.cooldowns[cd_name]
-            return ret
-        else:
-            return 0
-
-    def cooldown_active(self, cd_name, match_data = None):
+    def cooldown_find(self, cd_name, match_data = None):
         if cd_name in self.cooldowns:
             to_go = self.cooldowns[cd_name]['end'] - server_time
             if to_go > 0:
@@ -7131,10 +7122,26 @@ class Player(AbstractPlayer):
                     data = self.cooldowns[cd_name].get('data',{})
                     for k,v in match_data.iteritems():
                         if data.get(k,None) != v:
-                            return 0 # mismatch
-                return self.cooldowns[cd_name].get('stack',1)
+                            return None # mismatch
+                return self.cooldowns[cd_name]
             del self.cooldowns[cd_name] # get rid of expired cooldown
-        return 0
+        return None
+
+    # return seconds to go
+    def cooldown_togo(self, cd_name, match_data = None):
+        cd = self.cooldown_find(cd_name, match_data = match_data)
+        if cd:
+            return cd['end'] - server_time
+        else:
+            return -1
+
+    # return number of active stacks
+    def cooldown_active(self, cd_name, match_data = None):
+        cd = self.cooldown_find(cd_name, match_data = match_data)
+        if cd:
+            return cd.get('stack',1)
+        else:
+            return 0
 
     def cooldown_trigger(self, cd_name, duration, add_stack = -1, data = None):
         if duration <= 0: return
@@ -7152,7 +7159,7 @@ class Player(AbstractPlayer):
 
     def prune_cooldowns(self):
         for cd_name in self.cooldowns.keys():
-            self.cooldown_active(cd_name)
+            self.cooldown_active(cd_name) # automatically deletes expired cooldowns
 
     def prune_ladder_match_history(self, session):
         max_exclude = Predicates.eval_cond_or_literal(gamedata['matchmaking'].get('ladder_match_history_exclude',1), session, self)

@@ -5574,33 +5574,54 @@ player.unblock_user = function(uid) {
     }
 };
 
-player.cooldown_togo = function(cd_name) {
-    var cd = null;
+/** @param {string} cd_name
+    @param {Object=} match_data
+    @return {Object|null} */
+player.cooldown_find = function(cd_name, match_data) {
     if(cd_name === 'GCD') {
-        cd = player.global_cooldown;
-        return (cd['end'] - client_time);
-    } else if(cd_name in player.cooldowns) {
-        cd = player.cooldowns[cd_name];
+        return player.global_cooldown;
+    }
+    if(cd_name in player.cooldowns) {
+        var cd = player.cooldowns[cd_name];
+        var to_go = cd['end'] - server_time;
+        if(to_go > 0) {
+            if(match_data) {
+                var data = ('data' in cd ? cd['data'] : {});
+                for(var k in match_data) {
+                    if(!(k in data) || data[k] != match_data[k]) {
+                        return null; // mismatchh
+                    }
+                }
+            }
+            return cd;
+        }
+        // don't clear expired cooldowns, let server do it
+    }
+    return null;
+};
+
+/** @param {string} cd_name
+    @param {Object=} match_data
+    @return {number} */
+player.cooldown_togo = function(cd_name, match_data) {
+    if(cd_name === 'GCD') {
+        // special treatment for GCD - compare against client time
+        return player.global_cooldown['end'] - client_time;
+    }
+    var cd = player.cooldown_find(cd_name, match_data);
+    if(cd) {
         return (cd['end'] - server_time);
     }
     return -1;
 };
 
 /** @param {string} cd_name
-    @param {Object=} match_data */
+    @param {Object=} match_data
+    @return {number} of active stacks */
 player.cooldown_active = function(cd_name, match_data) {
-    if(player.cooldown_togo(cd_name) > 0) {
-        var cd = player.cooldowns[cd_name];
-        if(match_data) {
-            var data = ('data' in cd ? cd['data'] : {});
-            for(var k in match_data) {
-                if(!(k in data) || data[k] != match_data[k]) {
-                    return 0; // mismatchh
-                }
-            }
-        }
-        if('stack' in cd) { return cd['stack']; }
-        return 1;
+    var cd = player.cooldown_find(cd_name, match_data);
+    if(cd) {
+        return ('stack' in cd ? cd['stack'] : 1);
     }
     return 0;
 };

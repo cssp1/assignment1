@@ -723,9 +723,12 @@ function CooldownActivePredicate(data) {
     goog.base(this, data);
     this.name = data['name'];
     this.match_data = data['match_data'] || null;
+    this.min_togo = ('min_togo' in data ? data['min_togo'] : 0);
 }
 goog.inherits(CooldownActivePredicate, Predicate);
-CooldownActivePredicate.prototype.is_satisfied = function(player, qdata) { return player.cooldown_active(this.name, this.match_data); };
+CooldownActivePredicate.prototype.is_satisfied = function(player, qdata) {
+    return player.cooldown_togo(this.name, this.match_data) >= this.min_togo;
+};
 CooldownActivePredicate.prototype.do_ui_describe = function(player) {
     return new PredicateUIDescription(gamedata['strings']['predicates'][this.kind]['ui_name'].replace('%s', this.name));
 };

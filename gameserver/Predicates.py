@@ -328,8 +328,10 @@ class CooldownActivePredicate(Predicate):
         Predicate.__init__(self, data)
         self.name = data['name']
         self.match_data = data.get('match_data',None)
+        self.min_togo = data.get('min_togo', 0)
     def is_satisfied(self, player, qdata):
-        return player.cooldown_active(self.name, match_data = self.match_data)
+        return player.cooldown_togo(self.name, match_data = self.match_data) >= self.min_togo
+
 class CooldownInactivePredicate(Predicate):
     def __init__(self, data):
         Predicate.__init__(self, data)
