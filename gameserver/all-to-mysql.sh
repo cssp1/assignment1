@@ -3,7 +3,7 @@
 # run all MongoDB/upcache-to-MySQL ETL scripts for one game title
 
 GAME_ID=`grep '"game_id":' config.json  | cut -d\" -f4 | sed 's/test//'`
-LOG=/var/tmp/etl.txt
+LOG="/var/tmp/etl-${GAME_ID}.txt"
 
 echo `date` "${GAME_ID} === ETL run start ===" >> ${LOG}
 
