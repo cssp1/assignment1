@@ -23,9 +23,8 @@ if [[ "$FREQ" == "daily" ]]; then
   echo `date` "${GAME_ID} stats done" >> ${LOG}
 
   # credits - done hourly
+  # gamebucks - done hourly
 
-  ./gamebucks_to_mysql.py -q --unit-cost --prune > /dev/null
-  echo `date` "${GAME_ID} gamebucks done" >> ${LOG}
   ./battles_to_mysql.py -q --prune > /dev/null
   echo `date` "${GAME_ID} battles done" >> ${LOG}
   ./battle_risk_reward_to_sql.py -q > /dev/null # requires battles, store (gamebucks), stats
@@ -120,6 +119,9 @@ elif [[ "$FREQ" == "hourly" ]]; then
 
   ./econ_res_to_sql.py -q --prune > /dev/null
   echo `date` "${GAME_ID} econ_res done" >> ${LOG}
+
+  ./gamebucks_to_mysql.py -q --unit-cost --prune > /dev/null
+  echo `date` "${GAME_ID} gamebucks done" >> ${LOG}
 
 else
     echo 'unknown frequency: specify "-f hourly" or "-f daily"'
