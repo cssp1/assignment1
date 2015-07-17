@@ -5578,25 +5578,30 @@ player.unblock_user = function(uid) {
     @param {Object=} match_data
     @return {Object|null} */
 player.cooldown_find = function(cd_name, match_data) {
+    var cd, to_go;
     if(cd_name === 'GCD') {
-        return player.global_cooldown;
+        cd = player.global_cooldown;
+        to_go = cd['end'] - client_time;
+    } else if(cd_name in player.cooldowns) {
+        cd = player.cooldowns[cd_name];
+        to_go = cd['end'] - server_time;
+    } else {
+        cd = null;
     }
-    if(cd_name in player.cooldowns) {
-        var cd = player.cooldowns[cd_name];
-        var to_go = cd['end'] - server_time;
-        if(to_go > 0) {
-            if(match_data) {
-                var data = ('data' in cd ? cd['data'] : {});
-                for(var k in match_data) {
-                    if(!(k in data) || data[k] != match_data[k]) {
-                        return null; // mismatchh
-                    }
+
+    if(cd && to_go > 0) {
+        if(match_data) {
+            var data = ('data' in cd ? cd['data'] : {});
+            for(var k in match_data) {
+                if(!(k in data) || data[k] != match_data[k]) {
+                    return null; // mismatchh
                 }
             }
-            return cd;
         }
+        return cd;
         // don't clear expired cooldowns, let server do it
     }
+
     return null;
 };
 
