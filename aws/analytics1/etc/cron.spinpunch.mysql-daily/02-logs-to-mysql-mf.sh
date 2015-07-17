@@ -2,4 +2,4 @@
 
 exit 0 # XXX disabled by default
 
-(cd ${HOME}/marsfrontier/gameserver && ./all-to-mysql.sh)
+(cd ${HOME}/marsfrontier/gameserver && ./all-to-mysql.sh -f daily)

@@ -2,8 +2,10 @@
 # XXX enable manually 0 7 * * * ec2-user run-parts /etc/cron.spinpunch.daily
 # XXX enable manually 0 7 * * * ec2-user run-parts /etc/cron.spinpunch.skynet-daily
 
-# run SQL ETL scripts at 0800 UTC for lowest latency before North American workday starts (~1300 UTC)
+# run daily SQL ETL scripts at 0800 UTC for lowest latency before North American workday starts (~1300 UTC)
 # XXX enable manually 0 8 * * * ec2-user run-parts /etc/cron.spinpunch.mysql-daily
+# run hourly SQL ETL scripts
+# XXX enable manually 0 * * * * ec2-user run-parts /etc/cron.spinpunch.mysql-hourly
 
 # run skynet adstat recorder hourly
 # leave	some time after the hour boundary for facebook to catch	up...
