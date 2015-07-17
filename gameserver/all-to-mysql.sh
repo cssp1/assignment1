@@ -3,7 +3,7 @@
 # run all MongoDB/upcache-to-MySQL ETL scripts for one game title
 
 GAME_ID=`grep '"game_id":' config.json  | cut -d\" -f4 | sed 's/test//'`
-FREQ="daily"
+FREQ="unknown"
 LOG="/var/tmp/etl-${GAME_ID}.txt"
 
 while getopts "f:" flag
@@ -120,6 +120,10 @@ elif [[ "$FREQ" == "hourly" ]]; then
 
   ./econ_res_to_sql.py -q --prune > /dev/null
   echo `date` "${GAME_ID} econ_res done" >> ${LOG}
+
+else
+    echo 'unknown frequency: specify "-f hourly" or "-f daily"'
+    exit 1
 fi
 
 echo `date` "${GAME_ID} === ${FREQ} ETL run done ===" >> ${LOG}
