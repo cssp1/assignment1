@@ -1803,7 +1803,7 @@ def adgroup_create_batch_element(db, campaign_id, campaign_name, creative_id, tg
                'campaign_id': campaign_id,
                'creative': SpinJSON.dumps({'creative_id':creative_id}),
                'tracking_specs': SpinJSON.dumps([{'action.type':'offsite_conversion','offsite_pixel':int(pixel['id'])} for pixel in conversion_pixels.itervalues()]),
-               'objective': 'PAGE_LIKES' if tgt.get('destination',None)=='app_page' else ('CANVAS_APP_ENGAGEMENT' if tgt.get('include_already_connected_to_game',False) else 'CANVAS_APP_INSTALLS'),
+               #'objective': 'PAGE_LIKES' if tgt.get('destination',None)=='app_page' else ('CANVAS_APP_ENGAGEMENT' if tgt.get('include_already_connected_to_game',False) else 'CANVAS_APP_INSTALLS'),
                'redownload':1,
                'fields': ADGROUP_FIELDS
                }
