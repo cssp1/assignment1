@@ -21859,6 +21859,7 @@ class GAMEAPI(resource.Resource):
 
             # record FB request (invite or gift) hits
             if ('fb_source' in url_qs) and ('notif_t' in url_qs) and ('request_ids' in url_qs) and (url_qs['fb_source'][0] == 'notification'):
+                request_event = None
                 if url_qs['notif_t'][0] == 'app_invite':
                     request_event = '7107_invite_friends_hit_redundant' if is_returning_user else '7106_invite_friends_hit_acquisition'
                     for request_id in url_qs['request_ids'][0].split(','):
