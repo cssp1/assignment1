@@ -19,7 +19,7 @@ if __name__ == '__main__':
     do_prune = False
     dry_run = False
     min_sec = 75
-    email_to = None
+    email_to = []
 
     opts, args = getopt.gnu_getopt(sys.argv[1:], 'q', ['prune','min-sec=','dry-run','email='])
 
@@ -28,7 +28,7 @@ if __name__ == '__main__':
         elif key == '--prune': do_prune = True
         elif key == '--min-sec': min_sec = int(val)
         elif key == '--dry-run': dry_run = True
-        elif key == '--email': email_to = val
+        elif key == '--email': email_to.append(val)
 
     if len(args) < 1:
         sys.stderr.write('please specify mysql_servers entry\n')
@@ -67,10 +67,10 @@ if __name__ == '__main__':
     else:
         recip_list = [
                       #{"type":"hipchat", "room":"Analysis", "ats":[]},
-                      {"type":"slack", "channel":"#analysis", "ats":[]}
+                      #{"type":"slack", "channel":"#analysis", "ats":[]}
                       ]
         if email_to:
-            recip_list.append({'type': 'email', 'to':[{'name': 'Analytics Tech', 'address': email_to}]})
+            recip_list.append({'type': 'email', 'to':[{'name': 'Analytics Tech', 'address': addr} for addr in email_to]})
 
         if body:
             SpinReminders.send_reminders('SpinPunch', recip_list, subject, body, dry_run = dry_run)
