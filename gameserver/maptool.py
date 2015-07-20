@@ -294,7 +294,7 @@ def auto_level_hive_objects(objlist, owner_level, owner_tech, xform):
         if 'orders' in src:
             dst['orders'] = []
             for order in src['orders']:
-                if 'dest' in order:
+                if 'dest' in order and order['dest']:
                     order = copy.copy(order)
                     order['dest'] = transform(xform, order['dest'])
                 dst['orders'].append(order)
@@ -686,7 +686,7 @@ def spawn_quarry(quarries, map_cache, db, lock_manager, region_id, id_num, id_se
         if 'orders' in p:
             obj['orders'] = []
             for order in p['orders']:
-                if 'dest' in order:
+                if 'dest' in order and order['dest']:
                     order = copy.copy(order)
                     order['dest'] = transform(xform, order['dest'])
                 obj['orders'].append(order)
