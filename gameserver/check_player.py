@@ -16,6 +16,51 @@ import sys, time, getopt, string
 
 time_now = int(time.time())
 
+# convert a floating-point number of seconds into a string like '10d 4h 5m 10s'
+# 'limit' limits how many "words" are in the result
+time_unit_table = {
+    'd': 'Day', 'h': 'Hour', 'm': 'Min', 's': 'Sec'
+}
+
+def do_pretty_print_time_unit(qty, abbrev, spell_it):
+    if spell_it:
+        u = time_unit_table[abbrev]
+        if qty != 1:
+            u = u + 's'
+        return ('%d' % qty) + ' ' + u
+    return ('%d' % qty) + abbrev
+
+def pretty_print_time(sec, limit = 99, spell_units = False):
+    if sec < 1: # includes negative
+        return '0'
+
+    ret = []
+    show_seconds = True
+
+    if sec >= 24*60*60:
+        days = sec//(24*60*60)
+        ret.append(do_pretty_print_time_unit(days, 'd', spell_units))
+        sec -= days * (24*60*60);
+        show_seconds = False
+
+    if sec >= (60*60):
+        hours = sec//(60*60)
+        ret.append(do_pretty_print_time_unit(hours, 'h', spell_units))
+        sec -= hours * (60*60)
+
+    if sec >= 60:
+        mins = sec // 60;
+        ret.append(do_pretty_print_time_unit(mins, 'm', spell_units))
+        sec -= mins * 60
+
+    if sec >= 1 and show_seconds:
+        secs = sec // 1;
+        ret.append(do_pretty_print_time_unit(secs, 's', spell_units))
+
+    ret = ret[0:limit]
+    return (', ' if spell_units else ' ').join(ret)
+
+
 def check_bloat(input, min_size = 1024, print_max = 20):
     sizes = []
     for key, val in input.iteritems():
@@ -424,7 +469,13 @@ if __name__ == '__main__':
             print fmt % ('CHAT OFFICIAL (blue text) account', '')
 
         if 'known_alt_accounts' in player and player['known_alt_accounts']:
-            print fmt % ('Known alt accounts:', repr(player['known_alt_accounts']))
+            print fmt % ('Known alt accounts:', '')
+            for s_other_id in sorted(player['known_alt_accounts'].iterkeys(), key = int):
+                entry = player['known_alt_accounts'][s_other_id]
+                if entry.get('logins',1) < 0: # marked non-alt
+                    continue
+                print fmt % ('', 'ID: %7d, #Logins: %4d, Last simultanous login: %s' % (int(s_other_id), entry.get('logins',1),
+                                                                         pretty_print_time(time_now - entry['last_login'], limit = 2)+' ago' if 'last_login' in entry else 'Unknown'))
 
         if 'customer_support' in player['history']:
             print fmt % ('Customer Support history', '')
