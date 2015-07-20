@@ -447,9 +447,9 @@ def do_slave(input):
                 alt_accounts = user.get('known_alt_accounts', None)
                 if alt_accounts and type(alt_accounts) is dict:
                     cur.executemany("INSERT INTO "+sql_util.sym(input['alts_table']) + \
-                                    " (user_id, other_id, logins, attacks)" + \
-                                    " VALUES (%s,%s,%s,%s)",
-                                    [(user['user_id'], int(alt_sid), alt.get('logins',1), alt.get('attacks',1)) \
+                                    " (user_id, other_id, logins, attacks, last_simultaneous_login)" + \
+                                    " VALUES (%s,%s,%s,%s,%s)",
+                                    [(user['user_id'], int(alt_sid), alt.get('logins',1), alt.get('attacks',1), alt.get('last_login',None)) \
                                      for alt_sid, alt in alt_accounts.iteritems()])
 
             # army composition table
@@ -719,7 +719,8 @@ if __name__ == '__main__':
                                       {'fields': [('user_id','INT4 NOT NULL'),
                                                   ('other_id','INT4 NOT NULL'),
                                                   ('logins','INT4'),
-                                                  ('attacks','INT4')],
+                                                  ('attacks','INT4'),
+                                                  ('last_simultaneous_login','INT8')],
                                        'indices': {'by_user_id': {'keys': [('user_id','ASC')]},
                                                    #'by_logins': {'keys': [('logins','ASC')]},
                                                    #'by_attacks': {'keys': [('attacks','ASC')]},

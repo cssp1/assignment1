@@ -10845,6 +10845,7 @@ class LivePlayer(Player):
 
         if alt_data is not None:
             alt_data['logins'] = alt_data.get('logins',0) + 1
+            alt_data['last_login'] = server_time # record time of last simultaneous login
 
     def is_alt_account_unattackable(self, other):
         limit = gamedata['server']['alt_no_attack_after']
