@@ -33,8 +33,9 @@ if [[ "$FREQ" == "daily" ]]; then
   # things needed for analytics-views, with sessions last
   ./metrics_to_mysql.py -q --prune > /dev/null
   echo `date` "${GAME_ID} metrics done" >> ${LOG}
-  ./fb_notifications_to_sql.py -q --prune > /dev/null
-  echo `date` "${GAME_ID} fb_notifications done" >> ${LOG}
+
+  # fb_notifications - done hourly
+
   ./fb_requests_to_sql.py -q --prune > /dev/null
   echo `date` "${GAME_ID} fb_requests done" >> ${LOG}
   ./fb_sharing_to_sql.py -q --prune > /dev/null
@@ -121,6 +122,9 @@ elif [[ "$FREQ" == "hourly" ]]; then
 
   ./gamebucks_to_mysql.py -q --unit-cost --prune > /dev/null
   echo `date` "${GAME_ID} gamebucks done" >> ${LOG}
+
+  ./fb_notifications_to_sql.py -q --prune > /dev/null
+  echo `date` "${GAME_ID} fb_notifications done" >> ${LOG}
 
   ./sessions_to_sql.py -q --prune > /dev/null
   echo `date` "${GAME_ID} sessions done" >> ${LOG}
