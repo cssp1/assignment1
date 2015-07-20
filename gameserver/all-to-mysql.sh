@@ -44,8 +44,7 @@ if [[ "$FREQ" == "daily" ]]; then
   ./fb_open_graph_to_sql.py -q --prune > /dev/null
   echo `date` "${GAME_ID} fb_open_graph done" >> ${LOG}
 
-  ./sessions_to_sql.py -q --prune > /dev/null
-  echo `date` "${GAME_ID} sessions done" >> ${LOG}
+  # sessions - done hourly
 
   # analytics-views
   ./update-analytics-views.sh > /dev/null # requires sessions, metrics, facebook_campaign_map (currently from upcache), fb_notifications, fb_permissions, credits, battles, battle_risk_reward
@@ -122,6 +121,9 @@ elif [[ "$FREQ" == "hourly" ]]; then
 
   ./gamebucks_to_mysql.py -q --unit-cost --prune > /dev/null
   echo `date` "${GAME_ID} gamebucks done" >> ${LOG}
+
+  ./sessions_to_sql.py -q --prune > /dev/null
+  echo `date` "${GAME_ID} sessions done" >> ${LOG}
 
 else
     echo 'unknown frequency: specify "-f hourly" or "-f daily"'
