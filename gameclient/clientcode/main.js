@@ -284,7 +284,8 @@ var time_unit_table = {
 function do_pretty_print_time_unit(qty, abbrev, spell_it) {
     if(spell_it) {
         var u = time_unit_table[abbrev];
-        if(qty != 1) {
+        // note: don't pluralize "Mins" or "Secs", it looks awkward
+        if(qty != 1 && (abbrev != 'm') && (abbrev != 's')) {
             u = (u + 's');
         }
         return qty.toString() + ' ' + u;
@@ -305,7 +306,7 @@ function do_pretty_print_time(sec, limit, spell_units) {
         var days = Math.floor(sec/(24*60*60));
         ret.push(do_pretty_print_time_unit(days, 'd', spell_units));
         sec -= days * (24*60*60);
-        show_seconds = false;
+        show_seconds = (limit >= 4);
     }
     if(sec >= (60*60)) {
         var hours = Math.floor(sec/(60*60));
@@ -34724,22 +34725,34 @@ function apply_dialog_hacks(dialog, _tip, consequent_context) {
     if('event_countdown_hack' in _tip && _tip['event_countdown_hack']['enable']) {
         var hack = _tip['event_countdown_hack'];
         dialog.widgets['event_countdown'].show = 1;
+        if('text_hjustify' in hack) { dialog.widgets['event_countdown'].text_hjustify = hack['text_hjustify']; }
         if('ui_title' in hack) { dialog.widgets['event_countdown_title'].str = hack['ui_title']; }
         if('ui_value' in hack) {
             dialog.widgets['event_countdown'].str = hack['ui_value'];
         } else {
-            var time_to_print;
-            if(hack['reset_origin_time']) {
-                // count down to end of current repetition interval
-                var now = player.get_absolute_time();
-                var this_period_end = ((Math.floor( (now - hack['reset_origin_time']) / hack['reset_interval'] ) + 1) * hack['reset_interval']) + hack['reset_origin_time'];
-                time_to_print = (this_period_end - now);
+            var update_cb = (function (_hack) { return function(w) {
+                var time_to_print;
+                if(_hack['reset_origin_time']) {
+                    // count down to end of current repetition interval
+                    var now = player.get_absolute_time();
+                    var this_period_end = ((Math.floor( (now - _hack['reset_origin_time']) / _hack['reset_interval'] ) + 1) * _hack['reset_interval']) + _hack['reset_origin_time'];
+                    time_to_print = (this_period_end - now);
+                } else {
+                    // count down to start or end of event
+                    time_to_print = -player.get_event_time(_hack['event_kind'] || 'current_event', _hack['event_name'] || null, _hack['method'], true);
+                }
+                var ui_name = _hack['ui_name'] || w.data['ui_name'];
+                var precision = ('time_precision' in _hack ? _hack['time_precision'] : 2);
+                var spell_out = ('spell_time_units' in _hack ? _hack['spell_time_units'] : true);
+                w.str = ui_name.replace('%s', do_pretty_print_time(time_to_print, precision, spell_out));
+            }; })(hack);
+            if(hack['realtime']) {
+                // update every frame
+                dialog.widgets['event_countdown'].ondraw = update_cb;
             } else {
-                // count down to start or end of event
-                time_to_print = -player.get_event_time(hack['event_kind'] || 'current_event', hack['event_name'], hack['method'], true);
+                // update once only
+                update_cb(dialog.widgets['event_countdown']);
             }
-            var ui_name = hack['ui_name'] || dialog.data['widgets']['event_countdown']['ui_name'];
-            dialog.widgets['event_countdown'].str = ui_name.replace('%s', do_pretty_print_time(time_to_print, 2, true));
         }
         if('xy' in hack) { dialog.widgets['event_countdown'].xy = hack['xy']; }
         if('dimensions' in hack) { dialog.widgets['event_countdown'].wh = hack['dimensions']; }
