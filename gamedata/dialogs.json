@@ -5520,7 +5520,9 @@
                                          "ui_tooltip_space_limit": "No space for more reinforcements.\nTo make room, upgrade %s or deploy\nexisting reinforcements in battle.",
                                          "tooltip_delay": 0 },
             "output_bg": { "kind": "StaticImage", "xy": [8,76], "dimensions": [297,180], "asset": "chat_output", "bg_image_resizable": 1 },
-            "output": { "kind": "ScrollingTextField", "xy": [16,81], "dimensions": [282,155], "text_size": 13, "text_hjustify": "left",
+            "output": { "kind": "ScrollingTextField", "xy": [16,81], "dimensions": [282,155],
+                        "clip_to": [16,81,287,155],
+                        "text_size": 13, "text_hjustify": "left",
                         "text_vjustify": "top", "scrollback_buffer": 100, "invert": 1, "ui_tooltip": "", "tooltip_delay": 0 },
 
             "scroll_up": { "kind": "ActionButton", "xy": [306,75], "dimensions": [27,46], "bg_image": "chat_scroll_up", "push_bg_image": 1 },

@@ -3078,6 +3078,7 @@ SPUI.ScrollingTextField = function(data) {
     this.text_vjustify = data['text_vjustify'] || "center";
     this.text_offset = data['text_offset'] || [0,0];
     this.alpha = ('alpha' in data ? data['alpha'] : 1);
+    this.clip_to = data['clip_to'] || null;
 
     // XXXXXX the circular-buffer scrolling mechanics here are very confusing.
     // this was originally designed "IRC client" style, with the window by default
@@ -3260,6 +3261,11 @@ SPUI.ScrollingTextField.prototype.do_draw = function(offset) {
     SPUI.ctx.save();
     if(this.alpha != 1) {
         SPUI.ctx.globalAlpha = this.alpha;
+    }
+    if(this.clip_to) {
+        SPUI.ctx.beginPath();
+        SPUI.ctx.rect(offset[0]+this.clip_to[0], offset[1]+this.clip_to[1], this.clip_to[2], this.clip_to[3]);
+        SPUI.ctx.clip();
     }
     SPUI.ctx.font = this.font.str();
     if(this.drop_shadow) {
