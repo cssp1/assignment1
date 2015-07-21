@@ -287,7 +287,7 @@ SPText.break_lines = function(inlines, width, default_font) {
 
     // XXX reset by block if font changes
     var space_width = SPUI.ctx.measureText(' ').width;
-    var em_width = SPUI.ctx.measureText('M').width;
+    var em_width = SPUI.ctx.measureText('@').width; // @ is wider than M
     var max_chars = Math.max(Math.floor(width / em_width), 1);
 
     for(var n = 0; n < inlines.length; n++) {
