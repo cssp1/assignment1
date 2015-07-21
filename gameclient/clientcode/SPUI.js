@@ -1149,6 +1149,10 @@ SPUI.DialogWidget = function(data) {
     this.sound = data['sound'] || null;
     this.sound_played = false;
     this.transform = data['transform'] || null;
+
+    /** @type {function(SPUI.DialogWidget)|null} optional function that is called right before dialog draws itself
+        e.g. to update values in real time */
+    this.ondraw = null;
 };
 goog.inherits(SPUI.DialogWidget, SPUI.Element);
 
@@ -1159,6 +1163,7 @@ SPUI.DialogWidget.prototype.draw = function(offset) {
     if(!this.show) { return false; }
     if(this.off_after > 0 && SPUI.time > this.start_time + this.off_after) { return false; }
     if(this.on_after > 0 && SPUI.time < this.start_time + this.on_after) { return false; }
+    if(this.ondraw) { this.ondraw(this); }
     if(SPUI.time >= this.start_time && this.sound && !this.sound_played) {
         GameArt.assets[this.sound].states['normal'].audio.play(SPUI.time);
         this.sound_played = true;
@@ -1726,9 +1731,6 @@ SPUI.Tooltip = function(data, owner) {
 
     // SPUI.time when the mouse entered the associated widget, -1 if never
     this.mouse_enter_time = -1;
-
-    // optional function to call right before drawing
-    this.ondraw = null;
 };
 goog.inherits(SPUI.Tooltip, SPUI.TextWidget);
 
