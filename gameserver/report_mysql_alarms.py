@@ -24,9 +24,9 @@ def get_issues(data):
             issues.append('CDN Issues per HAU >= 0.2')
         if float(data['browser_fails'])/hau >= 0.2:
             issues.append('Browser Issues per HAU >= 0.2')
-        if data['fb_notifications_sent'] > 200: # alert only on 5k+/day notifications
-            if float(data['fb_notifications_clicked'])/float(data['fb_notifications_sent']) < 0.17:
-                issues.append('FB App-to-User Notification CTR < 17%')
+        if data['fb_notifications_sent_24h'] > 5000: # alert only on 5k+/day notifications
+            if float(data['fb_notifications_clicked_24h'])/float(data['fb_notifications_sent_24h']) < 0.17:
+                issues.append('FB App-to-User Notification CTR < 17% during last 24h')
     return issues
 
 if __name__ == '__main__':
@@ -73,31 +73,28 @@ if __name__ == '__main__':
     # get the HAU data point
     cur.execute('SELECT SUM(hau) AS hau FROM %s WHERE hour = %%s' % (sql_util.sym(sessions_hourly_summary_table)), [last_valid_hour,])
     rows = cur.fetchall()
-    hau = raw_data['hau'] = rows[0]['hau']
+    raw_data['hau'] = rows[0]['hau']
 
     # get the browser-issues data points
-    cdn_fails = 0
-    browser_fails = 0
     cur.execute('''SELECT SUM(IF(event_name = '0660_asset_load_fail',1,0)) AS cdn_fails,
                           SUM(IF(event_name NOT IN ('0660_asset_load_fail','0631_direct_ajax_failure_falling_back_to_proxy','0645_direct_ws_failure_falling_back_to_proxy'),1,0)) AS browser_fails
                    FROM %s WHERE time >= %%s AND time < %%s''' % sql_util.sym(client_trouble_table),
                 [last_valid_hour, last_valid_hour + 3600])
     rows = cur.fetchall()
     if rows and rows[0]:
-        cdn_fails = raw_data['cdn_fails'] = rows[0]['cdn_fails']
-        browser_fails = raw_data['browser_fails'] = rows[0]['browser_fails']
+        raw_data['cdn_fails'] = rows[0]['cdn_fails']
+        raw_data['browser_fails'] = rows[0]['browser_fails']
 
     # get the FB notification data points
-    fb_notifications_sent = 0
-    fb_notifications_clicked = 0
+    # (look at 24h time window for FB notifications to avoid spurious single-hour alerts)
     cur.execute('''SELECT SUM(IF(event_name = '7130_fb_notification_sent',1,0)) AS sent,
                           SUM(IF(event_name = '7131_fb_notification_hit',1,0)) AS clicked
                    FROM %s WHERE time >= %%s AND time < %%s''' % sql_util.sym(fb_notifications_table),
-                [last_valid_hour, last_valid_hour + 3600])
+                [last_valid_hour - 23*3600, last_valid_hour + 3600])
     rows = cur.fetchall()
     if rows and rows[0]:
-        fb_notifications_sent = raw_data['fb_notifications_sent'] = rows[0]['sent']
-        fb_notifications_clicked = raw_data['fb_notifications_clicked'] = rows[0]['clicked']
+        raw_data['fb_notifications_sent_24h'] = rows[0]['sent']
+        raw_data['fb_notifications_clicked_24h'] = rows[0]['clicked']
 
     con.commit()
 
@@ -112,7 +109,7 @@ if __name__ == '__main__':
             body += '\n'.join(['ALERT: '+iss for iss in issues])
         else:
             body += '(no alerts)'
-        body += '\n\nRaw Data:\n' + '\n'.join(['%-30s: ' % k + (('%10d' % v) if v is not None else '-') for k,v in raw_data.iteritems()])
+        body += '\n\nRaw Data:\n' + '\n'.join(['%-30s: ' % k + (('%10d' % v) if v is not None else '-') for k,v in sorted(raw_data.items())])
 
     if dry_run:
         print '--- SUBJECT ---\n', subject, '\n--- BODY ---\n', body
