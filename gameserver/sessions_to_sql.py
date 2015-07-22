@@ -123,7 +123,9 @@ def do_main():
     affected_days = set()
     affected_months = set()
 
-    qs = {'time':{start_time_compare:start_time, '$lt': end_time}}
+    # note: query on "in" (login time) instead of "time" (update time of the MongoDB entry)
+    qs = {'in':{start_time_compare:start_time, '$lt': end_time}}
+    qs['time'] = {start_time_compare:start_time - SpinETL.MAX_SESSION_LENGTH} # for index optimization only
 
     for row in nosql_client.log_buffer_table('log_sessions').find(qs):
         if row.get('developer',False): continue # skip events by developers
