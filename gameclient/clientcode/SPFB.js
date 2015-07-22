@@ -65,6 +65,14 @@ SPFB.getLoginStatus = function(cb, force) {
 
 SPFB.AppEvents = {};
 SPFB.AppEvents.activateApp = function() {
+    return; // no longer necessary as of July 2015
+
+    // (Facebook: "App Launches and App Installs are now logged
+    // automatically for canvas app users. Calls to the JavaScript
+    // SDK's 'activateApp' method are now ignored as they're no longer
+    // needed.")
+
+    /*
     console.log('SPFB.AppEvents.activateApp()');
     if(spin_frame_platform != 'fb' || !spin_facebook_enabled || !gamedata['enable_fb_app_events']) { return; }
     if(typeof FB === 'undefined' || typeof FB.AppEvents == 'undefined') {
@@ -73,7 +81,9 @@ SPFB.AppEvents.activateApp = function() {
         return;
     }
     return FB.AppEvents.activateApp();
+    */
 };
+
 /** @param {string} name
     @param {number|null=} value
     @param {Object=} params */
