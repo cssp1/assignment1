@@ -14313,7 +14313,7 @@ function update_chat_frame(dialog) {
             tab.user_data['last_output_h'] = tab.widgets['output'].wh[1];
             tab.widgets['output_bg'].wh = [tab.data['widgets']['output_bg']['dimensions'][0], tab.wh[1] - (tab.data['dimensions'][1] - (tab.data['widgets']['output_bg']['xy'][1] + tab.data['widgets']['output_bg']['dimensions'][1]))];
             tab.widgets['output'].wh = [tab.data['widgets']['output']['dimensions'][0], tab.wh[1] - (tab.data['dimensions'][1] - (tab.data['widgets']['output']['xy'][1]+ tab.data['widgets']['output']['dimensions'][1]))];
-            tab.widgets['output'].clip_to = [tab.widgets['output'].xy[0], tab.widgets['output'].xy[0],
+            tab.widgets['output'].clip_to = [tab.widgets['output'].xy[0], tab.widgets['output'].xy[1],
                                              tab.widgets['output'].wh[0] + (tab.widgets['output'].data['clip_to'][2] - tab.widgets['output'].data['dimensions'][0]),
                                              tab.widgets['output'].wh[1] + (tab.widgets['output'].data['clip_to'][3] - tab.widgets['output'].data['dimensions'][1])];
             if(tab.widgets['output'].wh[1] != tab.user_data['last_output_h']) {
