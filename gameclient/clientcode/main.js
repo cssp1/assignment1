@@ -44940,6 +44940,8 @@ function handle_server_message(data) {
             }
             if(name !== "LADDER_MATCH_FAILED") {
                 if(!session.home_base) {
+                    // note: Might not want to visit_base_home() unconditionally when name.indexOf("CANNOT_SPY") == 0,
+                    // since you might just want to stay where you are
                     visit_base_home();
                 } else if(session.last_map_dialog_state) {
                     // make sure region map is up and pointing to last location
