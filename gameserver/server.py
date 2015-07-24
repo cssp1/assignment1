@@ -10601,7 +10601,9 @@ class LivePlayer(Player):
             if 'attachments' in tip:
                 msg['attachments'] = tip['attachments']
             if 'on_send' in tip:
-               session.execute_consequent_safe(tip['on_send'], self, retmsg, reason='get_daily_messages')
+               session.execute_consequent_safe(tip['on_send'], self, retmsg,
+                                               context = {'home_region': self.home_region},
+                                               reason='get_daily_messages')
             self.mailbox_append(msg)
             self.history[key] = 1
             got_any = True

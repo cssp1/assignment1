@@ -219,6 +219,7 @@ def MetricsLogFilter(child):
                                   '1500_server_restart',
                                   '3870_loot_given',
                                   '4701_change_region_success',
+                                  '4702_region_close_notified',
                                   #'5120_buy_item', # obsolete - use gamebucks log
 
                                   # thsese can be turned on temporarily for analytics
@@ -230,7 +231,6 @@ def MetricsLogFilter(child):
                                   #'5130_item_activated',
                                   #'5131_item_trashed',
                                   #'5140_mail_attachment_collected'
-                                  '4701_change_region_success',
 
                                   '5149_turret_heads_migrated',
 

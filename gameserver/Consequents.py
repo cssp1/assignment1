@@ -98,6 +98,14 @@ class MetricEventConsequent(Consequent):
                 return # already sent
             session.sent_metrics[self.tag] = True
         props = copy.deepcopy(self.props)
+        for k in props.iterkeys():
+            # context variable
+            if type(props[k]) in (str,unicode) and len(props[k]) >= 1 and props[k][0] == '$':
+                context_key = props[k][1:]
+                if context and (context_key in context):
+                    props[k] = context[context_key]
+                else:
+                    del props[k]
         if self.summary_key:
             props[self.summary_key] = player.get_denormalized_summary_props('brief')
         session.metric_event_coded(player, self.event_name, props)
