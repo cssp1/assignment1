@@ -17705,7 +17705,7 @@ function invoke_attack_through_protection_message(do_attack_cb) {
     dialog.modal = true;
     install_child_dialog(dialog);
 
-    dialog.widgets['yes_button'].onclick = (function (cb) { return function() { change_selection(null); cb(); }; })(do_attack_cb);
+    dialog.widgets['yes_button'].onclick = (function (cb) { return function(w) { close_parent_dialog(w); cb(); }; })(do_attack_cb);
     dialog.widgets['no_button'].onclick = function(w) { close_parent_dialog(w); visit_base_home(); };
     return dialog;
 }
@@ -44938,18 +44938,16 @@ function handle_server_message(data) {
             } else {
                 cb();
             }
-            if(name == "CANNOT_LOCK_QUARRY" ||
-               name == "CANNOT_ATTACK_BASE_WHILE_ALREADY_UNDER_ATTACK" ||
-               name == "CANNOT_ATTACK_THEIR_SQUAD_MOVED" ||
-               name == "CANNOT_ATTACK_THEIR_SQUAD_OFFENSE" ||
-               name == "CANNOT_ATTACK_THEIR_SQUAD_DEFENSE" ||
-               name == "CANNOT_ATTACK_YOUR_SQUAD_RACE") {
-                visit_base_home();
-            } else if(name.indexOf("CANNOT_SPY") == 0 && session.home_base && session.last_map_dialog_state) {
-                var state = session.last_map_dialog_state;
-                session.last_map_dialog_state = null;
-                var dialog = invoke_region_map();
-                if(dialog) { dialog.widgets['map'].set_state(state); }
+            if(name !== "LADDER_MATCH_FAILED") {
+                if(!session.home_base) {
+                    visit_base_home();
+                } else if(session.last_map_dialog_state) {
+                    // make sure region map is up and pointing to last location
+                    var state = session.last_map_dialog_state;
+                    session.last_map_dialog_state = null;
+                    var dialog = invoke_region_map();
+                    if(dialog) { dialog.widgets['map'].set_state(state); }
+                }
             }
 
         } else if(name == "CANNOT_CALL_INVALID_AI_ATTACK") {
