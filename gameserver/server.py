@@ -6650,32 +6650,18 @@ class Base(object):
 
         return to_remove, to_add
 
-def _min_attackable_level(attacker_level, mode):
-    table = gamedata['max_pvp_level_gap'][mode]
-    if type(table) is list:
-        ind = min(max(attacker_level-1, 0), len(table)-1)
-        max_gap = table[ind]
+def _min_attackable_level(level_gap_table, attacker_level):
+    if type(level_gap_table) is list:
+        ind = min(max(attacker_level-1, 0), len(level_gap_table)-1)
+        max_gap = level_gap_table[ind]
     else:
-        max_gap = table
+        max_gap = level_gap_table
     return max(attacker_level - max_gap, 0)
-
-def attackable_level_range(attacker_level, mode):
-    lower_bound = _min_attackable_level(attacker_level, mode)
-    if gamedata.get('apply_pvp_level_gap_upward',False):
-        # stupid algorithm, I know
-        upper_bound = lower_bound
-        while _min_attackable_level(upper_bound, mode) <= attacker_level:
-            upper_bound += 1
-        if upper_bound > lower_bound: upper_bound -= 1
-    else:
-        upper_bound = -1
-    return [lower_bound, upper_bound]
 
 def in_level_range(x, r):
     if r[0] >= 0 and x < r[0]: return False
     if r[1] >= 0 and x > r[1]: return False
     return True
-def in_attackable_level_range(attacker_level, defender_level, mode): return in_level_range(defender_level, attackable_level_range(attacker_level, mode))
 
 
 def get_spawn_location_for_unit(specname, base):
@@ -8526,6 +8512,36 @@ class Player(AbstractPlayer):
                     ret[res] += obj.get_leveled_quantity(getattr(obj.spec, 'storage_'+res))
         return ret
 
+    def attackable_level_range(self, mode = None):
+        attacker_level = self.level()
+
+        if mode is None:
+            if self.is_ladder_player():
+                mode = 'ladder'
+            else:
+                mode = 'default'
+
+        # game-global level gap table
+        level_gap_table = gamedata['max_pvp_level_gap'][mode]
+
+        # optional per-region override
+        if self.home_region and (self.home_region in gamedata['regions']):
+            level_gap_table = gamedata['regions'][self.home_region].get('max_pvp_level_gap', level_gap_table)
+
+        lower_bound = _min_attackable_level(level_gap_table, attacker_level)
+        if gamedata.get('apply_pvp_level_gap_upward',False):
+            # stupid algorithm, I know
+            upper_bound = lower_bound
+            while _min_attackable_level(level_gap_table, upper_bound) <= attacker_level:
+                upper_bound += 1
+            if upper_bound > lower_bound: upper_bound -= 1
+        else:
+            upper_bound = -1
+        return [lower_bound, upper_bound]
+
+    def in_attackable_level_range(self, defender_level, mode = None):
+        return in_level_range(defender_level, self.attackable_level_range(mode = mode))
+
     def level(self): return self.resources.player_level
 
     def get_achievement_points(self):
@@ -8618,7 +8634,7 @@ class Player(AbstractPlayer):
 
         level_range = [-1,9999]
 
-        r = attackable_level_range(self.level(), 'ladder')
+        r = self.attackable_level_range(mode = 'ladder')
         if r[0] > 0: level_range[0] = max(level_range[0], r[0])
         if r[1] > 0: level_range[1] = min(level_range[1], r[1])
 
@@ -8741,7 +8757,7 @@ class Player(AbstractPlayer):
         if not data_list or len(data_list) < 1: return False
         data = data_list[0]
 
-        if (not in_attackable_level_range(self.level(), data.get('player_level',1), 'ladder')): return False
+        if (not self.in_attackable_level_range(data.get('player_level',1), mode = 'ladder')): return False
         if (not gamedata['predicate_library']['pvp_requirement']['predicate'].startswith('ALWAYS_')):
             if (not data.get('pvp_player',0)): return False
         if (not gamedata.get('ladder_pvp', False)) and (not data.get('ladder_player',0)): return False
@@ -8878,7 +8894,7 @@ class Player(AbstractPlayer):
         if (self.home_region in gamedata['regions']) and (not gamedata['regions'][self.home_region].get('enable_pvp_level_gap', True)):
             apply_level_limit = False
         if apply_level_limit and \
-           (not in_attackable_level_range(self.level(), other_player.level(), 'default')) and \
+           (not self.in_attackable_level_range(other_player.level(), mode = 'default')) and \
            (not self.cooldown_active('revenge_defender:%d' % other_player.user_id)): return False
         if self.cooldown_active('ladder_fatigue:%d' % other_player.user_id): return False
         if other_player.my_home.calc_base_damage() >= gamedata['matchmaking']['ladder_win_damage']: return False
@@ -16304,8 +16320,7 @@ class GAMEAPI(resource.Resource):
                                                   my_level - his_level
                                                   ))
 
-                mode = 'ladder' if session.player.is_ladder_player() else 'default'
-                my_level_range = attackable_level_range(my_level, mode)
+                my_level_range = session.player.attackable_level_range()
 
                 if (session.viewing_base is not session.viewing_player.my_home):
                     # quarry/squad - no limit
@@ -16327,7 +16342,7 @@ class GAMEAPI(resource.Resource):
                     # we are much weaker - prevent attack
                     session.pvp_balance = 'enemy_strict'
 
-                elif my_level < attackable_level_range(his_level, mode)[0]:
+                elif my_level < session.viewing_player.attackable_level_range()[0]:
                     # we are much weaker - allow attack, but warn
                     session.pvp_balance = 'enemy'
 

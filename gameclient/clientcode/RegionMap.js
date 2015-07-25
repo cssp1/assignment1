@@ -1422,7 +1422,7 @@ RegionMap.RegionMap.update_feature_popup = function(dialog) {
     // out-of-level-range should always be shown if applicable
     if(feature['base_type'] == 'home' && !is_ai_user_id_range(feature['base_landlord_id'])) {
         var info = ('base_landlord_id' in feature ? PlayerCache.query_sync_fetch(feature['base_landlord_id']) : null);
-        if(info && !in_attackable_level_range(player.level(), info['player_level']||0, 'default') &&
+        if(info && !player.in_attackable_level_range(info['player_level']||0) &&
            !player.cooldown_active('revenge_defender:'+feature['base_landlord_id'].toString()) &&
            mapwidget.region.pvp_level_gap_enabled()) {
             blink_list.push({'status':((info['player_level']||0) > player.level() ? 'level_too_high' : 'level_too_low')});
@@ -1529,7 +1529,7 @@ RegionMap.RegionMap.prototype.winnable_ladder_points = function(feature) {
     if(!info) { return 0; }
     var player_info = PlayerCache.query_sync_fetch(session.user_id);
     if(!player_info) { return 0; }
-    if(!in_attackable_level_range(player.level(), info['player_level']||0, 'default') &&
+    if(!player.in_attackable_level_range(info['player_level']||0) &&
        !player.cooldown_active('revenge_defender:'+feature['base_landlord_id'].toString()) &&
        this.region.pvp_level_gap_enabled()) { return 0; }
     if(player.cooldown_active('ladder_fatigue:'+feature['base_landlord_id'].toString())) { return 0; }
@@ -2009,7 +2009,7 @@ RegionMap.RegionMap.prototype.draw_feature = function(feature) {
 
             if(feature['base_type'] == 'home' && feature['base_landlord_id'] && !is_ai_user_id_range(feature['base_landlord_id'])) {
                 var info = PlayerCache.query_sync_fetch(feature['base_landlord_id']);
-                if(info && !in_attackable_level_range(player.level(), info['player_level']||0, 'default') &&
+                if(info && !player.in_attackable_level_range(info['player_level']||0) &&
                    !player.cooldown_active('revenge_defender:'+feature['base_landlord_id'].toString()) &&
                    this.region.pvp_level_gap_enabled()) {
                     show_padlock = true; // player is too low or high level to attack
@@ -2226,7 +2226,7 @@ RegionMap.RegionMap.prototype.classify_feature = function(feature) {
         }
 
         if(!is_ai_user_id_range(feature['base_landlord_id']) && info &&
-           !in_attackable_level_range(player.level(), info['player_level']||0, 'default') &&
+           !player.in_attackable_level_range(info['player_level']||0) &&
            !player.cooldown_active('revenge_defender:'+feature['base_landlord_id'].toString()) &&
            this.region.pvp_level_gap_enabled()) {
             color += ((info['player_level']||0) > player.level() ? '_level_too_high' : '_level_too_low');

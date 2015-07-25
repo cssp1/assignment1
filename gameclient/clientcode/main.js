@@ -5293,23 +5293,37 @@ player.max_usable_inventory = function() {
     return player.max_inventory - player.reserved_inventory;
 };
 
-var _min_attackable_level = function(attacker_level, mode) {
-    var table = gamedata['max_pvp_level_gap'][mode];
+/** @param {number|!Array.<number>} level_gap_table
+    @param {number} attacker_level
+    @return {number} */
+var _min_attackable_level = function(level_gap_table, attacker_level) {
     var max_gap;
-    if((typeof table) === 'number') {
-        max_gap = table;
+    if((typeof level_gap_table) === 'number') {
+        max_gap = level_gap_table;
     } else {
-        var ind = Math.min(Math.max(attacker_level-1,0), table.length-1);
-        max_gap = table[ind];
+        var ind = Math.min(Math.max(attacker_level-1,0), level_gap_table.length-1);
+        max_gap = level_gap_table[ind];
     }
     return Math.max(attacker_level - max_gap, 0);
 };
-var attackable_level_range = function(attacker_level, mode) {
-    var lower_bound = _min_attackable_level(attacker_level, mode);
+
+/** @return {!Array.<number>} [low,high] inclusive level range */
+player.attackable_level_range = function() {
+    var attacker_level = player.level();
+
+    // game-global level gap table
+    var level_gap_table = gamedata['max_pvp_level_gap'][player.is_ladder_player() ? 'ladder' : 'default'];
+
+    // optional per-region override
+    if(session.region && session.region.data && session.region.data['max_pvp_level_gap']) {
+        level_gap_table = session.region.data['max_pvp_level_gap'];
+    }
+
+    var lower_bound = _min_attackable_level(level_gap_table, attacker_level);
     var upper_bound;
     if(gamedata['apply_pvp_level_gap_upward']) {
         upper_bound = lower_bound;
-        while(_min_attackable_level(upper_bound, mode) <= attacker_level) {
+        while(_min_attackable_level(level_gap_table, upper_bound) <= attacker_level) {
             upper_bound += 1;
         }
         if(upper_bound > lower_bound) { upper_bound -= 1; }
@@ -5318,13 +5332,23 @@ var attackable_level_range = function(attacker_level, mode) {
     }
     return [lower_bound, upper_bound];
 };
+
+/** @param {number} x
+    @param {!Array.<number>} r
+    @return {boolean} */
 var in_level_range = function(x, r) {
     if(r[0] >= 0 && x < r[0]) { return false; }
     if(r[1] >= 0 && x > r[1]) { return false; }
     return true;
 };
-var in_attackable_level_range = function(attacker_level, defender_level, mode) { return in_level_range(defender_level, attackable_level_range(attacker_level, mode)); };
 
+/** @param {number} defender_level
+    @return {boolean} */
+player.in_attackable_level_range = function(defender_level) {
+    return in_level_range(defender_level, player.attackable_level_range());
+};
+
+/** @return {number} */
 player.level = function() { return player.resource_state['player_level']; };
 
 player.unit_donation_enabled = function() {
@@ -6586,6 +6610,9 @@ enemy.init = function() {
         enemy.resource_state[res] = [0,0];
     }
 };
+
+/** @return {number} */
+enemy.level = function() { return enemy.resource_state['player_level']; };
 
 enemy.is_pvp_player = function() { return enemy.is_pvp_player_cache; };
 
@@ -16288,7 +16315,7 @@ function update_attack_button_dialog(dialog) {
                 } else if((session.viewing_user_id != session.user_id) &&
                           !session.viewing_ai &&
                           !session.is_remote_base() &&
-                          (!in_attackable_level_range(player.level(), enemy.resource_state['player_level'], player.is_ladder_player() ? 'ladder' : 'default')) &&
+                          !player.in_attackable_level_range(enemy.level()) &&
                           player.cooldown_active('revenge_defender:'+session.viewing_user_id.toString()) &&
                           session.region.pvp_level_gap_enabled() &&
                           (player.is_ladder_player() || player.is_legacy_pvp_player()) &&
@@ -16382,7 +16409,7 @@ function update_attack_button_dialog(dialog) {
                         invoke_attack_reinforce_message(cb);
                     } else if((session.viewing_user_id != session.user_id) &&
                               !session.viewing_ai &&
-                              (!in_attackable_level_range(player.level(), enemy.resource_state['player_level'], player.is_ladder_player() ? 'ladder' : 'default')) &&
+                              !player.in_attackable_level_range(enemy.level()) &&
                               player.cooldown_active('revenge_defender:'+session.viewing_user_id.toString()) &&
                               session.region.pvp_level_gap_enabled() &&
                               (player.is_ladder_player() || player.is_legacy_pvp_player()) &&
@@ -17763,7 +17790,7 @@ function invoke_attack_level_range_message(mode) {
     var dialog = new SPUI.Dialog(dialog_data);
     change_selection_ui(dialog);
     dialog.auto_center();
-    var level = Math.max(1, attackable_level_range(player.level(), (player.is_ladder_player() ? 'ladder' : 'default'))[(mode == 'stronger_strict' ? 1 : 0)]);
+    var level = Math.max(1, player.attackable_level_range()[(mode == 'stronger_strict' ? 1 : 0)]);
     dialog.widgets['description'].str = dialog_data['widgets']['description']['ui_name_'+mode].replace('%s', session.ui_name).replace('%d', level.toString());
     dialog.widgets['return_button'].onclick = visit_base_home;
     return dialog;
