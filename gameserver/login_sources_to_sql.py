@@ -10,6 +10,7 @@ import sys, time, getopt, re, urlparse
 import SpinConfig
 import SpinSQLUtil
 import SpinETL
+import SpinSingletonProcess
 import MySQLdb
 
 time_now = int(time.time())
@@ -66,99 +67,102 @@ if __name__ == '__main__':
 
     cfg = SpinConfig.get_mysql_config(game_id+'_upcache')
     con = MySQLdb.connect(*cfg['connect_args'], **cfg['connect_kwargs'])
-    login_sources_table = cfg['table_prefix']+game_id+'_login_sources'
-    login_sources_summary_table = cfg['table_prefix']+game_id+'_login_sources_daily_summary'
 
-    cur = con.cursor(MySQLdb.cursors.DictCursor)
-    sql_util.ensure_table(cur, login_sources_table, login_sources_schema(sql_util))
-#    sql_util.ensure_table(cur, login_sources_summary_table, login_sources_summary_schema(sql_util))
-    con.commit()
+    with SpinSingletonProcess.SingletonProcess('login_sources_to_sql-%s' % game_id):
 
-    # find most recent already-converted action
-    start_time = -1
-    end_time = time_now - 30  # skip entries too close to "now" to ensure all events for a given second have all arrived
+        login_sources_table = cfg['table_prefix']+game_id+'_login_sources'
+        login_sources_summary_table = cfg['table_prefix']+game_id+'_login_sources_daily_summary'
 
-    cur.execute("SELECT time FROM "+sql_util.sym(login_sources_table)+" ORDER BY time DESC LIMIT 1")
-    rows = cur.fetchall()
-    if rows:
-        start_time = max(start_time, rows[0]['time'])
-    con.commit()
-
-    if verbose:  print 'start_time', start_time, 'end_time', end_time
-
-    batch = 0
-    total = 0
-    affected_days = set()
-
-    for row in SpinETL.iterate_from_mongodb(game_id, 'log_login_sources', start_time, end_time):
-        keyvals = [('time',row['time']),
-                   ('event_name',row['event_name'])]
-
-        if ('country' in row) and row['country'] == 'unknown':
-            del row['country'] # do not record "unknown" countries
-
-        # write "unknown" browser info as NULLs to save space
-        if 'browser_hardware' in row and row['browser_hardware'] == 'unknown':
-            del row['browser_hardware']
-
-        # append country_tier if necessary
-        if ('country_tier' not in row) and ('country' in row):
-            row['country_tier'] = SpinConfig.country_tier_map.get(row['country'], 4)
-
-        if 'browser_OS' in row: # MongoDB log uses uppercase here for historical reasons, SQL uses lowercase
-            row['browser_os'] = row['browser_OS']
-
-        # don't bother writing apps.facebook.com or Kongregate iframe referers, since all info is redundant with query_string
-        if 'referer' in row and \
-           (row['referer'].startswith('https://apps.facebook.com/') or \
-            ('kongregate_game_url=' in row['referer']) or \
-            reload_referer_re.search(row['referer'])):
-            del row['referer']
-
-        # get rid of not-useful kongregate query string
-        if 'query_string' in row and \
-           ('kongregate_game_url=' in row['query_string']):
-            del row['query_string']
-
-        # fill in missing fb_source
-        if ('query_string' in row) and \
-           (not ('fb_source' in row)) and \
-           ('fb_source=' in row['query_string']):
-            q = urlparse.parse_qs(row['query_string'])
-            if 'fb_source' in q:
-                row['fb_source'] = q['fb_source'][-1]
-
-        for FIELD in ('user_id','social_id','frame_platform','country','country_tier','ip',
-                      'browser_name','browser_os','browser_version','browser_hardware','query_string','referer',
-                      'acquisition_campaign','ad_skynet','fb_source'):
-            if FIELD in row:
-                keyvals.append((FIELD, row[FIELD]))
-
-        sql_util.do_insert(cur, login_sources_table, keyvals)
-
-        batch += 1
-        total += 1
-        affected_days.add(86400*(row['time']//86400))
-
-        if commit_interval > 0 and batch >= commit_interval:
-            batch = 0
-            con.commit()
-            if verbose: print total, 'inserted'
-
-    con.commit()
-    if verbose: print 'total', total, 'inserted', 'affecting', len(affected_days), 'day(s)'
-
-    # XXX no summary yet
-
-    if do_prune:
-        # drop old data
-        KEEP_DAYS = 60
-        old_limit = time_now - KEEP_DAYS * 86400
-
-        if verbose: print 'pruning', login_sources_table
-        cur = con.cursor()
-        cur.execute("DELETE FROM "+sql_util.sym(login_sources_table)+" WHERE time < %s", old_limit)
-        if do_optimize:
-            if verbose: print 'optimizing', login_sources_table
-            cur.execute("OPTIMIZE TABLE "+sql_util.sym(login_sources_table))
+        cur = con.cursor(MySQLdb.cursors.DictCursor)
+        sql_util.ensure_table(cur, login_sources_table, login_sources_schema(sql_util))
+    #    sql_util.ensure_table(cur, login_sources_summary_table, login_sources_summary_schema(sql_util))
         con.commit()
+
+        # find most recent already-converted action
+        start_time = -1
+        end_time = time_now - 30  # skip entries too close to "now" to ensure all events for a given second have all arrived
+
+        cur.execute("SELECT time FROM "+sql_util.sym(login_sources_table)+" ORDER BY time DESC LIMIT 1")
+        rows = cur.fetchall()
+        if rows:
+            start_time = max(start_time, rows[0]['time'])
+        con.commit()
+
+        if verbose:  print 'start_time', start_time, 'end_time', end_time
+
+        batch = 0
+        total = 0
+        affected_days = set()
+
+        for row in SpinETL.iterate_from_mongodb(game_id, 'log_login_sources', start_time, end_time):
+            keyvals = [('time',row['time']),
+                       ('event_name',row['event_name'])]
+
+            if ('country' in row) and row['country'] == 'unknown':
+                del row['country'] # do not record "unknown" countries
+
+            # write "unknown" browser info as NULLs to save space
+            if 'browser_hardware' in row and row['browser_hardware'] == 'unknown':
+                del row['browser_hardware']
+
+            # append country_tier if necessary
+            if ('country_tier' not in row) and ('country' in row):
+                row['country_tier'] = SpinConfig.country_tier_map.get(row['country'], 4)
+
+            if 'browser_OS' in row: # MongoDB log uses uppercase here for historical reasons, SQL uses lowercase
+                row['browser_os'] = row['browser_OS']
+
+            # don't bother writing apps.facebook.com or Kongregate iframe referers, since all info is redundant with query_string
+            if 'referer' in row and \
+               (row['referer'].startswith('https://apps.facebook.com/') or \
+                ('kongregate_game_url=' in row['referer']) or \
+                reload_referer_re.search(row['referer'])):
+                del row['referer']
+
+            # get rid of not-useful kongregate query string
+            if 'query_string' in row and \
+               ('kongregate_game_url=' in row['query_string']):
+                del row['query_string']
+
+            # fill in missing fb_source
+            if ('query_string' in row) and \
+               (not ('fb_source' in row)) and \
+               ('fb_source=' in row['query_string']):
+                q = urlparse.parse_qs(row['query_string'])
+                if 'fb_source' in q:
+                    row['fb_source'] = q['fb_source'][-1]
+
+            for FIELD in ('user_id','social_id','frame_platform','country','country_tier','ip',
+                          'browser_name','browser_os','browser_version','browser_hardware','query_string','referer',
+                          'acquisition_campaign','ad_skynet','fb_source'):
+                if FIELD in row:
+                    keyvals.append((FIELD, row[FIELD]))
+
+            sql_util.do_insert(cur, login_sources_table, keyvals)
+
+            batch += 1
+            total += 1
+            affected_days.add(86400*(row['time']//86400))
+
+            if commit_interval > 0 and batch >= commit_interval:
+                batch = 0
+                con.commit()
+                if verbose: print total, 'inserted'
+
+        con.commit()
+        if verbose: print 'total', total, 'inserted', 'affecting', len(affected_days), 'day(s)'
+
+        # XXX no summary yet
+
+        if do_prune:
+            # drop old data
+            KEEP_DAYS = 60
+            old_limit = time_now - KEEP_DAYS * 86400
+
+            if verbose: print 'pruning', login_sources_table
+            cur = con.cursor()
+            cur.execute("DELETE FROM "+sql_util.sym(login_sources_table)+" WHERE time < %s", old_limit)
+            if do_optimize:
+                if verbose: print 'optimizing', login_sources_table
+                cur.execute("OPTIMIZE TABLE "+sql_util.sym(login_sources_table))
+            con.commit()

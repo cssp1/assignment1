@@ -10,6 +10,7 @@ import sys,time, getopt
 import SpinConfig
 import SpinJSON
 import SpinNoSQL
+# SingletonProcess not needed
 import MySQLdb
 from warnings import filterwarnings
 

@@ -10,6 +10,7 @@ import sys, time, getopt
 import SpinConfig
 import SpinNoSQL
 import SpinSQLUtil
+import SpinSingletonProcess
 import MySQLdb
 
 time_now = int(time.time())
@@ -55,79 +56,82 @@ if __name__ == '__main__':
     if not verbose: sql_util.disable_warnings()
 
     cfg = SpinConfig.get_mysql_config(game_id+'_upcache')
-    con = MySQLdb.connect(*cfg['connect_args'], **cfg['connect_kwargs'])
-    purchase_ui_table = cfg['table_prefix']+game_id+'_purchase_ui'
 
-    nosql_client = SpinNoSQL.NoSQLClient(SpinConfig.get_mongodb_config(game_id))
+    with SpinSingletonProcess.SingletonProcess('purchase_ui_to_sql-%s' % game_id):
 
-    cur = con.cursor(MySQLdb.cursors.DictCursor)
-    sql_util.ensure_table(cur, purchase_ui_table, purchase_ui_schema)
-    con.commit()
+        con = MySQLdb.connect(*cfg['connect_args'], **cfg['connect_kwargs'])
+        purchase_ui_table = cfg['table_prefix']+game_id+'_purchase_ui'
 
-    # find most recent already-converted action
-    start_time = -1
-    end_time = time_now - 60  # skip entries too close to "now" to ensure all events for a given second have all arrived
+        nosql_client = SpinNoSQL.NoSQLClient(SpinConfig.get_mongodb_config(game_id))
 
-    cur.execute("SELECT time FROM "+sql_util.sym(purchase_ui_table)+" ORDER BY time DESC LIMIT 1")
-    rows = cur.fetchall()
-    if rows:
-        start_time = max(start_time, rows[0]['time'])
-    con.commit()
-
-    if verbose:  print 'start_time', start_time, 'end_time', end_time
-
-    batch = 0
-    total = 0
-
-    qs = {'time':{'$gt':start_time, '$lt': end_time}}
-
-    for row in nosql_client.log_buffer_table('log_purchase_ui').find(qs):
-        _id = nosql_client.decode_object_id(row['_id'])
-
-        keyvals = [('_id',_id),
-                   ('time',row['time']),
-                   ('user_id',row['user_id']),
-                   ('code',row['code']),
-                   ('event_name',row['event_name'])]
-
-        if 'gui_version' in row:
-            if type(row['gui_version']) is list:
-                # bad data - cond chain
-                gui_version = 1
-            else:
-                gui_version = row['gui_version']
-            keyvals.append(('gui_version', gui_version))
-
-        for FIELD in ('client_time', 'sku', 'method', 'gamebucks', 'currency_price', 'currency'):
-            if FIELD in row:
-                keyvals.append((FIELD, row[FIELD]))
-
-        if 'usd_equivalent' in row:
-            if row['usd_equivalent'] is not None:
-                keyvals.append(('usd_receipts_cents', int(100*row['usd_equivalent'])))
-            elif row['event_name'] == '4450_buy_gamebucks_payment_complete' and row['currency'] == 'kgcredits': # bad legacy data
-                keyvals.append(('usd_receipts_cents', int(0.07*row['currency_price'])))
-
-        sql_util.do_insert(cur, purchase_ui_table, keyvals)
-
-        batch += 1
-        total += 1
-        if commit_interval > 0 and batch >= commit_interval:
-            batch = 0
-            con.commit()
-            if verbose: print total, 'inserted'
-
-    con.commit()
-    if verbose: print 'total', total, 'inserted'
-
-    if do_prune:
-        # drop old data
-        KEEP_DAYS = 180
-        old_limit = time_now - KEEP_DAYS * 86400
-
-        if verbose: print 'pruning', purchase_ui_table
-        cur.execute("DELETE FROM "+sql_util.sym(purchase_ui_table)+" WHERE time < %s", old_limit)
-        if do_optimize:
-            if verbose: print 'optimizing', purchase_ui_table
-            cur.execute("OPTIMIZE TABLE "+sql_util.sym(purchase_ui_table))
+        cur = con.cursor(MySQLdb.cursors.DictCursor)
+        sql_util.ensure_table(cur, purchase_ui_table, purchase_ui_schema)
         con.commit()
+
+        # find most recent already-converted action
+        start_time = -1
+        end_time = time_now - 60  # skip entries too close to "now" to ensure all events for a given second have all arrived
+
+        cur.execute("SELECT time FROM "+sql_util.sym(purchase_ui_table)+" ORDER BY time DESC LIMIT 1")
+        rows = cur.fetchall()
+        if rows:
+            start_time = max(start_time, rows[0]['time'])
+        con.commit()
+
+        if verbose:  print 'start_time', start_time, 'end_time', end_time
+
+        batch = 0
+        total = 0
+
+        qs = {'time':{'$gt':start_time, '$lt': end_time}}
+
+        for row in nosql_client.log_buffer_table('log_purchase_ui').find(qs):
+            _id = nosql_client.decode_object_id(row['_id'])
+
+            keyvals = [('_id',_id),
+                       ('time',row['time']),
+                       ('user_id',row['user_id']),
+                       ('code',row['code']),
+                       ('event_name',row['event_name'])]
+
+            if 'gui_version' in row:
+                if type(row['gui_version']) is list:
+                    # bad data - cond chain
+                    gui_version = 1
+                else:
+                    gui_version = row['gui_version']
+                keyvals.append(('gui_version', gui_version))
+
+            for FIELD in ('client_time', 'sku', 'method', 'gamebucks', 'currency_price', 'currency'):
+                if FIELD in row:
+                    keyvals.append((FIELD, row[FIELD]))
+
+            if 'usd_equivalent' in row:
+                if row['usd_equivalent'] is not None:
+                    keyvals.append(('usd_receipts_cents', int(100*row['usd_equivalent'])))
+                elif row['event_name'] == '4450_buy_gamebucks_payment_complete' and row['currency'] == 'kgcredits': # bad legacy data
+                    keyvals.append(('usd_receipts_cents', int(0.07*row['currency_price'])))
+
+            sql_util.do_insert(cur, purchase_ui_table, keyvals)
+
+            batch += 1
+            total += 1
+            if commit_interval > 0 and batch >= commit_interval:
+                batch = 0
+                con.commit()
+                if verbose: print total, 'inserted'
+
+        con.commit()
+        if verbose: print 'total', total, 'inserted'
+
+        if do_prune:
+            # drop old data
+            KEEP_DAYS = 180
+            old_limit = time_now - KEEP_DAYS * 86400
+
+            if verbose: print 'pruning', purchase_ui_table
+            cur.execute("DELETE FROM "+sql_util.sym(purchase_ui_table)+" WHERE time < %s", old_limit)
+            if do_optimize:
+                if verbose: print 'optimizing', purchase_ui_table
+                cur.execute("OPTIMIZE TABLE "+sql_util.sym(purchase_ui_table))
+            con.commit()

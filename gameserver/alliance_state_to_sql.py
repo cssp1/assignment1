@@ -10,6 +10,7 @@ import sys, getopt
 import SpinConfig
 import SpinNoSQL
 import SpinSQLUtil
+import SpinSingletonProcess
 import MySQLdb
 
 alliances_schema = {
@@ -71,46 +72,49 @@ if __name__ == '__main__':
 
     cfg = SpinConfig.get_mysql_config(game_id+'_upcache')
     con = MySQLdb.connect(*cfg['connect_args'], **cfg['connect_kwargs'])
-    alliances_table = cfg['table_prefix']+game_id+'_alliances'
-    alliance_members_table = cfg['table_prefix']+game_id+'_alliance_members'
 
-    cur = con.cursor(MySQLdb.cursors.DictCursor)
-    if not dry_run:
-        filterwarnings('ignore', category = MySQLdb.Warning)
-        for tbl, schema in ((alliances_table, alliances_schema),
-                            (alliance_members_table, alliance_members_schema)):
-            cur.execute("DROP TABLE IF EXISTS "+sql_util.sym(tbl+'_temp'))
-            sql_util.ensure_table(cur, tbl, schema)
-            sql_util.ensure_table(cur, tbl+'_temp', schema)
+    with SpinSingletonProcess.SingletonProcess('alliance_state_to_sql-%s' % game_id):
 
-        filterwarnings('error', category = MySQLdb.Warning)
-        con.commit()
+        alliances_table = cfg['table_prefix']+game_id+'_alliances'
+        alliance_members_table = cfg['table_prefix']+game_id+'_alliance_members'
 
-        for sql_table, nosql_table, schema, keyname_map in \
-            ((alliances_table, 'alliances', alliances_schema, {'alliance_id': '_id'}),
-             (alliance_members_table, 'alliance_members', alliance_members_schema, {'user_id': '_id'})):
-            total = 0
-            batch = 0
-            keyvals = []
+        cur = con.cursor(MySQLdb.cursors.DictCursor)
+        if not dry_run:
+            filterwarnings('ignore', category = MySQLdb.Warning)
+            for tbl, schema in ((alliances_table, alliances_schema),
+                                (alliance_members_table, alliance_members_schema)):
+                cur.execute("DROP TABLE IF EXISTS "+sql_util.sym(tbl+'_temp'))
+                sql_util.ensure_table(cur, tbl, schema)
+                sql_util.ensure_table(cur, tbl+'_temp', schema)
 
-            for row in nosql_client.alliance_table(nosql_table).find():
-                keyvals.append([(keyname, row.get(keyname_map.get(keyname,keyname),None))
-                                for keyname, keytype in schema['fields']])
-                total += 1
-                if commit_interval > 0 and len(keyvals) >= commit_interval:
-                    flush_keyvals(sql_util, cur, sql_table+'_temp', keyvals)
-                    if verbose: print total, nosql_table, 'inserted'
-
-            if keyvals: flush_keyvals(sql_util, cur, sql_table+'_temp', keyvals)
+            filterwarnings('error', category = MySQLdb.Warning)
             con.commit()
-            if verbose: print 'total', total, nosql_table, 'inserted'
 
-    if not dry_run:
-        filterwarnings('ignore', category = MySQLdb.Warning)
-        for tbl in (alliances_table, alliance_members_table):
-            cur.execute("RENAME TABLE "+\
-                        sql_util.sym(tbl)+" TO "+sql_util.sym(tbl+'_old')+","+\
-                        sql_util.sym(tbl+'_temp')+" TO "+sql_util.sym(tbl))
-            cur.execute("DROP TABLE IF EXISTS "+sql_util.sym(tbl+'_old'))
+            for sql_table, nosql_table, schema, keyname_map in \
+                ((alliances_table, 'alliances', alliances_schema, {'alliance_id': '_id'}),
+                 (alliance_members_table, 'alliance_members', alliance_members_schema, {'user_id': '_id'})):
+                total = 0
+                batch = 0
+                keyvals = []
 
-        con.commit()
+                for row in nosql_client.alliance_table(nosql_table).find():
+                    keyvals.append([(keyname, row.get(keyname_map.get(keyname,keyname),None))
+                                    for keyname, keytype in schema['fields']])
+                    total += 1
+                    if commit_interval > 0 and len(keyvals) >= commit_interval:
+                        flush_keyvals(sql_util, cur, sql_table+'_temp', keyvals)
+                        if verbose: print total, nosql_table, 'inserted'
+
+                if keyvals: flush_keyvals(sql_util, cur, sql_table+'_temp', keyvals)
+                con.commit()
+                if verbose: print 'total', total, nosql_table, 'inserted'
+
+        if not dry_run:
+            filterwarnings('ignore', category = MySQLdb.Warning)
+            for tbl in (alliances_table, alliance_members_table):
+                cur.execute("RENAME TABLE "+\
+                            sql_util.sym(tbl)+" TO "+sql_util.sym(tbl+'_old')+","+\
+                            sql_util.sym(tbl+'_temp')+" TO "+sql_util.sym(tbl))
+                cur.execute("DROP TABLE IF EXISTS "+sql_util.sym(tbl+'_old'))
+
+            con.commit()

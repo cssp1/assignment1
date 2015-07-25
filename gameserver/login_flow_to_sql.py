@@ -10,6 +10,7 @@ import sys, os, time, getopt
 import SpinConfig
 import SpinSQLUtil
 import SpinETL
+import SpinSingletonProcess
 import MySQLdb
 
 time_now = int(time.time())
@@ -58,74 +59,77 @@ if __name__ == '__main__':
 
     cfg = SpinConfig.get_mysql_config(game_id+'_upcache')
     con = MySQLdb.connect(*cfg['connect_args'], **cfg['connect_kwargs'])
-    login_flow_table = cfg['table_prefix']+game_id+'_login_flow'
-    login_flow_summary_table = cfg['table_prefix']+game_id+'_login_flow_daily_summary'
 
-    cur = con.cursor(MySQLdb.cursors.DictCursor)
-    sql_util.ensure_table(cur, login_flow_table, login_flow_schema(sql_util))
-#    sql_util.ensure_table(cur, login_flow_summary_table, login_flow_summary_schema(sql_util))
-    con.commit()
+    with SpinSingletonProcess.SingletonProcess('login_flow_to_sql-%s' % game_id):
 
-    # find most recent already-converted action
-    start_time = -1
-    end_time = time_now - 60  # skip entries too close to "now" to ensure all events for a given second have all arrived
+        login_flow_table = cfg['table_prefix']+game_id+'_login_flow'
+        login_flow_summary_table = cfg['table_prefix']+game_id+'_login_flow_daily_summary'
 
-    cur.execute("SELECT time FROM "+sql_util.sym(login_flow_table)+" ORDER BY time DESC LIMIT 1")
-    rows = cur.fetchall()
-    if rows:
-        start_time = max(start_time, rows[0]['time'])
-    con.commit()
-
-    if verbose:  print 'start_time', start_time, 'end_time', end_time
-
-    batch = 0
-    total = 0
-    affected_days = set()
-
-    for row in SpinETL.iterate_from_mongodb(game_id, 'log_login_flow', start_time, end_time):
-        keyvals = [('time',row['time']),
-                   ('event_name',row['event_name'])]
-
-        if ('country' in row) and row['country'] == 'unknown':
-            del row['country'] # do not record "unknown" countries
-
-        if ('country_tier' not in row) and ('country' in row):
-            row['country_tier'] = SpinConfig.country_tier_map.get(row['country'], 4)
-
-        if ('splash_image' in row) and (not (row['splash_image'].startswith('#'))):
-            row['splash_image'] = os.path.basename(row['splash_image'])
-
-        for FIELD in ('user_id','social_id','country','country_tier','ip',
-                      'browser_name','browser_os','browser_version','method',
-                      'splash_image'):
-            if FIELD in row:
-                keyvals.append((FIELD, row[FIELD]))
-
-        sql_util.do_insert(cur, login_flow_table, keyvals)
-
-        batch += 1
-        total += 1
-        affected_days.add(86400*(row['time']//86400))
-
-        if commit_interval > 0 and batch >= commit_interval:
-            batch = 0
-            con.commit()
-            if verbose: print total, 'inserted'
-
-    con.commit()
-    if verbose: print 'total', total, 'inserted', 'affecting', len(affected_days), 'day(s)'
-
-    # XXX no summary yet
-
-    if do_prune:
-        # drop old data
-        KEEP_DAYS = 60
-        old_limit = time_now - KEEP_DAYS * 86400
-
-        if verbose: print 'pruning', login_flow_table
-        cur = con.cursor()
-        cur.execute("DELETE FROM "+sql_util.sym(login_flow_table)+" WHERE time < %s", old_limit)
-        if do_optimize:
-            if verbose: print 'optimizing', login_flow_table
-            cur.execute("OPTIMIZE TABLE "+sql_util.sym(login_flow_table))
+        cur = con.cursor(MySQLdb.cursors.DictCursor)
+        sql_util.ensure_table(cur, login_flow_table, login_flow_schema(sql_util))
+    #    sql_util.ensure_table(cur, login_flow_summary_table, login_flow_summary_schema(sql_util))
         con.commit()
+
+        # find most recent already-converted action
+        start_time = -1
+        end_time = time_now - 60  # skip entries too close to "now" to ensure all events for a given second have all arrived
+
+        cur.execute("SELECT time FROM "+sql_util.sym(login_flow_table)+" ORDER BY time DESC LIMIT 1")
+        rows = cur.fetchall()
+        if rows:
+            start_time = max(start_time, rows[0]['time'])
+        con.commit()
+
+        if verbose:  print 'start_time', start_time, 'end_time', end_time
+
+        batch = 0
+        total = 0
+        affected_days = set()
+
+        for row in SpinETL.iterate_from_mongodb(game_id, 'log_login_flow', start_time, end_time):
+            keyvals = [('time',row['time']),
+                       ('event_name',row['event_name'])]
+
+            if ('country' in row) and row['country'] == 'unknown':
+                del row['country'] # do not record "unknown" countries
+
+            if ('country_tier' not in row) and ('country' in row):
+                row['country_tier'] = SpinConfig.country_tier_map.get(row['country'], 4)
+
+            if ('splash_image' in row) and (not (row['splash_image'].startswith('#'))):
+                row['splash_image'] = os.path.basename(row['splash_image'])
+
+            for FIELD in ('user_id','social_id','country','country_tier','ip',
+                          'browser_name','browser_os','browser_version','method',
+                          'splash_image'):
+                if FIELD in row:
+                    keyvals.append((FIELD, row[FIELD]))
+
+            sql_util.do_insert(cur, login_flow_table, keyvals)
+
+            batch += 1
+            total += 1
+            affected_days.add(86400*(row['time']//86400))
+
+            if commit_interval > 0 and batch >= commit_interval:
+                batch = 0
+                con.commit()
+                if verbose: print total, 'inserted'
+
+        con.commit()
+        if verbose: print 'total', total, 'inserted', 'affecting', len(affected_days), 'day(s)'
+
+        # XXX no summary yet
+
+        if do_prune:
+            # drop old data
+            KEEP_DAYS = 60
+            old_limit = time_now - KEEP_DAYS * 86400
+
+            if verbose: print 'pruning', login_flow_table
+            cur = con.cursor()
+            cur.execute("DELETE FROM "+sql_util.sym(login_flow_table)+" WHERE time < %s", old_limit)
+            if do_optimize:
+                if verbose: print 'optimizing', login_flow_table
+                cur.execute("OPTIMIZE TABLE "+sql_util.sym(login_flow_table))
+            con.commit()

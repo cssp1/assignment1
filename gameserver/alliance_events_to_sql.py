@@ -11,6 +11,7 @@ import SpinConfig
 import SpinNoSQL
 import SpinETL
 import SpinSQLUtil
+import SpinSingletonProcess
 import MySQLdb
 
 time_now = int(time.time())
@@ -84,69 +85,72 @@ if __name__ == '__main__':
 
     cfg = SpinConfig.get_mysql_config(game_id+'_upcache')
     con = MySQLdb.connect(*cfg['connect_args'], **cfg['connect_kwargs'])
-    alliance_events_table = cfg['table_prefix']+game_id+'_alliance_events'
-    alliance_member_events_table = cfg['table_prefix']+game_id+'_alliance_member_events'
 
-    cur = con.cursor(MySQLdb.cursors.DictCursor)
-    for tbl, schema in ((alliance_events_table, alliance_events_schema(sql_util)),
-                        (alliance_member_events_table, alliance_member_events_schema(sql_util))):
-        sql_util.ensure_table(cur, tbl, schema)
-    con.commit()
+    with SpinSingletonProcess.SingletonProcess('alliance_events_to_sql-%s' % game_id):
 
-    for sql_table, nosql_table, schema, keyname_map in \
-        ((alliance_events_table, 'log_alliances', alliance_events_schema(sql_util), {}),
-         (alliance_member_events_table, 'log_alliance_members', alliance_member_events_schema(sql_util), {})):
+        alliance_events_table = cfg['table_prefix']+game_id+'_alliance_events'
+        alliance_member_events_table = cfg['table_prefix']+game_id+'_alliance_member_events'
 
-        # find most recent already-converted action
-        start_time = -1
-        end_time = time_now - 60  # skip entries too close to "now" to ensure all events for a given second have all arrived
-
-        cur.execute("SELECT time FROM "+sql_util.sym(sql_table)+" ORDER BY time DESC LIMIT 1")
-        rows = cur.fetchall()
-        if rows:
-            start_time = max(start_time, rows[0]['time'])
+        cur = con.cursor(MySQLdb.cursors.DictCursor)
+        for tbl, schema in ((alliance_events_table, alliance_events_schema(sql_util)),
+                            (alliance_member_events_table, alliance_member_events_schema(sql_util))):
+            sql_util.ensure_table(cur, tbl, schema)
         con.commit()
 
-        total = 0
-        batch = 0
-        keyvals = []
+        for sql_table, nosql_table, schema, keyname_map in \
+            ((alliance_events_table, 'log_alliances', alliance_events_schema(sql_util), {}),
+             (alliance_member_events_table, 'log_alliance_members', alliance_member_events_schema(sql_util), {})):
 
-        for row in SpinETL.iterate_from_mongodb(game_id, nosql_table, start_time, end_time):
-            # note: DO include events by developers
+            # find most recent already-converted action
+            start_time = -1
+            end_time = time_now - 60  # skip entries too close to "now" to ensure all events for a given second have all arrived
 
-            # follow the keys in the schema, assuming that the summary dimensions start at position 3
-            assert schema['fields'][3][0] == sql_util.summary_in_dimensions()[0][0]
-
-            kv = [(keyname, row.get(keyname_map.get(keyname,keyname),None))
-                  for keyname, keytype in schema['fields'][0:3]]
-
-            if 'sum' in row:
-                kv += sql_util.parse_brief_summary(row['sum'])
-            else:
-                kv += [(keyname,None) for keyname, keytype in sql_util.summary_in_dimensions()]
-
-            kv += [(keyname, row.get(keyname_map.get(keyname,keyname),None))
-                   for keyname, keytype in schema['fields'][3+len(sql_util.summary_in_dimensions()):]]
-
-            keyvals.append(kv)
-
-            total += 1
-            if commit_interval > 0 and len(keyvals) >= commit_interval:
-                flush_keyvals(sql_util, cur, sql_table, keyvals)
-                if verbose: print total, nosql_table, 'inserted'
-
-        if keyvals: flush_keyvals(sql_util, cur, sql_table, keyvals)
-        con.commit()
-        if verbose: print 'total', total, nosql_table, 'inserted'
-
-        if do_prune:
-            # drop old data
-            KEEP_DAYS = 90
-            old_limit = time_now - KEEP_DAYS * 86400
-
-            if verbose: print 'pruning', sql_table
-            cur.execute("DELETE FROM "+sql_util.sym(sql_table)+" WHERE time < %s", old_limit)
-            if do_optimize:
-                if verbose: print 'optimizing', sql_table
-                cur.execute("OPTIMIZE TABLE "+sql_util.sym(sql_table))
+            cur.execute("SELECT time FROM "+sql_util.sym(sql_table)+" ORDER BY time DESC LIMIT 1")
+            rows = cur.fetchall()
+            if rows:
+                start_time = max(start_time, rows[0]['time'])
             con.commit()
+
+            total = 0
+            batch = 0
+            keyvals = []
+
+            for row in SpinETL.iterate_from_mongodb(game_id, nosql_table, start_time, end_time):
+                # note: DO include events by developers
+
+                # follow the keys in the schema, assuming that the summary dimensions start at position 3
+                assert schema['fields'][3][0] == sql_util.summary_in_dimensions()[0][0]
+
+                kv = [(keyname, row.get(keyname_map.get(keyname,keyname),None))
+                      for keyname, keytype in schema['fields'][0:3]]
+
+                if 'sum' in row:
+                    kv += sql_util.parse_brief_summary(row['sum'])
+                else:
+                    kv += [(keyname,None) for keyname, keytype in sql_util.summary_in_dimensions()]
+
+                kv += [(keyname, row.get(keyname_map.get(keyname,keyname),None))
+                       for keyname, keytype in schema['fields'][3+len(sql_util.summary_in_dimensions()):]]
+
+                keyvals.append(kv)
+
+                total += 1
+                if commit_interval > 0 and len(keyvals) >= commit_interval:
+                    flush_keyvals(sql_util, cur, sql_table, keyvals)
+                    if verbose: print total, nosql_table, 'inserted'
+
+            if keyvals: flush_keyvals(sql_util, cur, sql_table, keyvals)
+            con.commit()
+            if verbose: print 'total', total, nosql_table, 'inserted'
+
+            if do_prune:
+                # drop old data
+                KEEP_DAYS = 90
+                old_limit = time_now - KEEP_DAYS * 86400
+
+                if verbose: print 'pruning', sql_table
+                cur.execute("DELETE FROM "+sql_util.sym(sql_table)+" WHERE time < %s", old_limit)
+                if do_optimize:
+                    if verbose: print 'optimizing', sql_table
+                    cur.execute("OPTIMIZE TABLE "+sql_util.sym(sql_table))
+                con.commit()
