@@ -120,6 +120,8 @@ ModChain.get_stat = function(modchain, default_value) {
     @param {string} source
     @param {Object=} props */
 ModChain.add_or_replace_mod = function(modchain, method, strength, kind, source, props) {
+    var ret;
+
     var existing_index = (modchain ? goog.array.findIndex(modchain['mods'], function(mod) {
         return (mod['kind'] === kind) && (mod['source'] === source);
     }) : -1);
@@ -141,10 +143,12 @@ ModChain.add_or_replace_mod = function(modchain, method, strength, kind, source,
             }
             ModChain.add_mod(new_chain, mod['method'], new_strength, mod['kind'], mod['source'], new_props);
         }
-        return new_chain;
+        ret = new_chain;
     } else {
-        return ModChain.add_mod(modchain, method, strength, kind, source, props);
+        ret = ModChain.add_mod(modchain, method, strength, kind, source, props);
     }
+    ModChain.check_chain(ret);
+    return ret;
 };
 
 /** @param {?} base_val
@@ -154,6 +158,16 @@ ModChain.make_chain = function(base_val, props) {
     var mod = {'kind': 'base', 'val':base_val};
     if(props) { for(var k in props) { mod[k] = props[k]; } }
     return {'val':base_val, 'mods':[mod]};
+};
+
+/** Throw an exception if something is broken in the chain data structure
+    @param {!ModChain.ModChain} chain */
+ModChain.check_chain = function(chain) {
+    goog.array.forEach(chain['mods'], function(mod) {
+        if((mod['kind'] !== 'base') && (!('strength' in mod) || mod['strength'] === undefined)) {
+            throw Error('mod without "strength": '+JSON.stringify(chain));
+        }
+    });
 };
 
 // names of chain step properties to copy when copying to duplicate a chain
@@ -171,6 +185,7 @@ ModChain.recompute_with_new_base_val = function(old_chain, new_base, new_base_le
         });
         ModChain.add_mod(new_chain, mod['method'], mod['strength'], mod['kind'], mod['source'], props);
     }
+    ModChain.check_chain(new_chain);
     return new_chain;
 };
 
@@ -276,6 +291,7 @@ ModChain.display_delta_percent = function(strength, min_precision) {
         }
         ret = v2;
     }
+    if(ret.indexOf('NaN') !== -1) { throw Error('stat displayed as NaN! strength '+JSON.stringify(strength)+' min_precision '+JSON.stringify(min_precision)); }
     return ret+'%';
 };
 
@@ -367,6 +383,8 @@ ModChain.display_modstat_effect = function(effect, level) {
     @return {string} */
 ModChain.display_tooltip = function(stat, modchain, show_base, ui_data) {
     var display_mode = ui_data['display'] || null;
+    ModChain.check_chain(modchain);
+
     var ui_base = ModChain.display_value(modchain['val'], display_mode, 'tooltip');
     if(0 && modchain['mods'].length < 2) {
         return gamedata['strings']['modstats']['base_value'].replace('%value', ui_base).replace('%level', modchain['mods'][0]['level'].toString());
@@ -387,6 +405,7 @@ ModChain.display_tooltip = function(stat, modchain, show_base, ui_data) {
                     if(show_base) { ls.push(''); } // make spacing look nice
                     ls.push(gamedata['strings']['modstats']['bonuses']);
                 }
+                if(!mod || mod['strength'] === undefined) { throw Error('bad mod: '+JSON.stringify(mod)+' IN '+JSON.stringify(modchain)); }
 
                 var ui_delta = ModChain.display_delta(mod['strength'], display_mode, mod['method'], mod['val'], modchain['mods'][i-1]['val']).ui_delta;
 
@@ -523,6 +542,8 @@ ModChain.display_value_detailed = function(stat, modchain, spec, level, auto_spe
     } else if(stat == 'weapon') {
         show_base = true;
     }
+
+    ModChain.check_chain(modchain);
 
     return {str: ModChain.display_value(modchain['val'], ui_data['display']||null, 'widget'),
             value: modchain['val'],
