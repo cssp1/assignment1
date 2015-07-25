@@ -13,6 +13,7 @@ import SpinJSON
 import SpinETL
 import SpinNoSQL
 import SpinSQLUtil
+import SpinSingletonProcess
 import MySQLdb
 
 time_now = int(time.time())
@@ -156,252 +157,254 @@ if __name__ == '__main__':
     unit_cost_table = cfg['table_prefix']+game_id+'_unit_cost'
     unit_cost_daily_summary_table = cfg['table_prefix']+game_id+'_unit_cost_daily_summary'
 
-    nosql_client = SpinNoSQL.NoSQLClient(SpinConfig.get_mongodb_config(game_id))
+    with SpinSingletonProcess.SingletonProcess('gamebucks_to_mysql-%s' % game_id):
 
-    cur = con.cursor(MySQLdb.cursors.DictCursor)
-    sql_util.ensure_table(cur, store_table, store_schema(sql_util))
-    sql_util.ensure_table(cur, store_daily_summary_table, store_summary_schema(sql_util, 'day'))
-    sql_util.ensure_table(cur, store_hourly_summary_table, store_summary_schema(sql_util, 'hour'))
-    sql_util.ensure_table(cur, store_top_spenders_28d_table, store_top_spenders_schema(sql_util, 'day'))
-    if do_unit_cost:
-        sql_util.ensure_table(cur, unit_cost_table, unit_cost_schema(sql_util))
-        sql_util.ensure_table(cur, unit_cost_daily_summary_table, unit_cost_summary_schema(sql_util))
-    con.commit()
+        nosql_client = SpinNoSQL.NoSQLClient(SpinConfig.get_mongodb_config(game_id))
 
-    # find most recent already-converted action
-    start_time = -1
-    end_time = time_now - 60  # skip entries too close to "now" to ensure all events for a given second have all arrived
+        cur = con.cursor(MySQLdb.cursors.DictCursor)
+        sql_util.ensure_table(cur, store_table, store_schema(sql_util))
+        sql_util.ensure_table(cur, store_daily_summary_table, store_summary_schema(sql_util, 'day'))
+        sql_util.ensure_table(cur, store_hourly_summary_table, store_summary_schema(sql_util, 'hour'))
+        sql_util.ensure_table(cur, store_top_spenders_28d_table, store_top_spenders_schema(sql_util, 'day'))
+        if do_unit_cost:
+            sql_util.ensure_table(cur, unit_cost_table, unit_cost_schema(sql_util))
+            sql_util.ensure_table(cur, unit_cost_daily_summary_table, unit_cost_summary_schema(sql_util))
+        con.commit()
 
-    cur.execute("SELECT time FROM "+sql_util.sym(store_table)+" ORDER BY time DESC LIMIT 1")
-    rows = cur.fetchall()
-    if rows:
-        start_time = max(start_time, rows[0]['time'])
-    con.commit()
+        # find most recent already-converted action
+        start_time = -1
+        end_time = time_now - 60  # skip entries too close to "now" to ensure all events for a given second have all arrived
 
-    if verbose:  print 'start_time', start_time, 'end_time', end_time
+        cur.execute("SELECT time FROM "+sql_util.sym(store_table)+" ORDER BY time DESC LIMIT 1")
+        rows = cur.fetchall()
+        if rows:
+            start_time = max(start_time, rows[0]['time'])
+        con.commit()
 
-    batch = 0
-    total = 0
-    affected_days = set()
-    affected_hours = set()
+        if verbose:  print 'start_time', start_time, 'end_time', end_time
 
-    qs = {'time':{'$gt':start_time, '$lt':end_time}}
+        batch = 0
+        total = 0
+        affected_days = set()
+        affected_hours = set()
 
-    for row in nosql_client.log_buffer_table('log_gamebucks').find(qs):
-        keyvals = [('time',row['time']),
-                   ('user_id',row['user_id'])]
+        qs = {'time':{'$gt':start_time, '$lt':end_time}}
 
-        if 'summary' in row:
-            if row['summary'].get('developer',False): continue # skip events by developers
-            summary = sql_util.parse_brief_summary(row['summary'])
-        else:
-            summary = []
+        for row in nosql_client.log_buffer_table('log_gamebucks').find(qs):
+            keyvals = [('time',row['time']),
+                       ('user_id',row['user_id'])]
 
-        keyvals += summary
+            if 'summary' in row:
+                if row['summary'].get('developer',False): continue # skip events by developers
+                summary = sql_util.parse_brief_summary(row['summary'])
+            else:
+                summary = []
 
-        if row['event_name'] in ('1400_gamebucks_spent', '1401_fungible_spent'):
-            if row['event_name'] == '1400_gamebucks_spent':
-                keyvals.append(('price',row['gamebucks_price']))
-                keyvals.append(('currency','gamebucks'))
-            elif row['event_name'] == '1401_fungible_spent':
+            keyvals += summary
+
+            if row['event_name'] in ('1400_gamebucks_spent', '1401_fungible_spent'):
+                if row['event_name'] == '1400_gamebucks_spent':
+                    keyvals.append(('price',row['gamebucks_price']))
+                    keyvals.append(('currency','gamebucks'))
+                elif row['event_name'] == '1401_fungible_spent':
+                    keyvals.append(('price',row['price']))
+                    keyvals.append(('currency',row['price_currency']))
+
+                descr = row['Billing Description']
+                keyvals.append(('description',descr))
+                if descr.startswith("BUY_ITEM,"):
+                    spellarg_str = descr[len("BUY_ITEM,"):]
+                    if ("':" in spellarg_str): # old Python repr()
+                        spellarg = eval(spellarg_str)
+                    else:
+                        spellarg = SpinJSON.loads(spellarg_str)
+                    skudata = spellarg['skudata']
+                    keyvals.append(('item', skudata['item']))
+                    keyvals.append(('stack', skudata.get('stack',1)))
+                    if spellarg.get('ui_index',-1) >= 0:
+                        keyvals.append(('ui_index', spellarg['ui_index']))
+                elif (descr.startswith("BUY_RANDOM") or descr.startswith("FREE_RANDOM")) and descr.find(',') > 0:
+                    items = SpinJSON.loads(descr[descr.find(',')+1:])['items']
+                    assert len(items) == 1
+                    keyvals.append(('item', items[0]['spec']))
+                    keyvals.append(('stack', items[0].get('stack',1)))
+                else:
+                    pass # just go by the description for other spells
+
+                cat, subcat, level = SpinUpcache.classify_purchase(gamedata, descr)
+                keyvals.append(('category', cat))
+                keyvals.append(('subcategory', subcat))
+                keyvals.append(('level', level))
+
+                if do_unit_cost and ('unit_cost' in row):
+                    kvlist = []
+                    for location, r in row['unit_cost'].iteritems():
+                        for specname, cost in r.iteritems():
+                            kvlist.append([('time',row['time']),
+                                           ('user_id',row['user_id']),
+                                           ('specname',specname),
+                                           ('gamebucks',cost),
+                                           ('location',location)] + summary)
+                    if not dry_run:
+                        sql_util.do_insert_batch(cur, unit_cost_table, kvlist)
+
+            elif row['event_name'] == '5120_buy_item':
                 keyvals.append(('price',row['price']))
                 keyvals.append(('currency',row['price_currency']))
-
-            descr = row['Billing Description']
-            keyvals.append(('description',descr))
-            if descr.startswith("BUY_ITEM,"):
-                spellarg_str = descr[len("BUY_ITEM,"):]
-                if ("':" in spellarg_str): # old Python repr()
-                    spellarg = eval(spellarg_str)
-                else:
-                    spellarg = SpinJSON.loads(spellarg_str)
-                skudata = spellarg['skudata']
-                keyvals.append(('item', skudata['item']))
-                keyvals.append(('stack', skudata.get('stack',1)))
-                if spellarg.get('ui_index',-1) >= 0:
-                    keyvals.append(('ui_index', spellarg['ui_index']))
-            elif (descr.startswith("BUY_RANDOM") or descr.startswith("FREE_RANDOM")) and descr.find(',') > 0:
-                items = SpinJSON.loads(descr[descr.find(',')+1:])['items']
-                assert len(items) == 1
-                keyvals.append(('item', items[0]['spec']))
-                keyvals.append(('stack', items[0].get('stack',1)))
+                assert len(row['items']) == 1
+                item = row['items'][0]
+                keyvals.append(('item',item['spec']))
+                keyvals.append(('stack',item.get('stack',1)))
+                if row.get('ui_index',-1) >= 0:
+                    keyvals.append(('ui_index',row['ui_index']))
             else:
-                pass # just go by the description for other spells
+                if verbose: print 'unrecognized event', row
+                continue
 
-            cat, subcat, level = SpinUpcache.classify_purchase(gamedata, descr)
-            keyvals.append(('category', cat))
-            keyvals.append(('subcategory', subcat))
-            keyvals.append(('level', level))
+            if not dry_run:
+                sql_util.do_insert(cur, store_table, keyvals)
+            else:
+                print keyvals
 
-            if do_unit_cost and ('unit_cost' in row):
-                kvlist = []
-                for location, r in row['unit_cost'].iteritems():
-                    for specname, cost in r.iteritems():
-                        kvlist.append([('time',row['time']),
-                                       ('user_id',row['user_id']),
-                                       ('specname',specname),
-                                       ('gamebucks',cost),
-                                       ('location',location)] + summary)
-                if not dry_run:
-                    sql_util.do_insert_batch(cur, unit_cost_table, kvlist)
+            batch += 1
+            total += 1
+            affected_days.add(86400*(row['time']//86400))
+            affected_hours.add(3600*(row['time']//3600))
 
-        elif row['event_name'] == '5120_buy_item':
-            keyvals.append(('price',row['price']))
-            keyvals.append(('currency',row['price_currency']))
-            assert len(row['items']) == 1
-            item = row['items'][0]
-            keyvals.append(('item',item['spec']))
-            keyvals.append(('stack',item.get('stack',1)))
-            if row.get('ui_index',-1) >= 0:
-                keyvals.append(('ui_index',row['ui_index']))
+            if commit_interval > 0 and batch >= commit_interval:
+                batch = 0
+                con.commit()
+                if verbose: print total, 'inserted'
+
+        con.commit()
+        if verbose: print 'total', total, 'inserted', 'affecting', len(affected_days), 'day(s)', len(affected_hours), 'hour(s)'
+
+
+        # update summary
+        cur.execute("SELECT MIN(time) AS min_time, MAX(time) AS max_time FROM "+sql_util.sym(store_table))
+        rows = cur.fetchall()
+        if rows and rows[0] and rows[0]['min_time'] and rows[0]['max_time']:
+            store_range = (rows[0]['min_time'], rows[0]['max_time'])
         else:
-            if verbose: print 'unrecognized event', row
-            continue
+            store_range = None
 
-        if not dry_run:
-            sql_util.do_insert(cur, store_table, keyvals)
-        else:
-            print keyvals
-
-        batch += 1
-        total += 1
-        affected_days.add(86400*(row['time']//86400))
-        affected_hours.add(3600*(row['time']//3600))
-
-        if commit_interval > 0 and batch >= commit_interval:
-            batch = 0
-            con.commit()
-            if verbose: print total, 'inserted'
-
-    con.commit()
-    if verbose: print 'total', total, 'inserted', 'affecting', len(affected_days), 'day(s)', len(affected_hours), 'hour(s)'
-
-
-    # update summary
-    cur.execute("SELECT MIN(time) AS min_time, MAX(time) AS max_time FROM "+sql_util.sym(store_table))
-    rows = cur.fetchall()
-    if rows and rows[0] and rows[0]['min_time'] and rows[0]['max_time']:
-        store_range = (rows[0]['min_time'], rows[0]['max_time'])
-    else:
-        store_range = None
-
-    def update_store_summary(cur, table, interval, day_start, dt):
-        cur.execute("INSERT INTO "+sql_util.sym(table) + \
-                    "SELECT %s*FLOOR(store.time/%s) AS "+interval+"," + \
-                    "       store.frame_platform AS frame_platform," + \
-                    "       store.country_tier AS country_tier," + \
-                    "       store.townhall_level AS townhall_level," + \
-                    "       "+sql_util.encode_spend_bracket("store.prev_receipts")+" AS spend_bracket," + \
-                    "       store.currency AS currency," + \
-                    "       store.category AS category," + \
-                    "       store.subcategory AS subcategory," + \
-                    "       store.level AS level," + \
-                    "       store.item AS item," + \
-                    "       SUM(1) AS count, " + \
-                    "       SUM(price) AS total_price, " + \
-                    "       SUM(stack) AS total_stack " + \
-                    "FROM " + sql_util.sym(store_table) + " store " + \
-                    "WHERE store.time >= %s AND store.time < %s+%s AND (store.category IS NOT NULL OR store.item IS NOT NULL)" + \
-                    "GROUP BY "+interval+", frame_platform, country_tier, townhall_level, spend_bracket, currency, category, subcategory, level, item ORDER BY NULL", [dt,dt,day_start,day_start,dt])
-
-    def update_unit_cost_summary(cur, table, interval, day_start, dt):
-        cur.execute("INSERT INTO "+sql_util.sym(unit_cost_daily_summary_table) + \
-                    "SELECT 86400*FLOOR(cost.time/86400.0) AS day," + \
-                    "       cost.frame_platform AS frame_platform," + \
-                    "       cost.country_tier AS country_tier," + \
-                    "       cost.townhall_level AS townhall_level," + \
-                    "       "+sql_util.encode_spend_bracket("cost.prev_receipts")+" AS spend_bracket," + \
-                    "       cost.specname AS specname," + \
-                    "       cost.location AS location," + \
-                    "       SUM(1) AS count, " + \
-                    "       SUM(cost.gamebucks) AS gamebucks " + \
-                    "FROM " + sql_util.sym(unit_cost_table) + " cost " + \
-                    "WHERE cost.time >= %s AND cost.time < %s+86400 " + \
-                    "GROUP BY 86400*FLOOR(cost.time/86400.0), frame_platform, country_tier, townhall_level, spend_bracket, specname, location ORDER BY NULL", [day_start,]*2)
-
-    for table, interval, dt, affected in ((store_hourly_summary_table, 'hour', 3600, affected_hours),
-                                          (store_daily_summary_table, 'day', 86400, affected_days)):
-        SpinETL.update_summary(sql_util, con, cur, table, affected, store_range, interval, dt,
-                               verbose = verbose, resummarize_tail = dt, execute_func = update_store_summary)
-
-    if do_unit_cost:
-        SpinETL.update_summary(sql_util, con, cur, unit_cost_daily_summary_table, affected_days, store_range, 'day', 86400,
-                               verbose = verbose, resummarize_tail = 86400, execute_func = update_unit_cost_summary)
-
-
-    # update the "top spenders within trailing 28 days" summary table
-    def update_top_spenders(cur, table, interval, day_start, dt):
-        temp_table = cfg['table_prefix']+game_id+'_store_by_user_temp'
-        axes_table = cfg['table_prefix']+game_id+'_store_by_user_temp_axes'
-        for t in (temp_table, axes_table): cur.execute("DROP TABLE IF EXISTS "+sql_util.sym(t))
-        try:
-            # note: this can't actually be a TEMPORARY table because we need to refer to it more than once in the following queries
-            sql_util.ensure_table(cur, temp_table, store_by_user_temp_schema(sql_util), temporary = False)
-
-            # add up all spend by each user within the trailing time window
-            if verbose: print "gathering spend by user,currency in trailing window..."
-            cur.execute("INSERT INTO "+sql_util.sym(temp_table) + " " + \
-                        "SELECT store.frame_platform AS frame_platform," + \
+        def update_store_summary(cur, table, interval, day_start, dt):
+            cur.execute("INSERT INTO "+sql_util.sym(table) + \
+                        "SELECT %s*FLOOR(store.time/%s) AS "+interval+"," + \
+                        "       store.frame_platform AS frame_platform," + \
                         "       store.country_tier AS country_tier," + \
-                        "       MAX(store.townhall_level) AS townhall_level," + \
-                        "       MAX("+sql_util.encode_spend_bracket("store.prev_receipts")+") AS spend_bracket," + \
+                        "       store.townhall_level AS townhall_level," + \
+                        "       "+sql_util.encode_spend_bracket("store.prev_receipts")+" AS spend_bracket," + \
                         "       store.currency AS currency," + \
-                        "       store.user_id AS user_id," + \
-                        "       SUM(IF(store.price>0,1,0)) AS num_purchases," + \
-                        "       SUM(store.price) AS total_price " + \
+                        "       store.category AS category," + \
+                        "       store.subcategory AS subcategory," + \
+                        "       store.level AS level," + \
+                        "       store.item AS item," + \
+                        "       SUM(1) AS count, " + \
+                        "       SUM(price) AS total_price, " + \
+                        "       SUM(stack) AS total_stack " + \
                         "FROM " + sql_util.sym(store_table) + " store " + \
-                        "WHERE store.time >= %s AND store.time < %s AND store.price IS NOT NULL AND store.price > 0 " + \
-                        "GROUP BY store.user_id, store.currency ORDER BY NULL",
-                        [day_start - 28*86400, day_start])
-            con.commit()
+                        "WHERE store.time >= %s AND store.time < %s+%s AND (store.category IS NOT NULL OR store.item IS NOT NULL)" + \
+                        "GROUP BY "+interval+", frame_platform, country_tier, townhall_level, spend_bracket, currency, category, subcategory, level, item ORDER BY NULL", [dt,dt,day_start,day_start,dt])
 
-            # create another temp table with just the present permutations of all the summary dimensions
-            # in theory, this should not be necessary, we should just be able to do a SELECT MAX(total_price) and then GROUP BY summary dimensions
-            # however, MySQL's query optimizer blows up on this. So we manually create the handful of permutations here
-            # and use it to drive the following query of the max spender for each one, since that is indexed and fast.
-            cur.execute("CREATE TABLE "+sql_util.sym(axes_table) + " AS " + \
-                        "SELECT frame_platform, country_tier, townhall_level, spend_bracket, currency " + \
-                        "FROM " + sql_util.sym(temp_table) + " " + \
-                        "GROUP BY frame_platform, country_tier, townhall_level, spend_bracket, currency ORDER BY NULL")
-            con.commit()
+        def update_unit_cost_summary(cur, table, interval, day_start, dt):
+            cur.execute("INSERT INTO "+sql_util.sym(unit_cost_daily_summary_table) + \
+                        "SELECT 86400*FLOOR(cost.time/86400.0) AS day," + \
+                        "       cost.frame_platform AS frame_platform," + \
+                        "       cost.country_tier AS country_tier," + \
+                        "       cost.townhall_level AS townhall_level," + \
+                        "       "+sql_util.encode_spend_bracket("cost.prev_receipts")+" AS spend_bracket," + \
+                        "       cost.specname AS specname," + \
+                        "       cost.location AS location," + \
+                        "       SUM(1) AS count, " + \
+                        "       SUM(cost.gamebucks) AS gamebucks " + \
+                        "FROM " + sql_util.sym(unit_cost_table) + " cost " + \
+                        "WHERE cost.time >= %s AND cost.time < %s+86400 " + \
+                        "GROUP BY 86400*FLOOR(cost.time/86400.0), frame_platform, country_tier, townhall_level, spend_bracket, specname, location ORDER BY NULL", [day_start,]*2)
 
-            # only insert the max spender for each permutation of the summary dimensions
-            if verbose: print "selecting top spenders..."
-            cur.execute("INSERT INTO "+sql_util.sym(table) + " " + \
-                        "SELECT %s AS "+sql_util.sym(interval)+"," + \
-                        "       ax.frame_platform AS frame_platform," + \
-                        "       ax.country_tier AS country_tier," + \
-                        "       ax.townhall_level AS townhall_level," + \
-                        "       ax.spend_bracket AS spend_bracket," + \
-                        "       ax.currency AS currency," + \
-                        "       by_user.user_id AS user_id," + \
-                        "       by_user.num_purchases AS num_purchases," + \
-                        "       by_user.total_price AS total_price " + \
-                        "FROM "+sql_util.sym(axes_table)+ " ax, " +sql_util.sym(temp_table)+ " by_user " + \
-                        "WHERE by_user.total_price = (SELECT MAX(b2.total_price) FROM "+sql_util.sym(temp_table)+" b2 WHERE " + \
-                        "b2.frame_platform = ax.frame_platform AND b2.country_tier = ax.country_tier AND b2.townhall_level = ax.townhall_level AND b2.spend_bracket = ax.spend_bracket AND b2.currency = ax.currency) AND " + \
-                        "by_user.frame_platform = ax.frame_platform AND by_user.country_tier = ax.country_tier AND by_user.townhall_level = ax.townhall_level AND by_user.spend_bracket = ax.spend_bracket AND by_user.currency = ax.currency",
-                        [day_start,])
-        finally:
+        for table, interval, dt, affected in ((store_hourly_summary_table, 'hour', 3600, affected_hours),
+                                              (store_daily_summary_table, 'day', 86400, affected_days)):
+            SpinETL.update_summary(sql_util, con, cur, table, affected, store_range, interval, dt,
+                                   verbose = verbose, resummarize_tail = dt, execute_func = update_store_summary)
+
+        if do_unit_cost:
+            SpinETL.update_summary(sql_util, con, cur, unit_cost_daily_summary_table, affected_days, store_range, 'day', 86400,
+                                   verbose = verbose, resummarize_tail = 86400, execute_func = update_unit_cost_summary)
+
+
+        # update the "top spenders within trailing 28 days" summary table
+        def update_top_spenders(cur, table, interval, day_start, dt):
+            temp_table = cfg['table_prefix']+game_id+'_store_by_user_temp'
+            axes_table = cfg['table_prefix']+game_id+'_store_by_user_temp_axes'
             for t in (temp_table, axes_table): cur.execute("DROP TABLE IF EXISTS "+sql_util.sym(t))
+            try:
+                # note: this can't actually be a TEMPORARY table because we need to refer to it more than once in the following queries
+                sql_util.ensure_table(cur, temp_table, store_by_user_temp_schema(sql_util), temporary = False)
 
-    SpinETL.update_summary(sql_util, con, cur, store_top_spenders_28d_table,
-                           # every change to the store table affects top_spenders_28d up to 28 days in the future
-                           set(sum([range(x, min(x+(28+1)*86400, 86400*(end_time//86400 + 1)), 86400) for x in affected_days],[])),
-                           # input data only starts mattering 28 days after the event
-                           [min(store_range[0]+28*86400,end_time), min(store_range[1]+28*86400,end_time)] if store_range else None,
-                           'day', 86400, verbose=verbose, dry_run=dry_run, execute_func = update_top_spenders, resummarize_tail = 86400)
+                # add up all spend by each user within the trailing time window
+                if verbose: print "gathering spend by user,currency in trailing window..."
+                cur.execute("INSERT INTO "+sql_util.sym(temp_table) + " " + \
+                            "SELECT store.frame_platform AS frame_platform," + \
+                            "       store.country_tier AS country_tier," + \
+                            "       MAX(store.townhall_level) AS townhall_level," + \
+                            "       MAX("+sql_util.encode_spend_bracket("store.prev_receipts")+") AS spend_bracket," + \
+                            "       store.currency AS currency," + \
+                            "       store.user_id AS user_id," + \
+                            "       SUM(IF(store.price>0,1,0)) AS num_purchases," + \
+                            "       SUM(store.price) AS total_price " + \
+                            "FROM " + sql_util.sym(store_table) + " store " + \
+                            "WHERE store.time >= %s AND store.time < %s AND store.price IS NOT NULL AND store.price > 0 " + \
+                            "GROUP BY store.user_id, store.currency ORDER BY NULL",
+                            [day_start - 28*86400, day_start])
+                con.commit()
+
+                # create another temp table with just the present permutations of all the summary dimensions
+                # in theory, this should not be necessary, we should just be able to do a SELECT MAX(total_price) and then GROUP BY summary dimensions
+                # however, MySQL's query optimizer blows up on this. So we manually create the handful of permutations here
+                # and use it to drive the following query of the max spender for each one, since that is indexed and fast.
+                cur.execute("CREATE TABLE "+sql_util.sym(axes_table) + " AS " + \
+                            "SELECT frame_platform, country_tier, townhall_level, spend_bracket, currency " + \
+                            "FROM " + sql_util.sym(temp_table) + " " + \
+                            "GROUP BY frame_platform, country_tier, townhall_level, spend_bracket, currency ORDER BY NULL")
+                con.commit()
+
+                # only insert the max spender for each permutation of the summary dimensions
+                if verbose: print "selecting top spenders..."
+                cur.execute("INSERT INTO "+sql_util.sym(table) + " " + \
+                            "SELECT %s AS "+sql_util.sym(interval)+"," + \
+                            "       ax.frame_platform AS frame_platform," + \
+                            "       ax.country_tier AS country_tier," + \
+                            "       ax.townhall_level AS townhall_level," + \
+                            "       ax.spend_bracket AS spend_bracket," + \
+                            "       ax.currency AS currency," + \
+                            "       by_user.user_id AS user_id," + \
+                            "       by_user.num_purchases AS num_purchases," + \
+                            "       by_user.total_price AS total_price " + \
+                            "FROM "+sql_util.sym(axes_table)+ " ax, " +sql_util.sym(temp_table)+ " by_user " + \
+                            "WHERE by_user.total_price = (SELECT MAX(b2.total_price) FROM "+sql_util.sym(temp_table)+" b2 WHERE " + \
+                            "b2.frame_platform = ax.frame_platform AND b2.country_tier = ax.country_tier AND b2.townhall_level = ax.townhall_level AND b2.spend_bracket = ax.spend_bracket AND b2.currency = ax.currency) AND " + \
+                            "by_user.frame_platform = ax.frame_platform AND by_user.country_tier = ax.country_tier AND by_user.townhall_level = ax.townhall_level AND by_user.spend_bracket = ax.spend_bracket AND by_user.currency = ax.currency",
+                            [day_start,])
+            finally:
+                for t in (temp_table, axes_table): cur.execute("DROP TABLE IF EXISTS "+sql_util.sym(t))
+
+        SpinETL.update_summary(sql_util, con, cur, store_top_spenders_28d_table,
+                               # every change to the store table affects top_spenders_28d up to 28 days in the future
+                               set(sum([range(x, min(x+(28+1)*86400, 86400*(end_time//86400 + 1)), 86400) for x in affected_days],[])),
+                               # input data only starts mattering 28 days after the event
+                               [min(store_range[0]+28*86400,end_time), min(store_range[1]+28*86400,end_time)] if store_range else None,
+                               'day', 86400, verbose=verbose, dry_run=dry_run, execute_func = update_top_spenders, resummarize_tail = 86400)
 
 
-    if (not dry_run) and do_prune:
-        # drop old data
-        KEEP_DAYS = 90
-        old_limit = time_now - KEEP_DAYS * 86400
+        if (not dry_run) and do_prune:
+            # drop old data
+            KEEP_DAYS = 90
+            old_limit = time_now - KEEP_DAYS * 86400
 
-        for TABLE in store_table, unit_cost_table:
-            if verbose: print 'pruning', TABLE
-            cur.execute("DELETE FROM "+sql_util.sym(TABLE)+" WHERE time < %s", old_limit)
-            if do_optimize:
-                if verbose: print 'optimizing', TABLE
-                cur.execute("OPTIMIZE TABLE "+sql_util.sym(TABLE))
-            con.commit()
+            for TABLE in store_table, unit_cost_table:
+                if verbose: print 'pruning', TABLE
+                cur.execute("DELETE FROM "+sql_util.sym(TABLE)+" WHERE time < %s", old_limit)
+                if do_optimize:
+                    if verbose: print 'optimizing', TABLE
+                    cur.execute("OPTIMIZE TABLE "+sql_util.sym(TABLE))
+                con.commit()
