@@ -135,7 +135,7 @@ ModChain.add_or_replace_mod = function(modchain, method, strength, kind, source,
             goog.array.forEach(ModChain.persistent_props, function(p) {
                 if(p in mod) { new_props[p] = mod[p]; }
             });
-            var new_strength = mod['strenghth'];
+            var new_strength = mod['strength'];
             if(i == existing_index) {
                 if(mod['method'] !== method) { throw Error('method does not match'); }
                 new_strength = strength; // use provided updated strength
@@ -153,7 +153,7 @@ ModChain.add_or_replace_mod = function(modchain, method, strength, kind, source,
 
 /** @param {?} base_val
     @param {Object=} props
-    @return {ModChain.ModChain} */
+    @return {!ModChain.ModChain} */
 ModChain.make_chain = function(base_val, props) {
     var mod = {'kind': 'base', 'val':base_val};
     if(props) { for(var k in props) { mod[k] = props[k]; } }
