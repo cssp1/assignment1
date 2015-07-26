@@ -66,7 +66,7 @@ ItemDisplay.get_inventory_item_weapon_spell = function(spec) {
 ItemDisplay.get_crafting_recipe_product_spec = function(recipe, level) {
     level = level || 1;
     var product_list;
-    if(0 in recipe['product'] && (0 in recipe['product'][0])) { // per-level list
+    if(Array.isArray(recipe['product']) && recipe['product'].length >= 1 && Array.isArray(recipe['product'][0])) { // per-level list
         product_list = get_leveled_quantity(recipe['product'], level);
     } else {
         product_list = recipe['product'];
@@ -314,7 +314,11 @@ ItemDisplay.get_inventory_item_ui_description = function(item, opts) {
     var descr = '';
 
     if('max_level' in spec && !(opts && opts.hide_level)) {
-        descr += gamedata['strings']['cursors']['level_x_of_y'].replace('%cur', pretty_print_number(level)).replace('%max',pretty_print_number(spec['max_level']))+'\n\n';
+        var max_level = spec['max_level'];
+        if('max_ui_level' in spec) { // allow override for items that can "morph" via crafting to child items with more levels
+            max_level = spec['max_ui_level'];
+        }
+        descr += gamedata['strings']['cursors']['level_x_of_y'].replace('%cur', pretty_print_number(level)).replace('%max',pretty_print_number(max_level))+'\n\n';
     }
 
     descr += eval_cond_or_literal(spec['ui_description'], player, null);

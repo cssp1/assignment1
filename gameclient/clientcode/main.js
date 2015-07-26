@@ -7192,7 +7192,10 @@ function inventory_items_can_all_fit(items, inventory, max_usable_inventory) {
     @return {!Array.<!Object>} */
 function get_crafting_recipe_product_list(spec, level) { // XXXXXX move to ItemDisplay.js
     // need to manually check for array-of-arrays, since get_leveled_quantity() won't do it right
-    return ((0 in spec['product'] && (0 in spec['product'][0])) ? get_leveled_quantity(spec['product'], level || 1) : spec['product']);
+    if(Array.isArray(spec['product']) && spec['product'].length >= 1 && Array.isArray(spec['product'][0])) {
+        return get_leveled_quantity(spec['product'], level || 1);
+    }
+    return spec['product'];
 }
 
 /** @param {!Object} spec
@@ -7200,7 +7203,10 @@ function get_crafting_recipe_product_list(spec, level) { // XXXXXX move to ItemD
     @return {!Array.<!Object>} */
 function get_crafting_recipe_ingredients_list(spec, level) { // XXXXXX move to ItemDisplay.js
     // need to manually check for array-of-arrays, since get_leveled_quantity() won't do it right
-    return ((spec['ingredients'] && (0 in spec['ingredients']) && (0 in spec['ingredients'][0])) ? get_leveled_quantity(spec['ingredients'], level || 1) : spec['ingredients'] || []);
+    if(Array.isArray(spec['ingredients']) && spec['ingredients'].length >= 1 && Array.isArray(spec['ingredients'][0])) {
+        return get_leveled_quantity(spec['ingredients'], level || 1);
+    }
+    return spec['ingredients'] || [];
 }
 
 /** @param {!Object} spec
@@ -7211,10 +7217,10 @@ function get_crafting_recipe_ui_name(spec, level) { // XXXXXX move to ItemDispla
         return get_leveled_quantity(spec['ui_name'], level);
     }
     var product_list = get_crafting_recipe_product_list(spec, level);
-    if(product_list[0]['spec']) {
+    if(product_list[0] && product_list[0]['spec']) {
         return ItemDisplay.get_inventory_item_ui_name(ItemDisplay.get_inventory_item_spec(product_list[0]['spec']));
     }
-    throw Error('cannot determine ui_name for crafting recipe '+spec['name']);
+    throw Error('cannot determine ui_name for crafting recipe '+spec['name']+' at level '+level.toString());
 }
 
 /** @param {!Object} spec
@@ -7225,10 +7231,10 @@ function get_crafting_recipe_icon(spec, level) { // XXXXXX move to ItemDisplay.j
         return get_leveled_quantity(spec['icon'], level);
     }
     var product_list = get_crafting_recipe_product_list(spec, level);
-    if(product_list[0]['spec']) {
+    if(product_list[0] && product_list[0]['spec']) {
         return ItemDisplay.get_inventory_item_spec(product_list[0]['spec'])['icon'];
     }
-    throw Error('cannot determine icon for crafting recipe '+spec['name']);
+    throw Error('cannot determine icon for crafting recipe '+spec['name']+' at level '+level.toString());
 }
 
 // get a spec quantity that is possibly level-dependent (list indexed by level-1)
