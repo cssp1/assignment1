@@ -931,7 +931,7 @@ def check_crafting_recipe(recname, spec):
     if ('ui_name' not in spec):
         if spec['crafting_category'] == 'fishing':
             error |= 1; print '%s: ui_name is mandatory for fishing recipes' % recname
-        if not prod_list[0][0].get('spec',None):
+        if prod_list[0] and (not prod_list[0][0].get('spec',None)):
             error |= 1; print '%s: has no ui_name but product is not a single item' % recname
 
     if spec['crafting_category'] not in gamedata['crafting']['categories']:
@@ -953,7 +953,7 @@ def check_crafting_recipe(recname, spec):
         if spec['associated_item_set'] not in gamedata['item_sets']:
             error |=1; print '%s: has invalid associated_item_set "%s"' % (recname, spec['associated_item_set'])
         else:
-            if prod_list[0][0].get('spec',None) not in gamedata['item_sets'][spec['associated_item_set']]['members'] and \
+            if prod_list[0] and prod_list[0][0].get('spec',None) not in gamedata['item_sets'][spec['associated_item_set']]['members'] and \
                len(gamedata['item_sets'][spec['associated_item_set']]['members']) > 0: # ignore empty item sets that are used only for crafting recipes
                 error |=1; print '%s: has associated_item_set "%s" but its product is not a member of that set' % (recname, spec['associated_item_set'])
 
