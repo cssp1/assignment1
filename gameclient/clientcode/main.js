@@ -30872,7 +30872,9 @@ function crafting_dialog_change_category(dialog, category, page) {
                     player.stored_item_iter(function (entry) {
                         if(entry['spec'] === spec['associated_item']) {
                             var existing_level = entry['level'] || 1;
-                            if(existing_level < spec['max_level'] && !(existing_level.toString() in seen_levels)) {
+                            if(existing_level < spec['max_level'] &&
+                               get_leveled_quantity(spec['cost'], existing_level + 1) !== null &&
+                               !(existing_level.toString() in seen_levels)) {
                                 // item not already maxed, we can upgrade it
                                 seen_levels[existing_level.toString()] = 1; // mark seen
                                 var rec_this_level = {'spec': name, 'level': existing_level + 1}
@@ -31541,7 +31543,7 @@ function start_crafting(_builder, _build_recipe_spec, extra_params) {
         delay += d;
     }
     var start_time = server_time + Math.max(0, delay);
-    _craft_queue.push({'craft':{'recipe':_build_recipe_spec['name'], 'ui_tag': ui_tag, 'cost': goog.object.clone(_build_recipe_spec['cost'])},
+    _craft_queue.push({'craft':{'recipe':_build_recipe_spec['name'], 'level': level, 'ui_tag': ui_tag, 'cost': goog.object.clone(_build_recipe_spec['cost'])},
                        'start_time': start_time, 'done_time': 0, 'total_time': cost_time});
     goog.object.forEach(gamedata['resources'], function(res, resname) {
         var cost = _build_recipe_spec['cost'][resname] || 0;
@@ -31931,12 +31933,13 @@ function update_crafting_dialog_status_leaders(dialog) {
 
     dialog.parent.user_data['on_use_recipe'] = null; // default action when clicking the recipe on the left
 
-    var in_progress_recipe = null, in_progress_bus = null, in_progress_togo = -1;
+    var in_progress_recipe = null, in_progress_recipe_level = null, in_progress_bus = null, in_progress_togo = -1;
     goog.array.forEach(craft_queue, function(entry) {
         if(gamedata['crafting']['recipes'][entry['craft']['recipe']]['crafting_category'] == 'leaders') {
             // since there is no queueing, there should only be one of these
             in_progress_recipe = entry['craft']['recipe'];
             in_progress_bus = entry;
+            in_progress_recipe_level = entry['craft']['level'] || 1;
             in_progress_togo = entry['total_time'] - entry['done_time'];
             if(entry['start_time'] > 0) {
                 in_progress_togo -= Math.max(0, server_time - entry['start_time']);
@@ -31947,6 +31950,7 @@ function update_crafting_dialog_status_leaders(dialog) {
     var selected_rec = dialog.parent.user_data['selected_recipe'];
     var selected_recipe = (selected_rec ? selected_rec['spec'] : null);
     var selected_recipe_spec = (selected_recipe ? gamedata['crafting']['recipes'][selected_recipe] : null);
+    var selected_recipe_level = (selected_rec ? selected_rec['level'] : null);
 
     dialog.widgets['leader_icon'].state = 'normal';
     dialog.widgets['leader_timer'].show = false;
@@ -31986,13 +31990,13 @@ function update_crafting_dialog_status_leaders(dialog) {
     }
 
     // note that this may be unknown_crafting_product for randomized recipes
-    var selected_leader_spec = (selected_recipe_spec ? ItemDisplay.get_crafting_recipe_product_spec(selected_recipe_spec) : null);
+    var selected_leader_spec = (selected_recipe_spec ? ItemDisplay.get_crafting_recipe_product_spec(selected_recipe_spec, selected_recipe_level) : null);
 
     if(in_progress_recipe) {
-        dialog.widgets['leader_icon'].asset = get_crafting_recipe_icon(gamedata['crafting']['recipes'][in_progress_recipe]);
+        dialog.widgets['leader_icon'].asset = get_crafting_recipe_icon(gamedata['crafting']['recipes'][in_progress_recipe], in_progress_recipe_level);
         dialog.widgets['leader_icon'].alpha = 1;
         dialog.widgets['leader_frame'].onclick = null;
-        dialog.widgets['leader_frame'].tooltip.str = dialog.data['widgets']['leader_frame']['ui_tooltip_inprogress'].replace('%s', ItemDisplay.get_inventory_item_ui_name_long(ItemDisplay.get_crafting_recipe_product_spec(gamedata['crafting']['recipes'][in_progress_recipe])));
+        dialog.widgets['leader_frame'].tooltip.str = dialog.data['widgets']['leader_frame']['ui_tooltip_inprogress'].replace('%s', ItemDisplay.get_inventory_item_ui_name_long(ItemDisplay.get_crafting_recipe_product_spec(gamedata['crafting']['recipes'][in_progress_recipe], in_progress_recipe_level)));
         dialog.widgets['leader_frame'].tooltip.text_color = SPUI.default_text_color;
         dialog.widgets['leader_cancel'].show = true;
         dialog.widgets['leader_cancel'].tooltip.str = dialog.data['widgets']['leader_cancel']['ui_tooltip_cancel'];
@@ -48585,7 +48589,9 @@ function draw_building_or_inert(obj, powerfac) {
                 // pending collection
                 progress = 0;
             } else if(progress < 1 || obj.team == 'player') {
-                var ui_recipe = get_crafting_recipe_ui_name(recipe);
+                // existence of first entry is guaranteed by .is_crafting()
+                var recipe_level = obj.get_crafting_queue()[0]['craft']['level'] || 1;
+                var ui_recipe = get_crafting_recipe_ui_name(recipe, recipe_level);
                 var bus = obj.get_crafting_queue()[0]['craft'];
                 if(recipe['max_level'] > 1 && (bus['level'] || 1) > 1) {
                     ui_recipe += ' L'+bus['level'].toString();
