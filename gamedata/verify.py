@@ -11,9 +11,33 @@ import GameDataUtil
 import sys, traceback, os, copy, time, re
 import getopt
 
+# optionally use the Damerau-Levenshtein string distance metric to check for mis-spelled JSON keys
+has_damerau_levenshtein = False
+try:
+    from pyxdameraulevenshtein import damerau_levenshtein_distance
+    has_damerau_levenshtein = True
+except ImportError:
+    print 'pyxadameraulevenshtein module not found - install this if you want typo-checking'
+    pass
+
 time_now = int(time.time())
 gamedata = None
 verbose = False
+
+# check keys in a dictionary "d" for any key that is similar but not
+# quite equal to a member of set "correct_keys", which is probably a typo.
+def check_misspellings(d, correct_keys, reason):
+    if not has_damerau_levenshtein: return 0
+    assert type(correct_keys) is set
+    error = 0
+    for k in d:
+        if k not in correct_keys:
+            for key in correct_keys:
+                if damerau_levenshtein_distance(k, key) < 3:
+                    error |= 1
+                    print 'probable typo in dictionary key %s "%s" (similar to correct key "%s")' % \
+                          (reason, k, key)
+    return error
 
 # track all entries in art.json referenced by code and data
 # note, this is separate from the tracking of whether the art pack actually contains what's needed by art.json
@@ -2678,6 +2702,7 @@ def check_daily_tip(tip):
 
 def check_daily_message(msg):
     error = 0
+    error |= check_misspellings(msg, set(['show_if','attachments']), 'daily_message:%s' % msg['name'])
     if 'show_if' in msg:
         if check_predicate(msg['show_if'], reason='%s:show_if' % msg['name']):
             error |= 1
