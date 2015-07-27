@@ -302,6 +302,29 @@ var method_unmake_developer = function() {
         send_request('player', 'unmake_developer', $.extend(ident, {'ui_reason':ui_reason}), function(result) { alert("Success!"); });
     }
 };
+
+var method_ignore_or_unignore_alt = function(other_id, method_name) {
+    var ident = get_ident();
+    var ui_reason = check_ui_reason($("#alts_reason")[0].value);
+    if(ident && ui_reason) {
+        if(!ident['user_id']) {
+            display_error('Please look up this player by User ID');
+            return;
+        }
+        if(!other_id) {
+            display_error('Please fill in the ID of the other player you want to ignore or un-ignore');
+            return;
+        }
+        send_request('player', method_name, $.extend(ident, {'other_id': other_id, 'ui_reason': ui_reason}), (function (_method_name, _my_id, _other_id, _ui_reason) { return function(result) {
+            send_request('player', _method_name, {'user_id': _other_id, 'other_id': _my_id, 'ui_reason': _ui_reason}, (function (__method_name, __my_id, __other_id) { return function(result) {
+                alert({'ignore_alt':"Ignored (marked as NOT alt accounts): ", 'unignore_alt':"Un-ignored accounts: "}[__method_name]+__my_id.toString()+" and "+__other_id.toString()+"!");
+            }; })(_method_name, _my_id, _other_id));
+        }; })(method_name, ident['user_id'], other_id, ui_reason));
+    }
+};
+var method_ignore_alt = function(other_id) { method_ignore_or_unignore_alt(other_id, 'ignore_alt'); };
+var method_unignore_alt = function(other_id) { method_ignore_or_unignore_alt(other_id, 'unignore_alt'); };
+
 var method_clear_alias = function(cooldown) {
     var ident = get_ident();
     var ui_reason = check_ui_reason($("#chat_reason")[0].value);
@@ -1258,6 +1281,7 @@ $(function() {
     $('#send_message_body').elastic();
     $('#chat_gag_duration').spinner({max:240, min:1, step:1});
     $('#chat_block_other_id').spinner({min:0, step:1});
+    $('#ignore_alt_other_id').spinner({min:0, step:1});
     $('#clear_alias_duration').spinner({max:999999, min:0, step:1});
     $('#gamebucks_amount').spinner({max:50000, min:0, step:100});
     $('#item_to_give_qty').spinner({max:50, min:1, step:1});
@@ -1332,6 +1356,7 @@ $(function() {
     <li><a href="#player_tools_chat_gag" id="player_tools_chat_gag_header">Chat Tools</a></li>
     <li><a href="#player_tools_send_message" id="player_tools_send_message_header">Send Message</a></li>
     <li><a href="#player_tools_clear_cooldown" id="player_tools_clear_cooldown_header">Cooldowns</a></li>
+    <li><a href="#player_tools_alts" id="player_tools_alts_header">Alts</a></li>
     <li><a href="#player_tools_change_region" id="player_tools_change_region_header">Map Region</a></li>
     <li><a href="#player_tools_ban" id="player_tools_ban_header">Ban</a></li>
     <li><a href="#player_tools_developer" id="player_tools_developer_header">Developer</a></li>
@@ -1414,6 +1439,16 @@ $(function() {
       Reason for this action:
       <br>
       <input type="text" id="change_region_reason" style="width:500px;">
+    </div>
+
+    <div id="player_tools_alts">
+      Other Player ID: <input type="text" id="ignore_alt_other_id" name="ignore_alt_other_id">
+      <button onclick="method_ignore_alt($('#ignore_alt_other_id').spinner('value'))" class="spin_button" style="width:250px;">Ignore (mark as non-alt)</button>
+    <button onclick="method_unignore_alt($('#ignore_alt_other_id').spinner('value'))" class="spin_button" style="width:180px;">Un-ignore</button>
+      <p>
+      Reason for this action:
+      <br>
+      <input type="text" id="alts_reason" style="width:500px;">
     </div>
 
     <div id="player_tools_ban">

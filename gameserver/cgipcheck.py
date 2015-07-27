@@ -145,8 +145,8 @@ def do_action(path, method, args, spin_token_data, nosql_client):
             if (method not in ('lookup', 'get_raw_player')):
                 do_log = True # log all write activity
 
-            # require special role for writes, except for chat gagging/blocking and aura apply/remove
-            if (method not in ('lookup','get_raw_player','chat_gag','chat_ungag','chat_block','chat_unblock','apply_aura','remove_aura')):
+            # require special role for writes, except for chat, aura, and alt actions
+            if (method not in ('lookup','get_raw_player','chat_gag','chat_ungag','chat_block','chat_unblock','apply_aura','remove_aura','ignore_alt','unignore_alt')):
                 check_role(spin_token_data, 'PCHECK-WRITE')
                 if method in ('ban','unban'):
                     check_role(spin_token_data, 'PCHECK-BAN')
@@ -159,7 +159,7 @@ def do_action(path, method, args, spin_token_data, nosql_client):
             if method == 'lookup':
                 result = {'result':do_lookup(control_args)}
             elif method in ('give_item','send_message','chat_gag','chat_ungag','chat_block','chat_unblock','apply_aura','remove_aura','get_raw_player','ban','unban',
-                            'make_developer','unmake_developer','clear_alias','chat_official','chat_unofficial','clear_lockout','clear_cooldown','change_region'):
+                            'make_developer','unmake_developer','clear_alias','chat_official','chat_unofficial','clear_lockout','clear_cooldown','change_region','ignore_alt','unignore_alt'):
                 result = do_CONTROLAPI(control_args)
             else:
                 raise Exception('unknown player method '+method)

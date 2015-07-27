@@ -472,7 +472,10 @@ if __name__ == '__main__':
             print fmt % ('Known alt accounts:', '')
             for s_other_id in sorted(player['known_alt_accounts'].iterkeys(), key = int):
                 entry = player['known_alt_accounts'][s_other_id]
-                if entry.get('logins',1) < 0: # marked non-alt
+                if entry.get('logins',1) == 0:
+                    continue # ignore
+                elif entry.get('logins',1) < 0 or entry.get('ignore',False): # marked non-alt
+                    print fmt % ('', 'ID: %7d, IGNORED (marked as non-alt)' % (int(s_other_id)))
                     continue
                 print fmt % ('', 'ID: %7d, #Logins: %4d, Last simultanous login: %s' % (int(s_other_id), entry.get('logins',1),
                                                                          pretty_print_time(time_now - entry['last_login'], limit = 2)+' ago' if 'last_login' in entry else 'Unknown'))

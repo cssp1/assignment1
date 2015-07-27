@@ -162,6 +162,37 @@ class HandleMarkUninstalled(Handler):
         self.gamesite.pcache_client.player_cache_update(self.user_id, {'uninstalled': 1})
         return ReturnValue(result = 'ok')
 
+class HandleIgnoreAlt(Handler):
+    def do_exec_online(self, session, retmsg):
+        other_id = int(self.args['other_id'])
+        if str(other_id) not in session.player.known_alt_accounts:
+            session.player.known_alt_accounts[str(other_id)] = {'logins':0}
+        session.player.known_alt_accounts[str(other_id)]['ignore'] = 1
+        return ReturnValue(result = 'ok')
+    def do_exec_offline(self, user, player):
+        other_id = int(self.args['other_id'])
+        if ('known_alt_accounts' not in player) or type(player['known_alt_accounts']) is not dict:
+            player['known_alt_accounts'] = {}
+        if str(other_id) not in player['known_alt_accounts']:
+            player['known_alt_accounts'][str(other_id)] = {'logins':0}
+        player['known_alt_accounts'][str(other_id)]['ignore'] = 1
+        return ReturnValue(result = 'ok')
+
+class HandleUnignoreAlt(Handler):
+    def do_exec_online(self, session, retmsg):
+        other_id = int(self.args['other_id'])
+        if str(other_id) in session.player.known_alt_accounts and \
+           'ignore' in session.player.known_alt_accounts[str(other_id)]:
+            del session.player.known_alt_accounts[str(other_id)]['ignore']
+        return ReturnValue(result = 'ok')
+    def do_exec_offline(self, user, player):
+        other_id = int(self.args['other_id'])
+        if ('known_alt_accounts' in player) and type(player['known_alt_accounts']) is dict and \
+           str(other_id) in player['known_alt_accounts'] and \
+           'ignore' in player['known_alt_accounts'][str(other_id)]:
+            del player['known_alt_accounts'][str(other_id)]['ignore']
+        return ReturnValue(result = 'ok')
+
 class HandleMakeDeveloper(Handler):
     def do_exec_online(self, session, retmsg):
         session.user.developer = session.player.developer = 1 # note: update Player as well as User
@@ -578,6 +609,8 @@ methods = {
     'mark_uninstalled': HandleMarkUninstalled,
     'make_developer': HandleMakeDeveloper,
     'unmake_developer': HandleUnmakeDeveloper,
+    'ignore_alt': HandleIgnoreAlt,
+    'unignore_alt': HandleUnignoreAlt,
     'clear_alias': HandleClearAlias,
     'chat_block': HandleChatBlock,
     'chat_unblock': HandleChatUnblock,

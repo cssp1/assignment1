@@ -12843,21 +12843,6 @@ class CONTROLAPI(resource.Resource):
                                         add_stack = stack)
     def handle_remove_battle_fatigue(self, request, session = None, defender_id = None):
         session.player.cooldown_reset('battle_fatigue:%d' % int(defender_id))
-    def handle_identify_alt(self, request, session = None, alt_id = None):
-        alt_id = int(alt_id)
-        key = str(alt_id)
-        alt_data = session.player.known_alt_accounts.get(key, None)
-        if alt_data is None:
-            alt_data = session.player.known_alt_accounts[key] = {}
-        alt_data['logins'] = 999; alt_data['attacks'] = 999
-    def handle_clear_alt(self, request, session = None, alt_id = None):
-        alt_id = int(alt_id)
-        key = str(alt_id)
-        alt_data = session.player.known_alt_accounts.get(key, None)
-        if alt_data is None:
-            alt_data = session.player.known_alt_accounts[key] = {}
-        # set to large negative values rather than deleting, so that the alt won't get re-detected immediately
-        alt_data['logins'] = -999; alt_data['attacks'] = -999
     def handle_system_announcement(self, request, body = None):
         for session in session_table.itervalues():
             if not session.logout_in_progress:

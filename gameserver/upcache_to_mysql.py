@@ -450,7 +450,7 @@ def do_slave(input):
                                     " (user_id, other_id, logins, attacks, last_simultaneous_login)" + \
                                     " VALUES (%s,%s,%s,%s,%s)",
                                     [(user['user_id'], int(alt_sid), alt.get('logins',1), alt.get('attacks',1), alt.get('last_login',None)) \
-                                     for alt_sid, alt in alt_accounts.iteritems()])
+                                     for alt_sid, alt in alt_accounts.iteritems() if alt.get('logins',1) > 0 and not alt.get('ignore',False)])
 
             # army composition table
             ACTIVE_PLAYER_RECENCY = 7*86400 # only include players active more recently than this
