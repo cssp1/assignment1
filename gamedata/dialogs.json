@@ -2841,12 +2841,12 @@
             "delete_button": { "kind": "ActionButton", "xy":[665,88], "dimensions":[19,19], "push_bg_image":1, "bg_image": "delete_mail_button",
                                "ui_tooltip": "Delete message", "tooltip_delay": 0 },
 
-            "body":  { "kind": "TextField", "xy": [296,128], "dimensions": [385,142], "text_size": 17, "text_leading": 19,
+            "body":  { "kind": "TextField", "xy": [296,124], "dimensions": [385,142], "text_size": 17, "text_leading": 19,
                        "text_hjustify": "left", "text_vjustify": "top" },
             "nomail":  { "kind": "TextField", "xy": [296,128], "dimensions": [388,142], "text_size": 15, "text_leading": 19,
                          "text_hjustify": "center", "text_vjustify": "center", "ui_name": "You have no messages" },
 
-            "expiration": { "kind": "TextField", "xy": [296,274], "dimensions": [388,17], "text_hjustify": "left", "text_size": 13, "text_color":[1,0,0,1],
+            "expiration": { "kind": "TextField", "xy": [296,276], "dimensions": [388,17], "text_hjustify": "left", "text_size": 13, "text_color":[1,0,0,1],
                             "ui_name": "This message expires in %s." },
 
             "attach_taken": { "kind": "TextField", "xy": [308,370], "dimensions": [368,17], "text_hjustify": "left", "text_size": 13, "text_color":[1,0,0,1],
