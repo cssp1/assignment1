@@ -25,7 +25,14 @@ def get_issues(data):
         if float(data['browser_fails'])/hau >= 0.2:
             issues.append('Browser Issues per HAU >= 0.2')
         if data['fb_notifications_sent_24h'] > 5000: # alert only on 5k+/day notifications
-            if float(data['fb_notifications_clicked_24h'])/float(data['fb_notifications_sent_24h']) < 0.17:
+            ctr = float(data['fb_notifications_clicked_24h'])/float(data['fb_notifications_sent_24h'])
+
+            # Add an 8% "fudge factor" to account for notification clicks that don't result
+            # in a full login and are therefore not recorded in SQL. This is intended to
+            # cut down on false alarms where Facebook's CTR metric is not actually too low.
+            ctr *= 1.08
+
+            if ctr < 0.17:
                 issues.append('FB App-to-User Notification CTR < 17% during last 24h')
     return issues
 
