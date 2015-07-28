@@ -7502,6 +7502,15 @@ class Player(AbstractPlayer):
 
     def squads_enabled(self):
         return Predicates.read_predicate({'predicate': 'LIBRARY', 'name': 'squads_enabled'}).is_satisfied(self, None)
+    def auto_resolve_enabled(self):
+        if self.get_any_abtest_value('enable_auto_resolve', False):
+            return True
+        elif self.home_region in gamedata['regions'] and \
+             'enable_auto_resolve' in gamedata['regions'][self.home_region]:
+            return gamedata['regions'][self.home_region]['enable_auto_resolve']
+        else:
+            return gamedata['territory'].get('enable_auto_resolve', False)
+
     def unit_speedups_enabled(self):
         return self.is_cheater or gamedata.get('enable_unit_speedups', True)
     def crafting_speedups_enabled(self):
@@ -20258,6 +20267,20 @@ class GAMEAPI(resource.Resource):
 
         retmsg.append(["PLAYER_STATE_UPDATE", session.player.resources.calc_snapshot().serialize()])
 
+    def auto_resolve(self, session, retmsg):
+        if session.visit_base_in_progress or \
+           session.complete_attack_in_progress or \
+           not session.has_attacked:
+            retmsg.append(["ERROR", "HARMLESS_RACE_CONDITION"])
+            return
+
+        if not session.player.auto_resolve_enabled():
+            retmsg.append(["ERROR", "SERVER_PROTOCOL"])
+            return
+
+        # XXXXXX only allow in squad battles?
+        gamesite.exception_log.event(server_time, "XXXXXX implement auto resolve")
+
     def object_combat_updates(self, session, retmsg, arg):
         # update hitpoints and (for mobile units only) XY position and movement orders
 
@@ -22920,6 +22943,9 @@ class GAMEAPI(resource.Resource):
 
         elif arg[0] == "OBJECT_COMBAT_UPDATES":
             self.object_combat_updates(session, retmsg, arg[1])
+
+        elif arg[0] == "AUTO_RESOLVE":
+            self.auto_resolve(session, retmsg)
 
         elif arg[0] == "CREATE_INERT":
             self.do_create_inert(session, retmsg, arg[1:])

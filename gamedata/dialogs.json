@@ -862,7 +862,7 @@
 
     // just holds the "Attack"/"End Attack" button, so it can be repositioned easily
     "attack_button_dialog": {
-        "dimensions": [152,56],
+        "dimensions": [152,88],
         "top_center_offset": [316,0], // offset relative to desktop_top_visitor position when placed at top_center
         "bottom_left_offset": [7,-80], // offset relative to canvas lower-left corner when placed at bottom_left
         "widgets": {
@@ -894,7 +894,11 @@
                                "ui_tooltip_no_units": "Unable to attack - you have no units.\nReturn home and use %MENU menu to %VERB units.",
 
                                "state": "disabled", "tooltip_delay": 0,
-                               "text_size": 15, "text_style": "bold", "drop_shadow": 0 }
+                               "text_size": 15, "text_style": "bold", "drop_shadow": 0 },
+            "auto_resolve_button": { "show": 0,
+                                     "kind": "ActionButton", "xy": [2,60], "dimensions": [151,28], "bg_image": "action_button_resizable",
+                                     "bg_image_resizable": 1, "text_size": 13, "text_style": "bold",
+                                     "ui_name": "Auto-Resolve", "ui_tooltip": "Finish battle automatically", "tooltip_delay": 0 }
         }
     },
 

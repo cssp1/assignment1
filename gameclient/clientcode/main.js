@@ -6001,6 +6001,18 @@ player.can_level_up = function() {
 
 player.unit_micro_enabled = function() { return (!('enable_unit_micro' in gamedata) || gamedata['enable_unit_micro'] || player.is_cheater); };
 player.squads_enabled = function() { return read_predicate({'predicate':'LIBRARY', 'name': 'squads_enabled'}).is_satisfied(player, null); };
+
+/** @return {boolean} */
+player.auto_resolve_enabled = function() {
+    if(player.get_any_abtest_value('enable_auto_resolve', false)) {
+        return true;
+    } else if(session.region && session.region.data && ('enable_auto_resolve' in session.region.data)) {
+        return session.region.data['enable_auto_resolve'];
+    } else {
+        return gamedata['territory']['enable_auto_resolve'] || false;
+    }
+};
+
 player.unit_speedups_enabled = function() { return player.is_cheater || !('enable_unit_speedups' in gamedata) || gamedata['enable_unit_speedups']; };
 player.crafting_speedups_enabled = function() { return player.is_cheater || !('enable_crafting_speedups' in gamedata) || gamedata['enable_crafting_speedups']; };
 player.resource_gifts_enabled = function() { return (player.get_any_abtest_value('enable_resource_gifts', gamedata['enable_resource_gifts']) &&
@@ -15983,7 +15995,8 @@ function surrender_to_ai_attack() {
     window.setTimeout(visit_base_after_attack, 1000.0 * gamedata['client']['surrender_delay']);
 };
 
-function retreat_from_attack() {
+/** @param {boolean=} bypass_timer - skip retreat timer */
+function retreat_from_attack(bypass_timer) {
     var retreat_time_table = player.get_any_abtest_value('retreat_time_table', gamedata['retreat_time_table']);
     var retreat_time = 0;
 
@@ -16030,6 +16043,11 @@ function retreat_from_attack() {
                 retreat_time = 0;
             }
         }
+    }
+
+    // no retreat timer if manually disabled
+    if(bypass_timer) {
+        retreat_time = 0;
     }
 
     if(retreat_time <= 0) {
@@ -16079,6 +16097,8 @@ function update_attack_button_dialog(dialog) {
                 str = gamedata['dialogs']['retreating_dialog']['widgets']['loading_text']['ui_name_now'];
             }
             dialog.widgets['attack_button'].str = str;
+            dialog.widgets['auto_resolve_button'].show = false;
+
         } else { // retreat not pending
             dialog.widgets['attack_button'].state = 'end';
             if(player.tutorial_state != "COMPLETE" && player.tutorial_state != 'wait_battle_finish2') {
@@ -16086,7 +16106,20 @@ function update_attack_button_dialog(dialog) {
             }
             dialog.widgets['attack_button'].str = dialog.data['widgets']['attack_button']['ui_name_'+ (session.viewing_user_id == session.user_id ? 'stop_reinforcing' : 'stop_attack')];
             dialog.widgets['attack_button'].tooltip.str = dialog.data['widgets']['attack_button']['ui_tooltip_'+ (session.viewing_user_id == session.user_id ? 'stop_reinforcing' : 'stop_attack')];
-            dialog.widgets['attack_button'].onclick = retreat_from_attack;
+            dialog.widgets['attack_button'].onclick = function(w) { retreat_from_attack(); };
+
+            dialog.widgets['auto_resolve_button'].show = player.auto_resolve_enabled();
+            dialog.widgets['auto_resolve_button'].onclick = function(w) {
+                var s = gamedata['strings']['auto_resolve_confirm'];
+                invoke_child_message_dialog(s['ui_title'], s['ui_description'],
+                                            {'cancel_button': true,
+                                             'ok_button_ui_name': s['ui_button'],
+                                             'on_ok': function() {
+                                                 send_to_server.func(["AUTO_RESOLVE"]);
+                                                 retreat_from_attack();
+                                             }});
+
+            };
         }
 
     } else { // has_attacked is FALSE
@@ -16432,6 +16465,8 @@ function update_attack_button_dialog(dialog) {
                 }; })(attack_cb);
             } // attack_button is clickable with callback
         } // END you CAN attack
+
+        dialog.widgets['auto_resolve_button'].show = false;
     } // END session.has_attacked is FALSE
 
 }
