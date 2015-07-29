@@ -55,12 +55,15 @@ def resolve(session, log_func = None):
     shooter_list = []
     target_list = []
 
+    target_cur_hp = {} # track remaining HP on each target
+
     for obj in session.iter_objects():
         if (not obj.is_destroyed()):
             if obj.is_shooter():
                 shooter_list.append(obj)
             if (not obj.is_inert()): # it can be killed
                 target_list.append(obj)
+                target_cur_hp[obj.obj_id] = obj.hp
 
     if log_func:
         log_func('begin auto-resolve with shooters %r' % pretty_obj_list(shooter_list))
@@ -110,7 +113,8 @@ def resolve(session, log_func = None):
                     total_dps += dps
 
             if total_dps > 0:
-                ttk = float(obj.hp) / float(total_dps)
+                # reference current HP, not original HP here
+                ttk = float(target_cur_hp[obj.obj_id]) / float(total_dps)
                 kill_list.append((ttk, obj.obj_id, biggest_damager))
 
         if not kill_list: # nothing more is killable by anyone - stalemate
@@ -129,6 +133,7 @@ def resolve(session, log_func = None):
         target_list.remove(next)
         if next.is_shooter():
             shooter_list.remove(next)
+        del target_cur_hp[next.obj_id]
 
         # destroy the thing
         # (note: no update sent to client - we assume an immediate session change follows)
@@ -145,9 +150,27 @@ def resolve(session, log_func = None):
             new_hp = 0
             combat_updates.append([next.obj_id, next.spec.name, None, new_hp, None, killer_info, None])
 
+        # the opposing team doesn't suffer a death, but we need to
+        # subtract HP from its most vulnerable target
+        for next_ttk, next_damaged_id, unused2 in kill_list[1:]:
+            next_damaged = session.get_object(next_damaged_id)
+            if next_damaged.owner is not next.owner:
+                target_cur_hp[next_damaged.obj_id] *= (ttk/next_ttk)
+                break
+
         cur_iter += 1
         if cur_iter >= iter_max:
             raise Exception('runaway iteration, shooter_list %r target_list %r' % \
                             (pretty_obj_list(shooter_list), pretty_obj_list(target_list)))
+
+    # update HP on damaged-but-not-destroyed objects
+    for id, cur_hp in target_cur_hp.iteritems():
+        obj = session.get_object(id)
+        if cur_hp != obj.hp:
+            if log_func:
+                log_func('remaining damage: %s %s L%d HP %d -> %d' % \
+                         (('player' if obj.owner is session.player else 'enemy'), obj.spec.name, obj.level,
+                          obj.hp, cur_hp))
+            combat_updates.append([obj.obj_id, obj.spec.name, None, cur_hp, None, None, None])
 
     return objects_destroyed, combat_updates
