@@ -16109,7 +16109,7 @@ function update_attack_button_dialog(dialog) {
             dialog.widgets['attack_button'].onclick = function(w) { retreat_from_attack(); };
 
             // only allow in squad battles, unless DEV edit mode is on
-            dialog.widgets['auto_resolve_button'].show = player.auto_resolve_enabled() && (session.viewing_base.base_type === 'squad' || player.is_cheater);
+            dialog.widgets['auto_resolve_button'].show = player.auto_resolve_enabled() && (session.viewing_base.base_type === 'squad' || player.is_cheater) && !(!session.home_base && session.viewing_base.base_landlord_id === session.user_id);
             dialog.widgets['auto_resolve_button'].str = dialog.data['widgets']['auto_resolve_button'][(player.is_cheater && session.viewing_base.base_type !== 'squad') ? 'ui_name_dev': 'ui_name'];
 
             dialog.widgets['auto_resolve_button'].onclick = function(w) {
@@ -16119,7 +16119,7 @@ function update_attack_button_dialog(dialog) {
                                              'ok_button_ui_name': s['ui_button'],
                                              'on_ok': function() {
                                                  send_to_server.func(["AUTO_RESOLVE"]);
-                                                 retreat_from_attack();
+                                                 retreat_from_attack(true);
                                              }});
 
             };

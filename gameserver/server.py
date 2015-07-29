@@ -20276,7 +20276,8 @@ class GAMEAPI(resource.Resource):
     def auto_resolve(self, session, retmsg):
         if session.visit_base_in_progress or \
            session.complete_attack_in_progress or \
-           not session.has_attacked:
+           not session.has_attacked or \
+           ((not session.home_base) and session.player is session.viewing_player): # quarry reinforcement
             retmsg.append(["ERROR", "HARMLESS_RACE_CONDITION"])
             return
 
@@ -20292,8 +20293,11 @@ class GAMEAPI(resource.Resource):
         session.attack_event(session.player.user_id, '3829_battle_auto_resolved', {})
         session.auto_resolved = True
 
+        # XXXXXX deploy remaining deployable units?
+
         objects_destroyed, combat_updates = AutoResolve.resolve(session)
-        gamesite.exception_log.event(server_time, "player %d at %s auto-resolve destroys: %r\nupdates: %r" % (session.player.user_id, session.viewing_base.base_id, objects_destroyed, combat_updates))
+        if gamedata['server'].get('log_auto_resolve', False):
+            gamesite.exception_log.event(server_time, "player %d at %s auto-resolve destroys: %r ... updates: %r" % (session.player.user_id, session.viewing_base.base_id, objects_destroyed, combat_updates))
 
         for args in objects_destroyed:
             self.destroy_object(session, retmsg, *args)
