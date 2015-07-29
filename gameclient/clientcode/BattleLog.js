@@ -417,6 +417,8 @@ BattleLog.parse = function(my_id, summary, metlist) {
                 }
             }
 
+        } else if(met['event_name'] == '3829_battle_auto_resolved') {
+            line.push(new SPText.ABlock(names[met['user_id']]+' auto-resolved the battle, with the following outcome:', pr.hi));
         } else if(met['event_name'] == '3830_battle_end' || met['event_name'] == '3860_ai_attack_end') {
             var tx = 'Battle ended: ';
             var outcome = met['battle_outcome'];

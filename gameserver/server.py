@@ -73,6 +73,7 @@ import ChatChannels
 import ChatFilter
 import ResLoot
 import ResPrice
+import AutoResolve
 from Region import Region
 import ioslave
 import collections
@@ -20288,8 +20289,15 @@ class GAMEAPI(resource.Resource):
             retmsg.append(["ERROR", "SERVER_PROTOCOL"])
             return
 
-        gamesite.exception_log.event(server_time, "XXXXXX implement auto resolve")
+        session.attack_event(session.player.user_id, '3829_battle_auto_resolved', {})
         session.auto_resolved = True
+
+        objects_destroyed, combat_updates = AutoResolve.resolve(session)
+        gamesite.exception_log.event(server_time, "player %d at %s auto-resolve destroys: %r\nupdates: %r" % (session.player.user_id, session.viewing_base.base_id, objects_destroyed, combat_updates))
+
+        for args in objects_destroyed:
+            self.destroy_object(session, retmsg, *args)
+        self.object_combat_updates(session, retmsg, combat_updates)
 
     def object_combat_updates(self, session, retmsg, arg):
         # update hitpoints and (for mobile units only) XY position and movement orders
