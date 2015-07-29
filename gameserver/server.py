@@ -4875,6 +4875,9 @@ class GameObjectSpec(Spec):
         ["unit_repair_speed", 1.0],
         ["track_level_in_player_history", False],
         ["history_category", None],
+        ["defense_types", []],
+        ["invisible", False],
+        ["invis_on_hold", False],
         ["flying", False],
         ["consumable", False],
         ["resurrectable", False],
@@ -5327,6 +5330,10 @@ class GameObject:
     def is_inert(self):
         return self.spec.kind == 'inert'
 
+    def get_auto_spell(self): return None
+    def is_shooter(self): return self.get_auto_spell() is not None
+    def is_invisible(self, session): return False
+
     def cost_to_repair(self, player):
         return self.spec.cost_to_repair(self.level, self.hp/float(self.max_hp), player, self.obj_id)
     def time_to_repair(self, player):
@@ -5372,6 +5379,24 @@ class Mobile(GameObject):
         self.ensure_mobile_position(base_ncells)
         self.patrol = None
         self.orders = copy.copy(gamedata['client']['squad_deploy_ai_orders'])
+
+    def get_auto_spell(self):
+        spellname = self.owner.stattab.get_unit_stat(self.spec.name, 'weapon', self.spec.spells[0] if self.spec.spells else None)
+        if spellname:
+            spell = self.owner.get_abtest_spell(spellname)
+            if spell.get('activation') == 'auto':
+                return spell
+        return None
+
+    def is_invisible(self, session):
+        if self.spec.invis_on_hold and self.orders and len(self.orders) == 1 and \
+           not self.orders[0].get('aggressive',False) and \
+           self.orders[0]['state'] == 4: # ai_states.AI_ATTACK_STATIONARY
+            # check if in friendly base
+            if self.owner.user_id == session.viewing_base.base_landlord_id:
+                if session.viewing_base.base_type not in ('quarry', 'squad'):
+                    return True
+        return False
 
 class Inert(GameObject):
     def __init__(self, obj_id, spec, owner, x, y, hp, level, build_finish_time, auras, metadata=None):
@@ -5890,6 +5915,16 @@ class Building(GameObject):
                         if gamedata['crafting']['categories'][gamedata['crafting']['recipes'][entry.craft_state['recipe']]['crafting_category']].get('foreman', False):
                             return True
         return False
+
+    def get_auto_spell(self):
+        spellname = self.get_stat('weapon', self.spec.spells[0] if self.spec.spells else None)
+        if spellname:
+            spell = self.owner.get_abtest_spell(spellname)
+            if spell.get('activation') == 'auto':
+                return spell
+        return None
+
+    def is_invisible(self, session): return self.spec.invisible
 
 class ResourceStateSnapshot:
     def __init__(self, inventory, res_max, res_cur, gamebucks, facebook_credits, player_level, xp, protection_end_time):
@@ -6785,6 +6820,11 @@ class AbstractPlayer(object):
         modded_buildings = {}
         def get_player_stat(self, stat): raise Exception('AbstractPlayer has no stat table')
         def get_unit_stat(self, specname, stat, default_value): return default_value
+
+    # needed for object.owner.get_weapon_spell()
+    # note: precludes override of non-owned object spells
+    def get_abtest_spell(self, name):
+        return gamedata['spells'].get(name, None)
 
 # These virtual players instances represent the owners of game objects
 # that belong to the environment (e.g. landscape decorations) or
@@ -8371,8 +8411,6 @@ class Player(AbstractPlayer):
     def get_abtest_offer(self, name):
         return gamedata['offers'][name]
 
-    def get_abtest_spell(self, name):
-        return gamedata['spells'].get(name, None)
     def get_abtest_item(self, name):
         return gamedata['items'].get(name, None)
     def get_abtest_item_set(self, name):
@@ -20295,8 +20333,13 @@ class GAMEAPI(resource.Resource):
 
         # XXXXXX deploy remaining deployable units?
 
-        objects_destroyed, combat_updates = AutoResolve.resolve(session)
-        if gamedata['server'].get('log_auto_resolve', False):
+        if gamedata['server'].get('log_auto_resolve', 0) >= 3:
+            log_func = lambda x: gamesite.exception_log.event(server_time, x)
+        else:
+            log_func = None
+
+        objects_destroyed, combat_updates = AutoResolve.resolve(session, log_func = log_func)
+        if gamedata['server'].get('log_auto_resolve', 0) >= 2:
             gamesite.exception_log.event(server_time, "player %d at %s auto-resolve destroys: %r ... updates: %r" % (session.player.user_id, session.viewing_base.base_id, objects_destroyed, combat_updates))
 
         for args in objects_destroyed:
