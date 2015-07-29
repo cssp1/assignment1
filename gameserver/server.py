@@ -115,8 +115,9 @@ def dict_setvalue(d, key, amount):
     d[key] = amount
     return True
 
-def vec_sub(a, b):
-    return [a[0]-b[0], a[1]-b[1]]
+def vec_add(a, b): return [a[0]+b[0], a[1]+b[1]]
+def vec_sub(a, b): return [a[0]-b[0], a[1]-b[1]]
+def vec_scale(factor, a): return [factor*a[0], factor*a[1]]
 
 # see http://3dmdesign.com/development/hexmap-coordinates-the-easy-way
 # but note, the distance code there doesn't work for our coordinates
@@ -6283,6 +6284,18 @@ class Base(object):
             return True
         return False
 
+    def has_deployment_zone(self):
+        return bool(self.deployment_buffer and type(self.deployment_buffer) is dict)
+    def deployment_zone_centroid(self):
+        if not self.has_deployment_zone(): return None
+        if self.deployment_buffer['type'] != 'polygon':
+            raise Exception('unhandled deployment buffer type %r' % self.deployment_buffer['type'])
+        centroid = [0,0]
+        for vert in self.deployment_buffer['vertices']:
+            centroid = vec_add(centroid, vert)
+        centroid = vec_scale(1.0/len(self.deployment_buffer['vertices']), centroid)
+        return centroid
+
     def is_deployment_location_valid(self, player, xy):
         ncells = self.ncells()
         if xy[0] < 0 or xy[0] >= ncells[0] or xy[1] < 0 or xy[1] >= ncells[1]:
@@ -6293,7 +6306,7 @@ class Base(object):
             return True
 
         # check against base perimeter or deployment zone
-        if self.deployment_buffer and type(self.deployment_buffer) is dict:
+        if self.has_deployment_zone():
             # Gangnam style
             assert self.deployment_buffer['type'] == 'polygon'
             sign = 0
@@ -16676,7 +16689,7 @@ class GAMEAPI(resource.Resource):
             session.execute_consequent_safe(on_visit_consequent, session.player, retmsg, reason='on_visit')
 
         if pre_attack: # immediately proceed with attack attempt
-            self.do_attack(session, retmsg, [None, {}])
+            self.do_attack(session, retmsg, [None, []])
         else:
             assert not session.pre_locks
 
@@ -20331,7 +20344,68 @@ class GAMEAPI(resource.Resource):
         session.attack_event(session.player.user_id, '3829_battle_auto_resolved', {})
         session.auto_resolved = True
 
-        # XXXXXX deploy remaining deployable units?
+        # attempt to deploy all of player's un-deployed units
+        if not session.home_base:
+            deploy_list = [] # match format of argument to do_attack()
+            deployment_limit = session.player.stattab.get_player_stat('deployable_unit_space')
+            deployed_space = session.deployed_unit_space
+            do_home_units = False
+
+            # query for squad units
+            for base_id, feature in session.deployable_squads.iteritems():
+                if (not SQUAD_IDS.is_mobile_squad_id(feature['squad_id'])):
+                    do_home_units = True # probably base defenders
+                    continue
+
+                elif (not session.player.squad_is_deployed(feature['squad_id'])):
+                    do_home_units = True # mobile, but not deployed
+                    continue
+
+                elif session.player.home_region: # mobile, deployed
+                    for state in gamesite.nosql_client.get_mobile_objects_by_base(session.player.home_region, session.player.squad_base_id(feature['squad_id']), reason='auto_resolve'):
+                        if (not session.has_object(state['obj_id'])) and \
+                           (state.get('hp_ratio',1) > 0 or state.get('hp',1) > 0) and \
+                           session.viewing_base.can_deploy_unit(session.player.get_abtest_spec(GameObjectSpec, state['spec'])):
+                            assert state['squad_id'] == feature['squad_id']
+                            assert session.player.squad_base_id(state['squad_id']) in session.deployable_squads
+                            space = GameObjectSpec.get_leveled_quantity(session.player.get_abtest_spec(GameObjectSpec, state['spec']).consumes_space, state.get('level',1))
+                            if deployed_space + space > deployment_limit: break
+                            deploy_list.append({'obj_id':state['obj_id'], 'spec': state['spec'], 'squad_id': feature['squad_id'], 'source':'home_or_squad'})
+                            deployed_space += space
+
+            if do_home_units:
+                for obj in session.player.home_base_iter():
+                    if (not session.has_object(obj.obj_id)) and obj.is_mobile() and \
+                       (not obj.is_destroyed()) and \
+                       session.player.squad_base_id(obj.squad_id or 0) in session.deployable_squads and \
+                       session.viewing_base.can_deploy_unit(obj.spec):
+                        space = obj.get_leveled_quantity(obj.spec.consumes_space)
+                        if deployed_space + space > deployment_limit: break
+                        deploy_list.append({'obj_id': obj.obj_id, 'spec': obj.spec.name, 'source':'home_or_squad'})
+                        deployed_space += space
+
+            for donated_obj_id, state in session.player.donated_units.iteritems():
+                if session.viewing_base.can_deploy_unit(session.player.get_abtest_spec(GameObjectSpec, state['spec'])):
+                    if gamedata['donated_units_take_space']:
+                        space = GameObjectSpec.get_leveled_quantity(session.player.get_abtest_spec(GameObjectSpec, state['spec']).consumes_space, state.get('level',1))
+                    else:
+                        space = 0
+                    if deployed_space + space > deployment_limit: break
+                    deploy_list.append({'obj_id':donated_obj_id, 'spec': state['spec'], 'source':'donated'})
+                    deployed_space += space
+
+            if deploy_list:
+                if session.viewing_base.deployment_buffer and type(session.viewing_base.deployment_buffer) is dict:
+                    # deployment zone
+                    deploy_location = session.viewing_base.deployment_zone_centroid()
+                else:
+                    deploy_location = [1,1] # just throw the units into a corner
+
+                if gamedata['server'].get('log_auto_resolve', 0) >= 2:
+                     gamesite.exception_log.event(server_time, 'player %d at %s auto-resolve deploying at %r: %r' % \
+                                                  (session.player.user_id, session.viewing_base.base_id, deploy_location, deploy_list))
+
+                self.do_attack(session, retmsg, [deploy_location, deploy_list])
 
         if gamedata['server'].get('log_auto_resolve', 0) >= 3:
             log_func = lambda x: gamesite.exception_log.event(server_time, x)

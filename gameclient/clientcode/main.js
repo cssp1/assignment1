@@ -16112,7 +16112,7 @@ function update_attack_button_dialog(dialog) {
             dialog.widgets['auto_resolve_button'].show = player.auto_resolve_enabled() && (session.viewing_base.base_type === 'squad' || player.is_cheater) && !(!session.home_base && session.viewing_base.base_landlord_id === session.user_id);
             dialog.widgets['auto_resolve_button'].str = dialog.data['widgets']['auto_resolve_button'][(player.is_cheater && session.viewing_base.base_type !== 'squad') ? 'ui_name_dev': 'ui_name'];
 
-            if(session.deployed_unit_space <= 0) {
+            if(0 && session.deployed_unit_space <= 0) {
                 dialog.widgets['auto_resolve_button'].state = 'disabled';
                 dialog.widgets['auto_resolve_button'].tooltip.str = dialog.data['widgets']['auto_resolve_button']['ui_tooltip_no_units'];
             } else {
