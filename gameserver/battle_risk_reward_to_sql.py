@@ -45,7 +45,8 @@ def battles_risk_reward_schema(sql_util): return {
                ('damage_res3_value', 'INT4 NOT NULL'),
                ('damage_time_sec', 'INT4 NOT NULL'),
                ('damage_time_value', 'INT4 NOT NULL'),
-               ('is_victory', 'TINYINT(1) NOT NULL'),
+               ('is_victory', sql_util.bit_type()),
+               ('auto_resolved', sql_util.bit_type()),
                ('duration', 'INT4 NOT NULL'),
                ('gamebucks_spent_5min', 'INT4 NOT NULL'),
                ],
@@ -231,6 +232,7 @@ if __name__ == '__main__':
             time_price(-1*IFNULL((SELECT SUM(IF(damage.mobile,1,0.1)*damage.time) FROM $GAME_ID_battle_damage damage WHERE damage.battle_id = battles.battle_id AND damage.user_id = active_player_id),0)) AS damage_time_value,
 
             IF(active_player_outcome = 'victory', 1, 0) AS is_victory,
+            auto_resolved AS auto_resolved,
             duration AS duration,
 
             -- count all gamebucks spent by this player within +/- 5 minutes of the attack

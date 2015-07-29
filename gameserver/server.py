@@ -3067,6 +3067,8 @@ class Session(object):
         self.deployed_units = None # for analytics only, keep track of how many units of each type were deployed
         self.deployed_donated_units = None # for analytics only, keep track of how many units of each type were deployed (SUBSET of deployed_units)
 
+        self.auto_resolved = False # Flag that the current battle has been auto-resolved
+
         self.res_looter = None # ResLoot state object, set up at the beginning of each session
         self.starting_base_damage = None # copy of viewing_base.calc_base_damage() result made at the beginning of each session
 
@@ -15066,6 +15068,7 @@ class GAMEAPI(resource.Resource):
             summary.update(session.res_looter.battle_summary_props())
             if facebook_friends: summary['facebook_friends'] = True
             if session.viewing_user.social_id: summary['defender_social_id'] = session.viewing_user.social_id
+            if session.auto_resolved: summary['auto_resolved'] = 1
             if (not session.viewing_player.is_ai()):
                 summary['defender_summary'] = session.viewing_player.get_denormalized_summary_props('brief')
 
@@ -15668,6 +15671,7 @@ class GAMEAPI(resource.Resource):
                                 'attacker_outcome': 'victory' if (outcome == 'defeat') else 'defeat',
                                 'defender_outcome': outcome }
                     if apm is not None: summary['defender_apm'] = apm
+                    if session.auto_resolved: summary['auto_resolved'] = 1
                     summary.update(session.res_looter.battle_summary_props())
 
                     streak_cds = ['battle_streak']
@@ -15796,6 +15800,7 @@ class GAMEAPI(resource.Resource):
         session.starting_base_damage = None
         session.res_looter = None
         session.items_expended = {}
+        session.auto_resolved = False
         session.resurrectable_objects = []
         session.incoming_attack_type = None
         session.incoming_attack_data = None
@@ -20275,7 +20280,7 @@ class GAMEAPI(resource.Resource):
             return
 
         # only allow in squad battles, unless DEV edit mode is on
-        if (session.viewing_base.base_type != 'squad') and (not player.is_cheater):
+        if (session.viewing_base.base_type != 'squad') and (not session.player.is_cheater):
             retmsg.append(["ERROR", "HARMLESS_RACE_CONDITION"])
             return
 
@@ -20284,6 +20289,7 @@ class GAMEAPI(resource.Resource):
             return
 
         gamesite.exception_log.event(server_time, "XXXXXX implement auto resolve")
+        session.auto_resolved = True
 
     def object_combat_updates(self, session, retmsg, arg):
         # update hitpoints and (for mobile units only) XY position and movement orders
