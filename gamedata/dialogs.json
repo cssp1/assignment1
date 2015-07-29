@@ -7619,7 +7619,7 @@
 
     "region_map_dialog": {
         "dimensions": [736,423], "min_dimensions": [585,380],
-        "default_button": "close_button",
+        //"default_button": "close_button",
         "clip_children": 0, "transparent_to_mouse": 1,
         "widgets": {
             "bg": { "kind": "StaticImage", "xy": [0,0], "dimensions": [736,423], "asset": "dialog_resizable", "bg_image_resizable": 1, "transparent_to_mouse": 0 },
