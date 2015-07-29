@@ -16108,7 +16108,10 @@ function update_attack_button_dialog(dialog) {
             dialog.widgets['attack_button'].tooltip.str = dialog.data['widgets']['attack_button']['ui_tooltip_'+ (session.viewing_user_id == session.user_id ? 'stop_reinforcing' : 'stop_attack')];
             dialog.widgets['attack_button'].onclick = function(w) { retreat_from_attack(); };
 
-            dialog.widgets['auto_resolve_button'].show = player.auto_resolve_enabled();
+            // only allow in squad battles, unless DEV edit mode is on
+            dialog.widgets['auto_resolve_button'].show = player.auto_resolve_enabled() && (session.viewing_base.base_type === 'squad' || player.is_cheater);
+            dialog.widgets['auto_resolve_button'].str = dialog.data['widgets']['auto_resolve_button'][(player.is_cheater && session.viewing_base.base_type !== 'squad') ? 'ui_name_dev': 'ui_name'];
+
             dialog.widgets['auto_resolve_button'].onclick = function(w) {
                 var s = gamedata['strings']['auto_resolve_confirm'];
                 invoke_child_message_dialog(s['ui_title'], s['ui_description'],

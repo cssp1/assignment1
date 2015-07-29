@@ -898,7 +898,8 @@
             "auto_resolve_button": { "show": 0,
                                      "kind": "ActionButton", "xy": [2,60], "dimensions": [151,28], "bg_image": "action_button_resizable",
                                      "bg_image_resizable": 1, "text_size": 13, "text_style": "bold",
-                                     "ui_name": "Auto-Resolve", "ui_tooltip": "Finish battle automatically", "tooltip_delay": 0 }
+                                     "ui_name": "Auto-Resolve", "ui_name_dev": "Auto-Resolve (DEV only)",
+                                     "ui_tooltip": "Finish battle automatically", "tooltip_delay": 0 }
         }
     },
 

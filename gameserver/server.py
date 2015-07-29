@@ -20274,11 +20274,15 @@ class GAMEAPI(resource.Resource):
             retmsg.append(["ERROR", "HARMLESS_RACE_CONDITION"])
             return
 
+        # only allow in squad battles, unless DEV edit mode is on
+        if (session.viewing_base.base_type != 'squad') and (not player.is_cheater):
+            retmsg.append(["ERROR", "HARMLESS_RACE_CONDITION"])
+            return
+
         if not session.player.auto_resolve_enabled():
             retmsg.append(["ERROR", "SERVER_PROTOCOL"])
             return
 
-        # XXXXXX only allow in squad battles?
         gamesite.exception_log.event(server_time, "XXXXXX implement auto resolve")
 
     def object_combat_updates(self, session, retmsg, arg):
