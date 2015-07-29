@@ -16112,17 +16112,23 @@ function update_attack_button_dialog(dialog) {
             dialog.widgets['auto_resolve_button'].show = player.auto_resolve_enabled() && (session.viewing_base.base_type === 'squad' || player.is_cheater) && !(!session.home_base && session.viewing_base.base_landlord_id === session.user_id);
             dialog.widgets['auto_resolve_button'].str = dialog.data['widgets']['auto_resolve_button'][(player.is_cheater && session.viewing_base.base_type !== 'squad') ? 'ui_name_dev': 'ui_name'];
 
-            dialog.widgets['auto_resolve_button'].onclick = function(w) {
-                var s = gamedata['strings']['auto_resolve_confirm'];
-                invoke_child_message_dialog(s['ui_title'], s['ui_description'],
-                                            {'cancel_button': true,
-                                             'ok_button_ui_name': s['ui_button'],
-                                             'on_ok': function() {
-                                                 send_to_server.func(["AUTO_RESOLVE"]);
-                                                 retreat_from_attack(true);
-                                             }});
-
-            };
+            if(session.deployed_unit_space <= 0) {
+                dialog.widgets['auto_resolve_button'].state = 'disabled';
+                dialog.widgets['auto_resolve_button'].tooltip.str = dialog.data['widgets']['auto_resolve_button']['ui_tooltip_no_units'];
+            } else {
+                dialog.widgets['auto_resolve_button'].state = 'normal';
+                dialog.widgets['auto_resolve_button'].tooltip.str = dialog.data['widgets']['auto_resolve_button']['ui_tooltip'];
+                dialog.widgets['auto_resolve_button'].onclick = function(w) {
+                    var s = gamedata['strings']['auto_resolve_confirm'];
+                    invoke_child_message_dialog(s['ui_title'], s['ui_description'],
+                                                {'cancel_button': true,
+                                                 'ok_button_ui_name': s['ui_button'],
+                                                 'on_ok': function() {
+                                                     send_to_server.func(["AUTO_RESOLVE"]);
+                                                     retreat_from_attack(true);
+                                                 }});
+                };
+            }
         }
 
     } else { // has_attacked is FALSE
