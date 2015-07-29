@@ -99,7 +99,7 @@ if [[ "$FREQ" == "daily" ]]; then
   UPCACHE_FLAGS=""
   if [[ "$GAME_ID" == "mf" ]]; then
     UPCACHE_FLAGS+=" --lite"
-  fi    
+  fi
 
   ./upcache_to_mysql.py -q --parallel 8 $UPCACHE_FLAGS > /dev/null
   echo `date` "${GAME_ID} UPCACHE done" >> ${LOG}

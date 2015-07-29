@@ -14,9 +14,9 @@ S3_PATH="spinpunch-backups/analytics"
 while getopts "d:" flag
 do
     case $flag in
-	d)
-	    DBNAME="$OPTARG"
-	    ;;
+    d)
+        DBNAME="$OPTARG"
+        ;;
     esac
 done
 

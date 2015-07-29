@@ -1033,7 +1033,7 @@ if __name__ == '__main__':
 
             if 'villain_map_portrait' in data:
                 json += [("map_portrait", data['villain_map_portrait'][diff])]
-                
+
             if 'base_resource_loot' in data and data['base_resource_loot'][diff][i] is not None:
                 json += [("base_resource_loot", data['base_resource_loot'][diff][i])]
                 if 'base_richness' in data and data['base_richness'][diff][i] is not None:
@@ -1576,7 +1576,7 @@ if __name__ == '__main__':
             ("resources", { "player_level": data['starting_ai_level'][diff], "water": 0, "iron": 0 }),
             ("auto_level", 1),
             ("ui_info", "VICTORY COMPLETE\n" + data['ui_resets'])]
-        
+
         if 'villain_map_portrait' in data:
             json += [("map_portrait", data['villain_map_portrait'][diff])]
 
@@ -1585,7 +1585,7 @@ if __name__ == '__main__':
 
         assert unskipped_count == num_unskipped_bases
         assert (not (('skip' in data) and data['skip'][diff][-1])) # if last base is skipped, then we need to change our show_if predicate
-        
+
         # Dummy base "activation" predicate message can show for two cases:
         # 1. Player has already completed the event this week, and needs to wait for next week.
         # 2. While still logged in, a week boundary passes. The engine currently doesn't update the
