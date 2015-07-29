@@ -272,7 +272,12 @@ BattleLog.parse = function(my_id, summary, metlist) {
                 var spec = gamedata['auras'][data['spec']];
                 if(('show' in spec) && !spec['show']) { return; }
                 if(('show_in_battle_log' in spec) && !spec['show_in_battle_log']) { return; }
-                aura_list.push(spec['ui_name']);
+                var name = spec['ui_name'];
+                if(name.indexOf('%level') >= 0) {
+                    var level = ('level' in data ? data['level'] : 1);
+                    name = name.replace('%level', pretty_print_number(level));
+                }
+                aura_list.push(name);
             });
             if(aura_list.length > 0) {
                 //pr = (met['user_id'] == my_id) ? props.good : props.bad;
