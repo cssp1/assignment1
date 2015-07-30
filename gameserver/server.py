@@ -8123,8 +8123,13 @@ class Player(AbstractPlayer):
                    'base_map_path': None # explicit null for client's benefit
                    }
 
+        if self.squad_block_mode() == 'never':
+            exclude_filter = {'base_type': {'$ne': 'squad'}}
+        else:
+            exclude_filter = None
+
         # note: to avoid two successive map update broadcasts, wait until after lock release to send
-        if not gamesite.nosql_client.create_map_feature(self.home_region, feature['base_id'], feature, exclusive=0, originator=self.user_id, do_hook=False, reason='squad_enter_map'):
+        if not gamesite.nosql_client.create_map_feature(self.home_region, feature['base_id'], feature, exclusive=0, exclude_filter=exclude_filter, originator=self.user_id, do_hook=False, reason='squad_enter_map'):
             # map location already occupied - send update on what's blocking us
             results = list(gamesite.nosql_client.get_map_features_by_loc(self.home_region, coords, reason='squad_enter_map(fail)'))
             return False, [], ([rollback_feature]+results), ["INVALID_MAP_LOCATION", squad_id]
@@ -8223,6 +8228,10 @@ class Player(AbstractPlayer):
             new_entry = copy.copy(entry)
 
             squad_block_mode = self.squad_block_mode()
+            if squad_block_mode == 'never':
+                exclude_filter = {'base_type': {'$ne': 'squad'}}
+            else:
+                exclude_filter = None
 
             if check_path and coords and (len(coords) > 1) and (not gamedata['server'].get('trust_client_map_path', False)):
                 # This is a race-prone check to find conflicting features at intermediate waypoints (not including the final waypoint)
@@ -8232,7 +8241,7 @@ class Player(AbstractPlayer):
                 elif squad_block_mode == 'always':
                     blocked = gamesite.nosql_client.map_feature_occupancy_check(self.home_region, coords[:-1], reason = 'squad_step')
                 elif squad_block_mode == 'never':
-                    blocked = gamesite.nosql_client.map_feature_occupancy_check(self.home_region, coords[:-1], filter = {'base_type': {'$ne': 'squad'}}, reason = 'squad_step')
+                    blocked = gamesite.nosql_client.map_feature_occupancy_check(self.home_region, coords[:-1], exclude_filter = exclude_filter, reason = 'squad_step')
                 if blocked:
                     return False, [], [entry], ["INVALID_MAP_LOCATION", squad_id, 'path', coords[:-1]] # map location already occupied
 
@@ -8241,7 +8250,7 @@ class Player(AbstractPlayer):
             new_entry['base_map_path'] = new_path
             if not gamesite.nosql_client.move_map_feature(self.home_region, new_entry['base_id'], new_entry,
                                                           old_loc=entry['base_map_loc'], old_path=entry.get('base_map_path',None),
-                                                          exclusive=0, originator=self.user_id, reason='squad_step'):
+                                                          exclusive=0, exclude_filter=exclude_filter, originator=self.user_id, reason='squad_step'):
                 # conflict - check if we're moving into a friendly quarry with no other squad there
                 conflict_list = list(gamesite.nosql_client.get_map_features_by_loc(self.home_region, destination, reason='squad_step(conflict)'))
                 if (len(conflict_list) == 1) and (conflict_list[0].get('base_type',None) == 'quarry') and \

@@ -72,13 +72,14 @@ RegionMap.DeployCursor.prototype.draw = function() {
     var neighbors = this.map.region.get_neighbors(this.from_loc);
     goog.array.forEach(neighbors, function(loc) {
         var is_obstacle = this.map.region.obstructs_squads(loc);
-        var is_blocked = this.map.region.find_feature_at_coords(loc);
+        var is_blocked = this.map.region.occupancy.is_blocked(loc);
         var text_color = null, text_str = null;
         var text_alpha = (this.map.hovercell && vec_equals(loc, this.map.hovercell) ? '1.0 ' : '0.7');
         var cell_alpha = (this.map.hovercell && vec_equals(loc, this.map.hovercell) ? '0.4' : '0.2');
 
         if(is_obstacle || is_blocked) {
-            if(is_blocked && is_blocked['base_type'] == 'squad' && is_blocked['base_landlord_id'] != session.user_id) {
+            var blocker = this.map.region.find_feature_at_coords(loc);
+            if(blocker && blocker['base_type'] == 'squad' && blocker['base_landlord_id'] != session.user_id) {
                 text_color = 'rgba(255,255,0,';
                 text_str = gamedata['strings']['regional_map']['fight_to_escape'];
             } else {
@@ -99,8 +100,7 @@ RegionMap.DeployCursor.prototype.draw = function() {
 
     // transparent unit icon
     if(this.map.hovercell && hex_distance(this.map.hovercell, this.from_loc) == 1) {
-        var is_blocked = this.map.region.find_feature_at_coords(this.map.hovercell);
-        if(!is_blocked) {
+        if(!this.map.region.occupancy.is_blocked(this.map.hovercell)) {
             var hover_xy = this.map.cell_to_field(this.map.hovercell);
             SPUI.ctx.globalAlpha = 0.8;
             GameArt.assets[this.icon_assetname].states['normal'].draw(vec_add(hover_xy, vec_scale(0.5,gamedata['territory']['cell_size'])), 0, 0);
@@ -123,10 +123,10 @@ RegionMap.DeployCursor.prototype.on_mouseup = function(cell, button) {
     if(hex_distance(cell, this.from_loc) == 1) {
         if(this.map.region.obstructs_squads(cell)) { return true; } // obstructed
 
-        var is_blocked = this.map.region.find_feature_at_coords(cell);
-        if(is_blocked) {
-            if(is_blocked['base_type'] == 'squad' && is_blocked['base_landlord_id'] != session.user_id) {
-                do_visit_base(-1, {base_id: is_blocked['base_id']});
+        if(this.map.region.occupancy.is_blocked(cell)) {
+            var blocker = this.map.region.find_feature_at_coords(cell);
+            if(blocker && blocker['base_type'] == 'squad' && blocker['base_landlord_id'] != session.user_id) {
+                do_visit_base(-1, {base_id: blocker['base_id']});
                 this.map.cursor = null;
                 return true;
             }
@@ -194,7 +194,7 @@ RegionMap.MoveCursor.prototype.do_get_path = function(cell) {
         var feature_list;
         var is_my_home = false, is_my_quarry = false, is_blocked = false;
 
-        if(this.map.region.obstructs_squads(cell)) {
+        if(this.map.region.obstructs_squads(cell)) { // mountain?
             is_blocked = true; feature_list = [];
         } else {
             feature_list = this.map.region.find_features_at_coords(cell);
@@ -205,48 +205,45 @@ RegionMap.MoveCursor.prototype.do_get_path = function(cell) {
                 is_my_home = true;
             } else if(f['base_type'] == 'quarry' && f['base_landlord_id'] == session.user_id) {
                 is_my_quarry = true;
-            } else if(f['base_type'] == 'squad' && (f['base_landlord_id'] != session.user_id) || parseInt(f['base_id'].split('_')[1],10) != this.squad_id) {
-                // some squad other than this one
+                if(feature_list.length >= 2) {
+                    is_blocked = true; // your own quarry, and a second feature is already there, so no additional guard is allowed
+                }
+            } else if(f['base_type'] == 'squad' && f['base_landlord_id'] == session.user_id && parseInt(f['base_id'].split('_')[1],10) == this.squad_id) {
+                return; // don't block ourself
+            } else if(this.map.region.feature_blocks_map(f)) {
                 is_blocked = true;
             }
-        });
+        }, this);
 
-        if(is_blocked || feature_list.length >= 1) {
-            if(is_my_home || (is_my_quarry && !is_blocked)) {
-                // see if we have a path that leads up to it
-                if(hex_distance(player.squads[this.squad_id.toString()]['map_loc'], cell) == 1) {
-                    this.path = []; // 1 step away
-                } else {
-                    // not good path, try another adjacent destination
-                    this.path = player.squad_find_path_adjacent_to(this.squad_id, cell);
-                }
-
-                if(this.path !== null) {
-                    if(is_my_quarry) {
-                        // have to add the final jump manually
-                        this.path.push(cell);
-                    }
-                    return {'action': (is_my_home ? 'recall' : 'move'),
-                            'ui_name': gamedata['strings']['regional_map'][(is_my_home ? 'recall' : 'guard')],
-                            'text_color': (is_my_home ? 'rgba(128,255,128,1.0)' : 'rgba(128,200,255,1.0)')};
-                } else {
-                    // cannot get to home or friendly quarry
-                    return {'action':'blocked',
-                            'ui_name': gamedata['strings']['regional_map']['movement_blocked'],
-                            'text_color': 'rgba(255,0,0,1.0)'};
-                }
+        if(is_my_home || (is_my_quarry && !is_blocked)) {
+            // see if we have a path that leads up to it
+            if(hex_distance(player.squads[this.squad_id.toString()]['map_loc'], cell) == 1) {
+                this.path = []; // 1 step away
             } else {
-                if(1 || feature_list.length >= 1) {
-                    // destination occupied
-                    this.path = player.squad_find_path_adjacent_to(this.squad_id, cell); // show path as far as we can go
-                } else {
-                    // dest hex itself is obstruced
-                    this.path = null;
+                // not good path, try another adjacent destination
+                this.path = player.squad_find_path_adjacent_to(this.squad_id, cell);
+            }
+
+            if(this.path !== null) {
+                if(is_my_quarry) {
+                    // have to add the final jump manually
+                    this.path.push(cell);
                 }
+                return {'action': (is_my_home ? 'recall' : 'move'),
+                        'ui_name': gamedata['strings']['regional_map'][(is_my_home ? 'recall' : 'guard')],
+                        'text_color': (is_my_home ? 'rgba(128,255,128,1.0)' : 'rgba(128,200,255,1.0)')};
+            } else {
+                // cannot get to home or friendly quarry
                 return {'action':'blocked',
                         'ui_name': gamedata['strings']['regional_map']['movement_blocked'],
                         'text_color': 'rgba(255,0,0,1.0)'};
             }
+        } else if(is_blocked) {
+            // destination occupied
+            this.path = player.squad_find_path_adjacent_to(this.squad_id, cell); // show path as far as we can go
+            return {'action':'blocked',
+                    'ui_name': gamedata['strings']['regional_map']['movement_blocked'],
+                    'text_color': 'rgba(255,0,0,1.0)'};
         } else {
             this.path = player.squad_find_path_adjacent_to(this.squad_id, cell);
             if(!this.path || this.path.length<1 || !vec_equals(this.path[this.path.length-1], cell)) {

@@ -28023,7 +28023,7 @@ function make_squad_tile(dialog, squad_data, ij, dlg_mode) {
                             var neighbors = session.region.get_neighbors(player.home_base_loc);
                             var deploy_at = null;
                             goog.array.forEach(neighbors, function(xy) {
-                                if(!session.region.find_feature_at_coords(xy)) {
+                                if(!session.region.occupancy.is_blocked(xy)) {
                                     deploy_at = xy;
                                 }
                             });
@@ -28035,8 +28035,11 @@ function make_squad_tile(dialog, squad_data, ij, dlg_mode) {
                             // perform deployment
                             player.squads[squad_id.toString()]['pending'] = true;
                             send_to_server.func(["CAST_SPELL", GameObject.VIRTUAL_ID, "SQUAD_ENTER_MAP", squad_id, deploy_at]);
-                            // queue movement
-                            player.squad_set_client_data(squad_id, 'squad_orders', {'move': to_loc});
+
+                            if(!vec_equals(deploy_at, to_loc)) {
+                                // queue movement
+                                player.squad_set_client_data(squad_id, 'squad_orders', {'move': to_loc});
+                            }
 
                             // play movement sound
                             if(_squad_tile.user_data['icon_unit_specname']) {
