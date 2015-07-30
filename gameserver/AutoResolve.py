@@ -78,6 +78,8 @@ def resolve(session, log_func = None):
     # iterate until nothing that can shoot is left alive OR
     # nothing can be damaged by what's left.
 
+    # XXX things that will break this: kills_self spells, security team spawning
+
     iter_max = 10000 # protect against infinite loop
     cur_iter = 0
 
