@@ -6013,6 +6013,27 @@ player.auto_resolve_enabled = function() {
     }
 };
 
+/** @return {string} */
+player.squad_block_mode = function() {
+    var mode = gamedata['territory']['squad_block_mode'];
+    if(session.region && session.region.data && ('squad_block_mode' in session.region.data)) {
+        mode = session.region.data['squad_block_mode'];
+    }
+    mode = player.get_any_abtest_value('squad_block_mode', mode);
+    if(!goog.array.contains(['always', 'after_move', 'never'], mode)) { throw Error('bad squad_block_mode '+mode); }
+    return mode;
+};
+
+/** @return {boolean} */
+player.squad_combat_enabled = function() {
+    var ret = gamedata['territory']['enable_squad_combat'];
+    if(session.region && session.region.data && ('enable_squad_combat' in session.region.data)) {
+        ret = session.region.data['enable_squad_combat'];
+    }
+    ret = player.get_any_abtest_value('enable_squad_combat', ret);
+    return ret;
+}
+
 player.unit_speedups_enabled = function() { return player.is_cheater || !('enable_unit_speedups' in gamedata) || gamedata['enable_unit_speedups']; };
 player.crafting_speedups_enabled = function() { return player.is_cheater || !('enable_crafting_speedups' in gamedata) || gamedata['enable_crafting_speedups']; };
 player.resource_gifts_enabled = function() { return (player.get_any_abtest_value('enable_resource_gifts', gamedata['enable_resource_gifts']) &&
@@ -19681,6 +19702,11 @@ Region.prototype.feature_shown = function(feature) {
     return true;
 };
 
+/** @return {boolean} */
+Region.prototype.feature_blocks_map = function(feature) {
+    return (feature['base_type'] !== 'squad' || player.squad_block_mode() !== 'never');
+};
+
 // note: just checking for presence of base_map_path is not correct, because sometimes squads
 // get to where they're going, and the base_map_path on the server side disappears, but that
 // deletion does not make it out to the client, so we may see a stale value.
@@ -19893,6 +19919,7 @@ Region.prototype.receive_feature_update = function(res) {
 
         } else {
             if(gamedata['territory']['check_map_integrity'] >= 2) { this.check_map_integrity('receive_feature_update, existing, update, enter'); }
+            var do_block = this.feature_blocks_map(feature);
 
             if(!preserve_locks) {
                 // for incremental updates, a missing
@@ -19907,13 +19934,13 @@ Region.prototype.receive_feature_update = function(res) {
                (cur_loc && (!new_loc || cur_loc[0] != new_loc[0] || cur_loc[1] != new_loc[1]))) {
 
                 // XXXXXX check if block_hex assumed invariant still fails sometimes
-                if(cur_loc) {
+                if(cur_loc && do_block) {
                     this.occupancy.unblock_hex_maybe(cur_loc, feature);
                     //this.occupancy.block_hex(cur_loc, -1, feature);
                 }
                 this.map_index.remove(feature['base_id'], cur_loc||null, feature);
 
-                if(new_loc) {
+                if(new_loc && do_block) {
                     this.occupancy.block_hex(new_loc, 1, feature);
                 }
                 this.map_index.insert(feature['base_id'], new_loc||null, feature);
@@ -19933,7 +19960,9 @@ Region.prototype.receive_feature_update = function(res) {
             if(gamedata['territory']['check_map_integrity'] >= 2) { this.check_map_integrity('receive_feature_update, new, enter'); }
             this.features.push(res);
             if(res['base_map_loc']) {
-                this.occupancy.block_hex(res['base_map_loc'],1,res);
+                if(this.feature_blocks_map(res)) {
+                    this.occupancy.block_hex(res['base_map_loc'],1,res);
+                }
             } else {
                 //throw Error('received a feature update without base_map_loc! region '+(this.data ? this.data['id'] : 'NULL!')+' base_id '+res['base_id'].toString());
             }
@@ -19960,8 +19989,9 @@ Region.prototype.receive_update = function(db_time, result, last_db_time) {
         this.map_index.clear();
         this.for_each_feature((function (_this) { return function(feature) {
             if(feature['base_map_loc']) {
-                _this.occupancy.block_hex(feature['base_map_loc'],1,feature);
-
+                if(_this.feature_blocks_map(feature)) {
+                    _this.occupancy.block_hex(feature['base_map_loc'],1,feature);
+                }
             } else {
                 throw Error('received a feature without base_map_loc! region '+(_this.data ? _this.data['id'] : 'NULL')+' base_id '+feature['base_id'].toString());
             }
@@ -28228,13 +28258,13 @@ player.squad_find_path_adjacent_to = function(squad_id, dest) {
 
     // note! A* code tends to blow up memory/CPU if you ask it to go into a blocked destination
 
-    // When pass_moving_squads is enabled, allow travel through hexes that are reserved as the destination
+    // When squad_block_mode is 'after_move', allow travel through hexes that are reserved as the destination
     // of another squad before its arrival time. This requires a path-dependent blockage check, since the
     // arrival time to check against depends on how long it takes us to get ther.
 
     /** @type AStar.PathChecker */
     var path_checker = null;
-    if(gamedata['territory']['pass_moving_squads']) {
+    if(player.squad_block_mode() === 'after_move') {
         path_checker = function (_squad_id, _dest) { return function(cell, path) {
             if(cell.block_count > 0) {
                 for(var i = 0; i < cell.blockers.length; i++) {

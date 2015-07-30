@@ -1518,19 +1518,20 @@ class NoSQLClient (object):
             self.region_table(region, 'map_deletions').remove({'_id':base_id})
         return success
 
-    def map_feature_occupancy_check(self, region, coord_list, reason=''):
-        return self.instrument('map_feature_occupancy_check(%s)'%(reason), self._map_feature_occupancy_check, (region,coord_list))
-    def _map_feature_occupancy_check(self, region, coord_list):
+    def map_feature_occupancy_check(self, region, coord_list, filter = None, reason=''):
+        return self.instrument('map_feature_occupancy_check(%s)'%(reason), self._map_feature_occupancy_check, (region,coord_list,filter))
+    def _map_feature_occupancy_check(self, region, coord_list, filter):
         #qs = {'base_map_loc':{'$in':coord_list}} # doesn't work due to limitations of MongoDB 2d indices
         #qs = {'$or': [{'base_map_loc':coord} for coord in coord_list]} # works, but slow
         #NOT_EXPIRED = {'$or':[{'base_expire_time':{'$exists':False}},{'base_expire_time':{'$lte':0}},{'base_expire_time':{'$gt':self.time}}]}
         qs = {'base_map_loc_flat': {'$in': [self.flatten_map_loc(c) for c in coord_list]}} # ,NOT_EXPIRED}
+        if filter: qs.update(filter)
         return self.region_table(region, 'map').find_one(qs) is not None
 
     # waypoint_list is [{'xy':[x,y], 'eta':time}, ...]
-    def map_feature_occupancy_check_dynamic(self, region, waypoint_list, reason=''):
-        return self.instrument('map_feature_occupancy_check_dynamic(%s)'%(reason), self._map_feature_occupancy_check_dynamic, (region,waypoint_list))
-    def _map_feature_occupancy_check_dynamic(self, region, waypoint_list):
+    def map_feature_occupancy_check_dynamic(self, region, waypoint_list, filter = None, reason=''):
+        return self.instrument('map_feature_occupancy_check_dynamic(%s)'%(reason), self._map_feature_occupancy_check_dynamic, (region,waypoint_list,filter))
+    def _map_feature_occupancy_check_dynamic(self, region, waypoint_list, filter):
         qs = {'$or': [ # at any waypoint
                {'$and': [ # is a feature present here before we'd pass it?
                  {'base_map_loc_flat': self.flatten_map_loc(w['xy'])},
@@ -1538,7 +1539,7 @@ class NoSQLClient (object):
                          {'base_map_path':{'$type':10}}, # is null
                          {'base_map_path_eta':{'$exists':False}},
                          {'base_map_path_eta':{'$lte':w['eta']}}]}
-               ] } \
+               ] + ([filter,] if filter else []) } \
                for w in waypoint_list
              ] }
         return self.region_table(region, 'map').find_one(qs) is not None

@@ -7567,6 +7567,21 @@ class Player(AbstractPlayer):
         else:
             return gamedata['territory'].get('enable_auto_resolve', False)
 
+    def squad_block_mode(self):
+        mode = gamedata['territory']['squad_block_mode']
+        if self.home_region in gamedata['regions']:
+            mode = gamedata['regions'][self.home_region].get('squad_block_mode', mode)
+        mode = self.get_any_abtest_value('squad_block_mode', mode)
+        assert mode in ('after_move', 'always', 'never')
+        return mode
+    def squad_combat_enabled(self):
+        ret = gamedata['territory']['enable_squad_combat']
+        if self.home_region in gamedata['regions'] and \
+           'enable_squad_combat' in gamedata['regions'][self.home_region]:
+            ret = gamedata['regions'][self.home_region]['enable_squad_combat']
+        ret = self.get_any_abtest_value('enable_squad_combat', ret)
+        return ret
+
     def unit_speedups_enabled(self):
         return self.is_cheater or gamedata.get('enable_unit_speedups', True)
     def crafting_speedups_enabled(self):
@@ -8207,13 +8222,17 @@ class Player(AbstractPlayer):
 
             new_entry = copy.copy(entry)
 
+            squad_block_mode = self.squad_block_mode()
+
             if check_path and coords and (len(coords) > 1) and (not gamedata['server'].get('trust_client_map_path', False)):
-                # This is a race-prone check on intermediate waypoints (not including the final waypoint)
+                # This is a race-prone check to find conflicting features at intermediate waypoints (not including the final waypoint)
                 # We don't really care about squads crossing each other. The final waypoint is checked atomically below.
-                if gamedata['territory'].get('pass_moving_squads', False):
+                if squad_block_mode == 'after_move':
                     blocked = gamesite.nosql_client.map_feature_occupancy_check_dynamic(self.home_region, new_path[1:-1], reason = 'squad_step')
-                else:
+                elif squad_block_mode == 'always':
                     blocked = gamesite.nosql_client.map_feature_occupancy_check(self.home_region, coords[:-1], reason = 'squad_step')
+                elif squad_block_mode == 'never':
+                    blocked = gamesite.nosql_client.map_feature_occupancy_check(self.home_region, coords[:-1], filter = {'base_type': {'$ne': 'squad'}}, reason = 'squad_step')
                 if blocked:
                     return False, [], [entry], ["INVALID_MAP_LOCATION", squad_id, 'path', coords[:-1]] # map location already occupied
 
