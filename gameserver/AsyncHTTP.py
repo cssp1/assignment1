@@ -201,10 +201,13 @@ class AsyncHTTPRequester(object):
                     # for HTTP errors, we want the status AND any explanatory response that came with it
                     # (since APIs like Facebook and S3 usually have useful info in the response body when returning errors)
                     ui_reason = 'twisted.web.error.Error(HTTP %s (%s): "%s")' % (reason.value.status, reason.value.message, reason.value.response)
+                    body = reason.value.response
                 else:
                     ui_reason = repr(reason.value)
+                    body = None # things like TimeoutError have no .response attribute
+
                 if request.callback_type == self.CALLBACK_FULL:
-                    request.error_callback(ui_reason = ui_reason, body = reason.value.response, headers = getter.response_headers, status = getter.status)
+                    request.error_callback(ui_reason = ui_reason, body = body, headers = getter.response_headers, status = getter.status)
                 else:
                     request.error_callback(ui_reason)
             except:
