@@ -79,7 +79,7 @@ RegionMap.DeployCursor.prototype.draw = function() {
 
         if(is_obstacle || is_blocked) {
             var blocker = this.map.region.find_feature_at_coords(loc);
-            if(blocker && blocker['base_type'] == 'squad' && blocker['base_landlord_id'] != session.user_id) {
+            if(blocker && blocker['base_type'] == 'squad' && blocker['base_landlord_id'] != session.user_id && player.squad_combat_enabled()) {
                 text_color = 'rgba(255,255,0,';
                 text_str = gamedata['strings']['regional_map']['fight_to_escape'];
             } else {
@@ -126,7 +126,9 @@ RegionMap.DeployCursor.prototype.on_mouseup = function(cell, button) {
         if(this.map.region.occupancy.is_blocked(cell)) {
             var blocker = this.map.region.find_feature_at_coords(cell);
             if(blocker && blocker['base_type'] == 'squad' && blocker['base_landlord_id'] != session.user_id) {
-                do_visit_base(-1, {base_id: blocker['base_id']});
+                if(player.squad_combat_enabled()) {
+                    do_visit_base(-1, {base_id: blocker['base_id']});
+                }
                 this.map.cursor = null;
                 return true;
             }
@@ -831,6 +833,8 @@ RegionMap.RegionMap.prototype.on_mousewheel = function(uv, offset, delta) {
 
 // return value is fed into "buttons" down below
 RegionMap.RegionMap.prototype.make_nosql_spy_buttons = function(feature) {
+    if(feature['base_type'] === 'squad' && !player.squad_combat_enabled()) { return []; }
+
     var info = PlayerCache.query_sync(feature['base_landlord_id']);
     var same_alliance = info && info['alliance_id'] && session.is_in_alliance() && info['alliance_id'] == session.alliance_id;
     var pre_attack = player.get_any_abtest_value('squad_pre_attack', gamedata['client']['squad_pre_attack']) && feature['base_type'] == 'squad' && feature['base_landlord_id'] != session.user_id && !same_alliance;
@@ -927,10 +931,12 @@ RegionMap.RegionMap.update_feature_popup_menu = function(dialog) {
                     }; })(mapwidget, feature, squad_data), ((squad_data['pending'] || player.squad_get_client_data(squad_data['id'], 'halt_pending')) ? 'disabled' : 'normal')]);
 
                 } else {
-                    buttons.push([gamedata['strings']['regional_map']['instant_visit_own_squad'],
-                              (function(_feature) { return function() {
-                                  do_visit_base(-1, {base_id:_feature['base_id']});
-                              }; })(feature)]);
+                    if(player.squad_combat_enabled()) {
+                        buttons.push([gamedata['strings']['regional_map']['instant_visit_own_squad'],
+                                      (function(_feature) { return function() {
+                                          do_visit_base(-1, {base_id:_feature['base_id']});
+                                      }; })(feature)]);
+                    }
 
                     buttons.push([gamedata['strings']['regional_map']['move'], (function(_mapwidget, _feature, _squad_data) { return function() {
                         _mapwidget.set_popup(null);
@@ -1086,11 +1092,13 @@ RegionMap.RegionMap.update_feature_popup_menu = function(dialog) {
         // SPY
         buttons = buttons.concat(mapwidget.make_nosql_spy_buttons(feature));
         // CALL SQUAD
-        buttons.push([gamedata['strings']['regional_map']['call'],
-                      (function(_mapwidget, _feature) { return function() {
-                          _mapwidget.set_popup(null);
-                          var picker = do_invoke_squad_control('call', {'call_to':_feature['base_map_loc']});
-                      }; })(mapwidget, feature), 'passive']);
+        if(player.squad_combat_enabled()) {
+            buttons.push([gamedata['strings']['regional_map']['call'],
+                          (function(_mapwidget, _feature) { return function() {
+                              _mapwidget.set_popup(null);
+                              var picker = do_invoke_squad_control('call', {'call_to':_feature['base_map_loc']});
+                          }; })(mapwidget, feature), 'passive']);
+        }
         // GET INFO
         buttons.push([gamedata['strings']['regional_map']['get_info'],
                       (function (_mapwidget, _feature) { return function() {

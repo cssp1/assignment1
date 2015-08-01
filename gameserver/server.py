@@ -15987,7 +15987,8 @@ class GAMEAPI(resource.Resource):
 
                 if (not dest_feature) or \
                    (('base_map_path' in dest_feature) and (dest_feature['base_map_path'][-1]['eta']>server_time)) or \
-                   (dest_feature['base_type'] not in ('hive', 'quarry', 'home', 'squad')):
+                   (dest_feature['base_type'] not in ('hive', 'quarry', 'home', 'squad')) or \
+                   (dest_feature['base_type'] == 'squad' and not session.player.squad_combat_enabled()):
                     if gamedata['server'].get('log_nosql',0) < 2 and dest_base_id[0]=='s':
                         pass # do not bother logging failed attempts to spy on squads that have moved
                     else:
