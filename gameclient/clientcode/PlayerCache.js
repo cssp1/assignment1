@@ -168,3 +168,14 @@ PlayerCache._get_ui_name = function(info) {
 PlayerCache.get_ui_name = function(info) {
     return PlayerCache._get_ui_name(info) || 'Unknown(pc)';
 };
+
+/** hack - cut off the "COL. " rank prefix where we don't want it
+    @param {string} ui_name
+    @returns {string} */
+PlayerCache.strip_title_prefix = function(ui_name) {
+    var i = ui_name.indexOf('. ');
+    if(i >= 1) {
+        return ui_name.slice(i+2);
+    }
+    return ui_name;
+};

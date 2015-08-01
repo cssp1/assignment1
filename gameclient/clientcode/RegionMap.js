@@ -886,7 +886,7 @@ RegionMap.RegionMap.prototype.make_bookmark_button = function(feature) {
                 if(_feature['base_type'] == 'quarry') {
                     bm_name = gamedata['strings']['regional_map']['quarry'].replace('%s',_feature['base_ui_name']);
                 } else if(_feature['base_landlord_id'] && PlayerCache.query_sync(_feature['base_landlord_id'])) {
-                    bm_name = _this.pcache_to_name(PlayerCache.query_sync(_feature['base_landlord_id']));
+                    bm_name = _this.pcache_to_name(PlayerCache.query_sync(_feature['base_landlord_id']), 0);
                 } else if(_feature['base_ui_name']) {
                     bm_name = _feature['base_ui_name'];
                 } else {
@@ -1273,7 +1273,7 @@ RegionMap.RegionMap.update_feature_popup = function(dialog) {
                 ui.widgets['portrait_pending'].show = true;
             } else {
                 ui.widgets['portrait_pending'].show = false;
-                ui.widgets['name'].str = mapwidget.pcache_to_name(info);
+                ui.widgets['name'].str = mapwidget.pcache_to_name(info, 0);
                 ui.widgets['portrait'].onclick = (function (_info) { return function(w) {
                     PlayerInfoDialog.invoke(_info['user_id']);
                 }; })(info);
@@ -1816,10 +1816,13 @@ RegionMap.RegionMap.prototype.sort_features_for_draw = function(roi, feature_lis
 
 // convert PlayerCache entry to the most specific name we can
 /** @param {Object} info
-    @param {boolean=} abbreviate */
+    @param {number} abbreviate (0 = full name, 1 = strip title, 2 = strip title and level) */
 RegionMap.RegionMap.prototype.pcache_to_name = function(info, abbreviate) {
     var name = PlayerCache._get_ui_name(info) || gamedata['strings']['regional_map']['unknown_name'];
-    if(!abbreviate && ('player_level' in info)) {
+    if(abbreviate >= 1) {
+        name = PlayerCache.strip_title_prefix(name);
+    }
+    if(abbreviate < 2 && ('player_level' in info)) {
         name += ' L'+info['player_level'].toString();
     }
     return name;
@@ -2120,7 +2123,7 @@ RegionMap.RegionMap.prototype.draw_feature = function(feature) {
             if(!label && ('base_landlord_id' in feature)) {
                 var info = PlayerCache.query_sync_fetch(feature['base_landlord_id']);
                 if(info) {
-                    label = this.pcache_to_name(info, this.zoom < gamedata['territory']['abbreviate_labels_below_zoom']);
+                    label = this.pcache_to_name(info, (this.zoom < gamedata['territory']['abbreviate_labels_below_zoom'] ? 2 : 1));
                 } else {
                     label = gamedata['strings']['regional_map']['loading'];
                 }
