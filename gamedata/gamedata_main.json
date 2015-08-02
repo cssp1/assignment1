@@ -242,7 +242,9 @@
         "enable_alliance_chat_tags": 1,
         "enable_alliance_role_gui": 1,
 
-        "default_chat_tab": [[{"predicate":"HOME_REGION", "regions": ["ANY"]}, "REGION"],
+        "default_chat_tab": [[{"predicate": "AND", "subpredicates": [
+            {"predicate": "LIBRARY", "name": "quarry_requirement"},
+            {"predicate":"HOME_REGION", "regions": ["ANY"]}]}, "REGION"],
                              [{"predicate":"ALWAYS_TRUE"}, "GLOBAL"]],
         "maximize_chat_on_login_if": {"predicate": "AND", "subpredicates":[
             { "predicate": "PLAYER_HISTORY", "key": "logged_in_times", "method": ">=", "value": 5 },

@@ -14410,7 +14410,7 @@ function init_chat_frame() {
     dialog.user_data['channel_to_tab'] = {};
     //dialog.ondraw = update_chat_frame; this is now called from the master do_draw() because it can change Z order of chat frame and desktop dialogs
     dialog.user_data['channel_names'] = [];
-    if(gamedata['enable_region_map']) {
+    if(player.get_any_abtest_value('enable_region_map', gamedata['enable_region_map'])) {
         dialog.user_data['channel_names'].push('REGION');
     }
     dialog.user_data['channel_names'].push('GLOBAL');
@@ -18875,7 +18875,7 @@ function do_collect_deposit(deposit) {
 
 /** @param {Array.<ContextMenuButton>} buttons */
 function add_change_region_button(buttons) {
-    if(gamedata['enable_region_map'] && player.get_any_abtest_value('change_region_requirement', gamedata['territory']['change_region_requirement'])['predicate'] != 'ALWAYS_FALSE') {
+    if(player.get_any_abtest_value('enable_region_map', gamedata['enable_region_map']) && player.get_any_abtest_value('change_region_requirement', gamedata['territory']['change_region_requirement'])['predicate'] != 'ALWAYS_FALSE') {
         var pred = read_predicate(player.get_any_abtest_value('change_region_requirement', gamedata['territory']['change_region_requirement']));
         var spell = gamedata['spells']['CHANGE_REGION'];
         var ui_name = spell['ui_name'];
@@ -19089,7 +19089,8 @@ function invoke_building_context_menu(mouse_xy) {
             }
         }
 
-        if(session.home_base && obj.spec['name'] === gamedata['region_map_building'] && !obj.is_under_construction()) {
+        // note: redundant with townhall check below if region_map_building is the same as townhall
+        if(session.home_base && obj.spec['name'] === gamedata['region_map_building'] && gamedata['region_map_building'] !== gamedata['townhall'] && !obj.is_under_construction()) {
             // SHOW MAP button
             //add_regional_map_button(buttons);
 
@@ -27416,7 +27417,7 @@ function alliance_info_member_rowfunc(dialog, row, rowdata) {
             // TOOLTIP: role, last played (if alliancemate), donations, member since
             d.user_data['tip_info'] = [];
             d.user_data['tip_info'].push(d.user_data['ui_role']);
-            if(gamedata['enable_region_map']) { d.user_data['tip_info'].push(d.user_data['ui_home']); }
+            if(player.get_any_abtest_value('enable_region_map', gamedata['enable_region_map'])) { d.user_data['tip_info'].push(d.user_data['ui_home']); }
             if(gamedata['client']['show_alliance_mate_last_played_time'] && (session.alliance_id == d.parent.user_data['alliance_id'])) {
                 d.user_data['tip_info'].push(d.user_data['ui_last_played'] || '');
             }
