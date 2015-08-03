@@ -650,8 +650,10 @@ TurretHeadDialog.set_stats_display = function(dialog, emplacement_obj, name, rel
             left.show = right.show = true;
             var stat = statlist[i];
 
-            var modchain = ModChain.make_chain(ModChain.get_base_value(stat, spec, spec['level'] || 1), {'level':spec['level'] || 1});
-            var relative_modchain = (relative_to ? ModChain.make_chain(ModChain.get_base_value(stat, relative_spec, relative_spec['level'] || 1), {'level':relative_spec['level'] || 1}) : null);
+            // grab the stat from the emplacement, if it has it. This might not work if there's overlap
+            // between modstats that apply to emplacements (?)
+            var modchain = emplacement_obj.modstats[stat] || ModChain.make_chain(ModChain.get_base_value(stat, spec, spec['level'] || 1), {'level':spec['level'] || 1});
+            var relative_modchain = (relative_to ? emplacement_obj.modstats[stat] || ModChain.make_chain(ModChain.get_base_value(stat, relative_spec, relative_spec['level'] || 1), {'level':relative_spec['level'] || 1}) : null);
 
             ModChain.display_label_widget(left, stat, spell, true);
 
