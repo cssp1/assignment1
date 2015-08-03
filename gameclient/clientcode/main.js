@@ -9915,6 +9915,10 @@ SPINPUNCHGAME.init = function() {
               !chrome_version_atleast(33,0,1721,0)) {
         unsupported_reason = 'Chrome v33 beta with JS parser bug';
         unsupported_url = gamedata['strings']['bad_chrome_version_landing'];
+    } else if(spin_demographics['browser_name'] === 'Chrome' &&
+              chrome_version_atleast(42,0,0,0) &&
+              !chrome_version_atleast(43,0,0,0)) {
+        unsupported_reason = 'Chrome v42 with audio bug';
     }
 
     if(unsupported_reason) {
