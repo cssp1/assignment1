@@ -545,10 +545,26 @@ ModChain.display_value_detailed = function(stat, modchain, spec, level, auto_spe
 
     ModChain.check_chain(modchain);
 
+    var color = SPUI.default_text_color;
+
+    // has final stat changed from base value? if so, alter color
+    if(modchain['mods'].length>1 && modchain['val'] != modchain['mods'][0]['val']) {
+        var is_worse = false;
+        if(typeof(modchain['val']) === 'number') {
+            if(modchain['val'] < modchain['mods'][0]['val']) {
+                is_worse = true;
+            }
+            if((ui_data['better']||1) < 0) {
+                is_worse = !is_worse;
+            }
+        }
+        color = (is_worse ? SPUI.make_colorv([1,1,0,1]) : SPUI.good_text_color);
+    }
+
     return {str: ModChain.display_value(modchain['val'], ui_data['display']||null, 'widget'),
             value: modchain['val'],
             tooltip: gamedata['strings']['modstats']['tooltip_'+(!show_base && (modchain['mods'].length<2) ? 'base':'mods')].replace('%NAME', ui_data['ui_name']).replace('%DESCRIPTION', ui_data['ui_tooltip']).replace('%MODS', ModChain.display_tooltip(stat, modchain, show_base, ui_data)) + (extra ? '\n\n'+extra : ''),
-            color: ((modchain['mods'].length>1 && modchain['val'] != modchain['mods'][0]['val']) ? SPUI.good_text_color : SPUI.default_text_color)};
+            color: color};
 };
 
 /** same as above, and then apply to a SPUI widget
