@@ -4138,6 +4138,17 @@ Building.prototype.minefield_item = function() {
     return null;
 };
 
+// search session for any player-owned minefield building
+var find_any_player_minefield = function() {
+    for(var id in session.cur_objects.objects) {
+        var obj = session.cur_objects.objects[id];
+        if(obj.is_building() && obj.is_minefield() && obj.team === 'player') {
+            return obj;
+        }
+    }
+    return null;
+};
+
 Building.prototype.is_producer = function() {
     return ('production_capacity' in this.spec);
 };
@@ -6819,6 +6830,28 @@ function equip_is_compatible_with_building(unit, slot_type, espec, ignore_min_le
 function equip_is_compatible_with_unit(techname, specname, slot_type, espec, ignore_min_level) {
     return equip_is_compatible_with_slot(gamedata['units'][specname], player.tech[techname]||0, slot_type, espec, ignore_min_level);
 }
+
+/** Find any player-owned building in the session that is compatible with a given equip item
+    @param {Object} item_spec
+    @return {Building|null} */
+function find_any_compatible_building(item_spec) {
+    var equip = item_spec['equip'];
+    var crit_list = ('compatible' in equip ? equip['compatible'] : [equip]);
+    for(var i = 0; i < crit_list.length; i++) {
+        var crit = crit_list[i];
+        if(crit['kind'] === 'building') {
+            for(var id in session.cur_objects.objects) {
+                var obj = session.cur_objects.objects[id];
+                if(obj.spec['equip_slots'] && crit['slot_type'] in obj.spec['equip_slots'] &&
+                   equip_is_compatible_with_building(obj, crit['slot_type'], item_spec, true) &&
+                   obj.team === 'player') {
+                    return obj;
+                }
+            }
+        }
+    }
+    return null;
+};
 
 /** Reference to a specific slot in an equipment data structure
     @constructor
@@ -31110,13 +31143,16 @@ function crafting_dialog_select_recipe_mines(dialog, specname, recipe) { // XXX 
     var stat_spell = mine_spell;
     var stat_spell_level = 1;
 
+    // grab a random minefield building to catch any modstats that apply to mines
+    var minefield = find_any_player_minefield();
+
     // set up stats display for this kind of recipe
     var statlist = gamedata['crafting']['categories'][recipe['crafting_category']]['display_stats'] || [];
     goog.array.forEach(['descriptionL0', 'descriptionR0', 'descriptionL1', 'descriptionR1'], function(wname, i) {
         if(i < statlist.length) {
             dialog.widgets[wname].show = true;
             var stat = statlist[i];
-            var modchain = null;
+            var modchain = (minefield && (stat in minefield.modstats) ? minefield.modstats[stat] : null);
             // hack - get the .str for the label, then reset the widget to be the stat value display, get the .str, and combine them
             ModChain.display_label_widget(dialog.widgets[wname], stat, stat_spell, true);
             var label_str = dialog.widgets[wname].str;
@@ -39498,6 +39534,17 @@ function update_upgrade_dialog(dialog) {
         }
     }
 
+    var item_host_building = null;
+    if(tech && tech['associated_item']) {
+        // is it a building equip item (e.g. minefield or turret head)?
+        // if so, grab modchains from a relevant building so we show the applicable modstats
+        var item_name = get_leveled_quantity(tech['associated_item'], Math.min(new_level, max_level));
+        var item_spec = ItemDisplay.get_inventory_item_spec(item_name);
+        if('equip' in item_spec) {
+            item_host_building = find_any_compatible_building(item_spec);
+        }
+    }
+
     // mod techs need to show stats for "Level 0" unresearched state
     var show_level_0 = (tech && tech['affects_unit']);
 
@@ -39567,6 +39614,12 @@ function update_upgrade_dialog(dialog) {
             modchain = (player.stattab['units'][tech['associated_unit']] || {})[stat_name] || null;
         } else if('affects_unit' in tech) {
             modchain = (player.stattab['units'][tech['affects_unit']] || {})[stat_name] || null;
+        } else if('associated_item' in tech) {
+            // is it a building equip item (e.g. minefield or turret head)?
+            // if so, grab modchains from a relevant building so we show the applicable modstats
+            if(item_host_building && item_host_building.modstats[stat_name]) {
+                modchain = item_host_building.modstats[stat_name];
+            }
         }
 
         var old_chain = null, new_chain = null;
