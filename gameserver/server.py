@@ -12535,16 +12535,16 @@ class OGPAPI(resource.Resource):
                 #my_ui_description = 'For '+category
 
             elif type == OGPAPI.object_type('literal'):
+                for MANDATORY_ARG in ('spin_ref', 'ui_name'):
+                    if MANDATORY_ARG not in request.args:
+                        request.setResponseCode(http.BAD_REQUEST)
+                        return 'missing %s' % MANDATORY_ARG
+
                 my_ui_name = request.args['ui_name'][0].decode('utf-8')
                 if ('ui_description' in request.args):
                     my_ui_description = request.args['ui_description'][0].decode('utf-8')
                 else:
                     my_ui_description = SpinConfig.config['proxyserver'].get('fbexternalhit_description', '')
-
-                if 'spin_ref' not in request.args:
-                    request.setResponseCode(http.BAD_REQUEST)
-                    return 'missing spin_ref'
-
                 my_spin_ref = str(request.args['spin_ref'][0])
                 if ('spin_ref_user_id' in request.args):
                     my_spin_ref_user_id = str(request.args['spin_ref_user_id'][0])
