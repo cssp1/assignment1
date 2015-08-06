@@ -1690,6 +1690,11 @@ class GameProxy(proxy.ReverseProxyResource):
 
         screen_name, screen_data = get_loading_screen('game')
 
+        # temporary, to ensure sign_session() does not fail
+        assert visitor.social_id is not None
+        assert visitor.auth_token() is not None
+        assert extra_data is not None
+
         replacements = self.get_fb_global_variables(request, visitor)
         replacements.update({
             '$SERVER_HTTP_PORT$': str(SpinConfig.config['proxyserver']['external_http_port']),
