@@ -12437,6 +12437,9 @@ class OGPAPI(resource.Resource):
 
             elif type == OGPAPI.object_type('sku'):
                 spellname = request.args['spellname'][0]
+                if spellname not in gamedata['spells']:
+                    request.setResponseCode(http.NOT_FOUND)
+                    return 'invalid spellname'
                 spell = gamedata['spells'][spellname]
                 assert spell['price_formula'] == 'constant' # price must be only a function of the URL!
                 my_url = self.get_object_endpoint({'type':type, 'spellname': spellname})
