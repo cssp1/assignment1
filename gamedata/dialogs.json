@@ -6250,9 +6250,14 @@
         "widgets": {
             "sunken": {"kind": "StaticImage", "xy":[8,35], "dimensions":[754,418], "asset": "dialog_sunken_754x418" },
             "sunken2": {"kind": "StaticImage", "xy":[457,53], "dimensions":[290,382], "asset": "dialog_sunken_290x382_gray" },
+            "picture_frame": { "kind": "SolidRect", "xy": [15,42], "dimensions": [193,404], "outline_color": [1,1,1,0.5], "outline_width": 1.5 },
             "picture": {"kind": "StaticImage", "xy":[16,43], "dimensions":[191,402], "asset": "fullscreen_191x402" },
-            "picture2": {"kind": "StaticImage", "xy":[472,66], "dimensions":[260,170], "asset": "sirenum_268x170" },
-            "flavor": { "kind": "TextField", "xy": [481,250], "dimensions": [248,160], "text_size": 14, "text_style": "normal",
+
+            "picture2_frame": { "kind": "SolidRect", "xy": [471,65], "dimensions": [262,172], "outline_color": [1,1,1,0.5], "outline_width": 1.5 },
+            "picture2": {"kind": "StaticImage", "xy":[472,66], "dimensions":[260,170],
+                         "clip_to": [472,66,260,170], "asset": "sirenum_268x170" },
+
+            "flavor": { "kind": "TextField", "xy": [481,250], "dimensions": [242,160], "text_size": 14, "text_style": "normal",
                         "text_hjustify": "left", "text_vjustify": "top" },
 
             "title": { "kind": "TextField", "xy": [229,62], "dimensions": [210, 18], "text_size": 20, "text_style": "normal",
