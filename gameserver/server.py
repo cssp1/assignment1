@@ -10299,6 +10299,7 @@ class LivePlayer(Player):
             return
 
         config = self.get_any_abtest_value('iron_deposits', gamedata['server']['iron_deposits'])
+        if config['max'] < 1: return
 
         if self.last_iron_deposit < 1:
             num_to_spawn = 1
