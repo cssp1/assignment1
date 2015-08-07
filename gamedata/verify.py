@@ -3034,6 +3034,14 @@ def check_starting_conditions(starting_conditions):
         # when you "build a builder without a builder"
         error |= 1; print 'starting_conditions: needs a building with provides_foremen'
 
+    for key in ('returning_veteran_region','force_initial_region'):
+        if key in starting_conditions:
+            region_list = starting_conditions[key]
+            if type(region_list) is not list: region_list = [region_list,]
+            for region in region_list:
+                if region not in gamedata['regions'] or (not gamedata['regions'][region].get('auto_join',1)):
+                    error |= 1; print 'starting_conditions: region "%s" has auto_join off, probably not suitable for new/returning players?' % region
+
     return error
 
 def check_loading_screens(loading_screens):
