@@ -64,11 +64,13 @@ def get_browser(ag):
         name = 'Explorer'
         os = 'Windows'
         ver = get_version(ag, 'MSIE')
+    elif ('Edge/' in ag):
+        name = 'Explorer'
+        os = 'Windows'
+        ver = get_version(ag, 'Edge')
     elif ('Trident/' in ag):
         name = 'Explorer'
         os = 'Windows'
-        if 'Windows Phone' in ag:
-            hardware = 'Windows Phone'
         ver = get_version(ag, 'rv')
     elif ('Firefox' in ag):
         name = 'Firefox'
@@ -103,6 +105,10 @@ def get_browser(ag):
         else:
             os = 'unknown'
 
+    if os == 'Windows':
+        if 'Windows Phone' in ag:
+            hardware = 'Windows Phone'
+
     return {'name': name, 'version': ver, 'OS': os, 'hardware': hardware}
 
 # given browser info (parsed above), return true if the browser can
@@ -120,3 +126,5 @@ if __name__ == '__main__':
     brow = get_browser("Mozilla/5.0 (Windows NT 6.1. WOW64. Trident/7.0. rv:9.0) like Gecko")
     print brow
     print browser_supports_xhr_eval(brow)
+    print get_browser("10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/42.0.2311.135 Safari/537.36 Edge/12.6666")
+    print get_browser("Mozilla/5.0 (Windows Phone 10.0; Android 4.2.1; DEVICE INFO) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/42.0.2311.135 Mobile Safari/537.36 Edge/12.6666")
