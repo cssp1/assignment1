@@ -54,6 +54,7 @@ def make_virtual_currency_settings_update(config, gamedata):
     # Xsolla looks up SKUs by currency and price, so we cannot have
     # SKUs at the same currency and price with different Gamebucks quantities!
     by_currency_and_price = {}
+    by_currency_and_amount = {}
 
     # skip SKUs where the "requires" predicate has an A/B test in it
     def skip_predicate(pred, depth = 0):
@@ -77,6 +78,7 @@ def make_virtual_currency_settings_update(config, gamedata):
             # it's really hard to figure out which SKUs to include just by looking at the predicates,
             # so use a hacky method for now...
             if 'D1_' in spellname or 'D3_' in spellname or \
+               ('D2_' not in spellname) or \
                'SALE_' in spellname or \
                'P050XY' in spellname:
                 # turn off this SKU
@@ -105,9 +107,16 @@ def make_virtual_currency_settings_update(config, gamedata):
             key2 = (currency, data['price'])
             if key2 in by_currency_and_price:
                 other_spellname, other_quantity = by_currency_and_price[key2]
-                raise Exception('Xsolla SKU overlap! %s %s %r %d with %s %r %d from %s\n%r\n\n' % (spellname, currency, data['price'], data['quantity'], currency, data['price'], other_quantity, other_spellname, data['requires']))
+                raise Exception('Xsolla SKU currency/price overlap! %s %s %r %d with %s %r %d from %s\n%r\n\n' % (spellname, currency, data['price'], data['quantity'], currency, data['price'], other_quantity, other_spellname, data['requires']))
             else:
                 by_currency_and_price[key2] = spellname, data['quantity']
+
+            key2a = (currency, data['quantity'])
+            if key2a in by_currency_and_amount:
+                other_spellname, other_price = by_currency_and_amount[key2a]
+                raise Exception('Xsolla SKU currency/amount overlap! %s %s %r %d with %s %r %d from %s\n%r\n\n' % (spellname, currency, data['price'], data['quantity'], currency, other_price, data['quantity'], other_spellname, data['requires']))
+            else:
+                by_currency_and_amount[key2a] = spellname, data['price']
 
     return 'https://api.xsolla.com/merchant/projects/%s/virtual_currency' % config['xsolla_project_id'], 'PUT', make_headers(config), SpinJSON.dumps(body_json) # this must be an HTTP "PUT" to work
 
