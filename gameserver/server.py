@@ -8965,7 +8965,7 @@ class Player(AbstractPlayer):
         return bool(my_alliances.intersection(other_alliances)), my_alliances, other_alliances
 
     def can_spy_despite_map_violation(self, self_user, other_player_id, other_social_id):
-        if len(gamedata['regions']) == 0: return True # no regional map (could also check (not gamedata['ladder_pvp']))
+        if gamedata['ladder_pvp']: return True # no regional map
         if self.is_developer(): return True
         if self_user.is_friends_with(other_social_id): return True
         if self.is_same_alliance(other_player_id): return True

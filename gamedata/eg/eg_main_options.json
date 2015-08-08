@@ -75,7 +75,7 @@
 "currency": "gamebucks", // currency system ("fbcredits" or "gamebucks")
 
 "legacy_pvp": false, // whether to enable list-based PvP
-"ladder_pvp": false, // whether ladder PvP is on by default
+"ladder_pvp": false, // whether ladder PvP is on by default - ALSO controls ability to visit_base without being in the same region
 "default_player_auras": [],
 
 "default_climate": "grass",
