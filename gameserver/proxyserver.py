@@ -1371,6 +1371,11 @@ class GameProxy(proxy.ReverseProxyResource):
         return '<html><body onload="location.href = \'%s\';"></body></html>' % str(redirect_url)
 
     def index_visit_authorized(self, request, visitor):
+        if not visitor.social_id:
+            # this can happen when the Facebook fetch_oauth_token API fails
+            request.setResponseCode(http.BAD_REQUEST)
+            return str('error')
+
         if self.is_visitor_prohibited(visitor):
             return self.index_visit_prohibited_country(request, visitor)
 
