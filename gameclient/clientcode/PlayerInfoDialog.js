@@ -757,7 +757,7 @@ PlayerInfoDialog.update_profile_tab = function(dialog) {
                 dialog.widgets['gift_button'].state = is_giftable ? 'normal' : 'disabled';
                 dialog.widgets['gift_button'].onclick = (function (_uid) { return function() {
                     change_selection(null);
-                    FBSendRequests.invoke_send_gifts_dialog(_uid, 'player_info_profile_tab');
+                    invoke_send_gifts_dialog(_uid, 'player_info_profile_tab');
                 }; })(user_id);
                 dialog.widgets['gift_button'].tooltip.str = is_giftable ? null : dialog.data['widgets']['gift_button']['ui_tooltip_already_sent'];
             } else {
