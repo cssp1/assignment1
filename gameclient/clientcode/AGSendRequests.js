@@ -48,7 +48,7 @@ AGSendRequests.invoke_send_gifts_dialog = function(to_user, reason, info_list) {
         var dialog = w.parent;
 
         if(!dialog) { throw Error('no dialog!'); }
-        if(!dialog.user_data['recipients']) {
+        if(!dialog.user_data['recipients'] || !goog.object.getCount(dialog.user_data['recipients'])) {
             throw Error('no recipients! rowdata '+dialog.user_data['rowdata'].length);
         }
 
