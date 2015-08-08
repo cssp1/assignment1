@@ -9090,6 +9090,24 @@ function fb_iframe_update(cb) {
     }; })(cb));
 }
 
+/** Set fixed canvas size based on browser dimensions
+    @param {!Array.<number>} max_dims */
+function update_armorgames_iframe_size(max_dims) {
+    if(spin_frame_platform === 'ag' &&
+       spin_armorgames_enabled &&
+       gamedata['client']['armorgames_iframe_size_mode'] === 'screen') {
+        var header = document.getElementById('spin_header');
+        var width_buffer = gamedata['client']['armorgames_iframe_margins'][0];
+        var height_buffer = (header ? header.clientHeight : 0) + gamedata['client']['armorgames_iframe_footer_peek'] +
+            gamedata['client']['armorgames_iframe_margins'][1];
+        var width = Math.max(736, max_dims[0] - width_buffer);
+        var height = Math.max(425, max_dims[1] - height_buffer);
+        var arg = {'width': width, 'height': height};
+        console.log("MAX_DIMS "+JSON.stringify(max_dims)+" RESIZING TO "+JSON.stringify(arg));
+        SPArmorGames.setIframeDimensions(arg);
+    }
+}
+
 // called when browser window changes size - query for max iframe size
 function on_resize_browser(e) {
     console.log('BROWSER '+window.innerWidth+' x '+window.innerHeight+' screen '+screen.width+' x '+screen.height);
@@ -42730,16 +42748,8 @@ function handle_server_message(data) {
 
         linkbar_put_id(session.user_id);
 
-        // on AG, set fixed canvas size based on browser dimensions
-        if(spin_frame_platform === 'ag' && spin_armorgames_enabled && gamedata['client']['armorgames_iframe_size_mode'] === 'screen') {
-            var width_buffer = gamedata['client']['armorgames_iframe_margins'][0];
-            var height_buffer = (header ? header.clientHeight : 0) + gamedata['client']['armorgames_iframe_footer_peek'] +
-                gamedata['client']['armorgames_iframe_margins'][1];
-            var width = Math.max(736, screen.availWidth - width_buffer);
-            var height = Math.max(425, screen.availHeight - height_buffer);
-            SPArmorGames.setIframeDimensions({'width': width,
-                                              'height': height});
-        }
+        // set fixed canvas size on load based on browser dimensions
+        update_armorgames_iframe_size([screen.availWidth, screen.availHeight]);
 
         // reflow in case the header height changed
         if(need_reflow || canvas_oversample !== 1) { on_resize_browser(null); }
