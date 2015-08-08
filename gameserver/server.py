@@ -1575,7 +1575,7 @@ class User:
                 if round(spell['price'], 2) != round(real_currency_amount, 2): continue
 
                 return spellname, None # match found!
-        gamesite.exception_log.event(server_time, 'find_buy_gamebucks_spell failed for %s %r %d' % (real_currency, real_currency_amount, gamebucks_amount))
+        gamesite.exception_log.event(server_time, 'player %d find_buy_gamebucks_spell failed for %s %r %d' % (session.user.user_id, real_currency, real_currency_amount, gamebucks_amount))
         return None, None
 
     # ping an already-completed FB payment to check for chargebacks
