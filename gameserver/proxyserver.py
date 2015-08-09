@@ -2496,6 +2496,8 @@ class AGPortraitProxy(PortraitProxy):
                 exception_log.event(proxy_time, 'unrecognized AG portrait qs: %s' % repr(parts))
                 assert False # force fail
         avatar_url = qs['avatar_url'][-1]
+        if '%2F' in avatar_url: # handle browsers that (improperly?) leave avatar_url URL-encoded
+            avatar_url = urllib.unquote(avatar_url)
         avatar_parts = urlparse.urlparse(avatar_url)
         if not avatar_parts.netloc.endswith('armorgames.com'):
             exception_log.event(proxy_time, 'unrecognized AG portrait URL: %s' % repr(avatar_parts))
