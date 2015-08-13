@@ -94,6 +94,11 @@ Predicate.prototype.ui_expire_time = function(player) { throw Error('ui_expire_t
 // null if description is unavailable (not all predicates have these)
 Predicate.prototype.ui_progress = function(player, qdata) { return null; }
 
+/** Return a measure of the "difficulty" of satisfying a predicate, so
+    that we can compare predicates and show the player the "easiest" one.
+    @return {number} */
+Predicate.prototype.ui_difficulty = function() { return 0; }
+
 /** @constructor
   * @extends Predicate */
 function AlwaysTruePredicate(data) { goog.base(this, data); }
@@ -167,7 +172,16 @@ AndPredicate.prototype.ui_expire_time = function(player) {
         etime = (etime > 0 ? Math.min(etime, t) : t);
     }
     return etime;
-}
+};
+
+/** @override */
+AndPredicate.prototype.ui_difficulty = function() {
+    var difficulty = 0;
+    for(var i = 0; i < this.subpredicates.length; i++) {
+        difficulty = Math.max(difficulty, this.subpredicates[i].ui_difficulty());
+    }
+    return difficulty;
+};
 
 /** @constructor
   * @extends ComboPredicate */
@@ -214,7 +228,16 @@ OrPredicate.prototype.ui_expire_time = function(player) {
         }
     }
     return etime;
-}
+};
+
+/** @override */
+OrPredicate.prototype.ui_difficulty = function() {
+    var difficulty = Infinity;
+    for(var i = 0; i < this.subpredicates.length; i++) {
+        difficulty = Math.min(difficulty, this.subpredicates[i].ui_difficulty());
+    }
+    return difficulty;
+};
 
 /** @constructor
   * @extends ComboPredicate */
@@ -808,8 +831,12 @@ PlayerHistoryPredicate.prototype.ui_progress = function(player, qdata) {
     ret = ret.replace('%d2', pretty_print_number(this.minvalue));
     return ret;
 };
-PlayerHistoryPredicate.prototype.ui_expire_time = function(player) { return -1; }
+PlayerHistoryPredicate.prototype.ui_expire_time = function(player) { return -1; };
 
+/** @override */
+PlayerHistoryPredicate.prototype.ui_difficulty = function() {
+    return this.minvalue;
+};
 
 /** @constructor
   * @extends Predicate */

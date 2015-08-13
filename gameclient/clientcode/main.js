@@ -20571,6 +20571,7 @@ function region_map_finder_update(dialog, kind, state) {
 
     if(state['found'] === null && !session.region.dirty) {
         state['found'] = [];
+        var min_difficulty = Infinity;
 
         dialog.widgets['map'].region.for_each_feature(function(f) {
             var found = null;
@@ -20582,7 +20583,12 @@ function region_map_finder_update(dialog, kind, state) {
                     var pred = (!player.is_cheater && ('activation' in gamedata['hives_client']['templates'][f['base_template']]) ? read_predicate(gamedata['hives_client']['templates'][f['base_template']]['activation']) : null);
                     if(pred && !pred.is_satisfied(player, null)) {
                         // locked
-                        state['pred'] = pred;
+                        // remember the "easiest" unsatisfied predicate, so that players see the least amount of work they need to do to unlock any hive
+                        var difficulty = pred.ui_difficulty();
+                        if (difficulty < min_difficulty) {
+                            state['pred'] = pred;
+                            min_difficulty = difficulty;
+                        }
                         return;
                     }
                     // unlocked
