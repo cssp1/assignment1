@@ -39,6 +39,7 @@ if __name__ == '__main__':
                       'mg_tower':'turret',
                       'mortar_emplacement':'turret',
                       'tow_emplacement':'turret',
+                      'turret_emplacement':'turret',
 
                       'tesla_coil':'turret',
                       'energy_plant':'energy_plant',
