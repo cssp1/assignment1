@@ -1504,13 +1504,13 @@ if __name__ == '__main__':
             if separate_files:
                 # write the base_json to a separate file, then include it into the skeleton
                 if base_filename_convention == 'new':
-                    base_file = '%s_ai_%s_%d_%s.json' % (game_id, event_dirname, base_id, kind[3:])
+                    base_file = '$GAME_ID_ai_%s_%d_%s.json' % (event_dirname, base_id, kind[3:])
                 elif base_filename_convention == 'old':
-                    base_file = '%s_ai_bases_%s_%d.json' % (game_id, event_dirname, base_id)
+                    base_file = '$GAME_ID_ai_bases_%s_%d.json' % (event_dirname, base_id)
                 else:
                     raise Exception('unknown base_filename_convention')
 
-                base_file_path = base_file_dir + '/' + base_file
+                base_file_path = base_file_dir + '/' + base_file.replace('$GAME_ID', game_id)
                 if os.path.exists(base_file_path):
                     pass
                 else:
@@ -1526,9 +1526,9 @@ if __name__ == '__main__':
                         else:
                             print >> fd, ''
                     pass
-                # note: this should probably use $GAME_ID instead of hard-coding it into the output
-                relative_path = '%s_ai_bases_%s/%s' % (game_id, event_dirname, base_file)
-                base_json = [("base_source_file", game_id+'/'+relative_path),
+
+                relative_path = '$GAME_ID_ai_bases_%s/%s' % (event_dirname, base_file)
+                base_json = [("base_source_file", '$GAME_ID/'+relative_path),
                              '#include_stripped "%s"' % relative_path]
             else:
                 base_json = base
