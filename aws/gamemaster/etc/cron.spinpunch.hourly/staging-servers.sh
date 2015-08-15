@@ -10,7 +10,7 @@ test_regions[tablettransform]=sector200
 export PYTHONPATH="/home/ec2-user/twisted-13.2.0/lib64/python:$PYTHONPATH"
 
 # flavorysoda is off now
-for GAMEDIR in ransomerrift thudrunner piratewarmers tablettransform rummagestones; do
+for GAMEDIR in ransomerrift thudrunner piratewarmers tablettransform rummagestones flavorysoda; do
         # update to latest code
         (cd /home/ec2-user/$GAMEDIR/gameserver && ../scmtool.sh force-up && ./stopserver.sh > /dev/null && rm -f *.pid && ./make-compiled-client.sh && ./runserver.sh > /dev/null )
         # global database maintenance
