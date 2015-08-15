@@ -603,7 +603,9 @@ class NoSQLClient (object):
         finally:
             if not has_time: del data['time']
             if not has_ident and log_ident: del data['ident']
-            if id_key is not None: del data['_id']
+            if '_id' in data: # id_key is not None:
+                # remove _id unconditionally, to avoid leaking the mutation back to the caller
+                del data['_id']
 
     def log_bookmark_set(self, user_name, key, ts, reason=''):
         return self.instrument('log_boomkark_set', self._log_bookmark_set, (user_name, key, ts))
