@@ -15,8 +15,8 @@ import SpinConfig
 
 s3_keyfile = SpinConfig.aws_key_file()
 
-quarries = SpinConfig.load(SpinConfig.gamedata_component_filename('quarries_compiled.json'))
-hives = SpinConfig.load(SpinConfig.gamedata_component_filename('hives_compiled.json'))
+quarries = SpinJSON.load(SpinConfig.gamedata_component_filename('quarries_compiled.json'))
+hives = SpinJSON.load(SpinConfig.gamedata_component_filename('hives_compiled.json'))
 
 # ensure that the spawn list is ordered by id_start - necessary for find_template() below
 for spawn_list in quarries['spawn'], hives['spawn']:

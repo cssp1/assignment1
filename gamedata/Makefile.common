@@ -74,13 +74,13 @@ ${BUILT}/${GAME_ID}_spells_gamebucks_skus.json: ${GAMEDATA}/make_country_skus2.p
 ${BUILT}/${GAME_ID}_spells_kgcredits_skus.json: ${GAMEDATA}/make_kgcredits_skus.py
 	@echo "    ${GAME_ID}_spells_kgcredits_skus.json..." && ${GAMEDATA}/make_kgcredits_skus.py --game-id ${GAME_ID} ${VERIFY_ARGS} $@
 ${BUILT}/${GAME_ID}_items_auto.json ${BUILT}/${GAME_ID}_spells_auto.json: ${GAME_ID}/${GAME_ID}_make_items_auto.py ${GAME_ID}/${GAME_ID}_resources.json
-	@echo "    ${GAME_ID}_items_auto.json..." && ${GAME_ID}/${GAME_ID}_make_items_auto.py ${GAME_ID}/${GAME_ID}_resources.json ${BUILT}/${GAME_ID}_items_auto.json ${BUILT}/${GAME_ID}_spells_auto.json
+	@echo "    ${GAME_ID}_items_auto.json..." && ${GAME_ID}/${GAME_ID}_make_items_auto.py --game-id ${GAME_ID} ${GAME_ID}/${GAME_ID}_resources.json ${BUILT}/${GAME_ID}_items_auto.json ${BUILT}/${GAME_ID}_spells_auto.json
 ${BUILT}/${GAME_ID}_art_items.json: ${GAMEDATA}/make_art_items.py ${GAME_ID}/${GAME_ID}_units.json
 	@echo "    ${GAME_ID}_art_items.json..." && ${GAMEDATA}/make_art_items.py --game-id ${GAME_ID} ${GAME_ID}/${GAME_ID}_units.json $@
 ${BUILT}/${GAME_ID}_items_units.json: ${GAME_ID}/${GAME_ID}_make_items_units.py ${GAME_ID}/${GAME_ID}_units.json
-	@echo "    ${GAME_ID}_items_units.json..." && ${GAME_ID}/${GAME_ID}_make_items_units.py ${GAME_ID}/${GAME_ID}_units.json $@
+	@echo "    ${GAME_ID}_items_units.json..." && ${GAME_ID}/${GAME_ID}_make_items_units.py --game-id ${GAME_ID} ${GAME_ID}/${GAME_ID}_units.json $@
 ${BUILT}/${GAME_ID}_items_boosts.json: ${GAME_ID}/${GAME_ID}_make_items_boosts.py ${GAME_ID}/${GAME_ID}_units.json
-	@echo "    ${GAME_ID}_items_boosts.json..." && ${GAME_ID}/${GAME_ID}_make_items_boosts.py ${GAME_ID}/${GAME_ID}_units.json $@
+	@echo "    ${GAME_ID}_items_boosts.json..." && ${GAME_ID}/${GAME_ID}_make_items_boosts.py --game-id ${GAME_ID} ${GAME_ID}/${GAME_ID}_units.json $@
 ${BUILT}/${GAME_ID}_loot_tables.json: ${GAME_ID}/${GAME_ID}_make_loot_tables.py
 	@echo "    ${GAME_ID}_loot_tables.json..." && ${GAME_ID}/${GAME_ID}_make_loot_tables.py $@
 ${BUILT}/${GAME_ID}_loot_tables_compiled.json: ${BUILT}/${GAME_ID}_loot_tables.json

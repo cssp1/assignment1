@@ -21,7 +21,7 @@ if __name__ == '__main__':
         elif key == '-b': batch_size = int(val)
 
     gamedata = {} # SpinJSON.load(open(SpinConfig.gamedata_filename()))
-    gamedata['regions'] = SpinConfig.load(SpinConfig.gamedata_component_filename("regions.json", override_game_id = game_id))
+    gamedata['regions'] = SpinConfig.load(SpinConfig.gamedata_component_filename("regions.json", override_game_id = game_id), override_game_id = game_id)
 
     nosql_client = SpinNoSQL.NoSQLClient(SpinConfig.get_mongodb_config(SpinConfig.config['game_id']))
     TRIALS = 10

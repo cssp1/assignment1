@@ -105,10 +105,10 @@ if __name__ == '__main__':
     assert game_id
 
     # partial build of gamedata
-    gamedata = {'predicate_library': SpinConfig.load(args[0]),
-                'buildings': SpinConfig.load(args[1]),
-                'tech': SpinConfig.load(args[2]),
-                'crafting': SpinConfig.load(args[3])
+    gamedata = {'predicate_library': SpinConfig.load(args[0], override_game_id = game_id),
+                'buildings': SpinConfig.load(args[1], override_game_id = game_id),
+                'tech': SpinConfig.load(args[2], override_game_id = game_id),
+                'crafting': SpinConfig.load(args[3], override_game_id = game_id)
                 }
 
     out_fd = AtomicFileWrite.AtomicFileWrite(args[4], 'w', ident=str(os.getpid()))

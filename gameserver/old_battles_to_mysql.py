@@ -81,8 +81,8 @@ def do_slave(task):
 
     # gamedata = SpinJSON.load(open(SpinConfig.gamedata_filename(override_game_id = game_id)))
     if not verbose: filterwarnings('ignore', category = MySQLdb.Warning)
-    quarries = SpinConfig.load(SpinConfig.gamedata_component_filename('quarries_compiled.json'))
-    hives = SpinConfig.load(SpinConfig.gamedata_component_filename('hives_compiled.json'))
+    quarries = SpinJSON.load(SpinConfig.gamedata_component_filename('quarries_compiled.json'))
+    hives = SpinJSON.load(SpinConfig.gamedata_component_filename('hives_compiled.json'))
 
     # ensure that the spawn list is ordered by id_start - necessary for find_template() below
     for spawn_list in quarries['spawn'], hives['spawn']:

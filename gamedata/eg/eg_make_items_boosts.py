@@ -83,12 +83,16 @@ def get_ui_name_duration(duration):
         return ''
 
 if __name__ == '__main__':
-    opts, args = getopt.gnu_getopt(sys.argv[1:], '', [])
+    game_id = SpinConfig.game()
+    opts, args = getopt.gnu_getopt(sys.argv[1:], 'g:', ['game-id='])
+    for key, val in opts:
+        if key == '-g' or key == '--game-id': game_id = val
+
     ident = str(os.getpid())
 
     # read unit data
-    gamedata = {'units': SpinConfig.load(args[0])}
-    out_fd = AtomicFileWrite.AtomicFileWrite(args[1], 'w', ident=ident)
+    gamedata = {'units': SpinConfig.load(args[0], override_game_id = game_id)}
+    out_fd = AtomicFileWrite.AtomicFileWrite(args[1], 'w', ident=str(os.getpid()))
 
     # provide special behaviour for unit-type boosts
     unit_types = {'rover': {'name': 'rover', 'ui_name': 'Infantry', 'ui_name_plural': 'infantry'},

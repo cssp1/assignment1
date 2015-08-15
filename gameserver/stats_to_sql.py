@@ -133,7 +133,7 @@ if __name__ == '__main__':
     except IOError:
         fishing_json_fd = None # no fishing in this game
 
-    fishing_slates = SpinConfig.load_fd(fishing_json_fd, stripped=True) if fishing_json_fd else None
+    fishing_slates = SpinConfig.load_fd(fishing_json_fd, stripped=True, override_game_id = game_id) if fishing_json_fd else None
 
     cfg = SpinConfig.get_mysql_config(game_id+'_upcache')
 

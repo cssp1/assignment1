@@ -46,7 +46,7 @@ def get_six_X_comments(game_id, time_now):
 def do_reminders(game_id, dry_run = False):
     filename = SpinConfig.gamedata_component_filename('dev_reminders.json', override_game_id = game_id)
     if not os.path.exists(filename): return
-    data = SpinConfig.load(filename)
+    data = SpinConfig.load(filename, override_game_id = game_id)
 
     time_now = int(time.time())
     sender_name = data['sender']

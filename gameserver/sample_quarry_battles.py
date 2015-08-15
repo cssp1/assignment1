@@ -8,7 +8,7 @@ import sys, os, time, getopt, re
 import SpinJSON # fast JSON library
 import SpinConfig
 
-quarries = SpinConfig.load(SpinConfig.gamedata_component_filename('quarries_compiled.json'))
+quarries = SpinJSON.load(SpinConfig.gamedata_component_filename('quarries_compiled.json'))
 
 time_now = int(time.time())
 
