@@ -15428,7 +15428,7 @@ class GAMEAPI(resource.Resource):
                                                          (session.viewing_player.user_id, session.viewing_base.base_ui_name, session.player.user_id))
                         session.viewing_base.quarry_conquer(session.viewing_player, session.player)
                         session.increment_player_metric('quarries_conquered', 1, time_series = False)
-                        if SpinConfig.game() == 'tr': # NASTY HACK
+                        if SpinConfig.game() in ('tr','dv'): # NASTY HACK
                             session.increment_player_metric('quarries_conquered_for_achievement', 1, time_series = False)
                         metric_event_coded(session.user.user_id, '4710_quarry_conquered', {'region': session.viewing_base.base_region,
                                                                                            'base_id': session.viewing_base.base_id,

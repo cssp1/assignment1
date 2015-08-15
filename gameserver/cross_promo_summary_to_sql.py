@@ -29,7 +29,7 @@ def cross_promo_summary_schema(sql_util, interval):
             }
 
 # we need to query the upcache and metrics tables for each game
-GAMES = ['mf','tr','mf2','bfm','sg']
+GAMES = ['mf','tr','mf2','bfm','sg'] # XXXXXX add dv
 
 if __name__ == '__main__':
     game_id = SpinConfig.game()

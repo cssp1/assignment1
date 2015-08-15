@@ -1495,7 +1495,7 @@ if __name__ == '__main__':
 
             elif kind == 'ai_attack':
                 example_unit = {'mf': 'mining_droid',
-                                'tr': 'rifleman',
+                                'tr': 'rifleman', 'dv': 'rifleman',
                                 'mf2': 'shock_trooper',
                                 'bfm': 'marine',
                                 }[game_id]

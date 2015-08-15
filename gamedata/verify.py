@@ -1031,7 +1031,7 @@ def check_item_set(setname, spec):
                     error |= 1; print '%s:bonus_aura refers to missing aura %s' % (setname, aura_name)
                 elif gamedata['auras'][aura_name].get('ends_on', None) != 'recalc_stattab':
                     error |= 1; print '%s:bonus_aura %s needs to have "ends_on":"recalc_stattab"' % (setname, aura_name)
-    if 'ui_description' not in spec and gamedata['game_id'] not in ('tr','mf2'): # ignore legacy games
+    if 'ui_description' not in spec and gamedata['game_id'] not in ('tr','dv','mf2'): # ignore legacy games
         error |= 1; print '%s needs to have a "ui_description". See other item sets for examples.' % (setname)
     if 'icon' in spec:
         error |= require_art_asset(spec['icon'], setname+':icon')
@@ -1245,7 +1245,7 @@ def check_item(itemname, spec):
                 if PRED in crit:
                     error |= check_predicate(crit[PRED], reason = 'item %s: equip %s' % (itemname,PRED))
 
-        if ('name' in equip) and (gamedata['game_id'] == 'tr') and ('turret_heads' in gamedata['crafting']['categories']) and (equip['name'] in ('mg_tower', 'mortar_emplacement', 'tow_emplacement')):
+        if ('name' in equip) and (gamedata['game_id'] in ('tr','dv')) and ('turret_heads' in gamedata['crafting']['categories']) and (equip['name'] in ('mg_tower', 'mortar_emplacement', 'tow_emplacement')):
             error |= 1; print '%s: needs migration to be "compatible" with turret heads' % itemname
 
         for CONS in ('on_equip', 'on_unequip'):
