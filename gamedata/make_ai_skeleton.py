@@ -832,14 +832,14 @@ if __name__ == '__main__':
         elif key == '--base-filename-convention': base_filename_convention = val
 
     # manually load some parts of gamedata. Do not require ALL of it, in order to avoid a chicken-and-egg dependency cycle.
-    gamedata_main_options = SpinConfig.load(SpinConfig.gamedata_component_filename('main_options.json', override_game_id = game_id), stripped = True)
+    gamedata_main_options = SpinConfig.load(SpinConfig.gamedata_component_filename('main_options.json', override_game_id = game_id), stripped = True, override_game_id = game_id)
     gamedata = {'townhall': gamedata_main_options['townhall']}
-    gamedata['resources'] = SpinConfig.load(SpinConfig.gamedata_component_filename('resources.json', override_game_id = game_id))
-    gamedata['units'] = SpinConfig.load(SpinConfig.gamedata_component_filename('units.json', override_game_id = game_id))
-    gamedata['item_sets'] = SpinConfig.load(SpinConfig.gamedata_component_filename('item_sets.json', override_game_id = game_id))
-    gamedata['loot_tables'] = SpinConfig.load(SpinConfig.gamedata_component_filename('loot_tables.json', override_game_id = game_id))
-    gamedata['matchmaking'] = SpinConfig.load(SpinConfig.gamedata_component_filename('matchmaking.json', override_game_id = game_id))
-    gamedata['achievements'] = SpinConfig.load(SpinConfig.gamedata_component_filename('achievements.json', override_game_id = game_id))
+    gamedata['resources'] = SpinConfig.load(SpinConfig.gamedata_component_filename('resources.json', override_game_id = game_id), override_game_id = game_id)
+    gamedata['units'] = SpinConfig.load(SpinConfig.gamedata_component_filename('units.json', override_game_id = game_id), override_game_id = game_id)
+    gamedata['item_sets'] = SpinConfig.load(SpinConfig.gamedata_component_filename('item_sets.json', override_game_id = game_id), override_game_id = game_id)
+    gamedata['loot_tables'] = SpinConfig.load(SpinConfig.gamedata_component_filename('loot_tables.json', override_game_id = game_id), override_game_id = game_id)
+    gamedata['matchmaking'] = SpinConfig.load(SpinConfig.gamedata_component_filename('matchmaking.json', override_game_id = game_id), override_game_id = game_id)
+    gamedata['achievements'] = SpinConfig.load(SpinConfig.gamedata_component_filename('achievements.json', override_game_id = game_id), override_game_id = game_id)
 
     if args[1] in event_data: # event data hard-coded in this file
         data = event_data[args[1]]

@@ -18,7 +18,7 @@ include_detector = re.compile('^#include "(.+)"')
 include_stripped_detector = re.compile('^#include_stripped "(.+)"')
 
 # returns UTF8 string
-def load_fd_raw(fd, stripped = False, verbose = False, path = None):
+def load_fd_raw(fd, stripped = False, verbose = False, path = None, override_game_id = None):
     js = ''
     contents_cache = {}
     for line in fd:
@@ -50,6 +50,9 @@ def load_fd_raw(fd, stripped = False, verbose = False, path = None):
             # get the name of the file to include from the regular expression
             filename = os.path.join(path, match.group(1))
 
+            if '$GAME_ID' in filename:
+                filename = filename.replace('$GAME_ID', game(override_game_id = override_game_id))
+
             # replace the line with the contents of the included file
             line = load_fd_raw(open(filename), stripped = (match is include_stripped_match), path = os.path.dirname(filename))
 
@@ -59,12 +62,12 @@ def load_fd_raw(fd, stripped = False, verbose = False, path = None):
     return js
 
 # returns JSON object
-def load_fd(fd, stripped = False, verbose = False, path = None):
-    raw = load_fd_raw(fd, stripped, verbose, path)
+def load_fd(fd, stripped = False, verbose = False, path = None, override_game_id = None):
+    raw = load_fd_raw(fd, stripped, verbose, path, override_game_id = override_game_id)
     return SpinJSON.loads(raw)
 
-def load(filename, stripped = False, verbose = False):
-    return load_fd(open(filename), stripped = stripped, verbose = verbose, path = os.path.dirname(filename))
+def load(filename, stripped = False, verbose = False, override_game_id = None):
+    return load_fd(open(filename), stripped = stripped, verbose = verbose, path = os.path.dirname(filename), override_game_id = override_game_id)
 
 def gameserver_dir():
     e = os.getenv('SPIN_GAMESERVER')
