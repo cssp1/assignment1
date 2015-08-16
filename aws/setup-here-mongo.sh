@@ -1,7 +1,7 @@
 #!/bin/bash
 
-AWSHOST="sgprod-mongo.spinpunch.com"
-AWSKEY="$HOME/.ssh/sgprod.pem"
+AWSHOST="dvprod-mongo.spinpunch.com"
+AWSKEY="$HOME/.ssh/dvprod.pem"
 SYSTEM="mongo"
 
 # run on mothership machine

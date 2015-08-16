@@ -115,6 +115,7 @@ echo "AWS key /home/ec2-user/.ssh/host-awssecret"
 echo "SSL key /home/ec2-user/.ssh/spinpunch.com.key for SSL service."
 echo "    key /home/ec2-user/.ssh/hipchat.token for automated messages"
 echo "    key /home/ec2-user/.ssh/slack.token (with incoming webhook for game channel) for automated messages"
+echo "/home/ec2-user/.aws/credentials file with host awssecret for CloudWatch metrics"
 
 echo "build/install ujson, blist, and lz4 libraries. (python setup.py build; sudo python setup.py install)"
 echo "Twisted update:"

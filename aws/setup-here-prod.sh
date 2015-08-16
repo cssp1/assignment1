@@ -1,8 +1,8 @@
 #!/bin/bash
 
-AWSHOST="sgprod.spinpunch.com"
-GAME_ID="sg"
-GAME_ID_LONG="summonersgate"
+AWSHOST="dvprod.spinpunch.com"
+GAME_ID="dv"
+GAME_ID_LONG="daysofvalor"
 AWSKEY="$HOME/.ssh/${GAME_ID}prod.pem"
 
 # run on mothership machine
