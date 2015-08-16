@@ -13,6 +13,8 @@ window.fbAsyncInit = function() {
     };
     if(spin_facebook_api_versions && ('jssdk' in spin_facebook_api_versions)) {
         init_params.version = spin_facebook_api_versions['jssdk'];
+    } else if(spin_facebook_api_versions && ('default' in spin_facebook_api_versions)) {
+        init_params.version = spin_facebook_api_versions['default'];
     } else {
         init_params.version = 'v2.2'; // fallback default (sync with: FacebookSDK.js, fb_guest.html, gameserver/SpinFacebook.py, gameclient/clientcode/SPFB.js)
     }
