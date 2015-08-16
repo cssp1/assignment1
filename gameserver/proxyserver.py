@@ -2077,7 +2077,9 @@ class GameProxy(proxy.ReverseProxyResource):
                     pinger = FBRTAPI_payment_pinger(payment_id, pay, d)
                     fb_async_http.queue_request(proxy_time,
                                                 SpinFacebook.versioned_graph_endpoint('payment', payment_id) + \
-                                                '?'+urllib.urlencode({'access_token': SpinConfig.config['facebook_app_access_token']}),
+                                                '?'+urllib.urlencode({'access_token': SpinConfig.config['facebook_app_access_token'],
+                                                                      'fields':SpinFacebook.PAYMENT_FIELDS
+                                                                      }),
                                                 pinger.on_response, error_callback = pinger.on_error, max_tries = 4)
                     # fire-and-forget - let the pinger go asynchronously
                     return ''

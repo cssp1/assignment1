@@ -1521,7 +1521,8 @@ class User:
         if not SpinConfig.config['enable_facebook']: return
 
         url = SpinFacebook.versioned_graph_endpoint('payment', str(self.facebook_id)+'/payment_transactions') + '?' + \
-              urllib.urlencode(dict(request_id=request_id, access_token=SpinConfig.config['facebook_app_access_token']))
+              urllib.urlencode(dict(request_id=request_id, access_token=SpinConfig.config['facebook_app_access_token'],
+                                    fields=SpinFacebook.PAYMENT_FIELDS))
 
         if gamedata['server']['log_fbpayments'] >= 2:
             gamesite.exception_log.event(server_time, 'ping_fbpayment user %d request_id %s SEND %s' % (session.player.user_id, request_id, url))
