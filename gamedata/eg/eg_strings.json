@@ -818,6 +818,10 @@
     "post_screenshot_success": { "ui_title": "Screenshot Posted!",
                                  "ui_description": "Visit your Facebook profile to see the post." },
 
+    "auto_resolve_confirm": { "ui_title": "Automatically finish battle?",
+                              "ui_button": "Proceed",
+                              "ui_description": "Winner will be determined automatically. Beware, combat results may differ from your manual battles." },
+
     "skip_tutorial_confirm": { "ui_title": "Skip Tutorial Missions?",
                                "ui_button": "Skip",
                                "ui_description": "To resume, click the \"?\" button at the top of your screen." },
