@@ -102,4 +102,4 @@ echo "MISSING: (if using Postfix) mail aliases in /etc/postfix/canonical_recipie
 echo "MISSING: /var/svn/slack.token for SVN commit messages"
 echo "MISSING: /home/ec2-user/.ssh/spinpunch.com.key for SSL auth"
 echo "MISSING: /etc/aliases: add 'root: awstech@example.com' mail alias"
-echo "MongoDB and pymongo"
+echo "MongoDB and pymongo==2.8.1"

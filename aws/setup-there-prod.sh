@@ -98,7 +98,7 @@ echo "/etc/spinpunch - edit anything that needs changing."
 echo "MISSING: /etc/aliases: add 'root: awstech@example.com' mail alias"
 echo "SSL certs, from s3://spinpunch-config/ssl-spinpunch.com.tar.gz.gpg."
 
-echo "easy_install pymongo requests" # note: this overrides python-requests package with a newer version of Requests
+echo "easy_install pymongo==2.8.1 requests" # note: this overrides python-requests package with a newer version of Requests
 echo "easy_install psycopg2 txpostgres" # note: this overrides system psycopg2 with newer version necessary for txpostgres
 echo "easy_install geoip2 - but, install libmaxminddb first for C acceleration from https://github.com/maxmind/libmaxminddb"
 
