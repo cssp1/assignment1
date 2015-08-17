@@ -6768,8 +6768,8 @@
 
             // WHILE REPAIRING
             "repair_remain_bg": { "kind": "StaticImage", "xy": [10,1], "dimensions": [146,31], "bg_image_resizable":1, "asset": "dialog_sunken_gray_resizable", "alpha": 1},
-            "repair_remain_icon": { "kind": "StaticImage", "xy": [18,2], "dimensions": [24,24], "asset": "repair_wrench_green" },
-            "repair_remain_value": { "kind": "TextField", "xy": [50,5], "dimensions": [70,20], "text_size": 13, "text_hjustify": "center", "drop_shadow": 1 },
+            "repair_remain_icon": { "kind": "StaticImage", "xy": [18,4], "dimensions": [24,24], "asset": "repair_wrench_green" },
+            "repair_remain_value": { "kind": "TextField", "xy": [50,7], "dimensions": [70,20], "text_size": 13, "text_hjustify": "center", "drop_shadow": 1 },
 
             // ALWAYS ON
             "manage_button": { "kind": "ActionButton", "xy": [14,29], "dimensions": [134,28], "bg_image": "menu_button_134px", "text_size": 13, "text_style": "bold", "ui_name": "Manage" },
@@ -6779,7 +6779,7 @@
                                "bg_image": "price_display_short", "ui_name": "123", "ui_tooltip": "", "tooltip_delay": 0 }, // PRICE
             "price_spinner": { "kind": "StaticImage", "xy":[52,113], "dimensions":[16,16], "asset":"loading_spinner" },
 
-            "finish_button": { "kind": "ActionButton", "xy": [80,107], "dimensions": [78,28], "text_offset": [0,0], "text_size": 13,
+            "finish_button": { "kind": "ActionButton", "xy": [80,106], "dimensions": [78,28], "text_offset": [0,0], "text_size": 13,
                                "bg_image": "action_button_78px", "text_color": [0,0,0,1], "text_style": "bold",
                                "ui_name": "Finish", "ui_name_pending": "Working",
                                "ui_tooltip": "", "tooltip_delay": 0 },
