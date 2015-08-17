@@ -4657,7 +4657,9 @@ function Base(id) {
     this.base_landlord_id = -1;
     this.base_size = 0;
     this.base_ncells = null;
+    /** @type {string|null} */
     this.base_climate = null;
+    /** @type {!Object} */
     this.base_climate_data = {};
     this.base_map_loc = null;
     this.base_expire_time = -1;
@@ -4668,6 +4670,9 @@ function Base(id) {
 
     this.power_state = [0,0]; // power [produced,consumed]
     this.power_factor_cache = 0; // must be reset when power_state changes
+
+    /** @type {!Climate} */
+    this.climate = new Climate(this.base_climate_data); // initialize to blank climate
 }
 
 Base.prototype.ncells = function() {
@@ -4900,80 +4905,105 @@ Base.prototype.draw_base_perimeter = function(purpose) {
     SPUI.ctx.restore();
 }
 
-Base.prototype.has_climate_unit_restrictions = function() {
-    if(this.base_climate_data['include_manufacture_categories'] ||
-       this.base_climate_data['exclude_manufacture_categories'] ||
-       this.base_climate_data['exclude_air_units'] ||
-       this.base_climate_data['exclude_ground_units'] ||
-       this.base_climate_data['include_units'] ||
-       this.base_climate_data['exclude_units']) {
+/** Functions for working with climates
+    @constructor */
+var Climate = function(data) {
+    /** @const */
+    this.data = data;
+};
+
+/** @return {boolean} if there are unit deployment restrictions */
+Climate.prototype.has_climate_unit_restrictions = function() {
+    if(this.data['include_manufacture_categories'] ||
+       this.data['exclude_manufacture_categories'] ||
+       this.data['exclude_air_units'] ||
+       this.data['exclude_ground_units'] ||
+       this.data['include_units'] ||
+       this.data['exclude_units']) {
         return true;
     }
     return false;
 };
-Base.prototype.has_climate_restrictions = function() {
+
+/** @return {boolean} if there are unit deployment OR other (missile) restrictions */
+Climate.prototype.has_climate_restrictions = function() {
     return (this.has_climate_unit_restrictions() ||
-            this.base_climate_data['applies_aura'] ||
-            this.base_climate_data['exclude_missiles']);
+            this.data['applies_aura'] ||
+            this.data['exclude_missiles']);
 };
-Base.prototype.can_deploy_unit = function(spec) {
-    if(('include_manufacture_categories' in this.base_climate_data)) {
-        if(!goog.array.contains(this.base_climate_data['include_manufacture_categories'], spec['manufacture_category'])) { return false; }
+
+/** @param {!Object} spec
+    @return {boolean} */
+Climate.prototype.can_deploy_unit_of_spec = function(spec) {
+    if(('include_manufacture_categories' in this.data)) {
+        if(!goog.array.contains(this.data['include_manufacture_categories'], spec['manufacture_category'])) { return false; }
     }
-    if(('exclude_manufacture_categories' in this.base_climate_data)) {
-        if(goog.array.contains(this.base_climate_data['exclude_manufacture_categories'], spec['manufacture_category'])) { return false; }
+    if(('exclude_manufacture_categories' in this.data)) {
+        if(goog.array.contains(this.data['exclude_manufacture_categories'], spec['manufacture_category'])) { return false; }
     }
-    if(this.base_climate_data['exclude_air_units'] && spec['flying']) { return false; }
-    if(this.base_climate_data['exclude_ground_units'] && !spec['flying']) { return false; }
-    if('include_units' in this.base_climate_data) {
-        if(!goog.array.contains(this.base_climate_data['include_units'], spec['name'])) { return false; }
+    if(this.data['exclude_air_units'] && spec['flying']) { return false; }
+    if(this.data['exclude_ground_units'] && !spec['flying']) { return false; }
+    if('include_units' in this.data) {
+        if(!goog.array.contains(this.data['include_units'], spec['name'])) { return false; }
     }
-    if('exclude_units' in this.base_climate_data) {
-        if(goog.array.contains(this.base_climate_data['exclude_units'], spec['name'])) { return false; }
+    if('exclude_units' in this.data) {
+        if(goog.array.contains(this.data['exclude_units'], spec['name'])) { return false; }
     }
     return true;
 };
-Base.prototype.get_climate_unit_restrictions = function() {
-    var data = this.base_climate_data;
+
+/** Return list of ui_descriptions of unit deployment restrictions
+    @return {!Array.<string>} */
+Climate.prototype.get_climate_unit_restrictions = function() {
     var strings = gamedata['strings']['climate_restrictions'];
     var ls = [];
     goog.array.forEach(['include_manufacture_categories','exclude_manufacture_categories'], function(kind) {
-        if(kind in data) {
+        if(kind in this.data) {
             var catlist = [];
-            goog.array.forEach(data[kind], function(cat) {
+            goog.array.forEach(this.data[kind], function(cat) {
                 catlist.push(gamedata['strings']['manufacture_categories'][cat]['plural']);
             });
             ls.push(strings[kind].replace('%s', catlist.join(', ')));
         }
-    });
+    }, this);
     goog.array.forEach(['include_units','exclude_units'], function(kind) {
-        if(kind in data) {
+        if(kind in this.data) {
             var catlist = [];
-            goog.array.forEach(data[kind], function(specname) {
+            goog.array.forEach(this.data[kind], function(specname) {
                 catlist.push(gamedata['units'][specname]['ui_name']);
             });
             ls.push(strings[kind].replace('%s', catlist.join(', ')));
         }
-    });
+    }, this);
     goog.array.forEach(['exclude_air_units','exclude_ground_units'], function(kind) {
-        if(data[kind]) { ls.push(strings[kind]); }
-    });
+        if(this.data[kind]) { ls.push(strings[kind]); }
+    }, this);
     return ls;
 };
-Base.prototype.describe_climate_restrictions = function() {
-    var data = this.base_climate_data;
+
+/** Return a single ui_string describing all climate restrictions and auras
+    @return {string} */
+Climate.prototype.describe_climate_restrictions = function() {
     var strings = gamedata['strings']['climate_restrictions'];
     var ls = this.get_climate_unit_restrictions();
-     goog.array.forEach(['exclude_missiles'], function(kind) {
-        if(data[kind]) { ls.push(strings[kind]); }
-    });
-    if('applies_aura' in data) {
-        ls.push(gamedata['auras'][data['applies_aura']]['ui_description']);
+    goog.array.forEach(['exclude_missiles'], function(kind) {
+        if(this.data[kind]) { ls.push(strings[kind]); }
+    }, this);
+    if('applies_aura' in this.data) {
+        ls.push(gamedata['auras'][this.data['applies_aura']]['ui_description']);
     }
+    // ensure something is listed
+    if(ls.length < 1) { ls.push(gamedata['strings']['climate_restrictions']['none']); }
     return ls.join('. ');
 };
-Base.prototype.describe_climate_unit_restrictions = function() {
-    return this.get_climate_unit_restrictions().join('. ');
+
+/** Return a single ui_string describing only climate unit restrictions
+    @return {string} */
+Climate.prototype.describe_climate_unit_restrictions = function() {
+    var ls = this.get_climate_unit_restrictions();
+    // ensure something is listed
+    if(ls.length < 1) { ls.push(gamedata['strings']['climate_restrictions']['none']); }
+    return ls.join('. ');
 };
 
 // session state
@@ -5120,7 +5150,7 @@ session.foreach_deployable_unit = function(func) {
 
         // check that the unit satisfies climate restrictions
         var spec = gamedata['units'][obj['spec']];
-        if(!session.viewing_base.can_deploy_unit(spec)) { return; }
+        if(!session.viewing_base.climate.can_deploy_unit_of_spec(spec)) { return; }
 
         func(obj);
     });
@@ -12861,9 +12891,9 @@ function update_desktop_dialogs() {
 
         // update desktop_bottom_visitor
 
-        dialog.widgets['climate_restrictions'].show = session.viewing_base.has_climate_restrictions();
+        dialog.widgets['climate_restrictions'].show = session.viewing_base.climate.has_climate_restrictions();
         if(dialog.widgets['climate_restrictions'].show) {
-            dialog.widgets['climate_restrictions'].str = dialog.data['widgets']['climate_restrictions']['ui_name'].replace('%name', session.viewing_base.base_climate_data['ui_name']).replace('%s', session.viewing_base.describe_climate_restrictions());
+            dialog.widgets['climate_restrictions'].str = dialog.data['widgets']['climate_restrictions']['ui_name'].replace('%name', session.viewing_base.climate.data['ui_name']).replace('%s', session.viewing_base.climate.describe_climate_restrictions());
         }
 
         dialog.widgets['deployable_squads'].show = player.squads_enabled() && session.deployable_squads.length > 0 && session.viewing_base.base_landlord_id != session.user_id &&
@@ -12969,7 +12999,7 @@ function update_desktop_dialogs() {
                 var spec = gamedata['units'][specname];
 
                 if(!(specname in unique_specs)) { continue; }
-                if(!session.viewing_base.can_deploy_unit(spec)) { continue; }
+                if(!session.viewing_base.climate.can_deploy_unit_of_spec(spec)) { continue; }
                 if(skip > 0) { skip--; continue; }
                 var home_qty = session.count_deployable_units_of_spec(specname);
                 var in_battle_qty = session.count_post_deploy_units_of_spec(specname);
@@ -13132,7 +13162,7 @@ function update_desktop_dialogs() {
 
             // DONATED UNITS
             if(i < ROWS && player.unit_donation_enabled() && player.has_donated_units() &&
-               !session.viewing_base.has_climate_unit_restrictions()) {
+               !session.viewing_base.climate.has_climate_unit_restrictions()) {
 
                 var specname = 'DONATED_UNITS';
                 dialog.user_data['deploy_button_specs'].push(specname);
@@ -16389,7 +16419,7 @@ function update_attack_button_dialog(dialog) {
                 } else if(!player.has_any_units()) {
                     dialog.widgets['attack_button'].tooltip.str = dialog.data['widgets']['attack_button']['ui_tooltip_no_units'].replace('%MENU', gamedata['dialogs']['desktop_bottom']['widgets']['robots_button']['ui_name']).replace('%VERB', gamedata['spells']['MAKE_DROIDS']['ui_name'].toLowerCase());
                 } else {
-                    dialog.widgets['attack_button'].tooltip.str = dialog.data['widgets']['attack_button']['ui_tooltip_no_units_for_climate'].replace('%name',session.viewing_base.base_climate_data['ui_name']).replace('%descr',session.viewing_base.describe_climate_unit_restrictions());
+                    dialog.widgets['attack_button'].tooltip.str = dialog.data['widgets']['attack_button']['ui_tooltip_no_units_for_climate'].replace('%name',session.viewing_base.climate.data['ui_name']).replace('%descr',session.viewing_base.climate.describe_climate_unit_restrictions());
                 }
             } else if(session.repeat_attack_cooldown_expire > server_time) {
                 dialog.widgets['attack_button'].str = dialog.data['widgets']['attack_button']['ui_name_cooldown'].replace('%s', pretty_print_time_brief(session.repeat_attack_cooldown_expire-server_time));
@@ -19880,18 +19910,35 @@ Region.prototype.find_feature_at_coords = function(cell, options) {
     }
 };
 
+/** Return list of squads neighboring "cell" that can attack into it
+    @param {!Array.<number>} cell
+    @return {!Array.<number>} */
 Region.prototype.squads_nearby = function(cell) {
-    var ok = false;
+    var ls = [];
 
-    // next to home base is always OK
-    if(hex_distance(player.home_base_loc, cell) == 1) { return true; }
+    // special rules for attacking cell neighboring your home base
+    if(hex_distance(player.home_base_loc, cell) == 1) {
+        goog.object.forEach(player.squads, function(squad) {
+            if(SQUAD_IDS.is_mobile_squad_id(squad['id'])) {
+                if(!player.squad_is_deployed(squad['id'])) {
+                    ls.push(squad['id']);
+                }
+            } else if(squad['id'] === SQUAD_IDS.BASE_DEFENDERS && gamedata['territory']['base_defenders_can_attack_neighbors']) {
+                ls.push(squad['id']);
+            }
+        });
+    } else {
+        goog.object.forEach(player.squads, function(squad) {
+            if(SQUAD_IDS.is_mobile_squad_id(squad['id']) &&
+               player.squad_is_deployed(squad['id']) &&
+               hex_distance(squad['map_loc'], cell) == 1 &&
+               !player.squad_is_moving(squad['id'])) {
+                ls.push(squad['id']);
+            }
+        });
+    }
 
-    goog.object.forEach(player.squads, function(squad) {
-        if(('map_loc' in squad) && hex_distance(squad['map_loc'], cell) == 1 && !player.squad_is_moving(squad['id'])) {
-            ok = true;
-        }
-    });
-    return ok;
+    return ls;
 };
 
 /** Make sure all features are blocking map properly
@@ -42825,6 +42872,7 @@ function handle_server_message(data) {
         // XXX does not set gravity parameters as in SESSION_CHANGE
         session.viewing_base.base_climate = data[4];
         session.viewing_base.base_climate_data = (gamedata['climates'][session.viewing_base.base_climate] || {});
+        session.viewing_base.climate = new Climate(session.viewing_base.base_climate_data);
 
         if(global_chat_frame) { change_chat_tab(global_chat_frame, null); }
 
@@ -43085,6 +43133,7 @@ function handle_server_message(data) {
         session.viewing_base.base_landlord_id = data[17];
         session.viewing_base.base_climate = data[18];
         session.viewing_base.base_climate_data = (gamedata['climates'][session.viewing_base.base_climate] || {});
+        session.viewing_base.climate = new Climate(session.viewing_base.base_climate_data);
         session.viewing_base.base_map_loc = data[19];
         session.viewing_base.base_expire_time = data[20];
         session.viewing_base.base_ui_name = data[21];

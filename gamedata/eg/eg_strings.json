@@ -30,6 +30,7 @@
     },
 
     "climate_restrictions": {
+        "none": "No restrictions",
         "include_manufacture_categories": "Unit types allowed for attack: %s",
         "exclude_manufacture_categories": "Unit types not allowed for attack: %s",
         "include_units": "Units allowed for attack: %s",

@@ -838,6 +838,7 @@ RegionMap.RegionMap.prototype.make_nosql_spy_buttons = function(feature) {
     var info = PlayerCache.query_sync(feature['base_landlord_id']);
     var same_alliance = info && info['alliance_id'] && session.is_in_alliance() && info['alliance_id'] == session.alliance_id;
     var pre_attack = player.get_any_abtest_value('squad_pre_attack', gamedata['client']['squad_pre_attack']) && feature['base_type'] == 'squad' && feature['base_landlord_id'] != session.user_id && !same_alliance;
+    var squads_nearby = this.region.squads_nearby(feature['base_map_loc']);
 
     var will_lose_protection = pre_attack &&
         player.resource_state['protection_end_time'] > server_time &&
@@ -853,7 +854,7 @@ RegionMap.RegionMap.prototype.make_nosql_spy_buttons = function(feature) {
             var msg = gamedata['errors']['CANNOT_SPY_ON_MOVING_SQUAD'];
             invoke_child_message_dialog(msg['ui_title'], msg['ui_name'], {'dialog':'message_dialog_big'});
         }; })(this, feature), 'disabled_clickable', gamedata['errors']['CANNOT_SPY_ON_MOVING_SQUAD']['ui_name'], SPUI.error_text_color]];
-    } else if(!this.region.squads_nearby(feature['base_map_loc'])) {
+    } else if(squads_nearby.length < 1 && hex_distance(player.home_base_loc, feature['base_map_loc']) !== 1) {
         return [[verb, (function(_mapwidget, _feature) { return function() {
             _mapwidget.set_popup(null);
             var msg = gamedata['errors']['CANNOT_SPY_NO_NEARBY_SQUADS'];
@@ -869,10 +870,25 @@ RegionMap.RegionMap.prototype.make_nosql_spy_buttons = function(feature) {
         }; };
         var spy_cb = make_cb(this, feature, false);
         var ret = [[verb, spy_cb]];
+
+
         if(pre_attack) {
-            var attack_cb = make_cb(this, feature, true);
-            var wrapped_attack_cb = (will_lose_protection ? (function(_attack_cb) { return function() { invoke_attack_through_protection_message(_attack_cb); }; })(attack_cb) : attack_cb);
-            ret.push([gamedata['strings']['regional_map']['attack'], wrapped_attack_cb, 'attack']);
+            // do not show pre_attack option if player has no units deployable into this climate
+            var climate = new Climate(gamedata['climates'][(feature['base_climate'] && feature['base_climate'] in gamedata['climates'] ? feature['base_climate'] : gamedata['default_climate'])]);
+            var found_unit = false;
+            for(var id in player.my_army) {
+                var o = player.my_army[id];
+                if(goog.array.contains(squads_nearby, o['squad_id'])) {
+                    if(army_unit_hp(o)[0] > 0 && climate.can_deploy_unit_of_spec(gamedata['units'][o['spec']])) {
+                        found_unit = true; break;
+                    }
+                }
+            }
+            if(found_unit) {
+                var attack_cb = make_cb(this, feature, true);
+                var wrapped_attack_cb = (will_lose_protection ? (function(_attack_cb) { return function() { invoke_attack_through_protection_message(_attack_cb); }; })(attack_cb) : attack_cb);
+                ret.push([gamedata['strings']['regional_map']['attack'], wrapped_attack_cb, 'attack']);
+            }
         }
         return ret;
     }
