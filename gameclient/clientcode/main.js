@@ -45961,13 +45961,17 @@ function create_mouse_tooltip() {
         }
 
         // also kill the tooltip if the mouse is hovering over any desktop UI element
-        var ui_up = false;
         for(var name in desktop_dialogs) {
             var dialog = desktop_dialogs[name];
             if(dialog.mouse_enter_time > 0) {
-                ui_up = true;
-                mouse_tooltip.onleave();
-                return;
+                for(var i = 0; i < dialog.children.length; i++) {
+                    var child = dialog.children[i];
+                    // XXX note: not all SPUI widgets have a mouse_enter_time member!
+                    if(child.mouse_enter_time && child.mouse_enter_time > 0) {
+                        mouse_tooltip.onleave();
+                        return;
+                    }
+                }
             }
         }
 
