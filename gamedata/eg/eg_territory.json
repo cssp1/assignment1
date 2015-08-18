@@ -44,23 +44,23 @@
         "your_home": "rgba(146,255,80,1)", // your home base
         "owned": "rgba(146,255,80,1)", // other bases you own
 
-        "other_home": "rgba(255,255,255,1)", // home bases of other players
+        "other_home": "rgba(255,245,200,1)", // home bases of other players
         "other_home_level_too_low": "rgba(200,200,200,1)", // home bases of other players whose levels are too low to attack
         "other_home_level_too_high": "rgba(200,200,200,1)", // home bases of other players whose levels are too high to attack
 
         "your_squad": "rgba(146,255,80,1)", // your squad
-        "other_squad": "rgba(255,255,255,1)", // squads of other players
+        "other_squad": "rgba(255,245,200,1)", // squads of other players
 
         "alliance_friendly": "rgba(255,80,255,1)",
         "alliance_friendly_xl": "rgba(255,80,255,1)",
         "alliance_friendly_level_too_low": "rgba(200,80,200,1)",
         "alliance_friendly_level_too_high": "rgba(200,80,200,1)",
         "alliance_friendly_squad": "rgba(255,80,255,1)",
-        "alliance_hostile": "rgba(255,80,80,1)",
-        "alliance_hostile_xl": "rgba(255,80,80,1)",
-        "alliance_hostile_level_too_low": "rgba(200,80,80,1)",
-        "alliance_hostile_level_too_high": "rgba(200,80,80,1)",
-        "alliance_hostile_squad": "rgba(255,80,80,1)",
+        "alliance_hostile": "rgba(255,245,200,1)",
+        "alliance_hostile_xl": "rgba(255,245,200,1)",
+        "alliance_hostile_level_too_low": "rgba(200,200,200,1)",
+        "alliance_hostile_level_too_high": "rgba(200,200,200,1)",
+        "alliance_hostile_squad": "rgba(255,245,200,1)",
 
         "quarry_water": "rgba(125,221,255,1)", // water quarries you don't own
         "quarry_water_xl": "rgba(125,221,255,1)", // XL water quarries you don't own
@@ -142,7 +142,7 @@
     "default_zoom_nosql": -0.4, // default zoom for NoSQL (squad) regions
 
     "zoom_limits": [-1.5, 0.0], // minimum/maximum zoom amounts (linear units)
-    "max_label_zoom": 4.5, // max factor by which label text can grow when zoomed out
+    "max_label_zoom": 3, // max factor by which label text can grow when zoomed out
     "tile_fade_zoom": [0.60, 0.33], // zoom levels between which tiles fade into the background sprite (exponential zoom units)
     "abbreviate_labels_below_zoom": 0.5, // use shorter feature labels when more zoomed out than this (exponential zoom units)
     "show_alliance_membership_above_zoom": 0.5, // show alliance tags on features if zoomed in more than this
