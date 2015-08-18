@@ -5352,19 +5352,21 @@ var _min_attackable_level = function(level_gap_table, attacker_level) {
 player.attackable_level_range = function() {
     var attacker_level = player.level();
 
+    var mode = player.is_ladder_player() ? 'ladder' : 'default';
+
     // game-global level gap table
-    var level_gap_table = gamedata['max_pvp_level_gap'][player.is_ladder_player() ? 'ladder' : 'default'];
+    var level_gap_table = gamedata['max_pvp_level_gap'];
 
     // optional per-region override
     if(session.region && session.region.data && session.region.data['max_pvp_level_gap']) {
         level_gap_table = session.region.data['max_pvp_level_gap'];
     }
 
-    var lower_bound = _min_attackable_level(level_gap_table, attacker_level);
+    var lower_bound = _min_attackable_level(level_gap_table[mode], attacker_level);
     var upper_bound;
     if(gamedata['apply_pvp_level_gap_upward']) {
         upper_bound = lower_bound;
-        while(_min_attackable_level(level_gap_table, upper_bound) <= attacker_level) {
+        while(_min_attackable_level(level_gap_table[mode], upper_bound) <= attacker_level) {
             upper_bound += 1;
         }
         if(upper_bound > lower_bound) { upper_bound -= 1; }

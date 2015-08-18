@@ -8614,17 +8614,17 @@ class Player(AbstractPlayer):
                 mode = 'default'
 
         # game-global level gap table
-        level_gap_table = gamedata['max_pvp_level_gap'][mode]
+        level_gap_table = gamedata['max_pvp_level_gap']
 
         # optional per-region override
         if self.home_region and (self.home_region in gamedata['regions']):
             level_gap_table = gamedata['regions'][self.home_region].get('max_pvp_level_gap', level_gap_table)
 
-        lower_bound = _min_attackable_level(level_gap_table, attacker_level)
+        lower_bound = _min_attackable_level(level_gap_table[mode], attacker_level)
         if gamedata.get('apply_pvp_level_gap_upward',False):
             # stupid algorithm, I know
             upper_bound = lower_bound
-            while _min_attackable_level(level_gap_table, upper_bound) <= attacker_level:
+            while _min_attackable_level(level_gap_table[mode], upper_bound) <= attacker_level:
                 upper_bound += 1
             if upper_bound > lower_bound: upper_bound -= 1
         else:
