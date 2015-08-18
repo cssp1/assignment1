@@ -8,6 +8,10 @@ import sys, os, urllib, getopt, uuid, glob, copy, time, subprocess, datetime, ma
 
 import SpinJSON, Timezones, SpinConfig, SpinFacebook, FastGzipFile
 import pymongo
+
+if int(pymongo.version.split('.')[0]) >= 3:
+    raise Exception('not yet updated for PyMongo 3.0+ API. Use PyMongo 2.8 (and txMongo 15.0) for now.')
+
 import socket
 import SpinS3
 

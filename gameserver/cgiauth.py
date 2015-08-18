@@ -13,6 +13,9 @@ import pymongo
 import SpinConfig
 import SpinGoogleAuth
 
+if int(pymongo.version.split('.')[0]) >= 3:
+    raise Exception('not yet updated for PyMongo 3.0+ API. Use PyMongo 2.8 (and txMongo 15.0) for now.')
+
 def format_http_time(stamp):
     return time.strftime('%a, %d %b %Y %H:%M:%S GMT', time.gmtime(stamp))
 

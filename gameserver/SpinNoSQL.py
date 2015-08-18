@@ -12,6 +12,9 @@ import pymongo, bson
 import SpinConfig
 import SpinNoSQLId
 
+if int(pymongo.version.split('.')[0]) >= 3:
+    raise Exception('not yet updated for PyMongo 3.0+ API. Use PyMongo 2.8 (and txMongo 15.0) for now.')
+
 # to check if remove() modified anything:
 #        return .remove()['n'] > 0
 

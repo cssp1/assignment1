@@ -10,8 +10,11 @@
 import SpinConfig
 from twisted.internet import reactor, defer
 import txmongo
-import pymongo.errors
+import pymongo.errors, pymongo.version
 import time
+
+if int(pymongo.version.split('.')[0]) >= 3:
+    raise Exception('not yet updated for PyMongo 3.0+ API. Use PyMongo 2.8 (and txMongo 15.0) for now.')
 
 # adjust some connection parameters by monkey-patching
 txmongo.connection._Connection.initialDelay = 2 # Delay for the first reconnection attempt

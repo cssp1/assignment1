@@ -2638,6 +2638,9 @@ def do_funnel(qlist, significance_test, use_stages, conversion_rates):
 
         # connect to MongoDB
         import pymongo
+        if int(pymongo.version.split('.')[0]) >= 3:
+            raise Exception('not yet updated for PyMongo 3.0+ API. Use PyMongo 2.8 (and txMongo 15.0) for now.')
+
         dbconfig = SpinConfig.get_mongodb_config('skynet_remote' if 'skynet_remote' in SpinConfig.config['mongodb_servers'] else 'skynet_readonly')
         skynet_con = pymongo.MongoClient(*dbconfig['connect_args'], **dbconfig['connect_kwargs'])
         skynet_db = skynet_con[dbconfig['dbname']]

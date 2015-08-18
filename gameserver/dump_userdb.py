@@ -94,6 +94,8 @@ def do_slave(input):
     to_mongodb_config = input['to_mongodb_config']
     if to_mongodb_config:
         import pymongo
+        if int(pymongo.version.split('.')[0]) >= 3:
+            raise Exception('not yet updated for PyMongo 3.0+ API. Use PyMongo 2.8 (and txMongo 15.0) for now.')
         nosql_client = pymongo.MongoClient(*input['to_mongodb_config']['connect_args'],
                                            **input['to_mongodb_config']['connect_kwargs'])[to_mongodb_config['dbname']]
         nosql_table = nosql_client[to_mongodb_config['tablename']]

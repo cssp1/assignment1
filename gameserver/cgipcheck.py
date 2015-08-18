@@ -19,6 +19,9 @@ import SpinLog
 import FastGzipFile
 import pymongo # for skynet only
 
+if int(pymongo.version.split('.')[0]) >= 3:
+    raise Exception('not yet updated for PyMongo 3.0+ API. Use PyMongo 2.8 (and txMongo 15.0) for now.')
+
 time_now = int(time.time())
 
 # generic parameters for flot time graphs
