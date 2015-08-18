@@ -195,7 +195,7 @@ var send_request = function(path, method, args, cb, async, fail_cb) {
                            display_error("XHR Error: "+msg);
                            if(_fail_cb) { _fail_cb(result['error']); }
                        }; })(fail_cb, async),
-                       timeout: 30*1000, type: 'POST' });
+                       timeout: 75*1000, type: 'POST' });
     if(!async) { lock_gui(); }
 };
 
