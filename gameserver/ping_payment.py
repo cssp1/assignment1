@@ -4,14 +4,20 @@
 # Use of this source code is governed by an MIT-style license that can be
 # found in the LICENSE file.
 
-# run after receiving a Facebook Realtime Updates API notification about a payment status change
+# Run this after receiving a Facebook Realtime Updates API notification about a payment status change.
+# Since the notification includes no more info than just the payment ID and the fact that something changed,
+# we have to poll the payment Graph API data, and then, if we want the game server to do something about it,
+# we queue an asynchronous mail message to the affected player. (the server will handle any necessary actions
+# next time it checks the player's mail).
 
 import SpinNoSQL
 import SocialIDCache
 import SpinFacebook
 import SpinConfig
 import SpinJSON
-import sys, getopt, time, urllib, urllib2
+from urllib import urlencode
+import requests
+import sys, os, getopt, time
 
 time_now = int(time.time())
 verbose = False
@@ -30,27 +36,31 @@ if __name__ == '__main__':
         elif key == '-v' or key == '--verbose': verbose = True
 
     payment_id = args[0]
-    access_token = SpinConfig.config['facebook_app_access_token']
 
+    access_token = os.getenv('ACCESS_TOKEN') or SpinConfig.config['facebook_app_access_token']
+
+    requests_session = requests.Session()
     client = SpinNoSQL.NoSQLClient(SpinConfig.get_mongodb_config(SpinConfig.config['game_id']))
     social_id_table = SocialIDCache.SocialIDCache(client)
 
     response = None
+    err_msg = None
     attempt = 0
     while (not response) and (attempt < 10):
         attempt += 1
         try:
-            url = SpinFacebook.versioned_graph_endpoint('payment', payment_id)+'?'+urllib.urlencode({'access_token':access_token,
-                                                                                                     'fields': SpinFacebook.PAYMENT_FIELDS})
-            my_timeout = 30
-            conn = urllib2.urlopen(urllib2.Request(url))
-            response = SpinJSON.loads(conn.read())
+            url = SpinFacebook.versioned_graph_endpoint('payment', payment_id)+'?'+urlencode({'access_token':access_token,
+                                                                                              'fields': SpinFacebook.PAYMENT_FIELDS})
+            resp = requests_session.get(url, timeout = 30)
+            resp.raise_for_status()
+            response = SpinJSON.loads(resp.content)
         except KeyboardInterrupt:
             raise
-        except:
+        except Exception as e:
+            err_msg = repr(e)
             response = None
     if (not response):
-        raise Exception('Facebook API failure on payment '+payment_id)
+        raise Exception('Facebook API failure on payment %s: %s' % (payment_id, e))
 
     user_id = None
 
