@@ -1,0 +1,5 @@
+Find command for just (mostly) SpinPunch-originated files:
+
+find . spinpunch-private/ gamedata/{mf,tr,mf2,bfm,sg,dv}/ -type f ! -path '*.git*' ! -path '*closure*' ! -path '*gameclient/art*'
+
+# ... | xargs perl -pi -e 's/something/else/g'
