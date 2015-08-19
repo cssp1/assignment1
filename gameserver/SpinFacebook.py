@@ -12,7 +12,7 @@ import base64, hmac, hashlib, time, calendar
 # FACEBOOK API tools
 #
 
-# parse a Facebook time value that might NOT be in UTC (Ads API)
+# parse a Facebook time string value that might NOT be in UTC (Ads API), like '2015-08-1700:00:00T-0700', into a UTC UNIX timestamp
 def parse_fb_time(s):
     assert len(s) == 24 and s[10] == 'T'
     t = calendar.timegm(time.strptime(s[:19], '%Y-%m-%dT%H:%M:%S'))
@@ -22,8 +22,14 @@ def parse_fb_time(s):
     t -= off_sign * (3600 * off_hrs + 60 * off_min)
     return t
 
+# inverse of above
 def unparse_fb_time(t):
     return time.strftime('%Y-%m-%dT%H:%M:%S+0000', time.gmtime(t))
+
+# parse a Facebook data string '2015-08-17', possibly in a non-UTC time zone, into a UTC UNIX timestamp
+def parse_fb_date(s, utc_offset):
+    t = calendar.timegm(time.strptime(s, '%Y-%m-%d'))
+    return t - utc_offset
 
 # Facebook signed request verification code from
 # http://sunilarora.org/parsing-signedrequest-parameter-in-python-bas

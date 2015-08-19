@@ -600,37 +600,67 @@ def pretty_cents(cents):
     sign = '-' if cents < 0 else ''
     return sign+'$%.2f' % (0.01*abs(cents))
 
+# numeric counters inside adstats that we care about
+ADSTATS_COUNTERS = ['spend', 'spent', 'frequency',
+                    'clicks', 'unique_clicks', 'impressions', 'unique_impressions', 'reach',
+                    'social_clicks', 'unique_social_clicks', 'social_impressions', 'unique_social_impressions', 'social_reach']
+ADSTATS_DATA_FIELDS = ['relevance_score', 'actions'] # JSON object fields from adstats we want to store
+
 # actual query of Facebook API for adstats
 def _adstats_pull(db, adgroup_list, time_range = None):
     results = []
     do_store = (time_range is None) # don't store time-ranged results
 
+    if time_range:
+        # really awkward - API only lets you get daily stats in the advertiser's time zone!
+        def chop_to_date(unix): return time.strftime('%Y-%m-%d', time.gmtime(unix))
+
+        query = '?'+urllib.urlencode({'time_range': {'since': chop_to_date(time_range[0] + utc_pacific_offset(time_range[0])),
+                                                     # FB API is inclusive of last day, so subtract one day
+                                                     'until': chop_to_date(time_range[1] - 86400 + utc_pacific_offset(time_range[1]-86400))}})
+    else:
+        query = ''
+
     for adgroup, x in zip(adgroup_list,
-                          fb_api_batch(SpinFacebook.versioned_graph_endpoint('adgroup', ''),
-                                       [{'method':'GET', 'relative_url':adgroup['id']+'/stats'+('/%d/%d' % (time_range[0],time_range[1]) if time_range else '')} for adgroup in adgroup_list])):
-        stat_id, junk, stat_start_time, stat_end_time = x['id'].split('/')
+                          fb_api_batch(SpinFacebook.versioned_graph_endpoint('adinsights', ''),
+                                       [{'method':'GET', 'relative_url':adgroup['id']+'/insights'+query}
+                                        for adgroup in adgroup_list], read_only = True)):
+        if not x['data']:
+            # this means the ad had no delivery
+            results.append(None)
+            continue
+
+        x = x['data'][0]
         # make sure we got data for the right ad
-        assert str(stat_id) == str(adgroup['id'])
+        assert str(x['adgroup_id']) == str(adgroup['id'])
 
         if time_range:
             # make sure we got the right time range
-            # note: as of 2015 Feb 9, Facebook now snaps to 24hr days, so it looks like we cannot get hourly data anymore :(
-            parsed_start_time = SpinFacebook.parse_fb_time(x['start_time'])
-            parsed_end_time = SpinFacebook.parse_fb_time(x['end_time'])
-            if int(stat_start_time) != time_range[0] or \
-               int(stat_end_time) != time_range[1] or \
-               parsed_start_time != time_range[0] or \
+            parsed_start_time = SpinFacebook.parse_fb_date(x['date_start'], utc_pacific_offset(time_range[0]))
+            parsed_end_time = SpinFacebook.parse_fb_date(x['date_stop'], utc_pacific_offset(time_range[1])) + 86400
+
+            if parsed_start_time != time_range[0] or \
                parsed_end_time != time_range[1]:
                 raise Exception('asked for time_range %r %r %r but got %r (parsed %r %r %r %r)' % \
                                 (time_range, SpinFacebook.unparse_fb_time(time_range[0]), SpinFacebook.unparse_fb_time(time_range[1]),
-                                 x['id'], parsed_start_time, parsed_end_time, x['start_time'], x['end_time']))
+                                 x['adgroup_id'], parsed_start_time, parsed_end_time, x['date_start'], x['date_stop']))
 
-        for FIELD in ('spent', 'impressions', 'clicks'):
-            x[FIELD] = int(x[FIELD]) # sometimes Facebook returns numeric fields as a string :P
+        # Old API returned "spent" cents, new API returns "spend" dollars - convert back to cents
+        if 'spend' in x:
+            assert 'spent' not in x
+            x['spent'] = int(100*x['spend']+0.5)
+        elif 'spent' in x:
+            assert 'spend' not in x
+
+        # sometimes Facebook returns numeric fields as a string :P
+        for FIELD in ADSTATS_COUNTERS:
+            if FIELD in x and type(x[FIELD]) in (str, unicode):
+                x[FIELD] = float(x[FIELD]) if '.' in x[FIELD] else int(x[FIELD])
+
         x[spin_field('adgroup_id')] = adgroup['id']
         x[spin_field('adgroup_name')] = adgroup['name'] # denormalize for quick queries
 
-        if do_store:
+        if do_store and (not dry_run):
             # store in current adstats table
             update_fields_by_id(db.fb_adstats, mongo_enc(x), primary_key = spin_field('adgroup_id'))
 
@@ -640,6 +670,9 @@ def _adstats_pull(db, adgroup_list, time_range = None):
             db.fb_adstats_at_time.update({'_id':x['_id']}, mongo_enc(x), upsert=True)
 
         results.append(x)
+
+    if verbose:
+        print "_adstats_pull:", results
 
     return results
 
@@ -751,9 +784,20 @@ def adstats_record(db, adgroup_list, time_range):
                'raw_bid_type': adgroup['bid_type'], 'raw_bid_info': adgroup['bid_info'] # might be unnecessary
                }
 
-        for FIELD in ('spent', 'impressions', 'clicks'):
-            obj[FIELD] = int(stat[FIELD]) # sometimes Facebook returns numeric fields as a string :P
-            totals[FIELD] += obj[FIELD]
+        # copy the adstat counters and fields we want to store
+        for FIELD in ADSTATS_COUNTERS:
+            if FIELD in stat:
+                if type(stat[FIELD]) in (str, unicode):
+                    obj[FIELD] = float(stat[FIELD]) if '.' in stat[FIELD] else int(stat[FIELD])
+                else:
+                    assert type(stat[FIELD]) in (int, long, float)
+                    obj[FIELD] = stat[FIELD]
+            if FIELD in totals:
+                totals[FIELD] += obj[FIELD]
+
+        for FIELD in ADSTATS_DATA_FIELDS:
+            if FIELD in stat:
+                obj[FIELD] = stat[FIELD]
 
         if obj['spent']+obj['impressions']+obj['clicks'] < 1: continue # don't record empty stats
 
@@ -761,7 +805,8 @@ def adstats_record(db, adgroup_list, time_range):
             print "STAT", stat
             print "RECORD", obj
 
-        table.save(obj, manipulate=False)
+        if not dry_run:
+            table.save(obj, manipulate=False)
         count += 1
 
     if verbose:
@@ -2596,7 +2641,6 @@ if __name__ == '__main__':
                             use_regexp_ltv = use_regexp_ltv, use_record = use_record, output_format = output_format, output_frequency = output_frequency, tactical = tactical)
 
     elif mode == 'adstats-record':
-        table = adstats_record_table(db)
         if not time_range:
             if ADSTATS_PERIOD == 'hour':
                 # find UNIX time interval covering one whole hour, two hours ago
@@ -2659,10 +2703,9 @@ if __name__ == '__main__':
                 interval_end = adstats_quantize_time(interval_start + 86400 + 2*3600)
 
             if not quiet: print "Recording stats on %d non-deleted adgroups between %d-%d..." % (len(adgroup_list), interval_start, interval_end)
-            if not dry_run:
-                this_count = adstats_record(db, adgroup_list, [interval_start, interval_end])
-                if this_count >= 0:
-                    count += this_count
+            this_count = adstats_record(db, adgroup_list, [interval_start, interval_end])
+            if this_count >= 0:
+                count += this_count
             interval_start = interval_end
 
         if len(adgroup_list) < 1:
