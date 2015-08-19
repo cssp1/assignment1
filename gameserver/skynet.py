@@ -699,7 +699,14 @@ def adstats_pull(db, adgroup_list, time_range = None):
         db.fb_adstats_memo.ensure_index(spin_field('fetch_time'), expireAfterSeconds=ADSTATS_MEMO_LIFETIME)
         uncached = _adstats_pull(db, query, time_range = time_range)
         for q in xrange(len(query)):
-            stat = mongo_enc(uncached[q])
+            if uncached[q]:
+                stat = mongo_enc(uncached[q])
+            else:
+                # no data, make a blank entry
+                # XXX probably better to teach downstream code how to handle missing data
+                stat = {spin_field('adgroup_id'): query[q]['id']}
+                for COUNTER in ADSTATS_COUNTERS:
+                    stat[COUNTER] = 0
             stat[spin_field('fetch_time')] = fetch_time
             stat['_id'] = adstat_memo_key(query[q]['id'], time_range)
             db.fb_adstats_memo.save(stat, w=0, manipulate=False)
