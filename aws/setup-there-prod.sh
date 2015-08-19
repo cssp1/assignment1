@@ -5,15 +5,14 @@ GAME_ID_LONG=$2
 
 . ./setup-there-common.sh
 
-YUMPACKAGES="xfsprogs telnet subversion nscd munin-node git"
-YUMPACKAGES+=" python-twisted python-simplejson emacs strace"
-YUMPACKAGES+=" python-imaging python-imaging-devel numpy"
-YUMPACKAGES+=" libxml2 libxml2-devel"
-YUMPACKAGES+=" sendmail-cf patch fail2ban screen pinentry"
+YUMPACKAGES="git munin-node nscd patch pinentry screen sendmail-cf strace subversion xfsprogs"
+YUMPACKAGES+=" libffi libffi-devel libxml2 libxml2-devel"
 YUMPACKAGES+=" gcc autoconf automake libtool"
-YUMPACKAGES+=" postgresql postgresql-devel python-psycopg2" # note: client only
+YUMPACKAGES+=" postgresql postgresql-devel python-psycopg2" # note: Postgres client + python libs only
 YUMPACKAGES+=" mongodb-org-shell mongodb-org-tools" # note: client only
 YUMPACKAGES+=" java-1.8.0-openjdk-headless" # Google Closure Compiler now requires at least Java 7
+YUMPACKAGES+=" python27-devel python27-pip"
+YUMPACKAGES+=" python27-imaging python27-imaging-devel python27-numpy python27-pyOpenSSL python27-simplejson python27-twisted"
 
 echo "SETUP(remote): Installing additional packages..."
 sudo yum -y -q install $YUMPACKAGES
@@ -23,8 +22,6 @@ sudo chkconfig munin-node on
 sudo chkconfig --add nscd
 sudo chkconfig nscd on
 sudo /etc/init.d/nscd start
-sudo chkconfig fail2ban on
-sudo /etc/init.d/fail2ban start
 
 echo "SETUP(remote): Creating /etc/spinpunch config file..."
 echo "GAME_ID=${GAME_ID}" > /tmp/spinpunch
@@ -59,7 +56,7 @@ sudo chmod 0644 /etc/ssh/*
 sudo chmod 0600 /etc/ssh/sshd_config /etc/ssh/*_key
 sudo chmod 0644 /etc/cron.d/spinpunch
 sudo chmod 0755 /etc/cron.spinpunch.*/*
-sudo chmod 0644 /etc/fail2ban/jail.*
+
 sudo chmod 0700 /home/*
 sudo sh -c 'chown -R ec2-user:ec2-user /home/ec2-user'
 sudo sh -c 'chmod 0700 /home/ec2-user/.ssh'
@@ -98,9 +95,29 @@ echo "/etc/spinpunch - edit anything that needs changing."
 echo "MISSING: /etc/aliases: add 'root: awstech@example.com' mail alias"
 echo "SSL certs, from s3://spinpunch-config/ssl-spinpunch.com.tar.gz.gpg."
 
-echo "easy_install pymongo==2.8.1 requests" # note: this overrides python-requests package with a newer version of Requests
-echo "easy_install psycopg2 txpostgres" # note: this overrides system psycopg2 with newer version necessary for txpostgres
-echo "easy_install geoip2 - but, install libmaxminddb first for C acceleration from https://github.com/maxmind/libmaxminddb"
+
+# PYTHON PACKAGES
+echo "switch /etc/alternatives/python,pip,python-config to v2.7"
+echo "pip install --upgrade pip" # upgrade the upgrader
+echo "pip install --upgrade requests" # this overrides system python-requests package with a newer version of Requests
+echo "pip install --upgrade pyOpenSSL service_identity certifi" # override system pyOpenSSL with newer version and add service_identity and certifi
+echo "pip install --upgrade pymongo==2.8.1" # require pre-3.0 API
+echo "pip install --upgrade psycopg2 txpostgres" # replace system psycopg2 with newer version necessary for txpostgres
+echo "pip install --upgrade pyxDamerauLevenshtein"
+
+# FIRST, install libmaxminddb first for C acceleration from https://github.com/maxmind/libmaxminddb THEN
+echo "pip install --upgrade geoip2"
+
+# UPDATE TWISTED
+# (obsolete)
+# echo  " download from http://twistedmatrix.com/trac/wiki/Downloads and untar"
+# echo  " mkdir -p /home/ec2-user/twisted-13.2.0/lib64/python"
+# echo  " PYTHONPATH=/home/ec2-user/twisted-13.2.0/lib64/python python setup.py install --home=/home/ec2-user/twisted-13.2.0"
+# echo 'export PYTHONPATH="$PYTHONPATH:/home/ec2-user/twisted-13.2.0/lib64/python" in ~/.bash_profile'
+# echo "note: might require manual installation of newer version of zope.interface"
+
+echo "pip install --upgrade twisted"
+echo "Apply gameserver/http.py.patchX to twisted/web/http.py wherever it is installed"
 
 echo "MISSING: SVN: /home/ec2-user/.ssh/spsvnaccess.pem (also .ssh/config with Host/User/IdentityFile)"
 echo "MISSING: GIT: /home/ec2-user/.ssh/${GAME_ID}prod.pem (also .ssh/config with Host/User/IdentityFile)"
@@ -117,14 +134,8 @@ echo "    key /home/ec2-user/.ssh/hipchat.token for automated messages"
 echo "    key /home/ec2-user/.ssh/slack.token (with incoming webhook for game channel) for automated messages"
 echo "/home/ec2-user/.aws/credentials file with host awssecret for CloudWatch metrics"
 
+# CUSTOMIZED PYTHON PACKAGES
 echo "build/install ujson, blist, and lz4 libraries. (python setup.py build; sudo python setup.py install)"
-echo "Twisted update:"
-echo  " download from http://twistedmatrix.com/trac/wiki/Downloads and untar"
-echo  " mkdir -p /home/ec2-user/twisted-13.2.0/lib64/python"
-echo  " PYTHONPATH=/home/ec2-user/twisted-13.2.0/lib64/python python setup.py install --home=/home/ec2-user/twisted-13.2.0"
-echo "copy http.py.twistedX to twisted/web wherever it is installed"
-echo 'export PYTHONPATH="$PYTHONPATH:/home/ec2-user/twisted-13.2.0/lib64/python" in ~/.bash_profile'
-echo "note: might require manual installation of newer version of zope.interface"
 
 echo "apply private patches"
 

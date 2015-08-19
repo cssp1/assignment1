@@ -6,14 +6,13 @@ YUMPACKAGES="s3cmd xfsprogs httpd mod_ssl telnet mysql-server php php-mysql subv
 YUMPACKAGES+=" python-twisted python-simplejson emacs strace"
 YUMPACKAGES+=" python-imaging python-imaging-devel numpy"
 YUMPACKAGES+=" libxml2 libxml2-devel"
-YUMPACKAGES+=" sendmail-cf patch screen fail2ban"
+YUMPACKAGES+=" sendmail-cf patch screen"
 
 echo "SETUP(remote): Installing additional packages..."
 sudo yum -y -q install $YUMPACKAGES
 
 sudo chkconfig mysqld on
 sudo chkconfig httpd on
-sudo chkconfig fail2ban on
 
 echo "SETUP(remote): Adjusting users, groups, and permissions..."
 
@@ -59,7 +58,6 @@ sudo mount -a
 echo "SETUP(remote): (Re)starting services..."
 sudo /etc/init.d/mysqld restart
 sudo /etc/init.d/httpd restart
-sudo /etc/init.d/fail2ban restart
 
 echo "SETUP(remote): Fixing mail configuration..."
 sudo ./fix-ec2-mail.py

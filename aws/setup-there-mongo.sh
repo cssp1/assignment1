@@ -4,7 +4,7 @@ SYSTEM=$1
 
 . ./setup-there-common.sh
 
-YUMPACKAGES="git xfsprogs telnet subversion nscd munin-node strace sendmail-cf patch fail2ban screen"
+YUMPACKAGES="git xfsprogs telnet subversion nscd munin-node strace sendmail-cf patch screen"
 
 echo "SETUP(remote): Installing additional packages..."
 sudo yum -y -q install $YUMPACKAGES
@@ -12,7 +12,6 @@ sudo yum -y -q install $YUMPACKAGES
 sudo chkconfig munin-node on
 sudo chkconfig --add nscd
 sudo chkconfig nscd on
-sudo chkconfig fail2ban on
 
 echo "SETUP(remote): Unpacking filesystem overlay..."
 (cd / && gunzip -c /home/ec2-user/overlay-${SYSTEM}.cpio.gz | sudo cpio -iuvd -R root:root)
@@ -47,7 +46,6 @@ sudo newaliases
 echo "SETUP(remote): (Re)starting services..."
 sudo /etc/init.d/nscd start
 sudo /etc/init.d/munin-node restart
-sudo /etc/init.d/fail2ban start
 
 echo "SETUP(remote): Fixing mail configuration..."
 sudo ./fix-ec2-mail.py

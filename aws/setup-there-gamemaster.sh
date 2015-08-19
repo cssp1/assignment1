@@ -2,13 +2,14 @@
 
 . ./setup-there-common.sh
 
-YUMPACKAGES="xfsprogs telnet subversion MySQL-python"
-YUMPACKAGES+=" python-twisted python-simplejson emacs strace"
-YUMPACKAGES+=" python-imaging python-imaging-devel numpy"
-YUMPACKAGES+=" libxml2 libxml2-devel"
-YUMPACKAGES+=" sendmail-cf patch screen fail2ban"
-YUMPACKAGES+=" postgresql python-psycopg2" # note: client only
+YUMPACKAGES="git munin-node nscd patch pinentry screen sendmail-cf strace subversion xfsprogs"
+YUMPACKAGES+=" libffi libffi-devel libxml2 libxml2-devel"
+YUMPACKAGES+=" gcc autoconf automake libtool"
+YUMPACKAGES+=" postgresql postgresql-devel python-psycopg2" # note: Postgres client + python libs only
+YUMPACKAGES+=" mongodb-org mongodb-org-server mongodb-org-shell mongodb-org-tools" # note: full MongoDB server
 YUMPACKAGES+=" java-1.8.0-openjdk-headless" # Google Closure Compiler now requires at least Java 7
+YUMPACKAGES+=" python27-devel python27-pip"
+YUMPACKAGES+=" python27-imaging python27-imaging-devel python27-numpy python27-pyOpenSSL python27-simplejson python27-twisted"
 
 echo "SETUP(remote): Installing additional packages..."
 sudo yum -y -q install $YUMPACKAGES
@@ -45,7 +46,6 @@ fi
 
 sudo chkconfig mysqld off
 sudo chkconfig httpd off
-sudo chkconfig fail2ban on
 
 echo "SETUP(remote): Adjusting users, groups, and permissions..."
 
@@ -82,18 +82,34 @@ sudo sh -c 'chmod 0600 /home/spanalytics/.ssh/*'
 echo "SETUP(remote): Mounting data EBS volume..."
 sudo mount -a
 
-echo "SETUP(remote): (Re)starting services..."
-sudo /etc/init.d/fail2ban restart
-
 # allow Python to bind to lower ports (dangerous?)
-sudo setcap 'cap_net_bind_service=+ep' /usr/bin/python2.6
+for P in /usr/bin/python2.6 /usr/bin/python26 /usr/bin/python2.7 /usr/bin/python27; do
+    if [ -e $P ]; then
+    sudo setcap 'cap_net_bind_service=+ep' $P
+    fi
+done
 
 echo "SETUP(remote): Fixing mail configuration..."
 sudo ./fix-ec2-mail.py
 
 echo "SETUP(remote): gamemaster setup done!"
 
-echo "MISSING: hostname in /etc/sysconfig/network. /etc/cron scripts for production. /var/tmp/swap setup. Home dirs in /media/aux"
+echo "MISSING:"
+echo "fstab"
+echo "/etc/sysconfig/network hostname and sudo hostname <HOSTNAME>"
+echo "fix-ec2-mail.py (requires hostname to be correct)"
+echo "set up swap space"
+
+# PYTHON PACKAGES
+echo "switch /etc/alternatives/python,pip,python-config to v2.7"
+echo "pip install --upgrade pip" # upgrade the upgrader
+echo "pip install --upgrade requests" # this overrides system python-requests package with a newer version of Requests
+echo "pip install --upgrade pyOpenSSL service_identity certifi" # override system pyOpenSSL with newer version and add service_identity and certifi
+echo "pip install --upgrade pymongo==2.8.1" # require pre-3.0 API
+echo "pip install --upgrade psycopg2 txpostgres" # replace system psycopg2 with newer version necessary for txpostgres
+echo "pip install --upgrade pyxDamerauLevenshtein"
+
+echo "MISSING: /etc/cron scripts for production. /var/tmp/swap setup. Home dirs in /media/aux"
 echo "MISSING: SSL certs, from s3://spinpunch-config/ssl-spinpunch.com.tar.gz.gpg."
 echo "MISSING: /home/outgoing-smtp/mailsender-awssecret"
 echo "MISSING: (if using Postfix) echo OUTGOING-MAIL-PASSWORD | sudo passwd --stdin outgoing-smtp"
@@ -102,4 +118,4 @@ echo "MISSING: (if using Postfix) mail aliases in /etc/postfix/canonical_recipie
 echo "MISSING: /var/svn/slack.token for SVN commit messages"
 echo "MISSING: /home/ec2-user/.ssh/spinpunch.com.key for SSL auth"
 echo "MISSING: /etc/aliases: add 'root: awstech@example.com' mail alias"
-echo "MongoDB and pymongo==2.8.1"
+

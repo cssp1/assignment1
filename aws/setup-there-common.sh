@@ -2,6 +2,19 @@
 
 # script that runs on the cloud node
 
+# stop SSH brute-force attacks
+echo "SETUP(remote): Setting up fail2ban..."
+sudo yum install fail2ban
+sudo sh -c '/bin/cat > /etc/fail2ban/jail.local' <<EOF
+[DEFAULT]
+bantime = 3600
+[ssh-iptables]
+action = iptables[name=SSH, port=ssh, protocol=tcp]
+EOF
+sudo chmod 0644 /etc/fail2ban/jail.*
+sudo chkconfig fail2ban on
+sudo /etc/init.d/fail2ban restart
+
 echo "SETUP(remote): Getting latest package updates..."
 sudo yum -y update
 

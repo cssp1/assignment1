@@ -2,31 +2,28 @@
 
 . ./setup-there-common.sh
 
-YUMPACKAGES="nscd xfsprogs subversion git"
-YUMPACKAGES+=" python-twisted python-simplejson strace"
-YUMPACKAGES+=" python-imaging python-imaging-devel numpy"
-YUMPACKAGES+=" libxml2 libxml2-devel gcc"
-YUMPACKAGES+=" sendmail-cf patch fail2ban screen"
+YUMPACKAGES="git munin-node nscd patch pinentry screen sendmail-cf strace subversion xfsprogs"
+YUMPACKAGES+=" libffi libffi-devel libxml2 libxml2-devel"
+YUMPACKAGES+=" gcc autoconf automake libtool"
+YUMPACKAGES+=" postgresql postgresql-devel python-psycopg2" # note: Postgres client + python libs only
 YUMPACKAGES+=" mysql MySQL-python" # note: MySQL server + client + python libs
-YUMPACKAGES+=" postgresql python-psycopg2" # note: Postgres client + python libs only
+YUMPACKAGES+=" mongodb-org mongodb-org-server mongodb-org-shell mongodb-org-tools" # note: full MongoDB server
 YUMPACKAGES+=" java-1.8.0-openjdk-headless" # Google Closure Compiler now requires at least Java 7
+YUMPACKAGES+=" python27-devel python27-pip"
+YUMPACKAGES+=" python27-imaging python27-imaging-devel python27-numpy python27-pyOpenSSL python27-simplejson python27-twisted"
 
 echo "SETUP(remote): Installing additional packages..."
 sudo yum -y -q install $YUMPACKAGES
 
+sudo chkconfig munin-node on
 sudo chkconfig --add nscd
 sudo chkconfig nscd on
 sudo /etc/init.d/nscd start
-sudo chkconfig fail2ban on
-sudo /etc/init.d/fail2ban start
 
 sudo chkconfig mysqld off # moved to RDS
 
 echo "SETUP(remote): Unpacking filesystem overlay..."
 (cd / && gunzip -c /home/ec2-user/overlay-analytics1.cpio.gz | sudo cpio -iuvd -R root:root)
-
-echo "SETUP(remote): Installing mongodb from mongodb.org repo..."
-sudo yum -y -q install mongodb-org mongodb-org-server mongodb-org-shell mongodb-org-tools # note: MongoDB server + client + python libs (below)
 
 # fix permissions
 sudo chown -R root:root /etc
@@ -47,17 +44,26 @@ sudo newaliases
 echo "SETUP(remote): Mounting all volumes..."
 sudo mount -a
 
-echo "SETUP(remote): Fixing mail configuration..."
-sudo ./fix-ec2-mail.py
-
 echo "SETUP(remote): Setting up ec2-send-memory-metrics.py..."
 sudo install ./ec2-send-memory-metrics.py /usr/local/bin/ec2-send-memory-metrics.py
 
 echo "SETUP(remote): analytics1 setup done!"
 
-echo "MISSING: /etc/fstab, /etc/sysconfig/network hostname"
+echo "/etc/fstab"
+echo "/etc/sysconfig/network hostname and sudo hostname <HOSTNAME>"
+echo "fix-ec2-mail.py (requires hostname to be correct)"
+
+# PYTHON PACKAGES
+echo "switch /etc/alternatives/python,pip,python-config to v2.7"
+echo "pip install --upgrade pip" # upgrade the upgrader
+echo "pip install --upgrade requests" # this overrides system python-requests package with a newer version of Requests
+echo "pip install --upgrade pyOpenSSL service_identity certifi" # override system pyOpenSSL with newer version and add service_identity and certifi
+echo "pip install --upgrade pymongo==2.8.1" # require pre-3.0 API
+echo "pip install --upgrade psycopg2 txpostgres" # replace system psycopg2 with newer version necessary for txpostgres
+echo "pip install --upgrade pyxDamerauLevenshtein"
+
 echo "MISSING: /etc/cron.spinpunch.mysql-daily/99-report-slow-queries.sh email"
-echo "MISSING: compile/install ujson library"
+echo "MISSING: compile/install ujson library (python setup.py build; sudo python setup.py install)"
 echo "MISSING: SVN: /home/ec2-user/.ssh/spsvnaccess.pem (also .ssh/config with Host/User/IdentityFile)"
 echo "MISSING: GIT: /home/ec2-user/.ssh/analytics1.pem (also .ssh/config with Host/User/IdentityFile)"
 echo "MISSING: GIT: git config --global user.name " # 'SpinPunch Deploy'
