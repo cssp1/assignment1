@@ -10,7 +10,7 @@ YUMPACKAGES+=" mysql MySQL-python" # note: MySQL server + client + python libs
 YUMPACKAGES+=" mongodb-org mongodb-org-server mongodb-org-shell mongodb-org-tools" # note: full MongoDB server
 YUMPACKAGES+=" java-1.8.0-openjdk-headless" # Google Closure Compiler now requires at least Java 7
 YUMPACKAGES+=" python27-devel python27-pip"
-YUMPACKAGES+=" python27-imaging python27-imaging-devel python27-numpy python27-pyOpenSSL python27-simplejson python27-twisted"
+YUMPACKAGES+=" python27-boto python27-imaging python27-imaging-devel python27-numpy python27-pyOpenSSL python27-simplejson python27-twisted"
 
 echo "SETUP(remote): Installing additional packages..."
 sudo yum -y -q install $YUMPACKAGES
