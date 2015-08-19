@@ -16,7 +16,7 @@ window.fbAsyncInit = function() {
     } else if(spin_facebook_api_versions && ('default' in spin_facebook_api_versions)) {
         init_params.version = spin_facebook_api_versions['default'];
     } else {
-        init_params.version = 'v2.2'; // fallback default (sync with: FacebookSDK.js, fb_guest.html, gameserver/SpinFacebook.py, gameclient/clientcode/SPFB.js)
+        init_params.version = 'v2.4'; // fallback default (sync with: FacebookSDK.js, fb_guest.html, gameserver/SpinFacebook.py, gameclient/clientcode/SPFB.js)
     }
     FB.init(init_params);
     //window.setTimeout(function() { FB.Canvas.setAutoGrow(); }, 250);
