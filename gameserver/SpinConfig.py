@@ -217,7 +217,7 @@ def game_launch_date(override_game_id = None):
              'mf2': 1388096233, # 2013 Dec 26 - Tier 1/2 release
              'bfm': 1407024000, # (1403728087) 2014 June 26 - Tier 4 release, (1407024000) 2014 August 3 - Tier 1/2 release
              'sg': 1414403421, # (1414403421) 2014 Oct 27 server set up, but not opened yet
-             'dv': 1439616129, # XXXXXX fill in
+             'dv': 1440046752, # Un-sandboxed Thu Aug 20 04:59:32 UTC 201
              }[override_game_id or game()]
 
 ACCOUNT_LAPSE_TIME = 7*24*60*60 # consider an account "lapsed" if this much time has passed since last logout
