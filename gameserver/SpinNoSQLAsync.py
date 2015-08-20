@@ -10,7 +10,7 @@
 import SpinConfig
 from twisted.internet import reactor, defer
 import txmongo
-import pymongo.errors, pymongo.version
+import pymongo, pymongo.errors
 import time
 
 if int(pymongo.version.split('.')[0]) >= 3:
