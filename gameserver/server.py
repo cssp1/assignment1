@@ -14841,7 +14841,7 @@ class XSAPI(resource.Resource):
         if their_sig != our_sig:
             gamesite.exception_log.event(server_time, 'XSAPI hash mismatch: theirs %s ours %s body %r' % (their_sig, our_sig, request_body))
             request.setResponseCode(http.BAD_REQUEST)
-            return SpinJSON.dumps({'error': {'code':'INVALID_SIGNATURE', 'message': 'XSAPI hash mismatch'}})
+            return SpinJSON.dumps({'error': {'code':'INVALID_SIGNATURE', 'message': 'XSAPI hash mismatch (by server)'}})
 
         request_data = SpinJSON.loads(request_body)
 
@@ -14855,7 +14855,9 @@ class XSAPI(resource.Resource):
         if not session:
             gamesite.exception_log.event(server_time, 'session not found for XSAPI order (xs_id %s)' % xs_id)
             request.setResponseCode(http.BAD_REQUEST)
-            return SpinJSON.dumps({'error': {'code':'INVALID_USER', 'message': 'session not found (by server)'}})
+            # do not send INVALID_USER, because Xsolla caches this, and we don't want to cache "invalid" for a valid
+            # user who does not happen to be logged in right now.
+            return SpinJSON.dumps({'error': {'code':'INCORRECT_INVOICE', 'message': 'session not found (by server)'}})
 
         if request_data['notification_type'] == 'user_validation':
             # since we found the session, the user is already considered valid
@@ -20317,6 +20319,26 @@ class GAMEAPI(resource.Resource):
                         gamesite.exception_log.event(server_time, 'FBRTAPI_payment API fail on user %d payment %s:' % (session.user.user_id, msg['payment_id']) + traceback.format_exc())
                         pass
                     to_ack.append(msg['msg_id'])
+
+                elif msg['type'] == 'XSAPI_payment':
+                    try:
+                        request_data = msg['response'] # note: we don't check the signature, assuming proxyserver checked it already.
+                        payment_id = request_data['transaction']['id']
+                        # don't re-run an already-completed payment
+                        found = False
+                        for entry in session.player.history.get('money_purchase_history',[]):
+                            if ('order_id' in entry) and str(entry['order_id']) == str(payment_id):
+                                found = True
+                                break
+
+                        if not found: # run the payment
+                            gamesite.xsapi.handle_payment(None, session, request_data)
+                            gamesite.exception_log.event(server_time, 'XSAPI_payment API success on user %d payment %s' % (session.user.user_id, payment_id))
+                    except:
+                        gamesite.exception_log.event(server_time, 'XSAPI_payment API fail on user %d payment %s:' % (session.user.user_id, payment_id) + traceback.format_exc())
+                        pass
+                    to_ack.append(msg['msg_id'])
+
                 else:
                     gamesite.exception_log.event(server_time, 'user %d: unhandled msg type %s' % (session.user.user_id, msg['type']))
 

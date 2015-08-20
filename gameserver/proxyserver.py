@@ -40,6 +40,7 @@ import SpinSSL
 import SpinHTTP
 import SpinFacebook
 import SpinKongregate
+import SpinXsolla
 import BrowserDetect
 import SpinLog
 import SpinNoSQL
@@ -1903,26 +1904,53 @@ class GameProxy(proxy.ReverseProxyResource):
             return self.render_via_proxy(session.gameserver_fwd, request)
 
         elif self.path == '/XSAPI':
-            # note: we don't check the signature here - that needs to be done by the gameserver
             request_body = request.content.read()
             xsapi_raw_log.event(proxy_time, request_body)
+
+            # check signature
+            their_sig = SpinHTTP.get_twisted_header(request, 'Authorization')[len('Signature '):]
+            our_sig = SpinXsolla.make_signature(SpinConfig.config, request_body)
+            if their_sig != our_sig:
+                exception_log.event(proxy_time, 'XSAPI hash mismatch: theirs %s ours %s body %r' % (their_sig, our_sig, request_body))
+                request.setResponseCode(http.BAD_REQUEST)
+                return SpinJSON.dumps({'error': {'code':'INVALID_SIGNATURE', 'message': 'XSAPI hash mismatch (by proxyserver)'}})
+
             request_data = SpinJSON.loads(request_body)
             xsapi_json_log.event(proxy_time, request_data)
 
-            session = None
-            if 'user' in request_data and 'id' in request_data['user']:
+            if 'user' in request_data and 'id' in request_data['user'] and 'notification_type' in request_data:
                 xs_id = request_data['user']['id']
+
+                # look up the user
                 # note: assume we are using social_id as the Xsolla ID
-                session = self.session_emulate(db_client.session_get_by_social_id(xs_id, reason=self.path))
-            else:
-                raise Exception('invalid XSAPI call: '+log_request(request)+' body '+repr(request_data))
+                social_id = xs_id
+                user_id = social_id_table.social_id_to_spinpunch(social_id, False)
+                if not user_id:
+                    exception_log.event(proxy_time, 'XSAPI user_validation failed: '+repr(request_data))
+                    request.setResponseCode(http.BAD_REQUEST)
+                    return SpinJSON.dumps({'error': {'code':'INVALID_USER', 'message': 'xs_id %s not found (by proxyserver)' % xs_id}})
 
-            if not session:
-                exception_log.event(proxy_time, 'cannot find session for XSAPI call: '+repr(request_data))
-                request.setResponseCode(http.BAD_REQUEST)
-                return SpinJSON.dumps({'error': {'code':'INVALID_USER', 'message': 'session not found (by proxyserver)'}})
+                if request_data['notification_type'] == 'user_validation':
+                    # user is valid, nothing more to do
+                    request.setResponseCode(http.NO_CONTENT)
+                    return ''
+                elif request_data['notification_type'] == 'payment':
+                    # proxy to gameserver, if player is logged in
+                    session = self.session_emulate(db_client.session_get_by_social_id(social_id, reason=self.path))
+                    if session:
+                        return self.render_via_proxy(session.gameserver_fwd, request)
 
-            return self.render_via_proxy(session.gameserver_fwd, request)
+                    # player is not logged in - queue a mail message so gameserver will receive it on next login
+                    exception_log.event(proxy_time, 'session not found for XSAPI order, queueing: '+repr(request_data))
+                    db_client.msg_send([{'to':[user_id],
+                                         'type':'XSAPI_payment',
+                                         'time':proxy_time,
+                                         'expire_time': proxy_time + SpinConfig.config['proxyserver'].get('XSAPI_payment_msg_duration', 30*24*60*60),
+                                         'response': request_data}])
+                    request.setResponseCode(http.NO_CONTENT)
+                    return ''
+
+            raise Exception('invalid XSAPI call: '+log_request(request)+' body '+repr(request_data))
 
         elif self.path == '/CREDITAPI':
             # extract session from the custom order_info the client passed to Facebook
