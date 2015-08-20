@@ -14406,7 +14406,7 @@ class Store:
                     session.spawn_new_units_for_player(session.player, retmsg, spell['give_units'])
 
             session.setvalue_player_metric('gamebucks_balance', session.player.resources.gamebucks, bucket=True, bucket_size=15*60)
-            retmsg.append(["PLAYER_STATE_UPDATE", session.player.resources.calc_snapshot().serialize()])
+            session.deferred_player_state_update = True
 
         elif spellname.startswith("BUY_PROTECTION"):
             assert gameapi.execute_spell(session, retmsg, spellname, None, reason = 'purchased_protection')
