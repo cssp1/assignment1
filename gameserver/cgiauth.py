@@ -9,26 +9,21 @@
 import cgi, cgitb
 import sys, os, time, datetime, functools
 import urlparse
-import pymongo
+import pymongo # 3.0+ OK
 import SpinConfig
 import SpinGoogleAuth
-
-if int(pymongo.version.split('.')[0]) >= 3:
-    raise Exception('not yet updated for PyMongo 3.0+ API. Use PyMongo 2.8 (and txMongo 15.0) for now.')
 
 def format_http_time(stamp):
     return time.strftime('%a, %d %b %Y %H:%M:%S GMT', time.gmtime(stamp))
 
 def gen_csrf_state(tbl, remote_host):
     state = ''.join([('%02x' % ord(c)) for c in os.urandom(16)])
-    tbl.ensure_index('created', expireAfterSeconds=300)
-    tbl.insert({'_id':state, 'created':datetime.datetime.utcnow(), 'host': remote_host})
+    tbl.create_index('created', expireAfterSeconds=300)
+    tbl.insert_one({'_id':state, 'created':datetime.datetime.utcnow(), 'host': remote_host})
     return state
 
 def check_csrf_state(tbl, remote_host, returned_state):
-    r = tbl.remove({'_id':returned_state, 'host': remote_host})
-    if r and r['ok'] and r.get('n',0)>=1: return True
-    return False
+    return tbl.delete_one({'_id':returned_state, 'host': remote_host}).deleted_count >= 1
 
 if __name__ == "__main__":
     if (not SpinConfig.config.get('secure_mode',False)):
