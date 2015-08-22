@@ -132,7 +132,7 @@ if __name__ == '__main__':
                 new_name = get_adgroup_name(str(row['adgroup_id']))
                 if new_name:
                     if SkynetLib.adgroup_name_is_bad(new_name):
-                        nosql_db['fb_adstats_hourly'].remove({'_id':row['_id']},w=0)
+                        nosql_db['fb_adstats_hourly'].delete_one({'_id':row['_id']})
                         continue
 
                     row['adgroup_name'] = new_name
