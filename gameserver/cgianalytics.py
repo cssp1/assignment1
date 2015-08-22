@@ -2637,9 +2637,7 @@ def do_funnel(qlist, significance_test, use_stages, conversion_rates):
         retmsg['skynet_queries'] = []
 
         # connect to MongoDB
-        import pymongo
-        if int(pymongo.version.split('.')[0]) >= 3:
-            raise Exception('not yet updated for PyMongo 3.0+ API. Use PyMongo 2.8 (and txMongo 15.0) for now.')
+        import pymongo # 3.0+ OK
 
         dbconfig = SpinConfig.get_mongodb_config('skynet_remote' if 'skynet_remote' in SpinConfig.config['mongodb_servers'] else 'skynet_readonly')
         skynet_con = pymongo.MongoClient(*dbconfig['connect_args'], **dbconfig['connect_kwargs'])
@@ -2711,15 +2709,14 @@ def do_funnel(qlist, significance_test, use_stages, conversion_rates):
 
             retmsg['skynet_queries'].append(qs)
 
-            agg_result = skynet_db.fb_adstats_hourly.aggregate([
+            agg_result_cursor = skynet_db.fb_adstats_hourly.aggregate([
                 {'$match': qs},
                 {'$group':{'_id':'ALL', 'spent':{'$sum':'$spent'}}}
                 ])['result']
 
-            if agg_result and len(agg_result) == 1:
-                total_spent = agg_result[0]['spent']/100.0 # cents -> dollars
-            else:
-                total_spent = 0.0
+            total_spent = 0.0
+            for agg_result in agg_result_cursor: # note: might have no data to iterate over
+                total_spent = agg_result['spent']/100.0 # cents -> dollars
 
             # get the "N" value for this measurement
             user_count = stage_rec_user['cohorts'][i]['N']
