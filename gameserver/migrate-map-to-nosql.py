@@ -10,6 +10,7 @@ import SpinConfig
 import SpinJSON
 import SpinNoSQL
 import sys, time
+import pymongo # 3.0+ OK
 
 time_now = int(time.time())
 
@@ -36,7 +37,7 @@ if __name__ == '__main__':
 
         expired = (props.get('base_expire_time',-1) > 0 and props['base_expire_time'] < time_now)
         if not expired:
-            nosql_client.region_table(region_id, 'map').save(props, w=0)
+            nosql_client.region_table(region_id, 'map').with_options(write_concern = pymongo.write_concern.WriteConcern(w=0)).replace_one({'_id':props['_id']}, props, upsert=True)
 
         converted += 1
         sys.stderr.write('%s: %4d/%4d... %s%s\n' % (region_id, converted, total, base_id, ' (expired)' if expired else ''))
