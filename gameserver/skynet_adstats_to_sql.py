@@ -10,15 +10,12 @@
 import sys, time, getopt, traceback
 import SpinConfig
 import SkynetLib
-import pymongo
+import pymongo # 3.0+ OK
 import MySQLdb
 import SpinSQLUtil
 import requests
 import SpinJSON
 import SpinFacebook
-
-if int(pymongo.version.split('.')[0]) >= 3:
-    raise Exception('not yet updated for PyMongo 3.0+ API. Use PyMongo 2.8 (and txMongo 15.0) for now.')
 
 time_now = int(time.time())
 
@@ -81,6 +78,7 @@ if __name__ == '__main__':
     nosql_config = SpinConfig.get_mongodb_config('skynet')
     nosql_client = pymongo.MongoClient(*nosql_config['connect_args'], **nosql_config['connect_kwargs'])
     nosql_db = nosql_client[nosql_config['dbname']]
+    nosql_tbl = nosql_db['fb_adstats_hourly']
 
     cur = con.cursor()
     if not dry_run:
@@ -112,7 +110,7 @@ if __name__ == '__main__':
     n_name_fixed = 0
     n_dtgt_fixed = 0
 
-    query = nosql_db['fb_adstats_hourly'].find(qs).sort([('start_time',1)])
+    query = nosql_tbl.find(qs).sort([('start_time',1)])
     query_size = query.count()
     cur = con.cursor()
     for row in query:
@@ -132,7 +130,7 @@ if __name__ == '__main__':
                 new_name = get_adgroup_name(str(row['adgroup_id']))
                 if new_name:
                     if SkynetLib.adgroup_name_is_bad(new_name):
-                        nosql_db['fb_adstats_hourly'].delete_one({'_id':row['_id']})
+                        nosql_tbl.delete_one({'_id':row['_id']})
                         continue
 
                     row['adgroup_name'] = new_name
@@ -142,7 +140,7 @@ if __name__ == '__main__':
                         assert dtgt
                         if 'a' not in dtgt: dtgt['a'] = 'tr' # fill in missing game on legacy ads
                         row['dtgt'] = dtgt
-                        nosql_db['fb_adstats_hourly'].update({'_id':row['_id']}, {'$set':{'adgroup_name':row['adgroup_name'], 'dtgt': dtgt}}, w=0)
+                        nosql_tbl.update_one({'_id':row['_id']}, {'$set':{'adgroup_name':row['adgroup_name'], 'dtgt': dtgt}})
                         n_name_fixed += 1
                     else:
                         print 'bad name?', new_name
@@ -160,7 +158,7 @@ if __name__ == '__main__':
             elif 'adgroup_name' in row:
                 if SkynetLib.adgroup_name_is_bad(row['adgroup_name']):
                     if fix_missing_data:
-                        nosql_db['fb_adstats_hourly'].remove({'_id':row['_id']},w=0)
+                        nosql_tbl.delete_one({'_id':row['_id']})
                     continue
                 stgt, tgt = SkynetLib.decode_adgroup_name(SkynetLib.standin_spin_params, row['adgroup_name'])
                 assert stgt and tgt
@@ -177,7 +175,7 @@ if __name__ == '__main__':
                     # note: if we added the game here, the dtgt wil disagree with the adgroup_name
                     dtgt = SkynetLib.stgt_to_dtgt(stgt)
                     assert 'a' in dtgt
-                    nosql_db['fb_adstats_hourly'].update({'_id':row['_id']}, {'$set':{'dtgt': dtgt}}, w=0)
+                    nosql_tbl.update_one({'_id':row['_id']}, {'$set':{'dtgt': dtgt}})
                     n_dtgt_fixed += 1
 
             else:
