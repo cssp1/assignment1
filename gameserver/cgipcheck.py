@@ -17,10 +17,7 @@ import SpinJSON
 import SpinGoogleAuth
 import SpinLog
 import FastGzipFile
-import pymongo # for skynet only
-
-if int(pymongo.version.split('.')[0]) >= 3:
-    raise Exception('not yet updated for PyMongo 3.0+ API. Use PyMongo 2.8 (and txMongo 15.0) for now.')
+import pymongo # 3.0+ OK
 
 time_now = int(time.time())
 
@@ -345,7 +342,7 @@ def do_action(path, method, args, spin_token_data, nosql_client):
                                 skynet_db.fb_adstats_hourly.aggregate([
                     {'$match': adgroup_dtgt_qs},
                     {'$group':{'_id':'$adgroup_id', 'adgroup_name':{'$last':'$adgroup_name'}}}
-                    ])['result'] \
+                    ]) \
                                 if (not SkynetLib.adgroup_name_is_bad(row.get('adgroup_name','BAD'))) and \
                                    (SkynetLib.decode_adgroup_name(SkynetLib.standin_spin_params, row['adgroup_name'])[1] is not None)]
                 adgroup_dict = dict((x['_id'], x) for x in adgroup_list)
@@ -387,7 +384,7 @@ def do_action(path, method, args, spin_token_data, nosql_client):
                                       'click_weighted_bid':{'$sum':{'$multiply':['$bid','$clicks']}},
                                       'imp_weighted_bid':{'$sum':{'$multiply':['$bid','$impressions']}},
                                       'samples':{'$sum':1}}}]
-                    agg_ret = skynet_db.fb_adstats_hourly.aggregate(agg)['result']
+                    agg_ret = skynet_db.fb_adstats_hourly.aggregate(agg)
                 else:
                     click_weighted_value_available = True
                     by_time = {}
