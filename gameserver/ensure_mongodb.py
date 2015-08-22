@@ -8,11 +8,8 @@
 
 import sys, getopt
 import SpinConfig
-import pymongo
+import pymongo # 3.0+ OK
 import bson.son
-
-if int(pymongo.version.split('.')[0]) >= 3:
-    raise Exception('not yet updated for PyMongo 3.0+ API. Use PyMongo 2.8 (and txMongo 15.0) for now.')
 
 if __name__ == '__main__':
     opts, args = getopt.gnu_getopt(sys.argv, 'u:p:', ['host=','dry-run'])
