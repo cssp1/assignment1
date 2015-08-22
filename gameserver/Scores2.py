@@ -170,6 +170,7 @@ class CurScores(object):
 
 # MongoDB interface, built on top of SpinNoSQL.NoSQLClient
 
+import pymongo # 3.0+ OK
 import re
 
 class MongoScores2(object):
@@ -188,11 +189,11 @@ class MongoScores2(object):
         tbl = self.nosql_client._table(name)
         if name not in self.seen_tables:
             # necessary for correctness (unique scores per user/board), and per-user lookups
-            tbl.ensure_index([(ID_FIELD[kind],1),('key',1)], unique=True)
+            tbl.create_index([(ID_FIELD[kind],1),('key',1)], unique=True)
             # used for the "Top 10" query
-            tbl.ensure_index([('key',1),('val',-1)])
+            tbl.create_index([('key',1),('val',-1)])
             self.seen_tables.add(name)
-        return tbl
+        return tbl.with_options(write_concern = pymongo.write_concern.WriteConcern(w=0))
 
     def _scores2_key(self, stat, axes):
         ret = stat
@@ -244,9 +245,9 @@ class MongoScores2(object):
             if method == '=': # overwrite
                 qs['val'] = item['val']
                 qs['mtime'] = self.nosql_client.time
-                tbl.save(qs, w=0)
+                tbl.replace_one({'_id':qs['_id']}, qs, upsert=True)
             elif method == '+=': # incr
-                tbl.update(qs, {'$set': {'mtime': self.nosql_client.time}, '$inc': {'val': item['val']}}, multi=False, upsert=True, w=0)
+                tbl.update_one(qs, {'$set': {'mtime': self.nosql_client.time}, '$inc': {'val': item['val']}}, upsert=True)
             else:
                 raise Exception('unknown method '+method)
 
@@ -274,13 +275,14 @@ class MongoScores2(object):
             if total == 0:
                 # if new score is zero, update any existing score but do not insert a zero score if none is already recorded
                 # we use _id, key, stat, and ID_FIELD to find the existing row uniquely
-                tbl.update({'_id': '%s_%s' % (str(alliance_id), key), 'key':key, 'stat':item['stat'], ID_FIELD['alliance']: alliance_id,
-                            # note: don't bother matching on "axes" because that is already uniquely determined by the (tbl,key) combination (and would complicate the query syntax)
-                            }, {'$set': {'val': total, 'mtime': self.nosql_client.time}}, upsert=False, w=0)
+                tbl.update_one({'_id': '%s_%s' % (str(alliance_id), key), 'key':key, 'stat':item['stat'], ID_FIELD['alliance']: alliance_id,
+                                # note: don't bother matching on "axes" because that is already uniquely determined by the (tbl,key) combination (and would complicate the query syntax)
+                                }, {'$set': {'val': total, 'mtime': self.nosql_client.time}}, upsert=False)
             else:
                 # unconditionally write nonzero scores
-                tbl.save({'_id': '%s_%s' % (str(alliance_id), key), 'key':key, 'stat':item['stat'],
-                          ID_FIELD['alliance']: alliance_id, 'axes': item['axes'], 'val': total, 'mtime': self.nosql_client.time}, w=0)
+                tbl.replace_one({'_id': '%s_%s' % (str(alliance_id), key)},
+                                {'_id': '%s_%s' % (str(alliance_id), key), 'key':key, 'stat':item['stat'],
+                                 ID_FIELD['alliance']: alliance_id, 'axes': item['axes'], 'val': total, 'mtime': self.nosql_client.time}, upsert=True)
         return True
 
     # get "Top N" scorers for a batch of (stat,axes) combinations
