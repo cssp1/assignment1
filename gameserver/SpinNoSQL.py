@@ -8,7 +8,7 @@
 
 import time, sys, re, random
 import datetime
-import pymongo, bson
+import pymongo, bson # XXX and check importers for raw usage!
 import SpinConfig
 import SpinNoSQLId
 

@@ -4,7 +4,7 @@
 # Use of this source code is governed by an MIT-style license that can be
 # found in the LICENSE file.
 
-# one-time migration script to convert dbserver map_cache to SpinNoSQL map table
+# OBSOLETE one-time migration script to convert dbserver map_cache to SpinNoSQL map table
 
 import SpinConfig
 import SpinJSON
