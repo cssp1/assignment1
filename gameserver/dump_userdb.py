@@ -75,7 +75,7 @@ def dump_user(seg, id, entry, method, cache_fd, nosql_table, nosql_deltas_only, 
 
     if nosql_table and (changed or (not nosql_deltas_only)):
         obj['_id'] = obj['user_id'] # SpinNoSQL.NoSQLClient.encode_object_id('%024d'%obj['user_id'])
-        nosql_table.replace_one({'_id':obj['_id']}, obj, upsert=True, w=0)
+        nosql_table.replace_one({'_id':obj['_id']}, obj, upsert=True)
 
     return obj
 
@@ -96,7 +96,7 @@ def do_slave(input):
         import pymongo # 3.0+ OK
         nosql_client = pymongo.MongoClient(*input['to_mongodb_config']['connect_args'],
                                            **input['to_mongodb_config']['connect_kwargs'])[to_mongodb_config['dbname']]
-        nosql_table = nosql_client[to_mongodb_config['tablename']]
+        nosql_table = nosql_client[to_mongodb_config['tablename']].with_options(write_concern = pymongo.write_concern.WriteConcern(w=0))
     else:
         nosql_table = None
     nosql_deltas_only = input.get('nosql_deltas_only', False)
