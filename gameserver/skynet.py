@@ -7,10 +7,7 @@
 import sys, os, urllib, getopt, uuid, glob, copy, time, subprocess, datetime, math, re, gzip, hashlib
 
 import SpinJSON, Timezones, SpinConfig, SpinFacebook, FastGzipFile
-import pymongo
-
-if int(pymongo.version.split('.')[0]) >= 3:
-    raise Exception('not yet updated for PyMongo 3.0+ API. Use PyMongo 2.8 (and txMongo 15.0) for now.')
+import pymongo # 3.0+ OK (I think!)
 
 import socket
 import SpinS3
@@ -125,7 +122,7 @@ def is_spin_field(name): return name.startswith('spin_')
 # perform field-by-field update (upsert) of a db entry
 def update_fields_by_id(coll, item, primary_key = 'id'):
     assert primary_key in item
-    coll.update({'_id':item[primary_key]}, {'$set': item}, upsert = True, w = 0)
+    coll.with_options(write_concern = pymongo.write_concern.WriteConcern(w=0)).update_one({'_id':item[primary_key]}, {'$set': item}, upsert = True)
     return item
 
 FB_MAX_TRIES = 10 # number of times to try FB API requests before giving up
@@ -367,7 +364,7 @@ def fb_api_batch(base_url, batch, limit = 50, read_only = False, ignore_errors =
 CUSTOM_AUDIENCE_FIELDS='id,account_id,approximate_count,data_source,delivery_status,lookalike_audience_ids,lookalike_spec,name,permission_for_actions,operation_status,time_updated,subtype'
 
 def custom_audiences_pull(db, ad_account_id):
-    db.fb_custom_audiences.ensure_index('name')
+    db.fb_custom_audiences.create_index('name')
     for x in fb_api(SpinFacebook.versioned_graph_endpoint('customaudience', 'act_'+ad_account_id+'/customaudiences') + '?fields=' + CUSTOM_AUDIENCE_FIELDS,
                     is_paged = False)['data']: # doesn't seem to be paged
         if 'account_id' in x: x['account_id'] = str(x['account_id']) # FB sometimes returns these as numbers :P
@@ -485,7 +482,7 @@ def adgroup_update_status_batch(db, arglist):
                                           'body': urllib.urlencode(new_props)} for adgroup_id, new_props in arglist])):
         adgroup_id, new_props = arg
         if result:
-            db.fb_adgroups.update({'_id':adgroup_id}, {'$set': new_props})
+            db.fb_adgroups.update_one({'_id':adgroup_id}, {'$set': new_props}, upsert = False)
 
 def adgroup_update_status(db, adgroup, *args, **kwargs):
     adgroup_update_status_batch(db, [adgroup_update_status_batch_element(adgroup, *args, **kwargs)])
@@ -571,19 +568,19 @@ def adcampaign_update_bid(db, adcampaign, new_bid):
     if not fb_api(SpinFacebook.versioned_graph_endpoint('adcampaign', adcampaign['id']),
                   post_params = {'bid_info': SpinJSON.dumps(adgroup_set_bid(adcampaign, new_bid)['bid_info'])}):
         return False
-    db.fb_adcampaigns.update({'_id':adcampaign['id']}, {'$set': adgroup_set_bid(adcampaign, new_bid)})
+    db.fb_adcampaigns.update_one({'_id':adcampaign['id']}, {'$set': adgroup_set_bid(adcampaign, new_bid)}, upsert = False)
     return True
 
 def adgroup_update_bid(db, adgroup, new_bid):
     if not fb_api(SpinFacebook.versioned_graph_endpoint('adgroup', adgroup['id']), post_params = adgroup_set_bid(adgroup, new_bid)):
         return False
-    db.fb_adgroups.update({'_id':adgroup['id']}, {'$set': adgroup_set_bid(adgroup, new_bid)})
+    db.fb_adgroups.update_one({'_id':adgroup['id']}, {'$set': adgroup_set_bid(adgroup, new_bid)}, upsert = False)
     return True
 def adgroup_update_bid_batch_send(adgroup, new_bid):
     return {'method': 'POST', 'relative_url': adgroup['id'], 'body': urllib.urlencode(adgroup_set_bid(adgroup, new_bid))}
 def adgroup_update_bid_batch_receive(db, adgroup, new_bid, result):
     if result:
-        db.fb_adgroups.update({'_id':adgroup['id']}, {'$set': adgroup_set_bid(adgroup, new_bid)}, w=0)
+        db.fb_adgroups.with_options(write_concern = pymongo.write_concern.WriteConcern(w=0)).update_one({'_id':adgroup['id']}, {'$set': adgroup_set_bid(adgroup, new_bid)}, upsert = False)
     return result
 
 # format of bid_updates is [(adgroup0, bid0), (adgroup1, bid1), ...]
@@ -665,9 +662,9 @@ def _adstats_pull(db, adgroup_list, time_range = None):
             update_fields_by_id(db.fb_adstats, mongo_enc(x), primary_key = spin_field('adgroup_id'))
 
             # record time series in at_time table
-            x['time'] = int(stat_end_time) # time_now
+            x['time'] = time_range[1]
             x['_id'] = x['id']
-            db.fb_adstats_at_time.update({'_id':x['_id']}, mongo_enc(x), upsert=True)
+            db.fb_adstats_at_time.update_one({'_id':x['_id']}, mongo_enc(x), upsert=True)
 
         results.append(x)
 
@@ -696,7 +693,7 @@ def adstats_pull(db, adgroup_list, time_range = None):
 
     if query:
         fetch_time = datetime.datetime.utcnow()
-        db.fb_adstats_memo.ensure_index(spin_field('fetch_time'), expireAfterSeconds=ADSTATS_MEMO_LIFETIME)
+        db.fb_adstats_memo.create_index(spin_field('fetch_time'), expireAfterSeconds=ADSTATS_MEMO_LIFETIME)
         uncached = _adstats_pull(db, query, time_range = time_range)
         for q in xrange(len(query)):
             if uncached[q]:
@@ -709,7 +706,7 @@ def adstats_pull(db, adgroup_list, time_range = None):
                     stat[COUNTER] = 0
             stat[spin_field('fetch_time')] = fetch_time
             stat['_id'] = adstat_memo_key(query[q]['id'], time_range)
-            db.fb_adstats_memo.save(stat, w=0, manipulate=False)
+            db.fb_adstats_memo.with_options(write_concern = pymongo.write_concern.WriteConcern(w=0)).replace_one({'_id':stat['_id']}, stat, upsert=True)
             results[query_indices[q]] = stat
     return results
 
@@ -758,8 +755,8 @@ def adstats_record_verify_time_range(table, time_range, allow_multi_period = Fal
 
 def adstats_record(db, adgroup_list, time_range):
     table = adstats_record_table(db)
-    table.ensure_index([('adgroup_id',pymongo.ASCENDING),('start_time',pymongo.ASCENDING)])
-    table.ensure_index([('start_time',pymongo.ASCENDING)])
+    table.create_index([('adgroup_id',pymongo.ASCENDING),('start_time',pymongo.ASCENDING)])
+    table.create_index([('start_time',pymongo.ASCENDING)])
 
     assert adstats_record_verify_time_range(table, time_range, allow_multi_period = False)
 
@@ -813,7 +810,7 @@ def adstats_record(db, adgroup_list, time_range):
             print "RECORD", obj
 
         if not dry_run:
-            table.save(obj, manipulate=False)
+            table.replace_one({'_id':obj['_id']}, obj, upsert=True)
         count += 1
 
     if verbose:
@@ -854,11 +851,11 @@ def adstats_record_get_live_adgroups(db, match_qs, time_range):
                     if stgt and (not adgroup_name_is_bad(adgroup['name'])):
                         qs_set = {'$set': {'adgroup_name': adgroup['name'], 'dtgt': stgt_to_dtgt(stgt), 'campaign_id': str(adgroup['campaign_id']), 'created_time': adgroup['created_time']}}
                         if not dry_run:
-                            adstats_record_table(db).update(qs, qs_set, w=0, multi=True, upsert=False)
+                            adstats_record_table(db).with_options(write_concern = pymongo.write_concern.WriteConcern(w=0)).update_many(qs, qs_set, upsert=False)
                     else:
                         if not quiet: print 'dropping stats for unknown adgroup named "%s"' % adgroup['name']
                         if 1:
-                            adstats_record_table(db).remove(qs, multi=True, w=0)
+                            adstats_record_table(db).with_options(write_concern = pymongo.write_concern.WriteConcern(w=0)).delete_many(qs)
 
     return result
 
@@ -928,8 +925,8 @@ def query_analytics2(game_id, spin_params, stgt_filter, group_by, groups, time_s
     else:
         uncached = _query_analytics2(game_id, query_string)
         entry = {'_id': abbreviate_key(query_string), 'key': query_string, 'fetch_time': datetime.datetime.utcnow(), 'output': uncached}
-        db.analytics2_memo.ensure_index('fetch_time', expireAfterSeconds = ANALYTICS2_MEMO_LIFETIME)
-        db.analytics2_memo.save(entry, manipulate=False)
+        db.analytics2_memo.create_index('fetch_time', expireAfterSeconds = ANALYTICS2_MEMO_LIFETIME)
+        db.analytics2_memo.replace_one({'_id':entry['_id']}, entry, upsert=True)
         ret = uncached
         if verbose: print
 
@@ -1468,7 +1465,7 @@ def adimage_get_s3_url(db, image):
         basename = os.path.basename(filename)
         assert con.put_file(s3_image_bucket, s3_image_path+basename, filename, acl='public-read')
         entry = {'_id':image, 'url': 'https://s3.amazonaws.com/'+s3_image_bucket+'/'+s3_image_path+basename}
-        db.s3_adimages.save(entry, w=0)
+        db.s3_adimages.with_options(write_concern = pymongo.write_concern.WriteConcern(w=0)).replace_one({'_id':entry['_id']}, entry, upsert=True)
         print 'done'
     return entry['url']
 
@@ -1503,7 +1500,7 @@ def page_feed_post_make(db, page_id, page_token, link, caption, title, body, ima
         assert entry and entry['id']
         entry['_id'] = page_post_key_hash
         entry[spin_field('key')] = page_post_key
-        db.fb_page_feed.save(entry, w=0)
+        db.fb_page_feed.with_options(write_concern = pymongo.write_concern.WriteConcern(w=0)).replace_one({'_id':entry['_id']}, entry, upsert=True)
         return entry['id']
 
 def adcreative_make_batch_element(db, ad_account_id, fb_campaign_name, campaign_name, tgt, spin_atgt):
@@ -1805,10 +1802,8 @@ def reachestimate_store(db, stgt, targeting, data):
     data['time'] = time_now
     data['targeting_spec'] = mongo_enc(copy.deepcopy(targeting)) # since action specs have "." in them
     data['stgt'] = stgt
-    #db.fb_reachestimates_at_time.insert(data)
-
     data['_id'] = stgt
-    db.fb_reachestimates.update({'_id':stgt}, data, upsert=True)
+    db.fb_reachestimates.update_one({'_id':stgt}, data, upsert=True)
 
 # retrieve reachestimate and then store it both as a current value per targeting, and a historical time series
 def reachestimate_get_and_store(db, ad_account_id, reach_tgt):
@@ -1905,7 +1900,7 @@ def adcampaign_groups_modify(db, campaign_group_name, pprops):
         if result:
             if pprops.get('campaign_group_status',None) == 'DELETED':
                 if result['success']:
-                    db.fb_adcampaign_groups.remove({'_id':grp['_id']})
+                    db.fb_adcampaign_groups.delete_one({'_id':grp['_id']})
             else:
                 update_fields_by_id(db.fb_adcampaign_groups, mongo_enc(result['data']['campaign_groups'][result['data']['campaign_groups'].keys()[0]]))
         count += 1
@@ -1955,7 +1950,7 @@ def adcampaigns_modify(db, campaign_name, pprops):
         if result:
             if pprops.get('campaign_group_status',None) == 'DELETED':
                 if result['success']:
-                    db.fb_adcampaigns.remove({'_id':camp['_id']})
+                    db.fb_adcampaigns.delete_one({'_id':camp['_id']})
             else:
                 update_fields_by_id(db.fb_adcampaigns, mongo_enc(result['data']['campaigns'][result['data']['campaigns'].keys()[0]]))
         count += 1
@@ -1977,7 +1972,7 @@ def adcampaigns_garbage_collect(db):
                                                       'body': urllib.urlencode({'campaign_status':CAMPAIGN_STATUS_CODES['deleted']})} for \
                                                      campaign_id in unused_campaign_ids])):
             if result:
-                db.fb_adcampaigns.remove({'_id':campaign_id}, w=0)
+                db.fb_adcampaigns.with_options(write_concern = pymongo.write_concern.WriteConcern(w=0)).delete_one({'_id':campaign_id})
 
 def compute_bid(db, spin_params, tgt, base_bid, ad_account_id = None, use_reachestimate = True, explain = True):
     if use_reachestimate: assert ad_account_id
@@ -2302,12 +2297,13 @@ def control_ad_campaign(db, spin_params, campaign_name, campaign_data, do_reache
 
             if not dry_run: # save tactical bid shade
                 for params, adgroup in zip(new_ad_params, new_adgroups):
-                    db.tactical.save({'_id': str(adgroup['id']),
-                                      'name': adgroup['name'],
-                                      'stgt': params['stgt'],
-                                      'dtgt': stgt_to_dtgt(params['stgt']),
-                                      'log_bid_shade': math.log(params['tactical_bid_shade']),
-                                      }, w=0, manipulate=False)
+                    db.tactical.with_options(write_concern = pymongo.write_concern.WriteConcern(w=0)).replace_one({'_id': str(adgroup['id'])},
+                                                                                                                  {'_id': str(adgroup['id']),
+                                                                                                                   'name': adgroup['name'],
+                                                                                                                   'stgt': params['stgt'],
+                                                                                                                   'dtgt': stgt_to_dtgt(params['stgt']),
+                                                                                                                   'log_bid_shade': math.log(params['tactical_bid_shade']),
+                                                                                                                   }, upsert=True)
 
     if enable_bid_updates:
         # Update bids on existing ads
@@ -2419,13 +2415,13 @@ def control_adgroups(db, spin_campaigns, stgt_filter = None, tactical = 'legacy'
                 tactical_bid_shade = float(cur_bid) / would_bid
                 print 'Putting', adgroup['name'], 'tactical_bid_shade', tactical_bid_shade
                 if not dry_run:
-                    db.tactical.save({'_id': str(adgroup['id']),
-                                      'name': adgroup['name'],
-                                      'stgt': stgt,
-                                      'dtgt': stgt_to_dtgt(stgt),
-                                      'log_bid_shade': math.log(tactical_bid_shade),
-                                      #'state':'ok',
-                                      }, w=0, manipulate=False)
+                    db.tactical.with_options(write_concern = pymongo.write_concern.WriteConcern(w=0)).save({'_id': str(adgroup['id']),
+                                                                                                            'name': adgroup['name'],
+                                                                                                            'stgt': stgt,
+                                                                                                            'dtgt': stgt_to_dtgt(stgt),
+                                                                                                            'log_bid_shade': math.log(tactical_bid_shade),
+                                                                                                            #'state':'ok',
+                                                                                                            }, manipulate=False)
         elif tactical == 'use':
             tactical_bid_shade = tactical_bid_shades_by_adgroup_id.get(str(adgroup['id']), None)
             if tactical_bid_shade is None:
@@ -2456,10 +2452,13 @@ def tactical_update(db, stgt_filter = None, coeff = 1, safe = 1):
     #print "QUERY", adgroup_query, 'modify by *', coeff
     log_coeff = math.log(coeff)
     if not dry_run:
-        result = db.tactical.update(adgroup_query, {'$inc': {'log_bid_shade': log_coeff}, '$set': {'mtime': time_now}}, multi = True, w = 1 if safe else 0)
+        tbl = db.tactical
+        if not safe:
+            tbl = tbl.with_options(write_concern = pymongo.write_concern.WriteConcern(w=0))
+        result = db.tactical.update_many(adgroup_query, {'$inc': {'log_bid_shade': log_coeff}, '$set': {'mtime': time_now}})
         if safe:
-            print 'updated', result['n'], 'adgroup bids'
-            count = result['n']
+            print 'updated', result.modified_count, 'adgroup bids'
+            count = result.modified_count
         else:
             count = 1 # no way to know how many were modified
     else:
@@ -2686,7 +2685,7 @@ if __name__ == '__main__':
             # few stats.
 
             # to close race condition, maintain a set of "recently seen" adgroups and add those to the query
-            db.recent_adgroups.ensure_index('expire_time', expireAfterSeconds=0)
+            db.recent_adgroups.create_index('expire_time', expireAfterSeconds=0)
             expire_time = datetime.datetime.utcnow() + datetime.timedelta(seconds=60*3600) # live for 60 hours to ensure all stats get recorded
             for adgroup in adgroup_list:
                 # remember adgroup
