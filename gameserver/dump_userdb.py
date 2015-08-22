@@ -75,7 +75,7 @@ def dump_user(seg, id, entry, method, cache_fd, nosql_table, nosql_deltas_only, 
 
     if nosql_table and (changed or (not nosql_deltas_only)):
         obj['_id'] = obj['user_id'] # SpinNoSQL.NoSQLClient.encode_object_id('%024d'%obj['user_id'])
-        nosql_table.save(obj,w=0)
+        nosql_table.replace_one({'_id':obj['_id']}, obj, upsert=True, w=0)
 
     return obj
 
@@ -93,9 +93,7 @@ def do_slave(input):
 
     to_mongodb_config = input['to_mongodb_config']
     if to_mongodb_config:
-        import pymongo
-        if int(pymongo.version.split('.')[0]) >= 3:
-            raise Exception('not yet updated for PyMongo 3.0+ API. Use PyMongo 2.8 (and txMongo 15.0) for now.')
+        import pymongo # 3.0+ OK
         nosql_client = pymongo.MongoClient(*input['to_mongodb_config']['connect_args'],
                                            **input['to_mongodb_config']['connect_kwargs'])[to_mongodb_config['dbname']]
         nosql_table = nosql_client[to_mongodb_config['tablename']]
