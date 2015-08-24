@@ -1803,7 +1803,7 @@ def reachestimate_store(db, stgt, targeting, data):
     data['targeting_spec'] = mongo_enc(copy.deepcopy(targeting)) # since action specs have "." in them
     data['stgt'] = stgt
     data['_id'] = stgt
-    db.fb_reachestimates.update_one({'_id':stgt}, data, upsert=True)
+    db.fb_reachestimates.replace_one({'_id':stgt}, data, upsert=True)
 
 # retrieve reachestimate and then store it both as a current value per targeting, and a historical time series
 def reachestimate_get_and_store(db, ad_account_id, reach_tgt):
