@@ -58,9 +58,10 @@ echo "switch /etc/alternatives/python,pip,python-config to v2.7"
 echo "pip install --upgrade pip" # upgrade the upgrader
 echo "pip install --upgrade requests" # this overrides system python-requests package with a newer version of Requests
 echo "pip install --upgrade pyOpenSSL service_identity certifi" # override system pyOpenSSL with newer version and add service_identity and certifi
-echo "pip install --upgrade pymongo==2.8.1" # require pre-3.0 API
+echo "pip install --upgrade pymongo" # note: we now require post-3.0 API
 echo "pip install --upgrade psycopg2 txpostgres" # replace system psycopg2 with newer version necessary for txpostgres
 echo "pip install --upgrade pyxDamerauLevenshtein"
+echo "pip install --upgrade asana" # for Ship Schedule integration
 
 echo "MISSING: /etc/cron.spinpunch.mysql-daily/99-report-slow-queries.sh email"
 echo "MISSING: compile/install ujson library (python setup.py build; sudo python setup.py install)"
@@ -92,6 +93,5 @@ echo "MISSING: mysql config for analytics (or RDS - if local, use /usr/bin/mysql
 # grant select, insert, drop, alter, create temporary tables, lock tables, execute, create view, show view on $GAME_upcache.* to 'username'@'%';
 # grant select, insert, drop, alter, create temporary tables, lock tables, execute, create view, show view on skynet.* to 'username'@'%';
 
-echo "MISSING: easy_install pymongo==2.8.1 - then see setup-there-mongo.sh for MongoDB setup instructions"
-echo "MISSING: easy_install asana - for Ship Schedule integration"
+echo "MISSING: see setup-there-mongo.sh for MongoDB setup instructions"
 echo "MISSING: /etc/aliases: add 'root: awstech@example.com' mail alias"
