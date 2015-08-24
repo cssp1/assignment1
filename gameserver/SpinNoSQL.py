@@ -482,7 +482,7 @@ class NoSQLClient (object):
                 slave = self.slave_for_table('server_latency')
                 # 75 bytes per record, about 120k records per day (6k/server/day) = 9MB/day
                 coll = slave.db.create_collection(slave.dbconfig['table_prefix']+'server_latency', capped = True, size = 128*1024*1024)
-                coll.ensure_index([('time',pymongo.ASCENDING)])
+                coll.create_index([('time',pymongo.ASCENDING)])
             self.seen_server_latency = True
         return self._table('server_latency')
     def server_latency_record(self, server_name, latency, reason=''):
@@ -497,7 +497,7 @@ class NoSQLClient (object):
                 slave = self.slave_for_table('client_perf')
                 # ~512 bytes per record, ?? records per day
                 coll = slave.db.create_collection(slave.dbconfig['table_prefix']+'client_perf', capped = True, size = 256*1024*1024)
-                coll.ensure_index([('time',pymongo.ASCENDING)])
+                coll.create_index([('time',pymongo.ASCENDING)])
             self.seen_client_perf = True
         return self._table('client_perf')
     def client_perf_record(self, data, reason=''):
@@ -513,7 +513,7 @@ class NoSQLClient (object):
     def visitors_table(self):
         coll = self._table('visitors')
         if not self.seen_visitors:
-            coll.ensure_index('last_active_time')
+            coll.create_index('last_active_time')
             self.seen_visitors = True
         return coll
     def visitors_prune(self, timeout, reason=''):
@@ -527,10 +527,10 @@ class NoSQLClient (object):
     def sessions_table(self):
         coll = self._table('sessions')
         if not self.seen_sessions:
-            coll.ensure_index('session_id', unique=True)
-            coll.ensure_index('ip')
-            coll.ensure_index('social_id')
-            coll.ensure_index('last_active_time')
+            coll.create_index('session_id', unique=True)
+            coll.create_index('ip')
+            coll.create_index('social_id')
+            coll.create_index('last_active_time')
             self.seen_sessions = True
         return coll
 
@@ -589,7 +589,7 @@ class NoSQLClient (object):
     def log_buffer_table(self, name):
         coll = self._table(name)
         if name not in self.seen_logs:
-            coll.ensure_index([('time',pymongo.ASCENDING)])
+            coll.create_index([('time',pymongo.ASCENDING)])
             self.seen_logs[name] = 1
         return coll
     def log_record(self, log_name, t, data, safe = False, log_ident = True, id_key = None, reason=''):
@@ -688,8 +688,8 @@ class NoSQLClient (object):
     def battles_table(self):
         coll = self._table('battles')
         if not self.seen_battles:
-            coll.ensure_index([('time',pymongo.ASCENDING)])
-            coll.ensure_index([('involved_players',pymongo.ASCENDING),('time',pymongo.ASCENDING)])
+            coll.create_index([('time',pymongo.ASCENDING)])
+            coll.create_index([('involved_players',pymongo.ASCENDING),('time',pymongo.ASCENDING)])
             self.seen_battles = True
         return coll
     def battle_record(self, summary, reason=''):
@@ -705,8 +705,8 @@ class NoSQLClient (object):
     def chat_buffer_table(self):
         coll = self._table('chat_buffer')
         if not self.seen_chat:
-            coll.ensure_index([('time',pymongo.ASCENDING)])
-            coll.ensure_index([('channel',pymongo.ASCENDING),('time',pymongo.ASCENDING)])
+            coll.create_index([('time',pymongo.ASCENDING)])
+            coll.create_index([('channel',pymongo.ASCENDING),('time',pymongo.ASCENDING)])
             self.seen_chat = True
         return coll
     def chat_record(self, channel, sender, text, reason=''):
@@ -780,7 +780,7 @@ class NoSQLClient (object):
     def facebook_id_table(self):
         coll = self._table('facebook_id_map')
         if not self.seen_facebook_ids:
-            coll.ensure_index('user_id', unique=True)
+            coll.create_index('user_id', unique=True)
             self.seen_facebook_ids = True
             self.min_user_id = 1111 # hard-coded
         return coll
@@ -842,17 +842,17 @@ class NoSQLClient (object):
     def player_cache(self):
         coll = self._table('player_cache')
         if not self.seen_player_cache:
-            coll.ensure_index('ui_name_searchable') # help with search-by-name
-            coll.ensure_index('last_mtime') # to help with get_users_modified_since()
-            coll.ensure_index('account_creation_time') # for Facebook notification queries
+            coll.create_index('ui_name_searchable') # help with search-by-name
+            coll.create_index('last_mtime') # to help with get_users_modified_since()
+            coll.create_index('account_creation_time') # for Facebook notification queries
             self.seen_player_cache = True
         return coll
 
     # manually create an index - used for ladder rival queries, since some games want player_level and others want gamedata['townhall']_level
-    def player_cache_ensure_index(self, name):
+    def player_cache_create_index(self, name):
         if name not in self.seen_player_cache_indexes:
             self.seen_player_cache_indexes.add(name)
-            self.player_cache().ensure_index(name)
+            self.player_cache().create_index(name)
 
     def decode_player_cache(self, data):
         # XXX might be a lock-only stub, but how do we know? Will the client barf if it gets an empty entry?
@@ -1195,7 +1195,7 @@ class NoSQLClient (object):
     def message_table(self):
         coll = self._table('message_table')
         if not self.seen_messages:
-            coll.ensure_index('recipient')
+            coll.create_index('recipient')
             self.seen_messages = True
         return coll
     def decode_message(self, msg):
@@ -1272,17 +1272,17 @@ class NoSQLClient (object):
         assert subdb
         # set up indices the first time we refer to a new region
         if region not in self.seen_regions:
-            self._table(self.region_table_name(region, 'map')).ensure_index('base_landlord_id') # base_id is primary key for this
-            self._table(self.region_table_name(region, 'map')).ensure_index([('base_map_loc',pymongo.GEO2D)], min=0, max=1024, bits=16)
-            self._table(self.region_table_name(region, 'map')).ensure_index('base_landlord_id') # base_id is primary key for this
-            self._table(self.region_table_name(region, 'map')).ensure_index('base_map_loc_flat') # used to speed up occupancy checks
+            self._table(self.region_table_name(region, 'map')).create_index('base_landlord_id') # base_id is primary key for this
+            self._table(self.region_table_name(region, 'map')).create_index([('base_map_loc',pymongo.GEO2D)], min=0, max=1024, bits=16)
+            self._table(self.region_table_name(region, 'map')).create_index('base_landlord_id') # base_id is primary key for this
+            self._table(self.region_table_name(region, 'map')).create_index('base_map_loc_flat') # used to speed up occupancy checks
 
-            self._table(self.region_table_name(region, 'map_deletions')).ensure_index('millitime', expireAfterSeconds=3*3600) # should be about as long as max session length
+            self._table(self.region_table_name(region, 'map_deletions')).create_index('millitime', expireAfterSeconds=3*3600) # should be about as long as max session length
 
 
-            self._table(self.region_table_name(region, 'mobile')).ensure_index('owner_id') # ([('owner_id',pymongo.ASCENDING), ('squad_id',pymongo.ASCENDING)])
-            self._table(self.region_table_name(region, 'mobile')).ensure_index('base_id')
-            self._table(self.region_table_name(region, 'fixed')).ensure_index('base_id')
+            self._table(self.region_table_name(region, 'mobile')).create_index('owner_id') # ([('owner_id',pymongo.ASCENDING), ('squad_id',pymongo.ASCENDING)])
+            self._table(self.region_table_name(region, 'mobile')).create_index('base_id')
+            self._table(self.region_table_name(region, 'fixed')).create_index('base_id')
 
             self.seen_regions[region] = 1
         return self._table(self.region_table_name(region, subdb))
@@ -1291,8 +1291,8 @@ class NoSQLClient (object):
         coll = self._table('alliance_turf')
         if not self.seen_turf:
             # note: there can be multiple alliances at the same rank in the same region
-            coll.ensure_index([('region_id',pymongo.ASCENDING),('rank',pymongo.ASCENDING)])
-            coll.ensure_index([('alliance_id',pymongo.ASCENDING)])
+            coll.create_index([('region_id',pymongo.ASCENDING),('rank',pymongo.ASCENDING)])
+            coll.create_index([('alliance_id',pymongo.ASCENDING)])
             self.seen_turf = True
         return coll
 
@@ -1738,15 +1738,15 @@ class NoSQLClient (object):
 
     def alliance_table(self, name):
         if not self.seen_alliances:
-            self._table('alliances').ensure_index('ui_name', unique=True)
-            self._table('alliances').ensure_index('chat_tag', unique=True, sparse=True)
-            self._table('alliance_members').ensure_index('alliance_id')
-            self._table('alliance_invites').ensure_index('user_id')
-            self._table('alliance_invites').ensure_index('alliance_id')
-            self._table('alliance_join_requests').ensure_index('user_id')
-            self._table('alliance_join_requests').ensure_index('alliance_id')
+            self._table('alliances').create_index('ui_name', unique=True)
+            self._table('alliances').create_index('chat_tag', unique=True, sparse=True)
+            self._table('alliance_members').create_index('alliance_id')
+            self._table('alliance_invites').create_index('user_id')
+            self._table('alliance_invites').create_index('alliance_id')
+            self._table('alliance_join_requests').create_index('user_id')
+            self._table('alliance_join_requests').create_index('alliance_id')
 
-            self._table('alliance_roles').ensure_index([('alliance_id',pymongo.ASCENDING),('role',pymongo.ASCENDING)], unique=True)
+            self._table('alliance_roles').create_index([('alliance_id',pymongo.ASCENDING),('role',pymongo.ASCENDING)], unique=True)
             assert self.ROLE_DEFAULT == 0
             assert self.ROLE_LEADER == 4
             self._table('alliance_roles').update_one({'alliance_id':-1,'role':0}, {'$set': {'ui_name':'Rank I', 'perms':[]}}, upsert = True) # Rank I
@@ -2149,9 +2149,9 @@ class NoSQLClient (object):
         tbl = self._table('player_scores')
         if not self.seen_player_scores:
             # necessary for correctness (unique scores per user/board), and per-user lookups
-            tbl.ensure_index([('user_id',pymongo.ASCENDING),('field',pymongo.ASCENDING),('frequency',pymongo.ASCENDING),('period',pymongo.ASCENDING)], unique=True)
+            tbl.create_index([('user_id',pymongo.ASCENDING),('field',pymongo.ASCENDING),('frequency',pymongo.ASCENDING),('period',pymongo.ASCENDING)], unique=True)
             # used for the "Top 10" query
-            tbl.ensure_index([('field',pymongo.ASCENDING),('frequency',pymongo.ASCENDING),('period',pymongo.ASCENDING),('score',pymongo.DESCENDING)])
+            tbl.create_index([('field',pymongo.ASCENDING),('frequency',pymongo.ASCENDING),('period',pymongo.ASCENDING),('score',pymongo.DESCENDING)])
             self.seen_player_scores = True
         return tbl
 
@@ -2199,7 +2199,7 @@ class NoSQLClient (object):
 
             # build index for per-user percentile/rank queries
             # note, we need to index this by user_id rather than by score, because scores used for ranking become stale
-            prog.ensure_index([('user_id',pymongo.ASCENDING),('field',pymongo.ASCENDING),('frequency',pymongo.ASCENDING),('period',pymongo.ASCENDING)], unique=True, background=True)
+            prog.create_index([('user_id',pymongo.ASCENDING),('field',pymongo.ASCENDING),('frequency',pymongo.ASCENDING),('period',pymongo.ASCENDING)], unique=True, background=True)
 
             # atomically replace old cache with the new one
             prog.rename(self.slave_for_table('player_scores_rank_cache').dbconfig['table_prefix']+'player_scores_rank_cache', dropTarget=True)
@@ -2281,8 +2281,8 @@ class NoSQLClient (object):
     def alliance_score_cache(self):
         tbl = self._table('alliance_score_cache')
         if not self.seen_alliance_score_cache:
-            tbl.ensure_index([('alliance_id',pymongo.ASCENDING),('field',pymongo.ASCENDING),('frequency',pymongo.ASCENDING),('period',pymongo.ASCENDING)], unique=True)
-            tbl.ensure_index([('field',pymongo.ASCENDING),('frequency',pymongo.ASCENDING),('period',pymongo.ASCENDING),('score',pymongo.DESCENDING)])
+            tbl.create_index([('alliance_id',pymongo.ASCENDING),('field',pymongo.ASCENDING),('frequency',pymongo.ASCENDING),('period',pymongo.ASCENDING)], unique=True)
+            tbl.create_index([('field',pymongo.ASCENDING),('frequency',pymongo.ASCENDING),('period',pymongo.ASCENDING),('score',pymongo.DESCENDING)])
             self.seen_alliance_score_cache = True
         return tbl
 

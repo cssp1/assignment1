@@ -833,7 +833,7 @@ def adstats_record_get_live_adgroups(db, match_qs, time_range):
               adstats_record_table(db).aggregate([
         {'$match':match_qs},
         {'$group':{'_id':'$adgroup_id', 'adgroup_name':{'$last':'$adgroup_name'}, 'created_time':{'$max':'$created_time'}}}
-        ])['result']]
+        ])]
 
     if 0:
         # fix old entries that have missing denormalized fields (high # of API calls!)
@@ -880,7 +880,7 @@ def adstats_record_pull_dict(db, adgroup_list, time_range = None):
                         }}]
     if verbose: print 'adstat record query:', query
 
-    results = adstats_record_table(db).aggregate(query)['result']
+    results = adstats_record_table(db).aggregate(query)
     #if verbose: print "GOT", results
     for row in results:
         ret[row['_id']] = row
@@ -1962,7 +1962,7 @@ def adcampaigns_set_daily_budget(db, campaign_name, new_daily_budget):
 def adcampaigns_garbage_collect(db):
     campaign_ids = set(str(x['id']) for x in db.fb_adcampaigns.find({'campaign_status':{'$ne':CAMPAIGN_STATUS_CODES['deleted']}}))
     used_campaign_ids = set(str(x['_id']) for x in db.fb_adgroups.aggregate([{'$match':{'adgroup_status':{'$ne':'DELETED'}}},
-                                                                             {'$group':{'_id':'$campaign_id'}}])['result'])
+                                                                             {'$group':{'_id':'$campaign_id'}}]))
     unused_campaign_ids = list(campaign_ids.difference(used_campaign_ids))
     print len(campaign_ids), 'campaigns', len(used_campaign_ids), 'used', len(unused_campaign_ids), 'unused'
     if unused_campaign_ids:
