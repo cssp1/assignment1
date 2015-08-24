@@ -342,6 +342,7 @@ def parse_mongodb_config(dbname, cfg, parent = None):
     table_prefix = cfg.get('table_prefix', parent.get('table_prefix', ''))
     connect_url = 'mongodb://%s:%s@%s:%s/%s' % tuple([urllib.quote(x, '') for x in [username,password,host,str(port),dbname]])
     return {'connect_args':[], 'connect_kwargs':{'host':connect_url},
+            'connect_uri':connect_url,
             'host':host, 'port':port, 'username':username, 'password':password,
             'dbname': dbname, 'table_prefix': table_prefix, 'delegate_tables':cfg.get('delegate_tables',parent.get('delegate_tables', {})),
             'maintenance_window': cfg.get('maintenance_window',None)}

@@ -10,11 +10,8 @@
 import SpinConfig
 from twisted.internet import reactor, defer
 import txmongo
-import pymongo, pymongo.errors
+import pymongo, pymongo.errors # 3.0+ OK
 import time
-
-if int(pymongo.version.split('.')[0]) >= 3:
-    raise Exception('not yet updated for PyMongo 3.0+ API. Use PyMongo 2.8 (and txMongo 15.0) for now.')
 
 # adjust some connection parameters by monkey-patching
 txmongo.connection._Connection.initialDelay = 2 # Delay for the first reconnection attempt
@@ -40,14 +37,14 @@ class NoSQLAsyncClient (object):
 
     @defer.inlineCallbacks
     def connect(self):
-        self.service = txmongo.MongoConnectionPool(host=self.dbconfig['host'], port=self.dbconfig['port'], pool_size=4)
+        self.service = txmongo.connection.ConnectionPool(self.dbconfig['connect_uri'], pool_size=4)
         # XXXXXX use delegate system
 
         self.db = self.service[self.dbconfig['dbname']]
         # this is the first thing that actually blocks
         auth_result = yield self.db.authenticate(self.dbconfig['username'], self.dbconfig['password'])
-        assert self.dbconfig['dbname'] in self.service.cred_cache # make sure it worked
         defer.returnValue(auth_result)
+
 
     def shutdown(self): # returns a deferred that fires when shutdown is complete
         return self.service.disconnect()
@@ -102,10 +99,17 @@ if __name__ == '__main__':
 
     client = NoSQLAsyncClient(SpinConfig.get_mongodb_config(game_instance))
     d = client.connect()
-    d.addCallback(lambda _: client.query('player_cache'))
+
+    def on_error(err):
+        sys.stdout.write('ERROR! %s\n' % err)
+#        fail_d = client.shutdown()
+#        fail_d.addCallback(lambda _: reactor.stop())
+        return err
+
+    d.addCallbacks(lambda _: client.query('player_cache'), on_error)
     d.addCallback(lambda res: sys.stdout.write('result %r\n' % res))
-    d.addCallback(lambda _: client.shutdown())
-    d.addCallback(lambda _: reactor.stop())
+    d.addBoth(lambda _: client.shutdown())
+    d.addBoth(lambda _: reactor.stop())
 
     reactor.run()
     print 'OK!'
