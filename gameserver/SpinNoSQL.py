@@ -8,17 +8,11 @@
 
 import time, sys, re, random
 import datetime
-import pymongo, bson # XXX and check importers for raw usage!
+import pymongo, bson # 3.0+ OK
 import SpinConfig
 import SpinNoSQLId
 
-if int(pymongo.version.split('.')[0]) >= 3:
-    raise Exception('not yet updated for PyMongo 3.0+ API. Use PyMongo 2.8 (and txMongo 15.0) for now.')
-
-# to check if remove() modified anything:
-#        return .remove()['n'] > 0
-
-# NOTE! when doing update(upsert=True) on a collection with manually-specified _id keys,
+# NOTE! when doing update_one(upsert=True) on a collection with manually-specified _id keys,
 # you MUST use the '$set':{} operator in the update and not just supply the fields
 # (otherwise MongoDB replaces _id with a server-generated one).
 
@@ -33,7 +27,12 @@ class NoSQLService (object):
         self.seen_dbnames = None
     def connect(self):
         if not self.con:
-            self.con = pymongo.MongoClient(host='mongodb://%s:%d' % (self.host, self.port), max_pool_size=1)
+            # note: don't use standard connect_args/connect_kwargs because we the live gameserver connection
+            # needs special settings (maxPoolSize)
+            self.con = pymongo.MongoClient(host='mongodb://%s:%d' % (self.host, self.port),
+                                           maxPoolSize = None, # ?
+                                           socketTimeoutMS = 120*1000 # 120 sec timeout
+                                           )
             # only use 1 socket since we never need concurrent requests, and it will mess up auth since
             # authenticate() does not update other outstanding sockets.
             self.seen_dbnames = {}
@@ -51,7 +50,7 @@ class NoSQLService (object):
             self.seen_dbnames = None
     # reconnect to get around timeout of idle connection
     def ping(self):
-        if (not self.con) or (not self.con.alive()):
+        if (not self.con):
             # reconnect
             self.con = None
             self.seen_dbnames = None
@@ -237,6 +236,8 @@ class NoSQLClient (object):
             except pymongo.errors.AutoReconnect as e: # on line 95
                 # attempt to reconnect and try a second time
                 if self.in_log_exception_func: return None # fail silently
+                # note: subsequent calls will not print any message, even while we are looping to reconnect,
+                # because in_log_exception_func is true
                 self.log_exception('AutoReconnect exception, retrying...')
                 needs_ping = True
                 last_exc = e
@@ -291,15 +292,15 @@ class NoSQLClient (object):
         if len(leaders) < 1: # no leader
             user_id = memberships[0]['_id']
             if verbose: print '  Alliance', alliance_id, 'has no leader. Elevating member', user_id, 'to leader.'
-            self.alliance_table('alliances').update({'_id':alliance_id}, {'$set':{'leader_id':user_id}})
-            self.alliance_table('alliance_members').update({'_id':user_id}, {'$set':{'role':self.ROLE_LEADER}})
+            self.alliance_table('alliances').update_one({'_id':alliance_id}, {'$set':{'leader_id':user_id}})
+            self.alliance_table('alliance_members').update_one({'_id':user_id}, {'$set':{'role':self.ROLE_LEADER}})
             return user_id
         elif len(leaders) > 1: # more than one leader!
             user_id = leaders[0]['_id']
             if verbose: print '  Alliance', alliance_id, 'has multiple leaders:', repr([x['_id'] for x in leaders]), 'nominating', user_id, 'as true leader and demoting all others.'
-            self.alliance_table('alliances').update({'_id':alliance_id}, {'$set':{'leader_id':user_id}})
+            self.alliance_table('alliances').update_one({'_id':alliance_id}, {'$set':{'leader_id':user_id}})
             for pretender in leaders[1:]:
-                self.alliance_table('alliance_members').update({'_id':pretender['_id']}, {'$set':{'role':self.ROLE_LEADER-1}})
+                self.alliance_table('alliance_members').update_one({'_id':pretender['_id']}, {'$set':{'role':self.ROLE_LEADER-1}})
             return user_id
         return 0
 
@@ -308,9 +309,8 @@ class NoSQLClient (object):
         LOCK_IS_TAKEN = {'$and':[{'LOCK_STATE':{'$exists':True}},
                                  {'LOCK_STATE':{'$gt':0}}]}
         LOCK_IS_STALE = {'LOCK_TIME':{'$lte':self.time - self.LOCK_TIMEOUT}}
-        n = self.player_cache().update({'$and':[LOCK_IS_TAKEN, LOCK_IS_STALE]},
-                                       {'$unset':{'LOCK_STATE':1,'LOCK_OWNER':1,'LOCK_TIME':1,'LOCK_GENERATION':1,'LOCK_HOLDER':1}},
-                                       multi=True)['n']
+        n = self.player_cache().update_many({'$and':[LOCK_IS_TAKEN, LOCK_IS_STALE]},
+                                            {'$unset':{'LOCK_STATE':1,'LOCK_OWNER':1,'LOCK_TIME':1,'LOCK_GENERATION':1,'LOCK_HOLDER':1}}).matched_count
         if n > 0:
             print '  Busted', n, 'stale player locks'
 
@@ -324,7 +324,7 @@ class NoSQLClient (object):
         }
         for msg_type, duration in FORCE_EXPIRE.iteritems():
             prune_msg_qs['$or'].append({'type':msg_type, 'time': {'$lt': time_now - duration}})
-        n = self.message_table().remove(prune_msg_qs)['n']
+        n = self.message_table().delete_many(prune_msg_qs).deleted_count
         if n > 0:
             print '  Deleted', n, 'expired player messages'
 
@@ -336,7 +336,7 @@ class NoSQLClient (object):
             true_count = self.alliance_table('alliance_members').find({'alliance_id':entry['_id']}).count()
             if entry.get('num_members_cache',-1) != true_count:
                 print '  Fixing alliance', entry['_id'], 'cached', entry.get('num_members_cache',-1), '-> true', true_count
-                self.alliance_table('alliances').update({'_id':entry['_id']}, {'$set':{'num_members_cache':true_count}})
+                self.alliance_table('alliances').update_one({'_id':entry['_id']}, {'$set':{'num_members_cache':true_count}})
             if true_count < 1:
                 print '  Deleting empty alliance', entry['_id']
                 self.delete_alliance(entry['_id'])
@@ -351,7 +351,7 @@ class NoSQLClient (object):
         for row in list(self.alliance_table('alliance_members').find()):
             if row['alliance_id'] not in valid_alliance_ids:
                 print '  Deleting dangling alliance_members row', row
-                self.alliance_table('alliance_members').remove({'_id':row['_id']})
+                self.alliance_table('alliance_members').delete_one({'_id':row['_id']})
                 continue
             true_role = None
 
@@ -367,7 +367,7 @@ class NoSQLClient (object):
 
             if row.get('role',self.ROLE_DEFAULT) != true_role:
                 print '  Fixing role of user %d alliance %d -> %d' % (row['_id'], row['alliance_id'], true_role)
-                self.alliance_table('alliance_members').update({'_id':row['_id']},{'$set':{'role':true_role}})
+                self.alliance_table('alliance_members').update_one({'_id':row['_id']},{'$set':{'role':true_role}})
             if true_role == self.ROLE_LEADER:
                 info = alliance_dict[row['alliance_id']]
                 if 'maint_leader' in info: # more than one leader
@@ -386,24 +386,24 @@ class NoSQLClient (object):
         for row in list(self.alliance_table('alliance_roles').find()):
             if row['alliance_id'] != -1 and (row['alliance_id'] not in valid_alliance_ids):
                 print '  Deleting dangling alliance_roles row', row
-                self.alliance_table('alliance_roles').remove({'_id':row['_id']})
+                self.alliance_table('alliance_roles').delete_one({'_id':row['_id']})
 
         print 'Checking for dangling or stale invites/join requests...'
         for TABLE in ('alliance_invites', 'alliance_join_requests'):
             for row in list(self.alliance_table(TABLE).find()):
                 if row['alliance_id'] not in valid_alliance_ids or row['expire_time'] < time_now:
                     print '  Deleting dangling or stale ', TABLE, 'row', row
-                    self.alliance_table(TABLE).remove({'_id':row['_id']})
+                    self.alliance_table(TABLE).delete_one({'_id':row['_id']})
 
         print 'Checking for stale unit_donation_requests...'
         earliest = time_now - gamedata['unit_donation_max_age'] # clear old entries
-        n = self.unit_donation_requests_table().remove({'time':{'$lt':earliest}})['n']
+        n = self.unit_donation_requests_table().delete_many({'time':{'$lt':earliest}}).deleted_count
         if n > 0:
             print '  Deleted', n, 'old unit_donation_requests'
 
         print 'Checking for old player_scores entries...'
-        n = self.player_scores().remove({'$or': [ {'frequency': 'season', 'period': {'$ne': cur_season} },
-                                                  {'frequency': 'week', 'period': {'$lt': cur_week-5} } ]})['n']
+        n = self.player_scores().delete_many({'$or': [ {'frequency': 'season', 'period': {'$ne': cur_season} },
+                                                       {'frequency': 'week', 'period': {'$lt': cur_week-5} } ]}).deleted_count
         if n > 0:
             print '  Deleted', n, 'old player_scores entries'
 
@@ -413,7 +413,7 @@ class NoSQLClient (object):
             if row['alliance_id'] not in valid_alliance_ids or \
                (row['frequency'] == 'season' and row['period'] != cur_season) or \
                (row['frequency'] == 'week' and row['period'] < cur_week - 5):
-                n += self.alliance_score_cache().remove({'_id':row['_id']})['n']
+                n += self.alliance_score_cache().delete_one({'_id':row['_id']}).deleted_count
         if n > 0:
             print '  Deleted', n, 'old or dangling alliance_score_cache entries'
 
@@ -439,7 +439,7 @@ class NoSQLClient (object):
     def decode_server_status(self, status):
         TIMEOUT = 120 # if a server does not update for 2 minutes, consider it dead
         if ('server_time' in status) and (self.time - status['server_time']) >= TIMEOUT:
-            self.server_status_table().remove({'_id':status['_id']}, w=0)
+            self.server_status_table().delete_one({'_id':status['_id']})
             return None
         status['server_name'] = status['_id']; del status['_id']
         return status
@@ -453,9 +453,9 @@ class NoSQLClient (object):
         return self.instrument('server_status_update(%s)'%reason, self._server_status_update, (server_name, props))
     def _server_status_update(self, server_name, props):
         if props is None: # clean shutdown
-            self.server_status_table().remove({'_id':server_name})
+            self.server_status_table().delete_one({'_id':server_name})
         else:
-            self.server_status_table().update({'_id':server_name}, {'$set':props}, upsert = True, w=0)
+            self.server_status_table().with_options(write_concern = pymongo.write_concern.WriteConcern(w=0)).update_one({'_id':server_name}, {'$set':props}, upsert = True)
     def server_status_query(self, qs={}, fields=None, sort=None, limit=None, reason=''):
         return self.instrument('server_status_query(%s)'%reason, self._server_status_query, (qs,fields,1,sort,limit))
     def server_status_query_one(self, qs={}, fields=None, reason=''):
@@ -488,7 +488,7 @@ class NoSQLClient (object):
     def server_latency_record(self, server_name, latency, reason=''):
         return self.instrument('server_latency_record(%s)'%reason, self._server_latency_record, (server_name, latency))
     def _server_latency_record(self, server_name, latency):
-        self.server_latency_table().insert({'time':self.time, 'ident':server_name, 'latency':latency}, w=0)
+        self.server_latency_table().with_options(write_concern = pymongo.write_concern.WriteConcern(w=0)).insert_one({'time':self.time, 'ident':server_name, 'latency':latency})
 
     def client_perf_table(self):
         if not self.seen_client_perf:
@@ -505,7 +505,7 @@ class NoSQLClient (object):
     def _client_perf_record(self, data):
         data['time'] = self.time
         data['ident'] = self.ident
-        self.client_perf_table().insert(data, w=0)
+        self.client_perf_table().with_options(write_concern = pymongo.write_concern.WriteConcern(w=0)).insert_one(data)
 
 
     ###### (PROXYSERVER) VISITORS ######
@@ -519,7 +519,7 @@ class NoSQLClient (object):
     def visitors_prune(self, timeout, reason=''):
         return self.instrument('visitors_prune(%s)'%reason, self._visitors_prune, (timeout,))
     def _visitors_prune(self, timeout):
-        return self.visitors_table().remove({'last_active_time':{'$lt':self.time - timeout}})['n']
+        return self.visitors_table().delete_many({'last_active_time':{'$lt':self.time - timeout}}).deleted_count
 
     ###### (PROXYSERVER) SESSIONS ######
     # note: the primary key here is user_id, not session_id!
@@ -537,7 +537,7 @@ class NoSQLClient (object):
     def sessions_prune(self, timeout, reason=''):
         return self.instrument('sessions_prune(%s)'%reason, self._sessions_prune, (timeout,))
     def _sessions_prune(self, timeout):
-        return self.sessions_table().remove({'last_active_time':{'$lt':self.time - timeout}})['n']
+        return self.sessions_table().delete_many({'last_active_time':{'$lt':self.time - timeout}}).deleted_count
 
     def session_get_by_session_id(self, session_id, reason=''):
         return self.instrument('session_get_by_session_id(%s)'%reason, self._sessions_query_one, ({'session_id':session_id},))
@@ -558,12 +558,12 @@ class NoSQLClient (object):
     def session_keepalive_batch(self, id_list, reason=''):
         return self.instrument('session_keepalive_batch(%s)'%reason, self._session_keepalive, ({'session_id':{'$in':id_list}},))
     def _session_keepalive(self, qs):
-        self.sessions_table().update(qs, {'$set':{'last_active_time':self.time}}, multi=True, upsert=False, w=0)
+        self.sessions_table().with_options(write_concern = pymongo.write_concern.WriteConcern(w=0)).update_many(qs, {'$set':{'last_active_time':self.time}}, upsert=False)
 
     def session_drop_by_session_id(self, session_id, reason=''):
         return self.instrument('session_drop_by_session_id(%s)'%reason, self._session_drop_by_session_id, (session_id,))
     def _session_drop_by_session_id(self, session_id):
-        return self.sessions_table().remove({'session_id':session_id})['n']
+        return self.sessions_table().delete_many({'session_id':session_id}).deleted_count
 
     # Attempt to create new session for this user_id.
     # If an existing session is in place, abort and return the old one.
@@ -573,8 +573,8 @@ class NoSQLClient (object):
     def _session_insert(self, id, user_id, social_id, ip, server_info, last_active_time):
         while True:
             try:
-                self.sessions_table().insert({'_id':user_id, 'session_id':id, 'social_id':social_id, 'ip':ip,
-                                              'server_info':server_info, 'last_active_time':last_active_time})
+                self.sessions_table().insert_one({'_id':user_id, 'session_id':id, 'social_id':social_id, 'ip':ip,
+                                                  'server_info':server_info, 'last_active_time':last_active_time})
                 return None
             except pymongo.errors.DuplicateKeyError:
                 old_session = self.sessions_table().find_one({'_id':user_id})
@@ -601,8 +601,14 @@ class NoSQLClient (object):
         if not has_ident and log_ident: data['ident'] = self.ident
         if id_key is not None: data['_id'] = id_key # manually set primary key
         try:
+            tbl = self.log_buffer_table(log_name)
+            if not safe:
+                tbl = tbl.with_options(write_concern = pymongo.write_concern.WriteConcern(w=0))
             # note: if id_key is specified, this can overwrite an existing entry
-            self.log_buffer_table(log_name).save(data, w = 1 if safe else 0)
+            if '_id' in data:
+                tbl.replace_one({'_id':data['_id']}, data, upsert=True)
+            else:
+                tbl.insert_one(data)
         finally:
             if not has_time: del data['time']
             if not has_ident and log_ident: del data['ident']
@@ -615,7 +621,7 @@ class NoSQLClient (object):
     def log_bookmark_get(self, user_name, key, reason=''):
         return self.instrument('log_boomkark_get', self._log_bookmark_get, (user_name, key))
     def _log_bookmark_set(self, user_name, key, ts):
-        self._table('log_bookmarks').update({'_id':user_name}, {'$set':{key: ts}}, upsert=True, multi=False)
+        self._table('log_bookmarks').update_one({'_id':user_name}, {'$set':{key: ts}}, upsert=True)
     def _log_bookmark_get(self, user_name, key):
         row = self._table('log_bookmarks').find_one({'_id':user_name}, {'_id':0,key:1})
         if row:
@@ -671,7 +677,7 @@ class NoSQLClient (object):
     def dau_record(self, t, user_id, country_tier, playtime, reason=''):
         return self.instrument('dau_record(%s)'%(reason), self._dau_record, (t, user_id, country_tier, playtime))
     def _dau_record(self, t, user_id, country_tier, playtime):
-        self.dau_table(t).update({'_id':user_id}, {'$set':{'tier': int(country_tier)}, '$inc':{'playtime': playtime}}, w=0, upsert=True, multi=False)
+        self.dau_table(t).with_options(write_concern = pymongo.write_concern.WriteConcern(w=0)).update_one({'_id':user_id}, {'$set':{'tier': int(country_tier)}, '$inc':{'playtime': playtime}}, upsert=True)
     def dau_get(self, t, reason=''):
         return self.instrument('dau_get(%s)'%(reason), self._dau_get, (t,))
     def _dau_get(self, t):
@@ -691,8 +697,8 @@ class NoSQLClient (object):
     def _battle_record(self, summary):
         assert 'time' in summary
         assert 'involved_players' in summary
-        self.battles_table().insert(summary, manipulate=False, w=0)
-        assert ('_id' not in summary)
+        self.battles_table().with_options(write_concern = pymongo.write_concern.WriteConcern(w=0)).insert_one(summary)
+        if '_id' in summary: del summary['_id'] # don't mutate it
 
     ###### CHAT BUFFER ######
 
@@ -709,7 +715,7 @@ class NoSQLClient (object):
         props = {'time':self.time,'channel':channel,'sender':sender}
         if text:
             props['text'] = unicode(text)
-        self.chat_buffer_table().insert(props, w=0)
+        self.chat_buffer_table().with_options(write_concern = pymongo.write_concern.WriteConcern(w=0)).insert_one(props)
     def chat_catchup(self, channel, start_time = -1, end_time = -1, skip = 0, limit = -1, reason=''):
         return self.instrument('chat_catchup(%s)'%reason, self._chat_catchup, (channel,start_time,end_time,skip,limit))
     def _chat_catchup(self, channel, start_time, end_time, skip, limit):
@@ -743,7 +749,7 @@ class NoSQLClient (object):
         return self.instrument('player_alias_release(%s)'%reason, self._player_alias_release, (alias,))
     def _player_alias_release(self, alias):
         tbl = self.player_alias_table()
-        tbl.remove({'_id': alias})
+        tbl.delete_one({'_id': alias})
         return True
 
     def player_alias_exists(self, alias, reason=''):
@@ -757,7 +763,7 @@ class NoSQLClient (object):
     def _player_alias_claim(self, alias):
         tbl = self.player_alias_table()
         try:
-            tbl.insert({'_id':alias})
+            tbl.insert_one({'_id':alias})
             return True
         except pymongo.errors.DuplicateKeyError as e:
             # E11000 duplicate key error
@@ -804,7 +810,7 @@ class NoSQLClient (object):
                 last_entry = list(tbl.find({}, {'_id':0,'user_id':1}).sort([('user_id',pymongo.DESCENDING)]).limit(1))
                 my_id = (last_entry[0]['user_id']+1) if last_entry else self.min_user_id
                 try:
-                    tbl.insert({'_id':socid, 'user_id':int(my_id)})
+                    tbl.insert_one({'_id':socid, 'user_id':int(my_id)})
                     return my_id
                 except pymongo.errors.DuplicateKeyError as e:
                     # E11000 duplicate key error index: trtest_dan.facebook_id_table.$user_id_1  dup key: { : 1 }
@@ -886,7 +892,7 @@ class NoSQLClient (object):
 
         if overwrite:
             to_set['_id'] = user_id
-            self.player_cache().save(to_set)
+            self.player_cache().replace_one({'_id':to_set['_id']}, to_set, upsert = True)
             return True
         else:
             param = {}
@@ -894,8 +900,9 @@ class NoSQLClient (object):
                 param['$set'] = to_set
             if to_unset:
                 param['$unset'] = to_unset
-            return self.player_cache().update({'_id':user_id}, param,
-                                              upsert=True, multi=False)['n'] > 0
+            result = self.player_cache().update_one({'_id':user_id}, param, upsert = True)
+            # MongoDB <2.6 doesn't return modified_count
+            return bool(result.upserted_id) or (result.matched_count > 0)
 
     def player_cache_lookup_batch(self, user_id_list, fields = None, reason = None):
         return self.instrument('player_cache_lookup_batch(%s)'%reason, self._player_cache_lookup_batch, (user_id_list, fields))
@@ -1084,7 +1091,7 @@ class NoSQLClient (object):
     def player_lock_keepalive_batch(self, player_ids, unused_generations, unused_expected_states, unused_check_messages, reason=''):
         self.instrument('player_lock_keepalive_batch(%s)'%reason, self._player_lock_keepalive_batch, (player_ids,))
     def _player_lock_keepalive_batch(self, player_ids):
-        self.player_cache().update({'_id':{'$in':player_ids}}, {'$set':{'LOCK_TIME':self.time}}, multi=True)
+        self.player_cache().update_many({'_id':{'$in':player_ids}}, {'$set':{'LOCK_TIME':self.time}})
 
     def player_lock_get_state_batch(self, player_ids, reason=''):
         return self.instrument('player_lock_get_state_batch(%s)'%reason, self._player_lock_get_state_batch, (player_ids,))
@@ -1105,7 +1112,7 @@ class NoSQLClient (object):
         else:
             # do NOT unset lock generation, leave it alone
             pass
-        return self.player_cache().update({'_id':player_id, 'LOCK_STATE':{'$gt':0}}, qs)['updatedExisting']
+        return self.player_cache().update_one({'_id':player_id, 'LOCK_STATE':{'$gt':0}}, qs).matched_count > 0
 
 
     def player_lock_acquire_login(self, player_id, owner_id = -1, reason=''):
@@ -1136,7 +1143,9 @@ class NoSQLClient (object):
 
         if want_state == self.LOCK_LOGGED_IN and generation < 0:
             # use find_and_modify because we want to return the previous generation and lock time even in success case
-            ret = self.player_cache().find_and_modify({'$and': [{'_id':player_id},qs]}, update = {'$set':update_fields}, fields = {'LOCK_GENERATION':1,'last_mtime':1})
+            ret = self.player_cache().find_one_and_update({'$and': [{'_id':player_id},qs]}, {'$set':update_fields},
+                                                          projection = {'LOCK_GENERATION':1,'last_mtime':1},
+                                                          return_document = pymongo.ReturnDocument.BEFORE)
             if ret:
                 success = True
                 # only return a valid prev_gen when the player was modified "recently"
@@ -1148,7 +1157,7 @@ class NoSQLClient (object):
             else:
                 success = False
         else:
-            success = self.player_cache().update({'$and': [{'_id':player_id},qs]}, {'$set':update_fields}, upsert=False, multi=False, w=1)['n'] > 0
+            success = self.player_cache().update_one({'$and': [{'_id':player_id},qs]}, {'$set':update_fields}, upsert=False).matched_count > 0
             prev_gen = -1
 
         if success: # acquired the lock
@@ -1158,7 +1167,7 @@ class NoSQLClient (object):
             # either there's no entry, or it's locked, or it's a generation mismatch - figure out what's going on
             try:
                 fields = update_fields.copy(); fields['_id'] = player_id
-                self.player_cache().insert(fields)
+                self.player_cache().insert_one(fields)
                 return (want_state, -1) # new player that wasn't in player_cache - created a new entry
             except pymongo.errors.DuplicateKeyError:
                 # it was already locked. Check current state, but for informational purposes only, because this is subject to race condition.
@@ -1205,7 +1214,7 @@ class NoSQLClient (object):
     def msg_ack(self, recipient, msg_idlist, reason=''):
         return self.instrument('msg_ack(%s)'%reason, self._msg_ack, (recipient, msg_idlist))
     def _msg_ack(self, recipient, msg_idlist):
-        self.message_table().remove({'recipient':recipient, '_id':{'$in': map(self.encode_object_id, msg_idlist)}})
+        self.message_table().delete_many({'recipient':recipient, '_id':{'$in': map(self.encode_object_id, msg_idlist)}})
 
     def msg_recv(self, recipient, type_filter = None, reason=''):
         return self.instrument('msg_recv(%s)'%reason, self._msg_recv, (recipient,type_filter))
@@ -1233,9 +1242,10 @@ class NoSQLClient (object):
                         if FIELD in new_props: del new_props[FIELD]
                     qs = {'recipient':msg['recipient'], 'unique_per_sender':msg['unique_per_sender']}
                     if 'from' in msg: qs['from'] = msg['from']
-                    self.message_table().update(qs, {'$set':new_props}, upsert = True, multi = False)
+                    self.message_table().update_one(qs, {'$set':new_props}, upsert = True)
                 else:
-                    self.message_table().insert(msg, manipulate = False)
+                    self.message_table().insert_one(msg)
+                    if '_id' in msg: del msg['_id'] # don't mutate msg
 
     ###### ABTEST TABLE ######
 
@@ -1249,13 +1259,10 @@ class NoSQLClient (object):
         key = name+':'+cohort
         # can't use a one-step update/upsert for this, because it would also try to upsert if the cohort is full
         try:
-            table.insert({'_id':key, 'name':name, 'cohort':cohort, 'N':0})
+            table.insert_one({'_id':key, 'name':name, 'cohort':cohort, 'N':0})
         except pymongo.errors.DuplicateKeyError:
             pass
-        ret = table.update({'_id':key, 'N': {'$lt':limit}}, {'$inc':{'N':1}}, upsert=False, w=1)
-        if ret['updatedExisting']:
-            return True
-        return False
+        return table.update_one({'_id':key, 'N': {'$lt':limit}}, {'$inc':{'N':1}}, upsert=False).matched_count > 0
 
     ###### GLOBAL MAP SETTINGS ######
 
@@ -1292,10 +1299,10 @@ class NoSQLClient (object):
     ###### MAP FEATURES (BASE) TABLES ######
 
     def alliance_turf_clear(self, region_id):
-        self.alliance_turf_table().remove({'region_id':region_id}, multi=True)
+        self.alliance_turf_table().delete_many({'region_id':region_id})
     def alliance_turf_update(self, region_id, rank, alliance_id, props = {}):
         props['rank'] = rank
-        self.alliance_turf_table().update({'region_id':region_id, 'alliance_id':alliance_id}, {'$set':props}, upsert=True, multi=False)
+        self.alliance_turf_table().update_one({'region_id':region_id, 'alliance_id':alliance_id}, {'$set':props}, upsert=True)
 
     def _decode_alliance_turf(self, props):
         if '_id' in props: del props['_id']
@@ -1390,9 +1397,9 @@ class NoSQLClient (object):
             self.map_update_hook(region, base_id, None, originator)
 
     def _drop_map_feature(self, region, base_id):
-        self.region_table(region, 'map').remove({'_id':base_id})
+        self.region_table(region, 'map').delete_one({'_id':base_id})
         # time field must be converted for the expireAfterSeconds TTL thing to work
-        self.region_table(region, 'map_deletions').save({'_id':base_id,'millitime':datetime.datetime.utcfromtimestamp(float(self.time))})
+        self.region_table(region, 'map_deletions').replace_one({'_id':base_id}, {'_id':base_id,'millitime':datetime.datetime.utcfromtimestamp(float(self.time))}, upsert=True)
 
     def update_map_feature(self, region, base_id, props, originator=None, do_hook = True, reason=''):
         ret = self.instrument('update_map_feature(%s)'%reason, self._update_map_feature, (region,base_id,props))
@@ -1409,7 +1416,7 @@ class NoSQLClient (object):
             props['base_map_path_eta'] = props['base_map_path'][-1]['eta']
         elif 'base_map_path' in props:
             del props['base_map_path']
-        self.region_table(region, 'map').update({'_id':base_id}, {'$set': props}, upsert = False)
+        self.region_table(region, 'map').update_one({'_id':base_id}, {'$set': props}, upsert = False)
 
     def create_map_feature(self, region, base_id, props, exclusive = -1, exclude_filter = None, originator=None, do_hook = True, reason=''):
         ret = self.instrument('create_map_feature(%s,x=%d)'%(reason,exclusive), self._create_map_feature, (region,base_id,props,originator,exclusive,exclude_filter,None,None))
@@ -1460,9 +1467,9 @@ class NoSQLClient (object):
         if exclusive < 0:
             # easy case
             if (old_loc is None):
-                self.region_table(region, 'map').save(props)
+                self.region_table(region, 'map').replace_one({'_id': base_id}, props, upsert = True)
             else:
-                self.region_table(region, 'map').update({'_id':base_id}, move_update, upsert = False)
+                self.region_table(region, 'map').update_one({'_id':base_id}, move_update, upsert = False)
             success = True
 
         else:
@@ -1480,7 +1487,7 @@ class NoSQLClient (object):
                 if(doc) {
                     return false;
                 } else {
-                    db[tname].save(props);
+                    db[tname].replace_one({'_id':props['base_id']}, props, {'upsert':true});
                     return true;
                 }
                 }"""
@@ -1501,15 +1508,15 @@ class NoSQLClient (object):
                 qs = {'$and': [OVERLAP, {'_id':{'$ne':base_id}}]} # , NOT_EXPIRED]}
 
                 if (old_loc is None):
-                    self.region_table(region, 'map').save(props)
+                    self.region_table(region, 'map').replace_one({'_id': base_id}, props, upsert = True)
                 else:
-                    self.region_table(region, 'map').update({'_id':base_id}, move_update, upsert = False)
+                    self.region_table(region, 'map').update_one({'_id':base_id}, move_update, upsert = False)
 
                 if bool(self.region_table(region, 'map').find_one(qs)):
                     # overlapped, roll back
                     success = False
                     if (old_loc is None):
-                        self.region_table(region, 'map').remove({'_id':base_id})
+                        self.region_table(region, 'map').delete_one({'_id':base_id})
                     else:
                         # possible race condition here. But what else are we gonna do?
                         rb_set = {'$set': {'base_map_loc':old_loc,
@@ -1519,12 +1526,12 @@ class NoSQLClient (object):
                         else:
                             rb_set['$set']['base_map_path'] = old_path
                             rb_set['$set']['base_map_path_eta'] = old_path[-1]['eta']
-                        self.region_table(region, 'map').update({'_id':base_id}, rb_set, upsert = False)
+                        self.region_table(region, 'map').update_one({'_id':base_id}, rb_set, upsert = False)
                 else:
                     success = True
 
         if success:
-            self.region_table(region, 'map_deletions').remove({'_id':base_id})
+            self.region_table(region, 'map_deletions').delete_one({'_id':base_id})
         return success
 
     def map_feature_occupancy_check(self, region, coord_list, exclude_filter = None, reason=''):
@@ -1582,14 +1589,13 @@ class NoSQLClient (object):
 
         # both of these work, update might be faster
         if 0:
-            ret = self.region_table(region, 'map').find_and_modify(query = qs, update = update,
-                                                                   fields = {'LOCK_STATE':1,'LOCK_OWNER':1},
-                                                                   new = True)
+            ret = self.region_table(region, 'map').find_one_and_update(qs, update,
+                                                                       projection = {'LOCK_STATE':1,'LOCK_OWNER':1},
+                                                                       return_document = pymongo.ReturnDocument.AFTER)
             if ret and ret['LOCK_OWNER'] == owner_id:
                 return ret['LOCK_STATE']
         else:
-            ret = self.region_table(region, 'map').update(qs, update, w=1)
-            if ret['updatedExisting']:
+            if self.region_table(region, 'map').update_one(qs, update).matched_count > 0:
                 return self.LOCK_BEING_ATTACKED
 
         return -self.LOCK_BEING_ATTACKED
@@ -1611,12 +1617,12 @@ class NoSQLClient (object):
         if extra_props:
             for k,v in extra_props.iteritems():
                 qs['$set'][k] = v
-        return self.region_table(region, 'map').update({'_id':base_id}, qs)
+        return self.region_table(region, 'map').update_one({'_id':base_id}, qs)
 
     def map_feature_lock_keepalive_batch(self, region, base_ids, reason=''):
         self.instrument('map_feature_lock_keepalive_batch(%s)'%reason, self._map_feature_lock_keepalive_batch, (region, base_ids))
     def _map_feature_lock_keepalive_batch(self, region, base_ids):
-        self.region_table(region, 'map').update({'_id':{'$in':base_ids}}, {'$set':{'LOCK_TIME':self.time}}, multi=True)
+        self.region_table(region, 'map').update_many({'_id':{'$in':base_ids}}, {'$set':{'LOCK_TIME':self.time}})
 
     def map_feature_lock_get_state_batch(self, region, base_ids, reason=''):
         return self.instrument('map_feature_lock_get_state_batch(%s)'%reason, self._map_feature_lock_get_state_batch, (region, base_ids))
@@ -1632,22 +1638,19 @@ class NoSQLClient (object):
         LOCK_IS_TAKEN = {'$and':[{'LOCK_STATE':{'$exists':True}},
                                  {'LOCK_STATE':{'$gt':0}}]}
         LOCK_IS_STALE = {'LOCK_TIME':{'$lte':self.time - self.LOCK_TIMEOUT}}
-        self.region_table(region, 'map').update({'$and':[LOCK_IS_TAKEN, LOCK_IS_STALE]},
-                                                {'$unset':{'LOCK_STATE':1,'LOCK_OWNER':1,'LOCK_TIME':1,'LOCK_GENERATION':1}},
-                                                multi=True)
+        self.region_table(region, 'map').update_many({'$and':[LOCK_IS_TAKEN, LOCK_IS_STALE]},
+                                                     {'$unset':{'LOCK_STATE':1,'LOCK_OWNER':1,'LOCK_TIME':1,'LOCK_GENERATION':1}})
         # get rid of path data for moving features that have already arrived at their destination by now
-        self.region_table(region, 'map').update({'$or': [{'base_map_path':{'$exists':True, '$type':10}}, # somehow a null path got left in here
-                                                         {'base_map_path_eta':{'$exists':True, '$lt': self.time}}]},
-                                                {'$unset':{'base_map_path':1,'base_map_path_eta':1}},
-                                                multi=True)
+        self.region_table(region, 'map').update_many({'$or': [{'base_map_path':{'$exists':True, '$type':10}}, # somehow a null path got left in here
+                                                              {'base_map_path_eta':{'$exists':True, '$lt': self.time}}]},
+                                                     {'$unset':{'base_map_path':1,'base_map_path_eta':1}})
 
         if 1: # clean up legacy features with no base_map_path_eta
-            self.region_table(region, 'map').update({'$and':[{'base_map_path':{'$exists':True}},
-                                                             {'base_map_path_eta':{'$exists':False}},
-                                                             {'base_map_path':{'$all':[{'$elemMatch': {'eta': {'$lt': self.time}}}]}}
-                                                             ]},
-                                                    {'$unset':{'base_map_path':1}},
-                                                    multi=True)
+            self.region_table(region, 'map').update_many({'$and':[{'base_map_path':{'$exists':True}},
+                                                                  {'base_map_path_eta':{'$exists':False}},
+                                                                  {'base_map_path':{'$all':[{'$elemMatch': {'eta': {'$lt': self.time}}}]}}
+                                                                  ]},
+                                                         {'$unset':{'base_map_path':1}})
 
     ###### MAP OBJECTS (FIXED/MOBILE) TABLES ######
 
@@ -1690,9 +1693,9 @@ class NoSQLClient (object):
             if partial:
                 _id = obj['_id']
                 del obj['_id']
-                self.region_table(region, table_name).update({'_id':_id}, {'$set': obj}, upsert = False)
+                self.region_table(region, table_name).update_one({'_id':_id}, {'$set': obj}, upsert = False)
             else:
-                self.region_table(region, table_name).save(obj)
+                self.region_table(region, table_name).replace_one({'_id':obj['_id']}, obj, upsert = True)
         finally:
             obj['obj_id'] = temp
 
@@ -1706,7 +1709,7 @@ class NoSQLClient (object):
             obj['_id'] = self.encode_object_id(obj['obj_id'])
             del obj['obj_id']
         try:
-            self.region_table(region, table_name).insert(objlist)
+            self.region_table(region, table_name).insert_many(objlist)
         finally:
             for obj in objlist:
                 obj['obj_id'] = self.decode_object_id(obj['_id'])
@@ -1720,11 +1723,11 @@ class NoSQLClient (object):
     def drop_fixed_object_by_id(self, region, obj_id, reason=''):  return self.instrument('drop_fixed_object_by_id(%s)'%reason, self._drop_objects, (region,'fixed',{'_id':self.encode_object_id(obj_id)}))
     def drop_mobile_object_by_id(self, region, obj_id, reason=''):  return self.instrument('drop_mobile_object_by_id(%s)'%reason, self._drop_objects, (region,'mobile',{'_id':self.encode_object_id(obj_id)}))
     def _drop_objects(self, region, table_name, query):
-        return self.region_table(region, table_name).remove(query)['n']
+        return self.region_table(region, table_name).delete_many(query).deleted_count
 
     def heal_mobile_object_by_id(self, region, obj_id, reason=''): return self.instrument('heal_mobile_object_by_id(%s)'%reason, self._heal_objects, (region,'mobile',{'_id':self.encode_object_id(obj_id)}))
     def _heal_objects(self, region, table_name, query):
-        self.region_table(region, table_name).update(query, {'$unset': {'hp':1, 'hp_ratio':1}}, multi = True)
+        self.region_table(region, table_name).update_many(query, {'$unset': {'hp':1, 'hp_ratio':1}})
 
     ###### ALLIANCE TABLES ######
 
@@ -1746,11 +1749,11 @@ class NoSQLClient (object):
             self._table('alliance_roles').ensure_index([('alliance_id',pymongo.ASCENDING),('role',pymongo.ASCENDING)], unique=True)
             assert self.ROLE_DEFAULT == 0
             assert self.ROLE_LEADER == 4
-            self._table('alliance_roles').update({'alliance_id':-1,'role':0}, {'$set': {'ui_name':'Rank I', 'perms':[]}}, upsert = True, multi = False) # Rank I
-            self._table('alliance_roles').update({'alliance_id':-1,'role':1}, {'$set': {'ui_name':'Rank II', 'perms':['invite']}}, upsert = True, multi = False) # Rank II
-            self._table('alliance_roles').update({'alliance_id':-1,'role':2}, {'$set': {'ui_name':'Rank III', 'perms':['invite','kick',]}}, upsert = True, multi = False) # Rank III
-            self._table('alliance_roles').update({'alliance_id':-1,'role':3}, {'$set': {'ui_name':'Rank IV', 'perms':['invite','kick','promote']}}, upsert = True, multi = False) # Rank IV
-            self._table('alliance_roles').update({'alliance_id':-1,'role':4}, {'$set': {'ui_name':'Rank V', 'perms':['invite','kick','promote','admin','leader']}}, upsert = True, multi = False) # Rank V
+            self._table('alliance_roles').update_one({'alliance_id':-1,'role':0}, {'$set': {'ui_name':'Rank I', 'perms':[]}}, upsert = True) # Rank I
+            self._table('alliance_roles').update_one({'alliance_id':-1,'role':1}, {'$set': {'ui_name':'Rank II', 'perms':['invite']}}, upsert = True) # Rank II
+            self._table('alliance_roles').update_one({'alliance_id':-1,'role':2}, {'$set': {'ui_name':'Rank III', 'perms':['invite','kick',]}}, upsert = True) # Rank III
+            self._table('alliance_roles').update_one({'alliance_id':-1,'role':3}, {'$set': {'ui_name':'Rank IV', 'perms':['invite','kick','promote']}}, upsert = True) # Rank IV
+            self._table('alliance_roles').update_one({'alliance_id':-1,'role':4}, {'$set': {'ui_name':'Rank V', 'perms':['invite','kick','promote','admin','leader']}}, upsert = True) # Rank V
 
             self.seen_alliances = True
         return self._table(name)
@@ -1771,7 +1774,7 @@ class NoSQLClient (object):
             my_id = (last_alliance[0]['_id']+1) if last_alliance else 1
             props['_id'] = my_id
             try:
-                tbl.insert(props)
+                tbl.insert_one(props)
                 break
             except pymongo.errors.DuplicateKeyError as e:
                 # E11000 duplicate key error index: trtest_dan.alliances.$_id_  dup key: { : 1 }
@@ -1788,12 +1791,12 @@ class NoSQLClient (object):
 
     def delete_alliance(self, id, reason=''): return self.instrument('delete_alliance(%s)'%reason, self._delete_alliance, (id,))
     def _delete_alliance(self, id):
-        self.alliance_table('alliances').remove({'_id':id})
-        self.alliance_table('alliance_roles').remove({'alliance_id':id})
-        self.alliance_table('alliance_members').remove({'alliance_id':id})
-        self.alliance_table('alliance_invites').remove({'alliance_id':id})
-        self.alliance_table('alliance_join_requests').remove({'alliance_id':id})
-        self.alliance_score_cache().remove({'alliance_id':id})
+        self.alliance_table('alliances').delete_one({'_id':id})
+        self.alliance_table('alliance_roles').delete_many({'alliance_id':id})
+        self.alliance_table('alliance_members').delete_many({'alliance_id':id})
+        self.alliance_table('alliance_invites').delete_many({'alliance_id':id})
+        self.alliance_table('alliance_join_requests').delete_many({'alliance_id':id})
+        self.alliance_score_cache().delete_many({'alliance_id':id})
 
     # note: modifications are rejected unless modifier_id has permission
     def modify_alliance(self, alliance_id, modifier_id, ui_name = None, ui_description = None, join_type = None, logo = None, leader_id = None, continent = None, chat_motd = None, chat_tag = None, reason = ''):
@@ -1823,8 +1826,8 @@ class NoSQLClient (object):
         try:
             mods = {'$set': props}
             if unset: mods['$unset'] = unset
-            ret = self.alliance_table('alliances').update({'_id':alliance_id}, mods)
-            if ret['updatedExisting']:
+            ret = self.alliance_table('alliances').update_one({'_id':alliance_id}, mods)
+            if ret.matched_count > 0:
                 return True, None
         except pymongo.errors.DuplicateKeyError as e:
             if ('alliances.$chat_tag_' in e.args[0]):
@@ -1966,11 +1969,11 @@ class NoSQLClient (object):
             qs['$or'] = [{'role':{'$exists':False}}, {'role':self.ROLE_DEFAULT}]
         else:
             qs['role'] = old_role
-        success = self.alliance_table('alliance_members').update(qs, {'$set':{'role':new_role}})['updatedExisting']
+        success = self.alliance_table('alliance_members').update_one(qs, {'$set':{'role':new_role}}).matched_count > 0
         if success and (not force) and (new_role >= self.ROLE_LEADER):
             # demote promoter
-            assert self.alliance_table('alliance_members').update({'_id':promoter_id,'alliance_id':alliance_id}, {'$set':{'role':self.ROLE_LEADER-1}})['updatedExisting']
-            assert self.alliance_table('alliances').update({'_id':alliance_id}, {'$set':{'leader_id':user_id}})['updatedExisting']
+            assert self.alliance_table('alliance_members').update_one({'_id':promoter_id,'alliance_id':alliance_id}, {'$set':{'role':self.ROLE_LEADER-1}}).matched_count > 0
+            assert self.alliance_table('alliances').update_one({'_id':alliance_id}, {'$set':{'leader_id':user_id}}).matched_count > 0
         return success
 
     def get_alliance_member_ids(self, alliance_id, reason=''): return [x['user_id'] for x in self.get_alliance_members(alliance_id, reason=reason)]
@@ -1986,17 +1989,17 @@ class NoSQLClient (object):
         # check that sender has permission. We DO allow sending invites even if the alliance is open-join.
         if (not force) and (not self._check_alliance_member_perm(alliance_id, sender_id, 'invite')): return False
         # get rid of any existing invites
-        self.alliance_table('alliance_invites').remove({'user_id':user_id, 'alliance_id':alliance_id})
+        self.alliance_table('alliance_invites').delete_many({'user_id':user_id, 'alliance_id':alliance_id})
         # record invite
-        self.alliance_table('alliance_invites').insert({'user_id':user_id, 'alliance_id':alliance_id, 'creation_time':time_now, 'expire_time': expire_time})
+        self.alliance_table('alliance_invites').insert_one({'user_id':user_id, 'alliance_id':alliance_id, 'creation_time':time_now, 'expire_time': expire_time})
         return True
 
     def send_join_request(self, user_id, alliance_id, time_now, expire_time, reason=''): return self.instrument('send_join_request(%s)'%reason, self._send_join_request, (user_id, alliance_id, time_now, expire_time))
     def _send_join_request(self, user_id, alliance_id, time_now, expire_time):
         # ensure alliance exists and is invite-only
         if not bool(self.alliance_table('alliances').find_one({'_id':alliance_id, 'join_type': 'invite_only'})): return False
-        self.alliance_table('alliance_join_requests').remove({'user_id':user_id})
-        self.alliance_table('alliance_join_requests').insert({'user_id':user_id, 'alliance_id':alliance_id, 'creation_time':time_now, 'expire_time':expire_time})
+        self.alliance_table('alliance_join_requests').delete_many({'user_id':user_id})
+        self.alliance_table('alliance_join_requests').insert_one({'user_id':user_id, 'alliance_id':alliance_id, 'creation_time':time_now, 'expire_time':expire_time})
         return True
 
     def poll_join_requests(self, poller_id, alliance_id, time_now, reason=''): return self.instrument('poll_join_requests(%s)'%reason, self._poll_join_requests, (poller_id, alliance_id, time_now))
@@ -2014,7 +2017,7 @@ class NoSQLClient (object):
             success = self._join_alliance(user_id, alliance_id, time_now, max_members, force = True)
         if (not success) or (not accept):
             # _join_alliance cleans up the request in the success case
-            self.alliance_table('alliance_join_requests').remove({'user_id':user_id})
+            self.alliance_table('alliance_join_requests').delete_many({'user_id':user_id})
         return success
 
     def am_i_invited(self, alliance_id, user_id, time_now, reason=''): return self.instrument('am_i_invited(%s)'%reason, self._am_i_invited, (alliance_id,user_id,time_now))
@@ -2036,7 +2039,7 @@ class NoSQLClient (object):
                 success = False
             else:
                 # it was a bogus entry, delete it (no need to update alliances table)
-                self.alliance_table('alliance_members').remove({'_id':user_id})
+                self.alliance_table('alliance_members').delete_one({'_id':user_id})
 
         if success:
             # check that destination alliance really exists
@@ -2054,17 +2057,17 @@ class NoSQLClient (object):
 
         if success:
             # check alliance size
-            if self.alliance_table('alliances').find_and_modify(query = {'_id':alliance_id, 'num_members_cache': { '$lt': max_members }},
-                                                                update = {'$inc': {'num_members_cache': 1} }):
+            if self.alliance_table('alliances').update_one({'_id':alliance_id, 'num_members_cache': { '$lt': max_members }},
+                                                           {'$inc': {'num_members_cache': 1} }).matched_count > 0:
                 # race in between here is protected by the player login lock
-                self.alliance_table('alliance_members').insert({'_id':user_id, 'alliance_id':alliance_id, 'role':role, 'join_time':time_now})
+                self.alliance_table('alliance_members').insert_one({'_id':user_id, 'alliance_id':alliance_id, 'role':role, 'join_time':time_now})
             else:
                 success = False
 
         if success:
             # get rid of all outstanding invites
-            self.alliance_table('alliance_invites').remove({'user_id':user_id})
-            self.alliance_table('alliance_join_requests').remove({'user_id':user_id})
+            self.alliance_table('alliance_invites').delete_many({'user_id':user_id})
+            self.alliance_table('alliance_join_requests').delete_many({'user_id':user_id})
 
         return success
 
@@ -2072,9 +2075,10 @@ class NoSQLClient (object):
     def leave_alliance(self, user_id, reason=''): return self.instrument('leave_alliance(%s)'%reason, self._leave_alliance, (user_id,))
     def _leave_alliance(self, user_id):
         # use find_and_modify so we get the alliance_id we were a member of
-        result = self.alliance_table('alliance_members').find_and_modify(query = {'_id':user_id}, remove = True)
+        result = self.alliance_table('alliance_members').find_one_and_delete({'_id':user_id})
         if result:
-            new_info = self.alliance_table('alliances').find_and_modify(query = {'_id':result['alliance_id']}, update = {'$inc':{'num_members_cache':-1}}, new = True)
+            new_info = self.alliance_table('alliances').find_one_and_update({'_id':result['alliance_id']}, {'$inc':{'num_members_cache':-1}},
+                                                                            return_document = pymongo.ReturnDocument.AFTER)
             if new_info.get('num_members_cache',0) <= 0 or result.get('role', self.ROLE_DEFAULT) >= self.ROLE_LEADER:
                 # handle succession crisis
                 return self.do_maint_fix_leadership_problem(result['alliance_id'], verbose = False)
@@ -2092,11 +2096,11 @@ class NoSQLClient (object):
                 return False
 
         success = False
-        if self.alliance_table('alliance_members').remove({'_id':user_id, 'alliance_id':alliance_id})['n']>0:
-            self.alliance_table('alliances').update({'_id':alliance_id}, {'$inc':{'num_members_cache':-1}})
+        if self.alliance_table('alliance_members').delete_one({'_id':user_id, 'alliance_id':alliance_id}).deleted_count > 0:
+            self.alliance_table('alliances').update_one({'_id':alliance_id}, {'$inc':{'num_members_cache':-1}})
             success = True
-        self.alliance_table('alliance_invites').remove({'alliance_id':alliance_id, 'user_id':user_id})
-        self.alliance_table('alliance_join_requests').remove({'alliance_id':alliance_id, 'user_id':user_id})
+        self.alliance_table('alliance_invites').delete_many({'alliance_id':alliance_id, 'user_id':user_id})
+        self.alliance_table('alliance_join_requests').delete_many({'alliance_id':alliance_id, 'user_id':user_id})
         return success
 
     ###### UNIT DONATIONS ######
@@ -2107,11 +2111,11 @@ class NoSQLClient (object):
 
     def request_unit_donation(self, *args): return self.instrument('request_unit_donation', self._request_unit_donation, args)
     def _request_unit_donation(self, user_id, alliance_id, time_now, tag, cur_space, max_space):
-        self.unit_donation_requests_table().update({'_id':user_id}, {'$set':{'alliance_id':alliance_id, 'time':time_now, 'tag':tag, 'space_left':max_space - cur_space, 'max_space':max_space}}, upsert=True)
+        self.unit_donation_requests_table().update_one({'_id':user_id}, {'$set':{'alliance_id':alliance_id, 'time':time_now, 'tag':tag, 'space_left':max_space - cur_space, 'max_space':max_space}}, upsert=True)
         return True
 
     def invalidate_unit_donation_request(self, *args): return self.instrument('invalidate_unit_donation_request', self._invalidate_unit_donation_request, args)
-    def _invalidate_unit_donation_request(self, user_id): return bool(self.unit_donation_requests_table().remove({'_id':user_id})['n'])
+    def _invalidate_unit_donation_request(self, user_id): return bool(self.unit_donation_requests_table().delete_one({'_id':user_id}).deleted_count)
 
     def make_unit_donation(self, *args): return self.instrument('make_unit_donation', self._make_unit_donation, args)
     def _make_unit_donation(self, recipient_id, alliance_id, tag, space_array):
@@ -2119,10 +2123,12 @@ class NoSQLClient (object):
         # of space_array in sequence (it should be sorted largest to smallest), stopping when we find an amount
         # of space such that cur_space + donated_space <= max_space.
         for donated_space in space_array:
-            ret = self.unit_donation_requests_table().find_and_modify(query = {'_id':recipient_id, 'alliance_id':alliance_id, 'tag':tag,
-                                                                               'space_left': { '$gte': donated_space } },
-                                                                      update = {'$inc':{'space_left':-donated_space}},
-                                                                      new=True, fields={'space_left':1,'max_space':1})
+            ret = self.unit_donation_requests_table().find_one_and_update({'_id':recipient_id, 'alliance_id':alliance_id, 'tag':tag,
+                                                                           'space_left': { '$gte': donated_space } },
+                                                                          {'$inc':{'space_left':-donated_space}},
+                                                                          upsert = False,
+                                                                          projection={'space_left':1,'max_space':1},
+                                                                          return_document = pymongo.ReturnDocument.AFTER)
             if ret:
                 return (ret['max_space'] - ret['space_left'], ret['max_space']) # return cur, max
         return None
@@ -2155,7 +2161,7 @@ class NoSQLClient (object):
             prog = self._table('player_scores_rank_cache_inprogress')
 
             # obtain all in-use combinations of field/freq/period
-            all_addrs = [x['_id'] for x in self.player_scores().aggregate([{'$group':{'_id':{'field':'$field','frequency':'$frequency','period':'$period'}}}])['result']]
+            all_addrs = [x['_id'] for x in self.player_scores().aggregate([{'$group':{'_id':{'field':'$field','frequency':'$frequency','period':'$period'}}}])]
 
             if cur_season is not None: all_addrs = filter(lambda x: (x['frequency']!='season') or (x['period']==cur_season), all_addrs)
             if cur_week is not None: all_addrs = filter(lambda x: (x['frequency']!='week') or (x['period']==cur_week), all_addrs)
@@ -2186,7 +2192,7 @@ class NoSQLClient (object):
                             row['n'] = len(all_scores)
                             yield row
 
-                prog.insert(row_generator(addr, all_scores, users_by_score))
+                prog.insert_many(row_generator(addr, all_scores, users_by_score))
 
                 end_time = time.time()
                 print 'done (%.2f ms)' % (1000.0*(end_time-start_time))
@@ -2208,7 +2214,8 @@ class NoSQLClient (object):
         for addr, score in updates:
             qs = self.parse_score_addr(addr)
             qs['user_id'] = player_id
-            self.player_scores().update(qs, {'$set':{'score': score}}, upsert=True, multi=False, w=0) # send asynchronously - this is a performance hotspot
+            # send asynchronously - this is a performance hotspot
+            self.player_scores().with_options(write_concern = pymongo.write_concern.WriteConcern(w=0)).update_one(qs, {'$set':{'score': score}}, upsert=True)
         return True
 
     def get_player_score_leaders(self, addr, num, start = 0, reason = ''): return self.instrument('get_player_score_leaders(%s)'%reason, self._get_player_score_leaders, (addr, num, start))
@@ -2306,7 +2313,7 @@ class NoSQLClient (object):
             total = int(total)
 
             qs = addr.copy(); qs['alliance_id'] = alliance_id
-            self.alliance_score_cache().update(qs, {'$set': {'score': total}}, upsert = True, multi = False)
+            self.alliance_score_cache().update_one(qs, {'$set': {'score': total}}, upsert = True)
         return True
 
     def get_alliance_score_leaders(self, addr, num, start = 0, reason = ''): return self.instrument('get_alliance_score_leaders(%s)'%reason, self._get_alliance_score_leaders, (addr, num, start))
@@ -2428,9 +2435,9 @@ if __name__ == '__main__':
     elif mode == 'clear-locks':
         ID_LIST = [1112,1113,1114,1115]
         LOCK_FIELDS = {'LOCK_HOLDER':1,'LOCK_TIME':1,'LOCK_STATE':1,'LOCK_OWNER':1}
-        client.player_cache().update({'_id':{'$in':ID_LIST}}, {'$unset':LOCK_FIELDS}, upsert=False, multi=True)
+        client.player_cache().update_many({'_id':{'$in':ID_LIST}}, {'$unset':LOCK_FIELDS})
         for region in set(x['home_region'] for x in client.player_cache().find({'_id':{'$in':ID_LIST}},{'home_region':1}) if x.get('home_region',None)):
-            client.region_table(region, 'map').update({'_id':{'$in':['h%d'%x for x in ID_LIST]}}, {'$unset': LOCK_FIELDS}, upsert=False, multi=True)
+            client.region_table(region, 'map').update_many({'_id':{'$in':['h%d'%x for x in ID_LIST]}}, {'$unset': LOCK_FIELDS})
 
     elif mode == 'console':
         import code
@@ -2654,11 +2661,11 @@ if __name__ == '__main__':
         # TEST LOCKS
         OWNER = 567
         client.player_cache().drop(); client.seen_player_cache = False
-        client.player_cache().insert({'_id':1112, 'facebook_id':'example1', 'ui_name':'Dan', 'last_mtime': time_now - 60, 'LOCK_GENERATION':5})
+        client.player_cache().insert_one({'_id':1112, 'facebook_id':'example1', 'ui_name':'Dan', 'last_mtime': time_now - 60, 'LOCK_GENERATION':5})
         assert client.player_lock_acquire_login(1112, OWNER) == (client.LOCK_LOGGED_IN,5)
         assert client.player_lock_acquire_login(1112, 9999)[0] < 0
         assert client.player_lock_acquire_attack(1112, 665, -1) < 0 # already locked
-        client.player_cache().update({'_id':1112},{'$set':{'LOCK_TIME':client.time-2*client.LOCK_TIMEOUT}})
+        client.player_cache().update_one({'_id':1112},{'$set':{'LOCK_TIME':client.time-2*client.LOCK_TIMEOUT}})
         assert client.player_lock_acquire_login(1112, OWNER) == (client.LOCK_LOGGED_IN,5) # stale lock is busted
 
         assert client.player_lock_get_state_batch([1112,9999]) == [(client.LOCK_LOGGED_IN,OWNER),(client.LOCK_OPEN,-1)]
@@ -2709,7 +2716,7 @@ if __name__ == '__main__':
         # TEST ABTESTS
 
         testname = 'scratch'
-        client.abtest_table().remove({'name':testname})
+        client.abtest_table().delete_many({'name':testname})
         for cohort in ('cohortA','cohortB'):
             assert client.abtest_join_cohort(testname, cohort, -1)
             assert not client.abtest_join_cohort(testname, cohort, 0)
@@ -2782,16 +2789,16 @@ if __name__ == '__main__':
         assert -client.LOCK_BEING_ATTACKED == client.map_feature_lock_acquire(region, 'h1112', 1112, generation = -1)
 
         # stale lock should be acquirable
-        client.region_table(region, 'map').update({'_id':'h1112'},{'$set':{'LOCK_TIME':client.time-2*client.LOCK_TIMEOUT}})
+        client.region_table(region, 'map').update_one({'_id':'h1112'},{'$set':{'LOCK_TIME':client.time-2*client.LOCK_TIMEOUT}})
         assert client.LOCK_BEING_ATTACKED == client.map_feature_lock_acquire(region, 'h1112', 1112, generation = -1)
 
         # prune should clear stale locks
-        client.region_table(region, 'map').update({'_id':'h1112'},{'$set':{'LOCK_TIME':client.time-2*client.LOCK_TIMEOUT}})
+        client.region_table(region, 'map').update_one({'_id':'h1112'},{'$set':{'LOCK_TIME':client.time-2*client.LOCK_TIMEOUT}})
         client.do_region_maint(region)
         assert client.LOCK_BEING_ATTACKED == client.map_feature_lock_acquire(region, 'h1112', 1112, generation = -1)
 
         # keepalive should refresh locks
-        client.region_table(region, 'map').update({'_id':'h1112'},{'$set':{'LOCK_TIME':client.time-2*client.LOCK_TIMEOUT}})
+        client.region_table(region, 'map').update_one({'_id':'h1112'},{'$set':{'LOCK_TIME':client.time-2*client.LOCK_TIMEOUT}})
         client.map_feature_lock_keepalive_batch(region, ['h1112','h1113'])
         assert -client.LOCK_BEING_ATTACKED == client.map_feature_lock_acquire(region, 'h1112', 1112, generation = -1)
 
