@@ -115,8 +115,10 @@ function do_up_git {
             (cd $dir && git pull)
         else
             # local changes - try to reapply on top
-            echo "fetching, stashing, merging, unstashing game-${dir}..."
-            (cd $dir && git fetch && git stash && git merge origin/master --ff-only && git stash pop)
+	    MY_BRANCH=`git rev-parse --abbrev-ref HEAD`
+	    ORIGIN_BRANCH="origin/${MY_BRANCH}"
+            echo "fetching, stashing, merging, unstashing game-${dir} from ${ORIGIN_BRANCH}..."
+            (cd $dir && git fetch && git stash && git merge ${ORIGIN_BRANCH} --ff-only && git stash pop)
         fi
     done
 }
@@ -128,7 +130,9 @@ function do_force_up_git {
             (cd $dir && git pull -q)
         else
             # local changes - try to reapply on top
-            (cd $dir && git fetch -q && git stash -q && git merge origin/master --ff-only -q && git stash pop -q)
+	    MY_BRANCH=`git rev-parse --abbrev-ref HEAD`
+	    ORIGIN_BRANCH="origin/${MY_BRANCH}"
+            (cd $dir && git fetch -q && git stash -q && git merge ${ORIGIN_BRANCH} --ff-only -q && git stash pop -q)
         fi
     done
 }
