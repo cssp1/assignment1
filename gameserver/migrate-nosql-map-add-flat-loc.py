@@ -19,7 +19,7 @@ if __name__ == '__main__':
 
     for raw in nosql_client.region_table(region_id, 'map').find({}, {'_id':1,'base_map_loc':1,'base_map_loc_flat':1}):
         if ('base_map_loc' in raw) and ('base_map_loc_flat' not in raw):
-            nosql_client.region_table(region_id, 'map').update({'_id':raw['_id']}, {'$set':{'base_map_loc_flat':nosql_client.flatten_map_loc(raw['base_map_loc'])}}, w=1)
+            nosql_client.region_table(region_id, 'map').update_one({'_id':raw['_id']}, {'$set':{'base_map_loc_flat':nosql_client.flatten_map_loc(raw['base_map_loc'])}})
             converted += 1
             sys.stderr.write('%s: %4d... %s\n' % (region_id, converted, raw['_id']))
 

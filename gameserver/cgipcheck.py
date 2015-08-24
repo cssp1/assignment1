@@ -311,9 +311,9 @@ def do_action(path, method, args, spin_token_data, nosql_client):
                     for code, sign in ((1000,1), (1310,-1)):
                         agg = [{'$match':{'code':code,'time':{'$gte':start_time,'$lt':end_time},'summary.developer':{'$exists':False}}},
                                {'$group':{'_id':1,'total':{'$sum':'$Billing Amount'}}}]
-                        result = nosql_client.log_buffer_table('log_credits').aggregate(agg)['result']
-                        if result:
-                            total += sign * result[0]['total']
+                        agg_result = nosql_client.log_buffer_table('log_credits').aggregate(agg)
+                        for result in agg_result:
+                            total += sign * result['total']
                     y,m,d = SpinConfig.unix_to_cal(start_time)
                     sample = {'start_time': start_time, 'end_time': end_time, 'date': '%d/%d' % (m,d), 'net': total}
                     if end_time > time_now:
@@ -472,7 +472,7 @@ def do_action(path, method, args, spin_token_data, nosql_client):
                                                        {'$group': {'_id': { '$subtract' :['$time', {'$mod':['$time', time_interval]}] }, # group by hour
                                                                    'count':{'$sum': 1}}}]
 
-                                        events = dict((x['_id'], {'count':x['count']}) for x in remote_nosql_client.log_buffer_table('log_fb_conversion_pixels').aggregate(remote_agg)['result'])
+                                        events = dict((x['_id'], {'count':x['count']}) for x in remote_nosql_client.log_buffer_table('log_fb_conversion_pixels').aggregate(remote_agg))
                                     else:
                                         weighted_value_available = True
                                         events_by_time = {}
@@ -592,7 +592,7 @@ def get_client_perf_series(nosql_client, name, source_key, qs, rescale = 1):
                                                                  {'$group':{'_id': { '$subtract' :['$time', {'$mod':['$time', 3600]}] },
                                                                             'average': {'$avg': '$rate'}}},
                                                                  {'$sort':{'_id':1}}
-                                                                 ])['result']]}
+                                                                 ])]}
 
 def get_server_latency(nosql_client):
     time_range = [time_now - 1*86400, time_now]

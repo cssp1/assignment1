@@ -23,7 +23,7 @@ if __name__ == '__main__':
         for cohortname, cohortdata in old_data.iteritems():
             N = cohortdata.get('N',0)
             key = testname+':'+cohortname
-            nosql_client.abtest_table().insert({'_id':key, 'name':testname, 'cohort':cohortname, 'N':N},w=1)
+            nosql_client.abtest_table().replace_one({'_id':key}, {'_id':key, 'name':testname, 'cohort':cohortname, 'N':N}, upsert=True)
             converted += 1
             sys.stderr.write('%4d... %s N=%d\n' % (converted, key, N))
 

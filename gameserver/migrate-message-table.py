@@ -33,6 +33,6 @@ if __name__ == '__main__':
         for msg in msg_list:
             msg['recipient'] = int(srecipient)
             if 'msg_id' in msg: del msg['msg_id']
-            nosql_client._table('message_table').insert(msg)
+            nosql_client._table('message_table').insert_one(msg)
 
     nosql_client.message_table() # create indexes

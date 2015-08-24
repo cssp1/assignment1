@@ -35,17 +35,23 @@ if __name__ == '__main__':
         dau = nosql_client.dau_get(time_now + time_offset)
         time_range = [day_start, day_start + 86400]
 
+    receipts = refunds = 0
+
     credits_tbl = nosql_client._table('log_credits')
     receipts_result = credits_tbl.aggregate([{'$match':{'code':1000,'time':{'$gte':time_range[0],'$lt':time_range[1]},
                                                         'summary.developer':{'$exists':False}
                                                         }},
-                                             {'$group':{'_id':1,'total':{'$sum':'$Billing Amount'}}}])['result']
-    receipts = receipts_result[0]['total'] if receipts_result else 0
+                                             {'$group':{'_id':1,'total':{'$sum':'$Billing Amount'}}}])
+    for result in receipts_result:
+        receipts += result['total']
+
     refunds_result = credits_tbl.aggregate([{'$match':{'code':1310,'time':{'$gte':time_range[0],'$lt':time_range[1]},
                                                        'summary.developer':{'$exists':False}
                                                        }},
-                                            {'$group':{'_id':1,'total':{'$sum':'$Billing Amount'}}}])['result']
-    refunds = refunds_result[0]['total'] if refunds_result else 0
+                                            {'$group':{'_id':1,'total':{'$sum':'$Billing Amount'}}}])
+    for result in refunds_result:
+        refunds += result['total']
+
     net_receipts = receipts - refunds
 
     metrics_tbl = nosql_client._table('log_metrics')

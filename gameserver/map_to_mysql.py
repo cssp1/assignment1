@@ -73,7 +73,7 @@ if __name__ == '__main__':
             count_by_template = nosql_client.region_table(name, 'map').aggregate([{'$match':{'base_type':KIND}},
                                                                                   {'$project':{'base_template':1}},
                                                                                   {'$group':{'_id': '$base_template',
-                                                                                             'count': {'$sum':1}}}])['result']
+                                                                                             'count': {'$sum':1}}}])
             cur = con.cursor()
             for row in count_by_template:
                 keyvals = [('time',time_now),
@@ -87,7 +87,7 @@ if __name__ == '__main__':
         count_by_townhall = nosql_client.region_table(name, 'map').aggregate([{'$match':{'base_type':'home'}},
                                                                               {'$project':{gamedata['townhall']+'_level':1}},
                                                                               {'$group':{'_id': '$'+gamedata['townhall']+'_level',
-                                                                                         'count': {'$sum':1}}}])['result']
+                                                                                         'count': {'$sum':1}}}])
         for row in count_by_townhall:
             keyvals = [('time',time_now),
                        ('region_id',name),

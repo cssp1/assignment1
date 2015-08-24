@@ -30,6 +30,6 @@ if __name__ == '__main__':
     nosql_client._table('facebook_id_map').drop()
 
     for fbid, user_id in old_map.iteritems():
-        nosql_client._table('facebook_id_map').insert({'_id':str(fbid), 'user_id':user_id})
+        nosql_client._table('facebook_id_map').replace_one({'_id':str(fbid)}, {'_id':str(fbid), 'user_id':user_id}, upsert=True)
 
     nosql_client.facebook_id_table() # create indexes

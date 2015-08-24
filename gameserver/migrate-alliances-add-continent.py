@@ -29,7 +29,7 @@ if __name__ == '__main__':
                     else:
                         new_continent = 'fb_intl'
                     if 1:
-                        nosql_client.alliance_table('alliances').update({'_id':row['_id']}, {'$set':{'continent':new_continent}})
+                        nosql_client.alliance_table('alliances').update_one({'_id':row['_id']}, {'$set':{'continent':new_continent}})
                     converted += 1
                     print '->', new_continent
                 else:

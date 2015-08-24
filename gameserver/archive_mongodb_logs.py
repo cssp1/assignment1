@@ -218,7 +218,7 @@ def do_clean(nosql_client, table, verbose, dry_run):
     if dry_run:
         print >> msg_fd, 'remove(%s) would affect %d' % (qs, nosql_client._table(table['table_name']).find(qs).count())
     else:
-        n = nosql_client._table(table['table_name']).remove(qs)['n']
+        n = nosql_client._table(table['table_name']).delete_many(qs).deleted_count
         print >> msg_fd, 'deleted %d' % n
 
 def my_slave(input):
