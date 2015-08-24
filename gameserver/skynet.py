@@ -2692,7 +2692,7 @@ if __name__ == '__main__':
                 update = adgroup.copy()
                 update['_id'] = update['id']
                 update['expire_time'] = expire_time
-                db.recent_adgroups.find_and_modify(query={'_id':adgroup['id']}, update=update, upsert=True)
+                db.recent_adgroups.find_one_and_update({'_id':update['_id']}, update, upsert=True)
 
             # add any remembered adgroups that we don't already have in the list
             previous = list(db.recent_adgroups.find({'_id':{'$nin':[x['id'] for x in adgroup_list]}}))
