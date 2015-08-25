@@ -33,7 +33,6 @@ var spin_token_domain = '$SPIN_TOKEN_DOMAIN$';
 var spin_giveable_items = $SPIN_GIVEABLE_ITEMS$;
 var spin_regions = $SPIN_REGIONS$;
 var spin_ai_base_ids = $SPIN_AI_BASE_IDS$;
-var spin_region_names = $SPIN_REGION_NAMES$;
 var spin_log_bookmark = $SPIN_LOG_BOOKMARK$;
 var spin_log_bookmark_dirty = true;
 var spin_ssl_available = $SPIN_SSL_AVAILABLE$;
@@ -1045,7 +1044,7 @@ var refresh_server_status = function() {
                             }
                         } else if(field['type'] == 'active_sessions') {
                             s = val.toFixed(0);
-                            var has_regions = Object.keys(spin_region_names).length > 0;
+                            var has_regions = Object.keys(spin_regions).length > 0;
                             var warn_if_over = (has_regions ? 100 : 300);
                             if(('game_http_port' in item) && val >= warn_if_over) {
                                 s = '<font color="#ff0000">'+s+'</font>';
@@ -1289,7 +1288,8 @@ $(function() {
         $('#item_to_give').append('<option value="'+entry['name']+'">'+entry['ui_name']+'</option>');
     });
     spin_regions.forEach(function(entry) {
-        $('#change_region_destination').append('<option value="'+entry['name']+'">'+entry['ui_name']+'</option>');
+        var ui_name = entry['ui_name'] + ' ('+entry['ui_description_short']+')';
+        $('#change_region_destination').append('<option value="'+entry['name']+'">'+ui_name+'</option>');
     });
     $('#skynet_query').bind('enterKey', method_skynet_query);
     $('#skynet_query').keyup(function(e) { if(e.keyCode == 13) { $(this).trigger('enterKey'); } });
