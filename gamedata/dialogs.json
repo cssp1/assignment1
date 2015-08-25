@@ -3578,27 +3578,10 @@
         }
     },
 
-    "map_dialog": {
-        "dimensions": [736,423],
+    "map_dialog_header_buttons": {
+        "dimensions": [736,58],
         "clip_children": 0, // since DISPLAY_MESSAGE windows on AI attack entries may be larger than this dialog
         "widgets": {
-            "bg": {"kind": "StaticImage", "xy":[0,0], "dimensions":[736,423], "asset":"dialog_resizable","bg_image_resizable":1 },
-            "sunken_left": {"kind": "StaticImage", "xy":[37,67], "dimensions":[662,344], "asset": "dialog_sunken_resizable", "bg_image_resizable": 1 },
-            "row_bg": { "kind": "SolidRect", "xy":[47,104], "dimensions":[638,52],
-                        "color": [0,0,0,0.1],
-                        "color_hitlist": [0.03,0.015,0.015,1],
-                        "outline_color": [0,0,0,0.5], "outline_width": 1, "array": [1,5], "array_offset": [0,56] },
-
-            "title": { "kind": "TextField", "xy": [37,18], "dimensions": [221, 41], "text_size": 30, "text_style": "thick",
-                       "text_hjustify": "left", "ui_name": "!TX desktop map/attack button" },
-
-            "dev_title": { "show": 0, "kind": "TextField", "xy": [50,50], "dimensions": [221, 41], "text_size": 13,
-                           "text_style": "thick", "text_color": [1,0,0,1], "drop_shadow": 1,
-                           "text_hjustify": "left",
-                           "ui_name": "You are in DEV Edit mode - enemies that would normally be locked are NOT shown as locked!" },
-
-            "close_button": { "kind": "ActionButton", "xy": [706,1], "dimensions": [19,22], "bg_image": "close_button_small", "push_bg_image": 1 },
-
             "hitlist_warning_text":  { "kind": "TextField", "xy": [254,9], "dimensions": [136,24], "text_size": 12, "text_style": "normal",
                                        "text_color": [1,0.8,0.1,1], "text_hjustify": "center", "text_vjustify": "top",
                                        "ui_name": "Limited time only",
@@ -3620,7 +3603,32 @@
                                  "layout": { "hjustify": "right", "vjustify": "top" } },
             "computers_button": { "kind": "ActionButton", "xy": [398,26], "dimensions": [136,32], "text_size": 13, "text_style": "bold",
                                   "bg_image": "menu_button_136px", "state": "active", "ui_name": "Single Player",
-                                  "layout": { "hjustify": "right", "vjustify": "top" } },
+                                  "layout": { "hjustify": "right", "vjustify": "top" } }
+        }
+    },
+
+    "map_dialog": {
+        "dimensions": [736,423],
+        "clip_children": 0, // since DISPLAY_MESSAGE windows on AI attack entries may be larger than this dialog
+        "widgets": {
+            "bg": {"kind": "StaticImage", "xy":[0,0], "dimensions":[736,423], "asset":"dialog_resizable","bg_image_resizable":1 },
+            "sunken_left": {"kind": "StaticImage", "xy":[37,67], "dimensions":[662,344], "asset": "dialog_sunken_resizable", "bg_image_resizable": 1 },
+            "row_bg": { "kind": "SolidRect", "xy":[47,104], "dimensions":[638,52],
+                        "color": [0,0,0,0.1],
+                        "color_hitlist": [0.03,0.015,0.015,1],
+                        "outline_color": [0,0,0,0.5], "outline_width": 1, "array": [1,5], "array_offset": [0,56] },
+
+            "title": { "kind": "TextField", "xy": [37,18], "dimensions": [221, 41], "text_size": 30, "text_style": "thick",
+                       "text_hjustify": "left", "ui_name": "!TX desktop map/attack button" },
+
+            "dev_title": { "show": 0, "kind": "TextField", "xy": [50,50], "dimensions": [221, 41], "text_size": 13,
+                           "text_style": "thick", "text_color": [1,0,0,1], "drop_shadow": 1,
+                           "text_hjustify": "left",
+                           "ui_name": "You are in DEV Edit mode - enemies that would normally be locked are NOT shown as locked!" },
+
+            "close_button": { "kind": "ActionButton", "xy": [706,1], "dimensions": [19,22], "bg_image": "close_button_small", "push_bg_image": 1 },
+
+            "header_buttons": { "kind": "Dialog", "dialog": "map_dialog_header_buttons", "xy": [0,0], "dimensions": [736,58] },
 
             "column_header_name": { "kind": "TextField", "xy": [52,79], "dimensions": [204,23],"text_size": 13, "text_style": "bold",
                                     "text_hjustify": "left", "ui_name": "NAME" },
@@ -3767,28 +3775,7 @@
                        "text_hjustify": "left", "ui_name": "!TX desktop map/attack button" },
             "close_button": { "kind": "ActionButton", "xy": [706,1], "dimensions": [19,22], "bg_image": "close_button_small", "push_bg_image": 1 },
 
-            "hitlist_warning_text":  { "kind": "TextField", "xy": [254,9], "dimensions": [136,24], "text_size": 12, "text_style": "normal",
-                                       "text_color": [1,0.8,0.1,1], "text_hjustify": "center", "text_vjustify": "top",
-                                       "ui_name": "Limited time only",
-                                       "layout": { "hjustify": "right", "vjustify": "top" }, "show": 0 },
-            "hitlist_button": { "kind": "ActionButton", "xy": [254,26], "dimensions": [136,32], "text_size": 13, "text_style": "bold",
-                                "bg_image": "menu_button_136px", "state": "active", "ui_name": "Hit List",
-                                "ui_tooltip_unmet": "Unmet Requirements:\n%s",
-                                "ui_tooltip": "For a LIMITED TIME fight special enemies to win Valor Points", "tooltip_delay": 0,
-                                "layout": { "hjustify": "right", "vjustify": "top" }, "show": 0 },
-
-            "rivals_button": { "kind": "ActionButton", "xy": [542,26], "dimensions": [136,32], "text_size": 13, "text_style": "bold",
-                               "bg_image": "menu_button_136px", "state": "normal", "ui_name": "Multiplayer",
-                               "ui_tooltip": "", "tooltip_delay": 0,
-                               "layout": { "hjustify": "right", "vjustify": "top" } },
-            "quarries_button": { "kind": "ActionButton", "xy": [542,26], "dimensions": [136,32], "text_size": 13, "text_style": "bold",
-                                 "bg_image": "menu_button_136px", "state": "normal", "ui_name": "Multiplayer", "show": 0,
-                                 "ui_tooltip_unmet": "Unmet Requirements:\n%s",
-                                 "ui_tooltip": "", "tooltip_delay": 0,
-                                 "layout": { "hjustify": "right", "vjustify": "top" } },
-            "computers_button": { "kind": "ActionButton", "xy": [398,26], "dimensions": [136,32], "text_size": 13, "text_style": "bold",
-                                  "bg_image": "menu_button_136px", "state": "active", "ui_name": "Single Player",
-                                  "layout": { "hjustify": "right", "vjustify": "top" } },
+            "header_buttons": { "kind": "Dialog", "dialog": "map_dialog_header_buttons", "xy": [0,0], "dimensions": [736,58] },
 
             "splash_image": { "kind": "StaticImage", "xy": [16,68], "dimensions": [703,333], "asset": "tutorial_slideshow1",
                               "opacity": 0.9, "clip_to": [45,135,646,207] },
@@ -7638,28 +7625,8 @@
             "close_button": { "kind": "ActionButton", "xy": [706,1], "dimensions": [19,22], "bg_image": "close_button_small", "push_bg_image": 1,
                               "layout": { "hjustify": "right", "vjustify": "top" } },
 
-            "hitlist_warning_text":  { "kind": "TextField", "xy": [254,9], "dimensions": [136,24], "text_size": 12, "text_style": "normal",
-                                       "text_color": [1,0.8,0.1,1], "text_hjustify": "center", "text_vjustify": "top",
-                                       "ui_name": "Limited time only",
-                                       "layout": { "hjustify": "right", "vjustify": "top" }, "show": 0 },
-            "hitlist_button": { "kind": "ActionButton", "xy": [254,26], "dimensions": [136,32], "text_size": 13, "text_style": "bold",
-                                "bg_image": "menu_button_136px", "state": "active", "ui_name": "Hit List",
-                                "ui_tooltip_unmet": "Unmet Requirements:\n%s",
-                                "ui_tooltip": "For a LIMITED TIME fight special enemies to win Valor Points", "tooltip_delay": 0,
-                                "layout": { "hjustify": "right", "vjustify": "top" }, "show": 0 },
-
-            "rivals_button": { "kind": "ActionButton", "xy": [542,26], "dimensions": [136,32], "text_size": 13, "text_style": "bold",
-                               "bg_image": "menu_button_136px", "state": "normal", "ui_name": "Multiplayer",
-                               "ui_tooltip": "", "tooltip_delay": 0,
-                               "layout": { "hjustify": "right", "vjustify": "top" } },
-            "quarries_button": { "kind": "ActionButton", "xy": [542,26], "dimensions": [136,32], "text_size": 13, "text_style": "bold",
-                                 "bg_image": "menu_button_136px", "state": "normal", "ui_name": "Multiplayer", "show": 0,
-                                 "ui_tooltip_unmet": "Unmet Requirements:\n%s",
-                                 "ui_tooltip": "", "tooltip_delay": 0,
-                                 "layout": { "hjustify": "right", "vjustify": "top" } },
-            "computers_button": { "kind": "ActionButton", "xy": [398,26], "dimensions": [136,32], "text_size": 13, "text_style": "bold",
-                                  "bg_image": "menu_button_136px", "state": "active", "ui_name": "Single Player",
-                                  "layout": { "hjustify": "right", "vjustify": "top" } },
+            "header_buttons": { "kind": "Dialog", "dialog": "map_dialog_header_buttons", "xy": [0,0], "dimensions": [736,58],
+                                "layout": { "hjustify": "right", "vjustify": "top" } },
 
             "map": {"kind": "RegionMap", "xy": [42,72], "dimensions": [653, 280], "layout": { "hresizable":1, "vresizable": 1 } },
 
