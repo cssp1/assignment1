@@ -2408,12 +2408,18 @@ class PortraitProxy(twisted.web.resource.Resource):
         SpinHTTP.set_access_control_headers_for_cdn(request, max_age)
 
     def render_OPTIONS(self, request):
-        self.parse_request(request) # just to assert it is a valid request
+        if not self.parse_request(request): # just to assert it is a valid request
+            request.setResponseCode(http.BAD_REQUEST)
+            return 'invalid parameters'
         self.set_cdn_headers(request)
         return ''
 
     def render(self, request):
         source_url = self.parse_request(request)
+        if not source_url:
+            exception_log.event(proxy_time, 'unrecognized PortraitProxy URL: ' + log_request(request))
+            request.setResponseCode(http.BAD_REQUEST)
+            return 'invalid parameters'
         self.set_cdn_headers(request)
         d = defer.Deferred()
         d.addBoth(self.complete_deferred_request, request)
@@ -2459,17 +2465,16 @@ class FBPortraitProxy(PortraitProxy):
         # sanity-check the URL we are about to proxy
         parts = urlparse.urlparse(request.uri)
         path_fields = parts.path.split('/')
-        assert len(path_fields) == 4
-        assert path_fields[1] == 'fb_portrait'
+        if len(path_fields) != 4: return None
+        if path_fields[1] != 'fb_portrait': return None
         fbid = path_fields[2]
-        assert path_fields[3] == 'picture'
-        assert (not parts.params) and (not parts.fragment)
+        if path_fields[3] != 'picture': return None
+        if parts.params or parts.fragment: return None
         qs = urlparse.parse_qs(parts.query)
-        assert ('spin_origin' in qs)
+        if ('spin_origin' not in qs): return None
         for key, val in qs.iteritems():
             if key not in ('v', 'spin_origin'):
-                exception_log.event(proxy_time, 'unrecognized FB portrait URL: %s' % repr(parts))
-                assert False # force fail
+                return None
         return SpinFacebook.versioned_graph_endpoint('user/picture', '%s/picture' % fbid)
 
 class KGPortraitProxy(PortraitProxy):
@@ -2485,21 +2490,19 @@ class KGPortraitProxy(PortraitProxy):
         # sanity-check the URL we are about to proxy
         parts = urlparse.urlparse(request.uri)
         path_fields = parts.path.split('/')
-        assert len(path_fields) == 3
-        assert path_fields[1] == 'kg_portrait'
-        assert path_fields[0] == '' and path_fields[2] == ''
-        assert (not parts.params) and (not parts.fragment)
+        if len(path_fields) != 3: return None
+        if path_fields[1] != 'kg_portrait': return None
+        if path_fields[0] != '' or path_fields[2] != '': return None
+        if parts.params or parts.fragment: return None
         qs = urlparse.parse_qs(parts.query)
-        assert ('spin_origin' in qs) and ('avatar_url' in qs)
+        if ('spin_origin' not in qs) or ('avatar_url' not in qs): return None
         for key, val in qs.iteritems():
             if key not in ('spin_origin', 'avatar_url', 'v'):
-                exception_log.event(proxy_time, 'unrecognized KG portrait qs: %s' % repr(parts))
-                assert False # force fail
+                return None
         avatar_url = qs['avatar_url'][-1]
         avatar_parts = urlparse.urlparse(avatar_url)
         if not (avatar_parts.netloc.endswith('kongcdn.com') or avatar_parts.netloc.endswith('insnw.net')):
-            exception_log.event(proxy_time, 'unrecognized KG portrait URL: %s' % repr(avatar_parts))
-            assert False # force fail
+            return None
         return avatar_url
 
 class AGPortraitProxy(PortraitProxy):
@@ -2515,23 +2518,21 @@ class AGPortraitProxy(PortraitProxy):
         # sanity-check the URL we are about to proxy
         parts = urlparse.urlparse(request.uri)
         path_fields = parts.path.split('/')
-        assert len(path_fields) == 3
-        assert path_fields[1] == 'ag_portrait'
-        assert path_fields[0] == '' and path_fields[2] == ''
-        assert (not parts.params) and (not parts.fragment)
+        if len(path_fields) != 3: return None
+        if path_fields[1] != 'ag_portrait': return None
+        if path_fields[0] != '' or path_fields[2] != '': return None
+        if parts.params or parts.fragment: return None
         qs = urlparse.parse_qs(parts.query)
-        assert ('spin_origin' in qs) and ('avatar_url' in qs)
+        if ('spin_origin' not in qs) or ('avatar_url' not in qs): return None
         for key, val in qs.iteritems():
             if key not in ('spin_origin', 'avatar_url', 'v'):
-                exception_log.event(proxy_time, 'unrecognized AG portrait qs: %s' % repr(parts))
-                assert False # force fail
+                return None
         avatar_url = qs['avatar_url'][-1]
         if '%2F' in avatar_url: # handle browsers that (improperly?) leave avatar_url URL-encoded
             avatar_url = urllib.unquote(avatar_url)
         avatar_parts = urlparse.urlparse(avatar_url)
         if not avatar_parts.netloc.endswith('armorgames.com'):
-            exception_log.event(proxy_time, 'unrecognized AG portrait URL: %s' % repr(avatar_parts))
-            assert False # force fail
+            return None
         return avatar_url
 
 class XDChannelResource(static.Data):
