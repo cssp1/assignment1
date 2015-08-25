@@ -20801,7 +20801,9 @@ function update_map_dialog_header_buttons(dialog) {
 
     // REGIONAL MAP button
     if(player.tutorial_state === "COMPLETE" &&
-       player.get_any_abtest_value('enable_region_map', gamedata['enable_region_map']) && !goog.array.contains(dialog.user_data['buttons'], 'rivals')) {
+       player.get_any_abtest_value('enable_region_map', gamedata['enable_region_map']) &&
+       !(session.region && session.region.data && ('enable_map' in session.region.data) && !session.region.data['enable_map'])) {
+
         var quarry_pred = read_predicate(player.get_any_abtest_value('quarry_play_requirement', gamedata['territory']['quarry_play_requirement']));
         var can_view_quarries = quarry_pred.is_satisfied(player, null);
 
@@ -33901,7 +33903,7 @@ function map_dialog_get_default_page() {
     }
 
     // check for tab accessibility
-    if((!player.is_pvp_player() || !player.is_legacy_pvp_player()) && map_dialog_default_page == 'rivals') { map_dialog_default_page = 'computers'; }
+    if(!player.is_ladder_player() && (!player.is_pvp_player() || !player.is_legacy_pvp_player()) && map_dialog_default_page == 'rivals') { map_dialog_default_page = 'computers'; }
     if(!session.region.map_enabled() && map_dialog_default_page == 'quarries') { map_dialog_default_page = 'computers'; }
 
     return map_dialog_default_page;

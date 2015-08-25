@@ -47,6 +47,12 @@ msgstr ""
 msgid " (protection expired %prot ago)"
 msgstr ""
 
+msgid "!TX Multiplayer (Non-Map)"
+msgstr "Multiplayer"
+
+msgid "!TX Multiplayer (Map)"
+msgstr "Multiplayer"
+
 #: dialogs/desktop_bottom/widgets/robots_button/ui_name
 #: dialogs/research_dialog/widgets/title/ui_name
 #: dialogs/manufacture_dialog/widgets/title/ui_name
