@@ -582,7 +582,7 @@
                         "if": {"predicate": "DIALOG_OPEN", "dialog_name": "map_dialog"},
                         "then": { "consequent": "AND", "subconsequents": [
                             {"consequent": "MESSAGE_BOX", "widgets": { "description": { "ui_name": "Spy on the enemy base to prepare for attack." } } },
-                            {"consequent": "TUTORIAL_ARROW", "arrow_type": "button", "direction": "up", "dialog_name": "map_dialog", "widget_name": "computers_button"}
+                            {"consequent": "TUTORIAL_ARROW", "arrow_type": "button", "direction": "up", "dialog_name": "map_dialog/header_buttons", "widget_name": "MAP:computers"}
                         ] }
                     }
                 }
@@ -689,7 +689,7 @@
                               "if": {"predicate": "DIALOG_OPEN", "dialog_name": "map_dialog"},
                               "then": { "consequent": "AND", "subconsequents": [
                                   {"consequent": "MESSAGE_BOX", "widgets": { "description": { "ui_name": "Spy on Mr. Skilling's Shooting Range." } } },
-                                  {"consequent": "TUTORIAL_ARROW", "arrow_type": "button", "direction": "up", "dialog_name": "map_dialog", "widget_name": "computers_button"}
+                                  {"consequent": "TUTORIAL_ARROW", "arrow_type": "button", "direction": "up", "dialog_name": "map_dialog/header_buttons", "widget_name": "MAP:computers"}
                               ] }
                           }
                       }

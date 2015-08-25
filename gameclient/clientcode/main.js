@@ -17027,24 +17027,26 @@ function tutorial_step_valentina_nonmodal_message(data) {
 // maintain a tutorial arrow pointing to a button on a specific UI dialog
 function update_tutorial_arrow_for_button(_dialog, _parent_path, _widget_name, _direction) {
     return (function (dialog, parent_path, widget_name, direction) { return function() {
-        var parent = null;
-        var parent_offset = [0,0];
-        var found_widget_name = widget_name;
+        var parent = null; // SPUI.Dialog hosting the widget to point at
+        var parent_offset = [0,0]; // transformation stack
+        var found_widget_name = widget_name; // name of widget to point at
+
+        var parent_path_list = parent_path.split('/');
 
         // special case for desktop dialogs
-        if(parent_path.indexOf("desktop_") === 0 || goog.array.contains(['attack_button_dialog','quest_bar'], parent_path)) {
+        if(parent_path_list[0].indexOf("desktop_") === 0 || goog.array.contains(['attack_button_dialog','quest_bar'], parent_path_list[0])) {
             // pick desktop dialog directly
-            parent = desktop_dialogs[parent_path] || null;
+            parent = desktop_dialogs[parent_path_list[0]] || null;
 
             // handle entries in desktop_dialogs that are nested below other dialogs
             if(parent && parent.parent && parent.parent !== SPUI.root) {
                 parent_offset = vec_add(parent_offset, parent.parent.get_absolute_xy());
             }
 
-        } else if(parent_path.indexOf("_dialog") != -1 ||
-                  parent_path.indexOf("_tab") != -1 ||
-                  parent_path.indexOf("context_menu") != -1 ||
-                  parent_path.indexOf("tutorial") != -1) {
+        } else if(parent_path_list[0].indexOf("_dialog") != -1 ||
+                  parent_path_list[0].indexOf("_tab") != -1 ||
+                  parent_path_list[0].indexOf("context_menu") != -1 ||
+                  parent_path_list[0].indexOf("tutorial") != -1) {
 
             // search for parent dialog by name
             var roots = [selection.ui, tutorial_root];
@@ -17054,7 +17056,7 @@ function update_tutorial_arrow_for_button(_dialog, _parent_path, _widget_name, _
                 var p = roots[i];
 
                 while(p) {
-                    if(p.user_data && ('dialog' in p.user_data) && match_dialog_name(parent_path, p.user_data['dialog'])) {
+                    if(p.user_data && ('dialog' in p.user_data) && match_dialog_name(parent_path_list[0], p.user_data['dialog'])) {
                         parent = p;
                         break; // found!
                     } else if(p.children && p.children.length > 0) {
@@ -17063,6 +17065,18 @@ function update_tutorial_arrow_for_button(_dialog, _parent_path, _widget_name, _
                     } else {
                         break; // dead end
                     }
+                }
+            }
+        }
+
+        // if the path has children, dive into sub-widgets
+        if(parent) {
+            for(var i = 1; i < parent_path_list.length; i++) {
+                if(parent_path_list[i] in parent.widgets) {
+                    parent_offset = vec_add(parent_offset, parent.xy);
+                    parent = parent.widgets[parent_path_list[i]];
+                } else {
+                    parent = null; break;
                 }
             }
         }
@@ -17103,6 +17117,12 @@ function update_tutorial_arrow_for_button(_dialog, _parent_path, _widget_name, _
                     found_widget_name = 'grid'+(slots[i][1].toString())+','+(slots[i][2].toString());
                     break;
                 }
+            }
+        } else if(widget_name && widget_name.indexOf('MAP:') == 0) {
+            var chapter = widget_name.split(':')[1];
+            var index = parent.user_data['buttons'].indexOf(chapter);
+            if(index >= 0) {
+                found_widget_name = 'button'+index.toString();
             }
         }
 
@@ -20724,97 +20744,121 @@ function region_map_finder_update(dialog, kind, state) {
 }
 
 function update_map_dialog_header_buttons(dialog) {
-    dialog.widgets['computers_button'].onclick = function(w) {
-        if(w.parent && w.parent.parent && w.parent.parent.user_data['dialog'] == 'map_dialog') {
-            if(w.parent.parent.user_data['chapter'] != 'computers') { map_dialog_change_page(w.parent.parent, 'computers', 0); }
+    dialog.user_data['buttons'] = [];
+    var i = 0;
+
+    // SINGLE PLAYER
+    dialog.user_data['buttons'].push('computers');
+    dialog.widgets['button'+i.toString()].show = true;
+    dialog.widgets['warning_text'+i.toString()].show = false;
+    dialog.widgets['button'+i.toString()].str = dialog.data['widgets']['button']['ui_name_computers'];
+    dialog.widgets['button'+i.toString()].tooltip.str = null;
+    dialog.widgets['button'+i.toString()].onclick = function(w) {
+        if(w.parent && w.parent.parent && w.parent.parent.user_data['dialog'] === 'map_dialog') {
+            if(w.parent.parent.user_data['chapter'] !== 'computers') { map_dialog_change_page(w.parent.parent, 'computers', 0); }
         } else {
             invoke_map_dialog('computers');
         }
     };
-    dialog.widgets['computers_button'].state = ((dialog.parent.user_data['dialog'] == 'map_dialog' && dialog.parent.user_data['chapter'] == 'computers') ? 'active' : 'normal');
+    dialog.widgets['button'+i.toString()].state = ((dialog.parent.user_data['dialog'] === 'map_dialog' && dialog.parent.user_data['chapter'] === 'computers') ? 'active' : 'normal');
+    i += 1;
 
     // RIVALS button
-    var pvp_pred = read_predicate({'predicate':'LIBRARY', 'name':'pvp_requirement'});
-    if(!pvp_pred.is_satisfied(player,null)) {
-        dialog.widgets['rivals_button'].show = true;
-        dialog.widgets['rivals_button'].state = 'disabled_clickable';
-        var ui_req = pvp_pred.ui_describe(player);
-        dialog.widgets['rivals_button'].tooltip.str = (ui_req ? gamedata['strings']['unmet_requirements'].replace('%s', ui_req) : null);
-        dialog.widgets['rivals_button'].tooltip.text_color = SPUI.error_text_color;
-        dialog.widgets['rivals_button'].onclick = get_requirements_help(pvp_pred);
-    } else {
-        dialog.widgets['rivals_button'].show = (player.is_legacy_pvp_player() || player.is_ladder_player());
-        if(dialog.widgets['rivals_button'].show) {
-            dialog.widgets['rivals_button'].state = (dialog.parent.user_data['dialog'] == 'map_ladder_pvp_dialog' || (dialog.parent.user_data['dialog'] == 'map_dialog' && dialog.parent.user_data['chapter'] == 'rivals') ? 'active' : 'normal');
-            dialog.widgets['rivals_button'].onclick = function(w) {
-                if(w.parent.parent.user_data['dialog'] == 'map_ladder_pvp_dialog') {
+    if(player.tutorial_state === "COMPLETE") {
+        var pvp_pred = read_predicate({'predicate':'LIBRARY', 'name':'pvp_requirement'});
+
+        if(!pvp_pred.is_satisfied(player,null)) {
+            dialog.user_data['buttons'].push('rivals');
+            dialog.widgets['button'+i.toString()].show = true;
+            dialog.widgets['button'+i.toString()].str = dialog.data['widgets']['button']['ui_name_rivals'];
+            dialog.widgets['warning_text'+i.toString()].show = false;
+            dialog.widgets['button'+i.toString()].state = 'disabled_clickable';
+            var ui_req = pvp_pred.ui_describe(player);
+            dialog.widgets['button'+i.toString()].tooltip.str = (ui_req ? dialog.data['widgets']['button']['ui_tooltip_unmet'].replace('%s', ui_req) : null);
+            dialog.widgets['button'+i.toString()].tooltip.text_color = SPUI.error_text_color;
+            dialog.widgets['button'+i.toString()].onclick = get_requirements_help(pvp_pred);
+            i += 1;
+        } else if(player.is_legacy_pvp_player() || player.is_ladder_player()) {
+            dialog.user_data['buttons'].push('rivals');
+            dialog.widgets['button'+i.toString()].show = true;
+            dialog.widgets['button'+i.toString()].str = dialog.data['widgets']['button']['ui_name_rivals'];
+            dialog.widgets['warning_text'+i.toString()].show = false;
+            dialog.widgets['button'+i.toString()].state = (dialog.parent.user_data['dialog'] === 'map_ladder_pvp_dialog' || (dialog.parent.user_data['dialog'] === 'map_dialog' && dialog.parent.user_data['chapter'] === 'rivals') ? 'active' : 'normal');
+            dialog.widgets['button'+i.toString()].onclick = function(w) {
+                if(w.parent.parent.user_data['dialog'] === 'map_ladder_pvp_dialog') {
                     return;
                 } else if(player.is_ladder_player()) {
                     invoke_map_ladder_pvp();
-                } else if(w.parent.parent.user_data['dialog'] != 'map_dialog') {
+                } else if(w.parent.parent.user_data['dialog'] !== 'map_dialog') {
                     invoke_map_dialog('rivals');
-                } else if(w.parent.parent.user_data['dialog']['chapter'] != 'rivals') {
+                } else if(w.parent.parent.user_data['dialog']['chapter'] !== 'rivals') {
                     map_dialog_change_page(w.parent.parent, 'rivals', 0);
                 }
             }
+            i += 1;
         }
     }
 
     // REGIONAL MAP button
-    dialog.widgets['quarries_button'].show = !!(player.get_any_abtest_value('enable_region_map', gamedata['enable_region_map']) && !dialog.widgets['rivals_button'].show);
-    if(dialog.widgets['quarries_button'].show) {
+    if(player.tutorial_state === "COMPLETE" &&
+       player.get_any_abtest_value('enable_region_map', gamedata['enable_region_map']) && !goog.array.contains(dialog.user_data['buttons'], 'rivals')) {
         var quarry_pred = read_predicate(player.get_any_abtest_value('quarry_play_requirement', gamedata['territory']['quarry_play_requirement']));
         var can_view_quarries = quarry_pred.is_satisfied(player, null);
 
-        dialog.widgets['quarries_button'].state = (dialog.parent.user_data['dialog'] == 'region_map_dialog' ? 'active' : (can_view_quarries ? 'normal' : 'disabled_clickable'));
-        if(dialog.parent.user_data['dialog'] == 'region_map_dialog') {
-            dialog.widgets['quarries_button'].onclick = null;
-            dialog.widgets['quarries_button'].tooltip.str = null;
-        } else if(can_view_quarries) {
-            dialog.widgets['quarries_button'].onclick = function() { invoke_region_map(); };
-            dialog.widgets['quarries_button'].tooltip.str = null;
-        } else {
-            dialog.widgets['quarries_button'].tooltip.text_color = SPUI.error_text_color;
-            dialog.widgets['quarries_button'].tooltip.str = gamedata['spells']['SHOW_REGIONAL_MAP']['ui_tooltip_unmet'].replace('%s', quarry_pred.ui_describe(player));
-            dialog.widgets['quarries_button'].onclick = get_requirements_help(quarry_pred);
-        }
-    }
+        dialog.user_data['buttons'].push('quarries');
+        dialog.widgets['button'+i.toString()].show = true;
+        dialog.widgets['button'+i.toString()].str = dialog.data['widgets']['button']['ui_name_quarries'];
+        dialog.widgets['warning_text'+i.toString()].show = false;
 
-    if(dialog.widgets['rivals_button'].show == dialog.widgets['quarries_button'].show) {
-        log_exception(null, 'quarries/rivals buttons not mutually exclusive! shown: '+dialog.widgets['rivals_button'].show.toString()+' legacy: '+player.is_legacy_pvp_player().toString()+' ladder: '+player.is_ladder_player().toString()+' map_enabled: '+session.region.map_enabled().toString());
+         dialog.widgets['button'+i.toString()].state = (dialog.parent.user_data['dialog'] === 'region_map_dialog' ? 'active' : (can_view_quarries ? 'normal' : 'disabled_clickable'));
+        if(dialog.parent.user_data['dialog'] === 'region_map_dialog') {
+            dialog.widgets['button'+i.toString()].onclick = null;
+            dialog.widgets['button'+i.toString()].tooltip.str = null;
+        } else if(can_view_quarries) {
+            dialog.widgets['button'+i.toString()].onclick = function() { invoke_region_map(); };
+            dialog.widgets['button'+i.toString()].tooltip.str = null;
+        } else {
+            dialog.widgets['button'+i.toString()].tooltip.text_color = SPUI.error_text_color;
+            dialog.widgets['button'+i.toString()].tooltip.str = gamedata['spells']['SHOW_REGIONAL_MAP']['ui_tooltip_unmet'].replace('%s', quarry_pred.ui_describe(player));
+            dialog.widgets['button'+i.toString()].onclick = get_requirements_help(quarry_pred);
+        }
+        i += 1;
     }
 
     // HITLIST button
-    if(('hitlist_show_if' in gamedata['predicate_library']) &&
+    if(player.tutorial_state === "COMPLETE" &&
+       ('hitlist_show_if' in gamedata['predicate_library']) &&
        read_predicate({'predicate':'LIBRARY', 'name':'hitlist_show_if'}).is_satisfied(player, null)) {
-        dialog.widgets['hitlist_button'].show = dialog.widgets['hitlist_warning_text'].show = true;
+        dialog.user_data['buttons'].push('hitlist');
+        dialog.widgets['button'+i.toString()].show = true;
+        dialog.widgets['button'+i.toString()].str = dialog.data['widgets']['button']['ui_name_hitlist'];
+        dialog.widgets['warning_text'+i.toString()].show = true;
+        dialog.widgets['warning_text'+i.toString()].str = dialog.data['widgets']['warning_text']['ui_name_limited_time'];
+
         var hitlist_pred = ('hitlist_requirement' in gamedata['predicate_library'] ? read_predicate({'predicate':'LIBRARY', 'name':'hitlist_requirement'}) : null);
         if(hitlist_pred && !hitlist_pred.is_satisfied(player,null)) {
-            dialog.widgets['hitlist_button'].state = 'disabled_clickable';
-            dialog.widgets['hitlist_button'].tooltip.text_color = SPUI.error_text_color;
-            dialog.widgets['hitlist_button'].tooltip.str = dialog.data['widgets']['hitlist_button']['ui_tooltip_unmet'].replace('%s', hitlist_pred.ui_describe(player));
-            dialog.widgets['hitlist_button'].onclick = get_requirements_help(hitlist_pred);
+            dialog.widgets['button'+i.toString()].state = 'disabled_clickable';
+            dialog.widgets['button'+i.toString()].tooltip.text_color = SPUI.error_text_color;
+            dialog.widgets['button'+i.toString()].tooltip.str = dialog.data['widgets']['button']['ui_tooltip_unmet'].replace('%s', hitlist_pred.ui_describe(player));
+            dialog.widgets['button'+i.toString()].onclick = get_requirements_help(hitlist_pred);
         } else {
-            dialog.widgets['hitlist_button'].state = ((dialog.parent.user_data['dialog'] == 'map_dialog' && dialog.parent.user_data['chapter'] == 'hitlist') ? 'active' : 'normal');
-            dialog.widgets['hitlist_button'].tooltip.text_color = SPUI.default_text_color;
-            dialog.widgets['hitlist_button'].tooltip.str = dialog.data['widgets']['hitlist_button']['ui_tooltip'];
-            dialog.widgets['hitlist_button'].onclick = function(w) {
-                if(w.parent && w.parent.parent && w.parent.parent.user_data['dialog'] == 'map_dialog') {
-                    if(w.parent.parent.user_data['chapter'] != 'hitlist') { map_dialog_change_page(w.parent.parent, 'hitlist', 0); }
+            dialog.widgets['button'+i.toString()].state = ((dialog.parent.user_data['dialog'] === 'map_dialog' && dialog.parent.user_data['chapter'] === 'hitlist') ? 'active' : 'normal');
+            dialog.widgets['button'+i.toString()].tooltip.text_color = SPUI.default_text_color;
+            dialog.widgets['button'+i.toString()].tooltip.str = dialog.data['widgets']['button']['ui_tooltip_hitlist'];
+            dialog.widgets['button'+i.toString()].onclick = function(w) {
+                if(w.parent && w.parent.parent && w.parent.parent.user_data['dialog'] === 'map_dialog') {
+                    if(w.parent.parent.user_data['chapter'] !== 'hitlist') { map_dialog_change_page(w.parent.parent, 'hitlist', 0); }
                 } else {
                     invoke_map_dialog('hitlist');
                 }
             };
         }
-    } else {
-        dialog.widgets['hitlist_button'].show = dialog.widgets['hitlist_warning_text'].show = false;
+        i += 1;
     }
 
-    // disable irrelevant buttons during tutorial
-    if(player.tutorial_state != "COMPLETE") {
-        dialog.widgets['hitlist_button'].state =
-            dialog.widgets['quarries_button'].state =
-            dialog.widgets['rivals_button'].state = 'disabled';
+    while(i < dialog.data['widgets']['button']['array'][0]) {
+        dialog.widgets['button'+i.toString()].show = dialog.widgets['warning_text'+i.toString()].show = false;
+        i += 1;
     }
 }
 
@@ -33824,12 +33868,18 @@ function invoke_map_dialog(force_page) {
     } else if(!page) {
         page = 'computers';
     }
-    if(!(((page||'')+'_button') in dialog.widgets['header_buttons'].widgets)) { throw Error('button not found for page '+(page ? page.toString() : 'null/undefined')); }
-    dialog.widgets['header_buttons'].widgets[page+'_button'].onclick(dialog.widgets['header_buttons'].widgets[page+'_button']);
-    if(force_page && dialog.user_data['chapter'] != force_page && dialog.widgets['header_buttons'].widgets[force_page+'_button'].show) {
-        dialog.widgets['header_buttons'].widgets[force_page+'_button'].onclick(dialog.widgets['header_buttons'].widgets[force_page+'_button']);
-    }
 
+    var click_it = function(name) {
+        var index = dialog.widgets['header_buttons'].user_data['buttons'].indexOf(name);
+        if(index < 0) { throw Error('button not found for '+(name ? name.toString() : 'null/undefined')); }
+        var w = dialog.widgets['header_buttons'].widgets['button'+index.toString()];
+        if(w.onclick) { w.onclick(w); }
+    }
+    click_it(page);
+    if(force_page && dialog.user_data['chapter'] !== force_page &&
+       goog.array.contains(dialog.widgets['header_buttons'].user_data['buttons'], force_page)) {
+        click_it(force_page);
+    }
 
     if(player.tutorial_state === 'open_map_dialog') { advance_tutorial(); }
 }

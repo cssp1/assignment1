@@ -3582,26 +3582,20 @@
         "dimensions": [482,58],
         "clip_children": 0, // since DISPLAY_MESSAGE windows on AI attack entries may be larger than this dialog
         "widgets": {
-            "hitlist_warning_text":  { "kind": "TextField", "xy": [0,9], "dimensions": [136,24], "text_size": 12, "text_style": "normal",
-                                       "text_color": [1,0.8,0.1,1], "text_hjustify": "center", "text_vjustify": "top",
-                                       "ui_name": "Limited time only", "show": 0 },
-            "hitlist_button": { "kind": "ActionButton", "xy": [0,26], "dimensions": [136,32], "text_size": 13, "text_style": "bold",
-                                "bg_image": "menu_button_136px", "state": "active", "ui_name": "Hit List",
-                                "ui_tooltip_unmet": "Unmet Requirements:\n%s",
-                                "ui_tooltip": "For a LIMITED TIME fight special enemies to win Valor Points", "tooltip_delay": 0,
-                                "show": 0 },
-
-            "computers_button": { "kind": "ActionButton", "xy": [144,26], "dimensions": [136,32], "text_size": 13, "text_style": "bold",
-                                  "bg_image": "menu_button_136px", "state": "active", "ui_name": "Single Player" },
-
-            "rivals_button": { "kind": "ActionButton", "xy": [288,26], "dimensions": [136,32], "text_size": 13, "text_style": "bold",
-                               "bg_image": "menu_button_136px", "state": "normal", "ui_name": "Multiplayer",
-                               "ui_tooltip": "", "tooltip_delay": 0 },
-
-            "quarries_button": { "kind": "ActionButton", "xy": [288,26], "dimensions": [136,32], "text_size": 13, "text_style": "bold",
-                                 "bg_image": "menu_button_136px", "state": "normal", "ui_name": "Multiplayer", "show": 0,
-                                 "ui_tooltip_unmet": "Unmet Requirements:\n%s",
-                                 "ui_tooltip": "", "tooltip_delay": 0 }
+            "warning_text":  { "kind": "TextField", "xy": [288,9], "dimensions": [136,24], "text_size": 12, "text_style": "normal",
+                               "text_color": [1,0.8,0.1,1], "text_hjustify": "center", "text_vjustify": "top",
+                               "ui_name_limited_time": "Limited time only",
+                               "show": 0, "array": [3,1], "array_offset": [-144,0] },
+            "button": { "kind": "ActionButton", "xy": [288,26], "dimensions": [136,32], "text_size": 13, "text_style": "bold",
+                        "bg_image": "menu_button_136px", "state": "active",
+                        "ui_name_computers": "Single Player",
+                        "ui_name_hitlist": "Hit List",
+                        "ui_name_rivals": "Multiplayer",
+                        "ui_name_quarries": "Multiplayer",
+                        "ui_tooltip": "", "tooltip_delay": 0,
+                        "ui_tooltip_unmet": "Unmet Requirements:\n%s",
+                        "ui_tooltip_hitlist": "For a LIMITED TIME fight special enemies to win Valor Points",
+                        "show": 0, "array": [3,1], "array_offset": [-144,0] }
         }
     },
 
