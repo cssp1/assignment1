@@ -260,7 +260,7 @@ def do_action(path, method, args, spin_token_data, nosql_client):
 
             if method == 'up':
                 res_list = [run_shell_command(['../scmtool.sh', 'force-revert']) or 'Revert OK',
-                            run_shell_command(['../scmtool.sh', 'up']) or 'Update OK',
+                            run_shell_command(['../scmtool.sh', 'up'], ignore_stderr = True) or 'Update OK',
                             run_shell_command(['../scmtool.sh', 'site-patch']) or 'Site-patch OK']
                 result = {'result': '\n'.join(res_list) }
             else:
