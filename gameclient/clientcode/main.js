@@ -33551,14 +33551,16 @@ function missions_dialog_select_mission(dialog, row) {
 
     var reward_res = {};
     var max_res = player.get_max_storage();
+    var ratio_ratio; // factor that applies ONLY to reward_x_ratio amounts
+    if('repeat_interval' in quest) {
+        ratio_ratio = player.get_any_abtest_value('daily_quest_reward_ratio', gamedata['daily_quest_reward_ratio']);
+    } else {
+        ratio_ratio = 1.0;
+    }
     for(var res in gamedata['resources']) {
         reward_res[res] = quest['reward_'+res]||0;
         if('reward_'+res+'_ratio' in quest) {
-            reward_res[res] += Math.floor(quest['reward_'+res+'_ratio']*max_res[res]);
-        }
-        if('repeat_interval' in quest) {
-            var ratio = player.get_any_abtest_value('daily_quest_reward_ratio', gamedata['daily_quest_reward_ratio']);
-            reward_res[res] = Math.floor(reward_res[res] * ratio);
+            reward_res[res] += Math.floor(ratio_ratio * quest['reward_'+res+'_ratio']*max_res[res]);
         }
         if('reward_'+res+'_amount' in dialog.widgets) {
             dialog.widgets['reward_'+res+'_amount'].str = pretty_print_number(reward_res[res]);
