@@ -107,6 +107,9 @@ def battles_risk_reward_summary_combined_schema(sql_util, interval_name): return
                ('loot_iron_water_amount_10th', 'INT8'), # iron + water only, 10th percentile
                ('loot_iron_water_amount_90th', 'INT8'), # iron + water only, 90th percentile
                ('damage_res_value', 'INT8'),
+               ('damage_iron_water_amount', 'INT8'), # iron + water only
+               ('damage_iron_water_amount_10th', 'INT8'), # iron + water only, 10th percentile
+               ('damage_iron_water_amount_90th', 'INT8'), # iron + water only, 90th percentile
                ('damage_time_value', 'INT8'),
                ('total_risk', 'INT8'),
                ('total_reward', 'INT8'),
