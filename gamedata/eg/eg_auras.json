@@ -181,6 +181,16 @@
         // SET_ALIAS spell checks for the presence of this aura
     },
 
+    "region_banished": {
+        "name": "region_banished",
+        "icon": "inventory_unknown",
+        "client": 0, "server": 0, "show": 0,
+        "harm": 1, "cancelable": 0,
+        "ui_name": "Banished from Map(s)",
+        "ui_description": "You have been banished from certain map regions."
+        // effects happen via AURA_(IN)ACTIVE predicates
+    },
+
     // these are only applied during AI base visits or attacks, triggered by the consequents generated in make_ai_skeleton.py
     "ai_base_first_time_loot_bonus": {
         "name": "ai_base_first_time_loot_bonus",

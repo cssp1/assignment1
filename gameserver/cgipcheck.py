@@ -116,7 +116,7 @@ def get_regions(gamedata):
     ret = []
     for key, val in gamedata['regions'].iteritems():
         # skip obsolete regions - these tend to have auto_join off plus a "requires" predicate
-        if not (val.get('auto_join',1) or ('requires' not in val)): continue
+        if not (val.get('auto_join',1) or ('requires' not in val) or val['requires']['predicate'] == 'AURA_INACTIVE'): continue
         val = copy.copy(val)
         val['name'] = key
         ret.append(val)

@@ -454,12 +454,17 @@ if __name__ == '__main__':
             print fmt % ('GAGGED - player cannot talk in chat (permanently - user.chat_gagged)', '')
 
         for aura in player.get('player_auras',[]):
+            if aura.get('end_time',-1) > 0:
+                if aura['end_time'] > time_now:
+                    ui_duration = 'For %.1f hrs' % ((aura['end_time'] - time_now)/3600.0)
+                else: continue # aura expired
+            else:
+                ui_duration = 'Permanently'
+
             if aura['spec'] == 'chat_gagged':
-                if aura.get('end_time',-1) > 0:
-                    if aura['end_time'] > time_now:
-                        print fmt % ('GAGGED - player cannot talk in chat for:', '%.1f hrs' % ((aura['end_time'] - time_now)/3600.0))
-                else:
-                    print fmt % ('GAGGED - player cannot talk in chat (permanently - chat_gagged aura)', '')
+                print fmt % ('GAGGED (by chat_gagged aura) - player cannot talk in chat:', ui_duration)
+            elif aura['spec'] == 'region_banished' and ('tag' in aura.get('data',{})):
+                print fmt % ('Banished from regions with "%s" tag:' % aura['data']['tag'], ui_duration)
 
         if user.get('chat_mod',0):
             print fmt % ('Player is a chat moderator', '')

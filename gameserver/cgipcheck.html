@@ -230,17 +230,39 @@ var method_clear_cooldown = function() {
 };
 var method_remove_aura = function(aura_name) {
     var ident = get_ident();
-    var ui_reason = check_ui_reason($("#chat_reason")[0].value);
-    if(ident && aura_name && ui_reason) {
-        send_request('player', 'remove_aura', $.extend(ident, {'aura_name':aura_name, 'ui_reason':ui_reason}), function(result) { alert("Success!"); });
+    if(ident && aura_name) {
+        send_request('player', 'remove_aura', $.extend(ident, {'aura_name':aura_name}), function(result) { alert("Success!"); });
     }
+};
+var has_anti_alt_regions = function() {
+    for(var i = 0; i < spin_regions.length; i++) {
+        var region = spin_regions[i];
+        if(('tags' in region) && region['tags'].indexOf('anti_alt') >= 0) {
+            return true;
+        }
+    }
+    return false;
 };
 var method_change_region = function() {
     var ident = get_ident();
     var new_region = $("#change_region_destination")[0].value;
     var ui_reason = check_ui_reason($("#change_region_reason")[0].value);
+    var banish_duration = (has_anti_alt_regions() && $("#change_region_do_banish")[0].checked) ? ($("#region_banish_duration").spinner("value") * 3600) : 0;
+
+    var on_complete = function(result) {
+        alert("Success! Remember to send the player a message explaining what happened!");
+    };
+
     if(ident && new_region && ui_reason) {
-        send_request('player', 'change_region', $.extend(ident, {'new_region':new_region, 'ui_reason':ui_reason}), function(result) { alert("Success! Remember to send the player a message explaining what happened!"); });
+        send_request('player', 'change_region', $.extend(ident, {'new_region':new_region, 'ui_reason':ui_reason}),
+                     (function (_ident, _on_complete, _banish_duration) { return function(result) {
+                         if(_banish_duration === 0) {
+                             _on_complete(result);
+                         } else {
+                             send_request('player', 'apply_aura', $.extend(_ident, {'aura_name':'region_banished','data':JSON.stringify({'tag':'anti_alt'})}),
+                                          _on_complete);
+                         }
+                     }; })(ident, on_complete, banish_duration));
     }
 };
 var method_give_item = function() {
@@ -1282,6 +1304,12 @@ $(function() {
     $('#chat_block_other_id').spinner({min:0, step:1});
     $('#ignore_alt_other_id').spinner({min:0, step:1});
     $('#clear_alias_duration').spinner({max:999999, min:0, step:1});
+    if(has_anti_alt_regions()) {
+        $('#region_banish_duration').spinner({max:999999, min:1, step:1});
+    } else {
+        $('#change_region_banishment_controls').remove();
+    }
+
     $('#gamebucks_amount').spinner({max:50000, min:0, step:100});
     $('#item_to_give_qty').spinner({max:50, min:1, step:1});
     spin_giveable_items.forEach(function(entry) {
@@ -1433,8 +1461,13 @@ $(function() {
       Force player to move to region:
       <p>
       <select id="change_region_destination" name="change_region_destination" class="spin_select"></select>
-      <p>
       <button onclick="method_change_region()" class="spin_button">Apply</button>
+      <span id="change_region_banishment_controls">
+        <p>
+        <input id="change_region_do_banish" type="checkbox" checked="1" style="height:initial;"></input>Also banish from anti-alt regions for:
+        <input type="text" id="region_banish_duration" name="region_banish_duration" value="720" style="width:100px"> Hours
+        <button onclick="method_remove_aura('region_banished')" class="spin_button" style="width:180px;">Undo Banishment</button>
+      </span>
       <p>
       Reason for this action:
       <br>
@@ -1460,7 +1493,7 @@ $(function() {
       <input type="text" id="ban_reason" style="width:500px;">
     </div>
     <div id="player_tools_developer">
-      &quot;Developer Flag&quot; enables developer-only features and excludes this player from analytics.<br>
+      &quot;Developer Flag&quot; enables developer-only features and excludes this player from analytics.<p>
       <button onclick="method_make_developer()" class="spin_button" style="width:200px;">Developer Flag ON</button>
       <button onclick="method_unmake_developer()" class="spin_button" style="width:200px;">Developer Flag OFF</button><p>
       <button onclick="method_chat_official()" class="spin_button" style="width:200px;">Blue Chat Text ON</button>
