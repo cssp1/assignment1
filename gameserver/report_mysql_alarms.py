@@ -20,9 +20,9 @@ def get_issues(data):
     issues = []
     if data['hau'] > 10:
         hau = float(data['hau']) # denominator for per-HAU metrics
-        if float(data['cdn_fails'])/hau >= 0.2:
+        if data['cdn_fails'] and float(data['cdn_fails'])/hau >= 0.2:
             issues.append('CDN Issues per HAU >= 0.2')
-        if float(data['browser_fails'])/hau >= 0.2:
+        if data['browser_fails'] and float(data['browser_fails'])/hau >= 0.2:
             issues.append('Browser Issues per HAU >= 0.2')
         if data['fb_notifications_sent_24h'] > 5000: # alert only on 5k+/day notifications
             ctr = float(data['fb_notifications_clicked_24h'])/float(data['fb_notifications_sent_24h'])
