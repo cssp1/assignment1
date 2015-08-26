@@ -310,10 +310,15 @@ class AuraActivePredicate(Predicate):
         Predicate.__init__(self, data)
         self.aura_name = data['aura_name']
         self.min_stack = data.get('min_stack',1)
+        self.match_data = data.get('match_data', None)
     def is_satisfied(self, player, qdata):
         player.prune_player_auras()
         for aura in player.player_auras:
             if aura['spec'] == self.aura_name and aura.get('stack',1) >= self.min_stack:
+                if self.match_data is not None:
+                    for k, v in self.match_data.iteritems():
+                        if aura.get('data',{}).get(k, None) != v:
+                            return False
                 return True
         return False
 class AuraInactivePredicate(Predicate):

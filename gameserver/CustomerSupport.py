@@ -284,8 +284,15 @@ class HandleRemoveAura(Handler):
         return ReturnValue(result = 'ok')
 
 class HandleApplyAura(Handler):
+    def __init__(self, *args, **kwargs):
+        Handler.__init__(self, *args, **kwargs)
+        if 'data' in self.args:
+            self.aura_data = SpinJSON.loads(self.args['data'])
+            assert isinstance(self.aura_data, dict)
+        else:
+            self.aura_data = None
     def do_exec_online(self, session, retmsg):
-        session.player.apply_aura(self.args['aura_name'], duration = int(self.args.get('duration','-1')), ignore_limit = True)
+        session.player.apply_aura(self.args['aura_name'], duration = int(self.args.get('duration','-1')), ignore_limit = True, data = self.aura_data)
         session.player.stattab.send_update(session, retmsg) # also sends PLAYER_AURAS_UPDATE
         return ReturnValue(result = 'ok')
     def do_exec_offline(self, user, player):
@@ -299,13 +306,18 @@ class HandleApplyAura(Handler):
                     duration = int(self.args['duration'])
                     assert duration > 0 # can't handle infinite durations
                     aura['end_time'] = max(aura.get('end_time',-1), self.time_now + duration)
+                # overwrite data
+                if self.aura_data is None and 'data' in aura: del aura['data']
+                if self.aura_data is not None: aura['data'] = self.aura_data
                 break
         if not found:
-            aura = {'spec': self.args['aura_name']}
+            aura = {'spec': self.args['aura_name'], 'start_time': self.time_now}
             if 'duration' in self.args:
                 duration = int(self.args['duration'])
                 assert duration > 0 # can't handle infinite durations
                 aura['end_time'] = self.time_now + duration
+            if self.aura_data is not None:
+                aura['data'] = self.aura_data
             player['player_auras'].append(aura)
         return ReturnValue(result = 'ok')
 

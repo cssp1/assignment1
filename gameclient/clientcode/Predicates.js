@@ -696,6 +696,7 @@ function AuraActivePredicate(data) {
     goog.base(this, data);
     this.aura_name = data['aura_name'];
     this.min_stack = data['min_stack'] || 1;
+    this.match_data = data['match_data'] || null;
 }
 goog.inherits(AuraActivePredicate, Predicate);
 AuraActivePredicate.prototype.is_satisfied = function(player, qdata) {
@@ -703,6 +704,14 @@ AuraActivePredicate.prototype.is_satisfied = function(player, qdata) {
         var aura = player.player_auras[i];
         if(aura['spec'] == this.aura_name && ((aura['stack']||1) >= this.min_stack)) {
             if(('end_time' in aura) && (aura['end_time'] > 0) && (aura['end_time'] < server_time)) { continue; }
+            if(this.match_data !== null) {
+                var theirs = aura['data'] || null;
+                for(var k in this.match_data) {
+                    if(!theirs || theirs[k] !== this.match_data[k]) {
+                        return false;
+                    }
+                }
+            }
             return true;
         }
     }
