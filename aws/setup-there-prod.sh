@@ -12,7 +12,7 @@ YUMPACKAGES+=" postgresql postgresql-devel python-psycopg2" # note: Postgres cli
 YUMPACKAGES+=" mongodb-org-shell mongodb-org-tools" # note: client only
 YUMPACKAGES+=" java-1.8.0-openjdk-headless" # Google Closure Compiler now requires at least Java 7
 YUMPACKAGES+=" python27-devel python27-pip"
-YUMPACKAGES+=" python27-boto python27-imaging python27-imaging-devel python27-numpy python27-pyOpenSSL python27-simplejson python27-twisted"
+YUMPACKAGES+=" python27-boto python27-imaging python27-imaging-devel python27-numpy python27-simplejson"
 
 echo "SETUP(remote): Installing additional packages..."
 sudo yum -y -q install $YUMPACKAGES
