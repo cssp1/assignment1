@@ -24916,6 +24916,8 @@ class GAMEAPI(resource.Resource):
                                                        'expire_time': server_time + gamedata['server']['message_expire_time']['resource_gift'],
                                                        'from_pcache': self.get_player_cache_props(session.user, session.player),
                                                        'unique_per_sender': 'resource_gift'}])
+                    if self.do_receive_mail(session, retmsg)['new_mail']:
+                        session.player.send_mailbox_update(retmsg)
 
             elif spellname == "CHEAT_GIVE_ITEMS":
                 if not session.player.is_cheater:

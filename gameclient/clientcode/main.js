@@ -21830,24 +21830,6 @@ function mail_dialog_select_mail(dialog, row) {
             dialog.widgets['attach_label3'].show =
             dialog.widgets['attach_scroll_left'].show =
             dialog.widgets['attach_scroll_right'].show = true;
-        /*
-        if(mail['pending']) {
-            dialog.widgets['attach_take'].str = dialog.widgets['attach_take'].data['ui_name_pending'];
-            dialog.widgets['attach_take'].state = 'disabled';
-        } else {
-            dialog.widgets['attach_take'].str = dialog.widgets['attach_take'].data['ui_name'];
-            dialog.widgets['attach_take'].state = 'normal';
-        }
-        dialog.widgets['attach_take'].show = true;
-        dialog.widgets['attach_take'].onclick = (function (_mail) { return function(w) {
-            if(!_mail['pending']) {
-                _mail['pending'] = 1;
-                w.state = 'disabled';
-                w.str = w.data['ui_name_pending'];
-                send_to_server.func(["MAIL_TAKE_ATTACHMENTS", _mail['msg_id'], -1, null, null]);
-            }
-        }; })(mail);
-        */
         mail_dialog_attach_scroll(dialog, 0);
     } else if('attachments_ghost' in mail) {
         for(var i = 0; i < mail['attachments_ghost'].length; i++) {
@@ -21907,10 +21889,10 @@ function mail_dialog_attach_scroll(dialog, page) {
             }
 
             dialog.widgets['attach_frame'+row.toString()].show = true;
-            dialog.widgets['attach_frame'+row.toString()].state = (mail['pending'] ? 'cooldown' : 'normal');
+            dialog.widgets['attach_frame'+row.toString()].state = (mail['pending'] && !synchronizer.is_in_sync(mail['pending']) ? 'cooldown' : 'normal');
             dialog.widgets['attach_frame'+row.toString()].bg_image_offset = [0,0];
             dialog.widgets['attach_frame'+row.toString()].onenter = (function (_mail, _row, _slot, _item) { return function (w) {
-                w.state = (_mail['pending'] ? 'cooldown' : 'active');
+                w.state = (_mail['pending'] && !synchronizer.is_in_sync(_mail['pending']) ? 'cooldown' : 'active');
                 var stickout = [0,-1];
                 w.bg_image_offset = stickout;
                 w.parent.widgets['attach_icon'+_row.toString()].bg_image_offset = stickout;
@@ -21918,8 +21900,8 @@ function mail_dialog_attach_scroll(dialog, page) {
                 mail_dialog_invoke_context(w.parent, _slot, _item);
             }; })(mail, row, i, at);
             dialog.widgets['attach_frame'+row.toString()].onclick = (function (_mail, _row, _slot, _item) { return function (w) {
-                if(!_mail['pending']) {
-                    _mail['pending'] = 1;
+                if(!(_mail['pending'] && !synchronizer.is_in_sync(_mail['pending']))) {
+                    _mail['pending'] = synchronizer.request_sync();
                     for(var j = 0; j < w.parent.data['widgets']['attach_icon']['array'][0]; j++) {
                         if(w.parent.widgets['attach_frame'+j.toString()].show) {
                             w.parent.widgets['attach_frame'+j.toString()].state = 'cooldown';
@@ -21935,7 +21917,7 @@ function mail_dialog_attach_scroll(dialog, page) {
                    inv_dialog.user_data['context'].user_data['slot'] === _slot &&
                    inv_dialog.user_data['context'].user_data['item'] === _item) {
                     mail_dialog_invoke_context(w.parent, -1, null);
-                    w.state = (_mail['pending'] ? 'cooldown' : 'normal');
+                    w.state = (_mail['pending'] && !synchronizer.is_in_sync(_mail['pending']) ? 'cooldown' : 'normal');
                     var stickout = [0,0];
                     w.bg_image_offset = stickout;
                     w.parent.widgets['attach_icon'+_row.toString()].bg_image_offset = stickout;
@@ -43676,7 +43658,19 @@ function handle_server_message(data) {
                 // IGNORE this update - we have a MAIL_DELETE in flight
                 return;
             }
+
+            var old_mailbox = player.mailbox;
             player.mailbox = data[2];
+            // carry over any in-flight pending flags
+            goog.array.forEach(old_mailbox, function(old_mail) {
+                if(old_mail['pending'] && !synchronizer.is_in_sync(old_mail['pending'])) {
+                    var new_mail = goog.array.find(player.mailbox, function(new_mail) { return new_mail['msg_id'] === old_mail['msg_id']; });
+                    if(new_mail) {
+                        new_mail['pending'] = old_mail['pending'];
+                    }
+                }
+            });
+
             if(selection.ui && selection.ui.user_data && selection.ui.user_data['dialog'] === 'mail_dialog') {
                 update_mail_dialog(selection.ui, false);
             }
@@ -43687,7 +43681,14 @@ function handle_server_message(data) {
         for(var i = 0; i < player.mailbox.length; i++) {
             var mail = player.mailbox[i];
             if(mail['msg_id'] === msg_id) {
-                if('pending' in mail) { delete mail['pending']; }
+                if('pending' in mail) {
+                    if(synchronizer.is_in_sync(mail['pending'])) {
+                        // clear pending flag
+                        delete mail['pending'];
+                    } else {
+                        continue; // do NOT apply the update, further updates are incoming for this mail
+                    }
+                }
                 if(newmail) {
                     player.mailbox[i] = newmail;
                 }
