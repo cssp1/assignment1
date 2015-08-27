@@ -43686,6 +43686,9 @@ function handle_server_message(data) {
             for(var i = 0; i < player.mailbox.length; i++) {
                 var mail = player.mailbox[i];
                 if(mail['msg_id'] === msg_id) {
+                    if(mail['pending'] && !synchronizer.is_in_sync(mail['pending'])) { // do NOT apply the update, further updates are incoming for this mail
+                        continue;
+                    }
                     player.mailbox[i] = data[2];
                     break;
                 }
@@ -43708,11 +43711,12 @@ function handle_server_message(data) {
                     }
                 }
             });
-
-            if(selection.ui && selection.ui.user_data && selection.ui.user_data['dialog'] === 'mail_dialog') {
-                update_mail_dialog(selection.ui, false);
-            }
         }
+
+        if(selection.ui && selection.ui.user_data && selection.ui.user_data['dialog'] === 'mail_dialog') {
+            update_mail_dialog(selection.ui, false);
+        }
+
         player.invalidate_quest_cache();
     } else if(msg == "MAIL_TAKE_ATTACHMENTS_RESULT") {
         var msg_id = data[1], slot = data[2], success = data[3], fungible = data[4], newmail = data[5];
