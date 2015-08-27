@@ -8692,7 +8692,7 @@ class Player(AbstractPlayer):
             trophy_filter = None
 
         if townhall_range:
-            gamesite.db_client.player_cache_ensure_index(gamedata['townhall']+'_level') # make sure there's an index
+            gamesite.db_client.player_cache_create_index(gamedata['townhall']+'_level') # make sure there's an index
             mycount = self.get_townhall_level_fast()
             townhall_filter = [gamedata['townhall']+'_level', max(1, mycount - townhall_range[0]), max(1, mycount + townhall_range[1])]
 
@@ -8736,7 +8736,7 @@ class Player(AbstractPlayer):
             level_range[0] = max(level_range[0], self.level() - gamedata['matchmaking']['ladder_match_down_levels'])
 
         if level_range[0] > 0 or level_range[1] < 9999:
-            gamesite.db_client.player_cache_ensure_index('player_level') # make sure there's an index
+            gamesite.db_client.player_cache_create_index('player_level') # make sure there's an index
             query.append(['player_level', level_range[0], level_range[1]])
 
         if gamedata.get('pvp_repair_on_victory', False) and gamedata.get('pvp_repair_on_defeat', False):
