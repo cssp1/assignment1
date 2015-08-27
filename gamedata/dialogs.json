@@ -31,9 +31,9 @@
             "description": { "kind": "TextField", "xy": [108,43], "dimensions": [300,34], "text_hjustify": "left",  "text_size": 13, "text_leading": 15,
                              "text_vjustify": "top", "ui_name": "DESCRIPTION" },
             "cancel_button": { "kind": "ActionButton", "xy": [166,110], "dimensions": [134,28], "show": 0, // off by default
-                               "bg_image": "menu_button_134px", "text_color": [0,0,0,1], "text_size": 13, "text_style": "bold", "ui_name": "Cancel" },
+                               "bg_image": "menu_button_134px", "text_size": 13, "text_style": "bold", "ui_name": "Cancel" },
             "ok_button": { "kind": "ActionButton", "xy": [308,110], "dimensions": [134,28],
-                           "bg_image": "action_button_134px", "text_color": [0,0,0,1], "text_size": 13, "text_style": "bold", "ui_name": "OK" }
+                           "bg_image": "action_button_134px", "text_size": 13, "text_style": "bold", "ui_name": "OK" }
         }
     },
 
@@ -66,10 +66,10 @@
                              },
 
             "cancel_button": { "kind": "ActionButton", "xy": [200,336], "dimensions": [134,28], "show": 0, // off by default
-                               "bg_image": "menu_button_134px", "text_color": [0,0,0,1], "text_size": 13, "text_style": "bold", "ui_name": "Cancel" },
+                               "bg_image": "menu_button_134px", "text_size": 13, "text_style": "bold", "ui_name": "Cancel" },
 
             "ok_button": { "kind": "ActionButton", "xy": [342,336], "dimensions": [134,28], "text_size": 13, "text_style": "bold",
-                           "bg_image": "action_button_134px", "text_color": [0,0,0,1], "ui_name": "Understood", "ui_tooltip": "", "tooltip_delay": 0 }
+                           "bg_image": "action_button_134px", "ui_name": "Understood", "ui_tooltip": "", "tooltip_delay": 0 }
         }
     },
 
@@ -94,7 +94,7 @@
             "description": { "kind": "TextField", "xy": [182,69], "dimensions": [277, 25], "text_size": 13, "text_style": "normal",
                              "text_hjustify": "left", "text_vjustify": "top", "ui_name": "" },
             "ok_button": { "kind": "ActionButton", "xy": [342,296], "dimensions": [134,28], "text_size": 13, "text_style": "bold",
-                           "bg_image": "action_button_134px", "text_color": [0,0,0,1], "ui_name": "Understood" },
+                           "bg_image": "action_button_134px", "ui_name": "Understood" },
             "ignore_button": { "kind": "ActionButton", "xy": [175,297], "dimensions": [150,26], "bg_image_offset": [0,4], "push_text": 0,
                                "bg_image": "checkbox_button", "text_color": [0.5,0.5,0.5,1], "text_size": 13,
                                "ui_name": "Don't show again",
@@ -115,7 +115,7 @@
             "img": {"kind":"StaticImage","xy":[15,17],"dimensions":[576,330],"asset":"you_got_bonus_units"},
             "close_button": { "show": 0, "kind": "ActionButton", "xy": [572,1], "dimensions": [19,22], "bg_image": "close_button_small" },
             "ok_button": { "kind": "ActionButton", "xy": [458,360], "dimensions": [134,28], "text_size": 13, "text_style": "bold",
-                           "bg_image": "action_button_134px", "text_color": [0,0,0,1], "ui_name": "Understood" }
+                           "bg_image": "action_button_134px", "ui_name": "Understood" }
         }
     },
 
@@ -157,10 +157,10 @@
                              "text_hjustify": "left", "text_vjustify": "top", "ui_name": "" },
 
             "ok_button": { "kind": "ActionButton", "xy": [198,296], "dimensions": [134,28], "text_size": 13, "text_style": "bold", "show": 0,
-                           "bg_image": "action_button_134px", "text_color": [0,0,0,1], "ui_name": "Show Me" },
+                           "bg_image": "action_button_134px", "ui_name": "Show Me" },
 
             "close_button": { "kind": "ActionButton", "xy": [340,296], "dimensions": [134,28], "text_size": 13, "text_style": "bold",
-                              "bg_image": "menu_button_134px", "text_color": [0,0,0,1], "ui_name": "Dismiss" }
+                              "bg_image": "menu_button_134px", "ui_name": "Dismiss" }
         }
     },
 
@@ -178,7 +178,7 @@
                            },
             "alloy_icon": {"kind": "ActionButton", "xy":[270,110], "dimensions":[28,28], "bg_image": "alloy_icon_med", "push_bg_image": 1 },
             "ok_button": { "kind": "ActionButton", "xy": [308,110], "dimensions": [134,28],
-                           "bg_image": "action_button_134px", "text_color": [0,0,0,1], "text_size": 13, "text_style": "bold", "ui_name": "Add %s" }
+                           "bg_image": "action_button_134px", "text_size": 13, "text_style": "bold", "ui_name": "Add %s" }
         }
     },
 
@@ -198,7 +198,7 @@
                              "ui_name_fishing": "Are you sure you want to cancel this dispatch?\nCanceling this dispatch discards its progress."
                            },
             "ok_button": { "kind": "ActionButton", "xy": [308,110], "dimensions": [134,28],
-                           "bg_image": "action_button_134px", "text_color": [0,0,0,1], "text_size": 13, "text_style": "bold",
+                           "bg_image": "action_button_134px", "text_size": 13, "text_style": "bold",
                            "ui_name_upgrade": "Cancel Upgrade",
                            "ui_name_research": "Cancel Research",
                            "ui_name_crafting": "Cancel Work",
@@ -237,7 +237,7 @@
             "price_display": { "kind": "ActionButton", "xy": [190,108], "dimensions": [120,32], "text_offset": [8,1], "text_size": 13, "text_style": "thick",
                                "bg_image": "price_display", "ui_name": "%d", "ui_tooltip": "", "tooltip_delay": 0 }, // PRICE
             "ok_button": { "kind": "ActionButton", "xy": [308,110], "dimensions": [134,28], "text_offset": [0,1],
-                           "bg_image": "action_button_134px", "state": "bigaction", "text_color": [0,0,0,1], "text_size": 13,
+                           "bg_image": "action_button_134px", "state": "bigaction", "text_size": 13,
                            "text_style": "bold", "ui_name": "Finish Now", "ui_name_pending": "Processing...", "ui_tooltip": "", "tooltip_delay": 0 }
         }
     },
@@ -263,7 +263,7 @@
             "price_display": { "kind": "ActionButton", "xy": [190,128], "dimensions": [120,32], "text_offset": [8,1], "text_size": 13, "text_style": "thick",
                                "bg_image": "price_display", "ui_name": "%d", "ui_tooltip": "", "tooltip_delay": 0 }, // PRICE
             "ok_button": { "kind": "ActionButton", "xy": [308,130], "dimensions": [134,28], "text_offset": [0,1],
-                           "bg_image": "action_button_134px", "state": "bigaction", "text_color": [0,0,0,1], "text_size": 13,
+                           "bg_image": "action_button_134px", "state": "bigaction", "text_size": 13,
                            "text_style": "bold", "ui_name": "Relocate", "ui_name_pending": "Processing...", "ui_tooltip": "", "tooltip_delay": 0 }
         }
     },
@@ -280,7 +280,7 @@
                              "ui_name": "If you attack this player, your own base will\nbecome vulnerable to attack!" },
 
             "yes_button": { "kind": "ActionButton", "xy": [144,106], "dimensions": [134,28], "text_size": 13, "text_style": "bold",
-                            "bg_image": "action_button_134px", "text_color": [0,0,0,1], "ui_name": "Attack" },
+                            "bg_image": "action_button_134px", "ui_name": "Attack" },
             "no_button": { "kind": "ActionButton", "xy": [287,106], "dimensions": [134,28],  "text_size": 13, "text_style": "bold",
                            "bg_image": "menu_button_134px", "ui_name": "Cancel" }
         }
@@ -297,7 +297,7 @@
                              "ui_name": "I thought %s was your friend!" },
 
             "yes_button": { "kind": "ActionButton", "xy": [144,106], "dimensions": [134,28], "text_size": 13, "text_style": "bold",
-                            "bg_image": "action_button_134px", "text_color": [0,0,0,1], "ui_name": "Attack" },
+                            "bg_image": "action_button_134px", "ui_name": "Attack" },
             "no_button": { "kind": "ActionButton", "xy": [287,106], "dimensions": [134,28],  "text_size": 13, "text_style": "bold",
                            "bg_image": "menu_button_134px", "ui_name": "Cancel" }
         }
@@ -314,7 +314,7 @@
                              "ui_name": "Units deployed to this quarry cannot be repaired\nor return home." },
 
             "yes_button": { "kind": "ActionButton", "xy": [144,106], "dimensions": [134,28], "text_size": 13, "text_style": "bold",
-                            "bg_image": "action_button_134px", "text_color": [0,0,0,1], "ui_name": "Proceed" },
+                            "bg_image": "action_button_134px", "ui_name": "Proceed" },
             "no_button": { "kind": "ActionButton", "xy": [287,106], "dimensions": [134,28],  "text_size": 13, "text_style": "bold",
                            "bg_image": "menu_button_134px", "ui_name": "Cancel" }
         }
@@ -336,10 +336,10 @@
                              "text_hjustify": "left", "text_vjustify": "top", "ui_name": "You are allowed ONE attack against this\nlower-level player because they attacked you\nrecently.\n\nAfter this battle, revenge will be disabled unless\nthey attack you again." },
 
             "no_button": { "kind": "ActionButton", "xy": [200,296], "dimensions": [134,28],
-                           "bg_image": "menu_button_134px", "text_color": [0,0,0,1], "text_size": 13, "text_style": "bold", "ui_name": "Cancel" },
+                           "bg_image": "menu_button_134px", "text_size": 13, "text_style": "bold", "ui_name": "Cancel" },
 
             "yes_button": { "kind": "ActionButton", "xy": [342,296], "dimensions": [134,28], "text_size": 13, "text_style": "bold",
-                            "bg_image": "action_button_134px", "text_color": [0,0,0,1], "ui_name": "Proceed" }
+                            "bg_image": "action_button_134px", "ui_name": "Proceed" }
         }
     },
 
@@ -354,7 +354,7 @@
                              "ui_name": "This powerful base is restricted from attacking you.\nIf you attack now, %s can retaliate!" },
 
             "yes_button": { "kind": "ActionButton", "xy": [144,106], "dimensions": [134,28], "text_size": 13, "text_style": "bold",
-                            "bg_image": "action_button_134px", "text_color": [0,0,0,1], "ui_name": "Attack" },
+                            "bg_image": "action_button_134px", "ui_name": "Attack" },
             "no_button": { "kind": "ActionButton", "xy": [287,106], "dimensions": [134,28],  "text_size": 13, "text_style": "bold",
                            "bg_image": "menu_button_134px", "ui_name": "Cancel" }
         }
@@ -385,7 +385,7 @@
             "description": { "kind": "TextField", "xy": [108,43], "dimensions": [275,34], "text_hjustify": "left",  "text_size": 13, "text_leading": 15,
                              "text_vjustify": "top", "ui_name": "You've been playing for %s today. Maybe a break is in order?" },
             "ok_button": { "kind": "ActionButton", "xy": [308,110], "dimensions": [134,28],
-                           "bg_image": "action_button_134px", "text_color": [0,0,0,1], "text_size": 13, "text_style": "bold", "ui_name": "Keep Playing" }
+                           "bg_image": "action_button_134px", "text_size": 13, "text_style": "bold", "ui_name": "Keep Playing" }
         }
     },
 
@@ -401,7 +401,7 @@
             "title":  { "kind": "TextField", "xy": [0,8], "dimensions": [152, 17], "text_style": "bold", "text_size": 13, "ui_name": "Title" },
             "level":  { "kind": "TextField", "xy": [0,24], "dimensions": [152, 17], "text_style": "normal", "text_size": 13, "ui_name": "Level %d0 of %d1" },
             "button": { "kind": "ActionButton", "xy": [9,47], "dimensions": [134,28], "text_offset": [0,1], "ui_tooltip": "", "tooltip_delay": 0,
-                        "bg_image": "action_button_resizable", "bg_image_resizable": 1, "text_color": [0,0,0,1], "text_size": 13, "text_style": "bold",
+                        "bg_image": "action_button_resizable", "bg_image_resizable": 1, "text_size": 13, "text_style": "bold",
                         // note: these buttons are created dynamically in JavaScript
                         "array": [1,0], "array_offset": [0,36] }
         }
@@ -419,14 +419,14 @@
             "head_title":  { "kind": "TextField", "xy": [0,8], "dimensions": [172, 17], "text_style": "bold", "text_size": 13, "ui_name_empty": "No Weapon" },
             "head_level":  { "kind": "TextField", "xy": [0,24], "dimensions": [172, 17], "text_style": "normal", "text_size": 13, "ui_name": "Level %d0 of %d1" },
             "head_button": { "kind": "ActionButton", "xy": [9,47], "dimensions": [154,28], "text_offset": [0,1], "ui_tooltip": "", "tooltip_delay": 0,
-                             "bg_image": "action_button_resizable", "bg_image_resizable": 1, "text_color": [0,0,0,1], "text_size": 13, "text_style": "bold",
+                             "bg_image": "action_button_resizable", "bg_image_resizable": 1, "text_size": 13, "text_style": "bold",
                              "array": [1,2], "array_offset": [0,36] },
             "separator": {"kind": "Line", "xy": [29,121], "dimensions": [114,0], "color":  [1,1,1,0.5], "stroke_width": 2 },
 
             "title":  { "kind": "TextField", "xy": [0,126], "dimensions": [172, 17], "text_style": "bold", "text_size": 13, "ui_name": "Title" },
             "level":  { "kind": "TextField", "xy": [0,142], "dimensions": [172, 17], "text_style": "normal", "text_size": 13, "ui_name": "Level %d0 of %d1" },
             "button": { "kind": "ActionButton", "xy": [9,165], "dimensions": [154,28], "text_offset": [0,1], "ui_tooltip": "", "tooltip_delay": 0,
-                        "bg_image": "action_button_resizable", "bg_image_resizable": 1, "text_color": [0,0,0,1], "text_size": 13, "text_style": "bold",
+                        "bg_image": "action_button_resizable", "bg_image_resizable": 1, "text_size": 13, "text_style": "bold",
                         // note: these buttons are created dynamically in JavaScript
                         "array": [1,0], "array_offset": [0,36] }
         }
@@ -452,14 +452,14 @@
         "dimensions": [152,157],
         "widgets": {
             "spy_button": { "kind": "ActionButton", "xy": [9,12], "dimensions": [134,28], "text_offset": [0,1],
-                            "bg_image": "action_button_134px", "text_color": [0,0,0,1], "text_size": 13, "text_style": "bold", "ui_name": "Spy" },
+                            "bg_image": "action_button_134px", "text_size": 13, "text_style": "bold", "ui_name": "Spy" },
             "gift_button": { "kind": "ActionButton", "xy": [9,48], "dimensions": [134,28], "text_offset": [0,1],
-                             "bg_image": "action_button_134px", "text_color": [0,0,0,1], "text_size": 13, "text_style": "bold", "ui_name": "Send Gifts",
+                             "bg_image": "action_button_134px", "text_size": 13, "text_style": "bold", "ui_name": "Send Gifts",
                              "ui_tooltip": "", "tooltip_delay": 0, "ui_tooltip_already_sent": "Gift already sent today.\nCheck back tomorrow to send another gift." },
             "message_button": { "kind": "ActionButton", "xy": [9,84], "dimensions": [134,28], "text_offset": [0,1],
-                                "bg_image": "action_button_134px", "text_color": [0,0,0,1], "text_size": 13, "text_style": "bold", "ui_name": "Send Message" },
+                                "bg_image": "action_button_134px", "text_size": 13, "text_style": "bold", "ui_name": "Send Message" },
             "info_button": { "kind": "ActionButton", "xy": [9,120], "dimensions": [134,28], "text_offset": [0,1],
-                             "bg_image": "action_button_134px", "text_color": [0,0,0,1], "text_size": 13, "text_style": "bold", "ui_name": "Get Info" }
+                             "bg_image": "action_button_134px", "text_size": 13, "text_style": "bold", "ui_name": "Get Info" }
         }
     },
 
@@ -1498,7 +1498,7 @@
                             "ui_tooltip": "", "tooltip_delay": 0, // PRICE
                             "array": [4,2], "array_offset": [160,150] },
             "grid_finish_button": { "kind": "ActionButton", "xy": [147,195], "dimensions": [54,28], "text_size": 13, "ui_tooltip": "", "tooltip_delay": 0,
-                                    "bg_image": "action_button_54px", "text_color": [0,0,0,1], "text_style": "bold",
+                                    "bg_image": "action_button_54px", "text_style": "bold",
                                     "ui_name": "Finish", "ui_name_repair": "Repair", "ui_name_pending": "Working",
                                     "array": [4,2], "array_offset": [160,150] },
 
@@ -1994,7 +1994,7 @@
             "instant_credits": { "kind": "ActionButton", "xy": [470,335], "dimensions": [120,32], "text_offset": [8,0], "text_size": 13, "text_style": "thick",
                                  "bg_image": "price_display", "ui_name": "%d", "ui_tooltip": "", "tooltip_delay": 0 }, // PRICE
             "instant_button": { "kind": "ActionButton", "xy": [589,336], "dimensions": [134,28], "text_size": 13, "text_style": "bold",
-                                "bg_image": "action_button_134px", "text_color": [0,0,0,1], "ui_name": "Instant", "ui_name_pending": "Processing...",
+                                "bg_image": "action_button_134px", "ui_name": "Instant", "ui_name_pending": "Processing...",
                                 "ui_tooltip_rare_res": "Not available for actions that require %s",
                                 "ui_tooltip": "", "tooltip_delay": 0 },
 
@@ -2348,7 +2348,7 @@
             "price_display": { "kind": "ActionButton", "xy": [443,337], "dimensions": [120,32], "text_offset": [8,0], "text_size": 13, "text_style": "thick",
                                "bg_image": "price_display", "ui_name": "%d", "ui_tooltip": "", "tooltip_delay": 0 }, // PRICE
             "finish_button": { "kind": "ActionButton", "xy": [564,338], "dimensions": [134,28], "text_offset": [0,0], "text_size": 13,
-                               "bg_image": "action_button_134px", "text_color": [0,0,0,1], "text_style": "bold",
+                               "bg_image": "action_button_134px", "text_style": "bold",
                                "ui_name": "Finish", "ui_name_pending": "Processing...", "ui_name_repair": "Repair Factory",
                                "ui_tooltip": "", "tooltip_delay": 0 },
 
@@ -2535,7 +2535,7 @@
             "instant_credits": { "kind": "ActionButton", "xy": [470,334], "dimensions": [120,32], "text_offset": [8,0], "text_size": 13, "text_style": "thick",
                                  "bg_image": "price_display", "ui_name": "%d", "ui_tooltip": "", "tooltip_delay": 0 }, // PRICE
             "instant_button": { "kind": "ActionButton", "xy": [589,335], "dimensions": [134,28], "text_size": 13, "text_style": "bold",
-                                "bg_image": "action_button_134px", "text_color": [0,0,0,1], "ui_name": "Instant", "ui_name_pending": "Processing...",
+                                "bg_image": "action_button_134px", "ui_name": "Instant", "ui_name_pending": "Processing...",
                                 "ui_tooltip_rare_res": "Not available for upgrades that require %s",
                                 "ui_tooltip": "", "tooltip_delay": 0 },
 
@@ -2640,7 +2640,7 @@
             "instant_credits": { "kind": "ActionButton", "xy": [470,332], "dimensions": [120,32], "text_offset": [8,0], "text_size": 13, "text_style": "thick",
                                  "bg_image": "price_display", "ui_name": "%d", "ui_tooltip": "", "tooltip_delay": 0 }, // PRICE
             "instant_button": { "kind": "ActionButton", "xy": [589,333], "dimensions": [134,28], "text_size": 13, "text_style": "bold",
-                                "bg_image": "action_button_134px", "text_color": [0,0,0,1], "ui_name": "Instant", "ui_tooltip": "", "tooltip_delay": 0 },
+                                "bg_image": "action_button_134px", "ui_name": "Instant", "ui_tooltip": "", "tooltip_delay": 0 },
 
             "cost_time_bar": { "kind": "StaticImage", "xy": [409,377], "dimensions": [213,22], "asset": "timer_bar_213px", "state": "offline" },
             "cost_time_clock": { "kind": "StaticImage", "xy": [400,370], "dimensions": [35,35], "asset": "resource_icon_clock"},
@@ -2783,7 +2783,7 @@
                             },
 
             "claim_button": { "kind": "ActionButton", "xy": [550,368], "dimensions": [134,28],
-                              "bg_image": "action_button_134px", "text_color": [0,0,0,1], "text_size": 13, "text_style": "bold",
+                              "bg_image": "action_button_134px", "text_size": 13, "text_style": "bold",
                               "ui_name": "Claim Reward", "ui_name_accept": "Accept", "ui_name_claiming": "Claiming...",
                               "ui_name_show_me": "Show Me"
                               //"ui_tooltip": "",
@@ -3475,9 +3475,9 @@
                                      "ui_name": "WARNING: Promoting %name to %role gives that player\ncontrol of the alliance and demotes you to %succession_role." },
 
             "cancel_button": { "kind": "ActionButton", "xy": [60,360], "dimensions": [134,28], "text_size": 13, "text_style": "bold",
-                               "bg_image": "menu_button_134px", "text_color": [0,0,0,1], "ui_name": "Cancel" },
+                               "bg_image": "menu_button_134px", "ui_name": "Cancel" },
             "ok_button": { "kind": "ActionButton", "xy": [534,360], "dimensions": [134,28], "text_size": 13, "text_style": "bold",
-                           "bg_image": "action_button_134px", "text_color": [0,0,0,1], "ui_name": "Confirm" }
+                           "bg_image": "action_button_134px", "ui_name": "Confirm" }
 
         }
     },
@@ -3519,10 +3519,10 @@
                               "kind": "ActionButton", "xy": [463,1], "dimensions": [19,22], "bg_image": "close_button_small", "push_bg_image": 1 },
 
             "reject_button": { "kind": "ActionButton", "xy": [200,296], "dimensions": [134,28], "show": 1,
-                               "bg_image": "menu_button_134px", "text_color": [0,0,0,1], "text_size": 13, "text_style": "bold", "ui_name": "Reject" },
+                               "bg_image": "menu_button_134px", "text_size": 13, "text_style": "bold", "ui_name": "Reject" },
 
             "accept_button": { "kind": "ActionButton", "xy": [342,296], "dimensions": [134,28], "text_size": 13, "text_style": "bold",
-                               "bg_image": "action_button_134px", "text_color": [0,0,0,1], "ui_name": "Accept" }
+                               "bg_image": "action_button_134px", "ui_name": "Accept" }
         }
     },
 
@@ -3546,9 +3546,9 @@
                               "ui_name": "Gift will be sent as in-game Message." },
             "close_button": { "kind": "ActionButton", "xy": [463,1], "dimensions": [19,22], "bg_image": "close_button_small", "push_bg_image": 1 },
             "cancel_button": { "kind": "ActionButton", "xy": [200,296], "dimensions": [134,28], "show": 1,
-                               "bg_image": "menu_button_134px", "text_color": [0,0,0,1], "text_size": 13, "text_style": "bold", "ui_name": "Cancel" },
+                               "bg_image": "menu_button_134px", "text_size": 13, "text_style": "bold", "ui_name": "Cancel" },
             "ok_button": { "kind": "ActionButton", "xy": [342,296], "dimensions": [134,28], "text_size": 13, "text_style": "bold",
-                           "bg_image": "action_button_134px", "text_color": [0,0,0,1], "ui_name": "Buy Gift" }
+                           "bg_image": "action_button_134px", "ui_name": "Buy Gift" }
         }
     },
 
@@ -3574,7 +3574,7 @@
                               "text_hjustify": "center", "text_vjustify": "center", "drop_shadow": 1, "text_size": 13,
                               "ui_name": "Please allow a few minutes for delivery." },
             "ok_button": { "kind": "ActionButton", "xy": [342,296], "dimensions": [134,28], "text_size": 13, "text_style": "bold",
-                           "bg_image": "menu_button_134px", "text_color": [0,0,0,1], "ui_name": "Understood" }
+                           "bg_image": "menu_button_134px", "ui_name": "Understood" }
         }
     },
 
@@ -3830,7 +3830,7 @@
             "splash_image": { "kind": "StaticImage", "xy": [6,201], "dimensions": [354,82], "asset": "splash_defeat" },
 
             "viral_button": { "kind": "ActionButton", "xy": [6,290], "dimensions": [134,28], "text_offset": [0,1], "show": 0,
-                              "bg_image": "action_button_134px", "text_color": [0,0,0,1], "text_size": 13, "text_style": "bold", "ui_name": "Notify Earth" },
+                              "bg_image": "action_button_134px", "text_size": 13, "text_style": "bold", "ui_name": "Notify Earth" },
 
             // note: applies only to squad battles
             "squad_ignore_button": { "kind": "ActionButton", "xy": [135,170], "dimensions": [150,26], "bg_image_offset": [0,4], "push_text": 0,
@@ -3841,7 +3841,7 @@
                                    },
 
             "ok_button": { "kind": "ActionButton", "xy": [227,290], "dimensions": [134,28], "text_offset": [0,1],
-                           "bg_image": "action_button_134px", "text_color": [0,0,0,1], "text_size": 13, "text_style": "bold", "ui_name": "OK" }
+                           "bg_image": "action_button_134px", "text_size": 13, "text_style": "bold", "ui_name": "OK" }
         }
     },
 
@@ -4387,7 +4387,7 @@
                               },
 
             "ok_button": { "kind": "ActionButton", "xy": [605,404], "dimensions": [134,28], "text_size": 13, "text_style": "bold",
-                           "bg_image": "action_button_134px", "text_color": [0,0,0,1], "ui_name": "Accept" },
+                           "bg_image": "action_button_134px", "ui_name": "Accept" },
 
             "close_button": { "kind": "ActionButton", "xy": [738,1], "dimensions": [19,22], "bg_image": "close_button_small", "push_bg_image": 1 },
 
@@ -4401,10 +4401,10 @@
                                        "ui_tooltip": "Repair Instantly", "tooltip_delay": 0 },
 
             "repair_slow_button": { "kind": "ActionButton", "xy": [616,404], "dimensions": [134,28], "text_size": 13, "text_style": "bold",
-                                    "bg_image": "menu_button_134px", "text_color": [0,0,0,1], "ui_name": "Start Repairs" },
+                                    "bg_image": "menu_button_134px", "ui_name": "Start Repairs" },
 
             "repair_not_necessary_button": { "show":0, "kind": "ActionButton", "xy": [605,404], "dimensions": [134,28], "text_size": 13, "text_style": "bold",
-                                             "bg_image": "menu_button_134px", "text_color": [0,0,0,1], "ui_name": "Affirmative" }
+                                             "bg_image": "menu_button_134px", "ui_name": "Affirmative" }
         }
     },
 
@@ -4422,7 +4422,7 @@
                          "ui_name": "%s" },
 
             "ok_button": { "kind": "ActionButton", "xy": [358,148], "dimensions": [134,28], "text_offset": [0,1],
-                           "bg_image": "action_button_134px", "text_color": [0,0,0,1], "text_size": 13, "text_style": "bold", "ui_name": "Start Battle" }
+                           "bg_image": "action_button_134px", "text_size": 13, "text_style": "bold", "ui_name": "Start Battle" }
         }
     },
 
@@ -4440,7 +4440,7 @@
                          "ui_name": "%s" },
 
             "ok_button": { "kind": "ActionButton", "xy": [358,148], "dimensions": [134,28], "text_offset": [0,1],
-                           "bg_image": "action_button_134px", "text_color": [0,0,0,1], "text_size": 13, "text_style": "bold", "ui_name": "End Transmission" }
+                           "bg_image": "action_button_134px", "text_size": 13, "text_style": "bold", "ui_name": "End Transmission" }
         }
     },
 
@@ -4460,7 +4460,7 @@
                          "ui_name": "" },
 
             "ok_button": { "kind": "ActionButton", "xy": [367,148], "dimensions": [134,28], "text_offset": [0,1],
-                           "bg_image": "action_button_134px", "text_color": [0,0,0,1], "text_size": 13, "text_style": "bold", "ui_name": "End Transmission" }
+                           "bg_image": "action_button_134px", "text_size": 13, "text_style": "bold", "ui_name": "End Transmission" }
         }
     },
 
@@ -4885,7 +4885,7 @@
                               "ui_name_inventory": "Done", // warehouse
                               "ui_name_inventory_fungible": "Done", // storage
                               "ui_name": "Accept",
-                              "text_color": [0,0,0,1], "text_size": 13, "text_style": "bold"},
+                              "text_size": 13, "text_style": "bold"},
 
             "expiry": { "kind": "TextField", "xy": [0,381], "dimensions": [300, 12], "text_size": 13, "text_style": "normal", "text_color": [1,0,0,1],
                         "text_hjustify": "center", "text_vjustify": "center", "ui_name": "Message expires in %d days" },
@@ -4896,7 +4896,7 @@
             "lottery_price_display": { "show":0, "kind": "ActionButton", "xy": [24,379], "dimensions": [120,32], "text_offset": [8,1], "text_size": 13, "text_style": "thick",
                                        "bg_image": "price_display", "ui_tooltip": "", "tooltip_delay": 0 }, // PRICE
             "lottery_button": { "show":0, "kind": "ActionButton", "xy": [146,378], "dimensions": [134,32], "text_offset": [0,0], "text_size": 13,
-                                "bg_image": "action_button_resizable", "text_color": [0,0,0,1], "text_style": "bold",
+                                "bg_image": "action_button_resizable", "text_style": "bold",
                                 "bg_image_resizable": 1,
                                 "min_wait": 1.6, // wait at least this long for scan result even if it comes in immediately
                                 // ui_name from LOTTERY_SCAN spell
@@ -4914,9 +4914,9 @@
             "description":  { "kind": "TextField", "xy": [29,353], "dimensions": [552,48], "text_size": 15, "text_leading": 19, "text_hjustify": "left",
                               "ui_name": ""},
             "skip_button": { "kind": "ActionButton", "xy": [437,376], "dimensions": [134,28], "text_offset": [0,1],
-                             "bg_image": "action_button_134px", "text_color": [0,0,0,1], "text_size": 13, "text_style": "bold", "ui_name": "SKIP TUTORIAL" },
+                             "bg_image": "action_button_134px", "text_size": 13, "text_style": "bold", "ui_name": "SKIP TUTORIAL" },
             "next_button": { "kind": "ActionButton", "xy": [587,376], "dimensions": [134,28], "text_offset": [0,1],
-                             "bg_image": "action_button_134px", "text_color": [0,0,0,1], "text_size": 13, "text_style": "bold", "ui_name": "Next" }
+                             "bg_image": "action_button_134px", "text_size": 13, "text_style": "bold", "ui_name": "Next" }
         }
     },
     "tutorial_valentina_help_message": {
@@ -4932,7 +4932,7 @@
                              "text_vjustify": "top",
                              "ui_name": "" },
             "ok_button": { "kind": "ActionButton", "xy": [357,149], "dimensions": [134,28], "text_offset": [0,1],
-                           "bg_image": "action_button_134px", "text_color": [0,0,0,1], "text_size": 13, "text_style": "bold", "ui_name": "Proceed" }
+                           "bg_image": "action_button_134px", "text_size": 13, "text_style": "bold", "ui_name": "Proceed" }
         }
     },
 
@@ -5042,7 +5042,7 @@
             "instant_credits": { "kind": "ActionButton", "xy": [25,105], "dimensions": [120,32], "text_offset": [8,0], "text_size": 13, "text_style": "thick",
                                  "bg_image": "price_display", "ui_name": "FREE", "show": 0 },
             "instant_button": { "kind": "ActionButton", "xy": [144,106], "dimensions": [134,28], "text_size": 13, "text_style": "bold",
-                                "bg_image": "action_button_134px", "text_color": [0,0,0,1], "ui_name": "Instant", "show": 0 },
+                                "bg_image": "action_button_134px", "ui_name": "Instant", "show": 0 },
             "use_resources_button": { "kind": "ActionButton", "xy": [287,106], "dimensions": [134,28],  "text_size": 13, "text_style": "bold",
                                       "bg_image": "action_button_134px", "ui_name": "Start Repairs" }
         }
@@ -5071,7 +5071,7 @@
             "close_button": { "kind": "ActionButton", "xy": [463,1], "dimensions": [19,22], "bg_image": "close_button_small", "push_bg_image": 1, "show": 0 },
 
             "ok_button": { "kind": "ActionButton", "xy": [257,278], "dimensions": [134,28], "text_offset": [0,1],
-                           "bg_image": "action_button_134px", "text_color": [0,0,0,1], "text_size": 13, "text_style": "bold", "ui_name": "Invite friends" }
+                           "bg_image": "action_button_134px", "text_size": 13, "text_style": "bold", "ui_name": "Invite friends" }
         }
     },
 
@@ -5156,9 +5156,9 @@
                                        "bg_image": "action_button_134px","ui_name": "Repair Instantly", "ui_name_pending": "Working...", "ui_tooltip": "", "tooltip_delay": 0 },
 
             "repair_slow_button": { "kind": "ActionButton", "xy": [606,407], "dimensions": [134,28], "text_size": 13, "text_style": "bold",
-                                    "bg_image": "menu_button_134px", "text_color": [0,0,0,1], "ui_name": "Repair Slowly" },
+                                    "bg_image": "menu_button_134px", "ui_name": "Repair Slowly" },
             "repair_not_necessary_button": { "show":0, "kind": "ActionButton", "xy": [606,407], "dimensions": [134,28], "text_size": 13, "text_style": "bold",
-                                             "bg_image": "menu_button_134px", "text_color": [0,0,0,1], "ui_name": "Affirmative" },
+                                             "bg_image": "menu_button_134px", "ui_name": "Affirmative" },
 
 
 
@@ -5199,7 +5199,7 @@
             "price_display": { "kind": "ActionButton", "xy": [170,293], "dimensions": [120,32], "text_offset": [8,0], "text_size": 13, "text_style": "thick",
                                "bg_image": "price_display", "ui_name": "FREE", "ui_tooltip": "", "tooltip_delay": 0 }, // PRICE
             "repair_instant_button": { "kind": "ActionButton", "xy": [287,295], "dimensions": [134,28], "text_size": 13, "text_style": "bold",
-                                       "bg_image": "action_button_134px", "text_color": [0,0,0,1], "ui_name": "Repair All Instantly", "ui_name_pending": "Processing...", "ui_tooltip": "", "tooltip_delay": 0 },
+                                       "bg_image": "action_button_134px", "ui_name": "Repair All Instantly", "ui_name_pending": "Processing...", "ui_tooltip": "", "tooltip_delay": 0 },
             "repair_slow_button": { "kind": "ActionButton", "xy": [425,295], "dimensions": [134,28],  "text_size": 13, "text_style": "bold",
                                     "bg_image": "menu_button_134px", "ui_name": "Repair Slowly" },
             "repair_not_necessary_button": { "show": 0, "kind": "ActionButton", "xy": [425,295], "dimensions": [134,28],  "text_size": 13, "text_style": "bold",
@@ -5240,7 +5240,7 @@
                                    "bg_image": "menu_button_134px","ui_name": "Say Thanks" },
 
             "send_button": { "kind": "ActionButton", "xy": [328,296], "dimensions": [134,28], "text_size": 13, "text_style": "bold",
-                             "bg_image": "action_button_134px", "text_color": [0,0,0,1], "ui_name": "Send a FREE Gift" }
+                             "bg_image": "action_button_134px", "ui_name": "Send a FREE Gift" }
         }
     },
     "gift_prompt_dialog": {
@@ -5259,7 +5259,7 @@
             "close_button": { "kind": "ActionButton", "xy": [463,1], "dimensions": [19,22], "bg_image": "close_button_small", "push_bg_image": 1 },
 
             "send_button": { "kind": "ActionButton", "xy": [214,240], "dimensions": [206,40], "text_size": 13, "text_style": "bold",
-                             "bg_image": "action_button_206px", "text_color": [0,0,0,1], "ui_name": "Send Gifts to Friends" }
+                             "bg_image": "action_button_206px", "ui_name": "Send Gifts to Friends" }
         }
     },
 
@@ -5280,7 +5280,7 @@
             "description": { "kind": "TextField", "xy": [185,77], "dimensions": [275,195], "text_size": 13, "text_leading": 15,
                              "text_style": "normal", "text_hjustify": "left", "text_vjustify": "top", "ui_name": "Nothing to report." },
             "ok_button": { "kind": "ActionButton", "xy": [328,296], "dimensions": [134,28], "text_size": 13, "text_style": "bold",
-                           "bg_image": "menu_button_134px", "text_color": [0,0,0,1], "ui_name": "OK" },
+                           "bg_image": "menu_button_134px", "ui_name": "OK" },
             "close_button": { "kind": "ActionButton", "xy": [463,1], "dimensions": [19,22], "bg_image": "close_button_small", "push_bg_image": 1 }
         }
     },
@@ -5328,9 +5328,9 @@
             "close_button": { "kind": "ActionButton", "xy": [463,1], "dimensions": [19,22], "bg_image": "close_button_small", "push_bg_image": 1 },
 
             "spam_button_inform": { "kind": "ActionButton", "on_after": 1.5, "xy": [226,260], "dimensions": [206,40], "text_size": 13, "text_style": "bold",
-                                    "bg_image": "action_button_206px", "text_color": [0,0,0,1] },
+                                    "bg_image": "action_button_206px" },
             "spam_button_invite": { "kind": "ActionButton", "on_after": 1.5, "xy": [226,260], "dimensions": [206,40], "text_size": 13, "text_style": "bold",
-                                    "bg_image": "action_button_206px", "text_color": [0,0,0,1], "ui_name": "Invite Friends" },
+                                    "bg_image": "action_button_206px", "ui_name": "Invite Friends" },
             "screenshot_button": {"show": 0, "kind": "ActionButton", "xy":[308,13], "dimensions":[23,23], "bg_image": "photo_button", "push_bg_image": 1,
                                   "ui_caption": "%PLAYER - Level Up"},
             "new_achievement": { "show": 0, "off_after": 1.5,
@@ -5374,9 +5374,9 @@
                          "text_hjustify": "left", "text_vjustify":"top", "ui_name": "Kitchen Sink"},
 
             "delay_button": { "kind": "ActionButton", "xy": [179,294], "dimensions": [134,28], "text_size": 13, "text_style": "bold",
-                              "bg_image": "menu_button_134px", "text_color": [0,0,0,1], "ui_name": "Delay" },
+                              "bg_image": "menu_button_134px", "ui_name": "Delay" },
             "fight_button": { "kind": "ActionButton", "xy": [336,294], "dimensions": [134,28], "text_size": 13, "text_style": "bold",
-                              "bg_image": "action_button_134px", "text_color": [0,0,0,1], "ui_name": "Fight" }
+                              "bg_image": "action_button_134px", "ui_name": "Fight" }
         }
     },
 
@@ -5440,9 +5440,9 @@
                                        "bg_image": "action_button_134px","ui_name": "Repair Instantly", "ui_name_pending": "Working...", "ui_tooltip": "", "tooltip_delay": 0 },
 
             "repair_slow_button": { "kind": "ActionButton", "xy": [338,302], "dimensions": [134,28], "text_size": 13, "text_style": "bold",
-                                    "bg_image": "menu_button_134px", "text_color": [0,0,0,1], "ui_name": "Start Repairs" },
+                                    "bg_image": "menu_button_134px", "ui_name": "Start Repairs" },
             "repair_not_necessary_button": { "show":0, "kind": "ActionButton", "xy": [338,302], "dimensions": [134,28], "text_size": 13, "text_style": "bold",
-                                             "bg_image": "menu_button_134px", "text_color": [0,0,0,1], "ui_name": "Affirmative" }
+                                             "bg_image": "menu_button_134px", "ui_name": "Affirmative" }
         }
     },
 
@@ -5500,7 +5500,7 @@
         "widgets": {
             "request_donation_button": { "show":0, "kind": "ActionButton", "xy": [206,8], "dimensions": [100,28], "text_size": 13, "text_style": "bold",
                                          "bg_image": "action_button_resizable", "bg_image_resizable": 1,
-                                         "text_color": [0,0,0,1], "ui_name": "Reinforce Me",
+                                         "ui_name": "Reinforce Me",
                                          "ui_tooltip": "Request one-time reinforcement units from your alliance",
                                          "ui_tooltip_cooldown": "Request more reinforcements in %s",
                                          "ui_tooltip_space_limit": "No space for more reinforcements.\nTo make room, upgrade %s or deploy\nexisting reinforcements in battle.",
@@ -5529,7 +5529,7 @@
                              "text_hjustify": "left", "text_vjustify": "top",
                              "ui_name": "Description" },
             "ok_button": { "kind": "ActionButton", "xy": [606,409], "dimensions": [134,28], "text_size": 13, "text_style": "bold",
-                           "bg_image": "menu_button_134px", "text_color": [0,0,0,1], "ui_name": "Dismiss" },
+                           "bg_image": "menu_button_134px", "ui_name": "Dismiss" },
             "close_button": { "kind": "ActionButton", "xy": [738,1], "dimensions": [19,22], "bg_image": "close_button_small", "push_bg_image": 1 }
         }
     },
@@ -5620,7 +5620,7 @@
             "your_status":   { "kind": "TextField", "xy": [52,342], "dimensions": [134, 28], "text_size": 15, "text_style": "bold",
                                "text_hjustify": "center", "ui_name": "-" },
             "inform_button": { "kind": "ActionButton", "xy": [52,390], "dimensions": [134,28], "text_size": 13, "text_style": "bold",
-                               "bg_image": "action_button_134px", "text_color": [0,0,0,1],
+                               "bg_image": "action_button_134px",
                                "ui_tooltip": "Post achievement to your Facebook timeline", "show": 0
                              },
             "divider": { "kind": "Line", "xy": [201, 141], "dimensions": [0, 280], "color": [0.7,0.7,0.7,0.5], "stroke_width": 1 },
@@ -5674,11 +5674,11 @@
                        "drop_shadow": 1 },
 
             "inform_button": { "on_after": 1.5, "kind": "ActionButton", "xy": [155,190], "dimensions": [134,28], "text_size": 13, "text_style": "bold",
-                               "bg_image": "action_button_134px", "text_color": [0,0,0,1],
+                               "bg_image": "action_button_134px",
                                "ui_tooltip": "Post achievement to your Facebook timeline"
                              },
             "close_button": { "on_after": 1.5, "kind": "ActionButton", "xy": [305,190], "dimensions": [134,28], "text_size": 13, "text_style": "bold",
-                              "bg_image": "menu_button_134px", "text_color": [0,0,0,1], "ui_name": "Dismiss"
+                              "bg_image": "menu_button_134px", "ui_name": "Dismiss"
                             },
 
             "close_button2": { "on_after": 1.5, "kind": "ActionButton", "xy": [414,22], "dimensions": [24,24], "bg_image": "close_button_big", "push_bg_image": 1},
@@ -6255,7 +6255,7 @@
                    },
 
             "ok_button": { "kind": "ActionButton", "xy": [265,401], "dimensions": [134,28], "text_size": 13, "text_style": "bold",
-                           "bg_image": "menu_button_134px", "text_color": [0,0,0,1], "ui_name": "Understood" },
+                           "bg_image": "menu_button_134px", "ui_name": "Understood" },
             "close_button": { "kind": "ActionButton", "xy": [738,1], "dimensions": [19,22], "bg_image": "close_button_small", "push_bg_image": 1 }
         }
     },
@@ -6279,9 +6279,9 @@
                              "text_leading": 16, "text_hjustify": "left", "text_vjustify": "top" },
 
             "ok_button": { "kind": "ActionButton", "xy": [267,404], "dimensions": [134,28], "text_size": 13, "text_style": "bold",
-                           "bg_image": "action_button_134px", "text_color": [0,0,0,1], "ui_name": "Understood" },
+                           "bg_image": "action_button_134px", "ui_name": "Understood" },
             "link_button": { "kind": "ActionButton", "xy": [421,404], "dimensions": [134,28], "text_size": 13, "text_style": "bold",
-                             "bg_image": "action_button_134px", "text_color": [0,0,0,1], "ui_name": "Learn More", "show": 0 },
+                             "bg_image": "action_button_134px", "ui_name": "Learn More", "show": 0 },
             "close_button": { "kind": "ActionButton", "xy": [738,1], "dimensions": [19,22], "bg_image": "close_button_small", "push_bg_image": 1 },
 
             "alloy_bonus": { "kind": "TextField", "xy": [595,267], "dimensions": [109,37], "text_size": 15, "text_style": "bold",
@@ -6330,7 +6330,7 @@
                              "bg_image": "menu_button_134px", "ui_name": "Previous" },
             "link_button": { "show": 0, "kind": "ActionButton", "xy": [164,422], "dimensions": [134,28], "text_size": 13, "text_style": "bold",
                              "ui_tooltip": "", "tooltip_delay": 0,
-                             "bg_image": "menu_button_134px", "text_color": [0,0,0,1], "ui_name": "Learn More" },
+                             "bg_image": "menu_button_134px", "ui_name": "Learn More" },
             "next_button": { "kind": "ActionButton", "xy": [312,422], "dimensions": [134,28], "text_size": 13, "text_style": "bold",
                              "bg_image": "menu_button_134px", "ui_name": "Next", "ui_name_close": "Dismiss" },
             "close_button": { "kind": "ActionButton", "xy": [428,1], "dimensions": [19,22], "bg_image": "close_button_small", "push_bg_image": 1 }
@@ -6351,7 +6351,7 @@
             "price_display": { "kind": "ActionButton", "xy": [329,374], "dimensions": [120,32], "text_offset": [8,1], "text_size": 13, "text_style": "thick",
                                "bg_image": "price_display", "ui_tooltip": "", "tooltip_delay": 0 }, // PRICE
             "ok_button": { "kind": "ActionButton", "xy": [450,375], "dimensions": [134,28], "text_offset": [0,0], "text_size": 13,
-                           "bg_image": "action_button_134px", "text_color": [0,0,0,1], "text_style": "bold", "ui_name": "Buy", "ui_name_pending": "Processing..." },
+                           "bg_image": "action_button_134px", "text_style": "bold", "ui_name": "Buy", "ui_name_pending": "Processing..." },
 
             "close_button": { "kind": "ActionButton", "xy": [738,1], "dimensions": [19,22], "bg_image": "close_button_small", "push_bg_image": 1 }
         }
@@ -6375,12 +6375,12 @@
                              },
 
             "link_button": { "kind": "ActionButton", "xy": [404,53], "dimensions": [94,24], "text_size": 13, "text_style": "bold",
-                             "bg_image": "menu_button_94px", "text_color": [0,0,0,1], "ui_name": "Learn More" }, // url is in strings.json:keyboard_shortcuts_help_url
+                             "bg_image": "menu_button_94px", "ui_name": "Learn More" }, // url is in strings.json:keyboard_shortcuts_help_url
 
             "prev_button": { "kind": "ActionButton", "xy": [525,53], "dimensions": [94,24], "text_size": 13, "text_style": "bold",
-                             "bg_image": "menu_button_94px", "text_color": [0,0,0,1], "ui_name": "<< Previous" },
+                             "bg_image": "menu_button_94px", "ui_name": "<< Previous" },
             "next_button": { "kind": "ActionButton", "xy": [627,53], "dimensions": [94,24], "text_size": 13, "text_style": "bold",
-                             "bg_image": "menu_button_94px", "text_color": [0,0,0,1], "ui_name": "Next >>" },
+                             "bg_image": "menu_button_94px", "ui_name": "Next >>" },
 
             "close_button": { "kind": "ActionButton", "xy": [738,1], "dimensions": [19,22], "bg_image": "close_button_small", "push_bg_image": 1, "ui_tooltip": "<Esc> to close" }
         }
@@ -6452,11 +6452,11 @@
                          "array": [1,7], "array_offset": [157,40], "transparent_to_mouse": false},
 
             "sprobe_button":{ "kind": "ActionButton", "xy": [43,390], "dimensions": [134,28],
-                              "bg_image": "menu_button_134px", "text_color": [0,0,0,1], "text_size": 13, "text_style": "bold",
+                              "bg_image": "menu_button_134px", "text_size": 13, "text_style": "bold",
                               "ui_name": "Connection Test" },
 
             "apply_button":{ "kind": "ActionButton", "xy": [585,390], "dimensions": [134,28], "ui_name_applying": "Applying...",
-                             "bg_image": "action_button_134px", "text_color": [0,0,0,1], "text_size": 13, "text_style": "bold", "ui_name": "Apply" },
+                             "bg_image": "action_button_134px", "text_size": 13, "text_style": "bold", "ui_name": "Apply" },
             "close_button": { "kind": "ActionButton", "xy": [738,1], "dimensions": [19,22], "bg_image": "close_button_small", "push_bg_image": 1, "ui_tooltip": "<Esc> to close" }
         }
     },
@@ -6511,7 +6511,7 @@
                                "text_size": 13, "text_leading": 16, "text_hjustify": "left", "text_vjustify": "top",
                                "ui_name_bbcode": "If you see [color=#ffff00]yellow[/color] or [color=#ff0000]red[/color] on any test above, please ensure you are using a wired internet connection instead of Wi-fi or 3G. Wireless signal interference is the leading cause of lag in high-performance video games." },
             "dismiss_button":{ "kind": "ActionButton", "xy": [585,386], "dimensions": [134,28], "text_offset": [0,1],
-                               "bg_image": "action_button_134px", "text_color": [0,0,0,1], "text_size": 13, "text_style": "bold", "ui_name": "Dismiss" },
+                               "bg_image": "action_button_134px", "text_size": 13, "text_style": "bold", "ui_name": "Dismiss" },
             "close_button": { "kind": "ActionButton", "xy": [738,1], "dimensions": [19,22], "bg_image": "close_button_small", "push_bg_image": 1, "ui_tooltip": "<Esc> to close" }
         }
     },
@@ -6546,7 +6546,7 @@
             "price_display": { "kind": "ActionButton", "xy": [218,140], "dimensions": [120,32], "text_offset": [8,1], "text_size": 13, "text_style": "thick",
                                "bg_image": "price_display", "ui_name": "%d", "ui_tooltip": "", "tooltip_delay": 0 }, // PRICE
             "ok_button": { "kind": "ActionButton", "xy": [336,142], "dimensions": [134,28], "text_offset": [0,1],
-                           "bg_image": "action_button_134px", "state": "bigaction", "text_color": [0,0,0,1], "text_size": 13,
+                           "bg_image": "action_button_134px", "state": "bigaction", "text_size": 13,
                            "text_style": "bold", "ui_name": "Buy Now", "ui_name_pending": "Processing...", "ui_tooltip": "", "tooltip_delay": 0 }
         }
     },
@@ -6576,9 +6576,9 @@
                           "ui_name": "Tip: Press [ENTER] key to %s." },
 
             "close_button": { "kind": "ActionButton", "xy": [215,159], "dimensions": [134,28], "text_offset": [0,1],
-                              "bg_image": "menu_button_134px", "text_color": [0,0,0,1], "text_size": 13, "text_style": "bold", "ui_name": "Cancel" },
+                              "bg_image": "menu_button_134px", "text_size": 13, "text_style": "bold", "ui_name": "Cancel" },
             "ok_button": { "kind": "ActionButton", "xy": [357,159], "dimensions": [134,28], "text_offset": [0,1],
-                           "bg_image": "action_button_134px", "text_color": [0,0,0,1], "text_size": 13, "text_style": "bold", "ui_name": "Recycle" }
+                           "bg_image": "action_button_134px", "text_size": 13, "text_style": "bold", "ui_name": "Recycle" }
         }
     },
 
@@ -6653,7 +6653,7 @@
                                "bg_image": "price_display_short", "ui_name": "123", "ui_tooltip": "", "tooltip_delay": 0 }, // PRICE
             "price_spinner": { "kind": "StaticImage", "xy":[562,369], "dimensions":[16,16], "asset":"loading_spinner" },
             "finish_button": { "kind": "ActionButton", "xy": [605,363], "dimensions": [78,28], "text_offset": [0,0], "text_size": 13,
-                               "bg_image": "action_button_78px", "text_color": [0,0,0,1], "text_style": "bold",
+                               "bg_image": "action_button_78px", "text_style": "bold",
                                "ui_name": "Finish", "ui_name_pending": "Working",
                                "ui_tooltip": "", "tooltip_delay": 0 },
 
@@ -6759,7 +6759,7 @@
             "price_spinner": { "kind": "StaticImage", "xy":[52,113], "dimensions":[16,16], "asset":"loading_spinner" },
 
             "finish_button": { "kind": "ActionButton", "xy": [80,106], "dimensions": [78,28], "text_offset": [0,0], "text_size": 13,
-                               "bg_image": "action_button_78px", "text_color": [0,0,0,1], "text_style": "bold",
+                               "bg_image": "action_button_78px", "text_style": "bold",
                                "ui_name": "Finish", "ui_name_pending": "Working",
                                "ui_tooltip": "", "tooltip_delay": 0 },
 
@@ -6976,7 +6976,7 @@
                                           "text_size": 13, "text_style": "bold", "push_bg_image": 1, "bg_image_resizable": 1, "ui_name": "Choose Friend" },
 
             "redeem_gift_card_button": { "show": 0, "kind": "ActionButton", "xy": [70,361], "dimensions": [134,28], "text_offset": [0,1],
-                                         "bg_image": "menu_button_134px", "text_color": [0,0,0,1], "text_size": 13, "text_style": "bold",
+                                         "bg_image": "menu_button_134px", "text_size": 13, "text_style": "bold",
                                          "ui_name": "Use Gift Card",
                                          "ui_tooltip": "Redeem a Facebook Gift Card for %s", "tooltip_delay": 0 },
 
@@ -6985,7 +6985,7 @@
                                "ui_tooltip_buy": "Buy %bucks for %credits",
                                "bg_image": "price_display", "ui_name": "%d", "ui_tooltip": "", "tooltip_delay": 0 }, // PRICE
             "buy_button": { "kind": "ActionButton", "xy": [357,361], "dimensions": [134,28], "text_offset": [0,1],
-                            "bg_image": "action_button_134px", "state": "bigaction", "text_color": [0,0,0,1], "text_size": 13, "text_style": "bold",
+                            "bg_image": "action_button_134px", "state": "bigaction", "text_size": 13, "text_style": "bold",
                             "ui_name": "Buy", "ui_name_gifts": "Buy Gift",
                             "ui_tooltip": "", "tooltip_delay": 0 },
 
@@ -7056,7 +7056,7 @@
                    },
 
             "trialpay_button": { "show": 0, "kind": "ActionButton", "xy": [19,380], "dimensions": [150,28], "bg_image": "action_button_resizable", "bg_image_resizable": 1,
-                                 "text_color": [0,0,0,1], "text_size": 13, "text_style": "bold",
+                                 "text_size": 13, "text_style": "bold",
                                  "ui_name": "Earn FREE %s" },
 
             "redeem_gift_card_warning": { "show": 0, "kind": "TextField", "text_size": 13, "text_color": [0.75,0.75,0.75,1],
@@ -7065,7 +7065,7 @@
 
             "redeem_gift_card_icon": { "show": 0, "kind": "StaticImage", "xy":[558,380], "dimensions":[32,32], "asset": "facebook_icon"},
             "redeem_gift_card_button": { "show": 0, "kind": "ActionButton", "xy": [597,380], "dimensions": [134,28], "text_offset": [0,1],
-                                         "bg_image": "menu_button_134px", "text_color": [0,0,0,1], "text_size": 13, "text_style": "bold",
+                                         "bg_image": "menu_button_134px", "text_size": 13, "text_style": "bold",
                                          "ui_name": "Use Gift Card",
                                          "ui_tooltip": "Redeem a Facebook Gift Card for %s", "tooltip_delay": 0 },
 
@@ -7296,9 +7296,9 @@
                          "text_vjustify": "top", "ui_name": "UNIT SPACE\netc" },
 
             "viral_button": { "kind": "ActionButton", "xy": [61,364], "dimensions": [134,28], "text_size": 13, "text_style": "bold",
-                              "bg_image": "action_button_134px", "text_color": [0,0,0,1], "ui_name": "", "show": 0 },
+                              "bg_image": "action_button_134px", "ui_name": "", "show": 0 },
             "ok_button": { "kind": "ActionButton", "xy": [61,364], "dimensions": [134,28], "text_size": 13, "text_style": "bold",
-                           "bg_image": "action_button_134px", "text_color": [0,0,0,1], "ui_name": "Understood" }
+                           "bg_image": "action_button_134px", "ui_name": "Understood" }
         }
     },
 
@@ -7338,10 +7338,10 @@
                             "bg_image_offset": [0,8], "bg_image_justify": "center", "state": "normal", "rotating": 1 },
 
             //          "viral_button": { "kind": "ActionButton", "xy": [264,375], "dimensions": [134,28], "text_size": 13, "text_style": "bold",
-            //                            "bg_image": "action_button_134px", "text_color": [0,0,0,1], "ui_name": "", "show": 0 },
+            //                            "bg_image": "action_button_134px", "ui_name": "", "show": 0 },
 
             "ok_button": { "kind": "ActionButton", "xy": [264,408], "dimensions": [134,28], "text_size": 13, "text_style": "bold",
-                           "bg_image": "action_button_134px", "text_color": [0,0,0,1], "ui_name": "Understood" }
+                           "bg_image": "action_button_134px", "ui_name": "Understood" }
         }
     },
 
@@ -7529,7 +7529,7 @@
 
             // BUTTONS
             "close_button": { "kind": "ActionButton", "xy": [738,1], "dimensions": [19,22], "bg_image": "close_button_small", "push_bg_image": 1 },
-            "ok_button": { "kind": "ActionButton", "xy": [600,408], "dimensions": [134,28], "text_size": 13, "text_style": "bold", "bg_image": "action_button_134px", "text_color": [0,0,0,1], "ui_name": "Understood" }
+            "ok_button": { "kind": "ActionButton", "xy": [600,408], "dimensions": [134,28], "text_size": 13, "text_style": "bold", "bg_image": "action_button_134px", "ui_name": "Understood" }
         }
     },
 
@@ -7577,7 +7577,7 @@
             //                            "bg_image": "action_button_134px", "text_color": [0,0,0,1], "ui_name": "", "show": 0 },
 
             "ok_button": { "kind": "ActionButton", "xy": [264,408], "dimensions": [134,28], "text_size": 13, "text_style": "bold",
-                           "bg_image": "action_button_134px", "text_color": [0,0,0,1], "ui_name": "Unlock" }
+                           "bg_image": "action_button_134px", "ui_name": "Unlock" }
         }
     },
 
@@ -7599,7 +7599,7 @@
                      "bg_image": "menu_button_136px", "ui_name": "COHORT NAME",
                      "array": [6,2], "array_offset": [142,40] },
             "ok_button": { "kind": "ActionButton", "xy": [301,345], "dimensions": [134,28], "text_size": 13, "text_style": "bold",
-                           "bg_image": "action_button_134px", "text_color": [0,0,0,1], "ui_name": "Apply Changes" }
+                           "bg_image": "action_button_134px", "ui_name": "Apply Changes" }
         }
     },
 
@@ -7956,7 +7956,7 @@
         "widgets": {
             "bgrect": { "kind":"SolidRect", "xy":[0,0], "dimensions": [736,60], "color":[0,0,0,0.5], "bevel":3 },
             "upgrade_button": { "kind": "ActionButton", "xy": [14,14], "dimensions": [134,28], "text_size": 13, "text_style": "bold",
-                                "bg_image": "menu_button_134px", "text_color": [0,0,0,1], "ui_name": "Upgrade", "alpha_nonhover": 0.8 },
+                                "bg_image": "menu_button_134px", "ui_name": "Upgrade", "alpha_nonhover": 0.8 },
             "output": { "kind": "ScrollingTextField",
                         "xy": [174,9], "dimensions": [512,44],
                         "xy_nobutton": [14,9], "dimensions_nobutton": [672,44],
@@ -8315,7 +8315,7 @@
             "lottery_price_display": { "kind": "ActionButton", "xy": [317,310], "dimensions": [120,32], "text_offset": [8,1], "text_size": 13, "text_style": "thick",
                                        "bg_image": "price_display", "ui_tooltip": "", "tooltip_delay": 0 }, // PRICE
             "lottery_button": { "kind": "ActionButton", "xy": [438,309], "dimensions": [134,32], "text_offset": [0,0], "text_size": 13,
-                                "bg_image": "action_button_resizable", "text_color": [0,0,0,1], "text_style": "bold",
+                                "bg_image": "action_button_resizable", "text_style": "bold",
                                 "bg_image_resizable": 1,
                                 "min_wait": 1.6, // wait at least this long for scan result even if it comes in immediately
                                 // ui_name from LOTTERY_SCAN spell
