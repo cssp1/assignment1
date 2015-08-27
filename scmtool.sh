@@ -109,30 +109,29 @@ function do_git_sync_svn {
 
 function do_up_git {
     for dir in $GIT_DIRS; do
+	MY_BRANCH=`(cd $dir && git rev-parse --abbrev-ref HEAD)`
+
         if (cd $dir && git diff --exit-code --quiet); then
             # tree is clean - plain pull
             echo "pulling game-${dir}..."
-            (cd $dir && git pull)
+            (cd $dir && git pull origin ${MY_BRANCH})
         else
             # local changes - try to reapply on top
-	    MY_BRANCH=`git rev-parse --abbrev-ref HEAD`
-	    ORIGIN_BRANCH="origin/${MY_BRANCH}"
-            echo "fetching, stashing, merging, unstashing game-${dir} from ${ORIGIN_BRANCH}..."
-            (cd $dir && git fetch && git stash && git merge ${ORIGIN_BRANCH} --ff-only && git stash pop)
+            echo "fetching, stashing, merging, unstashing game-${dir} from origin/${MY_BRANCH}..."
+            (cd $dir && git fetch && git stash && git merge origin/${MY_BRANCH} --ff-only && git stash pop)
         fi
     done
 }
 function do_force_up_git {
     # same code as do_up_git, but tries to be silent
     for dir in $GIT_DIRS; do
+	MY_BRANCH=`(cd $dir && git rev-parse --abbrev-ref HEAD)`
         if (cd $dir && git diff --exit-code --quiet); then
             # tree is clean - plain pull
-            (cd $dir && git pull -q)
+            (cd $dir && git pull origin ${MY_BRANCH} -q)
         else
             # local changes - try to reapply on top
-	    MY_BRANCH=`git rev-parse --abbrev-ref HEAD`
-	    ORIGIN_BRANCH="origin/${MY_BRANCH}"
-            (cd $dir && git fetch -q && git stash -q && git merge ${ORIGIN_BRANCH} --ff-only -q && git stash pop -q)
+            (cd $dir && git fetch -q && git stash -q && git merge origin/${MY_BRANCH} --ff-only -q && git stash pop -q)
         fi
     done
 }
