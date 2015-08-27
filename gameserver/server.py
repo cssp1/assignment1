@@ -24541,8 +24541,8 @@ class GAMEAPI(resource.Resource):
                         session.player.mailbox.remove(mail)
                         session.player.mailbox.append(old_mail)
             else:
-                gamesite.exception_log.event(server_time, 'player %d MAIL_TAKE_ATTACHMENTS: mail not found: msg_id %s index %d spec %s stack %d' % \
-                                             (session.player.user_id, msg_id, client_index, client_spec, client_stack))
+                gamesite.exception_log.event(server_time, 'player %d MAIL_TAKE_ATTACHMENTS: msg_id %s present %r index %d spec %s stack %d' % \
+                                             (session.player.user_id, msg_id, bool(mail), client_index, client_spec, client_stack))
                 retmsg.append(["ERROR", "HARMLESS_RACE_CONDITION"])
 
             #time.sleep(3) # to test lag
