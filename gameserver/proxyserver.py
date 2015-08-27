@@ -2404,10 +2404,28 @@ class PortraitProxy(twisted.web.resource.Resource):
         if SpinConfig.config['proxyserver'].get('cdn_expires_header', False):
             request.setHeader('Expires', format_http_time(proxy_time + max_age))
 
-        # note! this means that requests MUST have a unique ?origin=whatever in the URL!
+        # note! this means that requests MUST have a unique ?spin_origin=whatever in the URL!
+        assert 'spin_origin' in request.args
         SpinHTTP.set_access_control_headers_for_cdn(request, max_age)
 
+    # sometimes the client or the CDN strip off the ?spin_origin query parameter
+    # to avoid errors, "invent" a plausible origin that will probably match the request
+
+    def ensure_spin_origin(self, request):
+        if ('spin_origin' not in request.args):
+            if request.requestHeaders.hasHeader('origin'):
+                origin = SpinHTTP.get_twisted_header(request, 'origin')
+            else:
+                origin = SpinHTTP.get_twisted_header(request, 'host')
+            if origin:
+                listen_host = SpinConfig.config['proxyserver'].get('external_listen_host','')
+                # XXX this may cause problems if we ever have proxyserver listen on different origins
+                if listen_host and origin != listen_host:
+                    raise Exception('origin mismatch: %s vs %s' % (origin, listen_host))
+                request.args['spin_origin'] = [origin]
+
     def render_OPTIONS(self, request):
+        self.ensure_spin_origin(request)
         if not self.parse_request(request): # just to assert it is a valid request
             request.setResponseCode(http.BAD_REQUEST)
             return 'invalid parameters'
@@ -2415,6 +2433,7 @@ class PortraitProxy(twisted.web.resource.Resource):
         return ''
 
     def render(self, request):
+        self.ensure_spin_origin(request)
         source_url = self.parse_request(request)
         if not source_url:
             exception_log.event(proxy_time, 'unrecognized PortraitProxy URL: ' + log_request(request) + ' headers ' + repr(request.requestHeaders))
@@ -2471,7 +2490,6 @@ class FBPortraitProxy(PortraitProxy):
         if path_fields[3] != 'picture': return None
         if parts.params or parts.fragment: return None
         qs = urlparse.parse_qs(parts.query)
-        if ('spin_origin' not in qs): return None
         for key, val in qs.iteritems():
             if key not in ('v', 'spin_origin'):
                 return None
@@ -2495,7 +2513,7 @@ class KGPortraitProxy(PortraitProxy):
         if path_fields[0] != '' or path_fields[2] != '': return None
         if parts.params or parts.fragment: return None
         qs = urlparse.parse_qs(parts.query)
-        if ('spin_origin' not in qs) or ('avatar_url' not in qs): return None
+        if ('avatar_url' not in qs): return None
         for key, val in qs.iteritems():
             if key not in ('spin_origin', 'avatar_url', 'v'):
                 return None
@@ -2523,7 +2541,7 @@ class AGPortraitProxy(PortraitProxy):
         if path_fields[0] != '' or path_fields[2] != '': return None
         if parts.params or parts.fragment: return None
         qs = urlparse.parse_qs(parts.query)
-        if ('spin_origin' not in qs) or ('avatar_url' not in qs): return None
+        if ('avatar_url' not in qs): return None
         for key, val in qs.iteritems():
             if key not in ('spin_origin', 'avatar_url', 'v'):
                 return None
