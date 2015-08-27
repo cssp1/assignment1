@@ -2841,7 +2841,8 @@
             "attach_rect": { "kind": "SolidRect", "xy": [289,296], "dimensions": [404,105], "color": [0,0,0,0.5] },
 
             "from_label": { "kind": "TextField", "xy": [298,80], "dimensions": [60,17], "text_hjustify": "left", "text_size": 13, "text_color":[0.33,0.33,0.33,1], "ui_name": "From:" },
-            "from_name": { "kind": "TextField", "xy": [361,80], "dimensions": [334,17], "text_hjustify": "left", "text_size": 13 },
+            "from_name": { "kind": "TextField", "xy": [361,80], "dimensions": [334,17], "text_hjustify": "left", "text_size": 13,
+                           "clip_to": [361,80,294,21] },
             "subj_label": { "kind": "TextField", "xy": [298,97], "dimensions": [60,17], "text_hjustify": "left", "text_size": 13, "text_color":[0.33,0.33,0.33,1], "ui_name": "Subject:" },
             "subj_name": { "kind": "TextField", "xy": [361,97], "dimensions": [334,17], "text_hjustify": "left", "text_size": 13, "text_style": "thick" },
 
