@@ -4790,24 +4790,25 @@ Base.prototype.is_deployment_location_valid = function(xy) {
     return true;
 };
 
-Base.prototype.draw_deployable_area = function() {
-    return this.draw_base_perimeter('deploy');
-};
-
 // stroke a path outlining the base area perimeter
 // optionally shade either the inside or outside to indicate invalid locations
 Base.prototype.draw_base_perimeter = function(purpose) {
-    var shade_inside = ((purpose === 'deploy' && (this.base_landlord_id !== session.user_id) && gamedata['map']['deployment_buffer'] >= 0) || purpose === 'dev_edit');
-    var shade_outside = (purpose === 'build');
-    var shade_offmap = (purpose !== 'dev_edit');
-
     var ncells = this.ncells();
     var mid = this.midcell();
     var rad = [this.get_base_radius(), this.get_base_radius()];
     var old_deployment_buffer = (!!this.deployment_buffer && !this.has_deployment_zone());
     var new_deployment_buffer = this.has_deployment_zone();
+    var open_deployment = gamedata['map']['deployment_buffer'] < 0;
 
-    if(purpose === 'deploy' && old_deployment_buffer) {
+    var shade_inside = (purpose === 'deploy' && (this.base_landlord_id !== session.user_id) && !open_deployment);
+    var stroke_inside = (purpose === 'pre_deploy' && !open_deployment); // purpose.indexOf('deploy') >= 0);
+    var shade_outside = (purpose === 'build');
+    var stroke_outside = !stroke_inside && (purpose != 'build_ignore_perimeter' && !(purpose.indexOf('deploy') >= 0 && open_deployment) && !new_deployment_buffer);
+    var shade_offmap = (purpose !== 'dev_edit');
+
+    //console.log('shade_inside '+shade_inside.toString()+' stroke_inside '+stroke_inside.toString()+' shade_outside '+shade_outside.toString()+' stroke_outside '+stroke_outside.toString());
+
+    if(purpose.indexOf('deploy') >= 0 && old_deployment_buffer) {
         if(gamedata['map']['deployment_buffer'] >= 0) {
             rad[0] += gamedata['map']['deployment_buffer'];
             rad[1] += gamedata['map']['deployment_buffer'];
@@ -4823,44 +4824,71 @@ Base.prototype.draw_base_perimeter = function(purpose) {
              draw_quantize(ortho_to_draw([mid[0]-rad[0], mid[1]+rad[1]]))];
 
     SPUI.ctx.save();
-    SPUI.ctx.strokeStyle = '#FFFFFF';
     SPUI.ctx.fillStyle = 'rgba(255,0,0,0.25)';
+    var deploy_zone_outline_color = 'rgba(255,255,0,0.25)';
+    var deploy_zone_outline_width = 7;
 
-    if(shade_inside) {
+    if(shade_inside || stroke_inside) {
+        SPUI.ctx.save();
+
         if(new_deployment_buffer) {
             // Gangnam style
             if(this.deployment_buffer['type'] != 'polygon') { throw Error('unhandled deployment buffer type'+this.deployment_buffer['type'].toString()); }
             SPUI.ctx.beginPath();
-            // vertices of entire play area
-            var outer = [ortho_to_draw([0, 0]),
-                         ortho_to_draw([ncells[0], 0]),
-                         ortho_to_draw([ncells[0], ncells[1]]),
-                         ortho_to_draw([0, ncells[1]])];
-            for(var i = 0; i < outer.length+1; i++) {
-                var vtx = outer[(i==outer.length ? 0 : i)];
-                if(i == 0) {
-                    SPUI.ctx.moveTo(vtx[0], vtx[1]);
-                } else {
-                    SPUI.ctx.lineTo(vtx[0], vtx[1]);
+
+            if(shade_inside) {
+                // vertices of entire play area
+                var outer = [ortho_to_draw([0, 0]),
+                             ortho_to_draw([ncells[0], 0]),
+                             ortho_to_draw([ncells[0], ncells[1]]),
+                             ortho_to_draw([0, ncells[1]])];
+                for(var i = 0; i < outer.length; i++) {
+                    var vtx = outer[i];
+                    if(i == 0) {
+                        SPUI.ctx.moveTo(vtx[0], vtx[1]);
+                    } else {
+                        SPUI.ctx.lineTo(vtx[0], vtx[1]);
+                    }
                 }
+                SPUI.ctx.closePath();
             }
 
             // add the deployment zone as a subpath with reverse winding order to make a "hole"
-            SPUI.ctx.closePath();
-            for(var i = 0; i < this.deployment_buffer['vertices'].length+1; i++) {
-                var vtx = this.deployment_buffer['vertices'][(i==this.deployment_buffer['vertices'].length ? this.deployment_buffer['vertices'].length - 1 : this.deployment_buffer['vertices'].length - i - 1)];
+            for(var i = 0; i < this.deployment_buffer['vertices'].length; i++) {
+                var vtx = this.deployment_buffer['vertices'][this.deployment_buffer['vertices'].length - i - 1];
                 var loc = ortho_to_draw(vtx);
                 if(i == 0) {
                     SPUI.ctx.moveTo(loc[0], loc[1]);
                 } else {
                     SPUI.ctx.lineTo(loc[0], loc[1]);
                 }
+
             }
-            if(purpose !== 'dev_edit') { SPUI.ctx.fill(); }
+            SPUI.ctx.closePath();
+
+            if(shade_inside) {
+                SPUI.ctx.fill();
+                SPUI.ctx.strokeStyle = 'rgba(255,255,255,1)';
+            }
+            if(stroke_inside) { // override stroke color
+                SPUI.ctx.strokeStyle = deploy_zone_outline_color;
+                SPUI.ctx.lineWidth = deploy_zone_outline_width;
+            }
             SPUI.ctx.stroke();
+
         } else {
-            shade_quad(v);
+            if(shade_inside) {
+                shade_quad(v);
+            }
+            if(stroke_inside) {
+                SPUI.ctx.beginPath();
+                SPUI.add_quad_to_path(v);
+                SPUI.ctx.strokeStyle = deploy_zone_outline_color;
+                SPUI.ctx.lineWidth = deploy_zone_outline_width;
+                SPUI.ctx.stroke();
+            }
         }
+        SPUI.ctx.restore();
     }
 
     if(shade_outside) {
@@ -4890,11 +4918,11 @@ Base.prototype.draw_base_perimeter = function(purpose) {
         if(bottom[1] < canvas_height) { shade_quad_quantize([[0,bottom[1]], [canvas_width,bottom[1]], [canvas_width,canvas_height], [0,canvas_height]]); }
     }
 
-    // draw outline
-    if(!new_deployment_buffer && purpose != 'build_ignore_perimeter' &&
-       !(purpose == 'deploy' && gamedata['map']['deployment_buffer'] < 0)) {
+    // draw thin outline, for guiding building placement
+    if(stroke_outside) {
         SPUI.ctx.beginPath();
         SPUI.add_quad_to_path(v);
+        SPUI.ctx.strokeStyle = 'rgba(255,255,255,1)';
         SPUI.ctx.stroke();
     }
 
@@ -13975,7 +14003,7 @@ DeployUICursor.prototype.draw = function(offset) {
     SPUI.ctx.save();
     set_playfield_draw_transform(SPUI.ctx);
 
-    session.viewing_base.draw_deployable_area();
+    session.viewing_base.draw_base_perimeter('deploy');
 
     // do not draw deployment box if no units are ready for deployment
     var any_selected = goog.object.getCount(session.pre_deploy_units) > 0;
@@ -48304,6 +48332,13 @@ function draw_backdrop(want_scenery) {
         var drawn = draw_backdrop_simple(climate_data['backdrop']);
         if(drawn && want_scenery) { draw_backdrop_scenery(); }
         if(session.viewing_base) { draw_backdrop_area_bounds(); }
+    }
+
+    if(session.viewing_base &&
+       ((!session.home_base && session.viewing_base.base_landlord_id !== session.user_id) || player.is_cheater) &&
+       /* session.viewing_base.deployment_buffer && */
+       selection.unit !== player.virtual_units["DEPLOYER"]) {
+        session.viewing_base.draw_base_perimeter('pre_deploy');
     }
 }
 
