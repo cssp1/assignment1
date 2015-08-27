@@ -7210,12 +7210,16 @@ function get_alliance_logo_asset(logo) {
     return 'inventory_unknown';
 }
 
-// fungible items go immediately into resource storage
-function fungible_inventory_item_can_fit(spec, stack) {
+/** fungible items go immediately into resource storage. Check if there is enough room.
+    @param {!Object} spec
+    @param {number} stack
+    @param {!Object} resource_state
+    @return {boolean} */
+function fungible_inventory_item_can_fit(spec, stack, resource_state) {
     if(spec['resource'] == 'gamebucks') {
         return true;
-    } else if(spec['resource'] in player.resource_state) {
-        if(stack + player.resource_state[spec['resource']][1] <= player.resource_state[spec['resource']][0]) {
+    } else if(spec['resource'] in resource_state) {
+        if(stack + resource_state[spec['resource']][1] <= resource_state[spec['resource']][0]) {
             return true;
         }
     }
@@ -7226,8 +7230,8 @@ function inventory_item_can_fit(item, inventory, max_usable_inventory) {
     var spec = ItemDisplay.get_inventory_item_spec(item['spec']);
     var togo = ('stack' in item ? item['stack'] : 1);
 
-    if(spec['fungible'] && !fungible_inventory_item_can_fit(spec, 1)) { // check for at least 1 unit to fit
-        return false;
+    if(spec['fungible']) {
+        return fungible_inventory_item_can_fit(spec, 1, player.resource_state); // check for at least 1 unit to fit
     }
 
     // open slot
@@ -7251,36 +7255,46 @@ function inventory_item_can_fit(item, inventory, max_usable_inventory) {
 }
 
 function inventory_items_can_all_fit(items, inventory, max_usable_inventory) {
-    // operate on a copy of the inventory
+    // operate on a copy of the inventory and resources
     var scratch = [];
     for(var i = 0; i < inventory.length; i++) {
         scratch.push(goog.object.clone(inventory[i]));
     }
+    var scratch_resource_state = goog.object.clone(player.resource_state);
+
     for(var i = 0; i < items.length; i++) {
         var item = items[i];
         var spec = ItemDisplay.get_inventory_item_spec(item['spec']);
         var max_stack = (spec['max_stack'] || 1);
         var togo = ('stack' in item ? item['stack'] : 1);
 
-        if(spec['fungible'] && !fungible_inventory_item_can_fit(spec, togo)) { // check for entire stack to fit
-            return false;
-        }
-
-        // check for stackable item
-        for(var j = 0; j < scratch.length; j++) {
-            var inv = scratch[j];
-            if(inv['spec'] === item['spec']) {
-                var inv_stack = ('stack' in inv? inv['stack'] : 1);
-                if(inv_stack < max_stack) {
-                    var added = Math.min(togo, (max_stack - inv_stack))
-                    togo -= added;
-                    inv['stack'] = inv_stack + added;
+        if(spec['fungible']) {
+            // check for entire fungible amount to fit
+            if(fungible_inventory_item_can_fit(spec, togo, scratch_resource_state)) {
+                if(spec['resource'] in scratch_resource_state) {
+                    scratch_resource_state[spec['resource']][1] += togo;
+                }
+                continue;
+            } else {
+                return false;
+            }
+        } else {
+            // check for stackable item
+            for(var j = 0; j < scratch.length; j++) {
+                var inv = scratch[j];
+                if(inv['spec'] === item['spec']) {
+                    var inv_stack = ('stack' in inv? inv['stack'] : 1);
+                    if(inv_stack < max_stack) {
+                        var added = Math.min(togo, (max_stack - inv_stack))
+                        togo -= added;
+                        inv['stack'] = inv_stack + added;
+                    }
                 }
             }
+            if(togo <= 0) { continue; } // able to accommodate everything just by stacking
+            if(scratch.length >= max_usable_inventory) { return false; } // now we need a free slot
+            scratch.push(goog.object.clone(item));
         }
-        if(togo <= 0) { continue; } // able to accommodate everything just by stacking
-        if(scratch.length >= max_usable_inventory) { return false; } // now we need a free slot
-        scratch.push(goog.object.clone(item));
     }
     return true;
 }
