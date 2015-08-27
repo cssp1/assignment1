@@ -161,7 +161,7 @@ class NoSQLClient (object):
         self.max_retries = max_retries
         self.seen_server_status = False
         self.seen_server_latency = False
-        self.seen_visitors = False
+        self.seen_ip_hits = False
         self.seen_sessions = False
         self.seen_client_perf = False
         self.seen_chat = False
@@ -512,18 +512,30 @@ class NoSQLClient (object):
         self.client_perf_table().with_options(write_concern = pymongo.write_concern.WriteConcern(w=0)).insert_one(data)
 
 
-    ###### (PROXYSERVER) VISITORS ######
+    ###### (PROXYSERVER) IP HITS (for alt detection) ######
 
-    def visitors_table(self):
-        coll = self._table('visitors')
-        if not self.seen_visitors:
-            coll.create_index('last_active_time')
-            self.seen_visitors = True
+    def ip_hits_table(self):
+        coll = self._table('ip_hits')
+        if not self.seen_ip_hits:
+            coll.create_index('ip')
+            coll.create_index('millitime', expireAfterSeconds=86400)
+            self.seen_ip_hits = True
         return coll
-    def visitors_prune(self, timeout, reason=''):
-        return self.instrument('visitors_prune(%s)'%reason, self._visitors_prune, (timeout,))
-    def _visitors_prune(self, timeout):
-        return self.visitors_table().delete_many({'last_active_time':{'$lt':self.time - timeout}}).deleted_count
+    def ip_hit_record(self, ip, user_id, reason=''):
+        return self.instrument('ip_hit_record(%s)'%reason, self._ip_hit_record, (ip,user_id))
+    def _ip_hit_record(self, ip, user_id):
+        self.ip_hits_table().with_options(write_concern = pymongo.write_concern.WriteConcern(w=0)).replace_one({'ip':ip,'user_id':user_id},
+                                                                                                               {'ip':ip,'user_id':user_id,'millitime':datetime.datetime.utcfromtimestamp(float(self.time))},
+                                                                                                               upsert=True)
+    def ip_hits_get(self, ip, since = -1, exclude_user_id = -1, reason=''):
+        return self.instrument('ip_hits_get(%s)'%reason, self._ip_hits_get, (ip,since,exclude_user_id))
+    def _ip_hits_get(self, ip, since, exclude_user_id):
+        qs = {'ip':ip}
+        if since >= 0:
+            qs['millitime'] = {'$gte':datetime.datetime.utcfromtimestamp(float(since))}
+        if exclude_user_id >= 0:
+            qs['user_id'] = {'$ne': exclude_user_id}
+        return [x['user_id'] for x in self.ip_hits_table().find(qs,{'user_id':1,'_id':0})]
 
     ###### (PROXYSERVER) SESSIONS ######
     # note: the primary key here is user_id, not session_id!
@@ -2962,5 +2974,15 @@ if __name__ == '__main__':
         assert not client.player_alias_claim('asdf')
         assert client.player_alias_release('asdf')
         assert client.player_alias_claim('asdf')
+
+        # test ip hits
+        client.ip_hits_table().drop()
+        client.ip_hit_record('1.2.3.4', 100)
+        client.ip_hit_record('1.2.3.4', 101)
+        client.ip_hit_record('1.2.3.5', 200)
+        assert client.ip_hits_get('1.2.3.0') == []
+        assert set(client.ip_hits_get('1.2.3.4')) == set([100,101])
+        assert client.ip_hits_get('1.2.3.5') == [200,]
+        assert client.ip_hits_get('1.2.3.5', since = time_now + 50) == []
 
         print 'OK!'

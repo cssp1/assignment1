@@ -1687,7 +1687,13 @@ class GameProxy(proxy.ReverseProxyResource):
 
         # look up other accounts logged in from the same IP and tell
         # the gameserver about it so that we can detect alt accounts
-        possible_alts = db_client.sessions_get_users_by_ip(session.ip)
+
+        stickiness = SpinConfig.config['proxyserver'].get('alt_ip_stickiness', -1)
+        if stickiness > 0: # use new persistent record
+            db_client.ip_hit_record(session.ip, session.user_id)
+            possible_alts = db_client.ip_hits_get(session.ip, since = proxy_time - stickiness, exclude_user_id = session.user_id)
+        else: # old instantaneous-only approach
+            possible_alts = db_client.sessions_get_users_by_ip(session.ip)
 
         if possible_alts:
             extra_data = string.join([str(alt_user_id) for alt_user_id in possible_alts], ',')
