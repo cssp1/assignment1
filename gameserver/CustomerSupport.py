@@ -613,6 +613,62 @@ class HandleChangeRegion(Handler):
 
         return ReturnValue(result = 'ok')
 
+class HandleDemoteAllianceLeader(Handler):
+    def do_exec_online(self, session, retmsg): return self.do_exec_both()
+    def do_exec_offline(self, user, player): return self.do_exec_both()
+    def do_exec_both(self):
+        alliance_membership = self.gamesite.sql_client.get_users_alliance_membership(self.user_id, reason = 'CustomerSupport')
+        if not alliance_membership:
+            return ReturnValue(error = 'demote_alliance_leader failed: user %d is not in an alliance' % (self.user_id,))
+
+        alliance_id = alliance_membership['alliance_id']
+        if alliance_membership['role'] != self.gamesite.nosql_client.ROLE_LEADER:
+            return ReturnValue(error = 'demote_alliance_leader failed: user %d is in alliance %d, but is not the leader' % (self.user_id, alliance_id))
+
+        new_role = alliance_membership['role'] - 1
+        if not self.gamesite.nosql_client.promote_alliance_member(alliance_id, self.user_id, self.user_id,
+                                                                  alliance_membership['role'],
+                                                                  new_role,
+                                                                  force = True, reason = 'CustomerSupport'):
+            return ReturnValue(error = 'demote_alliance_leader failed: user %d might not be the leader of alliance %d' % \
+                               (self.user_id, alliance_id))
+        new_leader_id = self.gamesite.nosql_client.do_maint_fix_leadership_problem(alliance_id, exclude_leader_id = self.user_id, verbose = False)
+
+        self.gamesite.metrics_log.event(self.time_now, {'user_id': self.user_id,
+                                                        'event_name': '4626_alliance_member_promoted',
+                                                        'alliance_id': alliance_id, 'target_id': self.user_id, 'role':new_role,
+                                                        'reason':'CustomerSupport'})
+        return ReturnValue(result = {'new_leader_id': new_leader_id})
+
+class HandleKickAllianceMember(Handler):
+    def do_exec_online(self, session, retmsg): return self.do_exec_both()
+    def do_exec_offline(self, user, player): return self.do_exec_both()
+    def do_exec_both(self):
+        alliance_membership = self.gamesite.sql_client.get_users_alliance_membership(self.user_id, reason = 'CustomerSupport')
+        if not alliance_membership:
+            return ReturnValue(error = 'kick_alliance_member failed: user %d is not in an alliance' % (self.user_id,))
+
+        alliance_id = alliance_membership['alliance_id']
+        if not self.gamesite.nosql_client.kick_from_alliance(self.user_id, alliance_id, self.user_id, force = True, reason='CustomerSupport'):
+            return ReturnValue(error = 'kick_alliance_member failed: user %d might not be a member of of alliance %d' % \
+                               (self.user_id, alliance_id))
+
+        self.gamesite.pcache_client.player_cache_update(self.user_id, {'alliance_id': -1}, reason = 'CustomerSupport')
+
+        self.gamesite.metrics_log.event(self.time_now, {'user_id': self.user_id,
+                                                        'event_name': '4625_alliance_member_kicked',
+                                                        'alliance_id': alliance_id, 'target_id': self.user_id,
+                                                        'reason':'CustomerSupport'})
+
+        new_leader_id = self.gamesite.nosql_client.do_maint_fix_leadership_problem(alliance_id, verbose = False)
+        if new_leader_id > 0:
+            self.gamesite.metrics_log.event(self.time_now, {'user_id': new_leader_id,
+                                                            'event_name': '4626_alliance_member_promoted',
+                                                            'alliance_id': alliance_id, 'target_id': new_leader_id,
+                                                            'role':self.gamesite.nosql_client.ROLE_LEADER,
+                                                            'reason':'CustomerSupport'})
+        return ReturnValue(result = 'ok')
+
 methods = {
     'get_raw_player': HandleGetRawPlayer,
     'get_raw_user': HandleGetRawUser,
@@ -637,4 +693,6 @@ methods = {
     'give_item': HandleGiveItem,
     'send_message': HandleSendMessage,
     'change_region': HandleChangeRegion,
+    'demote_alliance_leader': HandleDemoteAllianceLeader,
+    'kick_alliance_member': HandleKickAllianceMember,
 }

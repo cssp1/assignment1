@@ -309,6 +309,20 @@ var method_unban = function() {
         send_request('player', 'unban', $.extend(ident, {'ui_reason':ui_reason}), function(result) { alert("Success!"); });
     }
 };
+var method_kick_alliance_member = function() {
+    var ident = get_ident();
+    var ui_reason = check_ui_reason($("#alliance_reason")[0].value);
+    if(ident && ui_reason) {
+        send_request('player', 'kick_alliance_member', $.extend(ident, {'ui_reason':ui_reason}), function(result) { alert("Success!"); });
+    }
+};
+var method_demote_alliance_leader = function() {
+    var ident = get_ident();
+    var ui_reason = check_ui_reason($("#alliance_reason")[0].value);
+    if(ident && ui_reason) {
+        send_request('player', 'demote_alliance_leader', $.extend(ident, {'ui_reason':ui_reason}), function(result) { alert("Success! The new Clan leader is user_id "+result['new_leader_id'].toString()); });
+    }
+};
 var method_make_developer = function() {
     var ident = get_ident();
     var ui_reason = check_ui_reason($("#make_developer_reason")[0].value);
@@ -1270,6 +1284,8 @@ $(function() {
         $('#player_tools_clear_cooldown_header').remove();
         $('#player_tools_change_region').remove();
         $('#player_tools_change_region_header').remove();
+        $('#player_tools_alliance').remove();
+        $('#player_tools_alliance_header').remove();
     }
 
     if(spin_token_data['roles'].indexOf('ADMIN') == -1) {
@@ -1386,6 +1402,7 @@ $(function() {
     <li><a href="#player_tools_clear_cooldown" id="player_tools_clear_cooldown_header">Cooldowns</a></li>
     <li><a href="#player_tools_alts" id="player_tools_alts_header">Alts</a></li>
     <li><a href="#player_tools_change_region" id="player_tools_change_region_header">Map Region</a></li>
+    <li><a href="#player_tools_alliance" id="player_tools_alliance_header">Clan</a></li>
     <li><a href="#player_tools_ban" id="player_tools_ban_header">Ban</a></li>
     <li><a href="#player_tools_developer" id="player_tools_developer_header">Developer</a></li>
   </ul>
@@ -1492,6 +1509,16 @@ $(function() {
       <br>
       <input type="text" id="ban_reason" style="width:500px;">
     </div>
+
+    <div id="player_tools_alliance">
+      <button onclick="method_demote_alliance_leader()" class="spin_button">Demote Leader</button>
+      <button onclick="method_kick_alliance_member()" class="spin_button">Kick from Clan</button>
+      <p>
+      Reason for this action:
+      <br>
+      <input type="text" id="alliance_reason" style="width:500px;">
+    </div>
+
     <div id="player_tools_developer">
       &quot;Developer Flag&quot; enables developer-only features and excludes this player from analytics.<p>
       <button onclick="method_make_developer()" class="spin_button" style="width:200px;">Developer Flag ON</button>

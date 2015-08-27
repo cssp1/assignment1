@@ -265,13 +265,17 @@ class NoSQLClient (object):
 
     # enforce leadership invariant.
     # returns: 0 if no problem. -1 if alliance needed to be disbanded. Otherwise, user_id of new leader.
-    def do_maint_fix_leadership_problem(self, alliance_id, verbose = True):
+    def do_maint_fix_leadership_problem(self, alliance_id, exclude_leader_id = -1, verbose = True):
         if verbose: print 'Fixing alliance leadership problem on alliance', alliance_id, '...'
         memberships = list(self.alliance_table('alliance_members').find({'alliance_id':alliance_id}))
         if len(memberships) < 1: # maint code doesn't get here
             if verbose: print '  Alliance', alliance_id, 'has no members left. Disbanding.'
             self.delete_alliance(alliance_id)
             return -1
+
+        if exclude_leader_id > 0: # don't consider this user as a potential leader
+            memberships = filter(lambda x: x['_id'] != exclude_leader_id, memberships)
+
         pcache_info = self.player_cache_lookup_batch([x['_id'] for x in memberships], fields = ['player_level'])
         pcache = dict((x['user_id'], x) for x in pcache_info if x)
 
