@@ -4894,11 +4894,7 @@ Base.prototype.draw_base_perimeter = function(purpose) {
     if(!new_deployment_buffer && purpose != 'build_ignore_perimeter' &&
        !(purpose == 'deploy' && gamedata['map']['deployment_buffer'] < 0)) {
         SPUI.ctx.beginPath();
-        SPUI.ctx.moveTo(v[0][0], v[0][1]);
-        SPUI.ctx.lineTo(v[1][0], v[1][1]);
-        SPUI.ctx.lineTo(v[2][0], v[2][1]);
-        SPUI.ctx.lineTo(v[3][0], v[3][1]);
-        SPUI.ctx.lineTo(v[0][0], v[0][1]);
+        SPUI.add_quad_to_path(v);
         SPUI.ctx.stroke();
     }
 
@@ -47878,8 +47874,7 @@ function draw_backdrop_area_bounds() {
     ctx.lineTo(xy[0],xy[1]);
     xy = ortho_to_draw([0,ncells[1]]);
     ctx.lineTo(xy[0],xy[1]);
-    xy = ortho_to_draw([0,0]);
-    ctx.lineTo(xy[0],xy[1]);
+    ctx.closePath();
     ctx.stroke();
 }
 function draw_backdrop_scenery() {
@@ -49770,7 +49765,7 @@ function draw_drag_selection() {
     ctx.lineTo(xmax, ymin);
     ctx.lineTo(xmax, ymax);
     ctx.lineTo(xmin, ymax);
-    ctx.lineTo(xmin, ymin);
+    ctx.closePath();
     ctx.fill();
     ctx.stroke();
     ctx.restore();
@@ -49825,7 +49820,7 @@ function draw_selection_highlight(unit, config_override) {
             ctx.lineTo(xy[0], xy[1]-r/2);
             ctx.lineTo(xy[0]+r, xy[1]);
             ctx.lineTo(xy[0], xy[1]+r/2);
-            ctx.lineTo(xy[0]-r, xy[1]);
+            ctx.closePath();
             ctx.fill();
             if(stroke_alpha > 0) { ctx.stroke(); }
         }
@@ -50201,7 +50196,7 @@ function draw_debug_map() {
                 ctx.lineTo(xy[0]+cellsize[0]/2,xy[1]+inset);
                 ctx.lineTo(xy[0]+cellsize[0]-inset,xy[1]+cellsize[1]/2);
                 ctx.lineTo(xy[0]+cellsize[0]/2,xy[1]+cellsize[1]-inset);
-                ctx.lineTo(xy[0]+inset,xy[1]+cellsize[1]/2);
+                ctx.closePath();
                 ctx.stroke();
             }
         }

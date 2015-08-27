@@ -2626,7 +2626,7 @@ SPUI.add_quad_to_path = function(v) {
     SPUI.ctx.lineTo(v[1][0], v[1][1]);
     SPUI.ctx.lineTo(v[2][0], v[2][1]);
     SPUI.ctx.lineTo(v[3][0], v[3][1]);
-    SPUI.ctx.lineTo(v[0][0], v[0][1]);
+    SPUI.ctx.closePath();
 };
 
 SPUI.add_beveled_rectangle_to_path = function(xy, wh, b) {
@@ -2638,7 +2638,7 @@ SPUI.add_beveled_rectangle_to_path = function(xy, wh, b) {
     SPUI.ctx.lineTo(xy[0]+b, xy[1]+wh[1]);
     SPUI.ctx.lineTo(xy[0], xy[1]+wh[1]-b);
     SPUI.ctx.lineTo(xy[0], xy[1]+b);
-    SPUI.ctx.lineTo(xy[0]+b, xy[1]);
+    SPUI.ctx.closePath();
 };
 
 SPUI.SolidRect.prototype.do_draw = function(offset) {
