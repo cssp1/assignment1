@@ -20747,24 +20747,13 @@ function update_map_dialog_header_buttons(dialog) {
     dialog.user_data['buttons'] = [];
     var i = 0;
 
-    // SINGLE PLAYER
-    dialog.user_data['buttons'].push('computers');
-    dialog.widgets['button'+i.toString()].show = true;
-    dialog.widgets['warning_text'+i.toString()].show = false;
-    dialog.widgets['button'+i.toString()].str = dialog.data['widgets']['button']['ui_name_computers'];
-    dialog.widgets['button'+i.toString()].tooltip.str = null;
-    dialog.widgets['button'+i.toString()].onclick = function(w) {
-        if(w.parent && w.parent.parent && w.parent.parent.user_data['dialog'] === 'map_dialog') {
-            if(w.parent.parent.user_data['chapter'] !== 'computers') { map_dialog_change_page(w.parent.parent, 'computers', 0); }
-        } else {
-            invoke_map_dialog('computers');
-        }
-    };
-    dialog.widgets['button'+i.toString()].state = ((dialog.parent.user_data['dialog'] === 'map_dialog' && dialog.parent.user_data['chapter'] === 'computers') ? 'active' : 'normal');
-    i += 1;
-
     // RIVALS button
-    if(player.tutorial_state === "COMPLETE") {
+
+    // use this instead of player.is_ladder_player() since that one checks pvp_requirement predicate
+    var ladder_available = gamedata['ladder_pvp'] || (session.region && session.region.data && session.region.data['ladder_pvp']);
+
+    if(player.tutorial_state === "COMPLETE" &&
+       (player.is_legacy_pvp_player() || ladder_available)) {
         var pvp_pred = read_predicate({'predicate':'LIBRARY', 'name':'pvp_requirement'});
 
         if(!pvp_pred.is_satisfied(player,null)) {
@@ -20778,7 +20767,7 @@ function update_map_dialog_header_buttons(dialog) {
             dialog.widgets['button'+i.toString()].tooltip.text_color = SPUI.error_text_color;
             dialog.widgets['button'+i.toString()].onclick = get_requirements_help(pvp_pred);
             i += 1;
-        } else if(player.is_legacy_pvp_player() || player.is_ladder_player()) {
+        } else {
             dialog.user_data['buttons'].push('rivals');
             dialog.widgets['button'+i.toString()].show = true;
             dialog.widgets['button'+i.toString()].str = dialog.data['widgets']['button']['ui_name_rivals'];
@@ -20826,6 +20815,22 @@ function update_map_dialog_header_buttons(dialog) {
         }
         i += 1;
     }
+
+    // SINGLE PLAYER
+    dialog.user_data['buttons'].push('computers');
+    dialog.widgets['button'+i.toString()].show = true;
+    dialog.widgets['warning_text'+i.toString()].show = false;
+    dialog.widgets['button'+i.toString()].str = dialog.data['widgets']['button']['ui_name_computers'];
+    dialog.widgets['button'+i.toString()].tooltip.str = null;
+    dialog.widgets['button'+i.toString()].onclick = function(w) {
+        if(w.parent && w.parent.parent && w.parent.parent.user_data['dialog'] === 'map_dialog') {
+            if(w.parent.parent.user_data['chapter'] !== 'computers') { map_dialog_change_page(w.parent.parent, 'computers', 0); }
+        } else {
+            invoke_map_dialog('computers');
+        }
+    };
+    dialog.widgets['button'+i.toString()].state = ((dialog.parent.user_data['dialog'] === 'map_dialog' && dialog.parent.user_data['chapter'] === 'computers') ? 'active' : 'normal');
+    i += 1;
 
     // HITLIST button
     if(player.tutorial_state === "COMPLETE" &&
