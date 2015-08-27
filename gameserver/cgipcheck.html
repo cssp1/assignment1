@@ -500,7 +500,7 @@ var log_formats = [
     // cheating
     [(new RegExp('gamedata checksum FAIL|REFUND|DISPUTE|LOGIN_ABUSE')), function(t) { return '<font color="#dd0000"><b>'+t+'</b></font>'; }],
     // unimportant
-    [(new RegExp('bad client message|extremely long session|got stale data|but acquirer gen|attack spam|raises object HP|PING_BASE_DAMAGE|found when decoding array|squad is locked|squad moved|has foreign squad|trim_unit_space|squad_exit_map |oversize army|Setting up AI|starting up|shutdown complete|mismatched gamedata build|repair speedup time|repair queue is empty')), function(t) { return '<font color="#c0c0c0">'+t+'</font>'; }],
+    [(new RegExp('bad client message|extremely long session|got stale data|but acquirer gen|attack spam|raises object HP|PING_BASE_DAMAGE|found when decoding array|squad is locked|squad moved|has foreign squad|trim_unit_space|squad_exit_map |oversize army|Setting up AI|starting up|shutdown complete|mismatched gamedata build|repair speedup time|repair queue is empty|unrecognized PortraitProxy URL')), function(t) { return '<font color="#c0c0c0">'+t+'</font>'; }],
 ];
 var newline_re = new RegExp('\n', 'g');
 var tab_re = new RegExp('\t', 'g');

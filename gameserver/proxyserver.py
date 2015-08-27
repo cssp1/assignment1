@@ -2417,7 +2417,7 @@ class PortraitProxy(twisted.web.resource.Resource):
     def render(self, request):
         source_url = self.parse_request(request)
         if not source_url:
-            exception_log.event(proxy_time, 'unrecognized PortraitProxy URL: ' + log_request(request))
+            exception_log.event(proxy_time, 'unrecognized PortraitProxy URL: ' + log_request(request) + ' headers ' + repr(request.requestHeaders))
             request.setResponseCode(http.BAD_REQUEST)
             return 'invalid parameters'
         self.set_cdn_headers(request)
