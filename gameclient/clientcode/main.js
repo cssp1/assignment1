@@ -21834,8 +21834,14 @@ function mail_dialog_select_mail(dialog, row) {
     dialog.widgets['subj_name'].str = mail['subject'];
     dialog.widgets['body'].set_text_with_linebreaking(mail['body']);
 
-    dialog.widgets['delete_button'].onclick = (function (_mail) { return function(w) {
-        var deleter = (function(__mail) { return function() {
+    dialog.widgets['delete_button'].onclick = (function (_msg_id) { return function(w) {
+        var _mail = player.get_mail_by_msg_id(_msg_id);
+        if(!_mail) { return; }
+
+        var deleter = (function(__msg_id) { return function() {
+            var __mail = player.get_mail_by_msg_id(__msg_id);
+            if(!__mail) { return; }
+
             player.mailbox_remove(__mail);
             // note: we really should do full client-side
             // prediction of mailbox contents. But because MAIL_DELETE is the
@@ -21846,7 +21852,7 @@ function mail_dialog_select_mail(dialog, row) {
             player.mailbox_sync_marker = synchronizer.request_sync();
             send_to_server.func(["MAIL_DELETE", __mail['msg_id']]);
             update_mail_dialog(w.parent, false);
-        }; })(_mail);
+        }; })(_msg_id);
 
         // only ask for confirmation if it has attachments
         if('attachments' in _mail) {
@@ -21860,7 +21866,7 @@ function mail_dialog_select_mail(dialog, row) {
             deleter();
         }
 
-    }; })(mail);
+    }; })(mail['msg_id']);
 
     if('attachments' in mail) {
         dialog.widgets['attach_label'].show =
@@ -21929,15 +21935,19 @@ function mail_dialog_attach_scroll(dialog, page) {
             dialog.widgets['attach_frame'+row.toString()].show = true;
             dialog.widgets['attach_frame'+row.toString()].state = (mail['pending'] && !synchronizer.is_in_sync(mail['pending']) ? 'cooldown' : 'normal');
             dialog.widgets['attach_frame'+row.toString()].bg_image_offset = [0,0];
-            dialog.widgets['attach_frame'+row.toString()].onenter = (function (_mail, _row, _slot, _item) { return function (w) {
+            dialog.widgets['attach_frame'+row.toString()].onenter = (function (_msg_id, _row, _slot, _item) { return function (w) {
+                var _mail = player.get_mail_by_msg_id(_msg_id);
+                if(!_mail) { return; }
                 w.state = (_mail['pending'] && !synchronizer.is_in_sync(_mail['pending']) ? 'cooldown' : 'active');
                 var stickout = [0,-1];
                 w.bg_image_offset = stickout;
                 w.parent.widgets['attach_icon'+_row.toString()].bg_image_offset = stickout;
                 w.parent.widgets['attach_stack'+_row.toString()].text_offset = stickout;
                 mail_dialog_invoke_context(w.parent, _slot, _item);
-            }; })(mail, row, i, at);
-            dialog.widgets['attach_frame'+row.toString()].onclick = (function (_mail, _row, _slot, _item) { return function (w) {
+            }; })(mail['msg_id'], row, i, at);
+            dialog.widgets['attach_frame'+row.toString()].onclick = (function (_msg_id, _row, _slot, _item) { return function (w) {
+                var _mail = player.get_mail_by_msg_id(_msg_id);
+                if(!_mail) { return; }
                 if(!(_mail['pending'] && !synchronizer.is_in_sync(_mail['pending']))) {
                     _mail['pending'] = synchronizer.request_sync();
                     for(var j = 0; j < w.parent.data['widgets']['attach_icon']['array'][0]; j++) {
@@ -21948,8 +21958,11 @@ function mail_dialog_attach_scroll(dialog, page) {
                     w.state = 'cooldown';
                     send_to_server.func(["MAIL_TAKE_ATTACHMENTS", _mail['msg_id'], _slot, _item['spec'], _item['stack'] || 1]);
                 }
-            }; })(mail, row, i, at);
-            dialog.widgets['attach_frame'+row.toString()].onleave_cb = (function (_mail, _row, _slot, _item) { return function (w) {
+            }; })(mail['msg_id'], row, i, at);
+            dialog.widgets['attach_frame'+row.toString()].onleave_cb = (function (_msg_id, _row, _slot, _item) { return function (w) {
+                var _mail = player.get_mail_by_msg_id(_msg_id);
+                if(!_mail) { return; }
+
                 var inv_dialog = w.parent;
                 if(inv_dialog.user_data['context'] &&
                    inv_dialog.user_data['context'].user_data['slot'] === _slot &&
@@ -21961,7 +21974,7 @@ function mail_dialog_attach_scroll(dialog, page) {
                     w.parent.widgets['attach_icon'+_row.toString()].bg_image_offset = stickout;
                     w.parent.widgets['attach_stack'+_row.toString()].text_offset = stickout;
                 }
-            }; })(mail, row, i, at);
+            }; })(mail['msg_id'], row, i, at);
             row += 1;
         }
     } else {
