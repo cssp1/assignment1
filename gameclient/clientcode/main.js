@@ -43696,13 +43696,14 @@ function handle_server_message(data) {
     } else if(msg == "MAIL_UPDATE") {
         var msg_id = data[1];
         if(msg_id) { // update one individual mail
+            var new_mail = data[2];
             for(var i = 0; i < player.mailbox.length; i++) {
-                var mail = player.mailbox[i];
-                if(mail['msg_id'] === msg_id) {
-                    if(mail['pending'] && !synchronizer.is_in_sync(mail['pending'])) { // do NOT apply the update, further updates are incoming for this mail
-                        continue;
+                var old_mail = player.mailbox[i];
+                if(old_mail['msg_id'] === msg_id) {
+                    if(old_mail['pending']) { // carry over pending flag
+                        new_mail['pending'] = old_mail['pending'];
                     }
-                    player.mailbox[i] = data[2];
+                    player.mailbox[i] = new_mail;
                     break;
                 }
             }
@@ -43717,7 +43718,7 @@ function handle_server_message(data) {
             player.mailbox = data[2];
             // carry over any in-flight pending flags
             goog.array.forEach(old_mailbox, function(old_mail) {
-                if(old_mail['pending'] && !synchronizer.is_in_sync(old_mail['pending'])) {
+                if(old_mail['pending']) {
                     var new_mail = goog.array.find(player.mailbox, function(new_mail) { return new_mail['msg_id'] === old_mail['msg_id']; });
                     if(new_mail) {
                         new_mail['pending'] = old_mail['pending'];
@@ -43732,23 +43733,21 @@ function handle_server_message(data) {
 
         player.invalidate_quest_cache();
     } else if(msg == "MAIL_TAKE_ATTACHMENTS_RESULT") {
-        var msg_id = data[1], slot = data[2], success = data[3], fungible = data[4], newmail = data[5];
-        for(var i = 0; i < player.mailbox.length; i++) {
-            var mail = player.mailbox[i];
-            if(mail['msg_id'] === msg_id) {
-                if('pending' in mail) {
-                    if(synchronizer.is_in_sync(mail['pending'])) {
-                        // clear pending flag
-                        delete mail['pending'];
-                    } else {
-                        continue; // do NOT apply the update, further updates are incoming for this mail
+        var msg_id = data[1], slot = data[2], success = data[3], fungible = data[4], new_mail = data[5];
+
+        if(new_mail) {
+            for(var i = 0; i < player.mailbox.length; i++) {
+                var old_mail = player.mailbox[i];
+                if(old_mail['msg_id'] === msg_id) {
+                    if(old_mail['pending']) { // carry over pending flag
+                        new_mail['pending'] = old_mail['pending'];
                     }
-                }
-                if(newmail) {
-                    player.mailbox[i] = newmail;
+                    player.mailbox[i] = new_mail;
+                    break;
                 }
             }
         }
+
         if(selection.ui && selection.ui.user_data && selection.ui.user_data['dialog'] === 'mail_dialog') {
             if(success) {
                 selection.ui.widgets['glow'].show = true;
