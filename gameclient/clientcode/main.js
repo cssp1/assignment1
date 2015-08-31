@@ -5497,6 +5497,7 @@ player.donated_units_max_space = function() {
 // same as player.mailbox on the server
 player.mailbox = [];
 player.mailbox_sync_marker = Synchronizer.INIT; // for client-side prediction of the mailbox contents
+player.mailbox_debug = []; // log of actions, only for debugging race conditions
 
 // same as player.map_bookmarks on server
 player.map_bookmarks = {};
@@ -21850,7 +21851,9 @@ function mail_dialog_select_mail(dialog, row) {
             // we can get away with just throwing away any MAIL_UPDATEs that
             // come in while we have another request in flight.
             player.mailbox_sync_marker = synchronizer.request_sync();
-            send_to_server.func(["MAIL_DELETE", __mail['msg_id']]);
+            var xmit = ["MAIL_DELETE", __mail['msg_id']];
+            player.mailbox_debug.push(JSON.stringify(xmit));
+            send_to_server.func(xmit);
             update_mail_dialog(w.parent, false);
         }; })(_msg_id);
 
@@ -21889,7 +21892,9 @@ function mail_dialog_select_mail(dialog, row) {
     // mark the mail as read
     if(!mail['read']) {
         mail['read'] = 1;
-        send_to_server.func(["MAIL_READ", mail['msg_id']]);
+        var xmit = ["MAIL_READ", mail['msg_id']];
+        player.mailbox_debug.push(JSON.stringify(xmit));
+        send_to_server.func(xmit);
         dialog.widgets['pending_messages_icon'].show =
             dialog.widgets['pending_messages_icon_glow'].show = player.has_unread_mail();
         dialog.widgets['row_icon'+(dialog.user_data['selected_row']-dialog.user_data['first_row']).toString()].show = false;
@@ -21902,10 +21907,10 @@ function mail_dialog_attach_scroll(dialog, page) {
     var any_expiring = false;
     var count = player.mailbox_count();
 
-    if(dialog.user_data['selected_row'] < 0 || dialog.user_data['selected_row'] >= count) { return; }
+    if(dialog.user_data['selected_row'] < 0 || dialog.user_data['selected_row'] >= count) { return; } // XXXXXX?
     dialog.user_data['attach_page'] = page;
     var mail = player.mailbox_nth(dialog.user_data['selected_row']);
-    if(!('attachments' in mail) || mail['attachments'].length < 1) { return; }
+    if(!('attachments' in mail) || mail['attachments'].length < 1) { return; } // XXXXXX?
     var row = 0;
     var rows_per_page = dialog.data['widgets']['attach_icon']['array'][0];
     var chapter_items = mail['attachments'].length;
@@ -21956,7 +21961,10 @@ function mail_dialog_attach_scroll(dialog, page) {
                         }
                     }
                     w.state = 'cooldown';
-                    send_to_server.func(["MAIL_TAKE_ATTACHMENTS", _mail['msg_id'], _slot, _item['spec'], _item['stack'] || 1]);
+                    var xmit = ["MAIL_TAKE_ATTACHMENTS", _mail['msg_id'], _slot, _item['spec'], _item['stack'] || 1];
+                    player.mailbox_debug.push(JSON.stringify(xmit));
+                    xmit.push(player.mailbox_debug); // add after to avoid recursion
+                    send_to_server.func(xmit);
                 }
             }; })(mail['msg_id'], row, i, at);
             dialog.widgets['attach_frame'+row.toString()].onleave_cb = (function (_msg_id, _row, _slot, _item) { return function (w) {
@@ -43694,6 +43702,7 @@ function handle_server_message(data) {
     } else if(msg == "TUTORIAL_STATE_UPDATE") {
         player.tutorial_state = data[1];
     } else if(msg == "MAIL_UPDATE") {
+        player.mailbox_debug.push(JSON.stringify(data));
         var msg_id = data[1];
         if(msg_id) { // update one individual mail
             var new_mail = data[2];
@@ -43733,6 +43742,7 @@ function handle_server_message(data) {
 
         player.invalidate_quest_cache();
     } else if(msg == "MAIL_TAKE_ATTACHMENTS_RESULT") {
+        player.mailbox_debug.push(JSON.stringify(data));
         var msg_id = data[1], slot = data[2], success = data[3], fungible = data[4], new_mail = data[5];
 
         if(new_mail) {

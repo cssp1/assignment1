@@ -24440,6 +24440,12 @@ class GAMEAPI(resource.Resource):
             client_index = arg[2]
             client_spec = arg[3]
             client_stack = arg[4]
+
+            if gamedata['server'].get('log_mail',0) >= 3:
+                client_debug_info = arg[5]
+            else:
+                client_debug_info = None
+
             success = False
             need_space = False
             need_resource_update = False
@@ -24541,8 +24547,8 @@ class GAMEAPI(resource.Resource):
                         session.player.mailbox.remove(mail)
                         session.player.mailbox.append(old_mail)
             else:
-                gamesite.exception_log.event(server_time, 'player %d MAIL_TAKE_ATTACHMENTS: msg_id %s present %r index %d spec %s stack %d' % \
-                                             (session.player.user_id, msg_id, bool(mail), client_index, client_spec, client_stack))
+                gamesite.exception_log.event(server_time, 'player %d MAIL_TAKE_ATTACHMENTS: msg_id %s present %r index %d spec %s stack %d debug %r' % \
+                                             (session.player.user_id, msg_id, bool(mail), client_index, client_spec, client_stack, client_debug_info))
                 retmsg.append(["ERROR", "HARMLESS_RACE_CONDITION"])
 
             #time.sleep(3) # to test lag
