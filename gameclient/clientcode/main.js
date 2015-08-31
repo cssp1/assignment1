@@ -21938,12 +21938,12 @@ function mail_dialog_attach_scroll(dialog, page) {
             }
 
             dialog.widgets['attach_frame'+row.toString()].show = true;
-            dialog.widgets['attach_frame'+row.toString()].state = (mail['pending'] && !synchronizer.is_in_sync(mail['pending']) ? 'cooldown' : 'normal');
+            dialog.widgets['attach_frame'+row.toString()].state = (('pending' in mail) && !synchronizer.is_in_sync(mail['pending']) ? 'cooldown' : 'normal');
             dialog.widgets['attach_frame'+row.toString()].bg_image_offset = [0,0];
             dialog.widgets['attach_frame'+row.toString()].onenter = (function (_msg_id, _row, _slot, _item) { return function (w) {
                 var _mail = player.get_mail_by_msg_id(_msg_id);
                 if(!_mail) { return; }
-                w.state = (_mail['pending'] && !synchronizer.is_in_sync(_mail['pending']) ? 'cooldown' : 'active');
+                w.state = (('pending' in _mail) && !synchronizer.is_in_sync(_mail['pending']) ? 'cooldown' : 'active');
                 var stickout = [0,-1];
                 w.bg_image_offset = stickout;
                 w.parent.widgets['attach_icon'+_row.toString()].bg_image_offset = stickout;
@@ -21953,7 +21953,7 @@ function mail_dialog_attach_scroll(dialog, page) {
             dialog.widgets['attach_frame'+row.toString()].onclick = (function (_msg_id, _row, _slot, _item) { return function (w) {
                 var _mail = player.get_mail_by_msg_id(_msg_id);
                 if(!_mail) { return; }
-                if(!(_mail['pending'] && !synchronizer.is_in_sync(_mail['pending']))) {
+                if(!(('pending' in _mail) && !synchronizer.is_in_sync(_mail['pending']))) {
                     _mail['pending'] = synchronizer.request_sync();
                     for(var j = 0; j < w.parent.data['widgets']['attach_icon']['array'][0]; j++) {
                         if(w.parent.widgets['attach_frame'+j.toString()].show) {
@@ -21976,7 +21976,7 @@ function mail_dialog_attach_scroll(dialog, page) {
                    inv_dialog.user_data['context'].user_data['slot'] === _slot &&
                    inv_dialog.user_data['context'].user_data['item'] === _item) {
                     mail_dialog_invoke_context(w.parent, -1, null);
-                    w.state = (_mail['pending'] && !synchronizer.is_in_sync(_mail['pending']) ? 'cooldown' : 'normal');
+                    w.state = (('pending' in _mail) && !synchronizer.is_in_sync(_mail['pending']) ? 'cooldown' : 'normal');
                     var stickout = [0,0];
                     w.bg_image_offset = stickout;
                     w.parent.widgets['attach_icon'+_row.toString()].bg_image_offset = stickout;
@@ -43709,7 +43709,7 @@ function handle_server_message(data) {
             for(var i = 0; i < player.mailbox.length; i++) {
                 var old_mail = player.mailbox[i];
                 if(old_mail['msg_id'] === msg_id) {
-                    if(old_mail['pending']) { // carry over pending flag
+                    if('pending' in old_mail) { // carry over pending flag
                         new_mail['pending'] = old_mail['pending'];
                     }
                     player.mailbox[i] = new_mail;
@@ -43727,7 +43727,7 @@ function handle_server_message(data) {
             player.mailbox = data[2];
             // carry over any in-flight pending flags
             goog.array.forEach(old_mailbox, function(old_mail) {
-                if(old_mail['pending']) {
+                if('pending' in old_mail) {
                     var new_mail = goog.array.find(player.mailbox, function(new_mail) { return new_mail['msg_id'] === old_mail['msg_id']; });
                     if(new_mail) {
                         new_mail['pending'] = old_mail['pending'];
@@ -43749,7 +43749,7 @@ function handle_server_message(data) {
             for(var i = 0; i < player.mailbox.length; i++) {
                 var old_mail = player.mailbox[i];
                 if(old_mail['msg_id'] === msg_id) {
-                    if(old_mail['pending']) { // carry over pending flag
+                    if('pending' in old_mail) { // carry over pending flag
                         new_mail['pending'] = old_mail['pending'];
                     }
                     player.mailbox[i] = new_mail;
