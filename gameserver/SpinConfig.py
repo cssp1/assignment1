@@ -290,12 +290,12 @@ def get_pvp_day(origin, t):
 
 
 
-# get mongodb connection info
-# returns a dictionary d where
-# d['connect_args'], d['connect_kwargs'] are the things you should pass to pymongo.MongoClient() to set up the connection
-# d['dbname'] is the database where your stuff is, and d['table_prefix'] should be prepended to all collection names.
-def get_mongodb_config(dbname):
-    # figure out parent/child relationships and implicit databases
+# internal function - figure out parent/child relationships and implicit databases
+# return (parents, implicit) where
+# parents maps from child dbnames to parent dbnames
+# implicit is the set of possible implicit dbnames
+
+def _read_mongodb_config():
     parents = {}
     implicit = set()
     for name, data in config['mongodb_servers'].iteritems():
@@ -304,6 +304,19 @@ def get_mongodb_config(dbname):
                 parents[sub_name] = data
                 if sub_name not in config['mongodb_servers']:
                     implicit.add(sub_name)
+    return parents, implicit
+
+# get list of all possible explicit and implicit dbnames
+def get_mongodb_config_list():
+    parents, implicit = _read_mongodb_config()
+    return sorted(list(set(config['mongodb_servers'].keys() + list(implicit))))
+
+# get mongodb connection info
+# returns a dictionary d where
+# d['connect_args'], d['connect_kwargs'] are the things you should pass to pymongo.MongoClient() to set up the connection
+# d['dbname'] is the database where your stuff is, and d['table_prefix'] should be prepended to all collection names.
+def get_mongodb_config(dbname):
+    parents, implicit = _read_mongodb_config()
     if dbname not in config.get('mongodb_servers',{}) and (dbname not in implicit):
         raise Exception('config.json: no mongodb_servers entry nor implicit entry for db '+dbname)
     return parse_mongodb_config(dbname, config['mongodb_servers'].get(dbname, {}), parent = parents.get(dbname, None))
