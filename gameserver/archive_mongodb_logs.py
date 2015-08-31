@@ -71,7 +71,7 @@ TABLES = {
     'econ_res': { 's3_name': 'econ_res', 'table_name': 'econ_res', 'compression': 'zip', 'retain_for': 1*86400 },
 
     # inventory source/sink log
-    'inventory': { 's3_name': 'inventory', 'table_name': 'log_inventory', 'compression': 'zip', 'retain_for': 60*86400 },
+    'inventory': { 's3_name': 'inventory', 'table_name': 'log_inventory', 'compression': 'zip', 'retain_for': 30*86400 },
 
     # lottery log
     'lottery': { 's3_name': 'lottery', 'table_name': 'log_lottery', 'compression': 'zip', 'retain_for': 60*86400 },
@@ -84,13 +84,13 @@ TABLES = {
     'unit_donation': { 's3_name': 'unit_donation', 'table_name': 'log_unit_donation', 'compression': 'zip', 'retain_for': 7*86400 },
 
     # ladder PvP log
-    'ladder_pvp': { 's3_name': 'ladder_pvp', 'table_name': 'log_ladder_pvp', 'compression': 'zip', 'retain_for': 10*86400 },
+    'ladder_pvp': { 's3_name': 'ladder_pvp', 'table_name': 'log_ladder_pvp', 'compression': 'zip', 'retain_for': 7*86400 },
 
     # damage protection log
     'damage_protection': { 's3_name': 'damage_protection', 'table_name': 'log_damage_protection', 'compression': 'zip', 'retain_for': 30*86400 },
 
     # fishing log
-    'fishing': { 's3_name': 'fishing', 'table_name': 'log_fishing', 'compression': 'zip', 'retain_for': 30*86400 },
+    'fishing': { 's3_name': 'fishing', 'table_name': 'log_fishing', 'compression': 'zip', 'retain_for': 15*86400 },
 
     # quests and achievements logs
     'quests': { 's3_name': 'quests', 'table_name': 'log_quests', 'compression': 'zip', 'retain_for': 30*86400 },
@@ -108,6 +108,7 @@ TABLES = {
     'fb_requests': { 's3_name': 'fb_requests', 'table_name': 'log_fb_requests', 'compression': 'zip', 'retain_for': 30*86400 },
     'fb_open_graph': { 's3_name': 'fb_open_graph', 'table_name': 'log_fb_open_graph', 'compression': 'zip', 'retain_for': 30*86400 },
     'fb_sharing': { 's3_name': 'fb_sharing', 'table_name': 'log_fb_sharing', 'compression': 'zip', 'retain_for': 30*86400 },
+    'fb_app_events': { 's3_name': 'fb_app_events', 'table_name': 'log_fb_app_events', 'compression': 'zip', 'retain_for': 30*86400 },
 
     # activity log
     'activity': { 's3_name': 'activity', 'table_name': 'activity', 'compression': 'zip', 'retain_for': 7*86400 },
