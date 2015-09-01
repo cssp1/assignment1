@@ -1380,8 +1380,7 @@ if __name__ == '__main__':
                     completion['subconsequents'] += [{ "consequent": "PLAYER_HISTORY", "key": "ai_"+data['event_name']+data['extra_key_suffix'][diff]+"_times_completed", "method": "increment", "value": 1 }]
 
                 if speedrun_aura:
-                    if_i_win = [{ "consequent": "PLAYER_HISTORY", "key": "ai_"+data['event_name']+data['key_suffix'][diff]+"_speedrun", "method": "max", "value": 1 },
-                                { "consequent": "REMOVE_AURA", "aura_name": speedrun_aura }]
+                    if_i_win = [{ "consequent": "PLAYER_HISTORY", "key": "ai_"+data['event_name']+data['key_suffix'][diff]+"_speedrun", "method": "max", "value": 1 },]
                     if ('extra_key_suffix' in data):
                         if_i_win.append({ "consequent": "PLAYER_HISTORY", "key": "ai_"+data['event_name']+data['extra_key_suffix'][diff]+"_speedrun", "method": "max", "value": 1 })
                     completion['subconsequents'] += [
@@ -1398,6 +1397,15 @@ if __name__ == '__main__':
             loot = loot_table[diff][i]
             if loot:
                 completion['subconsequents'] += [ { "consequent": "GIVE_LOOT", "reason": kind, "loot": [loot] } ]
+
+            # remove the speedrun aura AFTER giving loot, in case any conditional loot predicates want to look for the aura
+            if speedrun_aura and i == (data['bases_per_difficulty']-1):
+                completion['subconsequents'] += [
+                        { "consequent": "IF", "if": { "predicate": "AURA_ACTIVE", "aura_name": speedrun_aura },
+                          # player DID complete the event in time
+                          "then":  { "consequent": "REMOVE_AURA", "aura_name": speedrun_aura }
+                          }
+                        ]
 
             # get completion cutscene consequents
             completion_cutscene = []
