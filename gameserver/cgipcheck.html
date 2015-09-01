@@ -243,6 +243,18 @@ var has_anti_alt_regions = function() {
     }
     return false;
 };
+var has_non_anti_alt_regions = function() {
+    for(var i = 0; i < spin_regions.length; i++) {
+        var region = spin_regions[i];
+        if(('tags' in region) && region['tags'].indexOf('anti_alt') >= 0) {
+            // nothing
+        } else {
+            return true;
+        }
+    }
+    return false;
+};
+
 var method_change_region = function() {
     var ident = get_ident();
     var new_region = $("#change_region_destination")[0].value;
@@ -1331,10 +1343,14 @@ $(function() {
     spin_giveable_items.forEach(function(entry) {
         $('#item_to_give').append('<option value="'+entry['name']+'">'+entry['ui_name']+'</option>');
     });
-    spin_regions.forEach(function(entry) {
-        var ui_name = entry['ui_name'] + ' ('+entry['ui_description_short']+')';
-        $('#change_region_destination').append('<option value="'+entry['name']+'">'+ui_name+'</option>');
-    });
+    if(has_non_anti_alt_regions()) {
+        spin_regions.forEach(function(entry) {
+            var ui_name = entry['ui_name'] + ' ('+entry['ui_description_short']+')';
+            $('#change_region_destination').append('<option value="'+entry['name']+'">'+ui_name+'</option>');
+        });
+    } else {
+            $('#change_region_destination').append('<option value="LIMBO">Banish from all maps</option>');
+    }
     $('#skynet_query').bind('enterKey', method_skynet_query);
     $('#skynet_query').keyup(function(e) { if(e.keyCode == 13) { $(this).trigger('enterKey'); } });
 
