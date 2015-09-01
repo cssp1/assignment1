@@ -38,7 +38,11 @@
     ]},
 
     // requirement to participate in the Regional Map
-    "quarry_requirement": { "predicate": "BUILDING_LEVEL", "building_type": "toc", "trigger_level": 3 },
+    "quarry_requirement": {"predicate": "AND", "subpredicates": [
+        {"predicate": "BUILDING_LEVEL", "building_type": "toc", "trigger_level": 3},
+        {"predicate": "AURA_INACTIVE", "aura_name": "region_banished", "match_data": {"tag": "anti_alt"},
+         "ui_name": "You are banished from all maps for violating the alt-account policy."}
+    ] },
 
     // requirement to open and access the Regional Map
     "quarry_play_requirement": {"predicate": "AND", "subpredicates": [

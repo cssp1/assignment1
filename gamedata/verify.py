@@ -86,7 +86,7 @@ def get_cc_requirement_predicate(pred):
     elif pred['predicate'] == 'LIBRARY':
         return get_cc_requirement_predicate(gamedata['predicate_library'][pred['name']])
     elif pred['predicate'] in ('ALWAYS_TRUE', 'ANY_ABTEST', 'OR', 'BUILDING_QUANTITY', 'HOME_REGION',
-                               'LADDER_PLAYER', 'PLAYER_HISTORY', 'ABSOLUTE_TIME', 'QUEST_COMPLETED'):
+                               'LADDER_PLAYER', 'PLAYER_HISTORY', 'ABSOLUTE_TIME', 'QUEST_COMPLETED', 'AURA_INACTIVE'):
         pass
     else:
         raise Exception('unhandled upgrade requirement: %s' % repr(pred))
