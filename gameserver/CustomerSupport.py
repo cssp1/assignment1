@@ -408,7 +408,7 @@ class HandleChangeRegion(Handler):
         self.new_region = self.args.get('new_region', 'ANY')
         if self.new_region == 'ANY':
             self.new_region = None
-        assert (self.new_region is None or self.new_region in self.gamedata['regions'])
+        assert (self.new_region in (None,'LIMBO') or self.new_region in self.gamedata['regions'])
 
     # the online handler has to first end any ongoing attack, which may go asynchronous, and then
     # a synchronous return to home base, and finally the region change
@@ -489,7 +489,7 @@ class HandleChangeRegion(Handler):
 
     def do_exec_offline(self, user, player):
         # can't execute predicates on offline player (to choose a region), so require a specific destination region
-        assert self.new_region in self.gamedata['regions']
+        assert self.new_region in self.gamedata['regions'] or self.new_region == 'LIMBO'
 
         # this should do the same things that Player.change_region() does
 
@@ -510,7 +510,7 @@ class HandleChangeRegion(Handler):
                 # base is locked
                 return ReturnValue(error = 'change_region failed: base is locked')
 
-        if new_region:
+        if new_region and new_region != 'LIMBO':
             random.seed(self.user_id + self.gamedata['territory']['map_placement_gen'] + int(100*random.random()))
 
             map_dims = self.gamedata['regions'][new_region]['dimensions']
@@ -608,7 +608,7 @@ class HandleChangeRegion(Handler):
                                                         'new_region': player['base_region'], 'new_loc': player['base_map_loc'],
                                                         'old_region':old_region, 'old_loc':old_loc, 'reason':'CustomerSupport'})
         # drop lock from create_map_feature()
-        if new_region and (new_region != old_region):
+        if new_region and new_region != 'LIMBO' and (new_region != old_region):
             self.gamesite.nosql_client.map_feature_lock_release(new_region, base_id, self.user_id)
 
         return ReturnValue(result = 'ok')

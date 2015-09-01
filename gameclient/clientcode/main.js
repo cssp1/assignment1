@@ -42946,7 +42946,7 @@ function handle_server_message(data) {
         change_region_pending = null;
         var new_region_id = data[1];
         var during_login = data[3];
-        session.region = new Region(gamedata['regions'][new_region_id]);
+        session.region = new Region(gamedata['regions'][new_region_id] || null);
         player.home_base_loc = data[2];
         if(session.home_base && session.viewing_base) { session.viewing_base.base_map_loc = player.home_base_loc; }
         session.region.ping_contest_rank();

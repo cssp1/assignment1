@@ -11758,41 +11758,34 @@ class LivePlayer(Player):
 
             if len(regions) < 1:
                 gamesite.exception_log.event(server_time, 'map: no regions for player %d (all disabled or hard-capped) - pops: %s' % (self.user_id, repr(populations)))
-                return False
+                if self.home_region:
+                    # continue with taking player off the map
+                    new_region = 'LIMBO'
+                else:
+                    return False
 
-            new_region = regions[0]
-            new_region_pop = populations.get(new_region, 0)
-            for r in regions:
-                # if a region is under soft population cap, and preferred predicate is true, then pick it over all others.
-                # otherwise, just pick the lowest-pop region.
-                pop = populations.get(r, 0)
-                soft_cap = gamedata['regions'][r].get('pop_soft_cap',-1)
-                if pop < new_region_pop:
-                    new_region_pop = pop
-                    new_region = r
-                elif ('prefer_if' in gamedata['regions'][r]) and (soft_cap < 0 or pop < soft_cap) and Predicates.read_predicate(gamedata['regions'][r]['prefer_if']).is_satisfied(self,None):
-                    # if we find a preferred region that has not reached its soft cap yet, immediately choose it
-                    new_region = r
-                    break
+            else:
+                new_region = regions[0]
+                new_region_pop = populations.get(new_region, 0)
+                for r in regions:
+                    # if a region is under soft population cap, and preferred predicate is true, then pick it over all others.
+                    # otherwise, just pick the lowest-pop region.
+                    pop = populations.get(r, 0)
+                    soft_cap = gamedata['regions'][r].get('pop_soft_cap',-1)
+                    if pop < new_region_pop:
+                        new_region_pop = pop
+                        new_region = r
+                    elif ('prefer_if' in gamedata['regions'][r]) and (soft_cap < 0 or pop < soft_cap) and Predicates.read_predicate(gamedata['regions'][r]['prefer_if']).is_satisfied(self,None):
+                        # if we find a preferred region that has not reached its soft cap yet, immediately choose it
+                        new_region = r
+                        break
 
-        if (new_region not in gamedata['regions']):
+        if (new_region not in gamedata['regions']) and new_region != 'LIMBO':
             if gamedata['server']['log_map']:
                 gamesite.exception_log.event(server_time, 'map: player %d change_region picked invalid region %s' % (self.user_id, repr(new_region)))
             return False
-        if gamedata['regions'][new_region].get('developer_only',0) and (not session.player.is_developer()):
+        if new_region in gamedata['regions'] and gamedata['regions'][new_region].get('developer_only',0) and (not session.player.is_developer()):
             return False
-
-        # get population
-        if new_region_pop is None:
-            new_region_pop = gamesite.nosql_client.get_map_feature_population(new_region,'home',reason='change_region_get_pop')
-
-        map_dims = gamedata['regions'][new_region]['dimensions']
-        BORDER = gamedata['territory']['border_zone_player']
-
-        if new_loc:
-            new_loc = (int(new_loc[0]), int(new_loc[1]))
-            assert new_loc[0] >= BORDER and new_loc[0] < map_dims[0]-BORDER and \
-                   new_loc[1] >= BORDER and new_loc[1] < map_dims[1]-BORDER
 
         # remove from old place
         old_region = None
@@ -11803,81 +11796,97 @@ class LivePlayer(Player):
             old_region = self.home_region
             old_loc = self.my_home.base_map_loc
 
-        # place in new region via rejection sampling
-        if new_loc:
-            # search within a radius around new_loc
-            trials_set = set()
-            rad = gamedata['territory']['neighbor_search_radius']
-            for i in xrange(100):
-                tr = (new_loc[0] + int((2*random.random()-1)*rad),
-                      new_loc[1] + int((2*random.random()-1)*rad))
-                if tr[0] < BORDER or tr[0] >= map_dims[0]-BORDER or tr[1] < BORDER or tr[1] >= map_dims[1]-BORDER:
-                    continue # skip, out of bounds
-                trials_set.add(tr)
-            trials = list(trials_set)
-        else:
-            # search the entire map
+        if new_region != 'LIMBO':
+            # get population
+            if new_region_pop is None:
+                new_region_pop = gamesite.nosql_client.get_map_feature_population(new_region,'home',reason='change_region_get_pop')
 
-            # radius: how far from the center of the map we can place the player
-            radius = [map_dims[0]//2 - BORDER, map_dims[1]//2 - BORDER]
+            map_dims = gamedata['regions'][new_region]['dimensions']
+            BORDER = gamedata['territory']['border_zone_player']
 
-            # when entering a low-population region, prefer placing player close to the center of the map
-            if new_region_pop is not None:
-                cap = gamedata['regions'][new_region].get('pop_hard_cap',-1)
-                if cap > 0:
-                    # "fullness": ratio of the current population to centralize_below_pop * pop_hard_cap
-                    fullness = new_region_pop / float(cap * gamedata['territory'].get('centralize_below_pop', 0.5))
-                    if fullness < 1:
-                        # keep radius above a minimum, and raise it with the square root of fullness since open area grows as radius^2
-                        radius = [max(gamedata['territory'].get('centralize_min_radius',10), int(math.sqrt(fullness) * x)) for x in radius]
+            if new_loc:
+                new_loc = (int(new_loc[0]), int(new_loc[1]))
+                assert new_loc[0] >= BORDER and new_loc[0] < map_dims[0]-BORDER and \
+                       new_loc[1] >= BORDER and new_loc[1] < map_dims[1]-BORDER
 
-            # rectangle within which we can place the player
-            placement_range = [[map_dims[0]//2 - radius[0], map_dims[0]//2 + radius[0]],
-                               [map_dims[1]//2 - radius[1], map_dims[1]//2 + radius[1]]]
-            trials = map(lambda x: (min(max(placement_range[0][0] + int((placement_range[0][1]-placement_range[0][0])*random.random()), 2), map_dims[0]-2),
-                                    min(max(placement_range[1][0] + int((placement_range[1][1]-placement_range[1][0])*random.random()), 2), map_dims[1]-2)), xrange(100))
 
-        trials = filter(lambda x: not Region(gamedata, new_region).obstructs_bases(x), trials)
-
-        if gamedata['server']['log_map']:
-            gamesite.exception_log.event(server_time, 'map: player %d change_region attempting to place in %s' % (self.user_id, repr(new_region)))
-
-        i = 0
-        for tr in trials:
-            i += 1
-            self.my_home.base_region = new_region
-            self.my_home.base_map_loc = tr
-            props = self.my_home.get_cache_props()
-
-            if (new_region == old_region):
-                success = gamesite.nosql_client.move_map_feature(self.my_home.base_region, self.my_home.base_id, props, old_loc = old_loc,
-                                                                 exclusive = gamedata['territory']['exclusive_zone_player'], originator=self.user_id, reason='change_region')
+            # place in new region via rejection sampling
+            if new_loc:
+                # search within a radius around new_loc
+                trials_set = set()
+                rad = gamedata['territory']['neighbor_search_radius']
+                for i in xrange(100):
+                    tr = (new_loc[0] + int((2*random.random()-1)*rad),
+                          new_loc[1] + int((2*random.random()-1)*rad))
+                    if tr[0] < BORDER or tr[0] >= map_dims[0]-BORDER or tr[1] < BORDER or tr[1] >= map_dims[1]-BORDER:
+                        continue # skip, out of bounds
+                    trials_set.add(tr)
+                trials = list(trials_set)
             else:
-                success = gamesite.nosql_client.create_map_feature(self.my_home.base_region, self.my_home.base_id, props,
-                                                                   exclusive = gamedata['territory']['exclusive_zone_player'], originator=self.user_id, reason='change_region')
-            if success:
-                break
-            else:
-                self.my_home.base_region = old_region
-                self.my_home.base_map_loc = old_loc
-                # note! temporarily leave self.home_region pointing to the old region, so that we can clear the squads out
+                # search the entire map
 
-        if (not self.my_home.base_region) or ((self.my_home.base_region == old_region) and (self.my_home.base_map_loc == old_loc)):
-            if not new_loc: # don't print this warning when player deliberately tries to enter a crowded neighborhood
-                gamesite.exception_log.event(server_time, 'map: failed to place player %d in region %s after %d trials' % (self.user_id, new_region, i))
-            return False
+                # radius: how far from the center of the map we can place the player
+                radius = [map_dims[0]//2 - BORDER, map_dims[1]//2 - BORDER]
 
-        session.player_base_lock = (self.my_home.base_region, self.my_home.base_id)
-        self.my_home.base_climate = Region(gamedata, self.my_home.base_region).read_climate_name(self.my_home.base_map_loc)
-        scenery_removed, scenery_added = self.my_home.spawn_scenery(self, self.user_id + self.my_home.base_map_loc[0] + map_dims[0]*self.my_home.base_map_loc[1], overwrite = True)
+                # when entering a low-population region, prefer placing player close to the center of the map
+                if new_region_pop is not None:
+                    cap = gamedata['regions'][new_region].get('pop_hard_cap',-1)
+                    if cap > 0:
+                        # "fullness": ratio of the current population to centralize_below_pop * pop_hard_cap
+                        fullness = new_region_pop / float(cap * gamedata['territory'].get('centralize_below_pop', 0.5))
+                        if fullness < 1:
+                            # keep radius above a minimum, and raise it with the square root of fullness since open area grows as radius^2
+                            radius = [max(gamedata['territory'].get('centralize_min_radius',10), int(math.sqrt(fullness) * x)) for x in radius]
 
-#        self.my_home.nosql_pluck('change_region(leave-old)'); self.history['nosql_region'] = None
-#        self.my_home.nosql_plant('change_region(join-new)'); self.history['nosql_region'] = self.my_home.base_region
+                # rectangle within which we can place the player
+                placement_range = [[map_dims[0]//2 - radius[0], map_dims[0]//2 + radius[0]],
+                                   [map_dims[1]//2 - radius[1], map_dims[1]//2 + radius[1]]]
+                trials = map(lambda x: (min(max(placement_range[0][0] + int((placement_range[0][1]-placement_range[0][0])*random.random()), 2), map_dims[0]-2),
+                                        min(max(placement_range[1][0] + int((placement_range[1][1]-placement_range[1][0])*random.random()), 2), map_dims[1]-2)), xrange(100))
 
-        if gamedata['server']['log_map']:
-            gamesite.exception_log.event(server_time, 'map: placed player %d on %s at %s' % (self.user_id,
-                                                                                             self.my_home.base_region,
+            trials = filter(lambda x: not Region(gamedata, new_region).obstructs_bases(x), trials)
+
+            if gamedata['server']['log_map']:
+                gamesite.exception_log.event(server_time, 'map: player %d change_region attempting to place in %s' % (self.user_id, repr(new_region)))
+
+            i = 0
+            for tr in trials:
+                i += 1
+                self.my_home.base_region = new_region
+                self.my_home.base_map_loc = tr
+                props = self.my_home.get_cache_props()
+
+                if (new_region == old_region):
+                    success = gamesite.nosql_client.move_map_feature(self.my_home.base_region, self.my_home.base_id, props, old_loc = old_loc,
+                                                                     exclusive = gamedata['territory']['exclusive_zone_player'], originator=self.user_id, reason='change_region')
+                else:
+                    success = gamesite.nosql_client.create_map_feature(self.my_home.base_region, self.my_home.base_id, props,
+                                                                       exclusive = gamedata['territory']['exclusive_zone_player'], originator=self.user_id, reason='change_region')
+                if success:
+                    break
+                else:
+                    self.my_home.base_region = old_region
+                    self.my_home.base_map_loc = old_loc
+                    # note! temporarily leave self.home_region pointing to the old region, so that we can clear the squads out
+
+            if (not self.my_home.base_region) or ((self.my_home.base_region == old_region) and (self.my_home.base_map_loc == old_loc)):
+                if not new_loc: # don't print this warning when player deliberately tries to enter a crowded neighborhood
+                    gamesite.exception_log.event(server_time, 'map: failed to place player %d in region %s after %d trials' % (self.user_id, new_region, i))
+                return False
+
+            session.player_base_lock = (self.my_home.base_region, self.my_home.base_id)
+            self.my_home.base_climate = Region(gamedata, self.my_home.base_region).read_climate_name(self.my_home.base_map_loc)
+            scenery_removed, scenery_added = self.my_home.spawn_scenery(self, self.user_id + self.my_home.base_map_loc[0] + map_dims[0]*self.my_home.base_map_loc[1], overwrite = True)
+
+            if gamedata['server']['log_map']:
+                gamesite.exception_log.event(server_time, 'map: placed player %d on %s at %s' % (self.user_id,
+                                                                                                 self.my_home.base_region,
                                                                                              str(self.my_home.base_map_loc)))
+        elif old_region: # going into limbo
+            self.my_home.base_region = None
+            self.my_home.base_map_loc = None
+            scenery_removed = scenery_added = []
+
         ladder_reset = False
 
         if old_region:
@@ -11892,16 +11901,17 @@ class LivePlayer(Player):
                 gamesite.nosql_client.drop_map_feature(old_region, self.my_home.base_id, originator=self.user_id, reason='change_region(leave_old)')
 
                 old_is_ladder = gamedata['regions'][old_region].get('ladder_pvp', gamedata.get('ladder_pvp', False))
-                new_is_ladder = gamedata['regions'][self.my_home.base_region].get('ladder_pvp', gamedata.get('ladder_pvp', False))
+                new_is_ladder = self.my_home.base_region and gamedata['regions'][self.my_home.base_region].get('ladder_pvp', gamedata.get('ladder_pvp', False))
                 if old_is_ladder and (not new_is_ladder) and gamedata['matchmaking']['zero_points_on_ladder_exit']:
                     # switching out of ladder - reset scores
                     ladder_reset = True
                     self.modify_scores({'trophies_pvp':gamedata['trophy_floor']['pvp']}, method='=', reason = 'change_region')
 
-                cons = gamedata['regions'][self.my_home.base_region].get('on_enter', None)
-                if cons:
-                    # be careful about leaving the player in a broken state here!
-                    session.execute_consequent_safe(cons, self, retmsg, reason='change_region:on_enter(%s)' % self.my_home.base_region)
+                if self.my_home.base_region:
+                    cons = gamedata['regions'][self.my_home.base_region].get('on_enter', None)
+                    if cons:
+                        # be careful about leaving the player in a broken state here!
+                        session.execute_consequent_safe(cons, self, retmsg, reason='change_region:on_enter(%s)' % self.my_home.base_region)
 
             else:
                 # changed location within one region - no need to drop old stuff
