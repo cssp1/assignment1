@@ -25633,12 +25633,15 @@ class GAMEAPI(resource.Resource):
                         success = False
 
                 if success:
+                    # tag we will use for the NEW request
+                    tag = random.randrange(1<<31)
+
                     # in order to prevent race conditions, stop further donations from coming in, then check for any in-flight donations
                     # before calculating how much space we can request
                     if session.alliance_chat_channel:
                         session.do_chat_send(session.alliance_chat_channel,
                                              'Invalidate my unit donation request!',
-                                             bypass_gag = True, props = {'type':'unit_donation_request_invalidation'})
+                                             bypass_gag = True, props = {'type':'unit_donation_request_invalidation', 'new_tag': tag})
                     gamesite.sql_client.invalidate_unit_donation_request(session.player.user_id)
                     self.do_receive_mail(session, retmsg, type_filter = ['donated_units'])
                     cur_space = session.player.donated_units_space()
@@ -25648,7 +25651,6 @@ class GAMEAPI(resource.Resource):
                         success = False
 
                 if success:
-                    tag = random.randrange(1<<31)
                     if not gamesite.sql_client.request_unit_donation(session.player.user_id, alliance_id, server_time, tag, cur_space, max_space):
                         success = False
 

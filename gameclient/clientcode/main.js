@@ -44480,7 +44480,10 @@ function handle_server_message(data) {
                 // invalidate any outstanding requests on this recipient_id
                 for(var t in tab.user_data['unit_donation_requests']) {
                     var req = tab.user_data['unit_donation_requests'][t];
-                    if(req['recipient_id'] === sender_info['user_id']) {
+                    if(req['recipient_id'] === sender_info['user_id'] &&
+                       // do not apply invalidation to request with the new_tag value - this can happen if
+                       // the chat buffer re-orders the two messages that are sent with the same "time" value
+                       (!('new_tag' in sender_info) || req['tag'] !== sender_info['new_tag'])) {
                         req['cur_space'] = req['max_space'];
                         var node = req['node'];
                         if(node) {
