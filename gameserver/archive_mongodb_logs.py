@@ -223,6 +223,7 @@ def do_clean(nosql_client, table, verbose, dry_run):
         print >> msg_fd, 'deleted %d' % n
 
 def my_slave(input):
+    SpinNoSQL.set_default_socket_timeout(600) # set long timeout for big delete operations
     nosql_client = SpinNoSQL.NoSQLClient(SpinConfig.get_mongodb_config(SpinConfig.config['game_id']))
     table = TABLES[input['kind']]
     do_upload(nosql_client, table, input['verbose'], input['dry_run'], input['keep_local'])

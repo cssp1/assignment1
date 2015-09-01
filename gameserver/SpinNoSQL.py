@@ -18,11 +18,12 @@ import SpinNoSQLId
 
 # connect to a MongoDB service (possibly multiple databases within it)
 class NoSQLService (object):
-    def __init__(self, host, port, username, password):
+    def __init__(self, host, port, username, password, socket_timeout = None):
         self.host = host
         self.port = port
         self.username = username
         self.password = password
+        self.socket_timeout = socket_timeout if socket_timeout is not None else 120 # 120 sec timeout by default
         self.con = None
         self.seen_dbnames = None
     def connect(self):
@@ -31,7 +32,7 @@ class NoSQLService (object):
             # needs special settings (maxPoolSize)
             self.con = pymongo.MongoClient(host='mongodb://%s:%d' % (self.host, self.port),
                                            maxPoolSize = None, # ?
-                                           socketTimeoutMS = 120*1000 # 120 sec timeout
+                                           socketTimeoutMS = self.socket_timeout*1000
                                            )
             # only use 1 socket since we never need concurrent requests, and it will mess up auth since
             # authenticate() does not update other outstanding sockets.
@@ -60,7 +61,8 @@ class NoSQLService (object):
 
 # share connections to different databases within the same MongoDB service
 class NoSQLServicePool (object):
-    def __init__(self):
+    def __init__(self, socket_timeout = None):
+        self.socket_timeout = socket_timeout
         self.pool = {}
     def get_service(self, dbconfig):
         host = dbconfig['host']
@@ -69,10 +71,13 @@ class NoSQLServicePool (object):
         password = dbconfig['password']
         key = (host, port, username, password) # if db sharing does not turn out to work, just add dbconfig['dbname'] to the key
         if key not in self.pool:
-            self.pool[key] = NoSQLService(host, port, username, password)
+            self.pool[key] = NoSQLService(host, port, username, password, socket_timeout = self.socket_timeout)
         return self.pool[key]
 
 nosql_service_pool = NoSQLServicePool()
+
+def set_default_socket_timeout(new_value):
+    nosql_service_pool.socket_timeout = new_value
 
 # one database within the MongoDB service
 class NoSQLDatabase (object):
