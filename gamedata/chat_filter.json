@@ -1,4 +1,11 @@
 {
+    // anti-spam ("hey jajajajajajaja") filter settings
+    "spam": {
+        "min_length": 10, // ignore messages shorter than 10 characters
+        "rep_limit": 0.75, // reject messages where the repeating part is >75% of the message
+        "max_depth": 2 // check mono- and di-graphs
+    },
+
     // regexp matching options (case-insensitive, greedy)
     "options": "ig",
 

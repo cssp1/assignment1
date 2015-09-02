@@ -24119,7 +24119,7 @@ class GAMEAPI(resource.Resource):
 
         elif arg[0] == "CHAT_SEND":
             channel = arg[1]
-            text = SpinHTTP.unwrap_string(arg[2])
+            text = SpinHTTP.unwrap_string(arg[2]).strip()
 
             # try to avoid DOS attack spam
             limit = gamedata['chat_length_limit']
@@ -24128,10 +24128,11 @@ class GAMEAPI(resource.Resource):
 
             success = True
 
-            if session.player.cooldown_active('CHAT_SEND') >= gamedata['chat_spam_threshold']:
+            if session.player.cooldown_active('CHAT_SEND') >= gamedata['chat_spam_threshold'] or \
+               chat_filter.is_spammy(text):
                 session.player.cooldown_trigger('chat_spam_penalty', gamedata['chat_spam_penalty'])
                 session.player.cooldown_reset('CHAT_SEND')
-                metric_event_coded(session.user.user_id, '4023_chat_spam_throttled', {})
+                metric_event_coded(session.user.user_id, '4023_chat_spam_throttled', {'text': text})
 
             togo = session.player.cooldown_togo('chat_spam_penalty')
             if togo > 0:

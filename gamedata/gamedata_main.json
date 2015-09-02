@@ -634,7 +634,7 @@
     // gag player for "penalty" seconds after spamming chat (when more than "threshold" messages are sent within "cooldown" seconds)
     "chat_spam_cooldown": 5,
     "chat_spam_threshold": 5,
-    "chat_spam_penalty": 15,
+    "chat_spam_penalty": 10,
 
     "enable_chat_police": 0, // whether to make player chat reports apply the new warned/gagged auras on targets
     "chat_report_window": 1800, // how long after saying something in global or regional chat that you are subject to warnings
