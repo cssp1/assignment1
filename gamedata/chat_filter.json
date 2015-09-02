@@ -1,7 +1,7 @@
 {
     // anti-spam ("hey jajajajajajaja") filter settings
     "spam": {
-        "min_length": 10, // ignore messages shorter than 10 characters
+        "min_length": 12, // ignore messages shorter than 12 characters
         "rep_limit": 0.75, // reject messages where the repeating part is >75% of the message
         "max_depth": 2 // check mono- and di-graphs
     },
