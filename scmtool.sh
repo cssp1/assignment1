@@ -109,7 +109,7 @@ function do_git_sync_svn {
 
 function do_up_git {
     for dir in $GIT_DIRS; do
-	MY_BRANCH=`(cd $dir && git rev-parse --abbrev-ref HEAD)`
+    MY_BRANCH=`(cd $dir && git rev-parse --abbrev-ref HEAD)`
 
         if (cd $dir && git diff --exit-code --quiet); then
             # tree is clean - plain pull
@@ -125,7 +125,7 @@ function do_up_git {
 function do_force_up_git {
     # same code as do_up_git, but tries to be silent
     for dir in $GIT_DIRS; do
-	MY_BRANCH=`(cd $dir && git rev-parse --abbrev-ref HEAD)`
+    MY_BRANCH=`(cd $dir && git rev-parse --abbrev-ref HEAD)`
         if (cd $dir && git diff --exit-code --quiet); then
             # tree is clean - plain pull
             (cd $dir && git pull origin ${MY_BRANCH} -q)
