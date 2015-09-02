@@ -459,6 +459,14 @@ SPText.render_text = function(rblocklines, offset, default_font, no_color) {
                 if(rb.props && rb.props.color && !no_color) {
                     SPUI.ctx.fillStyle = SPUI.ctx.strokeStyle = rb.props.color;
                 }
+                if(rb.props && rb.props.alpha !== undefined) {
+                    if(rb.props.alpha <= 0) {
+                        SPUI.ctx.restore();
+                        continue; // fully transparent
+                    } else if(rb.props.alpha < 1) {
+                        SPUI.ctx.globalAlpha *= rb.props.alpha;
+                    }
+                }
                 if(rb.props && rb.props.style && rb.props.style == 'bold') {
                     if(!bold_font) {
                         bold_font = SPUI.make_font(default_font.size, default_font.leading, 'bold');
