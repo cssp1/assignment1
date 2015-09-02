@@ -12,6 +12,7 @@ import sys, os, getopt, time, tempfile
 import SpinS3
 import SpinConfig
 import SpinNoSQL
+import pymongo
 import bson.objectid
 import SpinLog
 import SpinParallel
@@ -219,11 +220,20 @@ def do_clean(nosql_client, table, verbose, dry_run):
     if dry_run:
         print >> msg_fd, 'remove(%s) would affect %d' % (qs, nosql_client._table(table['table_name']).find(qs).count())
     else:
-        n = nosql_client._table(table['table_name']).delete_many(qs).deleted_count
+        n = 0
+        while True:
+            try:
+                n += nosql_client._table(table['table_name']).delete_many(qs).deleted_count
+                break
+            except pymongo.errors.AutoReconnect:
+                print >> msg_fd, 'AutoReconnect exception during delete_many(), retrying...'
+                pass
+            except:
+                raise
         print >> msg_fd, 'deleted %d' % n
 
 def my_slave(input):
-    SpinNoSQL.set_default_socket_timeout(600) # set long timeout for big delete operations
+    SpinNoSQL.set_default_socket_timeout(3600) # set long timeout for big delete operations
     nosql_client = SpinNoSQL.NoSQLClient(SpinConfig.get_mongodb_config(SpinConfig.config['game_id']))
     table = TABLES[input['kind']]
     do_upload(nosql_client, table, input['verbose'], input['dry_run'], input['keep_local'])
