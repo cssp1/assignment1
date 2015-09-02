@@ -574,6 +574,7 @@ var selection = { unit: null,
                   spellname: null,
                   spellkind: null,
                   item: null, // inventory item
+                  /** @type {SPUI.Dialog|null} */
                   ui: null,
                   ui_change_time: -1
                 };
@@ -17641,18 +17642,18 @@ function invoke_child_message_dialog(title_text, body_text, props) {
     @param {string} title_text
     @param {string} body_text */
 function invoke_squad_error(title_text, body_text) {
-    var region_map_up = (selection.ui && selection.ui.user_data && selection.ui.user_data['dialog'] === 'region_map_dialog');
+    var map_dialog = (selection.ui && selection.ui.user_data && selection.ui.user_data['dialog'] === 'region_map_dialog') ? selection.ui : null;
 
-    if(player.preferences['nonmodal_squad_errors'] && region_map_up) {
+    if(player.preferences['nonmodal_squad_errors'] && map_dialog) {
         body_text = body_text.replace(/\n/g, ' '); // get rid of newlines
-        region_map_display_notification(selection.ui, '[color=#ffff00]'+title_text + ': ' + body_text+'[/color]');
+        region_map_display_notification(map_dialog, '[color=#ffff00]'+title_text + ': ' + body_text+'[/color]');
         GameArt.assets['error_sound'].states['normal'].audio.play(client_time); // play a sound so player knows something happened
         return;
     }
 
     var dialog = invoke_child_message_dialog(title_text, body_text, {'dialog': 'message_dialog_big'});
 
-    if(region_map_up) { // offer preference setting only if region map displayed - otherwise may hit non-map players
+    if(map_dialog) { // offer preference setting only if region map displayed - otherwise may hit non-map players
         dialog.widgets['ignore_button'].show = true;
         dialog.widgets['ignore_button'].onclick = function(w) {
             w.state = (w.state == 'active' ? 'normal' : 'active');
@@ -20681,9 +20682,9 @@ function update_region_map(dialog) {
 }
 
 /** Add a new message to the notification widget
-    @param {!SPUI.Dialog dialog}
+    @param {!SPUI.Dialog} dialog
     @param {string} bbcode
-    @param {Object?} props for SPText */
+    @param {Object=} props for SPText */
 function region_map_display_notification(dialog, bbcode, props) {
     if(!props) { props = {}; }
     // save client_time for fading animation
