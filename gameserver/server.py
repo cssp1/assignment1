@@ -24129,7 +24129,7 @@ class GAMEAPI(resource.Resource):
             success = True
 
             if session.player.cooldown_active('CHAT_SEND') >= gamedata['chat_spam_threshold'] or \
-               chat_filter.is_spammy(text):
+               (channel in ('GLOBAL','REGION',) and chat_filter.is_spammy(text)):
                 session.player.cooldown_trigger('chat_spam_penalty', gamedata['chat_spam_penalty'])
                 session.player.cooldown_reset('CHAT_SEND')
                 metric_event_coded(session.user.user_id, '4023_chat_spam_throttled', {'text': text})
