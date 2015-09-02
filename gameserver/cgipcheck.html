@@ -561,11 +561,13 @@ var pretty_log_entry = function(e) {
             }
             method = method.replace(client_exception_stack_keep_re, '$1');
             method = method.replace(client_exception_stack_remove_re, '');
-            method = method.trimRight().replace(newline_re, NEWLINE);
+            method = method.trimRight();
             //method = '<font color="#000000">'+method+'</font>';
+            method = quote_for_html(method);
+            method = method.replace(newline_re, NEWLINE);
         }
         if('location' in e) {
-            location = '<font color="#000000">'+e['location'].trimRight()+'</font>';
+            location = '<font color="#000000">'+quote_for_html(e['location'].trimRight())+'</font>';
             delete e['location'];
         }
 
