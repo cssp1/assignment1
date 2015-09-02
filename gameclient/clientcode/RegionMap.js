@@ -852,13 +852,13 @@ RegionMap.RegionMap.prototype.make_nosql_spy_buttons = function(feature) {
         return [[verb, (function(_mapwidget, _feature) { return function() {
             _mapwidget.set_popup(null);
             var msg = gamedata['errors']['CANNOT_SPY_ON_MOVING_SQUAD'];
-            invoke_child_message_dialog(msg['ui_title'], msg['ui_name'], {'dialog':'message_dialog_big'});
+            invoke_squad_error(msg['ui_title'], msg['ui_name']);
         }; })(this, feature), 'disabled_clickable', gamedata['errors']['CANNOT_SPY_ON_MOVING_SQUAD']['ui_name'], SPUI.error_text_color]];
     } else if(squads_nearby.length < 1 && hex_distance(player.home_base_loc, feature['base_map_loc']) !== 1) {
         return [[verb, (function(_mapwidget, _feature) { return function() {
             _mapwidget.set_popup(null);
             var msg = gamedata['errors']['CANNOT_SPY_NO_NEARBY_SQUADS'];
-            invoke_child_message_dialog(msg['ui_title'], msg['ui_name'], {'dialog':'message_dialog_big'});
+            invoke_squad_error(msg['ui_title'], msg['ui_name']);
         }; })(this, feature), 'disabled_clickable',
                  SPUI.break_lines(gamedata['errors']['CANNOT_SPY_NO_NEARBY_SQUADS']['ui_name'], SPUI.desktop_font, [300,0])[0],
                  SPUI.error_text_color]];

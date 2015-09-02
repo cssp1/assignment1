@@ -17636,6 +17636,32 @@ function invoke_child_message_dialog(title_text, body_text, props) {
     return dialog;
 }
 
+/** Same parameters as invoke_child_message_dialog(). If the Region Map is up, use the nonmodal error log there,
+    otherwise display a conventional error.
+    @param {string} title_text
+    @param {string} body_text */
+function invoke_squad_error(title_text, body_text) {
+    var region_map_up = (selection.ui && selection.ui.user_data && selection.ui.user_data['dialog'] === 'region_map_dialog');
+
+    if(player.preferences['nonmodal_squad_errors'] && region_map_up) {
+        body_text = body_text.replace(/\n/g, ' '); // get rid of newlines
+        region_map_display_notification(selection.ui, '[color=#ffff00]'+title_text + ': ' + body_text+'[/color]');
+        GameArt.assets['error_sound'].states['normal'].audio.play(client_time); // play a sound so player knows something happened
+        return;
+    }
+
+    var dialog = invoke_child_message_dialog(title_text, body_text, {'dialog': 'message_dialog_big'});
+
+    if(region_map_up) { // offer preference setting only if region map displayed - otherwise may hit non-map players
+        dialog.widgets['ignore_button'].show = true;
+        dialog.widgets['ignore_button'].onclick = function(w) {
+            w.state = (w.state == 'active' ? 'normal' : 'active');
+            player.preferences['nonmodal_squad_errors'] = (w.state == 'active' ? 1 : 0);
+            send_to_server.func(["UPDATE_PREFERENCES", player.preferences]);
+        };
+    }
+}
+
 function invoke_insufficient_alloy_message(reason, amount, order) {
     if(player.get_any_abtest_value('skip_insufficient_gamebucks', gamedata['store']['skip_insufficient_gamebucks'])) {
         return invoke_buy_gamebucks_dialog(reason, amount, order);
@@ -20623,6 +20649,20 @@ function update_region_map(dialog) {
         dialog.widgets['hover_alliance'].text_color = SPUI.make_colorv(gamedata['territory']['influence']['hover_alliance_'+(dialog.widgets['map'].hover_alliance == session.alliance_id ? 'friendly' : 'hostile')]['label_color']);
     }
 
+    // fade notifications
+    dialog.widgets['notifications'].revise_all_text(function(original_text, user_data) {
+        var elapsed = client_time - user_data['time'];
+        var hold_time = 3, fade_time = 3;
+        var alpha;
+        if(elapsed < hold_time) {
+            alpha = 1;
+        } else {
+            alpha = Math.max(0, 1 - (elapsed - hold_time)/fade_time);
+        }
+        goog.array.forEach(original_text[0], function(ablock) { ablock.props.alpha = alpha; });
+        return original_text;
+    });
+
     // update bookmarks state
     dialog.widgets['bookmarks_button'].state = ((dialog.widgets['map'].region && (dialog.widgets['map'].region.data['id'] in player.map_bookmarks) && (player.map_bookmarks[dialog.widgets['map'].region.data['id']].length >= 1)) ? 'normal' : 'disabled');
 
@@ -20638,6 +20678,16 @@ function update_region_map(dialog) {
 //    dialog.auto_center();
     dialog.xy = vec_floor(vec_add(vec_scale(0.05, [canvas_width,canvas_height]), [Math.floor(console_shift),0]));
     dialog.on_resize();
+}
+
+/** Add a new message to the notification widget
+    @param {!SPUI.Dialog dialog}
+    @param {string} bbcode
+    @param {Object?} props for SPText */
+function region_map_display_notification(dialog, bbcode, props) {
+    if(!props) { props = {}; }
+    // save client_time for fading animation
+    dialog.widgets['notifications'].append_text(SPText.cstring_to_ablocks_bbcode(bbcode, props), {'time': client_time});
 }
 
 function region_map_finder_state_init() { return {'time':-1, 'found':null, 'index':-1, 'pred':null}; };
@@ -44915,7 +44965,7 @@ function handle_server_message(data) {
                                 _dialog.widgets['map'].pan_to_cell(_feature['base_map_loc'], {slowly:true});
                                 _dialog.widgets['map'].zoom_all_the_way_in();
                             }; })(dialog, feature);
-                            dialog.widgets['notifications'].append_text(SPText.cstring_to_ablocks(str, {onclick: onclick, color:'#ff0000'}));
+                            region_map_display_notification(dialog, '[color=#ff0000]'+str+'[/color]', {onclick: onclick});
                         }
                     }
                 }
@@ -45262,9 +45312,7 @@ function handle_server_message(data) {
             if(argument && (argument.toString() in player.squads)) {
                 var squad = player.squads[argument.toString()];
                 player.squad_clear_client_data(argument); // unblock UI and erase orders
-                if(1 /*name == "INVALID_MAP_LOCATION" || name == "CANNOT_ALTER_SQUAD_WHILE_UNDER_ATTACK"*/) {
-                    invoke_child_message_dialog(display_title, display_string.replace('%BATNAME', squad['ui_name']), {'dialog':'message_dialog_big'});
-                }
+                invoke_squad_error(display_title, display_string.replace('%BATNAME', squad['ui_name']));
             }
         } else if(name.indexOf("CANNOT_CHANGE_REGION") == 0) {
             if(change_region_pending == 'paid') {
@@ -45285,7 +45333,7 @@ function handle_server_message(data) {
             visit_base_pending = false;
 
             var cb = (function (_title, _str) { return function() {
-                invoke_child_message_dialog(_title, _str, {'dialog':'message_dialog_big'});
+                invoke_squad_error(_title, _str);
             }; })(display_title, display_string);
 
             if(1) { // OLD
