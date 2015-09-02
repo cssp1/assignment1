@@ -48685,6 +48685,35 @@ Building.prototype.get_idle_state_advanced = function() {
                     } else {
                         continue;
                     }
+                } else if(catname == 'missiles' && cat['delivery'] == 'building_slot' && cat['delivery_building_for_ui']) {
+                    // only show idle icon if there is a free slot in a delivery building somewhere
+                    var found = false;
+                    var building_list = find_all_objects_by_type(cat['delivery_building_for_ui']);
+                    for(var i = 0; i < building_list.length; i++) {
+                        var building = building_list[i];
+                        var num_slots = building.get_leveled_quantity(building.spec['equip_slots'][cat['delivery_slot_type']]);
+                        if(building.equipment && cat['delivery_slot_type'] in building.equipment && building.equipment[cat['delivery_slot_type']].length >= num_slots) {
+                            for(var j = 0; j < building.equipment[cat['delivery_slot_type']].length; j++) {
+                                if(building.equipment[cat['delivery_slot_type']][j] === null) {
+                                    found = true; // empty slot
+                                    break;
+                                }
+                            }
+                            if(!found) { // all slots full
+                                continue;
+                            } else {
+                                break;
+                            }
+                        } else {
+                            found = true; break; // empty slot
+                        }
+                    }
+                    if(found) {
+                        draw_idle_icon = cat['idle_state'] || 'craft_advanced';
+                        break;
+                    } else {
+                        continue;
+                    }
                 }
                 draw_idle_icon = cat['idle_state'] || 'craft_advanced';
                 if(draw_idle_icon == 'fish') {
