@@ -262,8 +262,6 @@ if __name__ == '__main__':
             dry_run = True
         elif key == '--test':
             test = True
-        elif key == '--limit':
-            limit = int(val)
         elif key == '--parallel':
             parallel = int(val)
         elif key == '--quiet':
