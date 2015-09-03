@@ -266,12 +266,12 @@ var method_change_region = function() {
     };
 
     if(ident && new_region && ui_reason) {
-        send_request('player', 'change_region', $.extend(ident, {'new_region':new_region, 'ui_reason':ui_reason}),
+        send_request('player', 'change_region', $.extend({}, ident, {'new_region':new_region, 'ui_reason':ui_reason}),
                      (function (_ident, _on_complete, _banish_duration) { return function(result) {
                          if(_banish_duration === 0) {
                              _on_complete(result);
                          } else {
-                             send_request('player', 'apply_aura', $.extend(_ident, {'aura_name':'region_banished','data':JSON.stringify({'tag':'anti_alt'})}),
+                             send_request('player', 'apply_aura', $.extend({}, _ident, {'aura_name':'region_banished','data':JSON.stringify({'tag':'anti_alt'})}),
                                           _on_complete);
                          }
                      }; })(ident, on_complete, banish_duration));
@@ -381,9 +381,9 @@ var method_clear_alias = function(cooldown) {
             return;
         }
 
-        send_request('player', 'clear_alias', $.extend(ident, {'ui_reason':ui_reason}), (function(_ident, _ui_reason, _cooldown) { return function(result) {
+        send_request('player', 'clear_alias', $.extend({}, ident, {'ui_reason':ui_reason}), (function(_ident, _ui_reason, _cooldown) { return function(result) {
             if(_cooldown > 0) {
-                send_request('player', 'apply_aura', $.extend(_ident, {'ui_reason':_ui_reason,'aura_name':'alias_gagged','duration':_cooldown}),
+                send_request('player', 'apply_aura', $.extend({}, _ident, {'ui_reason':_ui_reason,'aura_name':'alias_gagged','duration':_cooldown}),
                              (function (__ident, __cooldown) { return function(result) {
                                  alert("Cleared alias from player "+__ident['user_id'].toString()+" and added cooldown for "+(__cooldown/3600).toFixed(0)+" hours");
                              }; })(_ident, _cooldown));
