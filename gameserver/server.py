@@ -24126,6 +24126,8 @@ class GAMEAPI(resource.Resource):
             if len(text) > limit:
                 text = text[:limit]
 
+            if not text: return # don't send empty message
+
             success = True
 
             if session.player.cooldown_active('CHAT_SEND') >= gamedata['chat_spam_threshold'] or \

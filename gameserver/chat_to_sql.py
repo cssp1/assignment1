@@ -111,6 +111,7 @@ if __name__ == '__main__':
 
             template = gamedata['strings']['chat_templates'].get(message_type, '%body')
             if '%body' in template:
+                if 'text' not in row: continue # bad data
                 text = row['text']
             else:
                 text = None
