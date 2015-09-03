@@ -271,7 +271,7 @@ var method_change_region = function() {
                          if(_banish_duration === 0) {
                              _on_complete(result);
                          } else {
-                             send_request('player', 'apply_aura', $.extend({}, _ident, {'aura_name':'region_banished','data':JSON.stringify({'tag':'anti_alt'})}),
+                             send_request('player', 'apply_aura', $.extend({}, _ident, {'aura_name':'region_banished','duration':banish_duration,'data':JSON.stringify({'tag':'anti_alt'})}),
                                           _on_complete);
                          }
                      }; })(ident, on_complete, banish_duration));
