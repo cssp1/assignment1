@@ -70,15 +70,19 @@ class Handler(object):
     # wrap "execute" functions to perform logging
     def exec_online(self, session, retmsg):
         ret = self.do_exec_online(session, retmsg)
-        if 'customer_support' not in session.player.history:
-            session.player.history['customer_support'] = []
-        session.player.history['customer_support'].append(self.get_log_entry())
+        log_entry = self.get_log_entry()
+        if log_entry:
+            if 'customer_support' not in session.player.history:
+                session.player.history['customer_support'] = []
+            session.player.history['customer_support'].append(log_entry)
         return ret
     def exec_offline(self, user, player):
         ret = self.do_exec_offline(user, player)
-        if 'customer_support' not in player['history']:
-            player['history']['customer_support'] = []
-        player['history']['customer_support'].append(self.get_log_entry())
+        log_entry = self.get_log_entry()
+        if log_entry:
+            if 'customer_support' not in player['history']:
+                player['history']['customer_support'] = []
+            player['history']['customer_support'].append(log_entry)
         return ret
 
 class HandleGetRaw(Handler):
@@ -87,14 +91,14 @@ class HandleGetRaw(Handler):
             result = SpinJSON.dumps(result, pretty = True, newline = True, size_hint = 1024*1024, double_precision = 5)
         return result
 class HandleGetRawPlayer(HandleGetRaw):
-    # note: no logging
+    # note: no logging, directly override exec()
     def exec_online(self, session, retmsg):
         player_json = SpinJSON.loads(self.gamesite.player_table.unparse(session.player))
         return ReturnValue(result = self.format(player_json))
     def exec_offline(self, user, player):
         return ReturnValue(result = self.format(player))
 class HandleGetRawUser(HandleGetRaw):
-    # note: no logging
+    # note: no logging, directly override exec()
     def exec_online(self, session, retmsg):
         user_json = SpinJSON.loads(self.gamesite.user_table.unparse(session.user))
         return ReturnValue(result = self.format(user_json))
@@ -271,9 +275,10 @@ class HandleClearCooldown(Handler):
         return ReturnValue(result = 'ok')
 
 class HandleCooldownTogo(Handler):
-    def do_exec_online(self, session, retmsg):
+    # note: no logging, directly override exec()
+    def exec_online(self, session, retmsg):
         return ReturnValue(result = session.player.cooldown_togo(self.args['name']))
-    def do_exec_offline(self, user, player):
+    def exec_offline(self, user, player):
         togo = -1
         if self.args['name'] in player['cooldowns']:
             togo = max(-1, player['cooldowns'][self.args['name']]['end'] - self.time_now)
