@@ -120,6 +120,7 @@ TABLES = {
     # (re)acquisitions log
     'acquisitions': { 's3_name': 'acquisitions', 'table_name': 'log_acquisitions', 'compression': 'zip', 'retain_for': 90*86400 },
 
+    'policy_bot': { 's3_name': 'policy_bot', 'table_name': 'log_policy_bot', 'compression': 'zip', 'retain_for': 30*86400 },
     }
 
 class NullFD(object):
