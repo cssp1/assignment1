@@ -270,6 +270,40 @@ class HandleClearCooldown(Handler):
                 del player['cooldowns'][self.args['name']]
         return ReturnValue(result = 'ok')
 
+class HandleCooldownTogo(Handler):
+    def do_exec_online(self, session, retmsg):
+        return ReturnValue(result = session.player.cooldown_togo(self.args['name']))
+    def do_exec_offline(self, user, player):
+        togo = -1
+        if self.args['name'] in player['cooldowns']:
+            togo = max(-1, player['cooldowns'][self.args['name']]['end'] - self.time_now)
+        return ReturnValue(result = togo)
+
+class HandleTriggerCooldown(Handler):
+    def __init__(self, *args, **kwargs):
+        Handler.__init__(self, *args, **kwargs)
+        self.cd_name = self.args['name']
+        self.duration = int(self.args['duration'])
+        self.add_stack = int(self.args['add_stack']) if 'add_stack' in self.args else -1
+        self.cd_data = SpinJSON.loads(self.args['data']) if 'data' in self.args else None
+    def do_exec_online(self, session, retmsg):
+        session.player.cooldown_trigger(self.cd_name, self.duration, add_stack = self.add_stack, data = self.cd_data)
+        return ReturnValue(result = 'ok')
+    def do_exec_offline(self, user, player):
+        if self.duration > 0:
+            stack = 1
+            if self.add_stack > 0 and self.cd_name in player['cooldowns'] and player['cooldowns'][self.cd_name]['end'] > self.time_now:
+                stack += player['cooldowns'][self.cd_name].get('stack',1)
+
+            cd = {'start': self.time_now, 'end': self.time_now + self.duration}
+            if stack > 1:
+                cd['stack'] = stack
+            if self.cd_data:
+                cd['data'] = self.cd_data
+            player['cooldowns'][self.cd_name] = cd
+
+        return ReturnValue(result = 'ok')
+
 class HandleRemoveAura(Handler):
     def do_exec_online(self, session, retmsg):
         session.player.remove_aura(session, retmsg, self.args['aura_name'], force = True)
@@ -686,6 +720,8 @@ methods = {
     'chat_unofficial': HandleChatUnofficial,
     'clear_lockout': HandleClearLockout,
     'clear_cooldown': HandleClearCooldown,
+    'cooldown_togo': HandleCooldownTogo,
+    'trigger_cooldown': HandleTriggerCooldown,
     'apply_aura': HandleApplyAura,
     'remove_aura': HandleRemoveAura,
     'chat_gag': HandleChatGag,
