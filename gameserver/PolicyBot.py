@@ -20,7 +20,7 @@ IGNORE_AGE = 7*86400
 gamedata = SpinJSON.load(open(SpinConfig.gamedata_filename()))
 
 # process batches of this many users at once
-BATCH_SIZE = 100
+BATCH_SIZE = 5
 
 # cooldown that identifies a player as a repeat offender
 REPEAT_OFFENDER_COOLDOWN_NAME = 'alt_account_violation'
@@ -99,7 +99,7 @@ class Sender(object):
 
         if not alt_ids: return
 
-        print >> self.msg_fd, 'player %d has possible alts: %r' % (user_id, alt_ids)
+        #print >> self.msg_fd, 'player %d has possible alts: %r' % (user_id, alt_ids)
 
         # query player cache on alts to determine if they are in the same region, and compare spend/account creation time
         alt_pcaches = self.db_client.player_cache_lookup_batch(alt_ids, fields = ['home_region','money_spent','account_creation_time'])
@@ -214,9 +214,6 @@ class Sender(object):
 
         return new_region['id']
 
-    def finish(self):
-        print >> self.msg_fd, 'saw', self.seen, 'players'
-
 def connect_to_db():
     return SpinNoSQL.NoSQLClient(SpinConfig.get_mongodb_config(SpinConfig.config['game_id']), identity = 'PolicyBot')
 
@@ -240,14 +237,13 @@ def my_slave(input):
         db_client.set_time(time_now)
 
         try:
-            sender.check_user(input['batch'][i], index = BATCH_SIZE*input['batch_num'] + i, total_count = input['total_count'])
+            sender.check_user(input['batch'][i], index = input['batch_start_index'] + i, total_count = input['total_count'])
         except KeyboardInterrupt:
             raise # allow Ctrl-C to abort
         except:
             sys.stderr.write(('error processing user %d: '%(input['batch'][i])) + traceback.format_exc())
 
     print >> msg_fd, 'batch %d done' % input['batch_num']
-    sender.finish()
 
 # main program
 if __name__ == '__main__':
@@ -308,7 +304,7 @@ if __name__ == '__main__':
 
         try:
 
-            batches = [{'batch_num':i,
+            batches = [{'batch_num':i//BATCH_SIZE, 'batch_start_index':i,
                         'batch':id_list[i:i+BATCH_SIZE],
                         'total_count':len(id_list),
                         'verbose':verbose, 'test':test,
@@ -322,7 +318,7 @@ if __name__ == '__main__':
             else:
                 SpinParallel.go(batches,
                                 [sys.argv[0], '--slave'],
-                                on_error = 'break', nprocs=parallel, verbose = False)
+                                on_error = 'continue', nprocs=parallel, verbose = False)
 
             time_now = int(time.time())
             db_client.set_time(time_now)
