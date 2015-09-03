@@ -78,7 +78,7 @@ class Sender(object):
     def check_user(self, user_id, index = -1, total_count = -1):
 
         self.seen += 1
-        print >> self.msg_fd, '(%6.2f%%) %7d' % (100*float(index+1)/float(total_count), user_id),
+        print >> self.msg_fd, '(%6.2f%%) %7d' % (100*float(index+1)/float(total_count), user_id)
 
         player = do_CONTROLAPI({'user_id':user_id, 'method':'get_raw_player'})['result']
 
@@ -114,6 +114,9 @@ class Sender(object):
                     continue
 
                 interfering_alt_pcaches.append(alt_pcache)
+
+        if not interfering_alt_pcaches:
+            return
 
         print >> self.msg_fd, 'player %d has violating alts: %r' % (user_id, interfering_alt_pcaches)
 
@@ -294,7 +297,8 @@ if __name__ == '__main__':
             id_list += db_client.player_cache_query_tutorial_complete_and_mtime_between_or_ctime_between([[start_time, time_now]], [],
                                                                                                          townhall_name = gamedata['townhall'],
                                                                                                          min_townhall_level = 3,
-                                                                                                         include_home_regions = anti_alt_region_names)
+                                                                                                         include_home_regions = anti_alt_region_names,
+                                                                                                         min_known_alt_count = 1)
 
         id_list.sort(reverse=True)
 

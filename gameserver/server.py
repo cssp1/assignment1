@@ -22526,6 +22526,12 @@ class GAMEAPI(resource.Resource):
         if session.player.isolate_pvp:
             cache_props['isolate_pvp'] = 1
 
+        known_alt_count = sum(1 for data in session.player.known_alt_accounts.itervalues() if not data.get('ignore',False))
+        if known_alt_count >= 1:
+            cache_props['known_alt_count'] = known_alt_count
+        else:
+            cache_props['known_alt_count'] = None
+
         gamesite.pcache_client.player_cache_update(session.user.user_id, cache_props, reason = reason)
 
     # new asynchronous logout
