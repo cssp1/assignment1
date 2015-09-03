@@ -650,7 +650,7 @@ class NoSQLClient (object):
         return None
 
     # retrieve log entries either by time or ObjectID range (useful for paging)
-    def log_retrieve(self, log_name, time_range = [-1,-1], id_range = [None, None], inclusive = True, code = None, reason=''):
+    def log_retrieve(self, log_name, time_range = [-1,-1], id_range = [None, None], inclusive = True, code = None, limit = None, sort_direction = 1, reason=''):
         # convert strings to oids
         id_range = map(lambda x: self.encode_object_id(x) if x else None, id_range)
         # convert time range to ObjectID range
@@ -658,11 +658,11 @@ class NoSQLClient (object):
         # intersection of both ranges
         id_range[0] = time_id_range[0] if (id_range[0] is None) else max(id_range[0], time_id_range[0])
         id_range[1] = time_id_range[1] if (id_range[1] is None) else min(id_range[1], time_id_range[1])
-        return self.instrument('log_retrieve(%s)'%(log_name+':'+reason), self._log_retrieve, (log_name, id_range, inclusive, code))
+        return self.instrument('log_retrieve(%s)'%(log_name+':'+reason), self._log_retrieve, (log_name, id_range, inclusive, code, limit, sort_direction))
     def decode_log(self, x):
         if '_id' in x: x['_id'] = self.decode_object_id(x['_id']) # convert to plain strings
         return x
-    def _log_retrieve(self, log_name, id_range, inclusive, code):
+    def _log_retrieve(self, log_name, id_range, inclusive, code, limit, sort_direction):
         qs = {}
         if id_range[0] or id_range[1]:
             qs['_id'] = {}
@@ -670,7 +670,13 @@ class NoSQLClient (object):
             if id_range[1]: qs['_id']['$lt'] = id_range[1]
         if code is not None:
             qs['code'] = code
-        return (self.decode_log(x) for x in self.log_buffer_table(log_name).find(qs).sort([('_id',1)]).batch_size(999999))
+
+        # XXX maybe better to sort on time before _id - this relies on MongoDB timestamp linearity
+        cur = self.log_buffer_table(log_name).find(qs).sort([('_id',sort_direction)]).batch_size(999999)
+        if limit:
+            cur = cur.limit(limit)
+
+        return (self.decode_log(x) for x in cur)
 
     ###### DAU TABLES ######
 
@@ -1005,9 +1011,16 @@ class NoSQLClient (object):
         return map(lambda x: x['_id'], result)
 
     # special case for use by notification checker
-    def player_cache_query_tutorial_complete_and_mtime_between_or_ctime_between(self, mtime_ranges, ctime_ranges, reason = None):
+    def player_cache_query_tutorial_complete_and_mtime_between_or_ctime_between(self, mtime_ranges, ctime_ranges,
+                                                                                townhall_name = None, min_townhall_level = None,
+                                                                                include_home_regions = None,
+                                                                                reason = None):
         qs = {'$or': [{'tutorial_complete':1,'last_mtime':{'$gte':r[0], '$lt':r[1]}} for r in mtime_ranges] + \
                      [{'tutorial_complete':1,'account_creation_time':{'$gte':r[0], '$lt':r[1]}} for r in ctime_ranges]}
+        if townhall_name and min_townhall_level:
+            qs = {'$and': [qs, {townhall_name+'_level': {'$gte': min_townhall_level}}]}
+        if include_home_regions:
+            qs = {'$and': [qs, {'home_region': {'$in': include_home_regions}}]}
         return self.instrument('player_cache_query_tutorial_complete_and_mtime_between_or_ctime_between(%s)'%reason,
                                lambda qs: map(lambda x: x['_id'], self.player_cache().find(qs, {'_id':1})), (qs,))
 
