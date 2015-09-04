@@ -353,11 +353,15 @@ Showcase.apply_showcase_hacks = function(dialog, hack) {
     if('progression_reward_items' in hack) {
         dialog.widgets['progression_rewards_bg'].show = true;
 
-        // this will be a list of [{"level": N, "item": {"spec": ...}}, ... ]
+        // this will be a list of [{"level": N, "loot": {"spec": ...}}, ... ]
+        // where "loot" acn also be a "multi", "cond", or random-choice array,
+        // similar but NOT identical to an actual loot table.
         var progression_item_list = eval_cond_or_literal(hack['progression_reward_items'], player, null) || [];
 
         var flatten_loot = function(loot) {
-            if('spec' in loot) {
+            if(loot === null) {
+                return [];
+            } else if('spec' in loot) {
                 return [loot];
             } else if('multi' in loot) {
                 return flatten_loot(loot['multi']);
@@ -383,7 +387,9 @@ Showcase.apply_showcase_hacks = function(dialog, hack) {
         // returns an array of the form [min, max] where min and max represent the minimum and maximum
         // number of items that will drop from a given loot table
         var get_loot_drop_count = function(loot) {
-            if('spec' in loot) {
+            if(loot === null) {
+                return [0, 0];
+            } else if('spec' in loot) {
                 return [1, 1];
             } else if('multi' in loot) {
                 var ret = [0, 0];
