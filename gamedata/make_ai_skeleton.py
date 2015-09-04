@@ -736,7 +736,7 @@ def get_progression_reward_items(loot, include_resource_boosts, include_random_l
             # this level drops an item so filter out any tokens or resource boosts
             if loot['spec'] == 'token':
                 return None
-            elif any(loot['spec'].startswith('boost_%s_' % resource) for resource in gamedata['resources']):
+            elif any(loot['spec'].startswith('boost_%s_' % resource) for resource in gamedata['resources'] if resource != 'res3'):
                 if not include_resource_boosts:
                     return None
                 else:
