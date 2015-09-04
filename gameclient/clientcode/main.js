@@ -10064,12 +10064,16 @@ SPINPUNCHGAME.init = function() {
         fonts_are_thick = (chrome_version_atleast(22,0,1229,79) && !chrome_version_atleast(22,0,1229,92)) || chrome_version_atleast(24,0,1312,52);
     }
 
-    // hack for horrible Chrome text rendering bug
+    // hack that reduces the variety of unique font sizes/faces used in rendering the Canvas
     var low_fonts = false;
     if(get_query_string('low_fonts') == '1') {
         low_fonts = true;
     } else if(spin_demographics['browser_name'] === 'Chrome') {
+        // These versions of Chrome have a glyph caching bug
         low_fonts |= (chrome_version_atleast(30,0,1599,69) && !chrome_version_atleast(30,0,1599,101));
+    } else if(spin_demographics['browser_name'] === 'Explorer' && spin_demographics['browser_version'] >= 12) {
+        // MS Edge has a performance problem with Canvas text rendering, reducing font variety helps
+        low_fonts |= true;
     }
 
     SPUI.init(canvas, ctx, {fonts_are_thick: fonts_are_thick, low_fonts: low_fonts});
