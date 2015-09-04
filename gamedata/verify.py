@@ -1848,15 +1848,14 @@ def check_showcase_hack(cons, reason = ''):
             if ITEM_FIELD in sc:
                 def check_showcase_item_field(cons, value, reason = ''):
                     error = 0
-                    if isinstance(value, dict):
-                        # item field is keyed on difficulty so loop through each difficulty's item(s)
-                        for diff in value:
-                            for entry in value[diff]:
-                                error |= check_item_name(entry['spec'], reason + ':' + cons['consequent'] + ':' + ITEM_FIELD)
-                    else:
-                        # literal item list
-                        for entry in value:
+                    # item field is keyed on difficulty so loop through each difficulty's item(s)
+                    if not isinstance(value, dict):
+                        value = {'Normal': value}
+
+                    for diff in value:
+                        for entry in value[diff]:
                             error |= check_item_name(entry['spec'], reason + ':' + cons['consequent'] + ':' + ITEM_FIELD)
+
                     return error
 
                 if type(sc[ITEM_FIELD]) is list and type(sc[ITEM_FIELD][0]) is list:
@@ -1867,6 +1866,37 @@ def check_showcase_hack(cons, reason = ''):
                             error |= check_item_name(entry['spec'], reason + ':' + cons['consequent'] + ':' + ITEM_FIELD)
                 else:
                     error |= check_showcase_item_field(cons, sc[ITEM_FIELD], reason)
+
+        if 'progression_reward_items' in sc:
+            ITEM_FIELD = 'progression_reward_items'
+
+            # each "level block" specifies loot as a single item, or list (to alternate), or a cond chain thereof
+            def check_progression_reward_block(entry):
+                error = 0
+                if isinstance(entry, dict):
+                    if 'spec' in entry:
+                        error |= check_item_name(entry['spec'], reason + ':' + cons['consequent'] + ':' + ITEM_FIELD)
+                    elif 'multi' in entry:
+                        for sub in entry['multi']:
+                            error |= check_progression_reward_block(sub)
+                    elif 'cond' in entry:
+                        for pred, loot_list in entry['cond']:
+                            error |= check_predicate(pred, reason = reason + ':' + cons['consequent'] + ':' + ITEM_FIELD)
+                            error |= check_progression_reward_block(loot_list)
+                    else:
+                        error |= 1; print 'mal-formed progression reward entry in', reason + ':' + cons['consequent'] + ':' + ITEM_FIELD, entry
+                elif isinstance(entry, list):
+                    for sub in entry:
+                        error |= check_item_name(sub['spec'], reason + ':' + cons['consequent'] + ':' + ITEM_FIELD)
+                elif entry is None:
+                    pass
+                else:
+                    error |= 1; print 'mal-formed progression reward entry in', reason + ':' + cons['consequent'] + ':' + ITEM_FIELD, entry
+                return error
+
+            for level_block in sc[ITEM_FIELD]:
+                error |= check_progression_reward_block(level_block['loot'])
+
         for COND_FIELD in ('feature_random_item_count', 'ui_final_reward_bbcode', 'ui_final_reward_subtitle', 'ui_random_rewards_text'):
             if COND_FIELD in sc and type(sc[COND_FIELD]) is list:
                 error |= check_cond_chain(sc[COND_FIELD], reason = reason + ':' + cons['consequent'] + ':' + COND_FIELD)
