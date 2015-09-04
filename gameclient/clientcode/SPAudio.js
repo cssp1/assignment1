@@ -270,7 +270,12 @@ SPAudio.ACDriver = function(client_time) {
 }
 goog.inherits(SPAudio.ACDriver, SPAudio.Driver);
 
-SPAudio.ACDriver.prototype.get_codec = function() { return 'ogg'; };
+SPAudio.ACDriver.prototype.get_codec = function() {
+    if(navigator.userAgent.indexOf('Edge/') >= 0) {
+        return 'mp3'; // MS Edge has no OGG support
+    }
+    return 'ogg';
+};
 
 SPAudio.ACDriver.prototype.sync_time = function(client_time) {
     this.time_offset = this.context.currentTime - client_time;

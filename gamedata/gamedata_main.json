@@ -358,13 +358,17 @@
         // name of audio driver to use - can be overridden by ?audio_driver= URL parameter
         "default_audio_driver": [
             [{"predicate":"BROWSER_NAME", "names": ["Chrome"]}, "AudioContext"],
+            [{"predicate":"BROWSER_HARDWARE", "hardware": ["Windows Phone"]}, null], // no Flash, no AudioContext, and buzz doesn't work
             [{"predicate":"AND", "subpredicates":[
                 {"predicate":"BROWSER_NAME", "names": ["Firefox"]},
                 {"predicate":"BROWSER_VERSION", "versions": [25,-1]}
             ]}, "AudioContext"],
+            [{"predicate":"AND", "subpredicates":[ // Microsoft Edge
+                {"predicate":"BROWSER_NAME", "names": ["Explorer"]},
+                {"predicate":"BROWSER_VERSION", "versions": [12,-1]}
+            ]}, "AudioContext"],
             [{"predicate":"BROWSER_NAME", "names": ["Firefox"]}, "buzz"], // switched back from sm2->buzz 2013 Aug 26
             [{"predicate":"BROWSER_NAME", "names": ["Safari"]}, "buzz"], // Flash audio trick causes severe memory/thread pressure in Safari as of 2012 May 27
-            [{"predicate":"BROWSER_HARDWARE", "hardware": ["Windows Phone"]}, null], // no Flash, no AudioContext, and buzz doesn't work
             [{"predicate":"BROWSER_NAME", "names": ["Explorer"]}, "sm2"],
             [{"predicate":"BROWSER_NAME", "names": ["Opera"]}, "sm2"],
             [{"predicate":"ALWAYS_TRUE"}, "sm2"]
