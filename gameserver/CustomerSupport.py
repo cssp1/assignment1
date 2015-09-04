@@ -414,9 +414,14 @@ class MessageSender(Handler):
 class HandleGiveItem(MessageSender):
     def make_message(self):
         assert self.args['spec'] in self.gamedata['items']
+        item_spec = self.gamedata['items'][self.args['spec']]
         item = {'spec':self.args['spec']}
         stack = int(self.args.get('stack','1'))
+        level = int(self.args.get('level','1'))
         if stack > 1: item['stack'] = stack
+        if level > 1:
+            assert 'max_level' in item_spec and level <= item_spec['max_level']
+            item['level'] = level
         expire_time = int(self.args.get('expire_time','-1'))
         if expire_time > 0: item['expire_time'] = expire_time
         if self.args.get('undiscardable',False): item['undiscardable'] = 1

@@ -282,13 +282,16 @@ var method_give_item = function() {
     var ui_reason = check_ui_reason($("#item_to_give_reason")[0].value);
     var spec = $("#item_to_give_text")[0].value || $("#item_to_give")[0].value;
     var stack = $("#item_to_give_qty").spinner("value");
+    var level = $("#item_to_give_level").spinner("value");
+    var ui_name = stack.toFixed() + "x " + spec + ((level != 1) ? (" L"+level.toString()) : "");
+
     if(ident && spec && stack > 0 && ui_reason) {
         var do_send = true;
-        if(stack > 10) {
-            do_send = confirm("You are trying to give " + stack.toFixed() + "x " + spec + ".\n\nAre you sure you want to do this?");
+        if(stack > 10 || level > 1) {
+            do_send = confirm("You are trying to give " + ui_name + ".\n\nAre you sure you want to do this?");
         }
         if(do_send) {
-            send_request('player', 'give_item', $.extend(ident, {'spec': spec, 'stack':stack, 'ui_reason':ui_reason}), (function(_spec, _stack) { return function(result) { alert("Successfully gave " + _stack.toFixed() + "x " + _spec + "!"); }; })(spec, stack));
+            send_request('player', 'give_item', $.extend(ident, {'spec': spec, 'stack':stack, 'level':level, 'ui_reason':ui_reason}), (function(_ui_name) { return function(result) { alert("Successfully gave " + _ui_name + "!"); }; })(ui_name));
         }
     }
 };
@@ -1342,6 +1345,7 @@ $(function() {
 
     $('#gamebucks_amount').spinner({max:50000, min:0, step:100});
     $('#item_to_give_qty').spinner({max:50, min:1, step:1});
+    $('#item_to_give_level').spinner({max:100, min:1, step:1});
     spin_giveable_items.forEach(function(entry) {
         $('#item_to_give').append('<option value="'+entry['name']+'">'+entry['ui_name']+'</option>');
     });
@@ -1460,6 +1464,8 @@ $(function() {
       <input type="text" id="item_to_give_text" onkeyup="update_item_to_give_widget_state()" style="width:250px;">
       <br><br>
       Quantity: <input type="text" id="item_to_give_qty" name="item_to_give_qty" value="1" style="width:80px;">
+      Level: <input type="text" id="item_to_give_level" name="item_to_give_level" value="1" style="width:80px;">
+
       <button onclick="method_give_item()" class="spin_button">Give</button>
       <p>
       Reason for this action:
