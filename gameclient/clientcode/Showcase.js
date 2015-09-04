@@ -428,17 +428,23 @@ Showcase.apply_showcase_hacks = function(dialog, hack) {
         // a single item or an array of items that may drop on that level
         progression_item_list = goog.array.map(progression_item_list,
             function(entry) {
-                if(entry['level'] > unskipped_level_progress) {
-                    // we need to get the drop count before we remove the structure of the loot table
-                    var count = get_loot_drop_count(entry['loot']);
-                    var flattened = flatten_loot(entry['loot']);
+                // we need to get the drop count before we remove the structure of the loot table
+                var count = get_loot_drop_count(entry['loot']);
+                var flattened = flatten_loot(entry['loot']);
 
+                if(flattened.length < 1) {
+                    return null;
+                }
+                if(entry['level'] > unskipped_level_progress) {
                     return {'level': entry['level'], 'count': count, 'loot': flattened};
-                } else {
+                } else { // fake entry that represents an already-obtained loot drop
                     return {'level': entry['level'], 'count': [1, 1], 'loot': {'spec': 'already_collected'}};
                 }
             }
         );
+
+        // get rid of null entries
+        progression_item_list = goog.array.filter(progression_item_list, function(x) { return x !== null; });
 
         // create just a list of [{"spec": ...}, ... ]
         var raw_item_list = goog.array.map(progression_item_list,
