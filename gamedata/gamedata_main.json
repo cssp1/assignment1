@@ -374,6 +374,14 @@
             [{"predicate":"ALWAYS_TRUE"}, "sm2"]
         ],
 
+        "use_requestAnimationFrame": [ // by default, can be over-ridden by ?requestAnimationFrame=1 query string
+            [{"predicate":"AND", "subpredicates":[ // Microsoft Edge
+                {"predicate":"BROWSER_NAME", "names": ["Explorer"]},
+                {"predicate":"BROWSER_VERSION", "versions": [12,-1]}
+            ]}, true],
+            [{"predicate":"ALWAYS_TRUE"}, false]
+        ],
+
         // maximum number of simultaneous audio effects to play, by audio driver API and browser name
         // (the game uses the smallest of these that applies to the player's browser)
         "max_audio_channels": {"buzz": 24, "sm2": 24, "AudioContext": 24,

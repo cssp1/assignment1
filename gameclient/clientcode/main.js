@@ -10139,17 +10139,20 @@ SPINPUNCHGAME.init = function() {
               window['webkitRequestAnimationFrame'] ||
               window['mozRequestAnimationFrame']    ||
               window['oRequestAnimationFrame']      ||
-              window['msRequestAnimationFrame'];
-        // disable this on Chrome on Mac OSX since it performs terribly
-//      if((navigator.userAgent.indexOf('Chrome') != -1) &&
-//         (navigator.platform.indexOf('Mac') != -1)) {
-//          console.log('Disabling requestAnimationFrame for Chrome on Mac OSX due to performance bugs!');
-//          fun = null;
-//      } else {
-        if(get_query_string('requestAnimationFrame') != '1') {
-            fun = null;
+              window['msRequestAnimationFrame']     ||
+            null;
+
+        if(get_query_string('requestAnimationFrame')) {
+            if(get_query_string('requestAnimationFrame') !== '1') {
+                fun = null;
+            } else {
+                // leave fun alone
+            }
+        } else {
+            if(!eval_cond_or_literal(gamedata['client']['use_requestAnimationFrame'], player, null)) {
+                fun = null; // disable it
+            }
         }
-//      }
 
         var ret;
         USING_REQUESTANIMATIONFRAME = (fun != null);
