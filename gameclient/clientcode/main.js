@@ -20016,6 +20016,9 @@ Region.prototype.squads_nearby = function(cell) {
             if(SQUAD_IDS.is_mobile_squad_id(squad['id'])) {
                 if(!player.squad_is_deployed(squad['id'])) {
                     ls.push(squad['id']);
+                } else if(hex_distance(squad['map_loc'], cell) == 1 &&
+                          !player.squad_is_moving(squad['id'])) {
+                    ls.push(squad['id']);
                 }
             } else if(squad['id'] === SQUAD_IDS.BASE_DEFENDERS && gamedata['territory']['base_defenders_can_attack_neighbors']) {
                 ls.push(squad['id']);
