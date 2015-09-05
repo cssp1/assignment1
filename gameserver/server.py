@@ -4288,7 +4288,7 @@ class Session(object):
 
         # dump loot buffer
         if self.player.loot_buffer:
-            self.player.loot_buffer = []
+            self.player.loot_buffer_release('deploy_ai_attack')
             retmsg.append(["LOOT_BUFFER_UPDATE", self.player.loot_buffer, False])
 
         if gamedata['server']['log_ai_attacks'] and (self.incoming_attack_type != 'tutorial'):
@@ -10454,6 +10454,16 @@ class LivePlayer(Player):
         if (slot > (len(self.inventory)-1)) or self.inventory[slot]['spec'] != specname or (level is not None and self.inventory[slot].get('level',1) != level):
             return None
         return self.inventory[slot]
+
+    def loot_buffer_release(self, reason):
+        if not self.loot_buffer: return
+        for entry in self.loot_buffer:
+            self.inventory_log_event('5131_item_trashed', entry['spec'], -entry.get('stack',1), entry.get('expire_time',-1), level = entry.get('level',None), reason=reason)
+            metric_name = entry['spec']
+            if entry.get('level',None) > 1:
+                metric_name += '_L%d' % entry['level']
+            record_player_metric(self, dict_increment, 'item:'+metric_name+':trashed', entry.get('stack',1), time_series=False)
+        self.loot_buffer = []
 
     # return how many items in item_list (format of loot_buffer and inventory) match "specname" and are not expired
     def get_item_quantity(self, item_list, specname, level = None):
@@ -16710,7 +16720,7 @@ class GAMEAPI(resource.Resource):
         if not session.home_base:
             # dump buffered loot when leaving home base
             # note: this means if you end an attack by visiting somewhere that isn't home base, you'll lose the loot
-            session.player.loot_buffer = []
+            session.player.loot_buffer_release('change_session_complete')
 
         retmsg.append(["LOOT_BUFFER_UPDATE", session.player.loot_buffer, False])
         retmsg.append(["DONATED_UNITS_UPDATE", session.player.donated_units])
@@ -24653,11 +24663,7 @@ class GAMEAPI(resource.Resource):
 
         elif arg[0] == "LOOT_BUFFER_RELEASE":
             client_contents = arg[1]
-            if session.player.loot_buffer:
-                for entry in session.player.loot_buffer:
-                    session.player.inventory_log_event('5131_item_trashed', entry['spec'], -entry.get('stack',1), entry.get('expire_time',-1), level = entry.get('level',None), reason='loot_buffer')
-                    session.increment_player_metric('item:'+entry['spec']+':trashed', entry.get('stack',1), time_series=False)
-            session.player.loot_buffer = []
+            session.player.loot_buffer_release('LOOT_BUFFER_RELEASE')
             retmsg.append(["LOOT_BUFFER_UPDATE", session.player.loot_buffer, False])
 
         elif arg[0] == "DAILY_TIP_UNDERSTOOD":
