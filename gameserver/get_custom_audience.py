@@ -106,14 +106,14 @@ if __name__ == '__main__':
                    {'game_id':gid, 'aud':'p10-c30', 'min_spend':10, 'churned_for_days':30},
                    {'game_id':gid, 'aud':'p10', 'min_spend':10, 'churned_for_days':-1},
                    ]
-            if gid in ('tr','sg'):
+            if gid in ('tr','sg','dv'):
                 ret.append({'game_id':gid, 'aud':'ALL', 'min_spend':-1, 'churned_for_days':-1})
             if 0:
                 for country in ('us','ca','gb','au','nz','dk','nl','no','se'):
                     ret.append({'game_id':gid, 'aud':'p10-n%s' % country, 'min_spend':10, 'churned_for_days':-1, 'country':country})
             return ret
         auds = []
-        for gid in ('mf','tr','mf2','bfm','sg'):
+        for gid in ('mf','tr','mf2','bfm','sg','dv'):
             auds += auds_for_game(gid)
 
     else:
