@@ -67,12 +67,13 @@ def master_account(a, b):
 def is_anti_alt_region(region): return 'anti_alt' in region.get('tags',[])
 
 class Sender(object):
-    def __init__(self, db_client, dry_run = True, test = False, msg_fd = None):
+    def __init__(self, db_client, dry_run = True, test = False, msg_fd = None, verbose = 0):
         self.db_client = db_client
         self.dry_run = dry_run
         self.test = test
         self.seen = 0
         self.msg_fd = msg_fd
+        self.verbose = verbose
         self.policy_bot_log = open_log(self.db_client)
 
     def check_user(self, user_id, index = -1, total_count = -1):
@@ -97,13 +98,17 @@ class Sender(object):
             if alt_data.get('last_login',0) < time_now - IGNORE_AGE: continue
             alt_ids.append(int(salt_id))
 
-        if not alt_ids: return
+        if self.verbose >= 2:
+            print >> self.msg_fd, 'alt_ids %r alt_accounts %r' % (alt_ids, alt_accounts)
 
-        #print >> self.msg_fd, 'player %d has possible alts: %r' % (user_id, alt_ids)
+        if not alt_ids: return
 
         # query player cache on alts to determine if they are in the same region, and compare spend/account creation time
         alt_pcaches = self.db_client.player_cache_lookup_batch(alt_ids, fields = ['home_region','money_spent','account_creation_time'])
         our_pcache = {'user_id': user_id, 'money_spent': player['history'].get('money_spent',0), 'account_creation_time': player['creation_time']}
+
+        if self.verbose >= 2:
+            print >> self.msg_fd, 'player %d has possible alts: %r' % (user_id, alt_pcaches)
 
         interfering_alt_pcaches = []
 
@@ -230,7 +235,7 @@ def my_slave(input):
     # reconnect to DB to avoid subprocesses sharing conenctions
     db_client = connect_to_db()
 
-    sender = Sender(db_client, dry_run = input['dry_run'], msg_fd = msg_fd, test = input['test'])
+    sender = Sender(db_client, dry_run = input['dry_run'], msg_fd = msg_fd, test = input['test'], verbose = input['verbose'])
 
     for i in xrange(len(input['batch'])):
         time_now = int(time.time())
@@ -251,11 +256,12 @@ if __name__ == '__main__':
         SpinParallel.slave(my_slave)
         sys.exit(0)
 
-    opts, args = getopt.gnu_getopt(sys.argv[1:], '', ['dry-run','test', 'parallel=', 'quiet'])
+    opts, args = getopt.gnu_getopt(sys.argv[1:], 'v', ['dry-run','test', 'parallel=', 'quiet', 'verbose', 'user-id='])
     dry_run = False
     test = False
     parallel = -1
-    verbose = True
+    verbose = 1
+    manual_user_list = []
 
     for key, val in opts:
         if key == '--dry-run':
@@ -265,7 +271,11 @@ if __name__ == '__main__':
         elif key == '--parallel':
             parallel = int(val)
         elif key == '--quiet':
-            verbose = False
+            verbose = 0
+        elif key == '--user-id':
+            manual_user_list.append(int(val))
+        elif key == '-v' or key == '--verbose':
+            verbose = 2
 
     with SpinSingletonProcess.SingletonProcess('PolicyBot-%s' % (SpinConfig.config['game_id'],)):
 
@@ -275,28 +285,32 @@ if __name__ == '__main__':
         run_start_time = time_now
         start_time = time_now - IGNORE_AGE
 
-        # if we can find a recent run in the log, start from where it left off
-        if verbose: print 'checking for recent completed run...'
-        for last_run in db_client.log_retrieve('log_policy_bot', time_range = [time_now - IGNORE_AGE, time_now], code = 7300, sort_direction = -1, limit = 1):
-            start_time = max(start_time, last_run['time'])
-            if verbose: print 'found previous run - starting at', start_time
+        if manual_user_list:
+            id_list = manual_user_list
 
-        id_list = []
-
-        if test:
-            id_list += [1112,]
         else:
-            if verbose: print 'querying player_cache...'
-            anti_alt_region_names = [name for name, data in gamedata['regions'].iteritems() if is_anti_alt_region(data)]
-            id_list += db_client.player_cache_query_tutorial_complete_and_mtime_between_or_ctime_between([[start_time, time_now]], [],
-                                                                                                         townhall_name = gamedata['townhall'],
-                                                                                                         min_townhall_level = 3,
-                                                                                                         include_home_regions = anti_alt_region_names,
-                                                                                                         min_known_alt_count = 1)
+            # if we can find a recent run in the log, start from where it left off
+            if verbose: print 'checking for recent completed run...'
+            for last_run in db_client.log_retrieve('log_policy_bot', time_range = [time_now - IGNORE_AGE, time_now], code = 7300, sort_direction = -1, limit = 1):
+                start_time = max(start_time, last_run['time'])
+                if verbose: print 'found previous run - starting at', start_time
+
+            id_list = []
+
+            if test:
+                id_list += [1112,]
+            else:
+                if verbose: print 'querying player_cache...'
+                anti_alt_region_names = [name for name, data in gamedata['regions'].iteritems() if is_anti_alt_region(data)]
+                id_list += db_client.player_cache_query_tutorial_complete_and_mtime_between_or_ctime_between([[start_time, time_now]], [],
+                                                                                                             townhall_name = gamedata['townhall'],
+                                                                                                             min_townhall_level = 3,
+                                                                                                             include_home_regions = anti_alt_region_names,
+                                                                                                             min_known_alt_count = 1)
 
         id_list.sort(reverse=True)
 
-        if not dry_run:
+        if not dry_run and not manual_user_list:
             policy_bot_log = open_log(db_client)
             policy_bot_log.event(time_now, {'event_name': '7300_policy_bot_run_started', 'code': 7300, 'num_users': len(id_list)})
 
@@ -321,11 +335,11 @@ if __name__ == '__main__':
             time_now = int(time.time())
             db_client.set_time(time_now)
 
-            if not dry_run:
+            if not dry_run and not manual_user_list:
                 policy_bot_log.event(time_now, {'event_name': '7302_policy_bot_run_finished', 'code': 7302, 'start_time':run_start_time})
 
         except:
-            if not dry_run:
+            if not dry_run and not manual_user_list:
                 time_now = int(time.time())
                 db_client.set_time(time_now)
                 policy_bot_log.event(time_now, {'event_name': '7303_policy_bot_run_aborted', 'code': 7303, 'start_time':run_start_time})
