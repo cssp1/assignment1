@@ -143,6 +143,14 @@ def resolve(session, log_func = None):
         if killer:
             killer_info = {'team': 'player' if killer.owner is session.player else 'enemy',
                            'spec': killer.spec.name, 'level': killer.level, 'id': killer.obj_id}
+            if killer.is_mobile():
+                killer_spell = killer.get_auto_spell()
+                if killer_spell and killer_spell.get('kills_self', False):
+                    # suicide unit
+                    shooter_list.remove(killer)
+                    target_list.remove(killer)
+                    kill_list = filter(lambda x: x[1] != killer.obj_id, kill_list) # remove it from kill_list
+                    objects_destroyed.append([killer.obj_id, [killer.x, killer.y], killer_info])
         else:
             killer_info = None
 
