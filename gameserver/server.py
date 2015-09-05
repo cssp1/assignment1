@@ -3526,6 +3526,8 @@ class Session(object):
 
         self.cur_objects = ObjectCollection()
 
+    def num_objects(self): return len(self.cur_objects)
+
     def add_object(self, obj):
         # we have to set obj.team according to the relationship
         # between the player and the owner of the object
@@ -4703,6 +4705,8 @@ class ObjectCollection:
         return self.objects.has_key(id)
     def iter_objects(self):
         return self.objects.itervalues()
+    def __len__(self):
+        return len(self.objects)
 
 # these "Specs" are a parsed form of object or tech specifications read from gamedata.json
 class Spec(object):
@@ -20483,13 +20487,30 @@ class GAMEAPI(resource.Resource):
         else:
             log_func = None
 
-        objects_destroyed, combat_updates = AutoResolve.resolve(session, log_func = log_func)
-        if gamedata['server'].get('log_auto_resolve', 0) >= 2:
-            gamesite.exception_log.event(server_time, "player %d at %s auto-resolve destroys: %r ... updates: %r" % (session.player.user_id, session.viewing_base.base_id, objects_destroyed, combat_updates))
+        resolve_iter = 0
 
-        for args in objects_destroyed:
-            self.destroy_object(session, retmsg, *args)
-        self.object_combat_updates(session, retmsg, combat_updates)
+        while True: # iterate, because object destruction can spawn new objects (security teams)
+            objects_destroyed, combat_updates = AutoResolve.resolve(session, log_func = log_func)
+            if gamedata['server'].get('log_auto_resolve', 0) >= 2:
+                gamesite.exception_log.event(server_time, "player %d at %s auto-resolve iter %d destroys: %r ... updates: %r" % (session.player.user_id, session.viewing_base.base_id, resolve_iter, objects_destroyed, combat_updates))
+
+            if not objects_destroyed and not combat_updates:
+                break # nothing happened
+
+            resolve_iter += 1
+
+            # compare number of objects before and after submitting
+            # the changes, to pick up new security team objects
+            num_before = session.num_objects()
+            for args in objects_destroyed:
+                self.destroy_object(session, retmsg, *args)
+            self.object_combat_updates(session, retmsg, combat_updates)
+
+            # check for security team spawning
+            num_after = session.num_objects()
+
+            if num_after <= num_before - len(objects_destroyed):
+                break # nothing new spawned
 
     def object_combat_updates(self, session, retmsg, arg):
         # update hitpoints and (for mobile units only) XY position and movement orders
