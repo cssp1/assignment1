@@ -29289,6 +29289,10 @@ function update_squad_manage(dialog) {
                     if(obj) {
                         send_to_server.func(["CAST_SPELL", GameObject.VIRTUAL_ID, "SQUAD_ASSIGN_UNIT", _squad_id, obj['obj_id']]);
                         unit_repair_sync_marker = synchronizer.request_sync();
+
+                        if(gamedata['client']['predict_squad_assign']) { // client-side predict
+                            obj['squad_id'] = _squad_id;
+                        }
                         obj['pending'] = 1;
                     }
                 }; })(dialog.user_data['squad_id'], specname, cur_squad_space, max_squad_space);
@@ -29338,7 +29342,10 @@ function update_squad_manage(dialog) {
                     }
                     send_to_server.func(["CAST_SPELL", GameObject.VIRTUAL_ID, "SQUAD_UNASSIGN_UNIT", _squad_id, _obj['obj_id']]);
                     unit_repair_sync_marker = synchronizer.request_sync();
-                _obj['pending'] = 1;
+                    if(gamedata['client']['predict_squad_assign']) { // client-side predict
+                        _obj['squad_id'] = SQUAD_IDS.RESERVES;
+                    }
+                    _obj['pending'] = 1;
                 }; })(dialog.user_data['squad_id'], obj)
             }
             var icon_state = ((obj['pending'] || !pred_ok || squad_is_under_repair || squad_is_deployed || squad_in_battle) ? 'disabled_clickable' : null);
