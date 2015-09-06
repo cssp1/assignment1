@@ -1852,7 +1852,7 @@ RegionMap.RegionMap.prototype.draw_feature = function(feature) {
     if(1) {
         var base_xy = this.cell_to_field(loc);
         var moving = this.region.feature_is_moving(feature);
-        var selected = (this.selection_loc && this.selection_loc[0] === loc[0] && this.selection_loc[1] === loc[1]);
+        var selected = (this.selection_feature === feature); // (this.selection_loc && this.selection_loc[0] === loc[0] && this.selection_loc[1] === loc[1]);
 
         if(gamedata['territory']['clip_features']) { // clip for speed
             if(selected || moving) {
@@ -1873,6 +1873,8 @@ RegionMap.RegionMap.prototype.draw_feature = function(feature) {
 
         var label_xy = base_xy;
         var show_label = true, is_guard = false;
+        var multi_index = 0; // if multiple squads overlap in a hex, this is our index
+        var multi_count = 1; // count of features in this hex, including us
         var squad_sid = null, squad_id = -1;
         var squad_pending = false; // own squad has pending orders
         var classification = this.classify_feature(feature);
@@ -1881,10 +1883,23 @@ RegionMap.RegionMap.prototype.draw_feature = function(feature) {
             squad_sid = feature['base_id'].split('_')[1];
             squad_id = parseInt(squad_sid,10);
 
-            // is this squad guarding a quarry?
+            // is this squad guarding a quarry? does it overlap with another squad?
             if(!moving) {
-                var f = this.region.find_feature_at_coords(loc);
-                if(f && f['base_type'] == 'quarry') { is_guard = true; }
+                var ls = this.region.find_features_at_coords(loc);
+                var squad_count = 0;
+                for(var i = 0; i < ls.length; i++) {
+                    var f = ls[i];
+                    if(f['base_type'] == 'quarry') {
+                        is_guard = true;
+                    } else if(f['base_type'] == 'squad') {
+                        if(f['base_id'] === feature['base_id']) {
+                            multi_index = squad_count;
+                        } else {
+                            multi_count += 1;
+                            squad_count += 1;
+                        }
+                    }
+                }
             }
 
             //if(feature['base_landlord_id'] != session.user_id) { show_label = false; } // no labels for enemy squads
@@ -1917,6 +1932,16 @@ RegionMap.RegionMap.prototype.draw_feature = function(feature) {
                     show_label = false;
                     icon_scale = 0.5;
                     icon_offset = [0.33,0.66]; // move off to the side
+                }
+
+                if(multi_count > 1) {
+                    icon_scale = 0.66;
+                    if(multi_index > 0) {
+                        show_label = false;
+                    }
+                    icon_offset = vec_add(vec_add([0.25, (multi_count >= 5 ? 0.25 : 0.5)],
+                                                  vec_scale(multi_index % 4, [0.6/4,0])),
+                                                  vec_scale(Math.floor(multi_index/4), [0,0.6/4]));
                 }
 
                 SPUI.ctx.save();
