@@ -569,7 +569,8 @@ var pointer_lock_supported = false;
 // the current modal action (e.g., a dialog box or building
 // placement cursor). You must add or remove this object from SPUI.root when changing selection.ui!
 
-var selection = { unit: null,
+var selection = { /** @type {GameObject|null} */
+                  unit: null,
                   multi: [], // only used for drag-selection of multiple mobile units
                   spellname: null,
                   spellkind: null,
@@ -19161,7 +19162,7 @@ function invoke_building_context_menu(mouse_xy) {
 
         if(session.home_base && obj.is_lottery_building() && !obj.is_under_construction()) {
             upgrade_is_active = false;
-            var state = player.get_lottery_state(obj);
+            var state = player.get_lottery_state(/** @type {!Building} */ (obj));
             buttons.push(new ContextMenuButton({ui_name: gamedata['spells']['LOTTERY_SCAN']['ui_name'],
                                                 state: (state.can_scan ? 'normal': 'disabled_clickable'),
                                                 asset: 'action_button_resizable',
@@ -19479,7 +19480,7 @@ function invoke_building_context_menu(mouse_xy) {
     // END is_building()
     } else if(obj.is_inert() && session.home_base && ('spells' in obj.spec)) {
         if(goog.array.contains(obj.spec['spells'], "COLLECT_DEPOSIT")) {
-            var collect_func = (function (_obj) { return function() { do_collect_deposit(_obj); }; })(obj);
+            var collect_func = (function (_obj) { return function() { do_collect_deposit(_obj); }; })(/** @type {!Inert} */ (obj));
             if(gamedata['enable_oneclick_harvest']) {
                 collect_func();
             } else {
