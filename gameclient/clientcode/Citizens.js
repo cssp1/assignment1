@@ -67,7 +67,7 @@ Citizens.Citizen.prototype.update = function() {
         } else {
             instance_data['path'] = path;
         }
-        this.fx = new SPFX.PhantomUnit(path[0], this.spec.flying ? this.spec.altitude : 0, [1, 0, 1], client_time,
+        this.fx = new SPFX.PhantomUnit(path[0], this.spec.flying ? this.spec.altitude : 0, [1, 0, 1], null,
                                        {'duration': -1, 'end_at_dest': false,
                                         'maxvel':0.5 // move more slowly than normal to look less "hurried"
                                        }, instance_data);

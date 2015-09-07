@@ -164,12 +164,12 @@ ItemDisplay.set_inventory_item_stack = function(widget, spec, item) { ItemDispla
 /** add a SPFX.CombatText effect to show result of actions on an inventory item widget
     @param {SPUI.DialogWidget} widget
     @param {string} str
-    @param {Array.<number>} color */
+    @param {!Array.<number>} color */
 ItemDisplay.add_inventory_item_effect = function(widget, str, color) {
     var abspos = [25,25];
     SPFX.add_ui(new SPFX.CombatText(vec_add(abspos, widget.get_absolute_xy()),
                                     0, str,
-                                    color, client_time, client_time + 3.0,
+                                    color, null, 3.0,
                                     {drop_shadow: true, font_size: 15, text_style: "thick", is_ui: true}));
 };
 

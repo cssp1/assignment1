@@ -36,12 +36,15 @@ SPFX.tick = new GameTypes.TickCount(0);
  to fire at specific combat ticks. This type encapsulates both cases.
  @constructor
  @struct
- @param {number|null} time
- @param {GameTypes.TickCount|null} tick */
-SPFX.When = function(time, tick) {
+ @param {number|null} time - compared against SPFX.time (client_time)
+ @param {GameTypes.TickCount|null} tick - compared against current combat tick count
+ @param {number|null=} tick_delay - additional real-time delay (seconds) AFTER tick is reached
+*/
+SPFX.When = function(time, tick, tick_delay) {
     if(time !== null && tick !== null) { throw Error('either time or tick must be null'); }
     this.time = time;
     this.tick = (tick ? tick.copy() : null);
+    this.tick_delay = tick_delay || 0;
 };
 
 SPFX.last_id = 0;
@@ -116,7 +119,17 @@ SPFX.set_time = function(time, tick) {
     @return {boolean} */
 SPFX.time_lt = function(t) {
     if(t.tick) {
-        return GameTypes.TickCount.lt(SPFX.tick, t.tick);
+        if(GameTypes.TickCount.lt(SPFX.tick, t.tick)) {
+            return true;
+        }
+        // we've reached the tick. Do we need an additional delay?
+        if(t.tick_delay > 0) {
+            // MUTATE t to a time value tick_delay into the future
+            t.time = SPFX.time + t.tick_delay;
+            t.tick = null;
+            return SPFX.time < t.time;
+        }
+        return false;
     } else {
         return SPFX.time < t.time;
     }
@@ -125,26 +138,6 @@ SPFX.time_lt = function(t) {
 /** @param {!SPFX.When} t
     @return {boolean} */
 SPFX.time_gte = function(t) { return !SPFX.time_lt(t); };
-
-/** @param {!SPFX.When} start
-    @param {!SPFX.When} end
-    @return {number} */
-SPFX.time_lerp = function(start, end) {
-    var s, e, cur;
-    if(start.tick) {
-        s = start.tick.get();
-        if(!end.tick) { throw Error('mixed When types'); }
-        e = end.tick.get();
-        cur = SPFX.tick.get(); // XXX this will produce non-smooth results, need to fix
-    } else {
-        s = start.time;
-        if(end.tick) { throw Error('mixed When types'); }
-        e = end.time;
-        cur = SPFX.time;
-    }
-    return (cur - s) / (e - s);
-};
-
 
 // only allow non-default compositing modes when detail > 1
 SPFX.set_composite_mode = function(mode) {
@@ -253,12 +246,11 @@ SPFX.get_camera_shake = function() {
     return [0,0,0];
 };
 
-/** @param {number|null} start_time
-    @param {GameTypes.TickCount|null} start_tick
+/** @param {!SPFX.When} when
     @param {number} amplitude
     @param {number} falloff */
-SPFX.shake_camera = function(start_time, start_tick, amplitude, falloff) {
-    SPFX.shake_impulses.push({when:new SPFX.When(start_time, start_tick), amplitude:amplitude, falloff:falloff, started_at: -1});
+SPFX.shake_camera = function(when, amplitude, falloff) {
+    SPFX.shake_impulses.push({when:when, amplitude:amplitude, falloff:falloff, started_at: -1});
 };
 
 /** @constructor
@@ -272,6 +264,7 @@ SPFX.FXObject.prototype.reposition = function(xyz, rotation) {};
 SPFX.FXObject.prototype.dispose = function() {};
 
 /** @constructor
+    @struct
     @extends SPFX.FXObject
     @param {?string=} charge */
 SPFX.Field = function(charge) {
@@ -284,6 +277,7 @@ SPFX.Field.prototype.eval_field = function(pos, vel) {};
 
 // MagnetField
 /** @constructor
+    @struct
     @param {!Array.<number>} pos
     @param {!Object} data
     @param {Object|null|undefined} instance_data
@@ -314,6 +308,7 @@ SPFX.MagnetField.prototype.reposition = function(xyz, rotation) {
 };
 
 /** @constructor
+    @struct
     @param {!Array.<number>} pos
     @param {!Object} data
     @param {Object|null|undefined} instance_data
@@ -333,6 +328,7 @@ SPFX.DragField.prototype.eval_field = function(pos, vel) {
 
 /** @constructor
     @struct
+    @param {Object|null=} data
     @extends SPFX.FXObject */
 SPFX.Effect = function(data) {
     goog.base(this);
@@ -344,7 +340,8 @@ goog.inherits(SPFX.Effect, SPFX.FXObject);
 SPFX.Effect.prototype.draw = function() {};
 
 // CoverScreen
-/** @constructor */
+/** @constructor
+    @struct */
 SPFX.CoverScreen = function(color_str) {
     this.color_str = color_str;
 };
@@ -418,13 +415,13 @@ SPFX.Tesla.prototype.draw = function() {
 
 /** @constructor
   * @extends SPFX.Effect
-  * @param {Array.<number>} spawn_pos
-  * @param {number} start_time
-  * @param {number} end_time
+  * @param {Array.<number>|null} spawn_pos
+  * @param {!SPFX.When} when
+  * @param {number} duration
   * @param {Object} data
   * @param {Object=} instance_data
   */
-SPFX.Particles = function(spawn_pos, start_time, end_time, data, instance_data) {
+SPFX.Particles = function(spawn_pos, when, duration, data, instance_data) {
     goog.base(this, data);
     this.spawn_pos = v3_add(spawn_pos || [0, 0, 0], (data && 'offset' in data) ? data['offset'] : [0, 0, 0]);
     this.spawn_radius = (instance_data ? instance_data['radius'] || 1 : 1) * (this.data['radius'] || 0);
@@ -443,9 +440,11 @@ SPFX.Particles = function(spawn_pos, start_time, end_time, data, instance_data) 
     this.emit_continuous_for = this.data['emit_continuous_for'] || 0;
     this.emit_continuous_residual = Math.random();
 
-    this.start_time = start_time;
-    this.end_time = this.emit_continuous_for >= 0 ? (end_time + this.max_age + this.emit_continuous_for) : -1;
-    this.last_time = start_time;
+    this.when = when;
+    this.duration = duration;
+    this.start_time = -1; // determined after start
+    this.end_time = -1;
+    this.last_time = -1;
 
     var col = data['color'] || [0,1,0,1];
     if(col.length == 4) {
@@ -561,7 +560,7 @@ SPFX.Particles.prototype.spawn = function(pos, dpos, vel, dvel, dvel_scale, coun
                 props = {'rotation': (180.0/Math.PI)*an, 'rotate_speed': (180.0/Math.PI)*anv};
             }
             // note: c may be null
-            c = SPFX.add_visual_effect([p[0],p[2]], p[1], [0,1,0], SPFX.time, this.child_data, true, props);
+            c = SPFX.add_visual_effect_at_time([p[0],p[2]], p[1], [0,1,0], SPFX.time, this.child_data, true, props);
         }
 
         if(this.pos.length < this.nmax) {
@@ -589,7 +588,12 @@ SPFX.Particles.prototype.spawn = function(pos, dpos, vel, dvel, dvel_scale, coun
     }
 };
 SPFX.Particles.prototype.draw = function() {
-    if(SPFX.time < this.start_time) { return; }
+    if(SPFX.time_lt(this.when)) { return; }
+    if(this.start_time < 0) {
+        this.start_time = this.last_time = SPFX.time;
+        this.end_time = (this.emit_continuous_for >= 0 ? (this.start_time + this.duration + this.max_age + this.emit_continuous_for) : -1);
+    }
+
     if(this.end_time >= 0 && SPFX.time > this.end_time) { SPFX.remove(this); return; }
 
     if(!this.emit_instant_done && ('emit_instant' in this.data) && this.data['emit_instant'] > 0) {
@@ -767,8 +771,24 @@ SPFX.Particles.prototype.run_physics = function(dt) {
 // Projectile
 
 /** @constructor
-  * @extends SPFX.Effect
-  */
+    @struct
+    @extends SPFX.Effect
+    @param {!Array.<number>} from
+    @param {number} from_height
+    @param {!Array.<number>} to
+    @param {number} to_height
+    @param {number} launch_time
+    @param {number} impact_time
+    @param {number} max_height
+    @param {!Array.<number>} color
+    @param {Object|null} exhaust
+    @param {number} line_width
+    @param {number} min_length
+    @param {number} fade_time
+    @param {string} comp_mode
+    @param {number} glow
+    @param {string|null} asset
+*/
 SPFX.Projectile = function(from, from_height, to, to_height, launch_time, impact_time, max_height, color, exhaust, line_width, min_length, fade_time, comp_mode, glow, asset) {
     goog.base(this, null);
     this.from = from;
@@ -801,7 +821,7 @@ SPFX.Projectile = function(from, from_height, to, to_height, launch_time, impact
 
     if(exhaust) {
         // exhaust particles
-        this.particles = new SPFX.Particles(null, launch_time, impact_time, exhaust);
+        this.particles = new SPFX.Particles(null, new SPFX.When(launch_time, null), impact_time - launch_time, exhaust); // should_be_tick
         this.exhaust_speed = exhaust['speed'] || 0;
         this.exhaust_dvel = (exhaust['randomize_vel'] || 0) * this.exhaust_speed;
         this.exhaust_vel = vec_scale(-this.exhaust_speed, shot_dir);
@@ -985,11 +1005,15 @@ SPFX.cue_tracker = {};
 SPFX.sound_throttle = 0.3;
 
 /** @constructor
-  * @extends SPFX.Effect
+    @struct
+    @extends SPFX.Effect
+    @param {!Object} data
+    @param {!SPFX.When} when
   */
-SPFX.SoundCue = function(data, start_time) {
+SPFX.SoundCue = function(data, when) {
     goog.base(this, data);
-    this.start_time = start_time;
+    this.when = when;
+    this.start_time = -1; // determined after "when"
     this.sprites = [];
     if('assets' in data) {
         // use multiple assets
@@ -1020,9 +1044,12 @@ SPFX.SoundCue = function(data, start_time) {
 };
 goog.inherits(SPFX.SoundCue, SPFX.Effect);
 SPFX.SoundCue.prototype.draw = function() {
-    if(SPFX.time < this.start_time) {
-        return;
+    if(SPFX.time_lt(this.when)) { return; }
+
+    if(this.start_time < 0) {
+        this.start_time = SPFX.time;
     }
+
     // start at a random place in the list
     var idx = (this.sprites.length > 1 ? Math.floor(this.sprites.length*Math.random()) : 0);
 
@@ -1054,9 +1081,17 @@ SPFX.get_vec_parameter = function(param) {
 };
 
 /** @constructor
-  * @extends SPFX.Effect
+  @extends SPFX.Effect
+  @struct
+  @param {!Array.<number>} where
+  @param {number} height
+  @param {string} assetname
+  @param {!SPFX.When} when
+  @param {boolean} enable_audio
+  @param {!Object} data
+  @param {Object|null} instance_data
   */
-SPFX.Explosion = function(where, height, assetname, start_time, enable_audio, data, instance_data) {
+SPFX.Explosion = function(where, height, assetname, when, enable_audio, data, instance_data) {
     goog.base(this, data);
 
     if(instance_data) {
@@ -1072,33 +1107,30 @@ SPFX.Explosion = function(where, height, assetname, start_time, enable_audio, da
         throw Error('unknown art asset '+assetname);
     }
     this.sprite = asset.states['normal'];
-    this.start_time = start_time;
+    this.when = when;
+    this.start_time = -1; // determined once "when" passes
+    this.end_time = -1;
 
     this.is_ui = (instance_data && instance_data.is_ui) || false; // "is_ui" means "this is a UI dialog effect, not a 3D playfield effect"
 
-    var duration;
     if(data && data['duration']) {
-        duration = data['duration'];
+        this.duration = data['duration'];
     } else {
-        duration = this.sprite.duration();
-        if(duration <= 0) {
-            duration = 0.07; // default for still images
+        this.duration = this.sprite.duration();
+        if(this.duration <= 0) {
+            this.duration = 0.07; // default for still images
         }
     }
-    if (duration >= 0) {
+
+    if(this.duration >= 0) {
         this.fade = ((data && data['fade']) ? data['fade'] : 0);
-        this.fade_duration = ((data && data['fade_duration']) ? data['fade_duration'] : duration / 2);
+        this.fade_duration = ((data && data['fade_duration']) ? data['fade_duration'] : this.duration / 2);
     } else {
         this.fade = 0;
     }
     this.motion = ((data && data['motion']) ? data['motion'] : null);
     this.motion_scale = ((data && 'motion_scale' in data) ? SPFX.get_vec_parameter(data['motion_scale']) : [1,1]);
 
-    if(duration >= 0) {
-        this.end_time = start_time + duration;
-    } else {
-        this.end_time = -1;
-    }
     this.enable_audio = enable_audio;
     this.audio_started = false;
 
@@ -1112,7 +1144,7 @@ SPFX.Explosion = function(where, height, assetname, start_time, enable_audio, da
 
     var old_data = gamedata['art'][assetname]['states']['normal'];
     if('particles' in old_data) {
-        var particles = new SPFX.Particles([this.where[0], this.height, this.where[1]], this.start_time, this.end_time, old_data['particles']);
+        var particles = new SPFX.Particles([this.where[0], this.height, this.where[1]], when, this.duration, old_data['particles']);
         SPFX.add(particles);
     }
 
@@ -1139,8 +1171,12 @@ SPFX.Explosion.prototype.reposition = function(xyz, rotation) {
 };
 
 SPFX.Explosion.prototype.draw = function() {
-    if(SPFX.time < this.start_time) {
-        return;
+    if(SPFX.time_lt(this.when)) { return; }
+    if(this.start_time < 0) {
+        this.start_time = SPFX.time;
+        if(this.duration >= 0) {
+            this.end_time = this.start_time + this.duration;
+        }
     }
 
     if(this.enable_audio && !this.audio_started && this.sprite.audio) {
@@ -1337,14 +1373,20 @@ SPFX.OffscreenArrow.prototype.draw = function() {
 // Scrolling Combat Text
 
 /** @constructor
-  * @extends SPFX.Effect
-  * @param {{solid_for: (number|undefined),
-             rise_speed: (number|undefined),
-             drop_shadow: (boolean|undefined),
-             font_size: (number|undefined), font_leading: (number|undefined), text_style: (string|undefined),
-             is_ui: (boolean|undefined)}=} props
+ @extends SPFX.Effect
+ @param {!Array.<number>} where
+ @param {number} altitude
+ @param {string} str
+ @param {!Array.<number>} col
+ @param {SPFX.When|null} when - null means "right now"
+ @param {number} duration
+ @param {{solid_for: (number|undefined),
+          rise_speed: (number|undefined),
+          drop_shadow: (boolean|undefined),
+          font_size: (number|undefined), font_leading: (number|undefined), text_style: (string|undefined),
+          is_ui: (boolean|undefined)}=} props
   */
-SPFX.CombatText = function(where, altitude, str, col, start_time, end_time, props) {
+SPFX.CombatText = function(where, altitude, str, col, when, duration, props) {
     goog.base(this, null);
     this.where = where;
     this.altitude = altitude;
@@ -1352,18 +1394,22 @@ SPFX.CombatText = function(where, altitude, str, col, start_time, end_time, prop
     this.solid_for = props.solid_for || 0.4; // alpha remains 1 for this portion of the start-end interval
     this.color = SPUI.make_colorv(SPUI.low_fonts ? [1,1,0,1] : col);
     this.shadow_color = new SPUI.Color(0, 0, 0, col[3]);
-    this.start_time = start_time;
+    this.when = when || new SPFX.When(SPFX.time, null);
+    this.duration = duration;
+    this.start_time = this.end_time = -1; // figured out after "when"
     this.speed = props.rise_speed || 40; // pixels per second
-    this.end_time = end_time;
     this.drop_shadow = props.drop_shadow || false;
     this.font = SPUI.make_font(props.font_size || 15, props.font_leading || 15, props.text_style || 'normal');
     this.is_ui = props.is_ui || false; // "is_ui" means "this is a UI dialog effect, not a 3D playfield effect"
 };
 goog.inherits(SPFX.CombatText, SPFX.Effect);
 SPFX.CombatText.prototype.draw = function() {
-    if(SPFX.time < this.start_time) {
-        return;
+    if(SPFX.time_lt(this.when)) { return; }
+    if(this.start_time < 0) {
+        this.start_time = SPFX.time;
+        this.end_time = this.start_time + this.duration;
     }
+
     if(SPFX.time > this.end_time) {
         SPFX.remove(this);
         return;
@@ -1412,25 +1458,31 @@ SPFX.CombatText.prototype.draw = function() {
     @struct
     @extends SPFX.Effect
     @param {!Array.<number>} col
-    @param {number} start_time
-    @param {number} end_time
+    @param {!SPFX.When} when
+    @param {number} duration
 */
-SPFX.FeedbackEffect = function(col, start_time, end_time) {
+SPFX.FeedbackEffect = function(col, when, duration) {
     goog.base(this, null);
     this.base_col = col;
     this.color = new SPUI.Color(col[0], col[1], col[2], col[3]);
-    this.start = new SPFX.When(start_time, null);
-    this.end = new SPFX.When(end_time, null);
+    this.when = when;
+    this.duration = duration;
+    this.start = this.end = -1;
 };
 goog.inherits(SPFX.FeedbackEffect, SPFX.Effect);
 SPFX.FeedbackEffect.prototype.do_draw = goog.abstractMethod;
 SPFX.FeedbackEffect.prototype.draw = function() {
-    if(SPFX.time_lt(this.start)) { return; }
-    if(SPFX.time_gte(this.end)) {
+    if(SPFX.time_lt(this.when)) { return; }
+    if(this.start < 0) {
+        this.start = SPFX.time;
+        this.end = this.start + this.duration;
+    }
+    if(SPFX.time > this.end) {
         SPFX.remove(this);
         return;
     }
-    var fade = SPFX.time_lerp(this.start, this.end);
+
+    var fade = (SPFX.time - this.start) / (this.end - this.start);
     this.color.a = this.base_col[3] * (1 - fade*fade);
     this.do_draw();
 };
@@ -1440,16 +1492,17 @@ SPFX.FeedbackEffect.prototype.draw = function() {
     @extends SPFX.FeedbackEffect
     @param {!Array.<number>} pos
     @param {!Array.<number>} col
-    @param {number} start_time
-    @param {number} end_time
+    @param {number} duration
   */
-SPFX.ClickFeedback = function(pos, col, start_time, end_time) {
-    goog.base(this, col, start_time, end_time);
+SPFX.ClickFeedback = function(pos, col, duration) {
+    goog.base(this, col, new SPFX.When(SPFX.time, null), duration);
     this.pos = vec_copy(pos);
 };
 goog.inherits(SPFX.ClickFeedback, SPFX.FeedbackEffect);
+
+/** @override */
 SPFX.ClickFeedback.prototype.do_draw = function() {
-    var radius = 20.0 * SPFX.time_lerp(this.start, this.end);
+    var radius = 20.0 * (SPFX.time - this.start) / (this.end - this.start);
 
     SPFX.ctx.save();
     SPFX.ctx.strokeStyle = this.color.str();
@@ -1465,9 +1518,14 @@ SPFX.ClickFeedback.prototype.do_draw = function() {
 };
 
 /** @constructor
-  * @extends SPFX.Effect
+    @struct
+    @extends SPFX.Effect
+    @param {!Array.<number>} where (2D)
+    @param {number} altitude
+    @param {!SPFX.When} when
+    @param {!Object} data
   */
-SPFX.Shockwave = function(where, altitude, start_time, data) {
+SPFX.Shockwave = function(where, altitude, when, data) {
     goog.base(this, data);
     this.where = where;
     this.altitude = altitude;
@@ -1481,19 +1539,28 @@ SPFX.Shockwave = function(where, altitude, start_time, data) {
     }
     this.center_color = new SPUI.Color(col[0], col[1], col[2], 0.0);
     this.edge_color = new SPUI.Color(col[0], col[1], col[2], data['opacity'] || 1.0);
-    this.start_time = start_time;
-    this.end_time = start_time + Math.max(data['duration'] || 0.5, 0.0);
+    this.when = when;
+    this.start_time = -1; // determined only after "when" is passed
+    this.end_time = -1;
     this.composite_mode = data['composite_mode'] || 'source-over';
 };
 goog.inherits(SPFX.Shockwave, SPFX.Effect);
 
 SPFX.Shockwave.prototype.draw = function() {
-    if(SPFX.time < this.start_time) {
+    if(SPFX.time_lt(this.when)) {
         return;
-    } else if(SPFX.time > this.end_time) {
+    }
+
+    if(this.start_time < 0) {
+        this.start_time = SPFX.time;
+        this.end_time = this.start_time + Math.max(this.data['duration'] || 0.5, 0.0);
+    }
+
+    if(SPFX.time > this.end_time) {
         SPFX.remove(this);
         return;
     }
+
     var t = SPFX.time - this.start_time;
     var u = t / (this.end_time - this.start_time);
 
@@ -1525,9 +1592,16 @@ SPFX.Shockwave.prototype.draw = function() {
 
 
 /** @constructor
-  * @extends SPFX.Effect
+    @struct
+    @extends SPFX.Effect
+    @param {!Array.<number>} pos
+    @param {number} altitude
+    @param {!Array.<number>} orient
+    @param {SPFX.When|null} when - null means "right now"
+    @param {!Object} data
+    @param {Object|null} instance_data
   */
-SPFX.PhantomUnit = function(pos, altitude, orient, time, data, instance_data) {
+SPFX.PhantomUnit = function(pos, altitude, orient, when, data, instance_data) {
     goog.base(this, data);
 
     instance_data = instance_data || {};
@@ -1538,8 +1612,14 @@ SPFX.PhantomUnit = function(pos, altitude, orient, time, data, instance_data) {
         pos = vec_add(pos, vec_scale(instance_data['tick_offset'], vec_sub(instance_data['my_next_pos'], pos)));
     }
 
-    this.start_time = time;
-    this.end_time = (!('duration' in data) || data['duration'] >= 0) ? (time + data['duration'] || 3.0) : -1;
+    if(!when) {
+        when = new SPFX.When(SPFX.time, null);
+    }
+
+    this.when = when;
+    this.start_time = -1; // determined after "when"
+    this.end_time = -1;
+    this.duration = (!('duration' in data) || data['duration'] >= 0) ? (data['duration'] || 3.0) : -1;
     this.end_at_dest = (('end_at_dest' in data) ? data['end_at_dest'] : true);
 
     this.obj = new Mobile();
@@ -1561,7 +1641,8 @@ SPFX.PhantomUnit = function(pos, altitude, orient, time, data, instance_data) {
     } else if('heading' in instance_data) {
         // compute heading relative to that given with instance data
         var heading = instance_data['heading'] + (Math.PI/180) * (data['heading'] || 0); // add heading to original spawn orientation
-        dest = vec_add(pos, vec_scale((this.end_time-this.start_time) * this.obj.combat_stats.maxvel * 1.1, [Math.cos(heading), Math.sin(heading)]));
+        if(this.duration <= 0) { throw Error('duration must be positive'); }
+        dest = vec_add(pos, vec_scale((this.duration) * this.obj.combat_stats.maxvel * 1.1, [Math.cos(heading), Math.sin(heading)]));
     } else if('path' in instance_data) {
         path = instance_data['path'];
         dest = path[path.length - 1];
@@ -1609,10 +1690,17 @@ SPFX.PhantomUnit.prototype.draw = function() { throw Error('should not be called
 SPFX.PhantomUnit.prototype.get_phantom_object = function() {
     if(this.end_time >= 0 && SPFX.time >= this.end_time) { return null; } // timed out
 
-    if(SPFX.time < this.start_time) {
+    if(SPFX.time_lt(this.when)) {
         this.obj.cur_opacity = 0;
         this.obj.last_opacity = 0;
     } else {
+        if(this.start_time < 0) {
+            this.start_time = SPFX.time;
+            if(this.duration >= 0) {
+                this.end_time = this.start_time + this.duration;
+            }
+        }
+
         if(this.start_halted && (SPFX.time - this.start_time) > this.start_halted) { // get moving now
             this.obj.control_state = control_states.CONTROL_MOVING;
         }
@@ -1638,21 +1726,53 @@ SPFX.PhantomUnit.prototype.get_phantom_object = function() {
 };
 
 /**
-   @param {Array.<number>} pos
+   @param {!Array.<number>} pos
    @param {number} altitude
-   @param {Array.<number>} orient
+   @param {!Array.<number>} orient
    @param {number} time
-   @param {Object} data
+   @param {!Object} data
    @param {boolean} allow_sound
-   @param {Object=} instance_data
+   @param {Object|null} instance_data
    */
-SPFX.add_visual_effect = function(pos, altitude, orient, time, data, allow_sound, instance_data) {
+SPFX.add_visual_effect_at_time = function(pos, altitude, orient, time, data, allow_sound, instance_data) {
+    return SPFX._add_visual_effect(pos, altitude, orient, new SPFX.When(time, null), data, allow_sound, instance_data);
+};
+SPFX.add_visual_effect_at_time_but_should_be_tick = SPFX.add_visual_effect_at_time;
+
+/**
+   @param {!Array.<number>} pos
+   @param {number} altitude
+   @param {!Array.<number>} orient
+   @param {!GameTypes.TickCount} tick
+   @param {!Object} data
+   @param {boolean} allow_sound
+   @param {Object|null} instance_data
+   */
+SPFX.add_visual_effect_at_tick = function(pos, altitude, orient, tick, data, allow_sound, instance_data) {
+    return SPFX._add_visual_effect(pos, altitude, orient, new SPFX.When(null, tick), data, allow_sound, instance_data);
+};
+
+/**
+   @param {!Array.<number>} pos
+   @param {number} altitude
+   @param {!Array.<number>} orient
+   @param {!SPFX.When} when
+   @param {!Object} data
+   @param {boolean} allow_sound
+   @param {Object|null} instance_data
+   @private
+   */
+SPFX._add_visual_effect = function(pos, altitude, orient, when, data, allow_sound, instance_data) {
     if(data['require_detail'] > SPFX.detail) { return null; }
     if(('max_detail' in data) && SPFX.detail >= data['max_detail']) { return null; }
 
     if(data['random_chance'] && (Math.random() >= data['random_chance'])) { return null; }
 
-    if('delay' in data) { time += data['delay']; }
+    if('delay' in data) {
+        // increment "when" by the real-time (seconds) delay
+        when = (when.tick ? new SPFX.When(null, when.tick, data['delay']) : new SPFX.When(when.time + data['delay'], null));
+    }
+
     if('translate' in data) { pos = v3_add(pos, data['translate']); }
 
     var add_func = SPFX.add;
@@ -1665,12 +1785,12 @@ SPFX.add_visual_effect = function(pos, altitude, orient, time, data, allow_sound
     }
 
     if(data['type'] === 'shockwave') {
-        return add_func(new SPFX.Shockwave(pos, altitude, time, data));
+        return add_func(new SPFX.Shockwave(pos, altitude, when, data));
     } else if(data['type'] === 'combine') {
         var ret = new SPFX.CombineEffect();
         var effects = data['effects'] || [];
         for(var i = 0; i < effects.length; i++) {
-            var child = SPFX.add_visual_effect(pos, altitude, orient, time, effects[i], allow_sound, instance_data);
+            var child = SPFX._add_visual_effect(pos, altitude, orient, when, effects[i], allow_sound, instance_data);
             if(child) {
                 ret.effects.push(child);
             }
@@ -1687,34 +1807,34 @@ SPFX.add_visual_effect = function(pos, altitude, orient, time, data, allow_sound
             });
             var r = Math.random() * total_weight;
             var index = -goog.array.binarySearch(breakpoints, r) - 1;
-            return SPFX.add_visual_effect(pos, altitude, orient, time, effects[index], allow_sound, instance_data);
+            return SPFX._add_visual_effect(pos, altitude, orient, when, effects[index], allow_sound, instance_data);
         }
     } else if(data['type'] === 'library') {
         var ref = gamedata['client']['vfx'][data['name']];
-        return SPFX.add_visual_effect(pos, altitude, orient, time, ref, allow_sound, instance_data);
+        return SPFX._add_visual_effect(pos, altitude, orient, when, ref, allow_sound, instance_data);
     } else if(data['type'] === 'explosion') {
-        return add_func(new SPFX.Explosion(pos, altitude, data['sprite'], time, false, data, instance_data));
+        return add_func(new SPFX.Explosion(pos, altitude, data['sprite'], when, false, data, instance_data));
     } else if(data['type'] === 'particles') {
-        var particles = new SPFX.Particles([pos[0], altitude, pos[1]], time, time + (data['max_age'] || 1.0), data, instance_data);
+        var particles = new SPFX.Particles([pos[0], altitude, pos[1]], when, (data['max_age'] || 1.0), data, instance_data);
         return add_func(particles);
     } else if(data['type'] === 'particle_magnet') {
         return SPFX.add_field(new SPFX.MagnetField([pos[0], altitude, pos[1]], data, instance_data));
     } else if(data['type'] === 'drag_field') {
         return SPFX.add_field(new SPFX.DragField([pos[0], altitude, pos[1]], data, instance_data));
     } else if(data['type'] === 'camera_shake') {
-        SPFX.shake_camera(time, null, data['amplitude'] || 100, data['decay_time'] || 0.4);
+        SPFX.shake_camera(when, data['amplitude'] || 100, data['decay_time'] || 0.4);
         return null;
     } else if(data['type'] === 'combat_text') {
-        return add_func(new SPFX.CombatText(pos, 0, data['ui_name'], data['text_color']||[1,1,1], time, time + (data['duration']||3),
+        return add_func(new SPFX.CombatText(pos, 0, data['ui_name'], data['text_color']||[1,1,1], when, data['duration']||3,
                                             {drop_shadow: !!data['drop_shadow'], font_size: data['font_size'] || 20, text_style: data['text_style']||'thick'}));
     } else if(data['type'] === 'sound') {
         if(allow_sound) {
-            return add_func(new SPFX.SoundCue(data, time));
+            return add_func(new SPFX.SoundCue(data, when));
         } else {
             return null;
         }
     } else if(data['type'] === 'phantom_unit') {
-        return add_func(new SPFX.PhantomUnit(pos, altitude, orient, time, data, instance_data));
+        return add_func(new SPFX.PhantomUnit(pos, altitude, orient, when, data, instance_data));
     } else {
         console.log('unhandled visual effect type "'+data['type']+'"!');
     }
