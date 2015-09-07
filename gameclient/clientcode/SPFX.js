@@ -231,8 +231,7 @@ SPFX.get_camera_shake = function() {
         var imp = SPFX.shake_impulses[i];
 
         if(imp.started_at < 0) { // check for start time/tick
-            if((imp.when.time !== null && SPFX.time >= imp.when.time) ||
-               (imp.when.tick !== null && GameTypes.TickCount.gte(SPFX.tick, imp.when.tick))) {
+            if(SPFX.time_gte(imp.when)) {
                 // once the shake starts, use time only
                 imp.started_at = SPFX.time;
             }
@@ -285,8 +284,11 @@ SPFX.Field.prototype.eval_field = function(pos, vel) {};
 
 // MagnetField
 /** @constructor
+    @param {!Array.<number>} pos
+    @param {!Object} data
+    @param {Object|null|undefined} instance_data
     @extends SPFX.Field */
-SPFX.MagnetField = function(pos, orient, time, data, instance_data) {
+SPFX.MagnetField = function(pos, data, instance_data) {
     goog.base(this, data['charge'] || null);
     this.pos = pos; // note: in 3D here
     this.strength = data['strength'] || 10.0;
@@ -312,8 +314,11 @@ SPFX.MagnetField.prototype.reposition = function(xyz, rotation) {
 };
 
 /** @constructor
+    @param {!Array.<number>} pos
+    @param {!Object} data
+    @param {Object|null|undefined} instance_data
     @extends SPFX.Field */
-SPFX.DragField = function(pos, orient, time, data, instance_data) {
+SPFX.DragField = function(pos, data, instance_data) {
     goog.base(this, data['charge'] || null);
     this.strength = data['strength'] || 1.0;
 };
@@ -1693,9 +1698,9 @@ SPFX.add_visual_effect = function(pos, altitude, orient, time, data, allow_sound
         var particles = new SPFX.Particles([pos[0], altitude, pos[1]], time, time + (data['max_age'] || 1.0), data, instance_data);
         return add_func(particles);
     } else if(data['type'] === 'particle_magnet') {
-        return SPFX.add_field(new SPFX.MagnetField([pos[0], altitude, pos[1]], orient, time, data, instance_data));
+        return SPFX.add_field(new SPFX.MagnetField([pos[0], altitude, pos[1]], data, instance_data));
     } else if(data['type'] === 'drag_field') {
-        return SPFX.add_field(new SPFX.DragField([pos[0], altitude, pos[1]], orient, time, data, instance_data));
+        return SPFX.add_field(new SPFX.DragField([pos[0], altitude, pos[1]], data, instance_data));
     } else if(data['type'] === 'camera_shake') {
         SPFX.shake_camera(time, null, data['amplitude'] || 100, data['decay_time'] || 0.4);
         return null;
