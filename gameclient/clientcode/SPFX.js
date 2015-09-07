@@ -39,6 +39,7 @@ SPFX.tick = new GameTypes.TickCount(0);
  @param {number|null} time
  @param {GameTypes.TickCount|null} tick */
 SPFX.When = function(time, tick) {
+    if(time !== null && tick !== null) { throw Error('either time or tick must be null'); }
     this.time = time;
     this.tick = (tick ? tick.copy() : null);
 };
@@ -65,8 +66,7 @@ SPFX.current_ui = {}; // on top of UI
 /** @type {Object.<string,!SPFX.Field>} */
 SPFX.fields = {}; // force fields
 
-/** @typedef {{time: (number|null|undefined), tick: (GameTypes.TickCount|null|undefined),
-               amplitude: number, falloff: number}} */
+/** @typedef {{when: !SPFX.When, amplitude: number, falloff: number, started_at: number}} */
 SPFX.ShakeImpulse;
 
 /** @type {Array.<!SPFX.ShakeImpulse>} */
@@ -85,6 +85,7 @@ SPFX.shake_origin_time = -1;
 SPFX.init = function(ctx, use_low_gfx, use_high_gfx) {
     SPFX.ctx = ctx;
     SPFX.time = 0;
+    SPFX.tick = new GameTypes.TickCount(0);
     SPFX.last_id = 0;
 
     // turn down number of particles/sprites for higher performance
@@ -228,13 +229,23 @@ SPFX.get_camera_shake = function() {
     var total_amp = 0.0;
     for(var i = 0; i < SPFX.shake_impulses.length; i++) {
         var imp = SPFX.shake_impulses[i];
-        if(SPFX.time < imp.time) { continue; } // too early
-        var exponent = (SPFX.time-imp.time)/imp.falloff;
-        if(exponent > 4.0) { // too late, no longer needed
-            SPFX.shake_impulses.splice(i, 1);
-            continue;
+
+        if(imp.started_at < 0) { // check for start time/tick
+            if((imp.when.time !== null && SPFX.time >= imp.when.time) ||
+               (imp.when.tick !== null && GameTypes.TickCount.gte(SPFX.tick, imp.when.tick))) {
+                // once the shake starts, use time only
+                imp.started_at = SPFX.time;
+            }
         }
-        total_amp += imp.amplitude * Math.exp(-exponent);
+
+        if(imp.started_at > 0) {
+            var exponent = (SPFX.time-imp.started_at)/imp.falloff;
+            if(exponent > 4.0) { // too late, no longer needed
+                SPFX.shake_impulses.splice(i, 1);
+                continue;
+            }
+            total_amp += imp.amplitude * Math.exp(-exponent);
+        }
     }
     if(Math.abs(total_amp) >= 0.0001) {
         var v = SPFX.shake_synth.evaluate(24.0*(SPFX.time-SPFX.shake_origin_time));
@@ -243,8 +254,12 @@ SPFX.get_camera_shake = function() {
     return [0,0,0];
 };
 
-SPFX.shake_camera = function(start_time, amp, falloff) {
-    SPFX.shake_impulses.push({time:start_time, amplitude:amp, falloff:falloff});
+/** @param {number|null} start_time
+    @param {GameTypes.TickCount|null} start_tick
+    @param {number} amplitude
+    @param {number} falloff */
+SPFX.shake_camera = function(start_time, start_tick, amplitude, falloff) {
+    SPFX.shake_impulses.push({when:new SPFX.When(start_time, start_tick), amplitude:amplitude, falloff:falloff, started_at: -1});
 };
 
 /** @constructor
@@ -1682,7 +1697,7 @@ SPFX.add_visual_effect = function(pos, altitude, orient, time, data, allow_sound
     } else if(data['type'] === 'drag_field') {
         return SPFX.add_field(new SPFX.DragField([pos[0], altitude, pos[1]], orient, time, data, instance_data));
     } else if(data['type'] === 'camera_shake') {
-        SPFX.shake_camera(time, data['amplitude'] || 100, data['decay_time'] || 0.4);
+        SPFX.shake_camera(time, null, data['amplitude'] || 100, data['decay_time'] || 0.4);
         return null;
     } else if(data['type'] === 'combat_text') {
         return add_func(new SPFX.CombatText(pos, 0, data['ui_name'], data['text_color']||[1,1,1], time, time + (data['duration']||3),
