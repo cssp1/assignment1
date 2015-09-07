@@ -704,11 +704,16 @@ RegionMap.RegionMap.prototype.select_feature_at = function(loc) {
     this.selection_feature = null;
 
     if(this.selection_loc) {
+        this.follow_travel = false;
+
         var ls = this.region.find_features_at_coords(this.selection_loc, {include_moving_squads:true});
 
-        if(ls.length > 0) { this.follow_travel = false; }
-
-        if(ls.length == 1) {
+        if(ls.length < 1) {
+            // select empty ground?
+            if(!this.region.obstructs_squads(this.selection_loc)) {
+                this.selection_feature = {'base_type': 'empty', 'base_map_loc': loc, 'base_climate': this.region.read_climate(this.selection_loc)['name']};
+            }
+        } else if(ls.length == 1) {
             this.selection_feature = ls[0];
         } else if(ls.length > 1) {
             // select first non-squad
@@ -1179,8 +1184,10 @@ RegionMap.RegionMap.update_feature_popup_menu = function(dialog) {
     } else {
         if(mapwidget.region.data['storage'] == 'nosql' || player.travel_satisfied(feature['base_map_loc'])) {
             if(mapwidget.region.data['storage'] == 'nosql') {
-                // SPY
-                buttons = buttons.concat(mapwidget.make_nosql_spy_buttons(feature));
+                if(feature['base_type'] !== 'empty') {
+                    // SPY
+                    buttons = buttons.concat(mapwidget.make_nosql_spy_buttons(feature));
+                }
                 // CALL SQUAD
                 buttons.push([gamedata['strings']['regional_map']['call'],
                               (function(_mapwidget, _feature) { return function() {
@@ -1193,7 +1200,10 @@ RegionMap.RegionMap.update_feature_popup_menu = function(dialog) {
                     do_visit_base(-1, {base_id:_feature['base_id']});
                 }; })(mapwidget, feature)]);
             }
-            buttons.push(mapwidget.make_bookmark_button(feature));
+
+            if(feature['base_type'] !== 'empty') {
+                buttons.push(mapwidget.make_bookmark_button(feature));
+            }
 
         } else if(player.travel_state['dest_loc'] && vec_equals(player.travel_state['dest_loc'], feature['base_map_loc'])) {
             buttons.push([gamedata['strings']['regional_map']['cancel_travel'], (function (_mapwidget) { return function() {
@@ -1260,7 +1270,7 @@ RegionMap.RegionMap.prototype.make_feature_popup_menu = function() {
 
     var feature = this.popup.user_data['feature'];
 
-    if(!goog.array.contains(['quarry','home','hive','squad'], feature['base_type'])) { return; } // decorative base
+    if(!goog.array.contains(['quarry','home','hive','squad','empty'], feature['base_type'])) { return; } // decorative base
 
     var dialog = new SPUI.Dialog(gamedata['dialogs']['region_map_popup_menu']);
     this.popup.user_data['menu'] = dialog; // reference from dialog to menu
@@ -1351,7 +1361,10 @@ RegionMap.RegionMap.update_feature_popup = function(dialog) {
     };
 
     // name/portrait
+    ui.widgets['portrait'].show = ui.widgets['climate_tile'].show = false;
+
     if('base_landlord_id' in feature) {
+        ui.widgets['portrait'].show = true;
         ui.widgets['portrait'].set_user(feature['base_landlord_id']);
         if(is_ai_user_id_range(feature['base_landlord_id'])) {
             var base_info = gamedata['ai_bases_client']['bases'][feature['base_landlord_id'].toString()];
@@ -1369,9 +1382,18 @@ RegionMap.RegionMap.update_feature_popup = function(dialog) {
                 }; })(info);
             }
         }
+    } else if(feature['base_type'] === 'empty') {
+        if(feature['base_climate'] && feature['base_climate'] in gamedata['climates']) {
+            var climate_data = gamedata['climates'][feature['base_climate']];
+            var tile_data = gamedata['territory']['tiles'][mapwidget.region.read_terrain(feature['base_map_loc'])];
+            ui.widgets['name'].str = gamedata['strings']['regional_map']['empty_hex'].replace('%s', climate_data['ui_name']);
+            ui.widgets['climate_tile'].show = true;
+            ui.widgets['climate_tile'].state = tile_data['sprite'];
+        } else {
+            ui.widgets['name'].str = gamedata['strings']['regional_map']['unknown_base'];
+        }
     } else {
         ui.widgets['name'].str = gamedata['strings']['regional_map']['unknown_base'];
-        ui.widgets['portrait'].set_user(-1);
     }
 
     // quarry/hive status widgets
@@ -1484,6 +1506,8 @@ RegionMap.RegionMap.update_feature_popup = function(dialog) {
         }
     } else if('base_ui_name' in feature) {
         descr = feature['base_ui_name'];
+    } else if(ftype == 'empty') {
+        descr = null;
     } else {
         descr = gamedata['strings']['regional_map']['unknown_name'];
     }

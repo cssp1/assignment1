@@ -410,6 +410,7 @@
         "already_bookmarked": "Bookmarked",
         "too_close_to_border": "Too Close to Border",
         "too_close_to_player": "Too Close to Another Player",
+        "empty_hex": "Empty %s",
         "unknown_name": "Unknown",
         "unknown_base": "Unknown Base",
         "unknown_squad": "Unknown Battalion",
