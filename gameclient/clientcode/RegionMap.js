@@ -704,9 +704,29 @@ RegionMap.RegionMap.prototype.select_feature_at = function(loc) {
     this.selection_feature = null;
 
     if(this.selection_loc) {
-        this.selection_feature = this.region.find_feature_at_coords(this.selection_loc, {include_moving_squads:true});
+        var ls = this.region.find_features_at_coords(this.selection_loc, {include_moving_squads:true});
+
+        if(ls.length > 0) { this.follow_travel = false; }
+
+        if(ls.length == 1) {
+            this.selection_feature = ls[0];
+        } else if(ls.length > 1) {
+            // select first non-squad
+            for(var i = 0; i < ls.length; i++) {
+                if(ls[i]['base_type'] != 'squad') {
+                    this.selection_feature = ls[i];
+                    break;
+                }
+            }
+            // feature might still be null if there are just multiple squads here
+
+            // if there are only squads remaining, filter out moving ones
+            if(!this.selection_feature) {
+                ls = goog.array.filter(ls, function(f) { return !this.region.feature_is_moving(f); }, this);
+            }
+        }
+
         if(this.selection_feature) {
-            this.follow_travel = false;
             if(!this.popup || this.popup.user_data['feature'] != this.selection_feature) {
                 this.set_popup(this.make_feature_popup(this.selection_feature, this.selection_loc));
             }
@@ -715,6 +735,10 @@ RegionMap.RegionMap.prototype.select_feature_at = function(loc) {
                 // play button-click sound
                 GameArt.assets[gamedata['dialogs']['region_map_popup_menu']['widgets']['button']['bg_image']].states['normal'].audio.play(client_time);
             }
+        } else if(ls.length > 1) {
+            // multi-selector
+            this.set_popup(this.make_multi_select_popup(ls, this.selection_loc, true));
+            return;
         }
     }
 
@@ -759,7 +783,25 @@ RegionMap.RegionMap.prototype.on_mousemove = function(uv, offset) {
     var hovertext;
 
     if(this.hovercell) {
-        var feature = this.region.find_feature_at_coords(this.hovercell, {include_moving_squads:true});
+        var ls = this.region.find_features_at_coords(this.hovercell, {include_moving_squads:true});
+        var feature = null;
+        if(ls.length === 1) {
+            feature = ls[0];
+        } else if(ls.length > 1) {
+            // select first non-squad
+            for(var i = 0; i < ls.length; i++) {
+                if(ls[i]['base_type'] != 'squad') {
+                    feature = ls[i];
+                    break;
+                }
+            }
+            // feature might still be null if there are just multiple squads here
+
+            // if there are only squads remaining, filter out moving ones
+            if(!feature) {
+                ls = goog.array.filter(ls, function(f) { return !this.region.feature_is_moving(f); }, this);
+            }
+        }
 
         if(feature && feature['base_landlord_id'] && !is_ai_user_id_range(feature['base_landlord_id'])) {
             var info = PlayerCache.query_sync_fetch(feature['base_landlord_id']);
@@ -769,13 +811,17 @@ RegionMap.RegionMap.prototype.on_mousemove = function(uv, offset) {
         }
 
         if(this.popup) {
-            if(this.popup.user_data['feature'] != feature &&
+            if(((this.popup.user_data['feature'] === null) || (this.popup.user_data['feature'] != feature)) &&
                !this.popup.user_data['sticky']) {
                 this.set_popup(null);
             }
         }
-        if(feature && !this.popup && !this.cursor) {
-            this.set_popup(this.make_feature_popup(feature, this.hovercell));
+        if(!this.popup && !this.cursor) {
+            if(feature) {
+                this.set_popup(this.make_feature_popup(feature, this.hovercell));
+            } else if(ls.length > 1) {
+                this.set_popup(this.make_multi_select_popup(ls, this.hovercell, false));
+            }
         }
         hovertext = this.hovercell[0].toString()+','+this.hovercell[1].toString();
     } else {
@@ -1229,11 +1275,17 @@ RegionMap.RegionMap.prototype.make_feature_popup_menu = function() {
     this.popup.add_under(dialog);
 };
 
+// XXX hack until we fix tooltips showing underneath modal dialogs
+RegionMap.RegionMap.prototype.has_modal_child_dialog = function() {
+    return this.parent.children[this.parent.children.length-1].user_data &&
+        this.parent.children[this.parent.children.length-1].user_data['dialog'] &&
+        !goog.array.contains(['region_map_scroll_help','region_map_popup','region_map_multi_select'],
+                             this.parent.children[this.parent.children.length-1].user_data['dialog']);
+};
+
 RegionMap.RegionMap.prototype.make_feature_popup = function(feature, click_map_loc) {
-    // XXX hack until we fix tooltips showing underneath modal dialogs
-    if(this.parent.children[this.parent.children.length-1].user_data &&
-       this.parent.children[this.parent.children.length-1].user_data['dialog'] &&
-       this.parent.children[this.parent.children.length-1].user_data['dialog'] != 'region_map_scroll_help') {
+
+    if(this.has_modal_child_dialog()) {
         // covered by a modal dialog
         return null;
     }
@@ -1241,14 +1293,17 @@ RegionMap.RegionMap.prototype.make_feature_popup = function(feature, click_map_l
     var ui = new SPUI.Dialog(gamedata['dialogs']['region_map_popup']);
     ui.transparent_to_mouse = true;
     ui.clip_children = false;
+    ui.user_data['dialog'] = 'region_map_popup';
     ui.user_data['mapwidget'] = this;
     ui.user_data['feature'] = feature;
     ui.user_data['sticky'] = false;
     ui.user_data['menu'] = null;
     ui.user_data['open_time'] = client_time; // for blinking effect
+    ui.user_data['selectable'] = false; // for multi-selector only
 
     // store original click location here (to handle moving squads) - position is updated in update_feature_popup
     ui.user_data['original_map_loc'] = click_map_loc;
+    ui.user_data['xy_offset'] = [0,0];
 
     ui.ondraw = RegionMap.RegionMap.update_feature_popup;
     ui.ondraw(ui); // call to set initial xy position in case this is immediately followed by make_feature_popup_menu()
@@ -1273,8 +1328,27 @@ RegionMap.RegionMap.update_feature_popup = function(dialog) {
         dialog.show = true;
     }
 
-    dialog.xy = [Math.floor(mapwidget.xy[0] + base_wxy[0] + mapwidget.zoom*(gamedata['territory']['cell_size'][0]/2) - dialog.wh[0]/2),
-                 Math.floor(mapwidget.xy[1] + base_wxy[1] + mapwidget.zoom*(gamedata['territory']['cell_size'][1] - 4))];
+    dialog.xy = vec_add(dialog.user_data['xy_offset'],
+                        [Math.floor(mapwidget.xy[0] + base_wxy[0] + mapwidget.zoom*(gamedata['territory']['cell_size'][0]/2) - dialog.wh[0]/2),
+                         Math.floor(mapwidget.xy[1] + base_wxy[1] + mapwidget.zoom*(gamedata['territory']['cell_size'][1] - 4))]);
+
+    // selectability
+    dialog.widgets['bgrect_selected'].show = (dialog.user_data['selectable']);
+    var is_active = (dialog.user_data['selectable'] && dialog.mouse_enter_time > 0);
+    dialog.widgets['bgrect_selected'].alpha = dialog.data['widgets']['bgrect_selected'][is_active ? 'alpha_active' : 'alpha'];
+
+    dialog.widgets['name'].onclick = function(w) {
+        var _dialog = w.parent;
+        var _this = _dialog.user_data['mapwidget'];
+        if(_dialog.parent && _dialog.parent.user_data && _dialog.parent.user_data['dialog'] === 'region_map_multi_select' &&
+           _dialog.user_data['selectable'] && _dialog.mouse_enter_time > 0) {
+            // perform the selection
+            _this.set_popup(_this.make_feature_popup(_dialog.user_data['feature'], _dialog.user_data['feature']['base_map_loc']));
+            if(_this.popup) {
+                _this.make_feature_popup_menu();
+            }
+        }
+    };
 
     // name/portrait
     if('base_landlord_id' in feature) {
@@ -1571,6 +1645,57 @@ RegionMap.RegionMap.prototype.winnable_ladder_points = function(feature) {
         win_points = Math.max(Math.floor(scale_points * win_points), 1);
     }
     return win_points;
+};
+
+/** @param {!Array.<!Object>} feature_list - list of map features
+    @param {!Array.<number>} click_map_loc - hex that was clicked to produce this popup
+    @param {boolean} sticky - whether this should persist after mouse moves away from the hex */
+RegionMap.RegionMap.prototype.make_multi_select_popup = function(feature_list, click_map_loc, sticky) {
+
+    if(this.has_modal_child_dialog()) {
+        // covered by a modal dialog
+        return null;
+    }
+
+    var ui = new SPUI.Dialog(gamedata['dialogs']['region_map_multi_select']);
+    ui.transparent_to_mouse = true;
+    ui.clip_children = false;
+    ui.user_data['dialog'] = 'region_map_multi_select';
+    ui.user_data['mapwidget'] = this;
+    ui.user_data['feature'] = null; // in case other code checks for this
+    ui.user_data['feature_list'] = feature_list;
+    ui.user_data['sticky'] = sticky;
+
+    var feature_i = 0;
+    for(var y = 0; y < ui.data['widgets']['feature']['array'][1]; y++) {
+        for(var x = 0; x < ui.data['widgets']['feature']['array'][0]; x++) {
+            var wname = SPUI.get_array_widget_name('feature', ui.data['widgets']['feature']['array'], [x,y]);
+            var w = ui.widgets[wname];
+
+            if(feature_i < feature_list.length) {
+                w.show = true;
+                w.transparent_to_mouse = true;
+                w.clip_children = false;
+                w.user_data['mapwidget'] = this;
+                w.user_data['feature'] = feature_list[feature_i];
+                w.user_data['sticky'] = sticky;
+                w.user_data['menu'] = null;
+                w.user_data['open_time'] = client_time; // for blinking effect
+                w.user_data['selectable'] = sticky;
+
+                // store original click location here (to handle moving squads) - position is updated in update_feature_popup
+                w.user_data['original_map_loc'] = click_map_loc;
+                w.user_data['xy_offset'] = vec_mul([x,y], ui.data['widgets']['feature']['array_offset']);
+                w.ondraw = RegionMap.RegionMap.update_feature_popup;
+                w.ondraw(w); // call to set initial xy position in case this is immediately followed by make_feature_popup_menu()
+            } else {
+                w.show = false;
+            }
+            feature_i += 1;
+        }
+    }
+
+    return ui;
 };
 
 RegionMap.RegionMap.prototype.draw_movement_path = function(path) {
@@ -1875,6 +2000,7 @@ RegionMap.RegionMap.prototype.draw_feature = function(feature) {
         var show_label = true, is_guard = false;
         var multi_index = 0; // if multiple squads overlap in a hex, this is our index
         var multi_count = 1; // count of features in this hex, including us
+
         var squad_sid = null, squad_id = -1;
         var squad_pending = false; // own squad has pending orders
         var classification = this.classify_feature(feature);
@@ -1930,15 +2056,17 @@ RegionMap.RegionMap.prototype.draw_feature = function(feature) {
 
                 if(is_guard) {
                     show_label = false;
-                    icon_scale = 0.5;
-                    icon_offset = [0.33,0.66]; // move off to the side
-                }
-
-                if(multi_count > 1) {
                     icon_scale = 0.66;
-                    if(multi_index > 0) {
+                    icon_offset = [0.33,0.66]; // move off to the side
+                } else if(multi_count > 1) {
+                    icon_scale = 0.66;
+
+                    // cycle through labels
+                    var cycle = Math.floor(client_time % multi_count);
+                    if(multi_index !== cycle) {
                         show_label = false;
                     }
+
                     icon_offset = vec_add(vec_add([0.25, (multi_count >= 5 ? 0.25 : 0.5)],
                                                   vec_scale(multi_index % 4, [0.6/4,0])),
                                                   vec_scale(Math.floor(multi_index/4), [0,0.6/4]));

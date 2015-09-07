@@ -7793,10 +7793,11 @@
     },
 
     "region_map_popup": {
-        //"bg_image": null,
         "dimensions": [266,66],
         "widgets": {
             "bgrect": { "kind":"StaticImage", "xy":[0,0], "dimensions": [270,66], "asset": "dialog_sunken_gray_resizable", "bg_image_resizable":1 },
+            "bgrect_selected": { "show": 0, "kind":"StaticImage", "xy":[0,0], "dimensions": [270,66], "asset": "dialog_sunken_white_resizable", "bg_image_resizable":1, "alpha": 0.15, "alpha_active": 0.4 },
+
             "portrait": {"kind": "FriendPortrait", "xy":[8,8], "dimensions": [50,50], "push_bg_image": 1 },
             "portrait_pending": { "kind": "StaticImage", "xy":[25,25], "dimensions":[16,16], "asset":"loading_spinner", "show": 0 },
 
@@ -7859,6 +7860,14 @@
         }
     },
 
+    "region_map_multi_select": {
+        "dimensions": [270,66],
+        "widgets": {
+            "feature": { "kind":"Dialog", "dialog": "region_map_popup",
+                         "xy":[0,0], "dimensions": [270,66],
+                         "array": [1,10], "array_offset": [0,70] } // XXXXXXX need dynamic positioning
+        }
+    },
 
     "region_map_popup_menu": {
         "dimensions": [160,181], // accommodate 4 buttons
