@@ -8565,8 +8565,8 @@ Mobile.prototype.run_ai = function() {
                 target_pos[1] = clamp(target_pos[1], 0, ncells[1]-1);
             }
 
-            if(!vec_equals(this.dest, target_pos)) {
-                if(!vec_equals_integer(this.dest, target_pos)) {
+            if(!this.dest || !vec_equals(this.dest, target_pos)) {
+                if(!this.dest || !vec_equals_integer(this.dest, target_pos)) {
                     this.path_valid = false;
                 }
                 this.dest = target_pos;
