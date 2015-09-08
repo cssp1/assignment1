@@ -898,7 +898,7 @@ Aura.prototype.apply = function(obj) {
             var n_ticks = Math.floor(apply_interval/TICK_INTERVAL + 0.5);
             if(n_ticks <= 1 || (((session.combat_engine.cur_tick.get() - this.start_tick.get()) % n_ticks) == 0)) {
                 var dmg = Math.max(1, Math.floor(this.strength*apply_interval));
-                session.combat_engine.damage_effect_queue.push(new CombatEngine.TargetedDamageEffect(session.combat_engine.cur_tick.copy(), client_time, this.source, obj, dmg, effect['damage_vs'] || this.vs_table));
+                session.combat_engine.damage_effect_queue.push(new CombatEngine.TargetedDamageEffect(session.combat_engine.cur_tick, this.source, obj, dmg, effect['damage_vs'] || this.vs_table));
             }
         } else if(code === 'projectile_speed_reduced') {
             obj.combat_stats.projectile_speed *= (1 - this.strength);
@@ -1792,16 +1792,15 @@ GameObject.prototype.cast_client_spell = function(spell_name, spell, target, loc
             if(spell['kills_self']) {
                 // Detonator droid/landmine
                 // queue BEFORE other damage so it's listed in this order in the battle log
-                var death_client_time = client_time + (spell['kills_self_delay']||0);
                 var death_tick = GameTypes.TickCount.add(session.combat_engine.cur_tick,
                                                             relative_time_to_tick(/** @type {number} */ (spell['kills_self_delay']||0)));
-                session.combat_engine.damage_effect_queue.push(new CombatEngine.KillDamageEffect(death_tick, death_client_time, this, this));
+                session.combat_engine.damage_effect_queue.push(new CombatEngine.KillDamageEffect(death_tick, this, this));
             }
 
             if(spell['impact_auras']) {
                 for (var i = 0; i < spell['impact_auras'].length; i++) {
                     var imp_aura = spell['impact_auras'][i];
-                    var effect = new CombatEngine.AreaAuraEffect(session.combat_engine.cur_tick.copy(), client_time, this, impact_pos,
+                    var effect = new CombatEngine.AreaAuraEffect(session.combat_engine.cur_tick, this, impact_pos,
                                                     ('targets_ground' in spell ? spell['targets_ground'] : 1),
                                                     ('targets_air' in spell ? spell['targets_air'] : 1),
                                                     radius, radius_rect,
@@ -1816,7 +1815,7 @@ GameObject.prototype.cast_client_spell = function(spell_name, spell, target, loc
                 }
             }
 
-            var effect = new CombatEngine.AreaDamageEffect(session.combat_engine.cur_tick.copy(), client_time, this, impact_pos,
+            var effect = new CombatEngine.AreaDamageEffect(session.combat_engine.cur_tick, this, impact_pos,
                                               ('targets_ground' in spell ? spell['targets_ground'] : 1),
                                               ('targets_air' in spell ? spell['targets_air'] : 1) || this.combat_stats.anti_air,
                                               radius,
@@ -1839,7 +1838,7 @@ GameObject.prototype.cast_client_spell = function(spell_name, spell, target, loc
                 if(dist > range) {
                     return false;
                 }
-                this.fire_projectile(client_time, -1, spell, this.level, target, location, 0); // use object level for the spell
+                this.fire_projectile(session.combat_engine.cur_tick, null, spell, this.level, target, location, 0); // use object level for the spell
             } else {
                 throw Error('projectile_attack with no location from '+this.spec['name']);
             }
@@ -2046,7 +2045,7 @@ function hurt_object(target, damage, vs_table, source) {
                                      target.is_flying() ? target.altitude : 0,
                                      pretty_print_number(Math.abs(damage)),
                                      (damage >= 0 ? [1, 1, 0.1, 1] : [0,1,0,1]),
-                                     new SPFX.When(client_time + time_offset, null), // should_be_tick
+                                     new SPFX.When(null, session.combat_engine.cur_tick, time_offset),
                                      1.0, {drop_shadow:true}));
     }
 
@@ -2469,7 +2468,7 @@ GameObject.prototype.run_control = function() {
                 target_height = target.is_flying() ? target.altitude : 0;
             }
 
-            this.fire_projectile(client_time, -1, spell, spell_level, target, target_pos, target_height);
+            this.fire_projectile(session.combat_engine.cur_tick, null, spell, spell_level, target, target_pos, target_height);
         }
     } else if(this.control_state === control_states.CONTROL_STOP) {
 
@@ -2542,15 +2541,16 @@ var no_miss_hack_reported = false;
     @param {!Array.<number>} my_pos
     @param {number} my_height
     @param {Array.<number>} my_muzzle_pos
-    @param {number} fire_time
-    @param {number} force_hit_time
+    @param {!GameTypes.TickCount} fire_tick
+    @param {GameTypes.TickCount|null} force_hit_tick
     @param {Object} spell
     @param {GameObject|null} target
     @param {!Array.<number>} target_pos
     @param {number} target_height
     @param {boolean} fizzle
+    @return {!GameTypes.TickCount}
 */
-function do_fire_projectile(my_source, my_id, my_spec_name, my_level, my_team, my_stats, my_pos, my_height, my_muzzle_pos, fire_time, force_hit_time, spell, target, target_pos, target_height, fizzle) {
+function do_fire_projectile(my_source, my_id, my_spec_name, my_level, my_team, my_stats, my_pos, my_height, my_muzzle_pos, fire_tick, force_hit_tick, spell, target, target_pos, target_height, fizzle) {
     var max_range = gamedata['map']['range_conversion'] * get_leveled_quantity(spell['range'], my_level) * (my_stats ? my_stats.weapon_range : 1);
     var eff_range = ('effective_range' in spell ? (gamedata['map']['range_conversion'] * get_leveled_quantity(spell['effective_range'], my_level) * (my_stats ? my_stats.effective_weapon_range : 1)) : max_range);
     var shot_v = vec_sub(target_pos, my_pos);
@@ -2606,7 +2606,8 @@ function do_fire_projectile(my_source, my_id, my_spec_name, my_level, my_team, m
         }
     }
 
-    var speed = player.get_any_abtest_value('global_projectile_speed_scale', gamedata['map']['global_projectile_speed_scale']) * get_leveled_quantity(spell['projectile_speed'] || 0, my_level) * (my_stats ? my_stats.projectile_speed : 1) * combat_time_scale();
+    var speed = player.get_any_abtest_value('global_projectile_speed_scale', gamedata['map']['global_projectile_speed_scale']) * get_leveled_quantity(spell['projectile_speed'] || 0, my_level) * (my_stats ? my_stats.projectile_speed : 1);
+
     // use_lead actually changes combat target position for splash weapons
     // for non-splash weapons, it affects graphics only (since hits are computed independently)
     var use_lead = get_leveled_quantity(spell['lead_target'] || 0, my_level);
@@ -2617,30 +2618,39 @@ function do_fire_projectile(my_source, my_id, my_spec_name, my_level, my_team, m
         copies = Math.min(Math.max(Math.floor(SPFX.detail * copies), 1), 2);
     }
     var interval = get_leveled_quantity(spell['projectile_burst_interval'] || 0, my_level);
-    var prefire_delay = get_leveled_quantity(spell['prefire_delay'] || 0, my_level) / combat_time_scale();
-    var postfire_delay = get_leveled_quantity(spell['postfire_delay'] || 0, my_level) / combat_time_scale();
+    var prefire_delay_ticks = relative_time_to_tick(get_leveled_quantity(spell['prefire_delay'] || 0, my_level));
+    var postfire_delay_ticks = relative_time_to_tick(get_leveled_quantity(spell['postfire_delay'] || 0, my_level));
 
-    var shot_time, shot_height;
+    /** @type {!GameTypes.TickCount} */
+    var shot_ticks;
+    /** @type {number} */
+    var shot_height;
+
     if(speed > 0) {
         // account for projectile travel time
         var P = shot_v;
-        shot_time = shot_length/speed;
+        shot_ticks = new GameTypes.TickCount(Math.floor(shot_length/speed + 0.5));
         shot_height = shot_length * arc;
 
         // fire splash weapons at extrapolated target position
         if(use_lead > 0 && ('splash_range' in spell) && target && target.is_mobile() && (target.vel[0] != 0 || target.vel[1] != 0)) {
             lead_applied = true;
 
-            if(prefire_delay+postfire_delay > 0) {
-                P = vec_mad(P, prefire_delay+postfire_delay, target.vel);
+            var target_vel_per_tick = vec_scale(1/TICK_INTERVAL, target.vel);
+            if(prefire_delay_ticks.get()+postfire_delay_ticks.get() > 0) {
+                P = vec_mad(P, prefire_delay_ticks.get()+postfire_delay_ticks.get(), target_vel_per_tick); // XXXXXX check math
             }
-            var lead_shot_time = apply_target_lead(P, target.vel, speed);
-            if(lead_shot_time >= 0) {
-                shot_time = lead_shot_time;
+            var lead_shot_ticks = apply_target_lead(P, target_vel_per_tick, speed);
+            if(lead_shot_ticks >= 1) {
+                shot_ticks = new GameTypes.TickCount(Math.floor(lead_shot_ticks + 0.5));
             }
 
             // propose extrapolated target position
-            var test_pos = vec_mad(target_pos, (shot_time + prefire_delay + postfire_delay) * use_lead, target.vel);
+            var test_pos = vec_mad(target_pos,
+                                   GameTypes.TickCount.scale(use_lead,
+                                                             GameTypes.TickCount.add(shot_ticks,
+                                                                                     GameTypes.TickCount.add(prefire_delay_ticks, postfire_delay_ticks))).get(),
+                                   target_vel_per_tick);
 
             // constrain impact distance by maximum weapon range
             var test_len = vec_distance(test_pos, my_pos);
@@ -2650,7 +2660,7 @@ function do_fire_projectile(my_source, my_id, my_spec_name, my_level, my_team, m
                 // constrain to max range
                 target_pos = vec_mad(my_pos, max_range, vec_normalized(vec_sub(test_pos, my_pos)));
                 // recompute shot_time
-                shot_time = max_range / speed;
+                shot_ticks = new GameTypes.TickCount(Math.floor(max_range / speed + 0.5));
             } else {
                 // use proposed position
                 target_pos = test_pos;
@@ -2665,19 +2675,26 @@ function do_fire_projectile(my_source, my_id, my_spec_name, my_level, my_team, m
 
     } else {
         // instant hit
-        shot_time = 0;
+        shot_ticks = new GameTypes.TickCount(0);
         shot_height = 0;
     }
 
-    // hit_time is the time at which the bullet will reach its final destination
-    // hit_time+postfire_delay is when it will explode and do damage
+    // hit_tick is the time at which the bullet will reach its final destination
+    // hit_tick+postfire_delay is when it will explode and do damage
 
-    var hit_time, impact_spread;
-    if(force_hit_time > 0) {
-        hit_time = force_hit_time;
+    /** @type {!GameTypes.TickCount} */
+    var hit_tick;
+
+    /** @type {number} */
+    var impact_spread;
+
+    if(force_hit_tick) {
+        hit_tick = force_hit_tick;
         impact_spread = 0; // shoot directly at target location
     } else {
-        hit_time = fire_time + prefire_delay + shot_time;
+        hit_tick = GameTypes.TickCount.add(fire_tick,
+                                           GameTypes.TickCount.add(prefire_delay_ticks,
+                                                                   shot_ticks));
         impact_spread = get_leveled_quantity(spell['projectile_impact_spread'] || 1.5, my_level);
     }
 
@@ -2736,8 +2753,7 @@ function do_fire_projectile(my_source, my_id, my_spec_name, my_level, my_team, m
         var impact_pos = vec_add(target_pos, [impact_spread*(-1+2*Math.random()),
                                               impact_spread*(-1+2*Math.random())]);
         var impact_height = target_height;
-        var muzzle_time = fire_time+i*interval+time_offset; // time at which muzzle flash effect begins (bullet emerges prefire_delay later)
-        var impact_time = hit_time+i*interval+time_offset; // time at which bullet reaches destination
+        var impact_tick = hit_tick; // tick at which bullet reaches destination
 
         // when using unit_draw_scatter, adjust the visual effect target point towards the drawn location
         if(target && target.is_mobile() && gamedata['client']['unit_draw_scatter']) {
@@ -2747,18 +2763,37 @@ function do_fire_projectile(my_source, my_id, my_spec_name, my_level, my_team, m
 
         // if lead is enabled for a non-splash weapon, apply it to the graphical effect
         if(use_lead > 0 && !lead_applied && target && target.is_mobile() && (target.vel[0] != 0 || target.vel[1] != 0)) {
-            var lead_shot_time = apply_target_lead(vec_mad(my_shot_v, prefire_delay+postfire_delay, target.vel), target.vel, speed);
-            if(lead_shot_time >= 0) {
-                impact_time = (muzzle_time + prefire_delay + lead_shot_time);
-                impact_pos = vec_mad(impact_pos, (lead_shot_time + prefire_delay + postfire_delay) * use_lead, target.vel);
+            var target_vel_per_tick = vec_scale(1/TICK_INTERVAL, target.vel);
+
+            var lead_shot_tick_count = apply_target_lead(vec_mad(my_shot_v, prefire_delay_ticks.get()+postfire_delay_ticks.get(), target_vel_per_tick), target_vel_per_tick, speed);
+            if(lead_shot_tick_count >= 0) {
+                var lead_shot_ticks = new GameTypes.TickCount(Math.floor(lead_shot_tick_count + 0.5));
+                impact_tick = GameTypes.TickCount.add(fire_tick,
+                                                      GameTypes.TickCount.add(prefire_delay_ticks,
+                                                                              lead_shot_ticks));
+                impact_pos = vec_mad(impact_pos, (lead_shot_ticks.get() + prefire_delay_ticks.get() + postfire_delay_ticks.get()) * use_lead, target_vel_per_tick);
             }
         }
 
         // visual projectile effect
         if(color !== null && my_muzzle_pos) {
+
+            // when interval is greater than a tick, actually delay the firing/impact graphics
+            var my_fire_tick = GameTypes.TickCount.add(fire_tick, prefire_delay_ticks);
+            var my_impact_tick = impact_tick;
+            var tick_delay = i*interval + time_offset;
+            if(tick_delay >= TICK_INTERVAL) {
+                var whole_ticks = Math.floor(tick_delay / TICK_INTERVAL);
+                tick_delay -= whole_ticks * TICK_INTERVAL;
+                my_fire_tick = new GameTypes.TickCount(my_fire_tick.get() + whole_ticks);
+                my_impact_tick = new GameTypes.TickCount(my_impact_tick.get() + whole_ticks);
+            }
+
             SPFX.add(new SPFX.Projectile(my_muzzle_pos, my_height,
                                          impact_pos, impact_height,
-                                         muzzle_time+prefire_delay, impact_time,
+                                         my_fire_tick,
+                                         my_impact_tick,
+                                         tick_delay,
                                          shot_height, color, (exhaust ? exhaust : null),
                                          get_leveled_quantity(spell['projectile_size'] || 2, my_level),
                                          get_leveled_quantity(spell['projectile_min_length'] || 0, my_level),
@@ -2793,9 +2828,9 @@ function do_fire_projectile(my_source, my_id, my_spec_name, my_level, my_team, m
         }
 
         if(impact_vfx) {
-            SPFX.add_visual_effect_at_time_but_should_be_tick(impact_pos, impact_height, [0,1,0],
-                                                              impact_time,
-                                                              impact_vfx, (i == 0), vfx_props); // only play audio for first impact
+            SPFX.add_visual_effect_at_tick(impact_pos, impact_height, [0,1,0],
+                                           impact_tick, // XXXXXX additional delay of i*interval + time_offset
+                                           impact_vfx, (i == 0), vfx_props); // only play audio for first impact
         }
 
         // visual muzzle flash effect
@@ -2810,10 +2845,10 @@ function do_fire_projectile(my_source, my_id, my_spec_name, my_level, my_team, m
 
         // only apply muzzle flash on first copy
         if(muzzle_vfx && my_muzzle_pos && (i == 0)) {
-            SPFX.add_visual_effect_at_time_but_should_be_tick(my_muzzle_pos, my_height,
-                                                              v3_normalized([my_shot_v[0], 0, my_shot_v[1]]),
-                                                              muzzle_time,
-                                                              muzzle_vfx, true, vfx_props);
+            SPFX.add_visual_effect_at_tick(my_muzzle_pos, my_height,
+                                           v3_normalized([my_shot_v[0], 0, my_shot_v[1]]),
+                                           fire_tick, // XXXXXX additional delay of i*interval + time_offset
+                                           muzzle_vfx, true, vfx_props);
         }
     }
 
@@ -2828,7 +2863,7 @@ function do_fire_projectile(my_source, my_id, my_spec_name, my_level, my_team, m
         if(spell['impact_auras']) {
             for (var i = 0; i < spell['impact_auras'].length; i++) {
                 var imp_aura = spell['impact_auras'][i];
-                effects.push(new CombatEngine.AreaAuraEffect(absolute_time_to_tick(hit_time+postfire_delay), hit_time+postfire_delay, my_source, target_pos,
+                effects.push(new CombatEngine.AreaAuraEffect(GameTypes.TickCount.add(hit_tick, postfire_delay_ticks), my_source, target_pos,
                                                 ('splash_to_ground' in spell ? spell['splash_to_ground'] : false) || !(target_height > 0),
                                                 ('splash_to_air' in spell ? spell['splash_to_air'] : false) || (target_height > 0),
                                                 radius, false,
@@ -2845,7 +2880,7 @@ function do_fire_projectile(my_source, my_id, my_spec_name, my_level, my_team, m
 
         // splash damage
         if(damage != 0) {
-            effects.push(new CombatEngine.AreaDamageEffect(absolute_time_to_tick(hit_time+postfire_delay), hit_time+postfire_delay, my_source, target_pos,
+            effects.push(new CombatEngine.AreaDamageEffect(GameTypes.TickCount.add(hit_tick, postfire_delay_ticks), my_source, target_pos,
                                               ('splash_to_ground' in spell ? spell['splash_to_ground'] : false) || !(target_height > 0),
                                               ('splash_to_air' in spell ? spell['splash_to_air'] : false) || (target_height > 0),
                                               radius,
@@ -2860,7 +2895,7 @@ function do_fire_projectile(my_source, my_id, my_spec_name, my_level, my_team, m
             if(spell['impact_auras']) {
                 for (var i = 0; i < spell['impact_auras'].length; i++) {
                     var imp_aura = spell['impact_auras'][i];
-                    effects.push(new CombatEngine.TargetedAuraEffect(absolute_time_to_tick(hit_time+postfire_delay), hit_time+postfire_delay, my_source, target,
+                    effects.push(new CombatEngine.TargetedAuraEffect(GameTypes.TickCount.add(hit_tick, postfire_delay_ticks), my_source, target,
                                                         get_leveled_quantity(imp_aura['strength'] || 1, my_level),
                                                         get_leveled_quantity(imp_aura['spec'], my_level),
                                                         relative_time_to_tick(get_leveled_quantity(imp_aura['duration'] || 1, my_level)),
@@ -2871,7 +2906,7 @@ function do_fire_projectile(my_source, my_id, my_spec_name, my_level, my_team, m
             }
 
             if(damage != 0) {
-                effects.push(new CombatEngine.TargetedDamageEffect(absolute_time_to_tick(hit_time+postfire_delay), hit_time+postfire_delay, my_source, target, damage, damage_vs));
+                effects.push(new CombatEngine.TargetedDamageEffect(GameTypes.TickCount.add(hit_tick, postfire_delay_ticks), my_source, target, damage, damage_vs));
             }
         }
     }
@@ -2901,23 +2936,23 @@ function do_fire_projectile(my_source, my_id, my_spec_name, my_level, my_team, m
                                          'damage': damage,
                                          'speed': speed,
                                          'client_time': client_time,
-                                         'fire_time': fire_time,
-                                         'hit_time': hit_time,
+                                         'fire_tick': fire_tick.get(),
+                                         'hit_tick': hit_tick.get(),
                                          'miss': miss
                                         });
     }
 
-    return hit_time;
+    return hit_tick;
 };
 
-/** @param {number} fire_time
-    @param {number} force_hit_time
+/** @param {!GameTypes.TickCount} fire_tick
+    @param {GameTypes.TickCount|null} force_hit_tick
     @param {Object} spell
     @param {number} spell_level
     @param {GameObject|null} target
     @param {!Array.<number>} target_pos
     @param {number} target_height */
-GameObject.prototype.fire_projectile = function(fire_time, force_hit_time, spell, spell_level, target, target_pos, target_height) {
+GameObject.prototype.fire_projectile = function(fire_tick, force_hit_tick, spell, spell_level, target, target_pos, target_height) {
     var my_pos = this.interpolate_pos();
     var my_height = (this.is_flying() ? this.altitude : 0);
     var my_muzzle_pos = my_pos;
@@ -2938,14 +2973,19 @@ GameObject.prototype.fire_projectile = function(fire_time, force_hit_time, spell
 
     if(spell['kills_self']) {
         // special for Detonator Droids - kill self
-        var death_client_time = client_time + (spell['kills_self_delay']||0);
-        var death_tick = absolute_time_to_tick(fire_time + /** @type {number} */ (spell['kills_self_delay']||0));
-        session.combat_engine.damage_effect_queue.push(new CombatEngine.KillDamageEffect(death_tick, death_client_time, this, this));
+        var death_client_time = client_time;
+        var death_tick = fire_tick;
+        if('kills_self_delay' in spell) {
+            death_tick = GameTypes.TickCount.add(death_tick, relative_time_to_tick(/** @type {number} */ (spell['kills_self_delay'])));
+            death_client_time += spell['kills_self_delay'];
+        }
+
+        session.combat_engine.damage_effect_queue.push(new CombatEngine.KillDamageEffect(death_tick, this, this));
     }
 
-    var hit_time = do_fire_projectile(this, this.id, this.spec['name'],
-                                      spell_level,
-                                      this.team, this.combat_stats, my_pos, my_height, my_muzzle_pos, fire_time, force_hit_time, spell, target, target_pos, target_height, false);
+    do_fire_projectile(this, this.id, this.spec['name'],
+                       spell_level,
+                       this.team, this.combat_stats, my_pos, my_height, my_muzzle_pos, fire_tick, force_hit_tick, spell, target, target_pos, target_height, false);
 };
 
 
@@ -44039,12 +44079,12 @@ function handle_server_message(data) {
                             }
 
                             // missile effect
-                            var hit_time = do_fire_projectile(player.virtual_units["PLAYER"], '0', 'PLAYER', 1, 'player', null, launch_loc, launch_height, launch_loc, client_time, -1, spell, null, target_loc, target_height, (interceptor!=null));
+                            var hit_tick = do_fire_projectile(player.virtual_units["PLAYER"], '0', 'PLAYER', 1, 'player', null, launch_loc, launch_height, launch_loc, session.combat_engine.cur_tick, null, spell, null, target_loc, target_height, (interceptor!=null));
 
                             if(interceptor) {
                                 // intecepting shot effect
                                 // hack - don't bother computing the actual fire time
-                                interceptor.fire_projectile(hit_time-0.25, hit_time, interceptor.get_auto_spell(), interceptor.get_auto_spell_level(), null, target_loc, target_height);
+                                interceptor.fire_projectile(new GameTypes.TickCount(hit_tick.get()-1), hit_tick, interceptor.get_auto_spell(), interceptor.get_auto_spell_level(), null, target_loc, target_height);
                             }
                         }
                     }
@@ -48024,6 +48064,7 @@ function do_draw() {
                     lines.push("using window.setTimeout("+LAST_ANIM_FRAME_TIMEOUT.toFixed(0)+"ms)");
                 }
                 lines.push('Client/server clock offset: '+(-1000*server_time_offset).toFixed(0)+'ms');
+                lines.push('Combat tick: '+session.combat_engine.cur_tick.get().toString());
                 ctx.save();
                 var fsize = 21;
                 ctx.font = SPUI.make_font(fsize, fsize+6, 'thick').str();

@@ -834,8 +834,9 @@ SPFX.Particles.prototype.run_physics = function(dt) {
     @param {number} from_height
     @param {!Array.<number>} to
     @param {number} to_height
-    @param {number} launch_time
-    @param {number} impact_time
+    @param {!GameTypes.TickCount} launch_tick
+    @param {!GameTypes.TickCount} impact_tick
+    @param {number} tick_delay - additional delay in seconds after impact_tick/launch_time for graphics offset
     @param {number} max_height
     @param {!Array.<number>} color
     @param {Object|null} exhaust
@@ -846,12 +847,18 @@ SPFX.Particles.prototype.run_physics = function(dt) {
     @param {number} glow
     @param {string|null} asset
 */
-SPFX.Projectile = function(from, from_height, to, to_height, launch_time, impact_time, max_height, color, exhaust, line_width, min_length, fade_time, comp_mode, glow, asset) {
+SPFX.Projectile = function(from, from_height, to, to_height, launch_tick, impact_tick, tick_delay, max_height, color, exhaust, line_width, min_length, fade_time, comp_mode, glow, asset) {
     goog.base(this, null);
+
+    if(SPFX.Projectile.DEBUG) {
+        console.log("Projectile launch_tick "+launch_tick.get().toString()+" impact_tick "+impact_tick.get().toString()+" tick_delay "+tick_delay.toString());
+    }
+
     this.from = from;
     this.to = to;
-    this.launch_time = launch_time;
-    this.impact_time = impact_time;
+    this.launch_tick = launch_tick;
+    this.impact_tick = impact_tick;
+    this.tick_delay = tick_delay;
     this.launch_height = 0.5 + from_height;
     this.to_height = to_height;
     this.max_height = max_height;
@@ -862,26 +869,26 @@ SPFX.Projectile = function(from, from_height, to, to_height, launch_time, impact
     this.glow = glow;
     this.asset = asset;
 
-    this.last_time = launch_time;
+    this.start_time = -1; // set upon launch_tick
+    this.end_time = -1; // set upon impact_tick
+    this.last_time = -1; // SPFX.time of last computation
+    this.last_progress = -1;
+
     this.color_str = (new SPUI.Color(color[0], color[1], color[2], 1.0)).str();
 
-    if(this.impact_time != this.launch_time) {
-        this.tscale = 1/(this.impact_time-this.launch_time);
-    } else {
-        this.tscale = 1000.0;
-    }
-
-    var shot_d = vec_sub(to, this.from);
+    var shot_d = vec_sub(this.to, this.from);
     var shot_len = vec_length(shot_d);
-    var shot_dir = vec_scale(1/shot_len, shot_d);
-    this.shot_vel = vec_scale(shot_len * this.tscale, shot_dir);
+    this.shot_dir = vec_scale(1/shot_len, shot_d);
 
     if(exhaust) {
         // exhaust particles
-        this.particles = new SPFX.Particles(null, new SPFX.When(launch_time, null), impact_time - launch_time, exhaust); // should_be_tick
+        this.particles = new SPFX.Particles(null, new SPFX.When(null, launch_tick),
+                                            // duration gets converted to seconds immediately here, for graphics only
+                                            (impact_tick.get() - launch_tick.get()) * TICK_INTERVAL/combat_time_scale(),
+                                            exhaust);
         this.exhaust_speed = ('speed' in exhaust ? /** @type {number} */ (exhaust['speed']) : 0);
         this.exhaust_dvel = ('randomize_vel' in exhaust ? /** @type {number} */ (exhaust['randomize_vel']) : 0) * this.exhaust_speed;
-        this.exhaust_vel = vec_scale(-this.exhaust_speed, shot_dir);
+        this.exhaust_vel = vec_scale(-this.exhaust_speed, this.shot_dir);
         this.exhaust_rate = Math.floor(Math.min(SPFX.detail, 1) * ('emit_rate' in exhaust ? /** @type {number} */ (exhaust['emit_rate']) : 60));
         SPFX.add(this.particles);
     } else {
@@ -889,6 +896,8 @@ SPFX.Projectile = function(from, from_height, to, to_height, launch_time, impact
     }
 };
 goog.inherits(SPFX.Projectile, SPFX.Effect);
+
+SPFX.Projectile.DEBUG = false;
 
 SPFX.Projectile.prototype.draw_beam = function() {
     var stroke_start = ortho_to_draw_3d([this.from[0], this.launch_height, this.from[1]]);
@@ -899,7 +908,7 @@ SPFX.Projectile.prototype.draw_beam = function() {
 
     var fade = 1;
     if(this.fade_time > 0) {
-        fade = 1 - (SPFX.time - this.launch_time) / this.fade_time;
+        fade = 1 - (SPFX.time - this.start_time) / this.fade_time;
         if(fade <= 0) {
             return;
         }
@@ -922,13 +931,33 @@ SPFX.Projectile.prototype.draw_beam = function() {
 };
 
 SPFX.Projectile.prototype.draw = function() {
-    if(SPFX.time < this.launch_time) {
+    var shot_ticks = this.impact_tick.get() - this.launch_tick.get();
+
+    if(GameTypes.TickCount.lt(SPFX.tick, this.launch_tick)) {
+        return;
+    } else if(this.start_time < 0) {
+        this.start_time = SPFX.last_tick_time + this.tick_delay;
+        this.last_time = this.start_time;
+    }
+    if(SPFX.time < this.start_time) {
+        if(SPFX.Projectile.DEBUG) {
+            console.log(SPFX.tick.get().toString()+' '+this.id+' cancelled - before start_time');
+        }
         return;
     }
 
-    if(SPFX.time > this.impact_time + this.fade_time) {
-        SPFX.remove(this);
-        return;
+    if(GameTypes.TickCount.gte(SPFX.tick, this.impact_tick)) {
+        if(this.end_time < 0) {
+            this.end_time = SPFX.last_tick_time + this.tick_delay;
+            if(shot_ticks < 1) { this.end_time += TICK_INTERVAL/combat_time_scale(); }
+        }
+        if(SPFX.time > this.end_time + this.fade_time) {
+            if(SPFX.Projectile.DEBUG) {
+                console.log(SPFX.tick.get().toString()+' '+this.id+' cancelled - after end_time');
+            }
+            SPFX.remove(this);
+            return;
+        }
     }
 
     if(this.min_length > 100.0) {
@@ -936,16 +965,29 @@ SPFX.Projectile.prototype.draw = function() {
         return this.draw_beam();
     }
 
-    var t = SPFX.time - this.launch_time;
+    // 0 = launch, 1 = impact
+    // works for shot_ticks = 0!
+    var progress = (SPFX.tick.get() - this.launch_tick.get()) / Math.max(shot_ticks, 1);
+
+    // add time since last tick
+    progress += ((SPFX.time-SPFX.last_tick_time-this.tick_delay)/(TICK_INTERVAL/combat_time_scale())) / Math.max(shot_ticks, 1);
+    var dprogress_dt = (1/(TICK_INTERVAL/combat_time_scale())) / Math.max(shot_ticks, 1);
+
+    //progress = Math.max(progress, 0);
+
+    //progress = Math.min(progress, 1);
+
+    // delta since last draw
+    var dprogress = (this.last_progress < 0 ? dprogress_dt : progress - this.last_progress);
     var dt = SPFX.time - this.last_time;
 
     // compute x,y ground position
-    var pos = vec_mad(this.from, t, this.shot_vel);
+    var pos = vec_lerp(this.from, this.to, progress);
 
     // parabolic arc
-    var height = this.launch_height + this.max_height * (1 - ((t*this.tscale-0.5)*(t*this.tscale-0.5))/0.25) + t*this.tscale * (this.to_height - this.launch_height);
-    // derivative of above with respect to t
-    var dheight_dt = -8 * this.max_height * (t*this.tscale - 0.5) * this.tscale + this.tscale * (this.to_height - this.launch_height);
+    var height = this.launch_height + this.max_height * (1 - ((progress-0.5)*(progress-0.5))/0.25) + progress * (this.to_height - this.launch_height);
+    // derivative of above with respect to progress
+    var dheight_dprogress = -8 * this.max_height * (progress - 0.5) + (this.to_height - this.launch_height);
 
     // spawn exhaust particles
     if(this.particles) {
@@ -956,8 +998,8 @@ SPFX.Projectile.prototype.draw = function() {
             int_particles += 1;
         }
         for(var i = 0; i < int_particles; i++) {
-            var pt = t - Math.random()*dt;
-            var ppos = vec_mad(this.from, pt, this.shot_vel);
+            var pt = progress - Math.random()*dprogress;
+            var ppos = vec_lerp(this.from, this.to, pt);
             var vel = this.exhaust_vel;
             /** @type {!Array.<number>} */
             var spawn_loc = [ppos[0], height, ppos[1]];
@@ -972,11 +1014,15 @@ SPFX.Projectile.prototype.draw = function() {
 
     // motion blur streak length - by default 50% of time interval to simulate 1/48th
     // shutter, but don't let it get too large if framerate drops
-    var sdt = 0.5 * Math.min(dt, 0.05);
+    var sdprogress = 0.5 * Math.min(dprogress, 0.05);
+
+    if(SPFX.Projectile.DEBUG) {
+        console.log('tick '+SPFX.tick.get().toString()+' progress '+progress.toString()+' dprogress '+dprogress.toString());
+    }
 
     var stroke_start = ortho_to_draw_3d([pos[0], height, pos[1]]);
-    var stroke_end_pos = vec_mad(pos, sdt, this.shot_vel);
-    var stroke_end_height = height + sdt * dheight_dt;
+    var stroke_end_pos = vec_mad(pos, sdprogress, vec_sub(this.to, this.from));
+    var stroke_end_height = height + sdprogress * dheight_dprogress;
     var stroke_end = ortho_to_draw_3d([stroke_end_pos[0], stroke_end_height, stroke_end_pos[1]]);
 
     if(this.min_length > 0) {
@@ -1040,6 +1086,7 @@ SPFX.Projectile.prototype.draw = function() {
     SPFX.ctx.restore();
 
     this.last_time = SPFX.time;
+    this.last_progress = progress;
 };
 
 /** Quantize a line segment for drawing. Mutates start/end in place.
@@ -1835,7 +1882,6 @@ SPFX.PhantomUnit.prototype.get_phantom_object = function() {
 SPFX.add_visual_effect_at_time = function(pos, altitude, orient, time, data, allow_sound, instance_data) {
     return SPFX._add_visual_effect(pos, altitude, orient, new SPFX.When(time, null), data, allow_sound, instance_data);
 };
-SPFX.add_visual_effect_at_time_but_should_be_tick = SPFX.add_visual_effect_at_time;
 
 /**
    @param {!Array.<number>} pos
