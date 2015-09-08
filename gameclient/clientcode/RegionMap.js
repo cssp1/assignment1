@@ -1937,8 +1937,8 @@ RegionMap.RegionMap.prototype.draw_feature_influence = function(roi, feature, in
 
         if(alpha > 0) {
             var grad = SPUI.ctx.createRadialGradient(0, 0, 0, 0, 0, radius);
-            grad.addColorStop('0.0', color_str+alpha.toString()+')');
-            grad.addColorStop('1.0', color_str+'0.0)');
+            grad.addColorStop(0.0, color_str+alpha.toString()+')');
+            grad.addColorStop(1.0, color_str+'0.0)');
             SPUI.ctx.save();
             SPUI.ctx.fillStyle = grad;
             SPUI.ctx.transform(1, 0, 0, 1,
