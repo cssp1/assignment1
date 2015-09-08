@@ -772,6 +772,11 @@ RegionMap.RegionMap.prototype.on_mouseup = function(uv, offset, button) {
 
     if(this.cursor && this.cursor.on_mouseup(hit[1], button)) { return true; }
 
+    if(button === SPUI.RIGHT_MOUSE_BUTTON) {
+        this.set_popup(null);
+        return true;
+    }
+
     this.select_feature_at(hit[1]);
 
     return hit[0];
