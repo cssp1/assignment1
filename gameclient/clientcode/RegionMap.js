@@ -758,14 +758,19 @@ RegionMap.RegionMap.prototype.on_mousedown = function(uv, offset, button) {
 };
 
 RegionMap.RegionMap.prototype.on_mouseup = function(uv, offset, button) {
+    if(!this.show) {
+        return false;
+    }
+
+    if(button === SPUI.RIGHT_MOUSE_BUTTON) {
+        this.set_popup(null);
+        return true;
+    }
+
     if(this.drag_full) {
         this.drag_start = null;
         this.drag_full = false;
         return true;
-    }
-
-    if(!this.show) {
-        return false;
     }
 
     var hit = this.detect_hit(uv, offset);
@@ -867,6 +872,9 @@ RegionMap.RegionMap.prototype.on_mousemove = function(uv, offset) {
     } else {
         this.drag_start = null;
         this.drag_full = false;
+        if(mouse_state.get_button(SPUI.RIGHT_MOUSE_BUTTON)) {
+            return true; // handle here, so the event won't go to the desktop
+        }
     }
     return this.drag_full;
 };
@@ -975,8 +983,7 @@ RegionMap.RegionMap.update_feature_popup_menu = function(dialog) {
     var lock_state = feature['LOCK_STATE'] || 0;
     var lock_owner = feature['LOCK_OWNER'] || -1;
 
-    var buttons = [];//["TEST 1", function() {}],
-    //["TEST 2", function() {}]];
+    var buttons = [];
 
     if(lock_state != 0 && (lock_owner != session.user_id)) {
         //buttons.push([gamedata['strings']['regional_map']['under_attack'], function() {}, 'disabled']);
@@ -1255,7 +1262,8 @@ RegionMap.RegionMap.update_feature_popup_menu = function(dialog) {
         dialog.widgets['button'+i].show = false; i += 1;
     }
 
-    dialog.widgets['bgrect'].wh[1] = 4 + 36 * buttons.length;
+    dialog.wh = dialog.widgets['bgrect'].wh = [dialog.data['widgets']['bgrect']['dimensions'][0],
+                                               4 + 36 * buttons.length];
 
     var anim_progress = Math.min((client_time - dialog.user_data['anim_start']) / 0.2, 1);
 
