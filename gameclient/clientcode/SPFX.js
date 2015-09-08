@@ -27,9 +27,18 @@ SPFX.ctx = null;
     @private */
 SPFX.time = 0;
 
+/** @type {number}
+    @private */
+SPFX.last_tick_time = 0;
+
 /** @type {!GameTypes.TickCount}
     @private */
 SPFX.tick = new GameTypes.TickCount(0);
+
+/** @type {!GameTypes.TickCount}
+    @private */
+SPFX.last_tick = new GameTypes.TickCount(0);
+
 
 /** Some effects want to fire at specific client_times and others want
  to fire at specific combat ticks. This type encapsulates both cases.
@@ -105,6 +114,9 @@ SPFX.init = function(ctx, use_low_gfx, use_high_gfx) {
     SPFX.ctx = ctx;
     SPFX.time = 0;
     SPFX.tick = new GameTypes.TickCount(0);
+    SPFX.last_tick = new GameTypes.TickCount(0);
+    SPFX.last_tick_time = 0;
+
     SPFX.last_id = 0;
 
     // turn down number of particles/sprites for higher performance
@@ -129,6 +141,10 @@ SPFX.init = function(ctx, use_low_gfx, use_high_gfx) {
 SPFX.set_time = function(time, tick) {
     SPFX.time = time;
     SPFX.tick = tick;
+    if(GameTypes.TickCount.gt(SPFX.tick, SPFX.last_tick)) {
+        SPFX.last_tick = SPFX.tick;
+        SPFX.last_tick_time = SPFX.time;
+    }
 };
 
 /** @param {!SPFX.When} t
