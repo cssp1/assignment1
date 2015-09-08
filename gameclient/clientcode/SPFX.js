@@ -46,6 +46,19 @@ SPFX.When = function(time, tick, tick_delay) {
     this.tick_delay = tick_delay || 0;
 };
 
+/** @param {!SPFX.When} a
+    @param {!SPFX.When} b
+    @return {boolean} */
+SPFX.When.equal = function(a, b) {
+    if(a.time !== null) {
+        return a.time === b.time;
+    } else if(a.tick !== null) {
+        return (b.tick !== null) && GameTypes.TickCount.equal(a.tick, b.tick) && (a.tick_delay === b.tick_delay);
+    }
+    throw Error('bad When values');
+    return false;
+};
+
 /** @type {number} */
 SPFX.last_id = 0;
 

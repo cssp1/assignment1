@@ -41,6 +41,11 @@ GameTypes.TickCount.scale = function(s, a) { return new GameTypes.TickCount(Math
 /** @param {!GameTypes.TickCount} a
     @param {!GameTypes.TickCount} b
     @return {boolean} */
+GameTypes.TickCount.equal = function(a, b) { return a.count === b.count; };
+
+/** @param {!GameTypes.TickCount} a
+    @param {!GameTypes.TickCount} b
+    @return {boolean} */
 GameTypes.TickCount.gte = function(a, b) { return a.count >= b.count; };
 
 /** @param {!GameTypes.TickCount} a

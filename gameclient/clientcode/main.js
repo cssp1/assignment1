@@ -7894,6 +7894,8 @@ function update_player_combat_time_scale(new_speed) {
     player_combat_time_scale = gamedata['client']['playfield_speeds'][player_playfield_speed.toFixed(0)] || 1;
     //session.set_attack_finish_time(session.true_attack_finish_time);
 };
+
+/** @return {number} */
 function combat_time_scale() {
     var sc = get_player_stat(player.stattab, 'combat_time_scale');
     return player_combat_time_scale * sc;
