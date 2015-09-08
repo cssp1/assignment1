@@ -165,7 +165,15 @@ function vec_max(v, w) { return [Math.max(v[0],w[0]), Math.max(v[1],w[1])]; }
 function vec_floor(v) { return [Math.floor(v[0]), Math.floor(v[1])]; }
 
 function vec_mod(v, n) { return [v[0]%n, v[1]%n]; }
+
+/** @param {!Array.<number>} v
+    @param {!Array.<number>} w
+    @return {!Array.<number>} */
 function v3_add(v, w) { return [v[0]+w[0], v[1]+w[1], v[2]+w[2]]; }
+
+/** @param {!Array.<number>} v
+    @param {!Array.<number>} w
+    @return {!Array.<number>} */
 function v3_sub(v, w) { return [v[0]-w[0], v[1]-w[1], v[2]-w[2]]; }
 
 /** @param {!Array.<number>} v
@@ -175,24 +183,54 @@ function vec_sub(v, w) {
     return [v[0]-w[0],v[1]-w[1]];
 }
 
+/** @param {number} s
+    @param {!Array.<number>} v
+    @return {!Array.<number>} */
 function vec_scale(s, v) {
     return [s*v[0],s*v[1]];
 }
+/** a + x*(b-a)
+    @param {!Array.<number>} a
+    @param {!Array.<number>} b
+    @param {number} x
+    @return {!Array.<number>} */
 function vec_lerp(a, b, x) {
     return vec_add(a, vec_scale(x, vec_sub(b, a)));
 }
+/** @param {number} a
+    @param {number} b
+    @param {number} x
+    @return {number} */
 function lerp(a, b, x) {
     return a + x*(b-a);
 }
 
+/** @param {number} s
+    @param {!Array.<number>} v
+    @return {!Array.<number>} */
 function v3_scale(s, v) { return [s*v[0], s*v[1], s*v[2]]; }
 
+/** @param {!Array.<number>} v
+    @return {number} */
 function v3_length(v) { return Math.sqrt(v[0]*v[0]+v[1]*v[1]+v[2]*v[2]); }
+
+/** @param {!Array.<number>} a
+    @param {!Array.<number>} b
+    @return {number} */
 function v3_distance(a, b) {
     var dx = b[0] - a[0], dy = b[1] - a[1], dz = b[2] - a[2];
     return Math.sqrt(dx*dx + dy*dy + dz*dz);
 }
+/** V + s * W
+    @param {!Array.<number>} v
+    @param {number} s
+    @param {!Array.<number>} w
+    @return {!Array.<number>} */
 function v3_mad(v, s, w) { return [v[0]+s*w[0], v[1]+s*w[1], v[2]+s*w[2]]; }
+
+/** @param {!Array.<number>} v
+    @param {!Array.<number>} w
+    @return {!Array.<number>} */
 function v3_mul(v, w) { return [v[0]*w[0], v[1]*w[1], v[2]*w[2]]; }
 
 function v3_normalized(v) {
@@ -213,11 +251,24 @@ function v3_rotate_by_facing(facing, v) {
     return [x,v[1],z];
 }
 
-// V + s * W
+/** V + s * W
+    @param {!Array.<number>} v
+    @param {number} s
+    @param {!Array.<number>} w
+    @return {!Array.<number>} */
 function vec_mad(v, s, w) { return [v[0]+s*w[0], v[1]+s*w[1]]; }
 
+/** @param {!Array.<number>} a
+    @param {!Array.<number>} b
+    @return {number} */
 function vec_dot(a,b) { return a[0]*b[0]+a[1]*b[1]; }
+
+/** @param {!Array.<number>} v
+    @return {number} */
 function vec_length2(v) { return v[0]*v[0]+v[1]*v[1]; }
+
+/** @param {!Array.<number>} v
+    @return {number} */
 function vec_length(v) { return Math.sqrt(v[0]*v[0]+v[1]*v[1]); }
 
 /** @param {!Array.<number>} a
@@ -235,6 +286,9 @@ function vec_normalized(v) {
 
 var POSITION_EPSILON = 0.01;
 
+/** @param {!Array.<number>} v
+    @param {!Array.<number>} w
+    @return {boolean} */
 function vec_equals(v, w) {
     var delta = vec_sub(v,w);
     if((delta[0]*delta[0]+delta[1]*delta[1]) < POSITION_EPSILON*POSITION_EPSILON) {
@@ -244,6 +298,9 @@ function vec_equals(v, w) {
     }
 }
 
+/** @param {!Array.<number>} v
+    @param {!Array.<number>} w
+    @return {boolean} */
 function vec_equals_integer(v, w) {
     if(Math.floor(v[0]) == Math.floor(w[0]) &&
        Math.floor(v[1]) == Math.floor(w[1])) {
@@ -682,7 +739,9 @@ var view_pos = [0,0];
 var view_limits = [ [0,0], [0,0] ]; // min/max value constraints on view_pos
 var view_zoom_linear = 0; // controller for view_zoom, indexes into gamedata.client.view_zoom_steps
 var view_zoom = 1; // zoom factor applied between playfield and screen coordinates
-var view_roi = [[0,0],[0,0]]; // corners of visible region, in "draw" coordinate space
+
+/** @type {!Array.<!Array.<number>>} corners of visible region, in "draw" coordinate space */
+var view_roi = [[0,0],[0,0]];
 
 // we apply certain optimizations when view_zoom is 1 for faster drawing
 function view_is_zoomed() { return Math.abs(view_zoom-1) >= 0.01; }
@@ -944,7 +1003,8 @@ var PLAYFIELD_DEBUG_DRAW = false; // display unit and building info debug text
 var COMBAT_DEBUG = (get_query_string('wombat') == '1');
 var CLICK_DETECTION_DEBUG = (get_query_string('click_detection_debug') == '1');
 
-// object movement/spell control states
+/** object movement/spell control states
+    @enum {number} */
 var control_states = {
     CONTROL_STOP : 0, // not doing anything
     CONTROL_MOVING : 1, // moving towards 'this.dest'
@@ -955,7 +1015,8 @@ control_state_names[control_states.CONTROL_STOP] = 'CONTROL_STOP';
 control_state_names[control_states.CONTROL_MOVING] = 'CONTROL_MOVING';
 control_state_names[control_states.CONTROL_SHOOT] = 'CONTROL_SHOOT';
 
-// object AI states
+/** object AI states
+    @enum {number} */
 var ai_states = {
     AI_STOP : 0, // do nothing
     AI_ATTACK_SPECIFIC : 1, // attack ai_target (and only ai_target, moving into range if necessary)
@@ -1082,7 +1143,49 @@ function GameObject() {
     this.last_speak_time = -1;
 
     // combat stats - pulled from gamedata but modified by auras
-    this.combat_stats = {};
+    /** @type {{stunned: number,
+                disarmed: number,
+                damage_taken: number,
+                damage_taken_from: !Object.<string,number>,
+                rate_of_fire: number,
+                accuracy: number,
+                weapon_damage: number,
+                weapon_damage_vs: !Object.<string,number>,
+                effective_weapon_range: number,
+                weapon_range: number,
+                extra_armor: number,
+                anti_air: number,
+                anti_missile: number,
+                turn_rate: number,
+                ice_effects: number,
+                swamp_effects: number,
+                projectile_speed: number,
+                splash_range: number,
+                maxvel: number,
+                erratic_flight: number}} */
+    this.combat_stats = {stunned: 0,
+                         disarmed: 0,
+                         damage_taken: 1,
+                         damage_taken_from: {},
+                         rate_of_fire: 1,
+                         accuracy: 1,
+                         weapon_damage: 1,
+                         weapon_damage_vs: {}, // multiplies with the usual damage_vs_table
+                         effective_weapon_range: 1,
+                         weapon_range: 1,
+                         extra_armor: 0,
+                         anti_air: 0,
+                         anti_missile: 1, // note! this is the chance that a missile is NOT intercepted
+                         turn_rate: 1,
+                         ice_effects: 1,
+                         swamp_effects: 1,
+                         projectile_speed: 1,
+                         splash_range: 1,
+
+                         // Mobile only
+                         maxvel: 1,
+                         erratic_flight: 0
+                        };
 
     /** @type {Array.<Aura>} */
     this.auras = [];
@@ -1103,8 +1206,10 @@ function GameObject() {
     this.draw_pos_cache = [[0,0],0];
 
     // for graphics only (fading-in/out effects), last object opacity
+    /** @type {number} */
     this.cur_opacity = 1;
-    this.last_opacity = gamedata['client']['unit_spawn_opacity'];
+    /** @type {number} */
+    this.last_opacity = /** @type {number} */ (gamedata['client']['unit_spawn_opacity']);
     this.last_opacity_time = client_time; // note: resets as unit is spawned
 
     // for graphics only, last stabilized hp value
@@ -1115,7 +1220,7 @@ function GameObject() {
     // SPFX effect that exists all the time the object is alive
     /** @type {Object|null} - pointer into gamedata for this effect (the level-dependent post-get_leveled_quantity value) */
     this.permanent_effect_source = null;
-    /** @type {SPFX.Effect|null} */
+    /** @type {SPFX.FXObject|null} */
     this.permanent_effect = null;
 }
 
@@ -2394,8 +2499,8 @@ GameObject.prototype.run_control = function() {
 };
 
 /** adjust a shot vector to aim ahead of a target (from a stationary shooter), extrapolating its path linearly to impact
- * @param {Array.<number>} P shot vector from shooter to target at proposed impact time
- * @param {Array.<number>} target_vel velocity vector of target
+ * @param {!Array.<number>} P shot vector from shooter to target at proposed impact time
+ * @param {!Array.<number>} target_vel velocity vector of target
  * @param {number} speed of bullet
  * @returns {number} time-of-flight of bullet, when fired in a way that will hit target at its linearly-extrapolated location
  * note: may fail to compute a time-of-flight if the target is moving away faster than the bullet can fly, in which case, returns -1.
@@ -8022,6 +8127,7 @@ function Mobile() {
     // client side reference only, the authoritive source is player.unit_repair_queue
     this.under_repair_finish = -1;
 
+    /** @type {?Array.<number>} */
     this.ai_dest = null;
     this.ai_aggressive = false;
 
@@ -8339,7 +8445,7 @@ Mobile.prototype.interpolate_pos = function () {
 // interpolated location, with added offset for un-dogpiling units
 Mobile.prototype.interpolate_pos_for_draw = function() {
     var pos = this.interpolate_pos();
-    if(gamedata['client']['unit_draw_scatter']) {
+    if(gamedata['client']['unit_draw_scatter'] && this.draw_offset) {
         return vec_mad(pos, gamedata['client']['unit_draw_scatter'], this.draw_offset);
     }
     return pos;
@@ -10050,6 +10156,8 @@ SPINPUNCHGAME.init = function() {
         // wait to hopefully allow metrics to fire
         window.setTimeout((function (_url) { return function() { do_unsupported_browser_redirect(_url); }; })(unsupported_url), 1500);
         return;
+    } else {
+        ctx = /** @type {!CanvasRenderingContext2D} */ (ctx); // guaranteed by unsupported_reason test
     }
 
     // initialize graphics modules
@@ -49194,7 +49302,7 @@ function draw_building_or_inert(obj, powerfac) {
         ctx.fillStyle = 'rgba(213,0,0,1)';
         SPUI.add_beveled_rectangle_to_path(vec_add(xy, obj.spec['scan_counter_offset']), [12+8*Math.floor(Math.log(obj.contents)/Math.log(10)),14], 2);
         ctx.fill();
-        ctx.font = SPUI.make_font(13, 16, 'thick');
+        ctx.font = SPUI.make_font(13, 16, 'thick').str();
         ctx.fillStyle = 'rgba(255,255,255,1)';
         var txy = vec_add(vec_add(xy, obj.spec['scan_counter_offset']), [2,12]);
         ctx.fillText(pretty_print_number(obj.contents), txy[0], txy[1]);
