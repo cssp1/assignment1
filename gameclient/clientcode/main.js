@@ -743,7 +743,8 @@ var view_zoom = 1; // zoom factor applied between playfield and screen coordinat
 /** @type {!Array.<!Array.<number>>} corners of visible region, in "draw" coordinate space */
 var view_roi = [[0,0],[0,0]];
 
-// we apply certain optimizations when view_zoom is 1 for faster drawing
+/** we apply certain optimizations when view_zoom is 1 for faster drawing
+    @return {boolean} true if zoom factor is != 1 */
 function view_is_zoomed() { return Math.abs(view_zoom-1) >= 0.01; }
 
 var hitloc = [0,0]; // last mouse-down location (*for debugging only*)
@@ -48168,6 +48169,7 @@ function draw_backdrop_tiled(data) {
 
     // [2,1]*tilesize must evenly divide nells*cellsize/2 in order for the edge tiles to line up
     // tilesize must be even
+    if(!main_sprite.wh) { throw Error('background sprite needs specific dimensions'); }
     var tilesize = (view_is_zoomed() ? vec_scale(view_zoom, main_sprite.wh) : main_sprite.wh); // size of a bg tile in pixels
     var ncells = session.viewing_base.ncells();
     var maptiles = vec_div(vec_mul(ncells,vec_div(cellsize,[2,2])), main_sprite.wh);
@@ -48354,6 +48356,8 @@ function draw_backdrop_tiled(data) {
 
 function draw_backdrop_whole(assetname) {
     var backdrop_sprite = GameArt.assets[assetname].states[(session.home_base ? 'home':'other')];
+    if(!backdrop_sprite.wh) { throw Error('backdrop sprite needs specific dimensions'); }
+
     var backdrop_image = backdrop_sprite.images[0];
 
     if(!backdrop_image.data_loaded || !session.viewing_base) {
@@ -48436,6 +48440,8 @@ function draw_backdrop_whole(assetname) {
 
 function draw_backdrop_simple(assetname) {
     var backdrop_sprite = GameArt.assets[assetname].states[(session.home_base ? 'home':'other')];
+    if(!backdrop_sprite.wh) { throw Error('backdrop sprite needs specific dimensions'); }
+
     var backdrop_image = backdrop_sprite.images[0];
 
     if(!backdrop_image.data_loaded) {
