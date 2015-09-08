@@ -18860,7 +18860,7 @@ function apply_animation(dialog, wname, widget, anim_data, anim_time, anim) {
         if(!(wname in dialog.user_data['spfx'])) {
             // SPFX wants time in terms of "start time", not "time relative to start", so invert the sense of time delays
             var spfx_start_time = client_time + (client_time-anim_time);
-            dialog.user_data['spfx'][wname] = SPFX.add_visual_effect_at_time(pos, 0, [0,1,0], spfx_start_time, anim['effect'], true, {is_ui:true});
+            dialog.user_data['spfx'][wname] = SPFX.add_visual_effect_at_time(pos, 0, [0,1,0], spfx_start_time, anim['effect'], true, {'is_ui':true});
         }
         //dialog.user_data['spfx'][wname].where = pos; // XXX how to track moving UI objects?
     } else {

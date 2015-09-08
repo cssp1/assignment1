@@ -5,9 +5,8 @@ goog.provide('SPFX');
 // found in the LICENSE file.
 
 /** @fileoverview
-    @suppress {reportUnknownTypes} XXX we are not typesafe yet
 
-    Note: references canvas_width/canvas_height/canvas_oversample from main.js
+    Note: references from main.js: canvas_width, canvas_height, canvas_oversample, view_is_zoomed, and some others
 */
 
 goog.require('goog.array');
@@ -104,7 +103,7 @@ SPFX.init = function(ctx, use_low_gfx, use_high_gfx) {
         SPFX.detail = gamedata['client']['graphics_detail']['default'];
     }
 
-    if('sound_throttle' in gamedata['client']) { SPFX.sound_throttle = gamedata['client']['sound_throttle']; }
+    if('sound_throttle' in gamedata['client']) { SPFX.sound_throttle = /** @type {number} */ (gamedata['client']['sound_throttle']); }
 
     SPFX.clear();
 
@@ -295,6 +294,9 @@ SPFX.Field = function(charge) {
 };
 goog.inherits(SPFX.Field, SPFX.FXObject);
 
+/** @param {!Array.<number>} pos
+    @param {!Array.<number>} vel
+    @return {!Array.<number>} */
 SPFX.Field.prototype.eval_field = goog.abstractMethod;
 
 // MagnetField
@@ -305,15 +307,19 @@ SPFX.Field.prototype.eval_field = goog.abstractMethod;
     @param {Object|null|undefined} instance_data
     @extends SPFX.Field */
 SPFX.MagnetField = function(pos, data, instance_data) {
-    goog.base(this, data['charge'] || null);
+    goog.base(this, ('charge' in data ? /** @type {string} */ (data['charge']) : null));
     this.pos = pos; // note: in 3D here
-    this.strength = data['strength'] || 10.0;
-    this.strength_3d = data['strength_3d'] || [1,1,1];
-    this.falloff = data['falloff'] || 0;
-    this.falloff_rim = data['falloff_rim'] || 0;
+    this.strength = ('strength' in data ? /** @type {number} */ (data['strength']) : 10.0);
+    this.strength_3d = ('strength_3d' in data ? /** @type {!Array.<number>} */ (data['strength_3d']) : [1,1,1]);
+    this.falloff = ('falloff' in data ? /** @type {number} */ (data['falloff']) : 0);
+    this.falloff_rim = ('falloff_rim' in data ? /** @type {number} */ (data['falloff_rim']) : 0);
 };
 goog.inherits(SPFX.MagnetField, SPFX.Field);
 
+/** @override
+    @param {!Array.<number>} pos
+    @param {!Array.<number>} vel
+    @return {!Array.<number>} */
 SPFX.MagnetField.prototype.eval_field = function(pos, vel) {
     var str = this.strength;
     var ray = v3_sub(pos, this.pos);
@@ -324,7 +330,9 @@ SPFX.MagnetField.prototype.eval_field = function(pos, vel) {
     }
     return v3_mul(v3_scale(-str, this.strength_3d), ray);
 };
-/** @override */
+/** @override
+    @param {!Array.<number>} xyz
+    @param {number=} rotation */
 SPFX.MagnetField.prototype.reposition = function(xyz, rotation) {
     this.pos = xyz;
 };
@@ -336,11 +344,15 @@ SPFX.MagnetField.prototype.reposition = function(xyz, rotation) {
     @param {Object|null|undefined} instance_data
     @extends SPFX.Field */
 SPFX.DragField = function(pos, data, instance_data) {
-    goog.base(this, data['charge'] || null);
-    this.strength = data['strength'] || 1.0;
+    goog.base(this, ('charge' in data ? /** @type {string} */ (data['charge']) : null));
+    this.strength = ('strength' in data ? /** @type {number} */ (data['strength']) : 1.0);
 };
 goog.inherits(SPFX.DragField, SPFX.Field);
 
+/** @override
+    @param {!Array.<number>} pos
+    @param {!Array.<number>} vel
+    @return {!Array.<number>} */
 SPFX.DragField.prototype.eval_field = function(pos, vel) {
     var spd = v3_length(vel);
     return v3_scale(-spd*this.strength, vel);
@@ -363,7 +375,9 @@ SPFX.Effect.prototype.draw = function() {};
 
 // CoverScreen
 /** @constructor
-    @struct */
+    @struct
+    @param {string} color_str
+*/
 SPFX.CoverScreen = function(color_str) {
     this.color_str = color_str;
 };
@@ -380,6 +394,8 @@ SPFX.CoverScreen.prototype.draw = function() {
   * @param {Array.<SPFX.Effect>=} effects */
 SPFX.CombineEffect = function(effects) {
     goog.base(this, null);
+
+    /** @type {!Array.<!SPFX.Effect>} */
     this.effects = effects || [];
 };
 goog.inherits(SPFX.CombineEffect, SPFX.Effect);
@@ -388,7 +404,9 @@ SPFX.CombineEffect.prototype.draw = function() {
     // SPFX maintains handles to each child effect so we don't need to draw them here
 };
 
-/** @override */
+/** @override
+    @param {!Array.<number>} xyz
+    @param {number=} rotation */
 SPFX.CombineEffect.prototype.reposition = function(xyz, rotation) {
     var len = this.effects.length;
     for(var i = 0; i < len; i++) {
@@ -400,36 +418,6 @@ SPFX.CombineEffect.prototype.dispose = function() {
     var len = this.effects.length;
     for(var i = 0; i < len; i++) {
         SPFX.remove(this.effects[i]);
-    }
-};
-
-// Tesla
-
-/** @constructor
-  * @extends SPFX.Effect
-  */
-SPFX.Tesla = function(from, to, cur_time) {
-    goog.base(this, null);
-    this.from = from;
-    this.to = to;
-    this.end_time = cur_time + 0.001;
-};
-goog.inherits(SPFX.Tesla, SPFX.Effect);
-
-SPFX.Tesla.prototype.draw = function() {
-    var xy;
-    SPFX.ctx.save();
-    SPFX.ctx.strokeStyle = '#ffffaa';
-    SPFX.ctx.beginPath();
-    xy = ortho_to_draw(this.from);
-    SPFX.ctx.moveTo(xy[0], xy[1]);
-    xy = ortho_to_draw(this.to);
-    SPFX.ctx.lineTo(xy[0], xy[1]);
-    SPFX.ctx.stroke();
-    SPFX.ctx.restore();
-
-    if(SPFX.time >= this.end_time) {
-        SPFX.remove(this);
     }
 };
 
@@ -445,21 +433,21 @@ SPFX.Tesla.prototype.draw = function() {
   */
 SPFX.Particles = function(spawn_pos, when, duration, data, instance_data) {
     goog.base(this, data);
-    this.spawn_pos = v3_add(spawn_pos || [0, 0, 0], (data && 'offset' in data) ? data['offset'] : [0, 0, 0]);
-    this.spawn_radius = (instance_data ? instance_data['radius'] || 1 : 1) * (this.data['radius'] || 0);
-    this.draw_mode = ('draw_mode' in data? data['draw_mode'] : ('child' in data ? 'none' : 'lines'));
-    this.max_age = data['max_age'] || 0.5;
-    this.child_data = data['child'] || null;
+    this.spawn_pos = v3_add(spawn_pos || [0, 0, 0], (data && 'offset' in data) ? /** @type {!Array.<number>} */ (data['offset']) : [0, 0, 0]);
+    this.spawn_radius = (instance_data && 'radius' in instance_data ? /** @type {number} */ (instance_data['radius']) : 1) * (('radius' in this.data ? /** @type {number} */ (this.data['radius']) : 0));
+    this.draw_mode = ('draw_mode' in data? /** @type {string} */ (data['draw_mode']) : ('child' in data ? 'none' : 'lines'));
+    this.max_age = ('max_age' in data ? /** @type {number} */ (data['max_age']) : 0.5);
+    this.child_data = ('child' in data ? /** @type {!Object} */ (data['child']) : null);
 
     if(SPFX.detail > 1) {
         this.max_age *= 1.2; // increase max_age to compensate for particles fading out individually
     }
 
     this.emit_instant_done = false;
-    this.emit_pattern = this.data['emit_pattern'] || 'square';
-    this.emit_by_area = this.data['emit_by_area'] || 0;
-    this.emit_continuous_rate = this.data['emit_continuous_rate'] || 0;
-    this.emit_continuous_for = this.data['emit_continuous_for'] || 0;
+    this.emit_pattern = ('emit_pattern' in this.data ? /** @type {string} */ (this.data['emit_pattern']) : 'square');
+    this.emit_by_area = ('emit_by_area' in this.data ? /** @type {number} */ (this.data['emit_by_area']) : 0);
+    this.emit_continuous_rate = ('emit_continuous_rate' in this.data ? /** @type {number} */ (this.data['emit_continuous_rate']) : 0);
+    this.emit_continuous_for = ('emit_continuous_for' in this.data ? /** @type {number} */ (this.data['emit_continuous_for']) : 0);
     this.emit_continuous_residual = Math.random();
 
     this.when = when;
@@ -468,38 +456,39 @@ SPFX.Particles = function(spawn_pos, when, duration, data, instance_data) {
     this.end_time = -1;
     this.last_time = -1;
 
-    var col = data['color'] || [0,1,0,1];
+    /** @type {!Array.<number>} */
+    var col = ('color' in data ? /** @type {!Array.<number>} */ (data['color']) : [0,1,0,1]);
     if(col.length == 4) {
         // good
     } else if(col.length == 3) {
         col = [col[0],col[1],col[2],1];
     } else {
-        log_exception(null, 'SPFX particles with bad color length '+data['color'].length.toString()+' value '+data['color'][0].toString()+','+data['color'][1].toString()+','+data['color'][2].toString());
+        log_exception(null, 'SPFX particles with bad color length '+col.length.toString()+' value '+col[0].toString()+','+col[1].toString()+','+col[2].toString());
         col = [1,1,1,1];
     }
 
     this.color = new SPUI.Color(col[0],col[1],col[2],col[3]);
     this.accel = [0,
-                  SPFX.global_gravity * ('gravity' in data ? data['gravity'] : -25),
+                  SPFX.global_gravity * ('gravity' in data ? /** @type {number} */ (data['gravity']) : -25),
                   0];
-    this.collide_ground = ('collide_ground' in data ? data['collide_ground'] : true);
-    this.elasticity = ('elasticity' in data ? data['elasticity'] : 0.5);
-    this.nmax = data['max_count'] || 50; // max number of particles
+    this.collide_ground = ('collide_ground' in data ? /** @type {boolean} */ (data['collide_ground']) : true);
+    this.elasticity = ('elasticity' in data ? /** @type {number} */ (data['elasticity']) : 0.5);
+    this.nmax = ('max_count' in data ? /** @type {number} */ (data['max_count']) : 50); // max number of particles
     this.nnext = 0;
-    this.line_width = data['width'] || 2;
-    this.min_length = data['min_length'] || 0;
-    this.fixed_length = data['fixed_length'] || 0;
-    this.spin_rate = (Math.PI/180) * (data['spin_rate'] || 0);
+    this.line_width =  ('width' in data ? /** @type {number} */ (data['width']) : 2);
+    this.min_length = ('min_length' in data ? /** @type {number} */ (data['min_length']) : 0);
+    this.fixed_length = ('fixed_length' in data ? /** @type {number} */ (data['fixed_length']) : 0);
+    this.spin_rate = (Math.PI/180) * ('spin_rate' in data ? /** @type {number} */ (data['spin_rate']) : 0);
 
     if('opacity' in data) {
-        this.opacity = data['opacity'];
+        this.opacity = /** @type {number} */ (data['opacity']);
     } else {
         this.opacity = 1;
     }
-    this.fade_power = (data['fade_power'] || 1);
-    this.composite_mode = data['composite_mode'] || 'source-over';
+    this.fade_power = ('fade_power' in data ? /** @type {number} */ (data['fade_power']) : 1);
+    this.composite_mode = ('composite_mode' in data ? /** @type {string} */ (data['composite_mode']) : 'source-over');
 
-    this.charge = data['charge'] || null; // charge for field interactions
+    this.charge = ('charge' in data ? /** @type {string} */ (data['charge']) : null); // charge for field interactions
 
     this.spawn_count = 0;
     this.pp_age = false; // whether or not age[i] varies between particles
@@ -507,24 +496,38 @@ SPFX.Particles = function(spawn_pos, when, duration, data, instance_data) {
 
     this.pos = [];
     this.vel = [];
-    // per-particle rotation
+
+    // per-particle rotations
+    /** @type {Array.<!Array.<number>>|null} */
     this.axis = (this.spin_rate > 0 ? [] : null);
+    /** @type {Array.<number>|null} */
     this.angle = (this.spin_rate > 0 ? [] : null);
+    /** @type {Array.<number>|null} */
     this.angle_v = (this.spin_rate > 0 ? [] : null);
+    /** @type {!Array.<number>} */
     this.age = [];
+    /** @type {Array.<SPFX.FXObject|null>|null} */
     this.children = (this.child_data !== null ? [] : null);
 };
 goog.inherits(SPFX.Particles, SPFX.Effect);
 
-/** @override */
+/** @override
+    @param {!Array.<number>} xyz
+    @param {number=} rotation */
 SPFX.Particles.prototype.reposition = function(xyz, rotation) {
     if(this.data && 'offset' in this.data) {
-        this.spawn_pos = v3_add(xyz, this.data['offset']);
+        this.spawn_pos = v3_add(xyz, /** @type {!Array.<number>} */ (this.data['offset']));
     } else {
         this.spawn_pos = xyz;
     }
 };
 
+/** @param {!Array.<number>} pos
+    @param {number} dpos
+    @param {!Array.<number>} vel
+    @param {number} dvel
+    @param {!Array.<number>} dvel_scale
+    @param {number} count */
 SPFX.Particles.prototype.spawn = function(pos, dpos, vel, dvel, dvel_scale, count) {
     if(this.spawn_count > 0) {
         // if particles are spawned more than once, it means the age is no longer global, so we have to turn on pp_age
@@ -543,6 +546,7 @@ SPFX.Particles.prototype.spawn = function(pos, dpos, vel, dvel, dvel_scale, coun
     }
 
     for(var i = 0; i < count; i++) {
+        /** @type {!Array.<number>} */
         var p = [pos[0], pos[1], pos[2]];
         if(dpos != 0) {
             // randomize spawn location
@@ -567,7 +571,11 @@ SPFX.Particles.prototype.spawn = function(pos, dpos, vel, dvel, dvel_scale, coun
                 ];
 
         // randomize spawn rotation axis and angular velocity
-        var ax = null, an = 0, anv = 0;
+
+        /** @type {Array.<number>|null} */
+        var ax = null;
+        var an = 0, anv = 0;
+
         if(this.spin_rate > 0) {
             ax = [0,0,1];
             an = 2*Math.PI*Math.random();
@@ -589,7 +597,7 @@ SPFX.Particles.prototype.spawn = function(pos, dpos, vel, dvel, dvel_scale, coun
             this.pos.push(p);
             this.vel.push(v);
             this.age.push(0);
-            if(this.spin_rate > 0) {
+            if(ax !== null) {
                 this.axis.push(ax);
                 this.angle.push(an);
                 this.angle_v.push(anv);
@@ -599,7 +607,7 @@ SPFX.Particles.prototype.spawn = function(pos, dpos, vel, dvel, dvel_scale, coun
             this.pos[this.nnext] = p;
             this.vel[this.nnext] = v;
             this.age[this.nnext] = 0;
-            if(this.spin_rate > 0) {
+            if(ax !== null) {
                 this.axis[this.nnext] = ax;
                 this.angle[this.nnext] = an;
                 this.angle_v[this.nnext] = anv;
@@ -618,13 +626,13 @@ SPFX.Particles.prototype.draw = function() {
 
     if(this.end_time >= 0 && SPFX.time > this.end_time) { SPFX.remove(this); return; }
 
-    if(!this.emit_instant_done && ('emit_instant' in this.data) && this.data['emit_instant'] > 0) {
+    if(!this.emit_instant_done && ('emit_instant' in this.data) && /** @type {number} */ (this.data['emit_instant']) > 0) {
         this.spawn(this.spawn_pos,
                    this.spawn_radius,
-                   v3_scale(this.data['speed'], this.data['emit_orient'] || [0,1,0]),
-                   this.data['speed_random'] || (this.data['speed'] || 0),
-                   this.data['speed_random_scale'] || [1,1,1],
-                   Math.floor(Math.min(SPFX.detail, 1)*this.data['emit_instant']));
+                   v3_scale(this.data['speed'], ('emit_orient' in this.data ? /** @type {!Array.<number>} */ (this.data['emit_orient']) : [0,1,0])),
+                   ('speed_random' in this.data ? /** @type {number} */ (this.data['speed_random']) : ('speed' in this.data ? /** @type {number} */ (this.data['speed']) : 0)),
+                   ('speed_random_scale' in this.data ? /** @type {!Array.<number>} */ (this.data['speed_random_scale']) : [1,1,1]),
+                   Math.floor(Math.min(SPFX.detail, 1) * /** @type {number} */ (this.data['emit_instant'])));
         this.emit_instant_done = true;
     }
 
@@ -652,9 +660,9 @@ SPFX.Particles.prototype.draw = function() {
         if(num_to_emit >= 1) {
             this.spawn(this.spawn_pos,
                        this.spawn_radius,
-                       v3_scale(this.data['speed'], this.data['emit_orient'] || [0,1,0]),
-                       this.data['speed_random'] || (this.data['speed'] || 0),
-                       this.data['speed_random_scale'] || [1,1,1],
+                       v3_scale(this.data['speed'], ('emit_orient' in this.data ? /** @type {!Array.<number>} */ (this.data['emit_orient']) : [0,1,0])),
+                       ('speed_random' in this.data ? /** @type {number} */ (this.data['speed_random']) : ('speed' in this.data ? /** @type {number} */ (this.data['speed']) : 0)),
+                       ('speed_random_scale' in this.data ? /** @type {!Array.<number>} */ (this.data['speed_random_scale']) : [1,1,1]),
                        num_to_emit);
         }
     }
@@ -748,6 +756,7 @@ SPFX.Particles.prototype.draw = function() {
     }
 };
 
+/** @param {number} dt - time delta since last step */
 SPFX.Particles.prototype.run_physics = function(dt) {
     if(dt <= 0) { return; }
 
@@ -782,10 +791,7 @@ SPFX.Particles.prototype.run_physics = function(dt) {
 
         // update children
         if(this.children !== null && this.children[i]) {
-            this.children[i].spawn_pos = this.pos[i]; // XXX should use a generic move() method or something
-            if(this.spin_rate > 0) {
-                this.children[i].rotation = this.angle[i]; /// XXX should check attr
-            }
+            this.children[i].reposition(this.pos[i], (this.spin_rate > 0 ? this.angle[i] : 0));
         }
     }
 };
@@ -844,10 +850,10 @@ SPFX.Projectile = function(from, from_height, to, to_height, launch_time, impact
     if(exhaust) {
         // exhaust particles
         this.particles = new SPFX.Particles(null, new SPFX.When(launch_time, null), impact_time - launch_time, exhaust); // should_be_tick
-        this.exhaust_speed = exhaust['speed'] || 0;
-        this.exhaust_dvel = (exhaust['randomize_vel'] || 0) * this.exhaust_speed;
+        this.exhaust_speed = ('speed' in exhaust ? /** @type {number} */ (exhaust['speed']) : 0);
+        this.exhaust_dvel = ('randomize_vel' in exhaust ? /** @type {number} */ (exhaust['randomize_vel']) : 0) * this.exhaust_speed;
         this.exhaust_vel = vec_scale(-this.exhaust_speed, shot_dir);
-        this.exhaust_rate = Math.floor(Math.min(SPFX.detail, 1) * (exhaust['emit_rate'] || 60));
+        this.exhaust_rate = Math.floor(Math.min(SPFX.detail, 1) * ('emit_rate' in exhaust ? /** @type {number} */ (exhaust['emit_rate']) : 60));
         SPFX.add(this.particles);
     } else {
         this.particles = null;
@@ -924,6 +930,7 @@ SPFX.Projectile.prototype.draw = function() {
             var pt = t - Math.random()*dt;
             var ppos = vec_mad(this.from, pt, this.shot_vel);
             var vel = this.exhaust_vel;
+            /** @type {!Array.<number>} */
             var spawn_loc = [ppos[0], height, ppos[1]];
             if(this.particles.spawn_radius > 0) {
                 for(var axis = 0; axis < 3; axis++) {
@@ -967,9 +974,11 @@ SPFX.Projectile.prototype.draw = function() {
 
     if(this.glow > 0 && SPFX.detail > 1) {
 
-        SPFX.set_composite_mode(gamedata['client']['projectile_glow_mode'] || 'source-over');
-        var glow_asset = 'fx/glows';
-        var glow_image = GameArt.assets[glow_asset].states['normal'].images[0];
+        SPFX.set_composite_mode(/** @type {string|undefined} */ (gamedata['client']['projectile_glow_mode']) || 'source-over');
+        var glow_asset_name = 'fx/glows';
+        var glow_asset = GameArt.assets[glow_asset_name]
+        var glow_sprite = /** @type {!GameArt.Sprite} down-cast from AbstractSprite */ (glow_asset.states['normal']);
+        var glow_image = glow_sprite.images[0];
 
         // primary glow
         SPFX.ctx.globalAlpha = this.glow*gamedata['client']['projectile_glow_intensity'];
@@ -978,7 +987,7 @@ SPFX.Projectile.prototype.draw = function() {
 
         // secondary, fainter glow
         SPFX.ctx.globalAlpha = this.glow*0.56*gamedata['client']['projectile_glow_intensity'];
-        glow_image = GameArt.assets[glow_asset].states['normal'].images[1];
+        glow_image = glow_sprite.images[1];
         glow_image.draw([stroke_end[0]-Math.floor(glow_image.wh[0]/2),
                          stroke_end[1]-Math.floor(glow_image.wh[1]/2)]);
 
@@ -1022,8 +1031,8 @@ function quantize_streak(start, end) {
 
 SPFX.cue_tracker = {};
 
-// allow at least this much of a gap between successive plays of the
-// same sound effect (helps with swarm firing and bad browsers)
+/** @type {number} allow at least this much of a gap between successive plays of the
+    same sound effect (helps with swarm firing and bad browsers) */
 SPFX.sound_throttle = 0.3;
 
 /** @constructor
@@ -1036,30 +1045,29 @@ SPFX.SoundCue = function(data, when) {
     goog.base(this, data);
     this.when = when;
     this.start_time = -1; // determined after "when"
-    /** @type {!Array.<GameArt.Sprite|GameArt.Sound>} */
+
+    /** @type {!Array.<!GameArt.AbstractSprite>} */
     this.sprites = [];
+
+    /** @type {!Array.<string>} */
+    var asset_list = [];
+
     if('assets' in data) {
         // use multiple assets
-        for(var i = 0; i < data['assets'].length; i++) {
-            var assetname = /** @type {string} */ (data['assets'][i]);
-            if(!(assetname in GameArt.assets)) {
-                console.log('missing audio SFX asset '+assetname+'!');
-                continue;
-            }
-            var sprite = GameArt.assets[assetname].states['normal'];
-            if(!sprite || !sprite.audio) {
-                throw Error('unknown or soundless audio asset '+assetname);
-            }
-            this.sprites.push(sprite);
-        }
+        asset_list = /** @type {!Array.<string>} */ (data['assets']);
     } else {
-        var assetname = /** @type {string} */ (data['sprite']);
+        asset_list = [/** @type {string} */ (data['sprite'])];
+    }
+
+    for(var i = 0; i < asset_list.length; i++) {
+        /** @type {string} */
+        var assetname = asset_list[i];
         if(!(assetname in GameArt.assets)) {
             console.log('missing audio SFX asset '+assetname+'!');
-            return;
+            continue;
         }
         var sprite = GameArt.assets[assetname].states['normal'];
-        if(!sprite || !sprite.audio) {
+        if(!sprite || !sprite.get_audio()) {
             throw Error('unknown or soundless audio asset '+assetname);
         }
         this.sprites.push(sprite);
@@ -1079,12 +1087,13 @@ SPFX.SoundCue.prototype.draw = function() {
     // keep running down the list if we can't play effects due to channel overlap
     for(var i = 0; i < this.sprites.length; i++) {
         var s = this.sprites[(i + idx) % this.sprites.length];
-        var key = s.audio.filename;
+        var audio = s.get_audio();
+        var key = audio.filename;
         if(key in SPFX.cue_tracker && (SPFX.time - SPFX.cue_tracker[key]) < SPFX.sound_throttle) {
             continue;
         }
 
-        if(s.audio.play(SPFX.time)) {
+        if(audio.play(SPFX.time)) {
             SPFX.cue_tracker[key] = SPFX.time;
             break;
         }
@@ -1132,13 +1141,14 @@ SPFX.Explosion = function(where, height, assetname, when, enable_audio, data, in
         throw Error('unknown art asset '+assetname);
     }
 
+    /** @type {!GameArt.AbstractSprite} */
     this.sprite = asset.states['normal'];
     this.when = when;
     this.start_time = -1; // determined once "when" passes
     this.end_time = -1;
 
     /** @type {boolean} "is_ui" means "this is a UI dialog effect, not a 3D playfield effect" */
-    this.is_ui = (instance_data && /** @type {boolean|undefined} */ (instance_data.is_ui)) || false;
+    this.is_ui = (instance_data && ('is_ui' in instance_data) ? /** @type {boolean} */ (instance_data['is_ui']) : false);
 
     if(data && 'duration' in data) {
         this.duration = /** @type {number} */ (data['duration']);
@@ -1150,28 +1160,31 @@ SPFX.Explosion = function(where, height, assetname, when, enable_audio, data, in
     }
 
     if(this.duration >= 0) {
-        this.fade = ((!!data && data['fade']) ? /** @type {number} */ (data['fade']) : 0);
-        this.fade_duration = ((!!data && data['fade_duration']) ? /** @type {number} */ (data['fade_duration']) : this.duration / 2);
+        this.fade = ((data && ('fade' in data)) ? /** @type {number} */ (data['fade']) : 0);
+        this.fade_duration = ((data && ('fade_duration' in data)) ? /** @type {number} */ (data['fade_duration']) : this.duration / 2);
     } else {
         this.fade = 0;
     }
 
     /** @type {string|null} */
-    this.motion = ((data && data['motion']) ? /** @type {string} */ (data['motion']) : null);
+    this.motion = ((data && ('motion' in data)) ? /** @type {string} */ (data['motion']) : null);
     this.motion_scale = ((data && 'motion_scale' in data) ? SPFX.get_vec_parameter(data['motion_scale']) : [1,1]);
 
+    /** @type {boolean} */
     this.enable_audio = enable_audio;
+
+    /** @type {boolean} */
     this.audio_started = false;
 
-    this.opacity = ((data && data['opacity']) ? /** @type {number} */ (data['opacity']) : 1);
-    this.composite_mode = ((data && data['composite_mode']) ? /** @type {string} */ (data['composite_mode']) : 'source-over');
+    this.opacity = ((data && ('opacity' in data)) ? /** @type {number} */ (data['opacity']) : 1);
+    this.composite_mode = ((data && ('composite_mode' in data)) ? /** @type {string} */ (data['composite_mode']) : 'source-over');
 
     this.sprite_scale = ((data && 'sprite_scale' in data) ? SPFX.get_vec_parameter(data['sprite_scale']) : [1,1]);
 
-    this.rotation = (instance_data && 'rotation' in instance_data ? /** @type {number} */ (instance_data['rotation']) : (data && data['rotation'] ? /** @type {number} */ (data['rotation']) : 0));
-    this.rotate_speed = (instance_data && 'rotate_speed' in instance_data ? /** @type {number} */ (instance_data['rotate_speed']) : (data && data['rotate_speed'] ? /** @type {number} */ (data['rotate_speed']) : 0));
+    this.rotation = (instance_data && 'rotation' in instance_data ? /** @type {number} */ (instance_data['rotation']) : (data && ('rotation' in data) ? /** @type {number} */ (data['rotation']) : 0));
+    this.rotate_speed = (instance_data && 'rotate_speed' in instance_data ? /** @type {number} */ (instance_data['rotate_speed']) : (data && ('rotate_speed' in data) ? /** @type {number} */ (data['rotate_speed']) : 0));
 
-    var old_data = gamedata['art'][assetname]['states']['normal'];
+    var old_data = /** @type {!Object} */ (gamedata['art'][assetname]['states']['normal']);
     if('particles' in old_data) {
         var particles = new SPFX.Particles([this.where[0], this.height, this.where[1]], when, this.duration, /** @type {!Object} */ (old_data['particles']));
         SPFX.add(particles);
@@ -1196,11 +1209,13 @@ SPFX.Explosion = function(where, height, assetname, when, enable_audio, data, in
 goog.inherits(SPFX.Explosion, SPFX.Effect);
 
 /** @override
-    @param {Array.<number>} xyz
+    @param {!Array.<number>} xyz
     @param {number=} rotation */
 SPFX.Explosion.prototype.reposition = function(xyz, rotation) {
-    this.where = vec_add([xyz[0],xyz[2]], (this.data && 'offset' in this.data ? [this.data['offset'][0], this.data['offset'][2]] : [0,0]));
-    this.height = xyz[1] + (this.data && 'offset' in this.data ? this.data['offset'][1] : 0.5);
+    this.where = vec_add([xyz[0],xyz[2]], (this.data && 'offset' in this.data ?
+                                           [/** @type {number} */ (this.data['offset'][0]),
+                                           /** @type {number} */ (this.data['offset'][2])] : [0,0]));
+    this.height = xyz[1] + (this.data && 'offset' in this.data ? /** @type {number} */ (this.data['offset'][1]) : 0.5);
     if(typeof(rotation) != 'undefined') { this.rotation = rotation; }
 };
 
@@ -1214,8 +1229,8 @@ SPFX.Explosion.prototype.draw = function() {
         }
     }
 
-    if(this.enable_audio && !this.audio_started && this.sprite.audio) {
-        this.sprite.audio.play(SPFX.time);
+    if(this.enable_audio && !this.audio_started && this.sprite.get_audio()) {
+        this.sprite.get_audio().play(SPFX.time);
         this.audio_started = true;
     }
 
@@ -1226,6 +1241,7 @@ SPFX.Explosion.prototype.draw = function() {
 
     var t = (SPFX.time - this.start_time) / (this.end_time-this.start_time);
 
+    /** @type {!Array.<number>} */
     var xyz = [this.where[0], this.height, this.where[1]];
     var scale = [this.sprite_scale[0], this.sprite_scale[1]];
     var rot = this.rotation + this.rotate_speed*(SPFX.time-this.start_time);
