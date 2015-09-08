@@ -42,7 +42,7 @@ SPFX.tick = new GameTypes.TickCount(0);
 SPFX.When = function(time, tick, tick_delay) {
     if(time !== null && tick !== null) { throw Error('either time or tick must be null'); }
     this.time = time;
-    this.tick = (tick ? tick.copy() : null);
+    this.tick = tick || null;
     this.tick_delay = tick_delay || 0;
 };
 
@@ -128,7 +128,7 @@ SPFX.init = function(ctx, use_low_gfx, use_high_gfx) {
     @param {!GameTypes.TickCount} tick */
 SPFX.set_time = function(time, tick) {
     SPFX.time = time;
-    SPFX.tick = tick.copy();
+    SPFX.tick = tick;
 };
 
 /** @param {!SPFX.When} t

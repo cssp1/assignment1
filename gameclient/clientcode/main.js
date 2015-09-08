@@ -1854,7 +1854,7 @@ GameObject.prototype.cast_client_spell = function(spell_name, spell, target, loc
         }
         var cd_ticks = Math.floor(cd_seconds/TICK_INTERVAL);
         visual_cooldown = client_time + (cd_ticks+1)*TICK_INTERVAL;
-        this.set_cooldown(spell_name, session.combat_engine.cur_tick.copy(), GameTypes.TickCount.add(session.combat_engine.cur_tick, new GameTypes.TickCount(cd_ticks)));
+        this.set_cooldown(spell_name, session.combat_engine.cur_tick, GameTypes.TickCount.add(session.combat_engine.cur_tick, new GameTypes.TickCount(cd_ticks)));
     }
 
     if(global_spell_icon && global_spell_icon.unit === this) {
@@ -1888,7 +1888,7 @@ GameObject.prototype.create_aura = function(creator, aura_name, strength, durati
             if(this.auras[i].spec === aura_spec) {
                 this.auras[i].strength = Math.max(this.auras[i].strength, strength);
                 this.auras[i].range = Math.max(this.auras[i].range, range);
-                this.auras[i].start_tick = session.combat_engine.cur_tick.copy();
+                this.auras[i].start_tick = session.combat_engine.cur_tick;
                 this.auras[i].source = creator;
                 if(!this.auras[i].expire_tick.is_infinite()) {
                     this.auras[i].expire_tick = GameTypes.TickCount.max(this.auras[i].expire_tick, end_tick);
@@ -1902,7 +1902,7 @@ GameObject.prototype.create_aura = function(creator, aura_name, strength, durati
 
     if(i >= this.auras.length) {
         // no existing applications, create one
-        this.auras.push(new Aura(creator, aura_spec, strength, range, session.combat_engine.cur_tick.copy(), end_tick, vs_table));
+        this.auras.push(new Aura(creator, aura_spec, strength, range, session.combat_engine.cur_tick, end_tick, vs_table));
     }
 };
 
@@ -2455,7 +2455,7 @@ GameObject.prototype.run_control = function() {
                 // trigger non-auto-attack cooldown
                 if(!this.get_cooldown(spell['cooldown_name'])) { return; }
                 var cd_ticks = Math.floor(get_leveled_quantity(spell['cooldown'], spell_level)/TICK_INTERVAL);
-                this.set_cooldown(spell['cooldown_name'], session.combat_engine.cur_tick.copy(),
+                this.set_cooldown(spell['cooldown_name'], session.combat_engine.cur_tick,
                                   GameTypes.TickCount.add(session.combat_engine.cur_tick, new GameTypes.TickCount(cd_ticks)));
             }
 
@@ -8071,7 +8071,7 @@ function run_unit_ticks() {
 
         apply_queued_damage_effects();
         flush_dirty_objects({urgent_only:true, skip_check:true});
-        session.combat_engine.cur_tick.inc();
+        session.combat_engine.cur_tick = new GameTypes.TickCount(session.combat_engine.cur_tick.get()+1);
     }
 }
 

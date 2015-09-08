@@ -15,6 +15,7 @@ GameTypes.Integer;
     @param {number} count */
 GameTypes.TickCount = function(count) {
     GameTypes.assert_integer(count);
+    /** @const {number} */
     this.count = count;
 };
 
@@ -28,10 +29,8 @@ GameTypes.TickCount.prototype.is_infinite = function() { return this.count < 0; 
 /** @return {boolean} */
 GameTypes.TickCount.prototype.is_nonzero = function() { return this.count != 0; };
 
-GameTypes.TickCount.prototype.inc = function() { this.count++; };
-
 /** @return {!GameTypes.TickCount} */
-GameTypes.TickCount.prototype.copy = function() { return new GameTypes.TickCount(this.count); };
+GameTypes.TickCount.prototype.copy = function() { return new GameTypes.TickCount(this.count); }; // XXXXXX remove this
 
 /** @param {!CombatEngine.Coeff} s
     @param {!GameTypes.TickCount} a
