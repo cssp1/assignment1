@@ -975,8 +975,7 @@ RegionMap.RegionMap.update_feature_popup_menu = function(dialog) {
     var lock_state = feature['LOCK_STATE'] || 0;
     var lock_owner = feature['LOCK_OWNER'] || -1;
 
-    var buttons = [];//["TEST 1", function() {}],
-    //["TEST 2", function() {}]];
+    var buttons = [];
 
     if(lock_state != 0 && (lock_owner != session.user_id)) {
         //buttons.push([gamedata['strings']['regional_map']['under_attack'], function() {}, 'disabled']);
@@ -1255,7 +1254,8 @@ RegionMap.RegionMap.update_feature_popup_menu = function(dialog) {
         dialog.widgets['button'+i].show = false; i += 1;
     }
 
-    dialog.widgets['bgrect'].wh[1] = 4 + 36 * buttons.length;
+    dialog.wh = dialog.widgets['bgrect'].wh = [dialog.data['widgets']['bgrect']['dimensions'][0],
+                                               4 + 36 * buttons.length];
 
     var anim_progress = Math.min((client_time - dialog.user_data['anim_start']) / 0.2, 1);
 

@@ -7878,7 +7878,7 @@
     },
 
     "region_map_popup_menu": {
-        "dimensions": [160,181], // accommodate 4 buttons
+        "dimensions": [160,181], // resized dynamically in code
         "widgets": {
             "bgrect": { "kind":"SolidRect", "xy":[0,0], "dimensions": [160,73], "color": [0.005,0.01,0.03,0.75] },
 
