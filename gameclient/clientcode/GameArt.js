@@ -19,6 +19,7 @@ goog.require('FlashDetect');
 // global namespace
 GameArt = { initialized: false };
 
+/** @enum {number} */
 GameArt.file_kinds = {
     IMAGE : 0,
     AUDIO : 1
@@ -448,6 +449,7 @@ GameArt.Asset.prototype.detect_rect = function(xy, facing, time, state, mouserec
 /** @constructor */
 GameArt.AbstractSprite = function(name, data) {
     this.name = name;
+    /** @type {Array.<number>|null} */
     this.wh = null;
     /** @type {Array.<number>|null} */
     this.center = null;
@@ -465,6 +467,10 @@ GameArt.AbstractSprite = function(name, data) {
 /** @return {number} */
 GameArt.AbstractSprite.prototype.duration = function() { return 0; };
 GameArt.AbstractSprite.prototype.get_center = function() { return this.center; };
+
+/** @return {GameArt.Sound|null} */
+GameArt.AbstractSprite.prototype.get_audio = function() { return null; };
+
 
 // draw sprite with CENTER at 'xy'
 GameArt.AbstractSprite.prototype.draw = function(xy, facing, time) {
@@ -594,7 +600,7 @@ GameArt.Sprite = function(name, data) {
             console.log('gameart needs dimensions for '+this.name);
         }
         if('origins' in data) {
-            origins = data['origins'];
+            origins = /** @type {!Array.<number>} */ (data['origins']);
         } else {
             origins = null;
         }
@@ -611,6 +617,7 @@ GameArt.Sprite = function(name, data) {
     this.on_mouseover = data['on_mouseover'] || false;
     this.on_push = data['on_push'] || false;
 
+    /** @type {!Array.<!GameArt.Image>} */
     this.images = [];
 
     var load_priority = data['load_priority'] || 0;
@@ -666,6 +673,7 @@ GameArt.Sprite = function(name, data) {
         }
     }
 
+    /** @type {GameArt.Sound|null} */
     this.audio = null;
     if('audio' in data) {
         var volume;
@@ -679,6 +687,10 @@ GameArt.Sprite = function(name, data) {
     }
 };
 goog.inherits(GameArt.Sprite, GameArt.AbstractSprite);
+
+/** @override
+    @return {GameArt.Sound|null} */
+GameArt.Sprite.prototype.get_audio = function() { return this.audio; };
 
 /** return length of animation (in seconds)
     @override
@@ -926,7 +938,14 @@ GameArt.CompoundSprite.prototype.do_draw = function(xy, facing, time, dest_wh) {
 // it brings loading into the GameArt framework and allows delayed loading
 // (you can call draw() even if the image data has not arrived yet)
 
-/** @constructor */
+/** @constructor
+    @struct
+    @param {string} filename
+    @param {Array.<number>|null} origin
+    @param {Array.<number>|null} wh
+    @param {number} load_priority
+    @param {boolean} delay_load
+*/
 GameArt.Image = function(filename, origin, wh, load_priority, delay_load) {
     this.origin = origin;
     this.wh = wh;
@@ -1266,13 +1285,20 @@ GameArt.TintedImage.prototype.prep_for_draw = function() {
 
 
 
-/** @constructor */
+/** @constructor
+    @struct
+    @param {string} filename
+    @param {number} volume
+    @param {number} priority
+    @param {number} load_priority
+    @param {boolean} delay_load
+    @param {GameArt.file_kinds} kind
+*/
 GameArt.Sound = function(filename, volume, priority, load_priority, delay_load, kind) {
-    if(!GameArt.enable_audio) {
-        this.entry = null;
-        this.audio = null;
-        return;
-    }
+    this.entry = null;
+
+    /* XXXXXX type {SPAudio.Sample|null} */
+    this.audio = null; // will be set by start_load
 
     this.data_loaded = false;
     this.delay_load = delay_load;
@@ -1295,11 +1321,14 @@ GameArt.Sound = function(filename, volume, priority, load_priority, delay_load, 
         load_priority = GameArt.essential_priority - 40;
     }
 
+    if(!GameArt.enable_audio) {
+        return;
+    }
+
     if(this.filename in GameArt.file_list) {
         // attach to existing download request
         var entry = GameArt.file_list[this.filename];
         this.entry = entry;
-        this.audio = null; // will be set by start_load
         entry.gameart_objects.push(this);
         entry.priority = Math.max(entry.priority, load_priority);
         if(!this.delay_load) { entry.delay_load = false; }
@@ -1405,6 +1434,8 @@ GameArt.Sound.prototype.check_delay_load = function() {
     this.entry.start_load(this.entry);
 };
 
+/** @param {number} time
+    @return {boolean} true if it actually made a sound (vs. being blocked by channel limits) */
 GameArt.Sound.prototype.play = function(time) {
     if(isNaN(time) || time < 0.0) {
         console.log('play() at invalid time '+time+' on '+this.filename);
