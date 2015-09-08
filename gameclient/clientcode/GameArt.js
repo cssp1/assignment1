@@ -233,6 +233,8 @@ GameArt.init = function(time, canvas, ctx, art_json, dl_callback, audio_driver_n
     GameArt.dl_complete_callback = dl_callback || function() {};
 
     // initialize assets
+
+    /** @type {!Object.<string, !GameArt.Asset>} */
     GameArt.assets = {};
     for(var name in art_json) {
         var data = art_json[name];
@@ -388,6 +390,7 @@ GameArt.image_ontimeout = function(filename) {
  */
 GameArt.Asset = function(name, data) {
     this.name = name;
+    /** @type {!Object.<string, !GameArt.AbstractSprite>} */
     this.states = {};
     for(var statename in data['states']) {
         var src_statename = statename;
@@ -446,17 +449,20 @@ GameArt.Asset.prototype.detect_rect = function(xy, facing, time, state, mouserec
 GameArt.AbstractSprite = function(name, data) {
     this.name = name;
     this.wh = null;
+    /** @type {Array.<number>|null} */
     this.center = null;
     if('dimensions' in data) {
         this.wh = data['dimensions'];
     }
 
     if('center' in data) {
-        this.center = data['center'];
+        this.center = /** @type {!Array.<number>} */ (data['center']);
     } else if(this.wh) {
         this.center = [Math.floor(this.wh[0]/2), Math.floor(this.wh[1]/2)];
     }
 };
+
+/** @return {number} */
 GameArt.AbstractSprite.prototype.duration = function() { return 0; };
 GameArt.AbstractSprite.prototype.get_center = function() { return this.center; };
 
@@ -674,7 +680,9 @@ GameArt.Sprite = function(name, data) {
 };
 goog.inherits(GameArt.Sprite, GameArt.AbstractSprite);
 
-// return length of animation (in seconds)
+/** return length of animation (in seconds)
+    @override
+    @return {number} */
 GameArt.Sprite.prototype.duration = function() {
     if(this.style === 'animation') {
         return this.images.length / this.framerate;
@@ -816,6 +824,8 @@ GameArt.CompoundSprite = function(name, data) {
     this.subassets = data['subassets'];
 };
 goog.inherits(GameArt.CompoundSprite, GameArt.AbstractSprite);
+/** @override
+    @return {number} */
 GameArt.CompoundSprite.prototype.duration = function() { return this.subassets[0].duration(); };
 GameArt.CompoundSprite.prototype.get_center = function() {
     return this.get_subasset(this.subassets[0]).get_center();
@@ -1120,7 +1130,8 @@ GameArt.float_to_sRGB = function(f) { return Math.min(Math.max(Math.floor(255.0*
     @param {Array.<number>} wh
     @param {Array.<number>} tint
     @param {number=} saturation
-    @param {Image=} mask_img */
+    @param {Image=} mask_img
+    @return {!HTMLImageElement} */
 GameArt.make_tinted_image = function(img, origin, wh, tint, saturation, mask_img) {
     var ret = new Image();
     var osc = null, con = null, data = null, pixels = null, data_url = null;
