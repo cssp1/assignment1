@@ -758,24 +758,24 @@ RegionMap.RegionMap.prototype.on_mousedown = function(uv, offset, button) {
 };
 
 RegionMap.RegionMap.prototype.on_mouseup = function(uv, offset, button) {
+    if(!this.show) {
+        return false;
+    }
+
+    if(button === SPUI.RIGHT_MOUSE_BUTTON) {
+        this.set_popup(null);
+        return true;
+    }
+
     if(this.drag_full) {
         this.drag_start = null;
         this.drag_full = false;
         return true;
     }
 
-    if(!this.show) {
-        return false;
-    }
-
     var hit = this.detect_hit(uv, offset);
 
     if(this.cursor && this.cursor.on_mouseup(hit[1], button)) { return true; }
-
-    if(button === SPUI.RIGHT_MOUSE_BUTTON) {
-        this.set_popup(null);
-        return true;
-    }
 
     this.select_feature_at(hit[1]);
 
@@ -872,6 +872,9 @@ RegionMap.RegionMap.prototype.on_mousemove = function(uv, offset) {
     } else {
         this.drag_start = null;
         this.drag_full = false;
+        if(mouse_state.get_button(SPUI.RIGHT_MOUSE_BUTTON)) {
+            return true; // handle here, so the event won't go to the desktop
+        }
     }
     return this.drag_full;
 };
