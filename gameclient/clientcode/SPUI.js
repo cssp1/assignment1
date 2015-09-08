@@ -35,7 +35,8 @@ SPUI.Font = function(size, leading, style) {
     this.style = style;
 };
 
-// return HTML5 representation of this font in string form
+/** return HTML5 representation of this font in string form
+    @return {string} */
 SPUI.Font.prototype.str = function() {
     var ret = "sans-serif";
     ret = this.size.toString() + "px " + ret;
@@ -45,8 +46,10 @@ SPUI.Font.prototype.str = function() {
     return ret;
 };
 
-// return the pixel width and height of a text string (multi-line OK)
-// NOTE: You must first set the context's font to this.str() before calling!
+/** return the pixel width and height of a text string (multi-line OK)
+    NOTE: You must first set the context's font to this.str() before calling!
+    @param {string} str
+    @return {!Array.<number>} */
 SPUI.Font.prototype.measure_string = function(str) {
     var ret = [0,0];
     if(!str || str.length < 1) { return ret; }
@@ -63,7 +66,11 @@ SPUI.Font.prototype.measure_string = function(str) {
 // keep a global table of unique fonts so that instances can be shared
 SPUI.font_table = {};
 
-// get a Font instance with this size, leading, and style
+/** get a Font instance with this size, leading, and style
+    @param {number} size
+    @param {number} leading
+    @param {string} style
+    @return {!SPUI.Font} */
 SPUI.make_font = function(size, leading, style) {
 
     // for "thick" items, use "bold" instead of "normal" if the browser's native gamma is not thick enough
@@ -96,8 +103,12 @@ SPUI.make_font = function(size, leading, style) {
 // font used for debug graphics and other stuff rendered on the play field
 SPUI.desktop_font = null;
 
+/** @param {!HTMLCanvasElement} canvas
+    @param {!CanvasRenderingContext2D} ctx
+    @param {{fonts_are_thick: (boolean|undefined),
+             low_fonts: (boolean|undefined)}=} options */
 SPUI.init = function(canvas, ctx, options) {
-    if(!options) { options = {}; }
+    if(!options) { options = {fonts_are_thick:undefined, low_fonts:undefined}; }
 
     SPUI.canvas = canvas;
     SPUI.canvas_width = 100;
@@ -136,8 +147,11 @@ SPUI.Color.mix = function(x, y, a) {
                           x.a+a*(y.a-x.a));
 };
 
+/** @param {!Array.<number>} col
+    @return {!SPUI.Color} */
 SPUI.make_colorv = function(col) { return new SPUI.Color(col[0], col[1], col[2], (col.length >= 4 ? col[3] : 1)); };
 
+/** @return {string} */
 SPUI.Color.prototype.str = function() {
     // gamma-encode values passed to HTML Canvas renderer - return as 'rgba(255,255,255,1)' string
     var gamma_r = Math.sqrt(this.r), gamma_g = Math.sqrt(this.g), gamma_b = Math.sqrt(this.b), gamma_a = Math.sqrt(this.a);
@@ -810,6 +824,7 @@ SPUI.Dialog = function(data, instance_props) {
 
     this.show = (('show' in instance_props) ? instance_props['show'] : true);
 
+    /** @type {number|boolean} - can be used as numerical alpha */
     this.modal = false;
     this.centered = null;
 
@@ -1970,7 +1985,7 @@ SPUI.ActionButton.prototype.do_draw = function(offset) {
             // since their sizes vary, we have to compute our own "center point" and then use the GameArt
             // drawing function that draws the unit/building with its center pixel on that point
             var ctr = [this.xy[0]+Math.floor(this.wh[0]/2), this.xy[1]+Math.floor(this.wh[1]/2)];
-            art_state.draw([ctr[0]+img_offset[0]+this.bg_image_offset[0], ctr[1]+img_offset[1]+this.bg_image_offset[1]], facing, SPUI.time, (this.bg_image_resizable ? this.wh : null));
+            art_state.draw([ctr[0]+img_offset[0]+this.bg_image_offset[0], ctr[1]+img_offset[1]+this.bg_image_offset[1]], facing, SPUI.time); // XXXXXX, (this.bg_image_resizable ? this.wh : null)); was passed before, but is probably a typo
         } else {
             // normal case. Note, if we are resizing the background
             // image, we pass OUR this.wh down into the GameArt
@@ -2266,7 +2281,7 @@ SPUI.StaticImage.prototype.do_draw = function(offset) {
                     // since their sizes vary, we have to compute our own "center point" and then use the GameArt
                     // drawing function that draws the unit/building with its center pixel on that point
                     var ctr = [this.xy[0]+Math.floor(this.wh[0]/2), this.xy[1]+Math.floor(this.wh[1]/2)];
-                    art_state.draw([ctr[0]+offset[0]+this.bg_image_offset[0], ctr[1]+offset[1]+this.bg_image_offset[1]], facing, SPUI.time, (this.bg_image_resizable ? this.wh : null));
+                    art_state.draw([ctr[0]+offset[0]+this.bg_image_offset[0], ctr[1]+offset[1]+this.bg_image_offset[1]], facing, SPUI.time); // XXXXXX, (this.bg_image_resizable ? this.wh : null)); was passed before, but is probably a typo
                 } else {
                     // normal case. Note, we pass OUR this.wh down into the GameArt drawing function, to handle resizable widgets
                     var draw_xy = [this.xy[0]+offset[0]+this.bg_image_offset[0],
