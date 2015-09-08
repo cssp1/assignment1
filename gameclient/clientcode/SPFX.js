@@ -47,27 +47,31 @@ SPFX.When = function(time, tick, tick_delay) {
     this.tick_delay = tick_delay || 0;
 };
 
+/** @type {number} */
 SPFX.last_id = 0;
+
+/** @type {number} */
 SPFX.detail = 1;
+
 SPFX.global_gravity = 1;
 SPFX.global_ground_plane = 0;
 
-// XXX hack to fake z-ordering - there are three "layers" of effects
+// hack to fake z-ordering - there are several "layers" of effects
 
-/** @type {Object.<string,!SPFX.Effect>} */
+/** @type {!Object.<string,!SPFX.Effect>} */
 SPFX.current_under = {}; // underneath units/buildings
 
-/** @type {Object.<string,!SPFX.PhantomUnit>} */
+/** @type {!Object.<string,!SPFX.PhantomUnit>} */
 SPFX.current_phantoms = {}; // phantom units/buildings managed by SPFX
 
-/** @type {Object.<string,!SPFX.Effect>} */
+/** @type {!Object.<string,!SPFX.Effect>} */
 SPFX.current_over = {}; // on top of units/buildings, below UI
 
-/** @type {Object.<string,!SPFX.Effect>} */
+/** @type {!Object.<string,!SPFX.Effect>} */
 SPFX.current_ui = {}; // on top of UI
 
-/** @type {Object.<string,!SPFX.Field>} */
-SPFX.fields = {}; // force fields
+/** @type {!Object.<string,!SPFX.Field>} */
+SPFX.fields = {}; // force fields only
 
 /** @typedef {{when: !SPFX.When, amplitude: number, falloff: number, started_at: number}} */
 SPFX.ShakeImpulse;
@@ -139,25 +143,40 @@ SPFX.time_lt = function(t) {
     @return {boolean} */
 SPFX.time_gte = function(t) { return !SPFX.time_lt(t); };
 
-// only allow non-default compositing modes when detail > 1
+/** only allow non-default compositing modes when detail > 1
+    @param {string} mode */
 SPFX.set_composite_mode = function(mode) {
     if(SPFX.detail > 1) {
         SPFX.ctx.globalCompositeOperation = mode;
     }
 };
+
+/** @private
+    @param {!Object.<string, !SPFX.FXObject>} layer
+    @param {!SPFX.FXObject} effect */
 SPFX.do_add = function(layer, effect) {
-    effect.id = SPFX.last_id;
-    SPFX.last_id++;
+    effect.id = SPFX.last_id.toString();
+    SPFX.last_id += 1;
     layer[effect.id] = effect;
-    return effect;
 };
 
-SPFX.add = function(effect) { return SPFX.do_add(SPFX.current_over, effect); };
-SPFX.add_phantom = function(effect) { return SPFX.do_add(SPFX.current_phantoms, effect); };
-SPFX.add_under = function(effect) { return SPFX.do_add(SPFX.current_under, effect); };
-SPFX.add_ui = function(effect) { return SPFX.do_add(SPFX.current_ui, effect); };
-SPFX.add_field = function(effect) { return SPFX.do_add(SPFX.fields, effect); };
+/** @param {!SPFX.Effect} effect
+    @return {!SPFX.Effect} */
+SPFX.add = function(effect) { SPFX.do_add(SPFX.current_over, effect); return effect; };
+/** @param {!SPFX.PhantomUnit} effect
+    @return {!SPFX.PhantomUnit} */
+SPFX.add_phantom = function(effect) { SPFX.do_add(SPFX.current_phantoms, effect); return effect; };
+/** @param {!SPFX.Effect} effect
+    @return {!SPFX.Effect} */
+SPFX.add_under = function(effect) { SPFX.do_add(SPFX.current_under, effect); return effect; };
+/** @param {!SPFX.Effect} effect
+    @return {!SPFX.Effect} */
+SPFX.add_ui = function(effect) { SPFX.do_add(SPFX.current_ui, effect); return effect; };
+/** @param {!SPFX.Field} effect
+    @return {!SPFX.Field} */
+SPFX.add_field = function(effect) { SPFX.do_add(SPFX.fields, effect); return effect; };
 
+/** @param {!SPFX.FXObject} effect */
 SPFX.remove = function(effect) {
     effect.dispose();
 
@@ -201,7 +220,7 @@ SPFX.draw_ui = function() {
 SPFX.get_phantom_objects = function() {
     var ret = [];
     goog.array.forEach(goog.object.getValues(SPFX.current_phantoms), function(fx) {
-        var obj = fx.get_phantom_object(); // will throw if it's not a SPFX.PhantomUnit
+        var obj = (/** @type {SPFX.PhantomUnit} */ (fx)).get_phantom_object(); // will throw if it's not a SPFX.PhantomUnit
         if(obj === null) { // done
             SPFX.remove(fx);
         } else {
@@ -255,9 +274,12 @@ SPFX.shake_camera = function(when, amplitude, falloff) {
 
 /** @constructor
     @struct */
-SPFX.FXObject = function() {};
+SPFX.FXObject = function() {
+    /** @type {string} */
+    this.id = '';
+};
 /** Repositions this object in the game world. Useful when attaching effects to a moving object.
-    @param {Array.<number>} xyz
+    @param {!Array.<number>} xyz
     @param {number=} rotation */
 SPFX.FXObject.prototype.reposition = function(xyz, rotation) {};
 /** Called by SPFX.remove to perform any work needed to cleanly remove this object. */
@@ -273,7 +295,7 @@ SPFX.Field = function(charge) {
 };
 goog.inherits(SPFX.Field, SPFX.FXObject);
 
-SPFX.Field.prototype.eval_field = function(pos, vel) {};
+SPFX.Field.prototype.eval_field = goog.abstractMethod;
 
 // MagnetField
 /** @constructor
@@ -1014,11 +1036,12 @@ SPFX.SoundCue = function(data, when) {
     goog.base(this, data);
     this.when = when;
     this.start_time = -1; // determined after "when"
+    /** @type {!Array.<GameArt.Sprite|GameArt.Sound>} */
     this.sprites = [];
     if('assets' in data) {
         // use multiple assets
         for(var i = 0; i < data['assets'].length; i++) {
-            var assetname = data['assets'][i];
+            var assetname = /** @type {string} */ (data['assets'][i]);
             if(!(assetname in GameArt.assets)) {
                 console.log('missing audio SFX asset '+assetname+'!');
                 continue;
@@ -1030,7 +1053,7 @@ SPFX.SoundCue = function(data, when) {
             this.sprites.push(sprite);
         }
     } else {
-        var assetname = data['sprite'];
+        var assetname = /** @type {string} */ (data['sprite']);
         if(!(assetname in GameArt.assets)) {
             console.log('missing audio SFX asset '+assetname+'!');
             return;
@@ -1071,7 +1094,9 @@ SPFX.SoundCue.prototype.draw = function() {
 
 // Explosion
 
-// get a parameter that could be one- or two-dimensional
+/** get a parameter that could be one- or two-dimensional
+    @param {number|!Array.<number>} param
+    @return {!Array.<number>} */
 SPFX.get_vec_parameter = function(param) {
     if((typeof param) === 'number') {
         return [param, param];
@@ -1081,15 +1106,15 @@ SPFX.get_vec_parameter = function(param) {
 };
 
 /** @constructor
-  @extends SPFX.Effect
-  @struct
-  @param {!Array.<number>} where
-  @param {number} height
-  @param {string} assetname
-  @param {!SPFX.When} when
-  @param {boolean} enable_audio
-  @param {!Object} data
-  @param {Object|null} instance_data
+    @extends SPFX.Effect
+    @struct
+    @param {!Array.<number>} where
+    @param {number} height
+    @param {string} assetname
+    @param {!SPFX.When} when
+    @param {boolean} enable_audio
+    @param {!Object} data
+    @param {Object|null} instance_data
   */
 SPFX.Explosion = function(where, height, assetname, when, enable_audio, data, instance_data) {
     goog.base(this, data);
@@ -1101,20 +1126,22 @@ SPFX.Explosion = function(where, height, assetname, when, enable_audio, data, in
     }
 
     this.where = vec_add(where, (data && 'offset' in data ? [data['offset'][0], data['offset'][2]] : [0,0]));
-    this.height = height + (data && 'offset' in data ? data['offset'][1] : 0.5);
+    this.height = height + (data && 'offset' in data ? /** @type {number} */ (data['offset'][1]) : 0.5);
     var asset = GameArt.assets[assetname];
     if(!asset) {
         throw Error('unknown art asset '+assetname);
     }
+
     this.sprite = asset.states['normal'];
     this.when = when;
     this.start_time = -1; // determined once "when" passes
     this.end_time = -1;
 
-    this.is_ui = (instance_data && instance_data.is_ui) || false; // "is_ui" means "this is a UI dialog effect, not a 3D playfield effect"
+    /** @type {boolean} "is_ui" means "this is a UI dialog effect, not a 3D playfield effect" */
+    this.is_ui = (instance_data && /** @type {boolean|undefined} */ (instance_data.is_ui)) || false;
 
-    if(data && data['duration']) {
-        this.duration = data['duration'];
+    if(data && 'duration' in data) {
+        this.duration = /** @type {number} */ (data['duration']);
     } else {
         this.duration = this.sprite.duration();
         if(this.duration <= 0) {
@@ -1123,36 +1150,40 @@ SPFX.Explosion = function(where, height, assetname, when, enable_audio, data, in
     }
 
     if(this.duration >= 0) {
-        this.fade = ((data && data['fade']) ? data['fade'] : 0);
-        this.fade_duration = ((data && data['fade_duration']) ? data['fade_duration'] : this.duration / 2);
+        this.fade = ((!!data && data['fade']) ? /** @type {number} */ (data['fade']) : 0);
+        this.fade_duration = ((!!data && data['fade_duration']) ? /** @type {number} */ (data['fade_duration']) : this.duration / 2);
     } else {
         this.fade = 0;
     }
-    this.motion = ((data && data['motion']) ? data['motion'] : null);
+
+    /** @type {string|null} */
+    this.motion = ((data && data['motion']) ? /** @type {string} */ (data['motion']) : null);
     this.motion_scale = ((data && 'motion_scale' in data) ? SPFX.get_vec_parameter(data['motion_scale']) : [1,1]);
 
     this.enable_audio = enable_audio;
     this.audio_started = false;
 
-    this.opacity = ((data && data['opacity']) ? data['opacity'] : 1);
-    this.composite_mode = ((data && data['composite_mode']) ? data['composite_mode'] : 'source-over');
+    this.opacity = ((data && data['opacity']) ? /** @type {number} */ (data['opacity']) : 1);
+    this.composite_mode = ((data && data['composite_mode']) ? /** @type {string} */ (data['composite_mode']) : 'source-over');
 
     this.sprite_scale = ((data && 'sprite_scale' in data) ? SPFX.get_vec_parameter(data['sprite_scale']) : [1,1]);
 
-    this.rotation = (instance_data && 'rotation' in instance_data ? instance_data['rotation'] : (data && data['rotation'] ? data['rotation'] : 0));
-    this.rotate_speed = (instance_data && 'rotate_speed' in instance_data ? instance_data['rotate_speed'] : (data && data['rotate_speed'] ? data['rotate_speed'] : 0));
+    this.rotation = (instance_data && 'rotation' in instance_data ? /** @type {number} */ (instance_data['rotation']) : (data && data['rotation'] ? /** @type {number} */ (data['rotation']) : 0));
+    this.rotate_speed = (instance_data && 'rotate_speed' in instance_data ? /** @type {number} */ (instance_data['rotate_speed']) : (data && data['rotate_speed'] ? /** @type {number} */ (data['rotate_speed']) : 0));
 
     var old_data = gamedata['art'][assetname]['states']['normal'];
     if('particles' in old_data) {
-        var particles = new SPFX.Particles([this.where[0], this.height, this.where[1]], when, this.duration, old_data['particles']);
+        var particles = new SPFX.Particles([this.where[0], this.height, this.where[1]], when, this.duration, /** @type {!Object} */ (old_data['particles']));
         SPFX.add(particles);
     }
 
-    // alternate HTML5 Image object used for tinting effects
-    // NOTE: this is not cached or shared, so use sparingly to avoid resource exhaustion!
+    /** @type {HTMLImageElement|null} alternate HTML5 Image object used for tinting effects
+        NOTE: this is not cached or shared, so use sparingly to avoid resource exhaustion! */
     this.special_img = null;
+
     // disable for now, since we must find some way to guarantee that the affected image is loaded in a CORS-safe way on all browsers
     // (see GameArt.TintedImage)
+    /*
     if(0 && data && data['tint'] && SPFX.detail > 1 && gamedata['client']['enable_pixel_manipulation']) {
         var img = this.sprite.select_image(0,0);
         // note: if pixels aren't here yet, just punt
@@ -1160,16 +1191,20 @@ SPFX.Explosion = function(where, height, assetname, when, enable_audio, data, in
             this.special_img = GameArt.make_tinted_image(img.img, img.origin, img.wh, data['tint']);
         }
     }
+    */
 };
 goog.inherits(SPFX.Explosion, SPFX.Effect);
 
-/** @override */
+/** @override
+    @param {Array.<number>} xyz
+    @param {number=} rotation */
 SPFX.Explosion.prototype.reposition = function(xyz, rotation) {
     this.where = vec_add([xyz[0],xyz[2]], (this.data && 'offset' in this.data ? [this.data['offset'][0], this.data['offset'][2]] : [0,0]));
     this.height = xyz[1] + (this.data && 'offset' in this.data ? this.data['offset'][1] : 0.5);
     if(typeof(rotation) != 'undefined') { this.rotation = rotation; }
 };
 
+/** @override */
 SPFX.Explosion.prototype.draw = function() {
     if(SPFX.time_lt(this.when)) { return; }
     if(this.start_time < 0) {
@@ -1262,8 +1297,12 @@ SPFX.Explosion.prototype.draw = function() {
 // Debris
 
 /** @constructor
-  * @extends SPFX.Effect
-  */
+    @struct
+    @extends SPFX.Effect
+    @param {!Array.<number>} where
+    @param {string} assetname
+    @param {number} facing
+*/
 SPFX.Debris = function(where, assetname, facing) {
     goog.base(this, null);
     this.show = true;
@@ -1289,25 +1328,28 @@ SPFX.Debris.prototype.draw = function() {
   */
 SPFX.OffscreenArrow = function() {
     goog.base(this, null);
+    /** @type {Array.<number>|null} */
     this.where = null;
+    /** @type {GameArt.AbstractSprite|null} */
     this.sprite = null;
 };
 goog.inherits(SPFX.OffscreenArrow, SPFX.Effect);
+/** @param {Array.<number>|null} where */
 SPFX.OffscreenArrow.prototype.reset = function(where) {
     this.where = where;
 };
 
+/** @type {!Array.<{min_angle: number, max_angle: number, sprite: string, draw_location: !Array.<number>}>} */
 SPFX.OffscreenArrow_data = [
-    // [min_angle, max_angle, sprite, draw_location]
-    [0, Math.PI/8, 'n', [0.5, 0.15]],
-    [Math.PI/8, 3*Math.PI/8, 'ne', [0.95, 0.15]],
-    [3*Math.PI/8, 5*Math.PI/8, 'e', [0.95, 0.5]],
-    [5*Math.PI/8, 7*Math.PI/8, 'se', [0.95, 0.65]],
-    [7*Math.PI/8, 9*Math.PI/8, 's', [0.5, 0.70]],
-    [9*Math.PI/8, 11*Math.PI/8, 'sw', [0.05, 0.65]],
-    [11*Math.PI/8, 13*Math.PI/8, 'w', [0.05, 0.5]],
-    [13*Math.PI/8, 15*Math.PI/8, 'nw', [0.05, 0.15]],
-    [15*Math.PI/8, 2*Math.PI, 'n', [0.5, 0.1]]
+    {min_angle: 0, max_angle: Math.PI/8, sprite: 'n', draw_location: [0.5, 0.15]},
+    {min_angle: Math.PI/8, max_angle: 3*Math.PI/8, sprite: 'ne', draw_location: [0.95, 0.15]},
+    {min_angle: 3*Math.PI/8, max_angle: 5*Math.PI/8, sprite: 'e', draw_location: [0.95, 0.5]},
+    {min_angle: 5*Math.PI/8, max_angle: 7*Math.PI/8, sprite: 'se', draw_location: [0.95, 0.65]},
+    {min_angle: 7*Math.PI/8, max_angle: 9*Math.PI/8, sprite: 's', draw_location: [0.5, 0.70]},
+    {min_angle: 9*Math.PI/8, max_angle: 11*Math.PI/8, sprite: 'sw', draw_location: [0.05, 0.65]},
+    {min_angle: 11*Math.PI/8, max_angle: 13*Math.PI/8, sprite: 'w', draw_location: [0.05, 0.5]},
+    {min_angle: 13*Math.PI/8, max_angle: 15*Math.PI/8, sprite: 'nw', draw_location: [0.05, 0.15]},
+    {min_angle: 15*Math.PI/8, max_angle: 2*Math.PI, sprite: 'n', draw_location: [0.5, 0.1]}
 ];
 
 SPFX.OffscreenArrow.prototype.draw = function() {
@@ -1336,12 +1378,13 @@ SPFX.OffscreenArrow.prototype.draw = function() {
     }
 
     // pick direction for the arrow
-    var dir = 'n', draw_loc = [0,0];
+    var dir = 'n';
+    var draw_loc = [0,0];
     for(var i = 0; i < SPFX.OffscreenArrow_data.length; i++) {
         var data = SPFX.OffscreenArrow_data[i];
-        if(angle >= data[0] && angle <= data[1]) {
-            dir = data[2];
-            draw_loc = data[3];
+        if(angle >= data.min_angle && angle <= data.max_angle) {
+            dir = data.sprite;
+            draw_loc = data.draw_location;
             break;
         }
     }
@@ -1529,20 +1572,20 @@ SPFX.Shockwave = function(where, altitude, when, data) {
     goog.base(this, data);
     this.where = where;
     this.altitude = altitude;
-    this.speed = (data['speed'] || 500);
-    this.thickness = Math.min(Math.max((data['thickness'] || 0.5),0.0),1.0);
+    this.speed = (/** @type {number|undefined} */ (data['speed']) || 500);
+    this.thickness = Math.min(Math.max((/** @type {number|undefined} */ (data['thickness']) || 0.5),0.0),1.0);
     var col;
     if('color' in data) {
-        col = data['color'];
+        col = /** @type {!Array.<number>} */ (data['color']);
     } else {
         col = [1,1,1];
     }
     this.center_color = new SPUI.Color(col[0], col[1], col[2], 0.0);
-    this.edge_color = new SPUI.Color(col[0], col[1], col[2], data['opacity'] || 1.0);
+    this.edge_color = new SPUI.Color(col[0], col[1], col[2], /** @type {number|undefined} */ (data['opacity']) || 1.0);
     this.when = when;
     this.start_time = -1; // determined only after "when" is passed
     this.end_time = -1;
-    this.composite_mode = data['composite_mode'] || 'source-over';
+    this.composite_mode = /** @type {string|undefined} */ (data['composite_mode']) || 'source-over';
 };
 goog.inherits(SPFX.Shockwave, SPFX.Effect);
 
@@ -1553,7 +1596,7 @@ SPFX.Shockwave.prototype.draw = function() {
 
     if(this.start_time < 0) {
         this.start_time = SPFX.time;
-        this.end_time = this.start_time + Math.max(this.data['duration'] || 0.5, 0.0);
+        this.end_time = this.start_time + Math.max(/** @type {number|undefined} */ (this.data['duration']) || 0.5, 0.0);
     }
 
     if(SPFX.time > this.end_time) {
@@ -1619,32 +1662,35 @@ SPFX.PhantomUnit = function(pos, altitude, orient, when, data, instance_data) {
     this.when = when;
     this.start_time = -1; // determined after "when"
     this.end_time = -1;
-    this.duration = (!('duration' in data) || data['duration'] >= 0) ? (data['duration'] || 3.0) : -1;
-    this.end_at_dest = (('end_at_dest' in data) ? data['end_at_dest'] : true);
+    this.duration = (!('duration' in data) || /** @type {number} */ (data['duration']) >= 0) ? (/** @type {number} */ (data['duration']) || 3.0) : -1;
+    this.end_at_dest = (('end_at_dest' in data) ? /** @type {boolean} */ (data['end_at_dest']) : true);
 
+    /** @type {!Mobile} */
     this.obj = new Mobile();
     this.obj.id = GameObject.DEAD_ID;
-    this.obj.spec = gamedata['units']['spec' in instance_data ? instance_data['spec'] : data['spec']];
+    this.obj.spec = gamedata['units']['spec' in instance_data ? /** @type {string} */ (instance_data['spec']) : /** @type {string} */ (data['spec'])];
     this.obj.x = pos[0]; this.obj.y = pos[1];
     this.obj.hp = this.obj.max_hp = 0;
     this.obj.team = 'none';
-    this.obj.level = (instance_data ? instance_data['level'] : null) || 1;
+    this.obj.level = (instance_data ? /** @type {number|undefined} */ (instance_data['level']) : null) || 1;
     this.obj.update_stats();
-    this.obj.combat_stats.maxvel *= (data['maxvel'] || 1);
+    this.obj.combat_stats.maxvel *= /** @type {number|undefined} */ (data['maxvel']) || 1;
     this.obj.ai_state = ai_states.AI_MOVE; // no AI
 
-    // movement destination
+    /** @type {Array.<number>|null} movement destination */
     var dest = null;
+    /** @type {Array.<!Array.<number>>|null} movement path */
     var path = null;
     if('dest' in instance_data) {
-        dest = instance_data['dest'];
+        dest = /** @type {!Array.<number>} */ (instance_data['dest']);
     } else if('heading' in instance_data) {
         // compute heading relative to that given with instance data
-        var heading = instance_data['heading'] + (Math.PI/180) * (data['heading'] || 0); // add heading to original spawn orientation
+        var heading = /** @type {number} */ (instance_data['heading']) +
+            (Math.PI/180) * (/** @type {number|undefined} */ (data['heading']) || 0); // add heading to original spawn orientation
         if(this.duration <= 0) { throw Error('duration must be positive'); }
         dest = vec_add(pos, vec_scale((this.duration) * this.obj.combat_stats.maxvel * 1.1, [Math.cos(heading), Math.sin(heading)]));
     } else if('path' in instance_data) {
-        path = instance_data['path'];
+        path = /** @type {!Array.<!Array.<number>>} */ (instance_data['path']);
         dest = path[path.length - 1];
     }
 
@@ -1657,7 +1703,11 @@ SPFX.PhantomUnit = function(pos, altitude, orient, when, data, instance_data) {
         this.obj.path_valid = false;
     }
 
-    this.start_halted = instance_data['start_halted'] || this.data['start_halted'] || 0; // start_halted will be used as the delay after start time at which to begin moving
+    // start_halted will be used as the delay after start time at which to begin moving
+    /** @type {number} */
+    this.start_halted = /** @type {number|undefined} */ (instance_data['start_halted']) ||
+        /** @type {number|undefined} */ (this.data['start_halted']) || 0;
+
     this.obj.control_state = (this.start_halted ? control_states.CONTROL_STOP : control_states.CONTROL_MOVING);
     this.obj.pos = [pos[0],pos[1]];
     this.obj.next_pos = [pos[0],pos[1]];
@@ -1687,6 +1737,8 @@ SPFX.PhantomUnit.prototype.set_dest = function(new_dest) {
 };
 
 SPFX.PhantomUnit.prototype.draw = function() { throw Error('should not be called'); };
+
+/** @return {Mobile|null} */
 SPFX.PhantomUnit.prototype.get_phantom_object = function() {
     if(this.end_time >= 0 && SPFX.time >= this.end_time) { return null; } // timed out
 
@@ -1710,7 +1762,7 @@ SPFX.PhantomUnit.prototype.get_phantom_object = function() {
             this.obj.cur_opacity = 0;
             this.obj.last_opacity = 1;
             this.obj.last_opacity_time = this.end_time - gamedata['client']['unit_fade_time'];
-        } else if(this.end_at_dest && vec_equals(this.obj.pos, this.obj.dest)) {
+        } else if(this.end_at_dest && this.obj.dest && vec_equals(this.obj.pos, this.obj.dest)) {
             if(this.obj.cur_opacity != 0) {
                 this.obj.cur_opacity = 0;
                 this.obj.last_opacity = 1;
@@ -1733,6 +1785,7 @@ SPFX.PhantomUnit.prototype.get_phantom_object = function() {
    @param {!Object} data
    @param {boolean} allow_sound
    @param {Object|null} instance_data
+   @return {SPFX.FXObject|null}
    */
 SPFX.add_visual_effect_at_time = function(pos, altitude, orient, time, data, allow_sound, instance_data) {
     return SPFX._add_visual_effect(pos, altitude, orient, new SPFX.When(time, null), data, allow_sound, instance_data);
@@ -1747,6 +1800,7 @@ SPFX.add_visual_effect_at_time_but_should_be_tick = SPFX.add_visual_effect_at_ti
    @param {!Object} data
    @param {boolean} allow_sound
    @param {Object|null} instance_data
+   @return {SPFX.FXObject|null}
    */
 SPFX.add_visual_effect_at_tick = function(pos, altitude, orient, tick, data, allow_sound, instance_data) {
     return SPFX._add_visual_effect(pos, altitude, orient, new SPFX.When(null, tick), data, allow_sound, instance_data);
@@ -1760,35 +1814,40 @@ SPFX.add_visual_effect_at_tick = function(pos, altitude, orient, tick, data, all
    @param {!Object} data
    @param {boolean} allow_sound
    @param {Object|null} instance_data
+   @return {SPFX.FXObject|null}
    @private
    */
 SPFX._add_visual_effect = function(pos, altitude, orient, when, data, allow_sound, instance_data) {
-    if(data['require_detail'] > SPFX.detail) { return null; }
-    if(('max_detail' in data) && SPFX.detail >= data['max_detail']) { return null; }
+    if(/** @type {number} */ (data['require_detail']) > SPFX.detail) { return null; }
+    if(('max_detail' in data) && SPFX.detail >= /** @type {number} */ (data['max_detail'])) { return null; }
 
-    if(data['random_chance'] && (Math.random() >= data['random_chance'])) { return null; }
+    if('random_chance' in data && (Math.random() >= /** @type {number} */ (data['random_chance']))) { return null; }
+
+    var effect_type = /** @type {string} */ (data['type']);
+    var effect_layer = /** @type {string|undefined} */ (data['layer']) || null;
 
     if('delay' in data) {
         // increment "when" by the real-time (seconds) delay
-        when = (when.tick ? new SPFX.When(null, when.tick, data['delay']) : new SPFX.When(when.time + data['delay'], null));
+        var delay = /** @type {number} */ (data['delay']);
+        when = (when.tick ? new SPFX.When(null, when.tick, delay) : new SPFX.When(when.time + delay, null));
     }
 
-    if('translate' in data) { pos = v3_add(pos, data['translate']); }
+    if('translate' in data) { pos = v3_add(pos, /** @type {!Array.<number>} */ (data['translate'])); }
 
+    /** @type {function(!SPFX.Effect): !SPFX.Effect} */
     var add_func = SPFX.add;
-    if(data['layer'] === 'under') {
+
+    if(effect_layer === 'under') {
         add_func = SPFX.add_under;
-    } else if(data['layer'] === 'ui') {
+    } else if(effect_layer === 'ui') {
         add_func = SPFX.add_ui;
-    } else if(data['type'] === 'phantom_unit') {
-        add_func = SPFX.add_phantom;
     }
 
-    if(data['type'] === 'shockwave') {
+    if(effect_type === 'shockwave') {
         return add_func(new SPFX.Shockwave(pos, altitude, when, data));
-    } else if(data['type'] === 'combine') {
+    } else if(effect_type === 'combine') {
         var ret = new SPFX.CombineEffect();
-        var effects = data['effects'] || [];
+        var effects = /** @type {!Array.<!Object>|undefined} */ (data['effects']) || [];
         for(var i = 0; i < effects.length; i++) {
             var child = SPFX._add_visual_effect(pos, altitude, orient, when, effects[i], allow_sound, instance_data);
             if(child) {
@@ -1796,47 +1855,59 @@ SPFX._add_visual_effect = function(pos, altitude, orient, when, data, allow_soun
             }
         }
         return ret;
-    } else if(data['type'] === 'random') {
-        var effects = data['effects'] || [];
+    } else if(effect_type === 'random') {
+        /** @type {!Array.<!Object>} */
+        var effects = /** @type {Array.<!Object>|undefined} */ (data['effects']) || [];
         if(effects.length > 0) {
+            /** @type {number} */
             var total_weight = 0;
+            /** @type {!Array.<number>} */
             var breakpoints = [];
-            goog.array.forEach(data['effects'], function(fx) {
-                total_weight += ('random_weight' in fx ? fx['random_weight'] : 1);
+            goog.array.forEach(effects, function(/** !Object */ fx) {
+                total_weight += ('random_weight' in fx ? /** @type {number} */ (fx['random_weight']) : 1);
                 breakpoints.push(total_weight);
             });
             var r = Math.random() * total_weight;
             var index = -goog.array.binarySearch(breakpoints, r) - 1;
             return SPFX._add_visual_effect(pos, altitude, orient, when, effects[index], allow_sound, instance_data);
         }
-    } else if(data['type'] === 'library') {
-        var ref = gamedata['client']['vfx'][data['name']];
+    } else if(effect_type === 'library') {
+        var ref = /** @type {!Object} */ (gamedata['client']['vfx'][data['name']]);
         return SPFX._add_visual_effect(pos, altitude, orient, when, ref, allow_sound, instance_data);
-    } else if(data['type'] === 'explosion') {
-        return add_func(new SPFX.Explosion(pos, altitude, data['sprite'], when, false, data, instance_data));
-    } else if(data['type'] === 'particles') {
-        var particles = new SPFX.Particles([pos[0], altitude, pos[1]], when, (data['max_age'] || 1.0), data, instance_data);
+    } else if(effect_type === 'explosion') {
+        return add_func(new SPFX.Explosion(pos, altitude, /** @type {string} */ (data['sprite']), when, false, data, instance_data));
+    } else if(effect_type === 'particles') {
+        var particles = new SPFX.Particles([pos[0], altitude, pos[1]], when,
+                                           /** @type {number|undefined} */ (data['max_age']) || 1.0,
+                                           data, instance_data);
         return add_func(particles);
-    } else if(data['type'] === 'particle_magnet') {
+    } else if(effect_type === 'particle_magnet') {
         return SPFX.add_field(new SPFX.MagnetField([pos[0], altitude, pos[1]], data, instance_data));
-    } else if(data['type'] === 'drag_field') {
+    } else if(effect_type === 'drag_field') {
         return SPFX.add_field(new SPFX.DragField([pos[0], altitude, pos[1]], data, instance_data));
-    } else if(data['type'] === 'camera_shake') {
-        SPFX.shake_camera(when, data['amplitude'] || 100, data['decay_time'] || 0.4);
+    } else if(effect_type === 'camera_shake') {
+        SPFX.shake_camera(when,
+                          /** @type {number|undefined} */ (data['amplitude']) || 100,
+                          /** @type {number|undefined} */ (data['decay_time']) || 0.4);
         return null;
-    } else if(data['type'] === 'combat_text') {
-        return add_func(new SPFX.CombatText(pos, 0, data['ui_name'], data['text_color']||[1,1,1], when, data['duration']||3,
-                                            {drop_shadow: !!data['drop_shadow'], font_size: data['font_size'] || 20, text_style: data['text_style']||'thick'}));
-    } else if(data['type'] === 'sound') {
+    } else if(effect_type === 'combat_text') {
+        return add_func(new SPFX.CombatText(pos, 0, /** @type {string} */ (data['ui_name']),
+                                            /** @type {!Array.<number>|undefined} */ (data['text_color']) || [1,1,1],
+                                            when,
+                                            /** @type {number|undefined} */ (data['duration']) || 3,
+                                            {drop_shadow: !!data['drop_shadow'],
+                                             font_size: /** @type {number|undefined} */ (data['font_size']) || 20,
+                                             text_style: /** @type {string|undefined} */ (data['text_style']) || 'thick'}));
+    } else if(effect_type === 'sound') {
         if(allow_sound) {
             return add_func(new SPFX.SoundCue(data, when));
         } else {
             return null;
         }
-    } else if(data['type'] === 'phantom_unit') {
-        return add_func(new SPFX.PhantomUnit(pos, altitude, orient, when, data, instance_data));
+    } else if(effect_type === 'phantom_unit') {
+        return SPFX.add_phantom(new SPFX.PhantomUnit(pos, altitude, orient, when, data, instance_data));
     } else {
-        console.log('unhandled visual effect type "'+data['type']+'"!');
+        console.log('unhandled visual effect type "'+effect_type+'"!');
     }
     return null;
 };
