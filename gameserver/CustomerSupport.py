@@ -171,11 +171,12 @@ class HandleRecordAltLogin(Handler):
         Handler.__init__(self, *args, **kwargs)
         self.other_id = int(self.args['other_id'])
         assert self.other_id != self.user_id
-    def do_exec_online(self, session, retmsg):
+    # note: no logging, directly override exec()
+    def exec_online(self, session, retmsg):
         session.player.possible_alt_record_login(self.other_id)
         return ReturnValue(result = 'ok')
 
-    def do_exec_offline(self, user, player):
+    def exec_offline(self, user, player):
         # reimplements Player.possible_alt_record_login()
         key = str(self.other_id)
         if ('known_alt_accounts' not in player) or type(player['known_alt_accounts']) is not dict:

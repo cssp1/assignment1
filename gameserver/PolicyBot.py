@@ -36,6 +36,7 @@ def do_CONTROLAPI(args):
     proto = 'http' if host == 'localhost' else 'https'
     url = '%s://%s:%d/CONTROLAPI' % (proto, host, SpinConfig.config['proxyserver']['external_http_port' if proto == 'http' else 'external_ssl_port'])
     args['ui_reason'] = 'PolicyBot'
+    args['spin_user'] = 'PolicyBot'
     args['secret'] = SpinConfig.config['proxy_api_secret']
     response = requests.post(url+'?'+urllib.urlencode(args))
     assert response.status_code == 200
