@@ -12664,16 +12664,18 @@ class CONTROLAPI(resource.Resource):
     def do_render_GET(self, request):
         update_server_time()
 
-        # wrap this block so the server does not return a revealing error message in case of exceptions
-        try:
+        if ('secret' in request.args and 'method' in request.args):
             secret = str(request.args['secret'][0])
             method = str(request.args['method'][0])
             args = dict([(k, str(v[0])) for k, v in request.args.iteritems() if k not in ('secret','method')])
-            return self.handle(request, secret, method, args)
 
-        except Exception:
-            gamesite.exception_log.event(server_time, 'CONTROLAPI Exception: '+traceback.format_exc())
+            # wrap this block so the server does not return a revealing error message in case of exceptions
+            try:
+                return self.handle(request, secret, method, args)
+            except Exception:
+                gamesite.exception_log.event(server_time, 'CONTROLAPI Exception (method %r args %r):\n%s' % (method, args, traceback.format_exc()))
 
+        request.setResponseCode(http.BAD_REQUEST)
         return 'error\n'
 
     def complete_deferred_request(self, body, request):
