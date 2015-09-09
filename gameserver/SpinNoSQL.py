@@ -1261,7 +1261,7 @@ class NoSQLClient (object):
     def _msg_recv(self, recipient, type_filter):
         qs = {'recipient':recipient}
         if type_filter: qs['type'] = {'$in': type_filter}
-        return map(self.decode_message, self.message_table().find(qs))
+        return map(self.decode_message, self.message_table().find(qs).sort([('time',pymongo.ASCENDING),]))
 
     def msg_send(self, msglist, reason=''):
         return self.instrument('msg_send(%s)'%reason, self._msg_send, (msglist,))
