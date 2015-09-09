@@ -12704,8 +12704,9 @@ class CONTROLAPI(resource.Resource):
 
     # encapsulate state needed to load, mutate, then store player and user JSON structs
     class AsyncSupport(object):
-        def __init__(self, user_id, handler, d):
+        def __init__(self, user_id, method_name, handler, d):
             self.user_id = user_id
+            self.method_name = method_name
             self.handler = handler
             self.d = d
             self.player_json = None
@@ -12751,7 +12752,7 @@ class CONTROLAPI(resource.Resource):
                 self.val = self.handler.exec_offline(self.user_json, self.player_json)
                 self.player_json['generation'] = self.player_json.get('generation',-1)+1
             except:
-                gamesite.exception_log.event(server_time, 'CustomerSupport exception player %d: %s' % (self.user_id, traceback.format_exc()))
+                gamesite.exception_log.event(server_time, 'CustomerSupport offline exception player %d method %r args %r:\n%s' % (self.user_id, self.method_name, self.handler.args, traceback.format_exc()))
                 self.d.callback(CustomerSupport.ReturnValue(error = traceback.format_exc()))
                 return
             player_buf = SpinJSON.dumps(self.player_json, pretty = True, newline = True, size_hint = 1024*1024, double_precision = 5)
@@ -12795,7 +12796,7 @@ class CONTROLAPI(resource.Resource):
                 try:
                     val = handler.exec_online(session, session.deferred_messages)
                 except:
-                    gamesite.exception_log.event(server_time, 'CustomerSupport ONLINE exception player %d: %s' % (user_id, traceback.format_exc()))
+                    gamesite.exception_log.event(server_time, 'CustomerSupport online exception player %d method %r args %r:\n%s' % (user_id, method_name, args, traceback.format_exc()))
                     val = CustomerSupport.ReturnValue(error = traceback.format_exc())
 
                 if val.async:
@@ -12831,7 +12832,7 @@ class CONTROLAPI(resource.Resource):
                         self.complete_deferred_request(val.as_body(), request)
                     d.addBoth(complete, request, self)
 
-                    self.AsyncSupport(user_id, handler, d).start()
+                    self.AsyncSupport(user_id, method_name, handler, d).start()
                     ret = server.NOT_DONE_YET
 
         else:
