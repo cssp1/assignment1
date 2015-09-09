@@ -166,6 +166,40 @@ class HandleMarkUninstalled(Handler):
         self.gamesite.pcache_client.player_cache_update(self.user_id, {'uninstalled': 1})
         return ReturnValue(result = 'ok')
 
+class HandleRecordAltLogin(Handler):
+    def __init__(self, *args, **kwargs):
+        Handler.__init__(self, *args, **kwargs)
+        self.other_id = int(self.args['other_id'])
+        assert self.other_id != self.user_id
+    def do_exec_online(self, session, retmsg):
+        session.player.possible_alt_record_login(self.other_id)
+        return ReturnValue(result = 'ok')
+
+    def do_exec_offline(self, user, player):
+        # reimplements Player.possible_alt_record_login()
+        key = str(self.other_id)
+        if ('known_alt_accounts' not in player) or type(player['known_alt_accounts']) is not dict:
+            player['known_alt_accounts'] = {}
+
+        alt_data = player['known_alt_accounts'].get(key, None)
+
+        if alt_data is None:
+            # move the ID from possible_alt_accounts to known_alt_accounts once detect_threshold logins have happened
+            detect_threshold = self.gamedata['server']['alt_detect_logins']
+            if detect_threshold >= 0:
+                if 'possible_alt_accounts' not in player: player['possible_alt_accounts'] = {}
+                player['possible_alt_accounts'][key] = player['possible_alt_accounts'].get(key, 0) + 1
+
+                if player['possible_alt_accounts'][key] >= detect_threshold:
+                    alt_data = player['known_alt_accounts'][key] = {}
+                    del player['possible_alt_accounts'][key]
+
+        if alt_data is not None:
+            alt_data['logins'] = alt_data.get('logins',0) + 1
+            alt_data['last_login'] = self.time_now # record time of last simultaneous login
+
+        return ReturnValue(result = 'ok')
+
 class HandleIgnoreAlt(Handler):
     def do_exec_online(self, session, retmsg):
         other_id = int(self.args['other_id'])
@@ -719,6 +753,7 @@ methods = {
     'ban': HandleBan,
     'unban': HandleUnban,
     'mark_uninstalled': HandleMarkUninstalled,
+    'record_alt_login': HandleRecordAltLogin,
     'make_developer': HandleMakeDeveloper,
     'unmake_developer': HandleUnmakeDeveloper,
     'ignore_alt': HandleIgnoreAlt,

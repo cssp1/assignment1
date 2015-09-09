@@ -1405,6 +1405,16 @@ class GameProxy(proxy.ReverseProxyResource):
         if SpinConfig.config.get('the_pool_is_closed',False): return True
         return False # dynamic routing does not use this path
 
+    def get_any_game_server(self):
+        # pick any open server (e.g. for customer support requests on offline players) and return (hostname, port)
+        qs = {'type':SpinConfig.game(), 'state':'ok',
+              'gamedata_build': proxysite.proxy_root.static_resources['gamedata-%s-en_US.js' % SpinConfig.game()].build_date,
+              'gameclient_build': proxysite.proxy_root.static_resources['compiled-client.js'].build_date}
+        result = db_client.server_status_query_one(qs, fields = {'hostname':1, 'game_http_port':1})
+        if result:
+            return (result['hostname'], result['game_http_port'])
+        return None
+
     def assign_game_server(self, request, visitor):
         # note: visitor may be None for METRICSAPI requests
 
@@ -1693,10 +1703,32 @@ class GameProxy(proxy.ReverseProxyResource):
             db_client.ip_hit_record(session.ip, session.user_id)
             possible_alts = db_client.ip_hits_get(session.ip, since = proxy_time - stickiness, exclude_user_id = session.user_id)
         else: # old instantaneous-only approach
-            possible_alts = db_client.sessions_get_users_by_ip(session.ip)
+            possible_alts = db_client.sessions_get_users_by_ip(session.ip, exclude_user_id = session.user_id)
 
         if possible_alts:
+            # for this account, send the other account IDs with the login message
             extra_data = string.join([str(alt_user_id) for alt_user_id in possible_alts], ',')
+
+            # for the other accounts, notify via CONTROLAPI
+            if SpinConfig.config['proxyserver'].get('alt_ip_notify', True):
+                for alt_user_id in possible_alts:
+                    fwd = None
+                    alt_session = self.session_emulate(db_client.session_get_by_user_id(alt_user_id, reason='record_alt_login'))
+                    if alt_session:
+                        fwd = session.gameserver_fwd
+                    else:
+                        fwd = self.get_any_game_server()
+
+                    if fwd:
+                        # send fire-and-forget requests
+                        control_async_http.queue_request(proxy_time,
+                                                         controlapi_url(fwd[0], fwd[1]) + '?' + \
+                                                         urllib.urlencode(dict(secret = str(SpinConfig.config['proxy_api_secret']),
+                                                                               method = 'record_alt_login',
+                                                                               other_id = session.user_id,
+                                                                               user_id = str(alt_user_id))),
+                                                         lambda response: None)
+
         else:
             extra_data = ''
 
@@ -1882,13 +1914,7 @@ class GameProxy(proxy.ReverseProxyResource):
                     fwd = session.gameserver_fwd
 
             if not fwd:
-                # pick any open server (e.g. for customer support requests on offline players)
-                qs = {'type':SpinConfig.game(), 'state':'ok',
-                      'gamedata_build': proxysite.proxy_root.static_resources['gamedata-%s-en_US.js' % SpinConfig.game()].build_date,
-                      'gameclient_build': proxysite.proxy_root.static_resources['compiled-client.js'].build_date}
-                result = db_client.server_status_query_one(qs, fields = {'hostname':1, 'game_http_port':1})
-                if result:
-                    fwd = (result['hostname'], result['game_http_port'])
+                fwd = self.get_any_game_server()
 
             if not fwd: raise Exception('cannot find server for CONTROLAPI call: '+log_request(request))
             return self.render_via_proxy(fwd, request)
@@ -2035,14 +2061,7 @@ class GameProxy(proxy.ReverseProxyResource):
 
         elif self.path == '/OGPAPI':
             # pick any open server
-            fwd = None
-
-            qs = {'type':SpinConfig.game(), 'state':'ok',
-                  'gamedata_build': proxysite.proxy_root.static_resources['gamedata-%s-en_US.js' % SpinConfig.game()].build_date,
-                  'gameclient_build': proxysite.proxy_root.static_resources['compiled-client.js'].build_date}
-            result = db_client.server_status_query_one(qs, fields = {'hostname':1, 'game_http_port':1})
-            if result:
-                fwd = (result['hostname'], result['game_http_port'])
+            fwd = self.get_any_game_server()
 
             if not fwd: raise Exception('cannot find server for OGPAPI call: '+log_request(request))
 
@@ -2130,12 +2149,9 @@ class GameProxy(proxy.ReverseProxyResource):
                 # mark account as "deauthorized"
 
                 # pick any open server
-                qs = {'type':SpinConfig.game(), 'state':'ok',
-                      'gamedata_build': proxysite.proxy_root.static_resources['gamedata-%s-en_US.js' % SpinConfig.game()].build_date,
-                      'gameclient_build': proxysite.proxy_root.static_resources['compiled-client.js'].build_date}
-                result = db_client.server_status_query_one(qs, fields = {'hostname':1, 'game_http_port':1})
-                if result:
-                    url = controlapi_url(result['hostname'], result['game_http_port']) + '?' + \
+                fwd = self.get_any_game_server()
+                if fwd:
+                    url = controlapi_url(fwd[0], fwd[1]) + '?' + \
                           urllib.urlencode(dict(secret = str(SpinConfig.config['proxy_api_secret']),
                                                 method = 'mark_uninstalled',
                                                 user_id = str(user_id)))

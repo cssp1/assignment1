@@ -569,8 +569,11 @@ class NoSQLClient (object):
     def _sessions_query_one(self, qs):
         return self.sessions_table().find_one(qs)
 
-    def sessions_get_users_by_ip(self, ip, reason=''):
-        return [x['_id'] for x in self.instrument('sessions_get_users_by_ip(%s)'%reason, self._sessions_query, ({'ip':ip},{'_id':1}))]
+    def sessions_get_users_by_ip(self, ip, exclude_user_id = -1, reason=''):
+        qs = {'ip':ip}
+        if exclude_user_id >= 0:
+            qs['_id'] = {'$ne': exclude_user_id}
+        return [x['_id'] for x in self.instrument('sessions_get_users_by_ip(%s)'%reason, self._sessions_query, (qs,{'_id':1}))]
     def _sessions_query(self, qs, fields):
         return list(self.sessions_table().find(qs, fields))
 
