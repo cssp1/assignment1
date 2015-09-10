@@ -2986,7 +2986,7 @@ function do_fire_projectile_ticks(my_source, my_id, my_spec_name, my_level, my_t
         }
     }
 
-    var speed = player.get_any_abtest_value('global_projectile_speed_scale', gamedata['map']['global_projectile_speed_scale']) * get_leveled_quantity(spell['projectile_speed'] || 0, my_level) * (my_stats ? my_stats.projectile_speed : 1);
+    var speed = player.get_any_abtest_value('global_projectile_speed_scale', gamedata['map']['global_projectile_speed_scale']) * get_leveled_quantity(spell['projectile_speed'] || 0, my_level) * (my_stats ? my_stats.projectile_speed : 1) * TICK_INTERVAL;
 
     // use_lead actually changes combat target position for splash weapons
     // for non-splash weapons, it affects graphics only (since hits are computed independently)
