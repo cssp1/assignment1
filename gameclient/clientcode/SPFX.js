@@ -825,7 +825,224 @@ SPFX.Particles.prototype.run_physics = function(dt) {
     }
 };
 
-// Projectile
+// TimeProjectile
+
+/** @constructor
+    @struct
+    @extends SPFX.Effect
+    @param {!Array.<number>} from
+    @param {number} from_height
+    @param {!Array.<number>} to
+    @param {number} to_height
+    @param {number} launch_time
+    @param {number} impact_time
+    @param {number} max_height
+    @param {!Array.<number>} color
+    @param {Object|null} exhaust
+    @param {number} line_width
+    @param {number} min_length
+    @param {number} fade_time
+    @param {string} comp_mode
+    @param {number} glow
+    @param {string|null} asset
+*/
+SPFX.TimeProjectile = function(from, from_height, to, to_height, launch_time, impact_time, max_height, color, exhaust, line_width, min_length, fade_time, comp_mode, glow, asset) {
+    goog.base(this, null);
+    this.from = from;
+    this.to = to;
+    this.launch_time = launch_time;
+    this.impact_time = impact_time;
+    this.launch_height = 0.5 + from_height;
+    this.to_height = to_height;
+    this.max_height = max_height;
+    this.line_width = line_width;
+    this.min_length = min_length;
+    this.fade_time = fade_time;
+    this.composite_mode = comp_mode || 'source-over';
+    this.glow = glow;
+    this.asset = asset;
+
+    this.last_time = launch_time;
+    this.color_str = (new SPUI.Color(color[0], color[1], color[2], 1.0)).str();
+
+    if(this.impact_time != this.launch_time) {
+        this.tscale = 1/(this.impact_time-this.launch_time);
+    } else {
+        this.tscale = 1000.0;
+    }
+
+    var shot_d = vec_sub(to, this.from);
+    var shot_len = vec_length(shot_d);
+    var shot_dir = vec_scale(1/shot_len, shot_d);
+    this.shot_vel = vec_scale(shot_len * this.tscale, shot_dir);
+
+    if(exhaust) {
+        // exhaust particles
+        this.particles = new SPFX.Particles(null, new SPFX.When(launch_time, null), impact_time - launch_time, exhaust); // should_be_tick
+        this.exhaust_speed = ('speed' in exhaust ? /** @type {number} */ (exhaust['speed']) : 0);
+        this.exhaust_dvel = ('randomize_vel' in exhaust ? /** @type {number} */ (exhaust['randomize_vel']) : 0) * this.exhaust_speed;
+        this.exhaust_vel = vec_scale(-this.exhaust_speed, shot_dir);
+        this.exhaust_rate = Math.floor(Math.min(SPFX.detail, 1) * ('emit_rate' in exhaust ? /** @type {number} */ (exhaust['emit_rate']) : 60));
+        SPFX.add(this.particles);
+    } else {
+        this.particles = null;
+    }
+};
+goog.inherits(SPFX.TimeProjectile, SPFX.Effect);
+
+SPFX.TimeProjectile.prototype.draw_beam = function() {
+    var stroke_start = ortho_to_draw_3d([this.from[0], this.launch_height, this.from[1]]);
+    var stroke_end = ortho_to_draw_3d([this.to[0], this.to_height, this.to[1]]);
+
+    // quantize to pixels
+    quantize_streak(stroke_start, stroke_end);
+
+    var fade = 1;
+    if(this.fade_time > 0) {
+        fade = 1 - (SPFX.time - this.launch_time) / this.fade_time;
+        if(fade <= 0) {
+            return;
+        }
+    }
+
+    SPFX.ctx.save();
+
+    if(1) {
+        SPFX.ctx.globalAlpha = fade;
+        SPFX.set_composite_mode(this.composite_mode);
+        SPFX.ctx.strokeStyle = this.color_str;
+        SPFX.ctx.lineWidth = this.line_width;
+        SPFX.ctx.beginPath();
+        SPFX.ctx.moveTo(stroke_start[0], stroke_start[1]);
+        SPFX.ctx.lineTo(stroke_end[0], stroke_end[1]);
+        SPFX.ctx.stroke();
+    }
+
+    SPFX.ctx.restore();
+};
+
+SPFX.TimeProjectile.prototype.draw = function() {
+    if(SPFX.time < this.launch_time) {
+        return;
+    }
+
+    if(SPFX.time > this.impact_time + this.fade_time) {
+        SPFX.remove(this);
+        return;
+    }
+
+    if(this.min_length > 100.0) {
+        // draw as solid beam instead of projectile
+        return this.draw_beam();
+    }
+
+    var t = SPFX.time - this.launch_time;
+    var dt = SPFX.time - this.last_time;
+
+    // compute x,y ground position
+    var pos = vec_mad(this.from, t, this.shot_vel);
+
+    // parabolic arc
+    var height = this.launch_height + this.max_height * (1 - ((t*this.tscale-0.5)*(t*this.tscale-0.5))/0.25) + t*this.tscale * (this.to_height - this.launch_height);
+    // derivative of above with respect to t
+    var dheight_dt = -8 * this.max_height * (t*this.tscale - 0.5) * this.tscale + this.tscale * (this.to_height - this.launch_height);
+
+    // spawn exhaust particles
+    if(this.particles) {
+        var num_particles = Math.min(0.10, dt) * this.exhaust_rate;
+        var int_particles = Math.floor(num_particles);
+        var frac_particles = num_particles - int_particles;
+        if(Math.random() < frac_particles) {
+            int_particles += 1;
+        }
+        for(var i = 0; i < int_particles; i++) {
+            var pt = t - Math.random()*dt;
+            var ppos = vec_mad(this.from, pt, this.shot_vel);
+            var vel = this.exhaust_vel;
+            /** @type {!Array.<number>} */
+            var spawn_loc = [ppos[0], height, ppos[1]];
+            if(this.particles.spawn_radius > 0) {
+                for(var axis = 0; axis < 3; axis++) {
+                    spawn_loc[i] += this.particles.spawn_radius * (2*Math.random()-1);
+                }
+            }
+            this.particles.spawn(spawn_loc, 0, [vel[0], 0, vel[1]], this.exhaust_dvel, [1,1,1], 1);
+        }
+    }
+
+    // motion blur streak length - by default 50% of time interval to simulate 1/48th
+    // shutter, but don't let it get too large if framerate drops
+    var sdt = 0.5 * Math.min(dt, 0.05);
+
+    var stroke_start = ortho_to_draw_3d([pos[0], height, pos[1]]);
+    var stroke_end_pos = vec_mad(pos, sdt, this.shot_vel);
+    var stroke_end_height = height + sdt * dheight_dt;
+    var stroke_end = ortho_to_draw_3d([stroke_end_pos[0], stroke_end_height, stroke_end_pos[1]]);
+
+    if(this.min_length > 0) {
+        var len = vec_distance(stroke_start, stroke_end);
+        if(len < this.min_length && len > 0) {
+            stroke_end = vec_mad(stroke_start, this.min_length/len, vec_sub(stroke_end, stroke_start));
+        }
+    }
+
+    SPFX.ctx.save();
+
+    if(0) {
+        //console.log(this.from[0]+','+t+' '+height+','+this.shot_vel[0]);
+        SPFX.ctx.strokeStyle = 'rgba(255,200,50,0.1)';
+        SPFX.ctx.lineWidth = 2;
+        SPFX.ctx.beginPath();
+        SPFX.ctx.moveTo(stroke_start[0], stroke_start[1]);
+        SPFX.ctx.lineTo(stroke_end[0], stroke_end[1]);
+        SPFX.ctx.stroke();
+    }
+
+    // quantize to pixels
+    quantize_streak(stroke_start, stroke_end);
+
+    if(this.glow > 0 && SPFX.detail > 1) {
+
+        SPFX.set_composite_mode(/** @type {string|undefined} */ (gamedata['client']['projectile_glow_mode']) || 'source-over');
+        var glow_asset_name = 'fx/glows';
+        var glow_asset = GameArt.assets[glow_asset_name]
+        var glow_sprite = /** @type {!GameArt.Sprite} down-cast from AbstractSprite */ (glow_asset.states['normal']);
+        var glow_image = glow_sprite.images[0];
+
+        // primary glow
+        SPFX.ctx.globalAlpha = this.glow*gamedata['client']['projectile_glow_intensity'];
+        glow_image.draw([stroke_end[0]-Math.floor(glow_image.wh[0]/2),
+                         stroke_end[1]-Math.floor(glow_image.wh[1]/2)]);
+
+        // secondary, fainter glow
+        SPFX.ctx.globalAlpha = this.glow*0.56*gamedata['client']['projectile_glow_intensity'];
+        glow_image = glow_sprite.images[1];
+        glow_image.draw([stroke_end[0]-Math.floor(glow_image.wh[0]/2),
+                         stroke_end[1]-Math.floor(glow_image.wh[1]/2)]);
+
+        SPFX.ctx.globalAlpha = 1;
+        SPFX.set_composite_mode('source-over');
+    }
+
+    if(this.asset) {
+        var sprite = GameArt.assets[this.asset].states['normal'];
+        sprite.draw(stroke_start, 0, SPFX.time);
+    } else {
+        SPFX.ctx.strokeStyle = this.color_str;
+        SPFX.ctx.lineWidth = this.line_width;
+        SPFX.set_composite_mode(this.composite_mode);
+        SPFX.ctx.beginPath();
+        SPFX.ctx.moveTo(stroke_start[0], stroke_start[1]);
+        SPFX.ctx.lineTo(stroke_end[0], stroke_end[1]);
+        SPFX.ctx.stroke();
+    }
+
+    SPFX.ctx.restore();
+
+    this.last_time = SPFX.time;
+};
+
+// TicksProjectile
 
 /** @constructor
     @struct
@@ -847,11 +1064,11 @@ SPFX.Particles.prototype.run_physics = function(dt) {
     @param {number} glow
     @param {string|null} asset
 */
-SPFX.Projectile = function(from, from_height, to, to_height, launch_tick, impact_tick, tick_delay, max_height, color, exhaust, line_width, min_length, fade_time, comp_mode, glow, asset) {
+SPFX.TicksProjectile = function(from, from_height, to, to_height, launch_tick, impact_tick, tick_delay, max_height, color, exhaust, line_width, min_length, fade_time, comp_mode, glow, asset) {
     goog.base(this, null);
 
-    if(SPFX.Projectile.DEBUG) {
-        console.log("Projectile launch_tick "+launch_tick.get().toString()+" impact_tick "+impact_tick.get().toString()+" tick_delay "+tick_delay.toString());
+    if(SPFX.TicksProjectile.DEBUG) {
+        console.log("TicksProjectile launch_tick "+launch_tick.get().toString()+" impact_tick "+impact_tick.get().toString()+" tick_delay "+tick_delay.toString());
     }
 
     this.from = from;
@@ -895,11 +1112,11 @@ SPFX.Projectile = function(from, from_height, to, to_height, launch_tick, impact
         this.particles = null;
     }
 };
-goog.inherits(SPFX.Projectile, SPFX.Effect);
+goog.inherits(SPFX.TicksProjectile, SPFX.Effect);
 
-SPFX.Projectile.DEBUG = false;
+SPFX.TicksProjectile.DEBUG = false;
 
-SPFX.Projectile.prototype.draw_beam = function() {
+SPFX.TicksProjectile.prototype.draw_beam = function() {
     var stroke_start = ortho_to_draw_3d([this.from[0], this.launch_height, this.from[1]]);
     var stroke_end = ortho_to_draw_3d([this.to[0], this.to_height, this.to[1]]);
 
@@ -930,7 +1147,7 @@ SPFX.Projectile.prototype.draw_beam = function() {
     SPFX.ctx.restore();
 };
 
-SPFX.Projectile.prototype.draw = function() {
+SPFX.TicksProjectile.prototype.draw = function() {
     var shot_ticks = this.impact_tick.get() - this.launch_tick.get();
 
     if(GameTypes.TickCount.lt(SPFX.tick, this.launch_tick)) {
@@ -940,7 +1157,7 @@ SPFX.Projectile.prototype.draw = function() {
         this.last_time = this.start_time;
     }
     if(SPFX.time < this.start_time) {
-        if(SPFX.Projectile.DEBUG) {
+        if(SPFX.TicksProjectile.DEBUG) {
             console.log(SPFX.tick.get().toString()+' '+this.id+' cancelled - before start_time');
         }
         return;
@@ -952,7 +1169,7 @@ SPFX.Projectile.prototype.draw = function() {
             if(shot_ticks < 1) { this.end_time += TICK_INTERVAL/combat_time_scale(); }
         }
         if(SPFX.time > this.end_time + this.fade_time) {
-            if(SPFX.Projectile.DEBUG) {
+            if(SPFX.TicksProjectile.DEBUG) {
                 console.log(SPFX.tick.get().toString()+' '+this.id+' cancelled - after end_time');
             }
             SPFX.remove(this);
@@ -1016,7 +1233,7 @@ SPFX.Projectile.prototype.draw = function() {
     // shutter, but don't let it get too large if framerate drops
     var sdprogress = 0.5 * Math.min(dprogress, 0.05);
 
-    if(SPFX.Projectile.DEBUG) {
+    if(SPFX.TicksProjectile.DEBUG) {
         console.log('tick '+SPFX.tick.get().toString()+' progress '+progress.toString()+' dprogress '+dprogress.toString());
     }
 
@@ -1888,13 +2105,14 @@ SPFX.add_visual_effect_at_time = function(pos, altitude, orient, time, data, all
    @param {number} altitude
    @param {!Array.<number>} orient
    @param {!GameTypes.TickCount} tick
+   @param {number} tick_delay
    @param {!Object} data
    @param {boolean} allow_sound
    @param {Object|null} instance_data
    @return {SPFX.FXObject|null}
    */
-SPFX.add_visual_effect_at_tick = function(pos, altitude, orient, tick, data, allow_sound, instance_data) {
-    return SPFX._add_visual_effect(pos, altitude, orient, new SPFX.When(null, tick), data, allow_sound, instance_data);
+SPFX.add_visual_effect_at_tick = function(pos, altitude, orient, tick, tick_delay, data, allow_sound, instance_data) {
+    return SPFX._add_visual_effect(pos, altitude, orient, new SPFX.When(null, tick, tick_delay), data, allow_sound, instance_data);
 };
 
 /**

@@ -60,13 +60,14 @@ CombatEngine.CombatEngine = function() {
 /** @constructor
     @struct
     @param {!GameTypes.TickCount} tick
+    @param {number} client_time_hack - until SPFX can think in terms of ticks, have to use client_time instead of tick count for applicaiton
     @param {GameObject|null} source
     @param {!GameTypes.Integer} amount
     @param {Object.<string,CombatEngine.Coeff>} vs_table
 */
-CombatEngine.DamageEffect = function(tick, source, amount, vs_table) {
-    console.log('DamageEffect at '+tick.get().toString());
+CombatEngine.DamageEffect = function(tick, client_time_hack, source, amount, vs_table) {
     this.tick = tick;
+    this.client_time_hack = client_time_hack;
     this.source = source;
     this.amount = amount;
     this.vs_table = vs_table;
@@ -74,11 +75,14 @@ CombatEngine.DamageEffect = function(tick, source, amount, vs_table) {
 CombatEngine.DamageEffect.prototype.apply = goog.abstractMethod;
 
 
-/** @return {boolean} true if more are pending */
-CombatEngine.CombatEngine.prototype.apply_queued_damage_effects = function() {
+/** @param {boolean} use_ticks instead of client_time
+    @return {boolean} true if more are pending */
+CombatEngine.CombatEngine.prototype.apply_queued_damage_effects = function(use_ticks) {
     for(var i = 0; i < this.damage_effect_queue.length; i++) {
         var effect = this.damage_effect_queue[i];
-        if(GameTypes.TickCount.gte(this.cur_tick, effect.tick)) {
+        var do_it = (use_ticks ? GameTypes.TickCount.gte(this.cur_tick, effect.tick) :
+                     (client_time >= effect.client_time_hack));
+        if(do_it) {
             this.damage_effect_queue.splice(i,1);
             effect.apply();
         }
@@ -92,11 +96,12 @@ CombatEngine.CombatEngine.prototype.apply_queued_damage_effects = function() {
     @struct
     @extends CombatEngine.DamageEffect
     @param {!GameTypes.TickCount} tick
+    @param {number} client_time_hack
     @param {GameObject|null} source
     @param {GameObject} target_obj
 */
-CombatEngine.KillDamageEffect = function(tick, source, target_obj) {
-    goog.base(this, tick, source, 0, null);
+CombatEngine.KillDamageEffect = function(tick, client_time_hack, source, target_obj) {
+    goog.base(this, tick, client_time_hack, source, 0, null);
     this.target_obj = target_obj;
 }
 goog.inherits(CombatEngine.KillDamageEffect, CombatEngine.DamageEffect);
@@ -121,13 +126,14 @@ CombatEngine.KillDamageEffect.prototype.apply = function() {
     @struct
     @extends CombatEngine.DamageEffect
     @param {!GameTypes.TickCount} tick
+    @param {number} client_time_hack
     @param {GameObject|null} source
     @param {GameObject} target_obj
     @param {!GameTypes.Integer} amount
     @param {Object.<string,CombatEngine.Coeff>} vs_table
 */
-CombatEngine.TargetedDamageEffect = function(tick, source, target_obj, amount, vs_table) {
-    goog.base(this, tick, source, amount, vs_table);
+CombatEngine.TargetedDamageEffect = function(tick, client_time_hack, source, target_obj, amount, vs_table) {
+    goog.base(this, tick, client_time_hack, source, amount, vs_table);
     this.target_obj = target_obj;
 }
 goog.inherits(CombatEngine.TargetedDamageEffect, CombatEngine.DamageEffect);
@@ -143,6 +149,7 @@ CombatEngine.TargetedDamageEffect.prototype.apply = function() {
     @struct
     @extends CombatEngine.DamageEffect
     @param {!GameTypes.TickCount} tick
+    @param {number} client_time_hack
     @param {GameObject|null} source
     @param {GameObject} target_obj
     @param {!GameTypes.Integer} amount
@@ -152,8 +159,8 @@ CombatEngine.TargetedDamageEffect.prototype.apply = function() {
     @param {Object.<string,CombatEngine.Coeff>} vs_table
     @param {Object.<string,CombatEngine.Coeff>} duration_vs_table
 */
-CombatEngine.TargetedAuraEffect = function(tick, source, target_obj, amount, aura_name, aura_duration, aura_range, vs_table, duration_vs_table) {
-    goog.base(this, tick, source, amount, vs_table);
+CombatEngine.TargetedAuraEffect = function(tick, client_time_hack, source, target_obj, amount, aura_name, aura_duration, aura_range, vs_table, duration_vs_table) {
+    goog.base(this, tick, client_time_hack, source, amount, vs_table);
     this.target_obj = target_obj;
     this.aura_name = aura_name;
     this.aura_duration = aura_duration;
@@ -178,6 +185,7 @@ CombatEngine.TargetedAuraEffect.prototype.apply = function() {
     @struct
     @extends CombatEngine.DamageEffect
     @param {!GameTypes.TickCount} tick
+    @param {number} client_time_hack
     @param {GameObject|null} source
     @param {!CombatEngine.Pos2D} target_location
     @param {boolean} hit_ground
@@ -188,8 +196,8 @@ CombatEngine.TargetedAuraEffect.prototype.apply = function() {
     @param {Object.<string,CombatEngine.Coeff>} vs_table
     @param {boolean} allow_ff - allow friendly fire
 */
-CombatEngine.AreaDamageEffect = function(tick, source, target_location, hit_ground, hit_air, radius, falloff, amount, vs_table, allow_ff) {
-    goog.base(this, tick, source, amount, vs_table);
+CombatEngine.AreaDamageEffect = function(tick, client_time_hack, source, target_location, hit_ground, hit_air, radius, falloff, amount, vs_table, allow_ff) {
+    goog.base(this, tick, client_time_hack, source, amount, vs_table);
     this.target_location = target_location;
     this.hit_ground = hit_ground;
     this.hit_air = hit_air;
@@ -235,6 +243,7 @@ CombatEngine.AreaDamageEffect.prototype.apply = function() {
     @struct
     @extends CombatEngine.DamageEffect
     @param {!GameTypes.TickCount} tick
+    @param {number} client_time_hack
     @param {GameObject|null} source
     @param {!CombatEngine.Pos2D} target_location
     @param {boolean} hit_ground
@@ -250,8 +259,8 @@ CombatEngine.AreaDamageEffect.prototype.apply = function() {
     @param {Object.<string,CombatEngine.Coeff>} duration_vs_table
     @param {boolean} allow_ff - allow friendly fire
 */
-CombatEngine.AreaAuraEffect = function(tick, source, target_location, hit_ground, hit_air, radius, radius_rect, falloff, amount, aura_name, aura_duration, aura_range, vs_table, duration_vs_table, allow_ff) {
-    goog.base(this, tick, source, amount, vs_table);
+CombatEngine.AreaAuraEffect = function(tick, client_time_hack, source, target_location, hit_ground, hit_air, radius, radius_rect, falloff, amount, aura_name, aura_duration, aura_range, vs_table, duration_vs_table, allow_ff) {
+    goog.base(this, tick, client_time_hack, source, amount, vs_table);
     this.target_location = target_location;
     this.hit_ground = hit_ground;
     this.hit_air = hit_air;
