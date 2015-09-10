@@ -5069,7 +5069,7 @@
             "friend_icon3": { "kind": "FriendIcon", "xy": [353, 163], "dimensions": [50,73], "state": "disabled" },
             "friend_icon4": { "kind": "FriendIcon", "xy": [407, 163], "dimensions": [50,73], "state": "disabled" },
 
-            "close_button": { "kind": "ActionButton", "xy": [463,1], "dimensions": [19,22], "bg_image": "close_button_small", "push_bg_image": 1, "show": 0 },
+            "close_button": { "kind": "ActionButton", "xy": [458,1], "dimensions": [19,22], "bg_image": "close_button_small", "push_bg_image": 1, "show": 0 },
 
             "ok_button": { "kind": "ActionButton", "xy": [257,278], "dimensions": [134,28], "text_offset": [0,1],
                            "bg_image": "action_button_134px", "text_size": 13, "text_style": "bold", "ui_name": "Invite friends" }
