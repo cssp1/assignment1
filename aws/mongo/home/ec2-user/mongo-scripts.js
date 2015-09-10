@@ -3,13 +3,13 @@
 // found in the LICENSE file.
 
 // download a full server backup
-export AWS="/home/ec2-user/aws --secrets-file=/home/ec2-user/XXX-awssecret"
-for F in `$AWS ls -1  spinpunch-backups/marsfrontier2-player-data-20140205/mongo`; do $AWS get --progress spinpunch-backups/$F `basename $F`; done
-for F in *.cpio.gz; do gunzip -c $F | cpio -ivd; done
+// set up ~/.aws/credentials, then
+/usr/bin/aws s3 cp s3://spinpunch-backups/summonersgate-player-data-20150909 . --recursive  --exclude='*' --include='mongo*'
+for F in *.cpio.gz; do tar zxf $F; done
 rm -rf admin
 
 // restore the backup
-/usr/local/mongodb/bin/mongorestore -u root -p `cat /home/ec2-user/.ssh/mf2prod-mongo-root-password` --authenticationDatabase admin .
+mongorestore -u root -p `cat /home/ec2-user/.ssh/XXX-mongo-root-password` --authenticationDatabase admin .
 
 //////////////////////////////
 // 2014 Feb 2 TR database migration

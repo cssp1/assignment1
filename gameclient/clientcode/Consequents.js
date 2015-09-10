@@ -324,6 +324,7 @@ MessageBoxConsequent.prototype.execute = function(state) {
 function InviteFriendsPromptConsequent(data) {
     goog.base(this, data);
     this.show_close_button = ('show_close_button' in data ? data['show_close_button'] : true);
+    this.show_arrow = ('show_arrow' in data ? data['show_arrow'] : true);
 }
 goog.inherits(InviteFriendsPromptConsequent, Consequent);
 InviteFriendsPromptConsequent.prototype.execute = function(state) {
@@ -331,7 +332,9 @@ InviteFriendsPromptConsequent.prototype.execute = function(state) {
     if(!dialog) { return; }
     dialog.widgets['close_button'].show = this.show_close_button;
     // hack - copy code from tutorial_step_congratulations
-    make_tutorial_arrow_for_button('tutorial_congratulations', 'ok_button', 'up');
+    if(this.show_arrow) {
+        make_tutorial_arrow_for_button('tutorial_congratulations', 'ok_button', 'up');
+    }
     GameArt.assets['conquer_sound'].states['normal'].audio.play(client_time);
 };
 
