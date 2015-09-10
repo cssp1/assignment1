@@ -156,10 +156,14 @@ SPFX.time_lt = function(t) {
         }
         // we've reached the tick. Do we need an additional delay?
         if(t.tick_delay > 0) {
-            // MUTATE t to a time value tick_delay into the future
-            t.time = SPFX.time + t.tick_delay;
-            t.tick = null;
-            return SPFX.time < t.time;
+            if(GameTypes.TickCount.equal(SPFX.tick, t.tick)) {
+                // MUTATE t to a time value tick_delay into the future
+                t.time = SPFX.last_tick_time + t.tick_delay;
+                t.tick = null;
+                return SPFX.time < t.time;
+            } else {
+                return false; // we skipped a tick - fire immediately
+            }
         }
         return false;
     } else {
