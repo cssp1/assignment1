@@ -27665,6 +27665,26 @@ function alliance_info_member_row_update(dialog) {
     var alliance_info = (dialog.parent.user_data['alliance_id'] ? AllianceCache.query_info_sync(dialog.parent.user_data['alliance_id']) : null);
     var r = dialog.user_data['user_info'];
 
+    // online indicator
+    dialog.widgets['online'].show = false;
+    if(gamedata['client']['show_alliance_mate_online_status'] &&
+       session.is_in_alliance() && alliance_info && session.alliance_id == dialog.parent.user_data['alliance_id']) {
+        dialog.widgets['online'].show = true;
+        var state = 'gray', msg = 'offline';
+        if('LOCK_STATE' in r && r['LOCK_STATE'] === 1) {
+            state = 'normal'; // green
+            msg = 'online';
+        } else if('LOCK_STATE' in r && r['LOCK_STATE'] == 2) {
+            state = 'yellow';
+            msg = 'under_attack';
+        }
+
+        dialog.widgets['online'].state = state;
+        if(msg) {
+            dialog.widgets['online'].tooltip.str = dialog.data['widgets']['online']['ui_tooltip_'+msg].replace('%s', pretty_print_time(client_time - dialog.parent.user_data['open_time']));
+        }
+    }
+
     // alternate between different lines of tip_info
     if(dialog.user_data['tip_info']) {
         var period = dialog.data['widgets']['info']['blink_period'];
