@@ -1740,6 +1740,7 @@ class NoSQLClient (object):
             obj['obj_id'] = temp
 
     def _save_objects(self, region, table_name, objlist):
+        if not objlist: return
         for obj in objlist:
             assert 'obj_id' in obj
             assert 'owner_id' in obj
