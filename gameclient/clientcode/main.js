@@ -27429,7 +27429,7 @@ function resort_alliance_info_tab(dialog) {
             }
             var props = {};
             props['_client_alliance_rank_'+dialog.user_data['point_stat']['name']] = i;
-            PlayerCache.update(user_id, props);
+            PlayerCache.update(user_id, props, false);
         }
         total = Math.floor(total);
         dialog.user_data['alliance_points'] = total;
@@ -27453,7 +27453,7 @@ function resort_alliance_info_tab(dialog) {
             }
             // NOTE! rank_within_role can have duplicates due to the "tying" logic above!
             props['_client_alliance_rank_within_role_'+dialog.user_data['point_stat']['name']] = rank_within_role;
-            PlayerCache.update(user_id, props);
+            PlayerCache.update(user_id, props, false);
             last_role = role;
             last_count = count;
         }
@@ -43177,7 +43177,7 @@ function handle_server_message(data) {
     } else if(msg == "CHAT_GAG_RESULT" || msg == "CHAT_UNGAG_RESULT") {
         var target_id = data[1], success = data[2];
         if(success) {
-            PlayerCache.update(target_id, {'chat_gagged': (msg == "CHAT_GAG_RESULT" ? true : false)});
+            PlayerCache.update(target_id, {'chat_gagged': (msg == "CHAT_GAG_RESULT" ? true : false)}, false);
             var s = gamedata['strings'][(msg == "CHAT_GAG_RESULT" ? 'chat_gag_success' : 'chat_ungag_success')];
             var info = PlayerCache.query_sync(target_id);
             var name = PlayerCache.get_ui_name(info);
@@ -43453,7 +43453,7 @@ function handle_server_message(data) {
 
         // send trophy data to the cache
         if(viewing_trophy_data) {
-            PlayerCache.update(session.viewing_user_id, viewing_trophy_data);
+            PlayerCache.update(session.viewing_user_id, viewing_trophy_data, false);
         }
 
         session.combat_engine = new CombatEngine.CombatEngine();
