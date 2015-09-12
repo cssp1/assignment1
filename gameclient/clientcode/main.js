@@ -9497,7 +9497,7 @@ function invoke_playfield_controls_bar() {
                     if(GameArt.music_volume > 0) {
                         backdrop_music.loop();
                         backdrop_music.play(client_time);
-                        backdrop_music.fadeTo(50*GameArt.music_volume,1);
+                        backdrop_music.fadeTo((gamedata['client']['backdrop_music_volume_hack'] || 50)*GameArt.music_volume,1);
                     } else {
                         backdrop_music.unloop();
                         backdrop_music.stop(client_time);
@@ -47354,7 +47354,7 @@ function change_backdrop_music(new_backdrop_music) {
                     backdrop_music.play(client_time);
                 }
 
-                backdrop_music.fadeTo(50, 1500);
+                backdrop_music.fadeTo(gamedata['client']['backdrop_music_volume_hack'] || 50, 1500);
             }
         }
     }
