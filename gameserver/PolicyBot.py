@@ -278,6 +278,11 @@ if __name__ == '__main__':
         elif key == '-v' or key == '--verbose':
             verbose = 2
 
+    anti_alt_region_names = [name for name, data in gamedata['regions'].iteritems() if is_anti_alt_region(data)]
+
+    if not manual_user_list and not anti_alt_region_names:
+        sys.exit(0) # nothing to do
+
     with SpinSingletonProcess.SingletonProcess('PolicyBot-%s' % (SpinConfig.config['game_id'],)):
 
         db_client = connect_to_db()
@@ -302,7 +307,6 @@ if __name__ == '__main__':
                 id_list += [1112,]
             else:
                 if verbose: print 'querying player_cache...'
-                anti_alt_region_names = [name for name, data in gamedata['regions'].iteritems() if is_anti_alt_region(data)]
                 id_list += db_client.player_cache_query_tutorial_complete_and_mtime_between_or_ctime_between([[start_time, time_now]], [],
                                                                                                              townhall_name = gamedata['townhall'],
                                                                                                              min_townhall_level = 3,
