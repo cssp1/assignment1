@@ -46404,7 +46404,7 @@ function do_on_mousedown(e) {
         var deployment_dripper_callback = function(mouse_xy) {
             var ji = screen_to_ortho(mouse_xy);
             if(!session.viewing_base.is_deployment_location_valid(ji)) {
-                return;
+                return true; // stop the dripper
             }
             var obj = null;
             // pick the first one
@@ -46418,9 +46418,10 @@ function do_on_mousedown(e) {
             }
             if(obj) {
                 do_deploy(ji, [obj]);
+                return false; // do not stop dripper
             } else {
                 // nothing left
-                mouse_state.dripper.stop();
+                return true; // stop the dripper
             }
         }
 
