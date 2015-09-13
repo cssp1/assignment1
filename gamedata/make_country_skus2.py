@@ -1068,10 +1068,11 @@ if __name__ == '__main__':
 #        "tr": ["P050XY_TRY"] # REMOVED 2013 August 8
         }
 
-    # Portugal was originally using the USD fallback slate, and we
-    # have many payers there in legacy games, so don't change them to Euros.
+    # Portugal and Lithuania were originally using the USD fallback slate, and we
+    # have many payers there in legacy games, so don't change them to (the proper currency) Euros.
     if game_id not in ('mf','tr','mf2','bfm'):
         COUNTRY_MAP["pt"] = ["P135D1_EUR","P135D1SALE_EUR","P135D2_EUR","P135D2SALE_EUR"]
+        COUNTRY_MAP["lt"] = ["P135D1_EUR","P135D1SALE_EUR","P135D2_EUR","P135D2SALE_EUR"]
 
     REVERSE_MAP = {}
 
