@@ -9,6 +9,7 @@ goog.provide('PlayerCache');
 */
 
 goog.require('goog.array');
+goog.require('goog.object');
 
 // client-side player info cache
 // this is a central respository for things we know about other players
@@ -46,8 +47,15 @@ PlayerCache.receive_result = function(tag, result) {
         }
     }
 };
-PlayerCache.update = function(user_id, data) {
+/** @param {number} user_id
+    @param {!Object} data
+    @param {boolean} replace - if true, completely overwrite fields - otherwise just add */
+PlayerCache.update = function(user_id, data, replace) {
     if(user_id in PlayerCache.entries) {
+        if(replace) {
+            // clear in-place to update existing references
+            goog.object.clear(PlayerCache.entries[user_id]);
+        }
         for(var key in data) {
             PlayerCache.entries[user_id][key] = data[key];
         }
@@ -60,7 +68,7 @@ PlayerCache.update_batch = function(datalist) {
     if(!datalist) { return; }
     for(var i = 0; i < datalist.length; i++) {
         if(datalist[i] && datalist[i]['user_id']) {
-            PlayerCache.update(datalist[i]['user_id'], datalist[i]);
+            PlayerCache.update(datalist[i]['user_id'], datalist[i], true);
         }
     }
 };

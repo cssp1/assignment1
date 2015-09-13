@@ -1288,7 +1288,7 @@ GameArt.TintedImage.prototype.prep_for_draw = function() {
 /** @constructor
     @struct
     @param {string} filename
-    @param {number} volume
+    @param {number} volume - 0.0-1.0
     @param {number} priority
     @param {number} load_priority
     @param {boolean} delay_load
@@ -1362,7 +1362,7 @@ GameArt.Sound = function(filename, volume, priority, load_priority, delay_load, 
                         snd.play_on_load = -1;
                     }
                     if(snd.load_faded != -1) {
-                        snd.fadeTo(snd.load_faded, 500);
+                        snd.fadeTo(snd.load_faded, 0.5);
                     }
                 }
                 GameArt.image_onload(entry.filename);
@@ -1402,15 +1402,16 @@ GameArt.Sound = function(filename, volume, priority, load_priority, delay_load, 
 GameArt.Sound.prototype.stop = function(t) { if(this.audio && this.data_loaded) { this.audio.stop(t); } };
 
 GameArt.Sound.prototype.setTime = function(t) { if(this.audio && this.data_loaded) { this.audio.setTime(t); } };
-GameArt.Sound.prototype.fadeIn = function(t) { this.fadeTo(100, t); }
-GameArt.Sound.prototype.fadeOut = function(t) { this.fadeTo(0, t); }
+GameArt.Sound.prototype.fadeIn = function(t) { this.fadeTo(1.0, t); }
+GameArt.Sound.prototype.fadeOut = function(t) { this.fadeTo(0.0, t); }
+/** @param {number} vol 0.0-1.0
+    @param {number} t in seconds */
 GameArt.Sound.prototype.fadeTo = function(vol, t) {
     this.load_faded = vol;
-    this.volume = vol;
     if(!this.entry) { return; }
     if(!this.audio) { this.check_delay_load(); return; }
     if(!this.data_loaded) { return; }
-    this.audio.fadeTo(GameArt.music_volume * vol * gamedata['client']['global_audio_volume'], GameArt.time, t);
+    this.audio.fadeTo(GameArt.music_volume * vol * this.volume * gamedata['client']['global_audio_volume'], GameArt.time, t);
 };
 GameArt.Sound.prototype.loop = function() {
     this.load_looped = true;
@@ -1467,6 +1468,6 @@ GameArt.Sound.prototype.play = function(time) {
         //console.log('ran out of channels to play '+this.filename);
         return false;
     }
-    return this.audio.play(time, 100*this.volume*GameArt.sound_volume*gamedata['client']['global_audio_volume']);
+    return this.audio.play(time, this.volume*GameArt.sound_volume*gamedata['client']['global_audio_volume']);
 };
 

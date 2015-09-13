@@ -3007,6 +3007,13 @@
 
             "portrait": { "kind": "FriendPortrait", "xy": [173,-2], "dimensions": [50,50], "clip_to": [178,4,37,37], "push_bg_image": 1,
                           "ui_tooltip": "Click for info", "fixed_tooltip_offset": [157,48], "tooltip_delay": 0 },
+            "online": { "kind": "StaticImage", "xy": [223,25], "dimensions": [14,14], "asset": "ok_icon", "show": 0,
+                        "ui_tooltip": "",
+                        "ui_tooltip_online": "Online (as of %s ago)",
+                        "ui_tooltip_offline": "Offline (as of %s ago)",
+                        "ui_tooltip_under_attack": "Under Attack (as of %s ago)",
+                        "tooltip_delay": 0, "fixed_tooltip_offset": [200,48] },
+
             "level": { "kind": "TextField", "xy": [223,5], "dimensions": [17, 17], "text_size": 13, "text_hjustify": "center",
                        "text_color":[0.8,0.8,0.8,1], "ui_name": "L%d" },
             "name": { "kind": "TextField", "xy": [250,5], "dimensions": [250, 17], "text_size": 17, "text_hjustify": "left", "text_style": "bold",

@@ -146,7 +146,8 @@ class Sender(object):
 
     def punish_user(self, user_id, master_id, cur_region_name, other_alt_region_names, all_alt_ids):
 
-        cur_continent_id = gamedata['regions'][cur_region_name].get('continent_id',None)
+        cur_region = gamedata['regions'][cur_region_name]
+        cur_continent_id = cur_region.get('continent_id',None)
 
         # find pro- and anti-alt regions in the same continent
         anti_alt_regions = filter(lambda x: is_anti_alt_region(x) and x.get('continent_id',None) == cur_continent_id, gamedata['regions'].itervalues())
@@ -192,14 +193,14 @@ class Sender(object):
         # player messages are slightly different depending on whether the game is majority anti-alt (DV) or not (WSE,TR,etc).
         if not is_repeat_offender:
             if is_majority_anti_alt_game:
-                message_body = 'We have identified an alternate account (ID %d) and therefore relocated your account to %s. If we falsely identified your account as an alternate account, please contact support and our team will be able to assist you with the case. However, note that a repeated violation of our anti-alt policy will result in a permanent ban from map regions.' % (master_id, new_region['ui_name'])
+                message_body = 'We identified an alternate account (ID %d) with you in %s and therefore relocated your base to %s. If we falsely identified your account as an alternate account, please contact support and our team will be able to assist you with the case. However, note that a repeated violation of our anti-alt policy will result in a permanent ban from map regions.' % (master_id, cur_region['ui_name'], new_region['ui_name'])
             else:
-                message_body = 'We have identified an alternate account (ID %d) in an anti-alt region and therefore relocated your account to %s. If we falsely identified your account as an alternate account, please contact support and our team will be able to assist you with the case. However, note that a repeated violation of our anti-alt policy will result in a permanent ban from anti-alt regions.' % (master_id, new_region['ui_name'])
+                message_body = 'We identified an alternate account (ID %d) with you in the anti-alt region %s and therefore relocated your base to %s. If we falsely identified your account as an alternate account, please contact support and our team will be able to assist you with the case. However, note that a repeated violation of our anti-alt policy will result in a permanent ban from anti-alt maps.' % (master_id, cur_region['ui_name'], new_region['ui_name'])
         else: # repeat offender
             if is_majority_anti_alt_game:
-                message_body = 'We have identified an alternate account (ID %d) and therefore relocated your account to %s and locked you out of the main regions due to repeated violations of our anti-alt policy. If you would like to appeal your case, please contact support and our team will be able to assist you.' % (master_id, new_region['ui_name'])
+                message_body = 'We identified an alternate account (ID %d) with you in %s and therefore relocated your base to %s and locked you out of the main map regions due to repeated violations of our anti-alt policy. If you would like to appeal your case, please contact support and our team will be able to assist you.' % (master_id, cur_region['ui_name'], new_region['ui_name'])
             else:
-                message_body = 'We have identified an alternate account (ID %d) in an anti-alt region and therefore relocated your account to %s. Moreover, your account has been locked from anti-alt regions due to repeated violations of our anti-alt policy. If you would like to appeal your case, please contact support and our team will be able to assist you.' % (master_id, new_region['ui_name'])
+                message_body = 'We identified an alternate account (ID %d) with you in the anti-alt region %s and therefore relocated your base to %s. Moreover, your account has been locked from anti-alt map regions due to repeated violations of our anti-alt policy. If you would like to appeal your case, please contact support and our team will be able to assist you.' % (master_id, cur_region['ui_name'], new_region['ui_name'])
 
         if not self.dry_run:
             assert do_CONTROLAPI({'user_id':user_id, 'method':'send_message',
@@ -278,6 +279,11 @@ if __name__ == '__main__':
         elif key == '-v' or key == '--verbose':
             verbose = 2
 
+    anti_alt_region_names = [name for name, data in gamedata['regions'].iteritems() if is_anti_alt_region(data)]
+
+    if not manual_user_list and not anti_alt_region_names:
+        sys.exit(0) # nothing to do
+
     with SpinSingletonProcess.SingletonProcess('PolicyBot-%s' % (SpinConfig.config['game_id'],)):
 
         db_client = connect_to_db()
@@ -302,7 +308,6 @@ if __name__ == '__main__':
                 id_list += [1112,]
             else:
                 if verbose: print 'querying player_cache...'
-                anti_alt_region_names = [name for name, data in gamedata['regions'].iteritems() if is_anti_alt_region(data)]
                 id_list += db_client.player_cache_query_tutorial_complete_and_mtime_between_or_ctime_between([[start_time, time_now]], [],
                                                                                                              townhall_name = gamedata['townhall'],
                                                                                                              min_townhall_level = 3,
