@@ -28079,8 +28079,9 @@ function find_friend_by_user_id(uid) {
     @param {string|null=} obj
     @param {function(SPUI.DialogWidget)|null=} onclick
     @param {string|null=} frame_state_override
-    @param {string|null=} tooltip_override */
-function unit_icon_set(dialog, specname, qty, obj, onclick, frame_state_override, tooltip_override) {
+    @param {string|null=} tooltip_override
+    @param {boolean=} enable_dripper */
+function unit_icon_set(dialog, specname, qty, obj, onclick, frame_state_override, tooltip_override, enable_dripper) {
     var spec = (specname ? gamedata['units'][specname] : null);
     dialog.user_data['spec'] = spec;
     dialog.user_data['obj'] = obj;
@@ -28092,6 +28093,12 @@ function unit_icon_set(dialog, specname, qty, obj, onclick, frame_state_override
         dialog.widgets['stack'].str = (qty > 1 ? pretty_print_number(qty) : null);
         dialog.widgets['frame'].onclick = (onclick ? onclick : null);
         dialog.widgets['frame'].tooltip.str = (tooltip_override ? tooltip_override : (onclick ? spec['ui_name'] + (('ui_tip' in spec) ? '\n'+spec['ui_tip'] : '') : null));
+        if(enable_dripper) {
+            dialog.widgets['frame'].dripper_cb = (function (_w) { return function() { return _w.onclick(_w); }; })(dialog.widgets['frame']);
+            dialog.widgets['frame'].dripper_rate = 4.0;
+        } else {
+            dialog.widgets['frame'].dripper_cb = null;
+        }
     }
     dialog.ondraw = unit_icon_update;
 }

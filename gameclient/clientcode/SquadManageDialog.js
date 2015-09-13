@@ -271,20 +271,23 @@ SquadManageDialog.update_squad_manage = function(dialog) {
             }
             dialog.widgets[wname].xy = vec_add(vec_add(dialog.data['widgets']['reserve_unit']['xy'], [-dialog.user_data['reserve_scroll_pos'],0]),
                                                vec_mul([grid_x,grid_y], dialog.data['widgets']['reserve_unit']['array_offset']));
-            var onclick;
-            if(!pred_ok) {
-                onclick = pred_help;
-            } else {
-                onclick = (function (_squad_id, _specname, _cur_squad_space, _max_squad_space) { return function(w, button) {
+
+            var onclick = (function (_pred_ok, _pred_help, _squad_id, _specname, _cur_squad_space, _max_squad_space) { return function(w, button) {
+                    if(!_pred_ok) {
+                        if(_pred_help) {
+                            _pred_help();
+                        }
+                        return true; // stop dripper
+                    }
                     if(player.squad_is_deployed(_squad_id) || player.squad_is_in_battle(_squad_id)) {
                         var s = gamedata['errors']['CANNOT_ALTER_SQUAD_WHILE_TRAVELING'];
                         invoke_child_message_dialog(s['ui_title'], s['ui_name']);
-                        return;
+                        return true; // stop dripper
                     }
                     if(player.squad_is_under_repair(_squad_id)) {
                         var s = gamedata['errors']['CANNOT_ALTER_SQUAD_UNDER_REPAIR'];
                         invoke_child_message_dialog(s['ui_title'], s['ui_name']);
-                        return;
+                        return true; // stop dripper
                     }
 
                     // find healthiest (or unhealthiest) non-pending reserve unit of this type
@@ -314,7 +317,7 @@ SquadManageDialog.update_squad_manage = function(dialog) {
                     if(no_space) {
                         var s = gamedata['errors']['CANNOT_SQUAD_ASSIGN_UNIT_LIMIT_REACHED'+(_squad_id == SQUAD_IDS.BASE_DEFENDERS ? '_BASE_DEFENDERS' : '')];
                         invoke_child_message_dialog(s['ui_title'], s['ui_name']);
-                        return;
+                        return true; // stop dripper
                     }
                     if(obj) {
                         send_to_server.func(["CAST_SPELL", GameObject.VIRTUAL_ID, "SQUAD_ASSIGN_UNIT", _squad_id, obj['obj_id']]);
@@ -324,13 +327,18 @@ SquadManageDialog.update_squad_manage = function(dialog) {
                             obj['squad_id'] = _squad_id;
                         }
                         obj['pending'] = 1;
+                        return false; // do not stop dripper
                     }
-                }; })(dialog.user_data['squad_id'], specname, cur_squad_space, max_squad_space);
-            }
+
+                    return true; // stop dripper
+
+            }; })(pred_ok, pred_help, dialog.user_data['squad_id'], specname, cur_squad_space, max_squad_space);
 
             var icon_state = ((!pred_ok || squad_is_under_repair || squad_is_deployed || squad_in_battle) ? 'disabled_clickable' : null);
 
-            unit_icon_set(dialog.widgets[wname], specname, reserve_units_by_type[specname], null, onclick, icon_state);
+            var enable_dripper = !!gamedata['client']['squad_manage_dripper'];
+
+            unit_icon_set(dialog.widgets[wname], specname, reserve_units_by_type[specname], null, onclick, icon_state, null, enable_dripper);
             if(!icon_state && dialog.widgets[wname].mouse_enter_time > 0) {
                 dialog.widgets['arrow'].show = true;
                 dialog.widgets['arrow'].xy = dialog.widgets[wname].xy;
