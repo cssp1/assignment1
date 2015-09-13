@@ -30282,28 +30282,25 @@ function update_manufacture_dialog(dialog) {
                             invoke_child_message_dialog(s['ui_title'], s['ui_name'], {'dialog': 'message_dialog_big'});
                         }
                     } else if(available_space < cost_space && !player.is_cheater) {
-                        var dripper = w.get_dripper();
-                        if (!dripper || dripper.times_fired <= 1) { // do not repeatedly display help when dripper is rapid-firing more clicks
-                            var helper = get_requirements_help('unit_space', cost_space - available_space);
-                            if(helper) {
-                                helper();
+                        var helper = get_requirements_help('unit_space', cost_space - available_space);
+                        if(helper) {
+                            helper();
+                        } else {
+                            var s = null;
+                            if(player.squads_enabled()) {
+                                var reason = classify_unit_space_shortage();
+                                if(reason == 'base_defenders') {
+                                    s = gamedata['strings']['requirements_help']['unit_space_base_defenders']['manage_base_defenders'];
+                                } else if(reason == 'total_army') {
+                                    s = gamedata['strings']['requirements_help']['unit_space_total_army']['upgrade'];
+                                } else if(reason == 'recycle') {
+                                    s = gamedata['strings']['requirements_help']['unit_space_total_army']['recycle'];
+                                }
                             } else {
-                                var s = null;
-                                if(player.squads_enabled()) {
-                                    var reason = classify_unit_space_shortage();
-                                    if(reason == 'base_defenders') {
-                                        s = gamedata['strings']['requirements_help']['unit_space_base_defenders']['manage_base_defenders'];
-                                    } else if(reason == 'total_army') {
-                                        s = gamedata['strings']['requirements_help']['unit_space_total_army']['upgrade'];
-                                    } else if(reason == 'recycle') {
-                                        s = gamedata['strings']['requirements_help']['unit_space_total_army']['recycle'];
-                                    }
-                                } else {
-                                    s = gamedata['strings']['requirements_help']['unit_space']['upgrade'];
-                                }
-                                if(s) {
-                                    invoke_child_message_dialog(s['ui_title'], s['ui_description'], {'dialog': 'message_dialog_big'});
-                                }
+                                s = gamedata['strings']['requirements_help']['unit_space']['upgrade'];
+                            }
+                            if(s) {
+                                invoke_child_message_dialog(s['ui_title'], s['ui_description'], {'dialog': 'message_dialog_big'});
                             }
                         }
                     } else if(builder.is_repairing()) {
@@ -30328,12 +30325,16 @@ function update_manufacture_dialog(dialog) {
                         }
                     } else {
                         send_command();
+                        return false; // do not stop the dripper
                     }
 
                 } else {
                     var helper = manufacture_dialog_unlock_helper(dialog.user_data['category'], spec_name, 'closure:builder'+(builder?'1':'0')+'unlock_level'+unlock_level.toString());
                     if(helper) { helper(); }
                 }
+
+                // all paths that do not end in send_command() should return true to stop the dripper, since it indicates some problem that must be solved.
+                return true;
             };
         })(name);
         widget.onclick = closure;

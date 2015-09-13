@@ -1876,12 +1876,10 @@ SPUI.ActionButton = function(data) {
     }
 
     if('dripper' in data) {
-        var make_dripper_cb = function(widget) {
-            return function() {
-                widget.onclick(widget);
-            };
-        };
-        this.dripper_cb = make_dripper_cb(this);
+        // parameterless callback that Dripper will call directly
+        this.dripper_cb = (function (_this) { return function() {
+            return _this.onclick(_this); // pass return value in case onclick wants to stop the dripper
+        }; })(this);
         this.dripper_rate = data['dripper']['rate'] || 1.5;
         this.dripper_delay = data['dripper']['delay'] || 0;
     } else {
@@ -1889,6 +1887,7 @@ SPUI.ActionButton = function(data) {
     }
 
     // note: it is expected that the caller will over-ride the onclick() handler
+    // return true to stop repeated calls from the dripper
     this.onclick = function(widget, buttons) { console.log('BUTTON PRESS ' + widget.str); };
 
     // mouse-enter handler
