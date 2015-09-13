@@ -2343,9 +2343,9 @@
                                                 "load_priority": 100
                                               } } },
 
-    "background_music": { "states": { "normal": { "audio": "art/music/home_base_contra_bassoon_amend_27_06_13_50kbit.$AUDIO_CODEC", "audio_type": "music", "volume": 1.0, "load_priority":200 },
-                                      "recon": { "audio": "art/music/Spying_Driven_by_Fear_30sec_64kbit.$AUDIO_CODEC", "audio_type": "music", "load_priority":100 },
-                                      "combat": { "audio": "art/music/attack_theme_loop_30sec_64kbit.$AUDIO_CODEC", "audio_type": "music", "load_priority":100 }
+    "background_music": { "states": { "normal": { "audio": "art/music/home_base_contra_bassoon_amend_27_06_13_50kbit.$AUDIO_CODEC", "audio_type": "music", "volume": 0.5, "load_priority":200 },
+                                      "recon": { "audio": "art/music/Spying_Driven_by_Fear_30sec_64kbit.$AUDIO_CODEC", "audio_type": "music", "volume": 0.5, "load_priority":100 },
+                                      "combat": { "audio": "art/music/attack_theme_loop_30sec_64kbit.$AUDIO_CODEC", "audio_type": "music", "volume": 0.5, "load_priority":100 }
                                     } },
 
     "backdrop_ice": { "states": { "home":  { "images": ["art/floor/backdrop_ice.jpg"], "dimensions": [512,512], "delay_load": 1 },

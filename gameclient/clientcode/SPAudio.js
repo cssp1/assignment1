@@ -6,6 +6,8 @@ goog.provide('SPAudio');
 
 /** @fileoverview
     @suppress {reportUnknownTypes} XXX we are not typesafe yet
+
+    Note: in the outward-facing API, "volume" should be in the range 0.0-1.0 and times are in seconds.
 */
 
 goog.require('buzz');
@@ -92,7 +94,7 @@ SPAudio.SM2Sample.prototype.loop = function() {
     this.play_looped = true;
     if(this.loaded && !this.obj.playState) {
         // XXX hack until we separate streaming audio
-        this.play((new Date()).getTime()/1000, 25.0);
+        this.play((new Date()).getTime()/1000, 0.25);
     }
 };
 
@@ -113,12 +115,11 @@ SPAudio.SM2Sample.prototype.do_load = function() {
             }
         }; })(this)
     });
-    //window.setTimeout(this.success_cb, 100);
 };
 SPAudio.SM2Sample.prototype.play = function(t, v) {
     if(!this.loaded) { return false; }
     if(!this.play_looped || !this.obj.playState) {
-        this.obj.play({volume:v, loops: this.play_looped ? 999 : 1, multiShot: !this.play_looped});
+        this.obj.play({volume:v*100, loops: this.play_looped ? 999 : 1, multiShot: !this.play_looped});
     }
     this.last_volume = v;
     return true;
@@ -139,15 +140,17 @@ SPAudio.SM2Sample.prototype.fadeTo = function(v, start_time, dur) {
     if(i >= this.driver.faders.length) { this.driver.faders.push(this); }
 
     this.fade_start = start_time;
-    this.fade_end = start_time + dur/1000.0;
+    this.fade_end = start_time + dur;
     this.fade_vol = v;
 };
 
 SPAudio.SM2Sample.prototype.fade_step = function(t) {
     if(this.fade_start < 0) { return; }
-    var progress = (t - this.fade_start) / (this.fade_end - this.fade_start);
+    var fade_dur = this.fade_end - this.fade_start;
+    var progress = (fade_dur > 0 ? (t - this.fade_start) / fade_dur : 1);
     if(progress < 0) { return; }
     if(progress >= 1) {
+        progress = 1;
         this.last_volume = this.fade_vol;
         this.fade_start = -1;
         this.fade_end = -1;
@@ -155,7 +158,7 @@ SPAudio.SM2Sample.prototype.fade_step = function(t) {
     }
     if(this.loaded) {
         var vol = this.last_volume + progress * (this.fade_vol - this.last_volume);
-        this.obj.setVolume(vol);
+        this.obj.setVolume(100*vol);
     }
 };
 
@@ -216,7 +219,7 @@ SPAudio.BuzzSample.prototype.unloop = function() { this.play_looped = false; thi
 SPAudio.BuzzSample.prototype.play = function(time, volume) {
     // prevent overlap on non-looped samples
     if(!this.play_looped && time > 0 && time < this.end_time) { return false; }
-    this.buzz_sound.setVolume(volume);
+    this.buzz_sound.setVolume(100*volume);
     if(0) {
         // potential multishot solution for FireFox?
         // this.buzz_sound.sound.cloneNode().play();
@@ -234,7 +237,7 @@ SPAudio.BuzzSample.prototype.stop = function(t) { this.buzz_sound.stop(); };
 SPAudio.BuzzSample.prototype.setTime = function(t) { this.buzz_sound.setTime(t); };
 SPAudio.BuzzSample.prototype.fadeTo = function(v, start, t) {
     try {
-        this.buzz_sound.fadeTo(v, t);
+        this.buzz_sound.fadeTo(100*v, 1000*t);
     } catch (ex) {
         log_exception(ex, 'buzz.fadeTo "'+this.url+'"');
     }
@@ -343,7 +346,7 @@ SPAudio.ACSample.prototype.play = function(t, v) {
     var gain = this.driver.context.createGain();
     voice['connect'](gain);
 
-    gain['gain']['value'] = v/100.0;
+    gain['gain']['value'] = v;
     gain['connect'](this.driver.context['destination']);
 
     // name changed from Chrome implementation (noteOn) to final Web Audio API (start)
@@ -365,7 +368,7 @@ SPAudio.ACSample.prototype.loop = function() {
         this.last_voice['loop'] = true;
     } else {
         // XXX hack until we separate streaming audio
-        this.play((new Date()).getTime()/1000, 100.0);
+        this.play((new Date()).getTime()/1000, 0.25);
     }
 };
 SPAudio.ACSample.prototype.unloop = function() {
@@ -404,15 +407,17 @@ SPAudio.ACSample.prototype.fadeTo = function(v, start_time, dur) {
     if(i >= this.driver.faders.length) { this.driver.faders.push(this); }
 
     this.fade_start = start_time;
-    this.fade_end = start_time + dur/1000.0;
+    this.fade_end = start_time + dur;
     this.fade_vol = v;
 };
 
 SPAudio.ACSample.prototype.fade_step = function(t) {
     if(this.fade_start < 0) { return; }
-    var progress = (t - this.fade_start) / (this.fade_end - this.fade_start);
+    var fade_dur = this.fade_end - this.fade_start;
+    var progress = (fade_dur > 0 ? (t - this.fade_start) / fade_dur : 1);
     if(progress < 0) { return; }
     if(progress >= 1) {
+        progress = 1;
         this.last_volume = this.fade_vol;
         this.fade_start = -1;
         this.fade_end = -1;
@@ -420,7 +425,7 @@ SPAudio.ACSample.prototype.fade_step = function(t) {
     }
     if(this.last_voice) {
         var vol = this.last_volume + progress * (this.fade_vol - this.last_volume);
-        this.last_gain['gain']['value'] = vol/100.0;
+        this.last_gain['gain']['value'] = vol;
     }
 };
 
