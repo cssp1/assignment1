@@ -184,6 +184,7 @@
         "squad_pre_attack": 1, // whether "Spy" button becomes "Attack" on regional map when looking at hostile squad
 
         "predict_squad_assign": 1, // enable client-side prediction for SQUAD_ASSIGN/UNASSIGN_UNIT
+        "squad_manage_dripper": 1, // enable click-and-hold for SQUAD_ASSIGN/UNASSIGN_UNIT
 
         // if true, ALWAYS shove the Missions dialog in the player's face and "click here" on the "Claim" button
         // as soon as any quest is completable, even the one that is not tracked!

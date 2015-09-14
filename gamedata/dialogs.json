@@ -6876,9 +6876,9 @@
             "deployed_midbar_coords":  { "kind": "TextField", "xy": [478,240], "dimensions": [220,38], "text_size": 13, "text_style": "thick",
                                          "text_hjustify": "center", "ui_name": "(%x,%y)" },
 
-            "squad_none_label":  { "kind": "TextField", "xy": [47,99], "dimensions": [330,38], "text_size": 13, "text_style": "thick",
+            "squad_none_label":  { "kind": "TextField", "xy": [47,160], "dimensions": [330,38], "text_size": 13, "text_style": "thick",
                                    "text_hjustify": "center",
-                                   "ui_name": "No units in battalion.\n\nClick a reserve unit at right to\nassign to this battalion.",
+                                   "ui_name": "No units in battalion.\n\nClick a reserve unit at right to\nassign to this battalion.\n\nClick and hold to assign multiple units rapidly.\n\nLeft-click to assign healthiest unit of that type.\nRight-click to assign most damaged unit of that type.",
                                    "ui_name_reserves_empty": "No units in battalion.",
                                    "text_color": [0.5,0.5,0.5,1] },
 

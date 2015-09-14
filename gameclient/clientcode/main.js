@@ -28507,6 +28507,9 @@ function army_unit_compare(a,b) {
     var bcurmax = army_unit_hp(b), bratio = bcurmax[0]/Math.max(bcurmax[1],1);
     if(aratio < bratio) { return 1; }
     if(aratio > bratio) { return -1; }
+    // use obj_id to break ties, for stable sort order
+    if(a['obj_id'] < b['obj_id']) { return 1; }
+    if(a['obj_id'] > b['obj_id']) { return -1; }
     return 0;
 }
 
