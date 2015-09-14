@@ -46192,7 +46192,7 @@ function do_on_mousemove(e) {
             }
         }
 
-        if(!mouse_state.button.get_button(SPUI.MouseButton.LEFT)) {
+        if(mouse_state.button.get_any_button() && mouse_state.has_scrolled) {
             // remove pop-up UI ONLY if it's a context menu
             if(player.tutorial_state == "COMPLETE" &&
                selection.ui != null &&

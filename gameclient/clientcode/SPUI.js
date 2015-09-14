@@ -37,6 +37,8 @@ SPUI.MouseButtonState = function(init) {
 /** @param {SPUI.MouseButton} num
     @return {boolean} */
 SPUI.MouseButtonState.prototype.get_button = function(num) { return (this.mask & (1<<num)) != 0; };
+/** @return {boolean} if any button is pressed */
+SPUI.MouseButtonState.prototype.get_any_button = function() { return this.mask !== 0; };
 /** @param {SPUI.MouseButton} num */
 SPUI.MouseButtonState.prototype.set_button = function(num) { this.mask |= (1<<num); };
 /** @param {SPUI.MouseButton} num */
