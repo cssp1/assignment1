@@ -242,6 +242,32 @@
         }
     },
 
+    "instant_repair_confirm_dialog": {
+        "dimensions": [451, 173],
+        "default_button": "close_button",
+        "clip_children": 0,
+        "widgets": {
+            "bg": {"kind": "StaticImage", "xy":[0,0], "dimensions":[451,173], "asset": "dialog_resizable", "bg_image_resizable": 1 },
+            "sunken_left": {"kind": "StaticImage", "xy":[9,11], "dimensions":[72,76], "asset": "dialog_sunken_resizable", "bg_image_resizable": 1 },
+            "valentina": { "kind": "StaticImage", "xy": [8,14], "dimensions": [72,72], "clip_to": [12,16,65,67], "asset": "valentina_72x72" },
+            "sunken_right": {"kind": "StaticImage", "xy":[89,11], "dimensions":[352,106], "asset": "dialog_sunken_resizable", "bg_image_resizable": 1 },
+
+            "title":  { "kind": "TextField", "xy": [110,19], "dimensions": [294, 24], "text_style": "bold", "text_hjustify": "left",
+                        "ui_name": "Confirm Repair" },
+
+            "description": { "kind": "TextField", "xy": [110,43], "dimensions": [294,34], "text_hjustify": "left",  "text_size": 13, "text_leading": 15,
+                             "text_vjustify": "top",
+                             "ui_name": "Use %GAMEBUCKS to repair all instantly?" },
+
+            "close_button": { "kind": "ActionButton", "xy": [424,1], "dimensions": [19,22], "bg_image": "close_button_small", "push_bg_image": 1 },
+            "price_display": { "kind": "ActionButton", "xy": [190,128], "dimensions": [120,32], "text_offset": [8,1], "text_size": 13, "text_style": "thick",
+                               "bg_image": "price_display", "ui_name": "%d", "ui_tooltip": "", "tooltip_delay": 0 }, // PRICE
+            "ok_button": { "kind": "ActionButton", "xy": [308,130], "dimensions": [134,28], "text_offset": [0,1],
+                           "bg_image": "action_button_134px", "state": "bigaction", "text_size": 13,
+                           "text_style": "bold", "ui_name": "Repair Instantly", "ui_tooltip": "", "tooltip_delay": 0 }
+        }
+    },
+
     "change_region_offer_dialog": {
         "dimensions": [451, 173],
         "default_button": "ok_button",

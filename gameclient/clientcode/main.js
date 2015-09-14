@@ -15047,7 +15047,7 @@ function invoke_you_were_attacked_dialog(recent_attacks) {
         dialog.widgets['halt_message'].str = interrupts.join('\n');
     }
 
-    init_dialog_repair_buttons(dialog, current_base_damage);
+    init_dialog_repair_buttons(dialog, current_base_damage, true);
 
     notification_queue.push(invoke_damage_protection_notice);
 
@@ -15064,7 +15064,81 @@ function test_you_were_attacked_dialog() {
 // hack - make sure repairs are only started once on login
 var repairs_started = false;
 
-function init_dialog_repair_buttons(dialog, base_damage) {
+function start_slow_repairs() {
+    send_to_server.func(["CAST_SPELL", GameObject.VIRTUAL_ID, "REPAIR", session.viewing_base.base_id]);
+
+    for(var id in session.cur_objects.objects) {
+        var obj = session.cur_objects.objects[id];
+        if(obj.is_building() && obj.is_damaged() && !obj.is_repairing()) {
+            // client-side predict
+            var health = (obj.hp) / (1.0*obj.max_hp);
+            health = Math.max(0.0, Math.min(health, 1.0))
+            var repair_time = Math.max(1, Math.floor((1.0-health)*(obj.get_leveled_quantity(obj.spec['repair_time'])/obj.get_stat('repair_speed',1))))
+            obj.repair_finish_time = server_time + repair_time;
+            obj.update_all_actions(server_time);
+        }
+    }
+    if(('enable_defending_units' in gamedata) && !gamedata['enable_defending_units']) {
+        // also check army for repair candidates
+        for(var id in player.my_army) {
+            var unit = player.my_army[id];
+            if((unit['squad_id']||0) == SQUAD_IDS.BASE_DEFENDERS) {
+                var curmax = army_unit_hp(unit);
+                if(curmax[0]<curmax[1] && !army_unit_is_under_repair(unit['obj_id']) && player.can_repair_unit_of_spec(gamedata['units'][unit['spec']], curmax[0])) {
+                    send_to_server.func(["UNIT_REPAIR_QUEUE", unit['obj_id']]);
+                }
+            }
+        }
+        unit_repair_sync_marker = synchronizer.request_sync();
+    }
+}
+
+function confirm_instant_repairs(price, ok_cb) {
+    var dialog_data = gamedata['dialogs']['instant_repair_confirm_dialog'];
+    var dialog = new SPUI.Dialog(dialog_data);
+    install_child_dialog(dialog);
+    dialog.auto_center();
+    dialog.modal = true;
+
+    dialog.widgets['description'].set_text_with_linebreaking(dialog.data['widgets']['description']['ui_name'].replace('%GAMEBUCKS', Store.gamebucks_ui_name()));
+    dialog.widgets['price_display'].bg_image = player.get_any_abtest_value('price_display_asset', gamedata['store']['price_display_asset']);
+    dialog.widgets['price_display'].state = Store.get_user_currency();
+    dialog.widgets['price_display'].str = Store.display_user_currency_price(price); // PRICE
+    dialog.widgets['price_display'].tooltip.str = Store.display_user_currency_price_tooltip(price);
+    dialog.widgets['price_display'].onclick =
+        dialog.widgets['ok_button'].onclick = (function (_ok_cb) { return function(w) { close_parent_dialog(w); _ok_cb(); }; })(ok_cb);
+    dialog.widgets['close_button'].onclick = close_parent_dialog;
+    return dialog;
+}
+
+/** @param {function()} cb to call once order is submitted
+    @return {boolean} whether repairs actually took place (may be cancelled if insufficient funds) */
+function do_instant_repairs(cb) {
+    return Store.place_user_currency_order(GameObject.VIRTUAL_ID, "REPAIR_ALL_FOR_MONEY",
+                                           session.viewing_base.base_id,
+                                           (function (_cb) { return function() {
+                                               for(var id in session.cur_objects.objects) {
+                                                   var obj = session.cur_objects.objects[id];
+                                                   if(obj.is_building() && obj.is_damaged()) {
+                                                       if(obj.is_destroyed()) { // reblock
+                                                           obj.block_map(1, 'REPAIR_ALL_FOR_MONEY predict');
+                                                       }
+                                                       obj.hp = obj.max_hp; obj.repair_finish_time = -1; // client-side predict
+                                                       obj.update_all_actions(server_time);
+                                                   }
+                                               }
+                                               _cb();
+                                           }; })(cb)
+                                          );
+}
+
+
+/** Set up the instant/slow repair buttons and price display.
+    Shared functionality for several different dialogs.
+    @param {!SPUI.Dialog} dialog
+    @param {number} base_damage
+    @param {boolean} enable_confirm - if true, enable the "are you sure?" confirmation */
+function init_dialog_repair_buttons(dialog, base_damage, enable_confirm) {
     var cost_res = {};
     var do_units = true;
     var any_unit_damage = false;
@@ -15104,38 +15178,6 @@ function init_dialog_repair_buttons(dialog, base_damage) {
     dialog.widgets['price_display'].bg_image = player.get_any_abtest_value('price_display_asset', gamedata['store']['price_display_asset']);
     dialog.widgets['price_display'].state = Store.get_user_currency();
 
-    var start_slow_repair = function(w) {
-        var dialog = w.parent;
-        close_parent_dialog(w);
-
-        send_to_server.func(["CAST_SPELL", GameObject.VIRTUAL_ID, "REPAIR", session.viewing_base.base_id]);
-
-        for(var id in session.cur_objects.objects) {
-            var obj = session.cur_objects.objects[id];
-            if(obj.is_building() && obj.is_damaged() && !obj.is_repairing()) {
-                // client-side predict
-                var health = (obj.hp) / (1.0*obj.max_hp);
-                health = Math.max(0.0, Math.min(health, 1.0))
-                var repair_time = Math.max(1, Math.floor((1.0-health)*(obj.get_leveled_quantity(obj.spec['repair_time'])/obj.get_stat('repair_speed',1))))
-                obj.repair_finish_time = server_time + repair_time;
-                obj.update_all_actions(server_time);
-            }
-        }
-        if(('enable_defending_units' in gamedata) && !gamedata['enable_defending_units']) {
-            // also check army for repair candidates
-            for(var id in player.my_army) {
-                var unit = player.my_army[id];
-                if((unit['squad_id']||0) == SQUAD_IDS.BASE_DEFENDERS) {
-                    var curmax = army_unit_hp(unit);
-                    if(curmax[0]<curmax[1] && !army_unit_is_under_repair(unit['obj_id']) && player.can_repair_unit_of_spec(gamedata['units'][unit['spec']], curmax[0])) {
-                        send_to_server.func(["UNIT_REPAIR_QUEUE", unit['obj_id']]);
-                    }
-                }
-            }
-            unit_repair_sync_marker = synchronizer.request_sync();
-        }
-    };
-
     if(base_damage > 0 || (player.unit_speedups_enabled() && any_unit_damage)) { // also check for unit repair cost?
         var instant_price = Store.get_user_currency_price(GameObject.VIRTUAL_ID, gamedata['spells']['REPAIR_ALL_FOR_MONEY'], session.viewing_base.base_id);
         dialog.widgets['price_display'].str = Store.display_user_currency_price(instant_price); // PRICE
@@ -15163,33 +15205,29 @@ function init_dialog_repair_buttons(dialog, base_damage) {
                 //send_to_server.func(["UNIT_REPAIR_SPEEDUP_FOR_FREE"]);
             };
         } else {
-            dialog.widgets['price_display'].onclick =
-                dialog.widgets['repair_instant_button'].onclick = function(w) {
-                    var dialog = w.parent;
+            var begin = (function (_dialog) { return function() {
+                var on_start = (function (__dialog) { return function() {
+                    __dialog.widgets['repair_instant_button'].str = __dialog.data['widgets']['repair_instant_button']['ui_name_pending'];
+                    __dialog.widgets['repair_instant_button'].state = 'disabled'; __dialog.widgets['price_display'].onclick = null;
+                }; })(_dialog);
+                var on_complete = (function (__dialog) { return function() { close_dialog(__dialog); }; })(_dialog);
+                if(do_instant_repairs(on_complete)) {
+                    on_start();
+                }
+            }; })(dialog);
 
-                    if(Store.place_user_currency_order(GameObject.VIRTUAL_ID, "REPAIR_ALL_FOR_MONEY",
-                                                       session.viewing_base.base_id,
-                                                       (function (_w) { return function() {
-                                                           close_parent_dialog(_w);
-                                                           for(var id in session.cur_objects.objects) {
-                                                               var obj = session.cur_objects.objects[id];
-                                                               if(obj.is_building() && obj.is_damaged()) {
-                                                                   if(obj.is_destroyed()) { // reblock
-                                                                       obj.block_map(1, 'REPAIR_ALL_FOR_MONEY predict');
-                                                                   }
-                                                                   obj.hp = obj.max_hp; obj.repair_finish_time = -1; // client-side predict
-                                                                   obj.update_all_actions(server_time);
-                                                               }
-                                                           }
-                                                       }; })(w)
-                                                      )) {
-                        dialog.widgets['repair_instant_button'].str = dialog.data['widgets']['repair_instant_button']['ui_name_pending'];
-                        dialog.widgets['repair_instant_button'].state = 'disabled'; dialog.widgets['price_display'].onclick = null;
-                    }
-            };
+            var do_confirm = enable_confirm && player.get_any_abtest_value('confirm_instant_repairs', gamedata['client']['confirm_instant_repairs']);
+
+            dialog.widgets['price_display'].onclick =
+                dialog.widgets['repair_instant_button'].onclick = (do_confirm ? (function (_instant_price, _begin) { return function(w) {
+                    confirm_instant_repairs(_instant_price, _begin);
+                }; })(instant_price, begin) : begin);
         }
 
-        dialog.widgets['repair_slow_button'].onclick = start_slow_repair;
+        dialog.widgets['repair_slow_button'].onclick = function(w) {
+            close_parent_dialog(w);
+            start_slow_repairs();
+        };
 
     } else {
         // base is not damaged
@@ -15197,7 +15235,10 @@ function init_dialog_repair_buttons(dialog, base_damage) {
         dialog.widgets['repair_slow_button'].show =
             dialog.widgets['repair_instant_button'].show = false;
         dialog.widgets['repair_not_necessary_button'].show = true;
-        dialog.widgets['repair_not_necessary_button'].onclick = (any_unit_damage ? start_slow_repair : close_parent_dialog);
+        dialog.widgets['repair_not_necessary_button'].onclick = (any_unit_damage ? function(w) {
+            close_parent_dialog(w);
+            start_slow_repairs();
+        } : close_parent_dialog);
         dialog.default_button = dialog.widgets['repair_not_necessary_button'];
     }
 };
@@ -15207,7 +15248,7 @@ function do_invoke_repair_dialog() {
     var dialog = new SPUI.Dialog(dialog_data);
     dialog.user_data['dialog'] = 'repair_dialog';
     dialog.modal = true;
-    init_dialog_repair_buttons(dialog, calc_base_damage({count_partial:true}));
+    init_dialog_repair_buttons(dialog, calc_base_damage({count_partial:true}), false);
     // count # of things needing repair, for UI only
     var buildings = 0, units = 0, barriers = 0, beyond_tech = 0, beyond_tech_types = {};
     for(var id in session.cur_objects.objects) {
@@ -16808,7 +16849,7 @@ function invoke_defense_end_dialog(battle_type, battle_base, battle_opponent_use
             dialog.widgets[res+'_amount'].str = pretty_print_number(lost);
         }
     }
-    init_dialog_repair_buttons(dialog, base_damage);
+    init_dialog_repair_buttons(dialog, base_damage, true);
     return dialog;
 };
 
@@ -18743,7 +18784,7 @@ function invoke_fancy_victory_dialog(battle_type, battle_base, battle_opponent_u
         // defensive battle
         var damage = calc_base_damage({count_partial:true});
         dialog.widgets['base_damage'].str = dialog.widgets['base_damage'].data['ui_name'].replace('%pct', Math.floor(100*damage).toFixed(0) + '%');
-        init_dialog_repair_buttons(dialog, damage);
+        init_dialog_repair_buttons(dialog, damage, true);
         dialog.default_button = dialog.widgets[(damage > 0 ? 'repair_instant_button' : 'repair_not_necessary_button')];
         dialog.widgets['close_button'].show = false;
         dialog.widgets['close_button'].onclick = null; // prevent ESC from working
