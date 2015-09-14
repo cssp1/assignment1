@@ -585,7 +585,7 @@ function update_client_and_server_time() {
 // for tracking mouse movement
 var mouse_state = { last_x: 0, last_y: 0, // last x,y location of movement that the game field handled
                     last_raw_x: 0, last_raw_y: 0, // last x,y location of movement, regardless of who handled the event
-                    button: 0,  // bitmask of button states
+                    button: new SPUI.MouseButtonState(),  // bitmask of button states, manipulate with SPUI.MouseButtonState methods
                     spacebar: false, // whether or not spacebar is being held down
                     // state of view-scroll operation
                     has_scrolled: false, scroll_start_x: 0, scroll_start_y: 0,
@@ -602,10 +602,6 @@ var mouse_state = { last_x: 0, last_y: 0, // last x,y location of movement that 
                     last_unit_clicked: null,
                     last_click_time: -1 // client_time when the click was made
                   };
-mouse_state.get_button = function(num) { return (mouse_state.button & (1<<num)) != 0; };
-mouse_state.set_button = function(num) { mouse_state.button |= (1<<num); };
-mouse_state.clear_button = function(num) { mouse_state.button &= ~(1<<num); };
-mouse_state.clear_all_buttons = function() { mouse_state.button = 0; };
 
 // number of seconds after a click within which a second click will be considered a double-click
 var DOUBLE_CLICK_TIME = 0.6;
@@ -45453,12 +45449,13 @@ function on_mouseup(e) {
 function do_on_mouseup(e) {
     e.preventDefault();
 
-    mouse_state.clear_button(e.button);
+    mouse_state.button.clear_button(/** @type {SPUI.MouseButton} */ (e.button));
+    var button_delta = new SPUI.MouseButtonState(/** @type {SPUI.MouseButton} */ (e.button));
 
     // get canvas coordinates of mouse pointer location
     var xy = event_to_canvas(e);
 
-    SPUI.dripper.stop(true, e.button);
+    SPUI.dripper.stop(true, button_delta);
 
     if(mouse_state.dripper.is_active()) {
         // Dripper.stop() will fire the callback one more time, but it doesn't have any way of updating the player's APM
@@ -45471,7 +45468,7 @@ function do_on_mouseup(e) {
         mouse_state.dripper.stop(true, xy);
     }
 
-    if(e.button == SPUI.RIGHT_MOUSE_BUTTON) {
+    if(e.button === SPUI.MouseButton.RIGHT) {
         // end drag
         if(mouse_state.has_dragged) {
             mouse_state.has_dragged = false;
@@ -45479,13 +45476,13 @@ function do_on_mouseup(e) {
                 player.record_feature_use('drag_select');
             }
         } else {
-            if(tutorial_root.on_mouseup(xy, [0,0], e.button)) {
+            if(tutorial_root.on_mouseup(xy, [0,0], button_delta)) {
                 return;
             }
-            if(player.quest_root.on_mouseup(xy, [0,0], e.button)) {
+            if(player.quest_root.on_mouseup(xy, [0,0], button_delta)) {
                 return;
             }
-            if(SPUI.root.on_mouseup(xy, [0,0], e.button)) {
+            if(SPUI.root.on_mouseup(xy, [0,0], button_delta)) {
                 return;
             }
             if(player.tutorial_state != "COMPLETE") {
@@ -45508,15 +45505,15 @@ function do_on_mouseup(e) {
     }
 
     // first let SPUI handle it
-    if(tutorial_root.on_mouseup(xy, [0,0], e.button)) {
+    if(tutorial_root.on_mouseup(xy, [0,0], button_delta)) {
         return;
     }
 
-    if(player.quest_root.on_mouseup(xy, [0,0], e.button)) {
+    if(player.quest_root.on_mouseup(xy, [0,0], button_delta)) {
         return;
     }
 
-    if(SPUI.root.on_mouseup(xy, [0,0], e.button)) {
+    if(SPUI.root.on_mouseup(xy, [0,0], button_delta)) {
         return;
     }
 
@@ -45817,7 +45814,7 @@ function on_mouseout(e) {
 }
 
 function do_on_mouseout(e) {
-    mouse_state.clear_all_buttons();
+    mouse_state.button.clear_all_buttons();
     mouse_state.dripper.stop();
     mouse_state.has_scrolled = false;
     mouse_state.has_dragged = false;
@@ -46149,7 +46146,7 @@ function do_on_mousemove(e) {
     }
 
     if(x != mouse_state.last_x || y != mouse_state.last_y) {
-        if(mouse_state.get_button(SPUI.LEFT_MOUSE_BUTTON) && allow_scroll) {
+        if(mouse_state.button.get_button(SPUI.MouseButton.LEFT) && allow_scroll) {
             // scroll view
             var dx = x - mouse_state.last_x;
             var dy = y - mouse_state.last_y;
@@ -46176,7 +46173,7 @@ function do_on_mousemove(e) {
                 mouse_state.dripper.stop(); // abort current drip operation
             }
         }
-        if(player.unit_micro_enabled() && (mouse_state.get_button(SPUI.RIGHT_MOUSE_BUTTON) || mouse_state.spacebar)) {
+        if(player.unit_micro_enabled() && (mouse_state.button.get_button(SPUI.MouseButton.RIGHT) || mouse_state.spacebar)) {
             // drag-select
             if(!mouse_state.has_dragged) {
                 mouse_state.has_dragged = true;
@@ -46192,7 +46189,7 @@ function do_on_mousemove(e) {
             }
         }
 
-        if(mouse_state.button != SPUI.LEFT_MOUSE_BUTTON) {
+        if(!mouse_state.button.get_button(SPUI.MouseButton.LEFT)) {
             // remove pop-up UI ONLY if it's a context menu
             if(player.tutorial_state == "COMPLETE" &&
                selection.ui != null &&
@@ -46365,26 +46362,26 @@ function do_on_mousedown(e) {
     register_player_input();
 
     e.preventDefault();
-    mouse_state.set_button(e.button);
+    mouse_state.button.set_button(/** @type {SPUI.MouseButton} */ (e.button));
+    var button_delta = new SPUI.MouseButtonState(/** @type {SPUI.MouseButton} */ (e.button));
 
     // get canvas coordinates of mouse-click location
     var xy = event_to_canvas(e);
     // first let SPUI handle it
-    if(tutorial_root.on_mousedown(xy, [0,0], e.button)) {
+    if(tutorial_root.on_mousedown(xy, [0,0], button_delta)) {
         return;
     }
-    if(player.quest_root.on_mousedown(xy, [0,0], e.button)) {
+    if(player.quest_root.on_mousedown(xy, [0,0], button_delta)) {
         return;
     }
-    if(SPUI.root.on_mousedown(xy, [0,0], e.button)) {
+    if(SPUI.root.on_mousedown(xy, [0,0], button_delta)) {
         return;
     }
 
-    if(e.button == 0) {
+    if(e.button === SPUI.MouseButton.LEFT) {
         // reset scroll
         mouse_state.has_scrolled = false;
-    }
-    if(e.button == 2) {
+    } else if(e.button === SPUI.MouseButton.RIGHT) {
         // reset drag
         mouse_state.has_dragged = false;
     }
@@ -47208,9 +47205,9 @@ function do_draw() {
 
         if(client_state == client_states.RUNNING && !visit_base_pending) {
 
-        SPUI.dripper.activate(client_time, mouse_state.button);
+        SPUI.dripper.activate(client_time, mouse_state.button); // pass current button state
 
-        mouse_state.dripper.activate(client_time, [mouse_state.last_x, mouse_state.last_y]);
+        mouse_state.dripper.activate(client_time, [mouse_state.last_x, mouse_state.last_y]); // pass current cursor location
 
         // run deferred citizens update
         session.do_update_citizens();

@@ -16,8 +16,38 @@ goog.require('PortraitCache');
 goog.require('Dripper');
 goog.require('SPFB'); // only for SPUI.FriendPortrait
 
-/** @const */ SPUI.LEFT_MOUSE_BUTTON = 0;
-/** @const */ SPUI.RIGHT_MOUSE_BUTTON = 2;
+/** @enum {number} HTML5 event button codes.
+    NOTE: the "button" values passed around for mouse events are instances of SPUI.MouseButtonState,
+    which is either a bitmask of the current state (for mousemove, dripper activate, etc) or
+    a (single-bit) bitmask of the button that changed state (for mousedown, mouseup, etc).
+    Do NOT compare equality with this enum, instead use the get_button() method below. */
+SPUI.MouseButton = { // these match the HTML5 event button codes
+    LEFT: 0,
+    RIGHT: 2
+};
+
+/** @constructor
+    @struct
+    @param {SPUI.MouseButton=} init */
+SPUI.MouseButtonState = function(init) {
+    /** @private */
+    this.mask = 0;
+    if(init !== undefined) { this.set_button(init); }
+};
+/** @param {SPUI.MouseButton} num
+    @return {boolean} */
+SPUI.MouseButtonState.prototype.get_button = function(num) { return (this.mask & (1<<num)) != 0; };
+/** @param {SPUI.MouseButton} num */
+SPUI.MouseButtonState.prototype.set_button = function(num) { this.mask |= (1<<num); };
+/** @param {SPUI.MouseButton} num */
+SPUI.MouseButtonState.prototype.clear_button = function(num) { this.mask &= ~(1<<num); };
+SPUI.MouseButtonState.prototype.clear_all_buttons = function() { this.mask = 0; };
+/** @return {!SPUI.MouseButtonState} */
+SPUI.MouseButtonState.prototype.copy = function() {
+    var x = new SPUI.MouseButtonState();
+    x.mask = this.mask;
+    return x;
+};
 
 // SPUI.Font - a font of a particular size and style
 

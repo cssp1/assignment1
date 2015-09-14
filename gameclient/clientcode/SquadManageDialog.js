@@ -292,7 +292,7 @@ SquadManageDialog.update_squad_manage = function(dialog) {
 
                     // find healthiest (or unhealthiest) non-pending reserve unit of this type
                     var obj = null, extreme_hp_ratio, no_space = false;
-                    if(button == SPUI.RIGHT_MOUSE_BUTTON) {
+                    if(button.get_button(SPUI.MouseButton.RIGHT)) {
                         extreme_hp_ratio = 1;
                     } else {
                         extreme_hp_ratio = -1;
@@ -303,8 +303,8 @@ SquadManageDialog.update_squad_manage = function(dialog) {
                             if(_cur_squad_space+space <= _max_squad_space) {
                                 var curmax = army_unit_hp(o);
                                 var ratio = curmax[0]/Math.max(curmax[1],1);
-                                if((button == SPUI.RIGHT_MOUSE_BUTTON && ratio <= extreme_hp_ratio) ||
-                                   (button != SPUI.RIGHT_MOUSE_BUTTON && ratio > extreme_hp_ratio)) {
+                                if((button.get_button(SPUI.MouseButton.RIGHT) && ratio <= extreme_hp_ratio) ||
+                                   (!button.get_button(SPUI.MouseButton.RIGHT) && ratio > extreme_hp_ratio)) {
                                     extreme_hp_ratio = ratio;
                                     obj = o;
                                 }

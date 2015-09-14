@@ -115,7 +115,7 @@ RegionMap.DeployCursor.prototype.on_mouseup = function(cell, button) {
     var squad_data = player.squads[this.squad_id.toString()];
 
     if((cell[0] == this.from_loc[0] && cell[1] == this.from_loc[1]) ||
-      button == SPUI.RIGHT_MOUSE_BUTTON) {
+       button.get_button(SPUI.MouseButton.RIGHT)) {
         // cancel
         this.map.cursor = null;
         return true;
@@ -326,7 +326,7 @@ RegionMap.MoveCursor.prototype.on_mouseup = function(cell, button) {
     var status = this.get_path(cell);
     if(!status) { return false; }
 
-    if(status['action'] == 'cancel' || button == SPUI.RIGHT_MOUSE_BUTTON) {
+    if(status['action'] == 'cancel' || button.get_button(SPUI.MouseButton.RIGHT)) {
         this.map.cursor = null;
         return true;
     } else if(status['action'] == 'move' || status['action'] == 'recall' || (status['action'] == 'blocked' && this.path && this.path.length >= 1)) {
@@ -438,7 +438,7 @@ RegionMap.RelocateCursor.prototype.on_mouseup = function(cell, button) {
     if(!cell) { return false; }
     var status = this.relocate_status(cell);
     if(!status) { return false; }
-    if(status['action'] == 'cancel' || button == SPUI.RIGHT_MOUSE_BUTTON) {
+    if(status['action'] == 'cancel' || button.get_button(SPUI.MouseButton.RIGHT)) {
         this.map.cursor = null;
     } else if(status['action'] == 'relocate') {
         this.map.cursor = null;
@@ -762,7 +762,7 @@ RegionMap.RegionMap.prototype.on_mouseup = function(uv, offset, button) {
         return false;
     }
 
-    if(button === SPUI.RIGHT_MOUSE_BUTTON) {
+    if(button.get_button(SPUI.MouseButton.RIGHT)) {
         this.set_popup(null);
         return true;
     }
@@ -838,7 +838,7 @@ RegionMap.RegionMap.prototype.on_mousemove = function(uv, offset) {
         hovertext = '-,-';
     }
 
-    if(mouse_state.get_button(SPUI.LEFT_MOUSE_BUTTON) || mouse_state.spacebar) {
+    if(mouse_state.button.get_button(SPUI.MouseButton.LEFT) || mouse_state.spacebar) {
         if(!this.drag_start) {
             if(hit[0] && (!this.cursor || this.cursor.allow_drag())) {
                 this.drag_start = [this.xy[0]+uv[0]+offset[0], this.xy[1]+uv[1]+offset[1]];
@@ -872,7 +872,7 @@ RegionMap.RegionMap.prototype.on_mousemove = function(uv, offset) {
     } else {
         this.drag_start = null;
         this.drag_full = false;
-        if(mouse_state.get_button(SPUI.RIGHT_MOUSE_BUTTON)) {
+        if(mouse_state.button.get_button(SPUI.MouseButton.RIGHT)) {
             return true; // handle here, so the event won't go to the desktop
         }
     }
