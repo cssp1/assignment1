@@ -28094,7 +28094,7 @@ function unit_icon_set(dialog, specname, qty, obj, onclick, frame_state_override
         dialog.widgets['frame'].onclick = (onclick ? onclick : null);
         dialog.widgets['frame'].tooltip.str = (tooltip_override ? tooltip_override : (onclick ? spec['ui_name'] + (('ui_tip' in spec) ? '\n'+spec['ui_tip'] : '') : null));
         if(enable_dripper) {
-            dialog.widgets['frame'].dripper_cb = (function (_w) { return function() { return _w.onclick(_w); }; })(dialog.widgets['frame']);
+            dialog.widgets['frame'].dripper_cb = (function (_w) { return function(button) { return _w.onclick(_w, button); }; })(dialog.widgets['frame']);
             dialog.widgets['frame'].dripper_rate = 4.0;
         } else {
             dialog.widgets['frame'].dripper_cb = null;
@@ -45458,7 +45458,7 @@ function do_on_mouseup(e) {
     // get canvas coordinates of mouse pointer location
     var xy = event_to_canvas(e);
 
-    SPUI.dripper.stop(true);
+    SPUI.dripper.stop(true, e.button);
 
     if(mouse_state.dripper.is_active()) {
         // Dripper.stop() will fire the callback one more time, but it doesn't have any way of updating the player's APM
@@ -47208,7 +47208,7 @@ function do_draw() {
 
         if(client_state == client_states.RUNNING && !visit_base_pending) {
 
-        SPUI.dripper.activate(client_time);
+        SPUI.dripper.activate(client_time, mouse_state.button);
 
         mouse_state.dripper.activate(client_time, [mouse_state.last_x, mouse_state.last_y]);
 

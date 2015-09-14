@@ -1877,8 +1877,8 @@ SPUI.ActionButton = function(data) {
 
     if('dripper' in data) {
         // parameterless callback that Dripper will call directly
-        this.dripper_cb = (function (_this) { return function() {
-            return _this.onclick(_this); // pass return value in case onclick wants to stop the dripper
+        this.dripper_cb = (function (_this) { return function(button) {
+            return _this.onclick(_this, button); // pass return value in case onclick wants to stop the dripper
         }; })(this);
         this.dripper_rate = data['dripper']['rate'] || 1.5;
         this.dripper_delay = data['dripper']['delay'] || 0;
