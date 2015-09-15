@@ -101,10 +101,13 @@ var FB = {
 };
 
 // Armor Games API
+/** @type {!Object} */
 var agi = {
+    /** @return {?} */
     "ping": function() {},
     "updateUserQuest": function() {},
-    "setIframeDimensions": function() {}
+    /** @param {!Object} arg */
+    "setIframeDimensions": function(arg) {}
 };
 
 // Kongregate API
