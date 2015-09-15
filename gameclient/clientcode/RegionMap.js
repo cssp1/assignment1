@@ -207,7 +207,7 @@ RegionMap.MoveCursor.prototype.do_get_path = function(cell) {
                 is_my_home = true;
             } else if(f['base_type'] == 'quarry' && f['base_landlord_id'] == session.user_id) {
                 is_my_quarry = true;
-                if(feature_list.length >= 2) {
+                if(!player.quarry_guards_enabled() || feature_list.length >= 2) {
                     is_blocked = true; // your own quarry, and a second feature is already there, so no additional guard is allowed
                 }
             } else if(f['base_type'] == 'squad' && f['base_landlord_id'] == session.user_id && parseInt(f['base_id'].split('_')[1],10) == this.squad_id) {

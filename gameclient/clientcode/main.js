@@ -6174,37 +6174,31 @@ player.can_level_up = function() {
 player.unit_micro_enabled = function() { return (!('enable_unit_micro' in gamedata) || gamedata['enable_unit_micro'] || player.is_cheater); };
 player.squads_enabled = function() { return read_predicate({'predicate':'LIBRARY', 'name': 'squads_enabled'}).is_satisfied(player, null); };
 
-/** @return {boolean} */
-player.auto_resolve_enabled = function() {
-    if(player.get_any_abtest_value('enable_auto_resolve', false)) {
-        return true;
-    } else if(session.region && session.region.data && ('enable_auto_resolve' in session.region.data)) {
-        return session.region.data['enable_auto_resolve'];
-    } else {
-        return gamedata['territory']['enable_auto_resolve'] || false;
+/** Get an over-rideable setting from territory.json
+    @param {string} name
+    @return {?} */
+player.get_territory_setting = function(name) {
+    var ret = gamedata['territory'][name] || false;
+    if(session.region && session.region.data && (name in session.region.data)) {
+        ret = session.region.data[name];
     }
+    ret = player.get_any_abtest_value(name, ret);
+    return ret;
 };
+
+/** @return {boolean} */
+player.auto_resolve_enabled = function() { return player.get_territory_setting('enable_auto_resolve'); };
+/** @return {boolean} */
+player.squad_combat_enabled = function() { return player.get_territory_setting('enable_squad_combat'); };
+/** @return {boolean} */
+player.quarry_guards_enabled = function() { return player.get_territory_setting('enable_quarry_guards'); };
 
 /** @return {string} */
 player.squad_block_mode = function() {
-    var mode = gamedata['territory']['squad_block_mode'];
-    if(session.region && session.region.data && ('squad_block_mode' in session.region.data)) {
-        mode = session.region.data['squad_block_mode'];
-    }
-    mode = player.get_any_abtest_value('squad_block_mode', mode);
+    var mode = player.get_territory_setting('squad_block_mode');
     if(!goog.array.contains(['always', 'after_move', 'never'], mode)) { throw Error('bad squad_block_mode '+mode); }
     return mode;
 };
-
-/** @return {boolean} */
-player.squad_combat_enabled = function() {
-    var ret = gamedata['territory']['enable_squad_combat'];
-    if(session.region && session.region.data && ('enable_squad_combat' in session.region.data)) {
-        ret = session.region.data['enable_squad_combat'];
-    }
-    ret = player.get_any_abtest_value('enable_squad_combat', ret);
-    return ret;
-}
 
 player.unit_speedups_enabled = function() { return player.is_cheater || !('enable_unit_speedups' in gamedata) || gamedata['enable_unit_speedups']; };
 player.crafting_speedups_enabled = function() { return player.is_cheater || !('enable_crafting_speedups' in gamedata) || gamedata['enable_crafting_speedups']; };

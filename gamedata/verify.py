@@ -3369,6 +3369,9 @@ def main(args):
 
     error |= check_turf_reward(gamedata['quarries_client']['alliance_turf'].get('reward',{"auras":[]}))
 
+    if gamedata['territory'].get('enable_quarry_guards', True) and not gamedata.get('enable_defending_units',1):
+        error |= 1; print 'territory.enable_quarry_guards should be off if global enable_defending_units setting is off'
+
     error |= check_quests(gamedata['quests'])
     for name, data in gamedata['achievement_categories'].iteritems():
         error |= check_achievement_category(name, data)

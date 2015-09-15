@@ -7563,29 +7563,23 @@ class Player(AbstractPlayer):
 
     def squads_enabled(self):
         return Predicates.read_predicate({'predicate': 'LIBRARY', 'name': 'squads_enabled'}).is_satisfied(self, None)
-    def auto_resolve_enabled(self):
-        if self.get_any_abtest_value('enable_auto_resolve', False):
-            return True
-        elif self.home_region in gamedata['regions'] and \
-             'enable_auto_resolve' in gamedata['regions'][self.home_region]:
-            return gamedata['regions'][self.home_region]['enable_auto_resolve']
-        else:
-            return gamedata['territory'].get('enable_auto_resolve', False)
+
+
+    def get_territory_setting(self, name):
+        ret = gamedata['territory'].get(name, False)
+        if self.home_region in gamedata['regions'] and \
+           name in gamedata['regions'][self.home_region]:
+            ret = gamedata['regions'][self.home_region][name]
+        ret = self.get_any_abtest_value(name, ret)
+        return ret
 
     def squad_block_mode(self):
-        mode = gamedata['territory']['squad_block_mode']
-        if self.home_region in gamedata['regions']:
-            mode = gamedata['regions'][self.home_region].get('squad_block_mode', mode)
-        mode = self.get_any_abtest_value('squad_block_mode', mode)
+        mode = self.get_territory_setting('squad_block_mode')
         assert mode in ('after_move', 'always', 'never')
         return mode
-    def squad_combat_enabled(self):
-        ret = gamedata['territory']['enable_squad_combat']
-        if self.home_region in gamedata['regions'] and \
-           'enable_squad_combat' in gamedata['regions'][self.home_region]:
-            ret = gamedata['regions'][self.home_region]['enable_squad_combat']
-        ret = self.get_any_abtest_value('enable_squad_combat', ret)
-        return ret
+    def auto_resolve_enabled(self): return self.get_territory_setting('enable_auto_resolve')
+    def squad_combat_enabled(self): return self.get_territory_setting('enable_squad_combat')
+    def quarry_guards_enabled(self): return self.get_territory_setting('enable_quarry_guards')
 
     def unit_speedups_enabled(self):
         return self.is_cheater or gamedata.get('enable_unit_speedups', True)
@@ -8257,7 +8251,10 @@ class Player(AbstractPlayer):
                                                           old_loc=entry['base_map_loc'], old_path=entry.get('base_map_path',None),
                                                           exclusive=0, exclude_filter=exclude_filter, originator=self.user_id, reason='squad_step'):
                 # conflict - check if we're moving into a friendly quarry with no other squad there
-                conflict_list = list(gamesite.nosql_client.get_map_features_by_loc(self.home_region, destination, reason='squad_step(conflict)'))
+                if self.quarry_guards_enabled():
+                    conflict_list = list(gamesite.nosql_client.get_map_features_by_loc(self.home_region, destination, reason='squad_step(conflict)'))
+                else:
+                    conflict_list = []
                 if (len(conflict_list) == 1) and (conflict_list[0].get('base_type',None) == 'quarry') and \
                    (conflict_list[0].get('base_landlord_id',None) == self.user_id):
                     # guarding a friendly quarry - force the update
