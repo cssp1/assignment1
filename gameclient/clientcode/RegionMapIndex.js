@@ -5,18 +5,21 @@ goog.provide('RegionMapIndex');
 // found in the LICENSE file.
 
 /** @fileoverview
-    @suppress {reportUnknownTypes} XXX we are not typesafe yet
+    Data structure for speeding up queries for region map features
+    by indexing by base ID as well as x,y coordinates.
 */
 
 goog.require('goog.array');
 
-// for speeding up queries for region map features
-
-RegionMapIndex = {};
-
-/** @constructor */
+/** @constructor
+    @struct
+    @param {!Array.<number>} dims */
 RegionMapIndex.RegionMapIndex = function(dims) {
     this.dims = dims;
+    /** @type {!Object.<string,*>} */
+    this.base_id_index = {};
+    /** @type {Array.<Array.<Array.<*>>>|null} */
+    this.lines = null;
     this.clear();
 }
 RegionMapIndex.RegionMapIndex.prototype.clear = function() {
@@ -29,6 +32,9 @@ RegionMapIndex.RegionMapIndex.prototype.clear = function() {
         this.lines[y] = null;
     }
 }
+/** @param {string} base_id
+    @param {!Array.<number>} xy
+    @param {*} obj */
 RegionMapIndex.RegionMapIndex.prototype.insert = function(base_id, xy, obj) {
     this.base_id_index[base_id] = obj;
     if(xy !== null) {
@@ -44,6 +50,10 @@ RegionMapIndex.RegionMapIndex.prototype.insert = function(base_id, xy, obj) {
         this.lines[xy[1]][xy[0]].push(obj);
     }
 }
+
+/** @param {string} base_id
+    @param {!Array.<number>} xy
+    @param {*} obj */
 RegionMapIndex.RegionMapIndex.prototype.remove = function(base_id, xy, obj) {
     if(base_id in this.base_id_index) { delete this.base_id_index[base_id]; }
     if(xy !== null) {
@@ -55,10 +65,14 @@ RegionMapIndex.RegionMapIndex.prototype.remove = function(base_id, xy, obj) {
     }
 }
 
+/** @param {string} id
+    @return {*|null} note: returns a SINGLE feature */
 RegionMapIndex.RegionMapIndex.prototype.get_by_base_id = function(id) {
     return this.base_id_index[id] || null;
 }
 
+/** @param {!Array.<number>} xy
+    @return {Array.<*>|null} note: returns LIST OF MULTIPLE features */
 RegionMapIndex.RegionMapIndex.prototype.get_by_loc = function(xy) {
     if(this.lines[xy[1]] !== null) {
         if(this.lines[xy[1]][xy[0]] !== null) {

@@ -20247,7 +20247,7 @@ Region.prototype.receive_feature_update = function(res) {
         delete res['preserve_locks'];
     }
 
-    var feature = this.map_index.get_by_base_id(res['base_id']);
+    var feature = /** @type {Object|null} */ (this.map_index.get_by_base_id(res['base_id']));
 
     if(feature) {
         // update or delete
