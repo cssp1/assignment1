@@ -48,7 +48,10 @@ GameArt.stats = function() {
     return msg;
 };
 
-// given an art asset filename from art.json, return the full URL to the source file
+/** Given an art asset filename from art.json, return the full URL to the source file
+    @param {string} filename
+    @param {boolean=} needs_cors - if cross-origin resource sharing must be available for this asset
+    @return {string} */
 GameArt.art_url = function(filename, needs_cors) {
     var use_cdn = true;
 

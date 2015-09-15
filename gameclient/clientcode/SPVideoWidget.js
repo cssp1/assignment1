@@ -5,21 +5,32 @@ goog.provide('SPVideoWidget');
 // found in the LICENSE file.
 
 /** @fileoverview
-    @suppress {reportUnknownTypes} XXX we are not typesafe yet
+    div-based widget that plays a YouTube video
 */
 
 goog.require('GameArt');
 
-SPVideoWidget = { div: null, onclose: null };
+/** @type {HTMLDivElement|null} */
+SPVideoWidget.div = null;
+/** @type {HTMLIFrameElement|null} */
+SPVideoWidget.iframe = null;
+/** @type {HTMLImageElement|null} */
+SPVideoWidget.close_button = null;
+/** @type {function()|null} */
+SPVideoWidget.onclose = null;
 
+/** @param {string} key
+    @return {string} */
 SPVideoWidget.make_youtube_url = function(key) {
     return 'http://www.youtube.com/embed/'+key+'?html5=1&autoplay=1&enablejsapi=1&hd=1&modestbranding=1&rel=0&theme=dark&origin='+spin_server_protocol+spin_server_host+':'+spin_server_port;
 };
 
+/** @param {string} video_url
+    @param {function()} onclose */
 SPVideoWidget.init = function(video_url, onclose) {
     SPVideoWidget.onclose = onclose;
 
-    SPVideoWidget.div = document.createElement('div');
+    SPVideoWidget.div = /** @type {HTMLDivElement} */ (document.createElement('div'));
     SPVideoWidget.div.style.backgroundColor = '#2c2c2c';
     SPVideoWidget.div.style.backgroundImage = 'url('+GameArt.art_url(gamedata['art']['dialog_video_widget']['states']['normal']['images'][0], false)+')';
     SPVideoWidget.div.style.position = 'absolute';
@@ -43,7 +54,7 @@ SPVideoWidget.init = function(video_url, onclose) {
     //SPVideoWidget.div.style.textAlign = 'center';
 
     if(1) {
-        SPVideoWidget.iframe = document.createElement('iframe');
+        SPVideoWidget.iframe = /** @type {HTMLIFrameElement} */ (document.createElement('iframe'));
         SPVideoWidget.iframe.allowfullscreen = true;
         SPVideoWidget.iframe.allowscriptaccess = true;
         SPVideoWidget.iframe.frameborder = '0';
@@ -56,7 +67,7 @@ SPVideoWidget.init = function(video_url, onclose) {
         SPVideoWidget.div.appendChild(SPVideoWidget.iframe);
     }
 
-    SPVideoWidget.close_button = document.createElement('img');
+    SPVideoWidget.close_button = /** @type {HTMLImageElement} */ (document.createElement('img'));
     SPVideoWidget.close_button.crossOrigin = 'Anonymous';
     SPVideoWidget.close_button.src = GameArt.art_url(gamedata['art']['close_button']['states']['normal']['images'][0], false);
     SPVideoWidget.close_button.style.position = 'absolute';
