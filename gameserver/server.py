@@ -7579,6 +7579,7 @@ class Player(AbstractPlayer):
         return mode
     def auto_resolve_enabled(self): return self.get_territory_setting('enable_auto_resolve')
     def squad_combat_enabled(self): return self.get_territory_setting('enable_squad_combat')
+    def map_home_combat_enabled(self): return self.get_territory_setting('enable_map_home_combat')
     def quarry_guards_enabled(self): return self.get_territory_setting('enable_quarry_guards')
 
     def unit_speedups_enabled(self):
@@ -16024,7 +16025,8 @@ class GAMEAPI(resource.Resource):
                 if (not dest_feature) or \
                    (('base_map_path' in dest_feature) and (dest_feature['base_map_path'][-1]['eta']>server_time)) or \
                    (dest_feature['base_type'] not in ('hive', 'quarry', 'home', 'squad')) or \
-                   (dest_feature['base_type'] == 'squad' and not session.player.squad_combat_enabled()):
+                   (dest_feature['base_type'] == 'squad' and not session.player.squad_combat_enabled()) or \
+                   (dest_feature['base_type'] == 'home' and not session.player.map_home_combat_enabled()):
                     if gamedata['server'].get('log_nosql',0) < 2 and dest_base_id[0]=='s':
                         pass # do not bother logging failed attempts to spy on squads that have moved
                     else:
