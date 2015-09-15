@@ -5,7 +5,6 @@ goog.provide('SPKongregate');
 // found in the LICENSE file.
 
 /** @fileoverview
-    suppress {reportUnknownTypes} XXX we are not typesafe yet
     This is a wrapper around Kongregate's SDK that
     detects cases where it failed to load asynchronously.
 */
