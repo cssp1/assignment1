@@ -12474,7 +12474,7 @@ function update_desktop_dialogs() {
         dialog.widgets['protection_message'].show =
             dialog.widgets['protection_defended'].show = false;
 
-        desktop_dialogs['combat_resource_bars'].show = session.enable_combat_resource_bars && (session.has_attacked || (session.is_ladder_battle() && gamedata['client']['combat_resource_bars_show_trophies']));
+        desktop_dialogs['combat_resource_bars'].show = session.enable_combat_resource_bars && (session.has_attacked || (session.is_ladder_battle() && gamedata['client']['combat_resource_bars_show_trophies'])) && (session.viewing_base.base_landlord_id !== session.user_id);
         desktop_dialogs['combat_damage_bar'].show =  desktop_dialogs['combat_resource_bars'].show && session.has_attacked;
 
         if(session.viewing_base.base_type == 'quarry' && session.viewing_base.base_landlord_id == session.user_id) {
