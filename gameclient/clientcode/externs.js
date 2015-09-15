@@ -111,12 +111,20 @@ var agi = {
 };
 
 // Kongregate API
+/** @type {!Object} */
 var kongregate = {
+    /** @type {!Object} */
     "mtx": {
-        "purchaseItemsRemote": function() {}
+        /** @param {!Object} arg0
+            @param {function()} arg1
+            @return {?} */
+        "purchaseItemsRemote": function(arg0, arg1) {}
     },
+    /** @type {!Object} */
     "services": {
-        "showInvitationBox": function() {}
+        /** @param {!Object} arg0
+            @return {?} */
+        "showInvitationBox": function(arg0) {}
     }
 };
 

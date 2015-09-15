@@ -49,7 +49,7 @@ SPay.place_order_fbcredits = function (order_info, callback, use_local_currency)
 };
 
 SPay.place_order_kgcredits = function (order_info, callback) {
-    return SPKongregate.purchaseItemsRemote(order_info, callback);
+    SPKongregate.purchaseItemsRemote(order_info, callback);
 };
 
 SPay.buy_more_credits = function(callback) {

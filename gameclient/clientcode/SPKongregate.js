@@ -5,17 +5,14 @@ goog.provide('SPKongregate');
 // found in the LICENSE file.
 
 /** @fileoverview
-    @suppress {reportUnknownTypes} XXX we are not typesafe yet
+    suppress {reportUnknownTypes} XXX we are not typesafe yet
+    This is a wrapper around Kongregate's SDK that
+    detects cases where it failed to load asynchronously.
 */
 
-// this is a wrapper around Kongregate's SDK that
-// detects cases whereit failed to load asynchronously
 
-// depends on client_time from main.js
-
-// global namespace
-SPKongregate = {};
-
+/** @param {!Object} arg0
+    @param {function()} arg1 */
 SPKongregate.purchaseItemsRemote = function(arg0, arg1) {
     var err = '0651_client_died_from_kongregate_api_error';
     var props = {'method':'purchaseItemsRemote'};
@@ -31,9 +28,11 @@ SPKongregate.purchaseItemsRemote = function(arg0, arg1) {
         document['SPINcancelFullScreen']();
     }
 
-    return kongregate.mtx.purchaseItemsRemote(arg0, arg1);
+    kongregate.mtx.purchaseItemsRemote(arg0, arg1);
 };
 
+
+/** @param {!Object} arg0 */
 SPKongregate.showInvitationBox = function(arg0) {
     var err = '0651_client_died_from_kongregate_api_error';
     var props = {'method':'showInvitationBox'};
@@ -49,5 +48,5 @@ SPKongregate.showInvitationBox = function(arg0) {
         document['SPINcancelFullScreen']();
     }
 
-    return kongregate.services.showInvitationBox(arg0);
+    kongregate.services.showInvitationBox(arg0);
 };
