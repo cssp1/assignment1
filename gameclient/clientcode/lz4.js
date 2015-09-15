@@ -2,10 +2,6 @@ goog.provide('lz4');
 
 // https://github.com/pierrec/node-lz4/blob/master/lib/decoder-js.js
 
-/** @fileoverview
-    @suppress {reportUnknownTypes} XXX we are not typesafe yet
-*/
-
 // Copyright (c) 2012 Pierre Curto
 
 // Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -28,8 +24,8 @@ goog.provide('lz4');
 
 // SP3RDPARTY : lz4.js : MIT License
 
-var lz4 = {};
-
+/** @param {!Array} input (ByteArray)
+    @return {!Array} */
 lz4.decompress = function(input) {
     var original_length = (input[0] | (input[1]<<8) | (input[2]<<16) | (input[3]<<24));
     var output = [];
@@ -37,9 +33,10 @@ lz4.decompress = function(input) {
     var n = input.length;
     var j = 0;
     while(i < n) {
+        /** @type {number} */
         var token = input[i++];
         var literals_length = (token >> 4);
-        for(var l = literals_length+240; l === 255; literals_length += (l = input[i++])) {}
+        for(var l = literals_length+240; l === 255; literals_length += (l = /** @type {number} */ (input[i++]))) {}
         if(literals_length > 0) {
             var end = i + literals_length;
             while (i < end) { output[j++] = input[i++]; }
@@ -49,7 +46,7 @@ lz4.decompress = function(input) {
         var offset = input[i++] | (input[i++]<<8);
         if(offset === 0) { throw Error('uncompress error'); }
         var match_length = (token & 0xf);
-        for(var l = match_length+240; l === 255; match_length += (l = input[i++])) {}
+        for(var l = match_length+240; l === 255; match_length += (l = /** @type {number} */ (input[i++]))) {}
         match_length += 4;
         var pos = j - offset;
         var end = j + match_length;

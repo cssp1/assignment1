@@ -44644,7 +44644,9 @@ function handle_server_message(data) {
         } else if(codec == 'lzjb') {
             result = JSON.parse(Iuppiter.bytes_to_string(Iuppiter.decompress(goog.crypt.base64.decodeStringToByteArray(z_result))));
         } else if(codec == 'lz4') {
-            result = JSON.parse(Iuppiter.bytes_to_string(lz4.decompress(goog.crypt.base64.decodeStringToByteArray(z_result))));
+            var arr = goog.crypt.base64.decodeStringToByteArray(z_result);
+            arr = /** @type {!Array} */ (arr); // since decodeStringToByteArray's return value is incorrectly annotated to be nullable
+            result = JSON.parse(Iuppiter.bytes_to_string(lz4.decompress(arr)));
         } else {
             throw Error('unknown codec '+codec);
         }
