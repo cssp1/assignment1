@@ -1,21 +1,26 @@
 goog.provide('BinaryHeap');
 
-/** @fileoverview
-    @suppress {reportUnknownTypes} XXX we are not typesafe yet
-*/
-
 // from http://eloquentjavascript.net/1st_edition/appendix2.html
 // via https://github.com/bgrins/javascript-astar
 // License: http://creativecommons.org/licenses/by/3.0/
 
 // SP3RDPARTY : BinaryHeap.js : CC-by License
 
+/** @interface */
+BinaryHeap.Element = function() {};
+/** @type {number}
+    Inline .heapscore property. This is stored inside the object because it is critical to performance. */
+BinaryHeap.Element.prototype.heapscore;
+
 /** @constructor
     @struct */
 BinaryHeap.BinaryHeap = function() {
-  this.content = [];
+    /** @type {!Array.<!BinaryHeap.Element>} */
+    this.content = [];
 };
 
+/** @param {!BinaryHeap.Element} element
+    @param {number} score */
 BinaryHeap.BinaryHeap.prototype.push = function(element, score) {
     // Add the new element to the end of the array.
     element.heapscore = score;
@@ -24,10 +29,11 @@ BinaryHeap.BinaryHeap.prototype.push = function(element, score) {
     this.sinkDown(this.content.length - 1);
 };
 
-// return first element, but do not remove it from the heap
+/** return first element, but do not remove it from the heap
+    @return {!BinaryHeap.Element} */
 BinaryHeap.BinaryHeap.prototype.peek = function() { return this.content[0]; };
 
-/** @return {?} */
+/** @return {!BinaryHeap.Element} */
 BinaryHeap.BinaryHeap.prototype.pop = function() {
     // Store the first element so we can return it later.
     var result = this.content[0];
@@ -42,6 +48,7 @@ BinaryHeap.BinaryHeap.prototype.pop = function() {
     return result;
 };
 
+/** @param {!BinaryHeap.Element} node */
 BinaryHeap.BinaryHeap.prototype.remove = function(node) {
     var i = this.content.indexOf(node);
 
@@ -62,6 +69,8 @@ BinaryHeap.BinaryHeap.prototype.size = function() {
     return this.content.length;
 };
 
+/** @param {!BinaryHeap.Element} node
+    @param {number} newscore */
 BinaryHeap.BinaryHeap.prototype.rescoreElement = function(node, newscore) {
       node.heapscore = newscore;
       for(var n = 0; n < this.content.length; n++) {
@@ -76,6 +85,7 @@ BinaryHeap.BinaryHeap.prototype.rescoreElement = function(node, newscore) {
       }
 };
 
+/** @param {number} n */
 BinaryHeap.BinaryHeap.prototype.sinkDown = function(n) {
     // Fetch the element that has to be sunk.
     var element = this.content[n];
@@ -98,6 +108,7 @@ BinaryHeap.BinaryHeap.prototype.sinkDown = function(n) {
     }
 };
 
+/** @param {number} n */
 BinaryHeap.BinaryHeap.prototype.bubbleUp = function(n) {
     // Look up the target element and its score.
     var length = this.content.length,
