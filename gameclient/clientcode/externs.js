@@ -115,8 +115,8 @@ var agi = {
 var kongregate = {
     /** @type {!Object} */
     "mtx": {
-        /** @param {!Object} arg0
-            @param {function()} arg1
+        /** @param {string} arg0
+            @param {function(?)} arg1
             @return {?} */
         "purchaseItemsRemote": function(arg0, arg1) {}
     },
@@ -129,13 +129,22 @@ var kongregate = {
 };
 
 // TrialPay API
+
+/** @type {!Object} */
 var TRIALPAY = {
+    /** @type {!Object} */
     "fb": {
-        "show_overlay": function() {}
+        /** @param {string} app_id
+            @param {string} method
+            @param {!Object} params
+            @return {?} */
+        "show_overlay": function(app_id, method, params) {}
     }
 };
 
 // Xsolla API
+
+/** @type {!Object} */
 var XPayStationWidget = {
     "init": function() {},
     "open": function() {},

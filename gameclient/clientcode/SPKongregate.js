@@ -10,8 +10,8 @@ goog.provide('SPKongregate');
 */
 
 
-/** @param {!Object} arg0
-    @param {function()} arg1 */
+/** @param {string} arg0
+    @param {function(?)} arg1 */
 SPKongregate.purchaseItemsRemote = function(arg0, arg1) {
     var err = '0651_client_died_from_kongregate_api_error';
     var props = {'method':'purchaseItemsRemote'};
