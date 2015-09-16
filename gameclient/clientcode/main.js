@@ -421,7 +421,9 @@ function pretty_print_qty_brief(n) {
     }
 }
 
-// print a number in the form xxx,xxx,xxx
+/** print a number in the form xxx,xxx,xxx
+    @param {number} n
+    @return {string} */
 function pretty_print_number(n) {
     var sign;
     if(n < 0) {
@@ -1101,8 +1103,8 @@ function GameObject() {
     /** @type {GameObjectId} */
     this.id = 'DEAD'; // = DEAD_ID if the object is "dead" or otherwise not part of the game world
 
-    /** @type {Object} */
-    this.spec = null;
+    /** @type {!Object} */
+    this.spec = {}; // set upon instantiation
     this.x = -1;
     this.y = -1;
     this.hp = -1;
@@ -31969,7 +31971,7 @@ function update_crafting_dialog_status_mines_and_missiles(dialog) {
                 var helper = null;
                 if(help_pred && dialog.widgets['mine_slot'+wname].show) {
                     helper = function (use_short_circuit) { return function() {
-                        var h = get_requirements_help(read_predicate(help_pred), null, {short_circuit:use_short_circuit});
+                        var h = get_requirements_help(read_predicate(/** @type {!Object} */ (help_pred)), null, {short_circuit:use_short_circuit});
                         if(h) { h(); }
                     }; };
                 }
@@ -33615,7 +33617,7 @@ function missions_dialog_select_mission(dialog, row) {
         // get mission progress text, if available
         var text = null;
         if(pred.ui_progress) {
-            text = pred.ui_progress(player);
+            text = pred.ui_progress(player, null);
         }
 
         if(text) {
@@ -35317,7 +35319,7 @@ function invoke_settings_dialog() {
     var row = 0;
     for(var name in settings) {
         var data = settings[name];
-        if('show_if' in data && !read_predicate(data['show_if']).is_satisfied(player, true)) {
+        if('show_if' in data && !read_predicate(data['show_if']).is_satisfied(player, null)) {
             continue;
         }
         dialog.user_data['settings'].push(data);
@@ -40598,7 +40600,7 @@ function can_cast_spell_detailed(unit_id, spellname, spellarg) {
     } else if(spellname.indexOf("CHANGE_REGION_INSTANTLY") == 0) {
         var pred = read_predicate(player.get_any_abtest_value('change_region_requirement', gamedata['territory']['change_region_requirement']));
         if(!pred.is_satisfied(player, null)) {
-            return [false, pred.ui_describe(player,null), [pred,null]];
+            return [false, pred.ui_describe(player), [pred,null]];
         }
     } else if(spellname == "ALLIANCE_GIFT_LOOT") {
         if(!session.is_in_alliance()) {

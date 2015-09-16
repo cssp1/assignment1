@@ -496,7 +496,7 @@ SquadManageDialog.update_squad_manage = function(dialog) {
         };
     } else if(!deploy_pred_ok) {
         dialog.widgets['deploy_button'].onclick = deploy_pred_help;
-        dialog.widgets['deploy_button'].tooltip.str = deploy_rpred.ui_describe(player, null);
+        dialog.widgets['deploy_button'].tooltip.str = deploy_rpred.ui_describe(player);
     } else {
         dialog.widgets['deploy_button'].onclick = function(w) {
             var squad_id = w.parent.user_data['squad_id'];
