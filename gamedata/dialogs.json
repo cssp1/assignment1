@@ -3833,7 +3833,7 @@
             "valentina": { "kind": "StaticImage", "xy": [0,6], "dimensions": [143,155], "clip_to": [12,12,108,115], "asset": "valentina_143x155" },
 
             "title":  { "kind": "TextField", "xy": [135,12], "dimensions": [228, 20], "text_style": "bold", "text_size": 15, "text_hjustify": "left", "ui_name": "Title" },
-            "description": { "kind": "TextField", "xy": [135,33], "dimensions": [224,32], "text_size": 13, "text_leading": 15, "text_hjustify": "left",
+            "description": { "kind": "TextField", "xy": [135,33], "dimensions": [220,32], "text_size": 13, "text_leading": 15, "text_hjustify": "left",
                              "text_vjustify": "top",
                              "ui_name": "Test 1\nTest 2\n" },
             "you_gained": { "kind": "TextField", "xy": [135,71], "dimensions": [224,18], "text_size": 13, "text_style": "normal", "text_hjustify": "left",
