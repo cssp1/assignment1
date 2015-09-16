@@ -5,11 +5,8 @@ goog.provide('Congrats');
 // found in the LICENSE file.
 
 /** @fileoverview
-    @suppress {reportUnknownTypes} XXX we are not typesafe yet
-*/
-
-// generates nicely-formatted SPText for upgrade congraulations M&Ms
-// uses pretty_print_number from main.js
+    Generates nicely-formatted SPText for townhall upgrade congratulations dialog.
+    */
 
 goog.require('Predicates');
 goog.require('SPText');
@@ -27,6 +24,12 @@ Congrats.props = { normal: {color:Congrats.color_neutral},
 // each PARAGRAPH is an array of LINES
 // each LINE is an array of ABlocks
 
+/** @param {string} ui_name
+    @param {string} text_before
+    @param {string} text_after
+    @param {number} start
+    @param {number} end
+    @return {!Array.<!SPText.ABlock>} */
 Congrats.item = function(ui_name, text_before, text_after, start, end) {
     var delta = end-start;
     var line = [];
@@ -36,7 +39,25 @@ Congrats.item = function(ui_name, text_before, text_after, start, end) {
     return line;
 };
 
-// pass in the townhall object
+// EXPERIMENTAL
+
+/** @dict
+    @typedef {!{subpredicates: (Array.<!PredicateSpec>|undefined)}} */
+var PredicateSpec;
+
+/** @dict
+    @typedef {!{developer_only: (boolean|undefined),
+                limit: (Array.<number>|number|undefined),
+                ui_name: string,
+                ui_name_plural: (string|undefined),
+                requires: (Array.<PredicateSpec>|PredicateSpec|undefined),
+                show_if: (Array.<PredicateSpec>|PredicateSpec|undefined)
+                }} */
+var GameObjectSpec;
+
+/** @param {Building} cc the townhall object
+    @param {number} level
+    @return {!Array.<!Array.<!Array.<!SPText.ABlock>>>} */
 Congrats.cc_upgrade = function(cc, level) {
     var ret = [];
     var line = [];
@@ -44,7 +65,7 @@ Congrats.cc_upgrade = function(cc, level) {
     var sep = new SPText.ABlock('\n', Congrats.props.normal);
 
     if('provides_space' in cc.spec && (cc.spec['provides_space'][level-2] != cc.spec['provides_space'][level-1])) {
-        ret.push([[new SPText.ABlock(gamedata['strings']['cc_upgrade_congrats']['unit_space']['ui_name'].toUpperCase(), Congrats.props.bold)]]);
+        ret.push([[new SPText.ABlock(/** @type {string} */ (gamedata['strings']['cc_upgrade_congrats']['unit_space']['ui_name']).toUpperCase(), Congrats.props.bold)]]);
         ret.push([Congrats.item(gamedata['strings']['cc_upgrade_congrats']['unit_space']['ui_name'],
                                 gamedata['strings']['cc_upgrade_congrats']['unit_space']['ui_before'],
                                 gamedata['strings']['cc_upgrade_congrats']['unit_space']['ui_after'],
@@ -52,22 +73,23 @@ Congrats.cc_upgrade = function(cc, level) {
     }
 
     ret.push([[sep]]);
-    ret.push([[new SPText.ABlock(gamedata['strings']['cc_upgrade_congrats']['max_number']['ui_name'].toUpperCase(), Congrats.props.bold)]]);
+    ret.push([[new SPText.ABlock(/** @type {string} */ (gamedata['strings']['cc_upgrade_congrats']['max_number']['ui_name']).toUpperCase(), Congrats.props.bold)]]);
     for(var name in gamedata['buildings']) {
-        var spec = gamedata['buildings'][name];
+        var spec = /** @type {GameObjectSpec} */ (gamedata['buildings'][name]);
 
         // ignore developer_only / hidden specs
-        if(spec['developer_only'] && (spin_secure_mode || !player.is_developer())) { continue; }
-        if(spec['show_if'] && !read_predicate(spec['show_if']).is_satisfied(player, null)) { continue; }
+        if(('developer_only' in spec) && (!!spec['developer_only']) && (spin_secure_mode || !player.is_developer())) { continue; }
+        if(('show_if' in spec) && !read_predicate(spec['show_if']).is_satisfied(player, null)) { continue; }
 
         if('limit' in spec && (typeof spec['limit']) !== 'number') {
-            var start = spec['limit'][level-2], end = spec['limit'][level-1];
+            var /** number */ start = spec['limit'][level-2];
+            var /** number */ end = spec['limit'][level-1];
             if(start != end) {
                 var ui_name;
                 if (end - start != 1) {
-                    ui_name = 'ui_name_plural' in spec ? spec['ui_name_plural'] : spec['ui_name']+'s';
+                    ui_name = ('ui_name_plural' in spec ? /** @type {string} */ (spec['ui_name_plural']) : (/** @type {string} */ (spec['ui_name'])+'s'));
                 } else {
-                    ui_name = spec['ui_name'];
+                    ui_name = /** @type {string} */ (spec['ui_name']);
                 }
 
                 ret.push([Congrats.item(ui_name,
@@ -80,10 +102,10 @@ Congrats.cc_upgrade = function(cc, level) {
 
     if('provides_limited_equipped' in cc.spec) {
         for(var key in cc.spec['provides_limited_equipped']) {
-            var arr = cc.spec['provides_limited_equipped'][key];
+            var arr = /** @type {!Array.<number>} */ (cc.spec['provides_limited_equipped'][key]);
             var start = arr[level-2], end = arr[level-1];
             if(start != end) {
-                var ui_name = gamedata['strings']['modstats']['stats']['provides_limited_equipped:'+key]['ui_name'];
+                var ui_name = /** @type {string} */ (gamedata['strings']['modstats']['stats']['provides_limited_equipped:'+key]['ui_name']);
 
                 ret.push([Congrats.item(ui_name,
                                         gamedata['strings']['cc_upgrade_congrats']['max_number']['ui_before'],
@@ -94,9 +116,9 @@ Congrats.cc_upgrade = function(cc, level) {
     }
 
     ret.push([[sep]]);
-    ret.push([[new SPText.ABlock(gamedata['strings']['cc_upgrade_congrats']['max_level']['ui_name'].toUpperCase(), Congrats.props.bold)]]);
+    ret.push([[new SPText.ABlock(/** @type {string} */ (gamedata['strings']['cc_upgrade_congrats']['max_level']['ui_name']).toUpperCase(), Congrats.props.bold)]]);
     for(var name in gamedata['buildings']) {
-        var item = Congrats.building_level_gain(cc.spec, level, gamedata['buildings'][name]);
+        var item = Congrats.building_level_gain(/** @type {GameObjectSpec} */ (cc.spec), level, gamedata['buildings'][name]);
         if(item) {
             ret.push([item]);
         }
@@ -106,23 +128,30 @@ Congrats.cc_upgrade = function(cc, level) {
     return ret;
 };
 
-// given a gamedata['buildings'] spec, see if upgrading source_building to source_level unlocks a higher level for it
-// if so, return a Congrats.item.
-// Originally, this mutated the source_building and checked predicates using is_satisfied(), but this misses upgrades
-// that have additional unsatisfied requirements. So for now, reach manually into the predicates and parse out BUILDING_LEVEL.
+/** Given a gamedata['buildings'] spec, see if upgrading source_building to source_level unlocks a higher level for it
+    if so, return a Congrats.item.
+
+    Originally, this mutated the source_building and checked predicates using is_satisfied(), but this misses upgrades
+    that have additional unsatisfied requirements. So for now, reach manually into the predicates and parse out BUILDING_LEVEL.
+    @param {GameObjectSpec} source_spec
+    @param {number} source_level
+    @param {GameObjectSpec} spec
+    @return {Array.<!SPText.ABlock>|null} */
 Congrats.building_level_gain = function(source_spec, source_level, spec) {
 
     // ignore developer_only if in production
-    if(spec['developer_only'] && (spin_secure_mode || !player.is_developer())) { return null; }
-    if(spec['show_if'] && !read_predicate(spec['show_if']).is_satisfied(player, null)) { return null; }
-    if(!spec['requires'] || !(0 in spec['requires'])) { return null; } // missing or non-array-valued "requires"
+    if(('developer_only' in spec) && (!!spec['developer_only']) && (spin_secure_mode || !player.is_developer())) { return null; }
+    if(('show_if' in spec) && !read_predicate(spec['show_if']).is_satisfied(player, null)) { return null; }
+    if(!spec['requires'] || !(spec['requires'] instanceof Array)) { return null; } // missing or non-array-valued "requires"
+
+    var requires = /** @type {!Array.<PredicateSpec>} */ (spec['requires']);
 
     var start = 0, end = 0;
-    for(var i = 0; i < spec['requires'].length; i++) {
-        if(Congrats.building_level_predicate_is_satisfied(spec['requires'][i], source_spec['name'], source_level-1)) {
+    for(var i = 0; i < requires.length; i++) {
+        if(Congrats.building_level_predicate_is_satisfied(requires[i], source_spec['name'], source_level-1)) {
             start = i+1;
         }
-        if(Congrats.building_level_predicate_is_satisfied(spec['requires'][i], source_spec['name'], source_level)) {
+        if(Congrats.building_level_predicate_is_satisfied(requires[i], source_spec['name'], source_level)) {
             end = i+1;
         }
     }
@@ -136,10 +165,15 @@ Congrats.building_level_gain = function(source_spec, source_level, spec) {
     return null;
 };
 
+/** @param {!Object} pred
+    @param {string} specname
+    @param {number} level
+    @return {boolean} */
 Congrats.building_level_predicate_is_satisfied = function(pred, specname, level) {
     if(pred['predicate'] === 'AND') {
-        for(var i = 0; i < pred['subpredicates'].length; i++) {
-            if(!Congrats.building_level_predicate_is_satisfied(pred['subpredicates'][i], specname, level)) {
+        var subpredicates = /** @type {!Array.<PredicateSpec>} */ (pred['subpredicates']);
+        for(var i = 0; i < subpredicates.length; i++) {
+            if(!Congrats.building_level_predicate_is_satisfied(subpredicates[i], specname, level)) {
                 return false;
             }
         }
