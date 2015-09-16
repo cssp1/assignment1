@@ -2180,7 +2180,7 @@ def check_ai_base_contents(strid, base, owner, base_type, ensure_force_building_
                 error |= 1; print 'AI base %s has invalid base_resource_loot entry "%s"' % (strid, res)
         if 'base_richness' in base:
             error |= 1; print 'AI base %s has base_resource_loot, therefore the base_richness setting is irrelevant and should be removed' % (strid,)
-    elif not gamedata['ai_bases']['loot_table']:
+    elif not gamedata['ai_bases']['loot_table'] and base_type != 'quarry':
         error |= 1; print 'AI base %s needs a base_resource_loot table' % strid
 
     for KIND in ('scenery', 'buildings', 'units'):
