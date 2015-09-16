@@ -481,7 +481,7 @@ SquadManageDialog.update_squad_manage = function(dialog) {
     dialog.widgets['recall_button'].show = (squad_is_deployed); // && !squad_is_moving);
     dialog.widgets['halt_button'].show = false; // (squad_is_deployed && squad_is_moving);
     dialog.widgets['disband_button'].show = !squad_is_deployed && SQUAD_IDS.is_mobile_squad_id(dialog.user_data['squad_id']);
-    dialog.widgets['deploy_button'].show = !squad_is_deployed && (cur_squad_space > 0) && SQUAD_IDS.is_mobile_squad_id(dialog.user_data['squad_id']);
+    dialog.widgets['deploy_button'].show = !squad_is_deployed && (squad_units.length > 0) && SQUAD_IDS.is_mobile_squad_id(dialog.user_data['squad_id']);
     dialog.widgets['deploy_button'].state = (!is_nosql_region || !deploy_pred_ok || squad_is_under_repair || squad_is_dead ? 'disabled_clickable' : 'normal');
 
     dialog.widgets['recall_button'].state = ((squad['pending'] || player.squad_get_client_data(squad['id'], 'squad_orders')) ? 'disabled' : 'normal');

@@ -28963,7 +28963,7 @@ function update_squad_tile(dialog) {
 
     var units_by_type = {};
     var max_space = (dialog.user_data['squad_id'] === SQUAD_IDS.BASE_DEFENDERS ? player.stattab['main_squad_space'] : player.stattab['squad_space']);
-    var cur_space = 0, max_hp = 0, cur_hp = 0;
+    var cur_space = 0, max_hp = 0, cur_hp = 0, cur_units = 0;
     var squad_is_damaged = false, squad_is_destroyed = true;
     var cost_to_repair = {};
 
@@ -28973,6 +28973,7 @@ function update_squad_tile(dialog) {
         var spec = gamedata['units'][obj['spec']];
         var level = obj['level'] || 1;
         cur_space += get_leveled_quantity(spec['consumes_space']||0, level);
+        cur_units += 1;
         var curmax = army_unit_hp(obj);
         cur_hp += curmax[0];
         max_hp += curmax[1];
@@ -29002,7 +29003,7 @@ function update_squad_tile(dialog) {
     } else if(squad_in_battle) {
         my_status = 'in_battle';
         my_status_s = squad_data['map_loc'][0].toString()+','+squad_data['map_loc'][1].toString();
-    } else if(cur_space <= 0) {
+    } else if(cur_units <= 0) {
         my_status = 'empty';
     } else if(cur_hp <= 0) {
         my_status = 'destroyed';
@@ -29066,7 +29067,7 @@ function update_squad_tile(dialog) {
     if(dlg_mode == 'normal') {
         dialog.widgets['coverup'].show = hover || squad_is_under_repair || squad_in_battle || (!squad_is_deployed && squad_is_damaged);
     } else if(dlg_mode == 'deploy' || dlg_mode == 'call') {
-        can_do_action = !(squad_is_under_repair || squad_in_battle || !SQUAD_IDS.is_mobile_squad_id(dialog.user_data['squad_id']) || ((dlg_mode=='deploy') && squad_is_deployed) || squad_is_destroyed || (cur_space <= 0)); // || (my_status == 'quarry'));
+        can_do_action = !(squad_is_under_repair || squad_in_battle || !SQUAD_IDS.is_mobile_squad_id(dialog.user_data['squad_id']) || ((dlg_mode=='deploy') && squad_is_deployed) || squad_is_destroyed || (cur_units <= 0)); // || (my_status == 'quarry'));
         dialog.widgets['coverup'].show = hover || !can_do_action;
     }
 
