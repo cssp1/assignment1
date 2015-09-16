@@ -20805,7 +20805,7 @@ class GAMEAPI(resource.Resource):
                 session.viewing_base.nosql_write_one(obj, 'OBJECT_COMBAT_UPDATES')
                 # XXXXXX need to audit fields that we write - persist_state omits the -1 for x_start_time on buildings fields = ['xy','hp_ratio','orders','patrol','contents','repair_finish_time','disarmed','build_start_time','research_start_time','upgrade_start_time','produce_start_time','manuf_start_time'])
 
-            elif owning_player and obj.is_mobile() and SQUAD_IDS.is_mobile_squad_id(obj.squad_id or 0) and \
+            elif owning_player and obj.is_mobile() and (not obj.spec.consumable) and SQUAD_IDS.is_mobile_squad_id(obj.squad_id or 0) and \
                  ((owning_player is not session.player) or owning_player.squad_is_deployed(obj.squad_id or 0)):
                 #assert owning_player.squad_is_deployed(obj.squad_id) may be false due to out-of-date player state
                 # note - second part of the "and" above handles the case when attacking out of your home base to an enemy squad that is next door
