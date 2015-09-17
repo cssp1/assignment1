@@ -6118,7 +6118,15 @@ class Base(object):
         self.base_ui_name = None
         self.base_type = base_type
         self.base_map_loc = None
-        self.base_climate = climate or gamedata.get('default_climate', None)
+
+        if climate:
+            self.base_climate = climate
+        elif ('default_player_home_climate' in gamedata) and (base_type == 'home') and (not is_ai_user_id_range(creator_id)):
+            # special-case override for player bases
+            self.base_climate = gamedata['default_player_home_climate']
+        else:
+            self.base_climate = gamedata.get('default_climate', None)
+
         self.base_ncells = None
         self.base_creation_time = server_time
         self.base_creator_id = creator_id # user_id of original creator
@@ -9918,13 +9926,23 @@ class Player(AbstractPlayer):
         # migrate base_size from playerdb to basedb
         self.my_home.base_size = max(self.my_home.base_size, self.resources.OLD_base_size)
 
-        # migrate scenery if regional map tile changed
-        if self.is_human() and self.my_home.base_region and self.my_home.base_region in gamedata['regions'] and self.my_home.base_map_loc:
-            region = Region(gamedata, self.my_home.base_region)
-            new_climate = region.read_climate_name(self.my_home.base_map_loc)
-            if self.my_home.base_climate != new_climate:
-                self.my_home.base_climate = new_climate
-                self.my_home.spawn_scenery(self, self.user_id + self.my_home.base_map_loc[0] + region.dimensions()[0]*self.my_home.base_map_loc[1], overwrite = True)
+        # migrate scenery if regional map tile changed, or if young player's home climate no longer matches the default
+        new_climate = None
+        scenery_seed = None
+        if self.is_human():
+            if self.my_home.base_region:
+                if self.my_home.base_region in gamedata['regions'] and self.my_home.base_map_loc:
+                    region = Region(gamedata, self.my_home.base_region)
+                    new_climate = region.read_climate_name(self.my_home.base_map_loc)
+                    scenery_seed = self.user_id + self.my_home.base_map_loc[0] + region.dimensions()[0]*self.my_home.base_map_loc[1]
+            else: # not on map yet
+                if ('default_player_home_climate' in gamedata):
+                    new_climate = gamedata['default_player_home_climate']
+                    scenery_seed = self.user_id
+
+        if new_climate and (self.my_home.base_climate != new_climate):
+            self.my_home.base_climate = new_climate
+            self.my_home.spawn_scenery(self, scenery_seed, overwrite = True)
 
         # fix bad techs
         if ('' in self.tech):

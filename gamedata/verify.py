@@ -2196,6 +2196,13 @@ def check_ai_base_contents(strid, base, owner, base_type, ensure_force_building_
                         error |= 1
                         print 'ERROR: AI base %s has unit %s not allowed by climate %s' % (strid, item['spec'], climate)
 
+                # check for climate-specific scenery with unspecified climate
+                # this will cause wrong-climate-specific sprites to appear in bases with the default climate
+                elif False and KIND == 'scenery' and base_type == 'home' and not (base.get('base_climate',None)) and ('base_climates' in gamedata['inert'][item['spec']]) and \
+                     not any(item['spec'].startswith(x) for x in ('roadway','dirt_road','lightpost','concrete')):
+                    error |= 1
+                    print 'ERROR: AI base %s has climate-specific scenery sprite %s but no explicit base_climate' % (strid, item['spec'])
+
                 max_level = -1
                 if KIND == 'buildings' and ('%RESOURCE' not in item['spec']):
                     spec = gamedata['buildings'][item['spec']]
@@ -3284,6 +3291,10 @@ def main(args):
 
     for name, data in gamedata['dialogs'].iteritems():
         error |= check_dialog('dialog:'+name, data)
+
+    for default_climate in (gamedata['default_climate'], gamedata.get('default_player_home_climate', gamedata['default_climate'])):
+        if default_climate not in gamedata['climates']:
+            error |= 1; print 'bad default climate %s' % default_climate
 
     for name, data in gamedata['climates'].iteritems():
         error |= check_climate(name, data)
