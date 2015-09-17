@@ -9918,6 +9918,14 @@ class Player(AbstractPlayer):
         # migrate base_size from playerdb to basedb
         self.my_home.base_size = max(self.my_home.base_size, self.resources.OLD_base_size)
 
+        # migrate scenery if regional map tile changed
+        if self.is_human() and self.my_home.base_region and self.my_home.base_region in gamedata['regions'] and self.my_home.base_map_loc:
+            region = Region(gamedata, self.my_home.base_region)
+            new_climate = region.read_climate_name(self.my_home.base_map_loc)
+            if self.my_home.base_climate != new_climate:
+                self.my_home.base_climate = new_climate
+                self.my_home.spawn_scenery(self, self.user_id + self.my_home.base_map_loc[0] + region.dimensions()[0]*self.my_home.base_map_loc[1], overwrite = True)
+
         # fix bad techs
         if ('' in self.tech):
             del self.tech['']
