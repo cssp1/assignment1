@@ -386,6 +386,7 @@
         "get_info": "Show Info",
         "spy": "Spy",
         "attack": "Attack",
+        "auto_resolve": "Auto-Resolve",
         "locked": "Locked",
         "to_unlock": "To Unlock: %s",
         "cancel_travel": "Cancel Travel",

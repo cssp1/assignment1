@@ -16568,6 +16568,10 @@ class GAMEAPI(resource.Resource):
                 gamesite.exception_log.event(server_time, 'base already damaged above win threshold (%f) before ladder attack %s' % \
                                              (base_damage, repr(new_ladder_state)))
 
+        if pre_attack >= 2:
+            # if we're going to immediately auto-resolve, THROW AWAY session change messages so the client doesn't even seen them
+            retmsg = []
+
         retmsg.append(["SESSION_CHANGE",
                        session.viewing_user.user_id,
                        session.viewing_user.facebook_id,
@@ -16737,23 +16741,24 @@ class GAMEAPI(resource.Resource):
         # if visiting a quarry that you own, force repairs to start
         if session.viewing_base.base_landlord_id == session.player.user_id and \
            session.viewing_base is not session.player.my_home:
-            return self.do_start_repairs(session, retmsg, session.viewing_base.base_id, repair_units = False)
+            self.do_start_repairs(session, retmsg, session.viewing_base.base_id, repair_units = False)
 
-        # fire AI base on_visit consequent
-        on_visit_consequent = None
+        else:
+            # fire AI base on_visit consequent
+            on_visit_consequent = None
 
-        if (session.viewing_base is session.viewing_player.my_home) and \
-           session.viewing_player.is_ai():
-            base = gamedata['ai_bases']['bases'].get(str(session.viewing_player.user_id), None)
-            if base and ('on_visit' in base):
-                on_visit_consequent = base['on_visit']
-        elif session.viewing_base.base_type == 'hive':
-            template = gamedata['hives']['templates'].get(session.viewing_base.base_template, None)
-            if template and ('on_visit' in template):
-                on_visit_consequent = template['on_visit']
+            if (session.viewing_base is session.viewing_player.my_home) and \
+               session.viewing_player.is_ai():
+                base = gamedata['ai_bases']['bases'].get(str(session.viewing_player.user_id), None)
+                if base and ('on_visit' in base):
+                    on_visit_consequent = base['on_visit']
+            elif session.viewing_base.base_type == 'hive':
+                template = gamedata['hives']['templates'].get(session.viewing_base.base_template, None)
+                if template and ('on_visit' in template):
+                    on_visit_consequent = template['on_visit']
 
-        if on_visit_consequent:
-            session.execute_consequent_safe(on_visit_consequent, session.player, retmsg, reason='on_visit')
+            if on_visit_consequent:
+                session.execute_consequent_safe(on_visit_consequent, session.player, retmsg, reason='on_visit')
 
         if pre_attack: # immediately proceed with attack attempt
             self.do_attack(session, retmsg, [None, []])
