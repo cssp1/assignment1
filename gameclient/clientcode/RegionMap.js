@@ -897,10 +897,10 @@ RegionMap.RegionMap.prototype.make_nosql_spy_buttons = function(feature) {
 
     var info = PlayerCache.query_sync(feature['base_landlord_id']);
     var same_alliance = info && info['alliance_id'] && session.is_in_alliance() && info['alliance_id'] == session.alliance_id;
-    var pre_attack = player.get_any_abtest_value('squad_pre_attack', gamedata['client']['squad_pre_attack']) && feature['base_type'] == 'squad' && feature['base_landlord_id'] != session.user_id && !same_alliance;
+    var can_pre_attack = player.get_any_abtest_value('squad_pre_attack', gamedata['client']['squad_pre_attack']) && feature['base_type'] == 'squad' && feature['base_landlord_id'] != session.user_id && !same_alliance;
     var squads_nearby = this.region.squads_nearby(feature['base_map_loc']);
 
-    var will_lose_protection = pre_attack &&
+    var will_lose_protection = can_pre_attack &&
         player.resource_state['protection_end_time'] > server_time &&
         !is_ai_user_id_range(feature['base_landlord_id']) &&
         (feature['base_type'] != 'squad' || gamedata['territory']['squads_affect_protection']) &&
@@ -923,16 +923,16 @@ RegionMap.RegionMap.prototype.make_nosql_spy_buttons = function(feature) {
                  SPUI.break_lines(gamedata['errors']['CANNOT_SPY_NO_NEARBY_SQUADS']['ui_name'], SPUI.desktop_font, [300,0])[0],
                  SPUI.error_text_color]];
     } else {
-        // SPY (and if pre_attack is true, then ATTACK as well)
+        // SPY (and if can_pre_attack is true, then ATTACK as well)
         var make_cb = function(_mapwidget, _feature, _pre_attack) { return function() {
             _mapwidget.set_popup(null);
             do_visit_base(-1, {base_id:_feature['base_id'], pre_attack:_pre_attack, short_loading_timeout:true});
         }; };
-        var spy_cb = make_cb(this, feature, false);
+        var spy_cb = make_cb(this, feature, 0);
         var ret = [[verb, spy_cb]];
 
 
-        if(pre_attack) {
+        if(can_pre_attack) {
             // do not show pre_attack option if player has no units deployable into this climate
             var climate = new Climate(gamedata['climates'][(feature['base_climate'] && feature['base_climate'] in gamedata['climates'] ? feature['base_climate'] : gamedata['default_climate'])]);
             var found_unit = false;
@@ -945,7 +945,7 @@ RegionMap.RegionMap.prototype.make_nosql_spy_buttons = function(feature) {
                 }
             }
             if(found_unit) {
-                var attack_cb = make_cb(this, feature, true);
+                var attack_cb = make_cb(this, feature, 1); // pre_attack = 1
                 var wrapped_attack_cb = (will_lose_protection ? (function(_attack_cb) { return function() { invoke_attack_through_protection_message(_attack_cb); }; })(attack_cb) : attack_cb);
                 ret.push([gamedata['strings']['regional_map']['attack'], wrapped_attack_cb, 'attack']);
             }

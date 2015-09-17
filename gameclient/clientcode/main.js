@@ -45399,7 +45399,7 @@ function do_visit_base(uid, options) {
             props['apm'] = options.apm;
         }
         if(options.pre_attack) {
-            props['pre_attack'] = true;
+            props['pre_attack'] = options.pre_attack;
         }
 
         if(options.ladder_battle) {

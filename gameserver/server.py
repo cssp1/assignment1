@@ -15928,7 +15928,7 @@ class GAMEAPI(resource.Resource):
         # force repairs to start to avoid exploits where you leave your own buildings unrepaired
         # note: not sending updates to retmsg, so we assume a session change will come right after this
         if session.home_base:
-            self.do_start_repairs(None, session, None, session.player.my_home.base_id, repair_units = False)
+            self.do_start_repairs(session, None, session.player.my_home.base_id, repair_units = False)
             session.player.ladder_point_decay_check(session, None) # after attack - player
 
         end_time = time.time()
@@ -16078,7 +16078,7 @@ class GAMEAPI(resource.Resource):
                                                                       'base_landlord_id': dest_feature['base_landlord_id'],
                                                                       'squad_id': int(dest_feature['base_id'].split('_')[1])}}
 
-                    if client_props and client_props.get('pre_attack',False) and (dest_feature['base_landlord_id'] != session.player.user_id):
+                    if client_props and client_props.get('pre_attack',None) and (dest_feature['base_landlord_id'] != session.player.user_id):
                         # attempt to lock the destination squad immediately, to reduce the time window for the defender to manipulate it before the player can attack
                         state = gamesite.nosql_client.map_feature_lock_acquire(session.player.home_region, dest_base_id, session.player.user_id, reason='VISIT_BASE2_pre_attack')
                         if state != Player.LockState.being_attacked:
@@ -16140,7 +16140,7 @@ class GAMEAPI(resource.Resource):
 
         # first clean up any ongoing attack, then perform the actual session change
         return self.complete_attack(session, retmsg, functools.partial(self.change_session2, request, session, retmsg, dest_user_id, dest_base_id, dest_feature, new_ladder_state, new_deployable_squads, new_defending_squads, delay,
-                                                                       client_props and client_props.get('pre_attack', False)),
+                                                                       client_props.get('pre_attack', None) if client_props else None),
                                     client_props = client_props, reason='change_session')
 
     # ready to change sessions, begin the I/O
@@ -16174,7 +16174,7 @@ class GAMEAPI(resource.Resource):
 
         return ret
 
-    def _change_session_complete(self, request, session, retmsg, dest_user_id, dest_user, dest_player, dest_base_id, dest_feature, dest_base, outcome, old_battle_summary, new_ladder_state, new_deployable_squads, new_defending_squads, pre_attack = False):
+    def _change_session_complete(self, request, session, retmsg, dest_user_id, dest_user, dest_player, dest_base_id, dest_feature, dest_base, outcome, old_battle_summary, new_ladder_state, new_deployable_squads, new_defending_squads, pre_attack = None):
         if dest_base_id:
             ascdebug('change_session_complete (new) %d:%s -> %s (%d,%d,%d)' % (session.user.user_id, session.viewing_base.base_id, dest_base_id, bool(dest_user), bool(dest_player), bool(dest_base)))
         else:
@@ -16737,7 +16737,7 @@ class GAMEAPI(resource.Resource):
         # if visiting a quarry that you own, force repairs to start
         if session.viewing_base.base_landlord_id == session.player.user_id and \
            session.viewing_base is not session.player.my_home:
-            return self.do_start_repairs(request, session, retmsg, session.viewing_base.base_id, repair_units = False)
+            return self.do_start_repairs(session, retmsg, session.viewing_base.base_id, repair_units = False)
 
         # fire AI base on_visit consequent
         on_visit_consequent = None
@@ -16757,6 +16757,16 @@ class GAMEAPI(resource.Resource):
 
         if pre_attack: # immediately proceed with attack attempt
             self.do_attack(session, retmsg, [None, []])
+            if pre_attack >= 2:
+                self.auto_resolve(session, retmsg)
+
+                # this will go async to write the battle result, so we shouldn't call it in-line, since the async return isn't propagated out to the caller
+                def go_home_and_flush(self, session):
+                    session.visit_base_in_progress = True
+                    self.change_session(None, session, session.deferred_messages, dest_user_id = session.player.user_id, force = True)
+                    session.flush_deferred_messages()
+                reactor.callLater(0, lambda: go_home_and_flush(self, session))
+
         else:
             assert not session.pre_locks
 
@@ -19044,7 +19054,7 @@ class GAMEAPI(resource.Resource):
 
         return did_a_manufacture
 
-    def do_start_repairs(self, request, session, retmsg, base_id, repair_units = True):
+    def do_start_repairs(self, session, retmsg, base_id, repair_units = True):
         if base_id == session.player.my_home.base_id:
             base = session.player.my_home
             do_units = repair_units
@@ -22281,7 +22291,7 @@ class GAMEAPI(resource.Resource):
         if session.player.tutorial_state == "COMPLETE":
             # force repairs to start to avoid exploits where you leave your own buildings unrepaired
             # XXXXXX this should be moved before initial session change!
-            self.do_start_repairs(None, session, None, session.player.my_home.base_id, repair_units = False)
+            self.do_start_repairs(session, None, session.player.my_home.base_id, repair_units = False)
 
             session.player.ladder_point_decay_check(session, retmsg) # login
 
@@ -22323,7 +22333,7 @@ class GAMEAPI(resource.Resource):
         # PRE-WRITE portion
 
         # force repairs to start to avoid exploits where you leave your own buildings unrepaired
-        self.do_start_repairs(None, session, None, session.player.my_home.base_id, repair_units = False)
+        self.do_start_repairs(session, None, session.player.my_home.base_id, repair_units = False)
         session.player.ladder_point_decay_check(session, None) # logout
 
         # log metric event
@@ -22638,8 +22648,11 @@ class GAMEAPI(resource.Resource):
             else:
                 client_props = None
 
-            if client_props and client_props.get('pre_attack',False):
+            if client_props and client_props.get('pre_attack',None):
                 # sanity check for pre_attack option
+                if client_props['pre_attack'] is True: # compatibility with old client
+                    client_props['pre_attack'] = 1
+                assert client_props['pre_attack'] in (1,2)
                 assert session.home_base
                 assert not session.has_attacked
                 assert arg[0] in ("VISIT_BASE", "VISIT_BASE2")
@@ -24768,7 +24781,7 @@ class GAMEAPI(resource.Resource):
                 self.do_speedup_for_free(session, retmsg, object)
 
             elif spellname == "REPAIR":
-                return self.do_start_repairs(request, session, retmsg, spellargs[0])
+                return self.do_start_repairs(session, retmsg, spellargs[0])
 
             elif spellname == "UPGRADE_FOR_FREE":
                 self.do_upgrade(session, retmsg, object)
