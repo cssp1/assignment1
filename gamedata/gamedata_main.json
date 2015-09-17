@@ -254,6 +254,7 @@
             { "predicate": "LIBRARY", "name": "extended_tutorial_complete" }
         ]},
         "show_alliance_mate_last_played_time": 1, // show "Last Played: X days ago" for members of your own alliance
+        "show_alliance_mate_online_status": 1, // show online/offline status for members of your own alliance
 
         // for UI purposes only, treat tournament "togo" intervals shortert than this many seconds as infinite (so don't show expiry timer)
         "infinite_trophy_togo": 2592000,
