@@ -166,14 +166,17 @@ class Sender(object):
         if is_majority_anti_alt_game and (not is_repeat_offender):
             # pick any other region, including anti-alt regions, as long as player has no OTHER alts there
             candidate_regions = filter(lambda x: x.get('continent_id',None) == cur_continent_id and \
-                                       x.get('auto_join',1) and \
+                                       x.get('auto_join',1) and x.get('enable_map',1) and \
                                        x['id'] not in other_alt_region_names, gamedata['regions'].itervalues())
             if len(candidate_regions) >= 1:
                 new_region = candidate_regions[random.randint(0, len(candidate_regions)-1)]
 
         if new_region is None:
             # pick any pro-alt region (which will be prison in a majority anti-alt game)
-            new_region = pro_alt_regions[random.randint(0, len(pro_alt_regions)-1)]
+            candidate_regions = filter(lambda x: x.get('continent_id',None) == cur_continent_id and \
+                                       x.get('open_join',1) and x.get('enable_map',1), pro_alt_regions)
+            assert len(candidate_regions) >= 1
+            new_region = candidate_regions[random.randint(0, len(candidate_regions)-1)]
 
         if not self.test:
             assert new_region['id'] != cur_region_name
