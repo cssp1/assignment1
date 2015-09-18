@@ -438,7 +438,13 @@ if __name__ == '__main__':
             prot = player['resources']['protection_end_time'] - time_now
         print fmt % ('Protection timer:', ('ON for %.1f hrs' % (prot/3600.0) if prot > 0 else 'off'))
 
-        print fmt % ('Home region:', player.get('home_region', None) or '(not on map)')
+        if player.get('home_region'):
+            ui_region = player['home_region']
+            if player['home_region'] in gamedata['regions']:
+                ui_region += ' ("%s")' % gamedata['regions'][player['home_region']]['ui_name']
+        else:
+            ui_region = '(not on map)'
+        print fmt % ('Home region:', ui_region)
 
         if player.get('isolate_pvp',0):
             print fmt % ('ISOLATED from making attacks against others', '')
