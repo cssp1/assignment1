@@ -4862,6 +4862,7 @@ class GameObjectSpec(Spec):
         ["production_capacity", 0],
         ] + resource_fields("storage") + [
         ] + resource_fields("specific_pve_loot_fraction", default = -1) + [
+        ] + resource_fields("specific_pvp_loot_fraction", default = -1) + [
         ["spells", []],
         ["level_determined_by_tech", None],
         ["limit", -1],
@@ -5791,15 +5792,17 @@ class Building(GameObject):
                 ret[res] = ret.get(res,0) + amount
         return ret
 
-    # for SpecificPvEResLoot, optionally take a fraction of the base's total loot instead of using a capacity-weighted contribution
-    def specific_pve_loot_fraction(self):
+    # for Specific ResLoot, optionally take a fraction of the base's total loot instead of using a capacity-weighted contribution
+    def _specific_loot_fraction(self, pve_or_pvp):
         ret = None
         for res in gamedata['resources']:
-            amount = self.get_leveled_quantity(getattr(self.spec, 'specific_pve_loot_fraction_'+res))
+            amount = self.get_leveled_quantity(getattr(self.spec, 'specific_'+pve_or_pvp+'_loot_fraction_'+res))
             if amount >= 0: # note: treat -1 as "no effect", 0 as "fraction is zero"
                 if ret is None: ret = {}
                 ret[res] = amount
         return ret
+    def specific_pve_loot_fraction(self): return self._specific_loot_fraction('pve')
+    def specific_pvp_loot_fraction(self): return self._specific_loot_fraction('pvp')
 
     def affects_power(self):
         return bool(self.spec.provides_power) or \
@@ -6144,7 +6147,7 @@ class Base(object):
         self.base_size = 0
         self.deployment_buffer = 1 # whether or not to add deployment buffer around base perimeter
 
-        # this is only used for some AI bases that have explicit loot amounts
+        # this is used for AI bases that have explicit loot amounts, and player bases to save state across attacks
         self.base_resource_loot = None # dictionary of {"resource": amount} remaining to be looted
 
         # list of GameObjects
@@ -22026,6 +22029,8 @@ class GAMEAPI(resource.Resource):
         player.spawn_deposits()
         player.migrate(session, user.user_id, user.account_creation_time, is_returning_user)
         player.prune_player_auras(is_session_change = True, is_login = True)
+
+        player.my_home.base_resource_loot = None # reset base_resource_loot state
 
         # check the data proxyserver attached to the session to see if there are other players logging in from the same IP
         # note: must be done AFTER migrate() since the format of known_alt_accounts has changed
