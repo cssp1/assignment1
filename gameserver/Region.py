@@ -12,8 +12,10 @@ class Region:
         self.region_id = region_id
     def is_nosql(self):
         return self.gamedata['regions'][self.region_id].get('storage','basedb')=='nosql'
+    def dimensions(self):
+        return self.gamedata['regions'][self.region_id]['dimensions']
     def read_terrain(self, xy):
-        dims = self.gamedata['regions'][self.region_id]['dimensions']
+        dims = self.dimensions()
         terrain = self.gamedata['region_terrain'][self.gamedata['regions'][self.region_id]['terrain']]
         index = xy[1]*dims[0]+xy[0]
         encoded = ord(terrain[index])

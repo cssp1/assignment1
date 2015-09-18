@@ -48,7 +48,10 @@ GameArt.stats = function() {
     return msg;
 };
 
-// given an art asset filename from art.json, return the full URL to the source file
+/** Given an art asset filename from art.json, return the full URL to the source file
+    @param {string} filename
+    @param {boolean=} needs_cors - if cross-origin resource sharing must be available for this asset
+    @return {string} */
 GameArt.art_url = function(filename, needs_cors) {
     var use_cdn = true;
 
@@ -100,23 +103,36 @@ GameArt.art_url = function(filename, needs_cors) {
 // ChannelGovernor manages an abstract set of audio channels
 // it tries to ensure that we don't overload the underlying audio driver by
 // trying to play too many sound effects at the same time
-/** @constructor */
+
+/** @constructor
+    @struct
+    @implements {BinaryHeap.Element} */
+GameArt.ChannelGovernorEntry = function(end) {
+    this.end = end;
+    this.heapscore = 0;
+};
+
+/** @constructor
+    @struct */
 GameArt.ChannelGovernor = function(max_chan) {
     this.max_chan = max_chan;
     this.cur = 0;
     // keep track of completion times of currently-playing sounds
-    this.completion = new BinaryHeap.BinaryHeap();
+    this.completion = /** @type {!BinaryHeap.BinaryHeap<GameArt.ChannelGovernorEntry>} */ (new BinaryHeap.BinaryHeap());
 };
 
-// try to get permission to play an audio clip, passing in starting and ending client_times
-// if successful, claim a channel and return true
-// if the audio system is overloaded, return false
+/** Try to get permission to play an audio clip, passing in starting and ending client_times.
+    If successful, claim a channel and return true.
+    Ff the audio system is overloaded, return false.
+    @param {number} start client_time of audio play start
+    @param {number} end client_time of audio play end
+    @return {boolean} */
 GameArt.ChannelGovernor.prototype.get_chan = function(start, end) {
     if(this.cur >= this.max_chan) { return false; }
     if(end <= start) { console.log('invalid start/end times '+start+'/'+end); return false; }
     this.cur += 1;
     // XXX take starting delay into account?
-    var entry = {end: end};
+    var entry = new GameArt.ChannelGovernorEntry(end);
     this.completion.push(entry, entry.end);
     return true;
 };

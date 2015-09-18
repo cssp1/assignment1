@@ -37,6 +37,11 @@ function PredicateUIDescription(descr, options) {
 */
 Predicate.prototype.do_ui_describe = goog.abstractMethod;
 
+/** @param {?} player
+    @param {Object|null=} qdata
+    @return {boolean} */
+Predicate.prototype.is_satisfied = goog.abstractMethod;
+
 /** If predicate is unsatisfied, return a PredicateUIDescription. Otherwise return null.
     @return {PredicateUIDescription|null} */
 Predicate.prototype.ui_describe_detail = function(player) {
@@ -1592,7 +1597,7 @@ function UsingTitlePredicate(data) {
 goog.inherits(UsingTitlePredicate, Predicate);
 UsingTitlePredicate.prototype.is_satisfied = function(player, qdata) {
     if(this.name === null) { // true if player is using any valid title
-        return player.title && (player.title in gamedata['titles']);
+        return (!!player.title) && (player.title in gamedata['titles']);
     } else {
         return player.title === this.name;
     }
@@ -1698,6 +1703,8 @@ ViewingBaseObjectDestroyedPredicate.prototype.is_satisfied = function(player, qd
     return false;
 };
 
+/** @param {!Object} data
+    @return {!Predicate} */
 function read_predicate(data) {
     var kind = data['predicate'];
     if(kind === 'AND') { return new AndPredicate(data); }

@@ -180,7 +180,7 @@ LoadAIBaseConsequent.prototype.execute = function(state) {
 function VisitBaseConsequent(data) {
     goog.base(this, data);
     this.user_id = data['user_id'];
-    this.pre_attack = data['pre_attack'] || false;
+    this.pre_attack = data['pre_attack'] || null;
 }
 goog.inherits(VisitBaseConsequent, Consequent);
 VisitBaseConsequent.prototype.execute = function(state) {
@@ -194,7 +194,6 @@ VisitBaseConsequent.prototype.execute = function(state) {
 function RepairAllConsequent(data) { // client-side only, kind of hacky
     goog.base(this, data);
     this.user_id = data['user_id'];
-    this.pre_attack = data['pre_attack'] || false;
 }
 goog.inherits(RepairAllConsequent, Consequent);
 RepairAllConsequent.prototype.execute = function(state) {

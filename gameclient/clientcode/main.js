@@ -421,7 +421,9 @@ function pretty_print_qty_brief(n) {
     }
 }
 
-// print a number in the form xxx,xxx,xxx
+/** print a number in the form xxx,xxx,xxx
+    @param {number} n
+    @return {string} */
 function pretty_print_number(n) {
     var sign;
     if(n < 0) {
@@ -585,7 +587,7 @@ function update_client_and_server_time() {
 // for tracking mouse movement
 var mouse_state = { last_x: 0, last_y: 0, // last x,y location of movement that the game field handled
                     last_raw_x: 0, last_raw_y: 0, // last x,y location of movement, regardless of who handled the event
-                    button: 0,  // bitmask of button states
+                    button: new SPUI.MouseButtonState(),  // bitmask of button states, manipulate with SPUI.MouseButtonState methods
                     spacebar: false, // whether or not spacebar is being held down
                     // state of view-scroll operation
                     has_scrolled: false, scroll_start_x: 0, scroll_start_y: 0,
@@ -602,10 +604,6 @@ var mouse_state = { last_x: 0, last_y: 0, // last x,y location of movement that 
                     last_unit_clicked: null,
                     last_click_time: -1 // client_time when the click was made
                   };
-mouse_state.get_button = function(num) { return (mouse_state.button & (1<<num)) != 0; };
-mouse_state.set_button = function(num) { mouse_state.button |= (1<<num); };
-mouse_state.clear_button = function(num) { mouse_state.button &= ~(1<<num); };
-mouse_state.clear_all_buttons = function() { mouse_state.button = 0; };
 
 // number of seconds after a click within which a second click will be considered a double-click
 var DOUBLE_CLICK_TIME = 0.6;
@@ -1105,8 +1103,8 @@ function GameObject() {
     /** @type {GameObjectId} */
     this.id = 'DEAD'; // = DEAD_ID if the object is "dead" or otherwise not part of the game world
 
-    /** @type {Object} */
-    this.spec = null;
+    /** @type {!Object} */
+    this.spec = {}; // set upon instantiation
     this.x = -1;
     this.y = -1;
     this.hp = -1;
@@ -6607,37 +6605,33 @@ player.can_level_up = function() {
 player.unit_micro_enabled = function() { return (!('enable_unit_micro' in gamedata) || gamedata['enable_unit_micro'] || player.is_cheater); };
 player.squads_enabled = function() { return read_predicate({'predicate':'LIBRARY', 'name': 'squads_enabled'}).is_satisfied(player, null); };
 
-/** @return {boolean} */
-player.auto_resolve_enabled = function() {
-    if(player.get_any_abtest_value('enable_auto_resolve', false)) {
-        return true;
-    } else if(session.region && session.region.data && ('enable_auto_resolve' in session.region.data)) {
-        return session.region.data['enable_auto_resolve'];
-    } else {
-        return gamedata['territory']['enable_auto_resolve'] || false;
+/** Get an over-rideable setting from territory.json
+    @param {string} name
+    @return {?} */
+player.get_territory_setting = function(name) {
+    var ret = gamedata['territory'][name] || false;
+    if(session.region && session.region.data && (name in session.region.data)) {
+        ret = session.region.data[name];
     }
+    ret = player.get_any_abtest_value(name, ret);
+    return ret;
 };
+
+/** @return {boolean} */
+player.auto_resolve_enabled = function() { return player.get_territory_setting('enable_auto_resolve'); };
+/** @return {boolean} */
+player.squad_combat_enabled = function() { return player.get_territory_setting('enable_squad_combat'); };
+/** @return {boolean} */
+player.map_home_combat_enabled = function() { return player.get_territory_setting('enable_map_home_combat'); };
+/** @return {boolean} */
+player.quarry_guards_enabled = function() { return player.get_territory_setting('enable_quarry_guards'); };
 
 /** @return {string} */
 player.squad_block_mode = function() {
-    var mode = gamedata['territory']['squad_block_mode'];
-    if(session.region && session.region.data && ('squad_block_mode' in session.region.data)) {
-        mode = session.region.data['squad_block_mode'];
-    }
-    mode = player.get_any_abtest_value('squad_block_mode', mode);
+    var mode = player.get_territory_setting('squad_block_mode');
     if(!goog.array.contains(['always', 'after_move', 'never'], mode)) { throw Error('bad squad_block_mode '+mode); }
     return mode;
 };
-
-/** @return {boolean} */
-player.squad_combat_enabled = function() {
-    var ret = gamedata['territory']['enable_squad_combat'];
-    if(session.region && session.region.data && ('enable_squad_combat' in session.region.data)) {
-        ret = session.region.data['enable_squad_combat'];
-    }
-    ret = player.get_any_abtest_value('enable_squad_combat', ret);
-    return ret;
-}
 
 player.unit_speedups_enabled = function() { return player.is_cheater || !('enable_unit_speedups' in gamedata) || gamedata['enable_unit_speedups']; };
 player.crafting_speedups_enabled = function() { return player.is_cheater || !('enable_crafting_speedups' in gamedata) || gamedata['enable_crafting_speedups']; };
@@ -12909,7 +12903,7 @@ function update_desktop_dialogs() {
         dialog.widgets['protection_message'].show =
             dialog.widgets['protection_defended'].show = false;
 
-        desktop_dialogs['combat_resource_bars'].show = session.enable_combat_resource_bars && (session.has_attacked || (session.is_ladder_battle() && gamedata['client']['combat_resource_bars_show_trophies']));
+        desktop_dialogs['combat_resource_bars'].show = session.enable_combat_resource_bars && (session.has_attacked || (session.is_ladder_battle() && gamedata['client']['combat_resource_bars_show_trophies'])) && (session.viewing_base.base_landlord_id !== session.user_id);
         desktop_dialogs['combat_damage_bar'].show =  desktop_dialogs['combat_resource_bars'].show && session.has_attacked;
 
         if(session.viewing_base.base_type == 'quarry' && session.viewing_base.base_landlord_id == session.user_id) {
@@ -15482,7 +15476,7 @@ function invoke_you_were_attacked_dialog(recent_attacks) {
         dialog.widgets['halt_message'].str = interrupts.join('\n');
     }
 
-    init_dialog_repair_buttons(dialog, current_base_damage);
+    init_dialog_repair_buttons(dialog, current_base_damage, true);
 
     notification_queue.push(invoke_damage_protection_notice);
 
@@ -15499,7 +15493,81 @@ function test_you_were_attacked_dialog() {
 // hack - make sure repairs are only started once on login
 var repairs_started = false;
 
-function init_dialog_repair_buttons(dialog, base_damage) {
+function start_slow_repairs() {
+    send_to_server.func(["CAST_SPELL", GameObject.VIRTUAL_ID, "REPAIR", session.viewing_base.base_id]);
+
+    for(var id in session.cur_objects.objects) {
+        var obj = session.cur_objects.objects[id];
+        if(obj.is_building() && obj.is_damaged() && !obj.is_repairing()) {
+            // client-side predict
+            var health = (obj.hp) / (1.0*obj.max_hp);
+            health = Math.max(0.0, Math.min(health, 1.0))
+            var repair_time = Math.max(1, Math.floor((1.0-health)*(obj.get_leveled_quantity(obj.spec['repair_time'])/obj.get_stat('repair_speed',1))))
+            obj.repair_finish_time = server_time + repair_time;
+            obj.update_all_actions(server_time);
+        }
+    }
+    if(('enable_defending_units' in gamedata) && !gamedata['enable_defending_units']) {
+        // also check army for repair candidates
+        for(var id in player.my_army) {
+            var unit = player.my_army[id];
+            if((unit['squad_id']||0) == SQUAD_IDS.BASE_DEFENDERS) {
+                var curmax = army_unit_hp(unit);
+                if(curmax[0]<curmax[1] && !army_unit_is_under_repair(unit['obj_id']) && player.can_repair_unit_of_spec(gamedata['units'][unit['spec']], curmax[0])) {
+                    send_to_server.func(["UNIT_REPAIR_QUEUE", unit['obj_id']]);
+                }
+            }
+        }
+        unit_repair_sync_marker = synchronizer.request_sync();
+    }
+}
+
+function confirm_instant_repairs(price, ok_cb) {
+    var dialog_data = gamedata['dialogs']['instant_repair_confirm_dialog'];
+    var dialog = new SPUI.Dialog(dialog_data);
+    install_child_dialog(dialog);
+    dialog.auto_center();
+    dialog.modal = true;
+
+    dialog.widgets['description'].set_text_with_linebreaking(dialog.data['widgets']['description']['ui_name'].replace('%GAMEBUCKS', Store.gamebucks_ui_name()));
+    dialog.widgets['price_display'].bg_image = player.get_any_abtest_value('price_display_asset', gamedata['store']['price_display_asset']);
+    dialog.widgets['price_display'].state = Store.get_user_currency();
+    dialog.widgets['price_display'].str = Store.display_user_currency_price(price); // PRICE
+    dialog.widgets['price_display'].tooltip.str = Store.display_user_currency_price_tooltip(price);
+    dialog.widgets['price_display'].onclick =
+        dialog.widgets['ok_button'].onclick = (function (_ok_cb) { return function(w) { close_parent_dialog(w); _ok_cb(); }; })(ok_cb);
+    dialog.widgets['close_button'].onclick = close_parent_dialog;
+    return dialog;
+}
+
+/** @param {function()} cb to call once order is submitted
+    @return {boolean} whether repairs actually took place (may be cancelled if insufficient funds) */
+function do_instant_repairs(cb) {
+    return Store.place_user_currency_order(GameObject.VIRTUAL_ID, "REPAIR_ALL_FOR_MONEY",
+                                           session.viewing_base.base_id,
+                                           (function (_cb) { return function() {
+                                               for(var id in session.cur_objects.objects) {
+                                                   var obj = session.cur_objects.objects[id];
+                                                   if(obj.is_building() && obj.is_damaged()) {
+                                                       if(obj.is_destroyed()) { // reblock
+                                                           obj.block_map(1, 'REPAIR_ALL_FOR_MONEY predict');
+                                                       }
+                                                       obj.hp = obj.max_hp; obj.repair_finish_time = -1; // client-side predict
+                                                       obj.update_all_actions(server_time);
+                                                   }
+                                               }
+                                               _cb();
+                                           }; })(cb)
+                                          );
+}
+
+
+/** Set up the instant/slow repair buttons and price display.
+    Shared functionality for several different dialogs.
+    @param {!SPUI.Dialog} dialog
+    @param {number} base_damage
+    @param {boolean} enable_confirm - if true, enable the "are you sure?" confirmation */
+function init_dialog_repair_buttons(dialog, base_damage, enable_confirm) {
     var cost_res = {};
     var do_units = true;
     var any_unit_damage = false;
@@ -15539,38 +15607,6 @@ function init_dialog_repair_buttons(dialog, base_damage) {
     dialog.widgets['price_display'].bg_image = player.get_any_abtest_value('price_display_asset', gamedata['store']['price_display_asset']);
     dialog.widgets['price_display'].state = Store.get_user_currency();
 
-    var start_slow_repair = function(w) {
-        var dialog = w.parent;
-        close_parent_dialog(w);
-
-        send_to_server.func(["CAST_SPELL", GameObject.VIRTUAL_ID, "REPAIR", session.viewing_base.base_id]);
-
-        for(var id in session.cur_objects.objects) {
-            var obj = session.cur_objects.objects[id];
-            if(obj.is_building() && obj.is_damaged() && !obj.is_repairing()) {
-                // client-side predict
-                var health = (obj.hp) / (1.0*obj.max_hp);
-                health = Math.max(0.0, Math.min(health, 1.0))
-                var repair_time = Math.max(1, Math.floor((1.0-health)*(obj.get_leveled_quantity(obj.spec['repair_time'])/obj.get_stat('repair_speed',1))))
-                obj.repair_finish_time = server_time + repair_time;
-                obj.update_all_actions(server_time);
-            }
-        }
-        if(('enable_defending_units' in gamedata) && !gamedata['enable_defending_units']) {
-            // also check army for repair candidates
-            for(var id in player.my_army) {
-                var unit = player.my_army[id];
-                if((unit['squad_id']||0) == SQUAD_IDS.BASE_DEFENDERS) {
-                    var curmax = army_unit_hp(unit);
-                    if(curmax[0]<curmax[1] && !army_unit_is_under_repair(unit['obj_id']) && player.can_repair_unit_of_spec(gamedata['units'][unit['spec']], curmax[0])) {
-                        send_to_server.func(["UNIT_REPAIR_QUEUE", unit['obj_id']]);
-                    }
-                }
-            }
-            unit_repair_sync_marker = synchronizer.request_sync();
-        }
-    };
-
     if(base_damage > 0 || (player.unit_speedups_enabled() && any_unit_damage)) { // also check for unit repair cost?
         var instant_price = Store.get_user_currency_price(GameObject.VIRTUAL_ID, gamedata['spells']['REPAIR_ALL_FOR_MONEY'], session.viewing_base.base_id);
         dialog.widgets['price_display'].str = Store.display_user_currency_price(instant_price); // PRICE
@@ -15598,33 +15634,29 @@ function init_dialog_repair_buttons(dialog, base_damage) {
                 //send_to_server.func(["UNIT_REPAIR_SPEEDUP_FOR_FREE"]);
             };
         } else {
-            dialog.widgets['price_display'].onclick =
-                dialog.widgets['repair_instant_button'].onclick = function(w) {
-                    var dialog = w.parent;
+            var begin = (function (_dialog) { return function() {
+                var on_start = (function (__dialog) { return function() {
+                    __dialog.widgets['repair_instant_button'].str = __dialog.data['widgets']['repair_instant_button']['ui_name_pending'];
+                    __dialog.widgets['repair_instant_button'].state = 'disabled'; __dialog.widgets['price_display'].onclick = null;
+                }; })(_dialog);
+                var on_complete = (function (__dialog) { return function() { close_dialog(__dialog); }; })(_dialog);
+                if(do_instant_repairs(on_complete)) {
+                    on_start();
+                }
+            }; })(dialog);
 
-                    if(Store.place_user_currency_order(GameObject.VIRTUAL_ID, "REPAIR_ALL_FOR_MONEY",
-                                                       session.viewing_base.base_id,
-                                                       (function (_w) { return function() {
-                                                           close_parent_dialog(_w);
-                                                           for(var id in session.cur_objects.objects) {
-                                                               var obj = session.cur_objects.objects[id];
-                                                               if(obj.is_building() && obj.is_damaged()) {
-                                                                   if(obj.is_destroyed()) { // reblock
-                                                                       obj.block_map(1, 'REPAIR_ALL_FOR_MONEY predict');
-                                                                   }
-                                                                   obj.hp = obj.max_hp; obj.repair_finish_time = -1; // client-side predict
-                                                                   obj.update_all_actions(server_time);
-                                                               }
-                                                           }
-                                                       }; })(w)
-                                                      )) {
-                        dialog.widgets['repair_instant_button'].str = dialog.data['widgets']['repair_instant_button']['ui_name_pending'];
-                        dialog.widgets['repair_instant_button'].state = 'disabled'; dialog.widgets['price_display'].onclick = null;
-                    }
-            };
+            var do_confirm = enable_confirm && player.get_any_abtest_value('confirm_instant_repairs', gamedata['client']['confirm_instant_repairs']);
+
+            dialog.widgets['price_display'].onclick =
+                dialog.widgets['repair_instant_button'].onclick = (do_confirm ? (function (_instant_price, _begin) { return function(w) {
+                    confirm_instant_repairs(_instant_price, _begin);
+                }; })(instant_price, begin) : begin);
         }
 
-        dialog.widgets['repair_slow_button'].onclick = start_slow_repair;
+        dialog.widgets['repair_slow_button'].onclick = function(w) {
+            close_parent_dialog(w);
+            start_slow_repairs();
+        };
 
     } else {
         // base is not damaged
@@ -15632,7 +15664,10 @@ function init_dialog_repair_buttons(dialog, base_damage) {
         dialog.widgets['repair_slow_button'].show =
             dialog.widgets['repair_instant_button'].show = false;
         dialog.widgets['repair_not_necessary_button'].show = true;
-        dialog.widgets['repair_not_necessary_button'].onclick = (any_unit_damage ? start_slow_repair : close_parent_dialog);
+        dialog.widgets['repair_not_necessary_button'].onclick = (any_unit_damage ? function(w) {
+            close_parent_dialog(w);
+            start_slow_repairs();
+        } : close_parent_dialog);
         dialog.default_button = dialog.widgets['repair_not_necessary_button'];
     }
 };
@@ -15642,7 +15677,7 @@ function do_invoke_repair_dialog() {
     var dialog = new SPUI.Dialog(dialog_data);
     dialog.user_data['dialog'] = 'repair_dialog';
     dialog.modal = true;
-    init_dialog_repair_buttons(dialog, calc_base_damage({count_partial:true}));
+    init_dialog_repair_buttons(dialog, calc_base_damage({count_partial:true}), false);
     // count # of things needing repair, for UI only
     var buildings = 0, units = 0, barriers = 0, beyond_tech = 0, beyond_tech_types = {};
     for(var id in session.cur_objects.objects) {
@@ -17243,7 +17278,7 @@ function invoke_defense_end_dialog(battle_type, battle_base, battle_opponent_use
             dialog.widgets[res+'_amount'].str = pretty_print_number(lost);
         }
     }
-    init_dialog_repair_buttons(dialog, base_damage);
+    init_dialog_repair_buttons(dialog, base_damage, true);
     return dialog;
 };
 
@@ -19178,7 +19213,7 @@ function invoke_fancy_victory_dialog(battle_type, battle_base, battle_opponent_u
         // defensive battle
         var damage = calc_base_damage({count_partial:true});
         dialog.widgets['base_damage'].str = dialog.widgets['base_damage'].data['ui_name'].replace('%pct', Math.floor(100*damage).toFixed(0) + '%');
-        init_dialog_repair_buttons(dialog, damage);
+        init_dialog_repair_buttons(dialog, damage, true);
         dialog.default_button = dialog.widgets[(damage > 0 ? 'repair_instant_button' : 'repair_not_necessary_button')];
         dialog.widgets['close_button'].show = false;
         dialog.widgets['close_button'].onclick = null; // prevent ESC from working
@@ -20645,7 +20680,7 @@ Region.prototype.receive_feature_update = function(res) {
         delete res['preserve_locks'];
     }
 
-    var feature = this.map_index.get_by_base_id(res['base_id']);
+    var feature = /** @type {Object|null} */ (this.map_index.get_by_base_id(res['base_id']));
 
     if(feature) {
         // update or delete
@@ -28510,8 +28545,9 @@ function find_friend_by_user_id(uid) {
     @param {string|null=} obj
     @param {function(SPUI.DialogWidget)|null=} onclick
     @param {string|null=} frame_state_override
-    @param {string|null=} tooltip_override */
-function unit_icon_set(dialog, specname, qty, obj, onclick, frame_state_override, tooltip_override) {
+    @param {string|null=} tooltip_override
+    @param {boolean=} enable_dripper */
+function unit_icon_set(dialog, specname, qty, obj, onclick, frame_state_override, tooltip_override, enable_dripper) {
     var spec = (specname ? gamedata['units'][specname] : null);
     dialog.user_data['spec'] = spec;
     dialog.user_data['obj'] = obj;
@@ -28523,6 +28559,12 @@ function unit_icon_set(dialog, specname, qty, obj, onclick, frame_state_override
         dialog.widgets['stack'].str = (qty > 1 ? pretty_print_number(qty) : null);
         dialog.widgets['frame'].onclick = (onclick ? onclick : null);
         dialog.widgets['frame'].tooltip.str = (tooltip_override ? tooltip_override : (onclick ? spec['ui_name'] + (('ui_tip' in spec) ? '\n'+spec['ui_tip'] : '') : null));
+        if(enable_dripper) {
+            dialog.widgets['frame'].dripper_cb = (function (_w) { return function(button) { return _w.onclick(_w, button); }; })(dialog.widgets['frame']);
+            dialog.widgets['frame'].dripper_rate = 4.0;
+        } else {
+            dialog.widgets['frame'].dripper_cb = null;
+        }
     }
     dialog.ondraw = unit_icon_update;
 }
@@ -28935,6 +28977,9 @@ function army_unit_compare(a,b) {
     var bcurmax = army_unit_hp(b), bratio = bcurmax[0]/Math.max(bcurmax[1],1);
     if(aratio < bratio) { return 1; }
     if(aratio > bratio) { return -1; }
+    // use obj_id to break ties, for stable sort order
+    if(a['obj_id'] < b['obj_id']) { return 1; }
+    if(a['obj_id'] > b['obj_id']) { return -1; }
     return 0;
 }
 
@@ -29351,7 +29396,7 @@ function update_squad_tile(dialog) {
 
     var units_by_type = {};
     var max_space = (dialog.user_data['squad_id'] === SQUAD_IDS.BASE_DEFENDERS ? player.stattab['main_squad_space'] : player.stattab['squad_space']);
-    var cur_space = 0, max_hp = 0, cur_hp = 0;
+    var cur_space = 0, max_hp = 0, cur_hp = 0, cur_units = 0;
     var squad_is_damaged = false, squad_is_destroyed = true;
     var cost_to_repair = {};
 
@@ -29361,6 +29406,7 @@ function update_squad_tile(dialog) {
         var spec = gamedata['units'][obj['spec']];
         var level = obj['level'] || 1;
         cur_space += get_leveled_quantity(spec['consumes_space']||0, level);
+        cur_units += 1;
         var curmax = army_unit_hp(obj);
         cur_hp += curmax[0];
         max_hp += curmax[1];
@@ -29390,7 +29436,7 @@ function update_squad_tile(dialog) {
     } else if(squad_in_battle) {
         my_status = 'in_battle';
         my_status_s = squad_data['map_loc'][0].toString()+','+squad_data['map_loc'][1].toString();
-    } else if(cur_space <= 0) {
+    } else if(cur_units <= 0) {
         my_status = 'empty';
     } else if(cur_hp <= 0) {
         my_status = 'destroyed';
@@ -29454,7 +29500,7 @@ function update_squad_tile(dialog) {
     if(dlg_mode == 'normal') {
         dialog.widgets['coverup'].show = hover || squad_is_under_repair || squad_in_battle || (!squad_is_deployed && squad_is_damaged);
     } else if(dlg_mode == 'deploy' || dlg_mode == 'call') {
-        can_do_action = !(squad_is_under_repair || squad_in_battle || !SQUAD_IDS.is_mobile_squad_id(dialog.user_data['squad_id']) || ((dlg_mode=='deploy') && squad_is_deployed) || squad_is_destroyed || (cur_space <= 0)); // || (my_status == 'quarry'));
+        can_do_action = !(squad_is_under_repair || squad_in_battle || !SQUAD_IDS.is_mobile_squad_id(dialog.user_data['squad_id']) || ((dlg_mode=='deploy') && squad_is_deployed) || squad_is_destroyed || (cur_units <= 0)); // || (my_status == 'quarry'));
         dialog.widgets['coverup'].show = hover || !can_do_action;
     }
 
@@ -30713,28 +30759,25 @@ function update_manufacture_dialog(dialog) {
                             invoke_child_message_dialog(s['ui_title'], s['ui_name'], {'dialog': 'message_dialog_big'});
                         }
                     } else if(available_space < cost_space && !player.is_cheater) {
-                        var dripper = w.get_dripper();
-                        if (!dripper || dripper.times_fired <= 1) { // do not repeatedly display help when dripper is rapid-firing more clicks
-                            var helper = get_requirements_help('unit_space', cost_space - available_space);
-                            if(helper) {
-                                helper();
+                        var helper = get_requirements_help('unit_space', cost_space - available_space);
+                        if(helper) {
+                            helper();
+                        } else {
+                            var s = null;
+                            if(player.squads_enabled()) {
+                                var reason = classify_unit_space_shortage();
+                                if(reason == 'base_defenders') {
+                                    s = gamedata['strings']['requirements_help']['unit_space_base_defenders']['manage_base_defenders'];
+                                } else if(reason == 'total_army') {
+                                    s = gamedata['strings']['requirements_help']['unit_space_total_army']['upgrade'];
+                                } else if(reason == 'recycle') {
+                                    s = gamedata['strings']['requirements_help']['unit_space_total_army']['recycle'];
+                                }
                             } else {
-                                var s = null;
-                                if(player.squads_enabled()) {
-                                    var reason = classify_unit_space_shortage();
-                                    if(reason == 'base_defenders') {
-                                        s = gamedata['strings']['requirements_help']['unit_space_base_defenders']['manage_base_defenders'];
-                                    } else if(reason == 'total_army') {
-                                        s = gamedata['strings']['requirements_help']['unit_space_total_army']['upgrade'];
-                                    } else if(reason == 'recycle') {
-                                        s = gamedata['strings']['requirements_help']['unit_space_total_army']['recycle'];
-                                    }
-                                } else {
-                                    s = gamedata['strings']['requirements_help']['unit_space']['upgrade'];
-                                }
-                                if(s) {
-                                    invoke_child_message_dialog(s['ui_title'], s['ui_description'], {'dialog': 'message_dialog_big'});
-                                }
+                                s = gamedata['strings']['requirements_help']['unit_space']['upgrade'];
+                            }
+                            if(s) {
+                                invoke_child_message_dialog(s['ui_title'], s['ui_description'], {'dialog': 'message_dialog_big'});
                             }
                         }
                     } else if(builder.is_repairing()) {
@@ -30759,12 +30802,16 @@ function update_manufacture_dialog(dialog) {
                         }
                     } else {
                         send_command();
+                        return false; // do not stop the dripper
                     }
 
                 } else {
                     var helper = manufacture_dialog_unlock_helper(dialog.user_data['category'], spec_name, 'closure:builder'+(builder?'1':'0')+'unlock_level'+unlock_level.toString());
                     if(helper) { helper(); }
                 }
+
+                // all paths that do not end in send_command() should return true to stop the dripper, since it indicates some problem that must be solved.
+                return true;
             };
         })(name);
         widget.onclick = closure;
@@ -32355,7 +32402,7 @@ function update_crafting_dialog_status_mines_and_missiles(dialog) {
                 var helper = null;
                 if(help_pred && dialog.widgets['mine_slot'+wname].show) {
                     helper = function (use_short_circuit) { return function() {
-                        var h = get_requirements_help(read_predicate(help_pred), null, {short_circuit:use_short_circuit});
+                        var h = get_requirements_help(read_predicate(/** @type {!Object} */ (help_pred)), null, {short_circuit:use_short_circuit});
                         if(h) { h(); }
                     }; };
                 }
@@ -34001,7 +34048,7 @@ function missions_dialog_select_mission(dialog, row) {
         // get mission progress text, if available
         var text = null;
         if(pred.ui_progress) {
-            text = pred.ui_progress(player);
+            text = pred.ui_progress(player, null);
         }
 
         if(text) {
@@ -35703,7 +35750,7 @@ function invoke_settings_dialog() {
     var row = 0;
     for(var name in settings) {
         var data = settings[name];
-        if('show_if' in data && !read_predicate(data['show_if']).is_satisfied(player, true)) {
+        if('show_if' in data && !read_predicate(data['show_if']).is_satisfied(player, null)) {
             continue;
         }
         dialog.user_data['settings'].push(data);
@@ -40984,7 +41031,7 @@ function can_cast_spell_detailed(unit_id, spellname, spellarg) {
     } else if(spellname.indexOf("CHANGE_REGION_INSTANTLY") == 0) {
         var pred = read_predicate(player.get_any_abtest_value('change_region_requirement', gamedata['territory']['change_region_requirement']));
         if(!pred.is_satisfied(player, null)) {
-            return [false, pred.ui_describe(player,null), [pred,null]];
+            return [false, pred.ui_describe(player), [pred,null]];
         }
     } else if(spellname == "ALLIANCE_GIFT_LOOT") {
         if(!session.is_in_alliance()) {
@@ -45038,7 +45085,9 @@ function handle_server_message(data) {
         } else if(codec == 'lzjb') {
             result = JSON.parse(Iuppiter.bytes_to_string(Iuppiter.decompress(goog.crypt.base64.decodeStringToByteArray(z_result))));
         } else if(codec == 'lz4') {
-            result = JSON.parse(Iuppiter.bytes_to_string(lz4.decompress(goog.crypt.base64.decodeStringToByteArray(z_result))));
+            var arr = goog.crypt.base64.decodeStringToByteArray(z_result);
+            arr = /** @type {!Array} */ (arr); // since decodeStringToByteArray's return value is incorrectly annotated to be nullable
+            result = JSON.parse(Iuppiter.bytes_to_string(lz4.decompress(arr)));
         } else {
             throw Error('unknown codec '+codec);
         }
@@ -45696,10 +45745,9 @@ function cancel_loading_base_timer() {
 
 function invoke_loading_base_dialog(dialog_name) {
     loading_base_dialog_timer = null;
-    change_selection(null);
     var dialog_data = gamedata['dialogs'][dialog_name];
     var dialog = new SPUI.Dialog(dialog_data);
-    change_selection_ui(dialog);
+    install_child_dialog(dialog);
     dialog.auto_center();
     dialog.modal = true;
     return dialog;
@@ -45788,7 +45836,7 @@ function do_visit_base(uid, options) {
             props['apm'] = options.apm;
         }
         if(options.pre_attack) {
-            props['pre_attack'] = true;
+            props['pre_attack'] = options.pre_attack;
         }
 
         if(options.ladder_battle) {
@@ -45883,12 +45931,13 @@ function on_mouseup(e) {
 function do_on_mouseup(e) {
     e.preventDefault();
 
-    mouse_state.clear_button(e.button);
+    mouse_state.button.clear_button(/** @type {SPUI.MouseButton} */ (e.button));
+    var button_delta = new SPUI.MouseButtonState(/** @type {SPUI.MouseButton} */ (e.button));
 
     // get canvas coordinates of mouse pointer location
     var xy = event_to_canvas(e);
 
-    SPUI.dripper.stop(true);
+    SPUI.dripper.stop(true, button_delta);
 
     if(mouse_state.dripper.is_active()) {
         // Dripper.stop() will fire the callback one more time, but it doesn't have any way of updating the player's APM
@@ -45901,7 +45950,7 @@ function do_on_mouseup(e) {
         mouse_state.dripper.stop(true, xy);
     }
 
-    if(e.button == SPUI.RIGHT_MOUSE_BUTTON) {
+    if(e.button === SPUI.MouseButton.RIGHT) {
         // end drag
         if(mouse_state.has_dragged) {
             mouse_state.has_dragged = false;
@@ -45909,13 +45958,13 @@ function do_on_mouseup(e) {
                 player.record_feature_use('drag_select');
             }
         } else {
-            if(tutorial_root.on_mouseup(xy, [0,0], e.button)) {
+            if(tutorial_root.on_mouseup(xy, [0,0], button_delta)) {
                 return;
             }
-            if(player.quest_root.on_mouseup(xy, [0,0], e.button)) {
+            if(player.quest_root.on_mouseup(xy, [0,0], button_delta)) {
                 return;
             }
-            if(SPUI.root.on_mouseup(xy, [0,0], e.button)) {
+            if(SPUI.root.on_mouseup(xy, [0,0], button_delta)) {
                 return;
             }
             if(player.tutorial_state != "COMPLETE") {
@@ -45938,15 +45987,15 @@ function do_on_mouseup(e) {
     }
 
     // first let SPUI handle it
-    if(tutorial_root.on_mouseup(xy, [0,0], e.button)) {
+    if(tutorial_root.on_mouseup(xy, [0,0], button_delta)) {
         return;
     }
 
-    if(player.quest_root.on_mouseup(xy, [0,0], e.button)) {
+    if(player.quest_root.on_mouseup(xy, [0,0], button_delta)) {
         return;
     }
 
-    if(SPUI.root.on_mouseup(xy, [0,0], e.button)) {
+    if(SPUI.root.on_mouseup(xy, [0,0], button_delta)) {
         return;
     }
 
@@ -46247,7 +46296,7 @@ function on_mouseout(e) {
 }
 
 function do_on_mouseout(e) {
-    mouse_state.clear_all_buttons();
+    mouse_state.button.clear_all_buttons();
     mouse_state.dripper.stop();
     mouse_state.has_scrolled = false;
     mouse_state.has_dragged = false;
@@ -46579,7 +46628,7 @@ function do_on_mousemove(e) {
     }
 
     if(x != mouse_state.last_x || y != mouse_state.last_y) {
-        if(mouse_state.get_button(SPUI.LEFT_MOUSE_BUTTON) && allow_scroll) {
+        if(mouse_state.button.get_button(SPUI.MouseButton.LEFT) && allow_scroll) {
             // scroll view
             var dx = x - mouse_state.last_x;
             var dy = y - mouse_state.last_y;
@@ -46606,7 +46655,7 @@ function do_on_mousemove(e) {
                 mouse_state.dripper.stop(); // abort current drip operation
             }
         }
-        if(player.unit_micro_enabled() && (mouse_state.get_button(SPUI.RIGHT_MOUSE_BUTTON) || mouse_state.spacebar)) {
+        if(player.unit_micro_enabled() && (mouse_state.button.get_button(SPUI.MouseButton.RIGHT) || mouse_state.spacebar)) {
             // drag-select
             if(!mouse_state.has_dragged) {
                 mouse_state.has_dragged = true;
@@ -46622,7 +46671,7 @@ function do_on_mousemove(e) {
             }
         }
 
-        if(mouse_state.button != SPUI.LEFT_MOUSE_BUTTON) {
+        if(mouse_state.button.get_any_button() && mouse_state.has_scrolled) {
             // remove pop-up UI ONLY if it's a context menu
             if(player.tutorial_state == "COMPLETE" &&
                selection.ui != null &&
@@ -46795,26 +46844,26 @@ function do_on_mousedown(e) {
     register_player_input();
 
     e.preventDefault();
-    mouse_state.set_button(e.button);
+    mouse_state.button.set_button(/** @type {SPUI.MouseButton} */ (e.button));
+    var button_delta = new SPUI.MouseButtonState(/** @type {SPUI.MouseButton} */ (e.button));
 
     // get canvas coordinates of mouse-click location
     var xy = event_to_canvas(e);
     // first let SPUI handle it
-    if(tutorial_root.on_mousedown(xy, [0,0], e.button)) {
+    if(tutorial_root.on_mousedown(xy, [0,0], button_delta)) {
         return;
     }
-    if(player.quest_root.on_mousedown(xy, [0,0], e.button)) {
+    if(player.quest_root.on_mousedown(xy, [0,0], button_delta)) {
         return;
     }
-    if(SPUI.root.on_mousedown(xy, [0,0], e.button)) {
+    if(SPUI.root.on_mousedown(xy, [0,0], button_delta)) {
         return;
     }
 
-    if(e.button == 0) {
+    if(e.button === SPUI.MouseButton.LEFT) {
         // reset scroll
         mouse_state.has_scrolled = false;
-    }
-    if(e.button == 2) {
+    } else if(e.button === SPUI.MouseButton.RIGHT) {
         // reset drag
         mouse_state.has_dragged = false;
     }
@@ -46841,7 +46890,7 @@ function do_on_mousedown(e) {
         var deployment_dripper_callback = function(mouse_xy) {
             var ji = screen_to_ortho(mouse_xy);
             if(!session.viewing_base.is_deployment_location_valid(ji)) {
-                return;
+                return true; // stop the dripper
             }
             var obj = null;
             // pick the first one
@@ -46855,9 +46904,10 @@ function do_on_mousedown(e) {
             }
             if(obj) {
                 do_deploy(ji, [obj]);
+                return false; // do not stop dripper
             } else {
                 // nothing left
-                mouse_state.dripper.stop();
+                return true; // stop the dripper
             }
         }
 
@@ -47637,9 +47687,9 @@ function do_draw() {
 
         if(client_state == client_states.RUNNING && !visit_base_pending) {
 
-        SPUI.dripper.activate(client_time);
+        SPUI.dripper.activate(client_time, mouse_state.button); // pass current button state
 
-        mouse_state.dripper.activate(client_time, [mouse_state.last_x, mouse_state.last_y]);
+        mouse_state.dripper.activate(client_time, [mouse_state.last_x, mouse_state.last_y]); // pass current cursor location
 
         // run deferred citizens update
         session.do_update_citizens();

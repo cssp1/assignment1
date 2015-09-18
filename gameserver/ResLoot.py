@@ -12,12 +12,16 @@ import Predicates
 
 # instantiate an appropriate looter for this (viewed) player and this base
 def ResLoot(gamedata, session, player, base):
-    if (base.base_type in ('home','hive')) and (base.base_resource_loot is not None):
+    if player.is_ai() and (base.base_type in ('home','hive')) and (base.base_resource_loot is not None):
         return SpecificPvEResLoot(gamedata, session, player, base)
     elif player.is_ai() or (base is not player.my_home):
         return TablePvEResLoot(gamedata, session, player, base)
     else: # PvP
-        if (not session.home_base) and gamedata.get('pvp_loot_method',None) == 'specific':
+        pvp_loot_method = gamedata.get('pvp_loot_method','hardcore')
+        if session.viewing_player.home_region and session.viewing_player.home_region in gamedata['regions'] and 'pvp_loot_method' in gamedata['regions'][session.viewing_player.home_region]:
+            pvp_loot_method = gamedata['regions'][session.viewing_player.home_region]['pvp_loot_method']
+        pvp_loot_method = session.viewing_player.get_any_abtest_value('pvp_loot_method', pvp_loot_method)
+        if (not session.home_base) and pvp_loot_method == 'specific': # XXX remove home_base condition for AI attacks?
             return SpecificPvPResLoot(gamedata, session, player, base)
         else:
             return HardcorePvPResLoot(gamedata, session, player, base)
@@ -139,6 +143,9 @@ class PerBuildingGradualLoot(object):
             for res, amount in tick.iteritems():
                 ret[res] = ret.get(res,0) + amount
         return ret
+
+    def serialize(self):
+        return copy.deepcopy(self.ticks)
 
 # SG-style PvE looting: decrements a persistent base-wide specific total, deterministically
 class SpecificPvEResLoot(BaseResLoot):
@@ -306,7 +313,10 @@ class PvPResLoot(BaseResLoot):
             loot_attacker_gains_region_scale *= Predicates.eval_cond_or_literal(gamedata['regions'][session.viewing_player.home_region].get('loot_attacker_gains_scale_if_defender',1), session, session.viewing_player)
             loot_defender_loses_region_scale *= Predicates.eval_cond_or_literal(gamedata['regions'][session.viewing_player.home_region].get('loot_defender_loses_scale_if_defender',1), session, session.viewing_player)
 
-        base_loot_attacker_gains_table = session.viewing_player.get_any_abtest_value('loot_attacker_gains', gamedata['loot_attacker_gains'])
+        base_loot_attacker_gains_table = gamedata['loot_attacker_gains']
+        if session.viewing_player.home_region and session.viewing_player.home_region in gamedata['regions'] and 'loot_attacker_gains' in gamedata['regions'][session.viewing_player.home_region]:
+            base_loot_attacker_gains_table = gamedata['regions'][session.viewing_player.home_region]['loot_attacker_gains']
+        base_loot_attacker_gains_table = session.viewing_player.get_any_abtest_value('loot_attacker_gains', base_loot_attacker_gains_table)
 
         if type(base_loot_attacker_gains_table) is dict:
             # note: predicates evaluated on viewing_player, not player!
@@ -314,7 +324,10 @@ class PvPResLoot(BaseResLoot):
         else: # one value for all kinds
             base_loot_attacker_gains = dict((res, base_loot_attacker_gains_table) for res in gamedata['resources'])
 
-        base_loot_defender_loses_table = session.viewing_player.get_any_abtest_value('loot_defender_loses', gamedata['loot_defender_loses'])
+        base_loot_defender_loses_table = gamedata['loot_defender_loses']
+        if session.viewing_player.home_region and session.viewing_player.home_region in gamedata['regions'] and 'loot_defender_loses' in gamedata['regions'][session.viewing_player.home_region]:
+            base_loot_defender_loses_table = gamedata['regions'][session.viewing_player.home_region]['loot_defender_loses']
+        base_loot_defender_loses_table = session.viewing_player.get_any_abtest_value('loot_defender_loses', base_loot_defender_loses_table)
 
         if type(base_loot_defender_loses_table) is dict:
             # note: predicates evaluated on viewing_player, not player!
@@ -366,6 +379,11 @@ class HardcorePvPResLoot(PvPResLoot):
             # of THIS resource, weighted by capacity), but since this is very much incompatible with current JSON
             # numbers, we are enabling the "loot_storage_distribution_bug" in titles that haven't been updated yet.
 
+            loot_storage_distribution_bug = gamedata.get('loot_storage_distribution_bug', False)
+            if session.viewing_player.home_region and session.viewing_player.home_region in gamedata['regions'] and 'loot_storage_distribution_bug' in gamedata['regions'][session.viewing_player.home_region]:
+                loot_storage_distribution_bug = gamedata['regions'][session.viewing_player.home_region]['loot_storage_distribution_bug']
+            loot_storage_distribution_bug = session.viewing_player.get_any_abtest_value('loot_storage_distribution_bug', loot_storage_distribution_bug)
+
             nbuild = 0
             weights = dict((res, 0) for res in gamedata['resources'])
 
@@ -380,7 +398,7 @@ class HardcorePvPResLoot(PvPResLoot):
             assert nbuild > 0
 
 
-            if gamedata.get('loot_storage_distribution_bug', False):
+            if loot_storage_distribution_bug:
                 # legacy method for backwards compatibility
                 factors = dict((res, (1.0/nbuild)) for res in gamedata['resources'])
             else:
@@ -416,6 +434,10 @@ class SpecificPvPResLoot(PvPResLoot):
     def __init__(self, gamedata, session, player, base):
         BaseResLoot.__init__(self, gamedata, session, player, base)
 
+        if base.base_resource_loot is None:
+            # we're going to persist this between logins to remember the amount of resources still "unexposed" to looting
+            base.base_resource_loot = dict((res, getattr(player.resources, res)) for res in gamedata['resources'])
+
         # precalculate the total loot available to the attacker
         self.starting_resource_loot = dict((res, 0) for res in gamedata['resources'])
 
@@ -426,56 +448,80 @@ class SpecificPvPResLoot(PvPResLoot):
         attacker_caps = dict((kind, dict((res, -1) for res in gamedata['resources'])) for kind in ('storage', 'producer'))
         defender_caps = dict((kind, dict((res, -1) for res in gamedata['resources'])) for kind in ('storage', 'producer'))
 
-        if type(gamedata['loot_attacker_gains']) is dict:
+        # get caps
+        base_loot_attacker_gains_table = gamedata['loot_attacker_gains']
+        if session.viewing_player.home_region and session.viewing_player.home_region in gamedata['regions'] and 'loot_attacker_gains' in gamedata['regions'][session.viewing_player.home_region]:
+            base_loot_attacker_gains_table = gamedata['regions'][session.viewing_player.home_region]['loot_attacker_gains']
+        base_loot_defender_loses_table = gamedata['loot_defender_loses']
+        if session.viewing_player.home_region and session.viewing_player.home_region in gamedata['regions'] and 'loot_defender_loses' in gamedata['regions'][session.viewing_player.home_region]:
+            base_loot_defender_loses_table = gamedata['regions'][session.viewing_player.home_region]['loot_defender_loses']
+        base_loot_defender_loses_table = session.viewing_player.get_any_abtest_value('loot_defender_loses', base_loot_defender_loses_table)
+
+        if type(base_loot_attacker_gains_table) is dict:
             for kind in attacker_caps:
                 for res in attacker_caps[kind]:
-                    cap = Predicates.eval_cond_or_literal(gamedata['loot_attacker_gains'][res][kind], session, session.viewing_player).get('cap',-1) # note: evaluated on viewing_player, not player!
+                    cap = Predicates.eval_cond_or_literal(base_loot_attacker_gains_table[res][kind], session, session.viewing_player).get('cap',-1) # note: evaluated on viewing_player, not player!
                     if cap >= 0:
                         attacker_caps[kind][res] = cap
 
-        if type(gamedata['loot_defender_loses']) is dict:
+        if type(base_loot_defender_loses_table) is dict:
             for kind in defender_caps:
                 for res in defender_caps[kind]:
-                    cap = Predicates.eval_cond_or_literal(gamedata['loot_defender_loses'][res][kind], session, session.viewing_player).get('cap',-1) # note: evaluated on viewing_player, not player!
+                    cap = Predicates.eval_cond_or_literal(base_loot_defender_loses_table[res][kind], session, session.viewing_player).get('cap',-1) # note: evaluated on viewing_player, not player!
                     if cap >= 0:
                         defender_caps[kind][res] = cap
 
-        # count how many storage buildings the owning player has for each resource
-        n_storages = dict((res, 0) for res in gamedata['resources'])
+        # count how much storage the owning player has for each resource
         total_storage_weight = dict((res, 0) for res in gamedata['resources'])
+        # for buildings that take a fraction of the total loot pool instead of being capacity-weighted
+        total_storage_fractions_taken = {} # {resource: total_fraction}
+
         for p in self.base.iter_objects():
-            if p.is_building() and p.is_storage(): # XXX (and not p.is_destroyed()) ?
-                for res in gamedata['resources']:
-                    qty = p.get_leveled_quantity(getattr(p.spec, 'storage_'+res))
-                    if qty > 0:
-                        n_storages[res] += 1
-                        total_storage_weight[res] += qty
+            if p.is_building() and p.is_storage() and (not p.is_destroyed()):
+                fraction = p.specific_pvp_loot_fraction()
+                contrib = p.resource_loot_contribution()
+                if fraction or contrib:
+                    for res in gamedata['resources']:
+                        if fraction and res in fraction:
+                            total_storage_fractions_taken[res] = total_storage_fractions_taken.get(res,0) + fraction[res]
+                        elif contrib and res in contrib:
+                            total_storage_weight[res] += contrib[res]
 
 
-        # mapping from obj_id to PerBuilding amounts remaining to be (looted, lost)
+        # mapping from obj_id to PerBuilding amounts remaining to be (looted, lost, original)
         self.storage_building_amounts = {}
 
         for p in self.base.iter_objects():
-            if p.is_building() and p.is_storage(): # XXX (and not p.is_destroyed()) ?
+            if p.is_building() and p.is_storage() and (not p.is_destroyed()):
                 loot_amounts = {}
                 lost_amounts = {}
+                orig_amounts = {}
+                fraction = p.specific_pvp_loot_fraction()
+                contrib = p.resource_loot_contribution()
                 for res in gamedata['resources']:
-                    qty = p.get_leveled_quantity(getattr(p.spec, 'storage_'+res))
-                    if qty > 0:
-                        weight = qty / float(total_storage_weight[res])
-                        loot_amounts[res] = int(weight * loot_attacker_gains_storage[res] * getattr(player.resources, res))
-                        lost_amounts[res] = int(weight * loot_defender_loses_storage[res] * getattr(player.resources, res))
-                        self.starting_resource_loot[res] += loot_amounts[res]
+                    # XXX might want to use the last_ids logic to ensure correct rounding as in SpecificPvEResLoot
+                    if fraction and res in fraction:
+                        weight = fraction[res]
+                    elif contrib and res in contrib:
+                        weight = contrib[res] / float(total_storage_weight[res])
+                        weight *= (1 - total_storage_fractions_taken.get(res,0))
+                    else:
+                        continue
+                    loot_amounts[res] = int(weight * loot_attacker_gains_storage[res] * base.base_resource_loot[res])
+                    lost_amounts[res] = int(weight * loot_defender_loses_storage[res] * base.base_resource_loot[res])
+                    orig_amounts[res] = int(weight * base.base_resource_loot[res])
+                    self.starting_resource_loot[res] += loot_amounts[res]
                 if loot_amounts or lost_amounts:
                     self.storage_building_amounts[p.obj_id] = (PerBuildingGradualLoot(gamedata, p, loot_amounts),
-                                                               PerBuildingGradualLoot(gamedata, p, lost_amounts))
+                                                               PerBuildingGradualLoot(gamedata, p, lost_amounts),
+                                                               PerBuildingGradualLoot(gamedata, p, orig_amounts))
 
         # mapping from obj_id to PerBuilding amounts remaining to be (looted, lost)
         self.producer_building_amounts = {}
 
         # compute total contribution of all buildings of each kind
         for p in self.base.iter_objects():
-            if p.is_building() and p.is_producer():
+            if p.is_building() and p.is_producer() and (not p.is_destroyed()):
                 loot_amounts = {}
                 lost_amounts = {}
                 for res in gamedata['resources']:
@@ -515,8 +561,9 @@ class SpecificPvPResLoot(PvPResLoot):
     def send_update(self, retmsg):
         retmsg.append(["RES_LOOTER_UPDATE", {'starting': self.starting_resource_loot,
                                              # these can be sent to the client for debugging only
-                                             # 'producer_amounts': self.producer_amounts,
-                                             # 'storage_amounts': self.storage_amounts,
+                                             #'base_resource_loot': copy.deepcopy(self.base.base_resource_loot),
+                                             #'producer_amounts': dict((k, [v[0].serialize(), v[1].serialize()]) for k, v in self.producer_building_amounts.iteritems()),
+                                             #'storage_amounts': dict((k, [v[0].serialize(),v[1].serialize(),v[2].serialize()]) for k, v in self.storage_building_amounts.iteritems()),
                                              'cur': copy.deepcopy(self.cur_resource_loot),
                                              'looted_uncapped': copy.deepcopy(self.total_looted_uncapped)}])
 
@@ -533,6 +580,8 @@ class SpecificPvPResLoot(PvPResLoot):
             if obj.obj_id in self.storage_building_amounts:
                 self.storage_building_amounts[obj.obj_id][0].grab(new_hp, looted)
                 self.storage_building_amounts[obj.obj_id][1].grab(new_hp, lost)
+                original = {}
+                self.storage_building_amounts[obj.obj_id][2].grab(new_hp, original)
                 # delete?
 
                 for res in looted:
@@ -540,6 +589,10 @@ class SpecificPvPResLoot(PvPResLoot):
 
                 # loot is taken directly from the owner's stored resources
                 owning_player.resources.gain_res(dict((res,-lost[res]) for res in lost), reason='looted_by_attacker')
+
+                # persist the fraction "seen" by the looting code, and only subject the remainder to future looting
+                for res in original:
+                    self.base.base_resource_loot[res] = max(0, self.base.base_resource_loot[res] - original[res])
 
         elif obj.is_producer():
             if obj.obj_id in self.producer_building_amounts:

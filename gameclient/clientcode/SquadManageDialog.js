@@ -145,7 +145,12 @@ SquadManageDialog.update_squad_manage = function(dialog) {
     }
 
     // scan for units
-    var reserve_units_by_type = {}, squad_units = [];
+
+    // mapping of specname -> quantity in reserves
+    var reserve_units_by_type = {};
+    // list of army units in this squad
+    var squad_units = [];
+
     var max_squad_space = (dialog.user_data['squad_id'] === SQUAD_IDS.BASE_DEFENDERS ? player.stattab['main_squad_space'] : player.stattab['squad_space']);
     var cur_squad_space = 0;
     var max_hp = 0, cur_hp = 0;
@@ -207,8 +212,11 @@ SquadManageDialog.update_squad_manage = function(dialog) {
         });
     }
 
+    // stack squad units together as much as possible
+    var stacked_squad_units = SquadManageDialog.stack_squad_units(squad_units);
+
     var reserve_columns = dialog.user_data['reserve_columns'] = (reserve_types_to_show.length < dialog.data['widgets']['reserve_unit']['array_max'][0]*dialog.data['widgets']['reserve_unit']['array_max'][1] ? dialog.data['widgets']['reserve_unit']['array_max'][0] : Math.ceil((reserve_types_to_show.length+1)/dialog.data['widgets']['reserve_unit']['array_max'][1]));
-    var squad_columns = dialog.user_data['squad_columns'] = (squad_units.length < dialog.data['widgets']['squad_unit']['array_max'][0]*dialog.data['widgets']['squad_unit']['array_max'][1] ? dialog.data['widgets']['squad_unit']['array_max'][0] : Math.ceil((squad_units.length+1)/dialog.data['widgets']['squad_unit']['array_max'][1]));
+    var squad_columns = dialog.user_data['squad_columns'] = (stacked_squad_units.length < dialog.data['widgets']['squad_unit']['array_max'][0]*dialog.data['widgets']['squad_unit']['array_max'][1] ? dialog.data['widgets']['squad_unit']['array_max'][0] : Math.ceil((stacked_squad_units.length+1)/dialog.data['widgets']['squad_unit']['array_max'][1]));
 
     dialog.user_data['reserve_scroll_limits'] = [0, Math.max(0, reserve_columns-dialog.data['widgets']['reserve_unit']['array_max'][0]) * dialog.data['widgets']['reserve_unit']['array_offset'][0]];
     dialog.user_data['squad_scroll_limits'] = [0, Math.max(0, squad_columns-dialog.data['widgets']['squad_unit']['array_max'][0]) * dialog.data['widgets']['squad_unit']['array_offset'][0]];
@@ -271,25 +279,28 @@ SquadManageDialog.update_squad_manage = function(dialog) {
             }
             dialog.widgets[wname].xy = vec_add(vec_add(dialog.data['widgets']['reserve_unit']['xy'], [-dialog.user_data['reserve_scroll_pos'],0]),
                                                vec_mul([grid_x,grid_y], dialog.data['widgets']['reserve_unit']['array_offset']));
-            var onclick;
-            if(!pred_ok) {
-                onclick = pred_help;
-            } else {
-                onclick = (function (_squad_id, _specname, _cur_squad_space, _max_squad_space) { return function(w, button) {
+
+            var onclick = (function (_pred_ok, _pred_help, _squad_id, _specname, _cur_squad_space, _max_squad_space) { return function(w, button) {
+                    if(!_pred_ok) {
+                        if(_pred_help) {
+                            _pred_help();
+                        }
+                        return true; // stop dripper
+                    }
                     if(player.squad_is_deployed(_squad_id) || player.squad_is_in_battle(_squad_id)) {
                         var s = gamedata['errors']['CANNOT_ALTER_SQUAD_WHILE_TRAVELING'];
                         invoke_child_message_dialog(s['ui_title'], s['ui_name']);
-                        return;
+                        return true; // stop dripper
                     }
                     if(player.squad_is_under_repair(_squad_id)) {
                         var s = gamedata['errors']['CANNOT_ALTER_SQUAD_UNDER_REPAIR'];
                         invoke_child_message_dialog(s['ui_title'], s['ui_name']);
-                        return;
+                        return true; // stop dripper
                     }
 
                     // find healthiest (or unhealthiest) non-pending reserve unit of this type
                     var obj = null, extreme_hp_ratio, no_space = false;
-                    if(button == SPUI.RIGHT_MOUSE_BUTTON) {
+                    if(button.get_button(SPUI.MouseButton.RIGHT)) {
                         extreme_hp_ratio = 1;
                     } else {
                         extreme_hp_ratio = -1;
@@ -300,8 +311,8 @@ SquadManageDialog.update_squad_manage = function(dialog) {
                             if(_cur_squad_space+space <= _max_squad_space) {
                                 var curmax = army_unit_hp(o);
                                 var ratio = curmax[0]/Math.max(curmax[1],1);
-                                if((button == SPUI.RIGHT_MOUSE_BUTTON && ratio <= extreme_hp_ratio) ||
-                                   (button != SPUI.RIGHT_MOUSE_BUTTON && ratio > extreme_hp_ratio)) {
+                                if((button.get_button(SPUI.MouseButton.RIGHT) && ratio <= extreme_hp_ratio) ||
+                                   (!button.get_button(SPUI.MouseButton.RIGHT) && ratio > extreme_hp_ratio)) {
                                     extreme_hp_ratio = ratio;
                                     obj = o;
                                 }
@@ -314,7 +325,7 @@ SquadManageDialog.update_squad_manage = function(dialog) {
                     if(no_space) {
                         var s = gamedata['errors']['CANNOT_SQUAD_ASSIGN_UNIT_LIMIT_REACHED'+(_squad_id == SQUAD_IDS.BASE_DEFENDERS ? '_BASE_DEFENDERS' : '')];
                         invoke_child_message_dialog(s['ui_title'], s['ui_name']);
-                        return;
+                        return true; // stop dripper
                     }
                     if(obj) {
                         send_to_server.func(["CAST_SPELL", GameObject.VIRTUAL_ID, "SQUAD_ASSIGN_UNIT", _squad_id, obj['obj_id']]);
@@ -324,13 +335,18 @@ SquadManageDialog.update_squad_manage = function(dialog) {
                             obj['squad_id'] = _squad_id;
                         }
                         obj['pending'] = 1;
+                        return false; // do not stop dripper
                     }
-                }; })(dialog.user_data['squad_id'], specname, cur_squad_space, max_squad_space);
-            }
+
+                    return true; // stop dripper
+
+            }; })(pred_ok, pred_help, dialog.user_data['squad_id'], specname, cur_squad_space, max_squad_space);
 
             var icon_state = ((!pred_ok || squad_is_under_repair || squad_is_deployed || squad_in_battle) ? 'disabled_clickable' : null);
 
-            unit_icon_set(dialog.widgets[wname], specname, reserve_units_by_type[specname], null, onclick, icon_state);
+            var enable_dripper = !!gamedata['client']['squad_manage_dripper'];
+
+            unit_icon_set(dialog.widgets[wname], specname, reserve_units_by_type[specname], null, onclick, icon_state, null, enable_dripper);
             if(!icon_state && dialog.widgets[wname].mouse_enter_time > 0) {
                 dialog.widgets['arrow'].show = true;
                 dialog.widgets['arrow'].xy = dialog.widgets[wname].xy;
@@ -344,7 +360,7 @@ SquadManageDialog.update_squad_manage = function(dialog) {
     // SQUAD
     if(1) {
         grid_x = grid_y = 0;
-        goog.array.forEach(squad_units, function(obj) {
+        goog.array.forEach(stacked_squad_units, function(obj) {
             var wname = 'squad_unit'+grid_x.toString()+','+grid_y.toString();
             if(!(wname in dialog.widgets)) {
                 dialog.widgets[wname] = new SPUI.Dialog(gamedata['dialogs'][dialog.data['widgets']['squad_unit']['dialog']], dialog.data['widgets']['squad_unit']);
@@ -353,35 +369,73 @@ SquadManageDialog.update_squad_manage = function(dialog) {
             dialog.widgets[wname].xy = vec_add(vec_add(dialog.data['widgets']['squad_unit']['xy'], [-dialog.user_data['squad_scroll_pos'],0]),
                                                vec_mul([grid_x,grid_y], dialog.data['widgets']['squad_unit']['array_offset']));
 
-            var onclick;
-            if(obj['pending']) {
-                onclick = null;
-            } else if(!pred_ok) {
-                onclick = pred_help;
-            } else {
-                onclick = (function (_squad_id, _obj) { return function(w) {
-                    if(player.squad_is_deployed(_squad_id) || player.squad_is_in_battle(_squad_id)) {
-                        var s = gamedata['errors']['CANNOT_ALTER_SQUAD_WHILE_TRAVELING'];
-                        invoke_child_message_dialog(s['ui_title'], s['ui_name']);
-                        return;
+            var onclick = (function (_pred_ok, _pred_help, _squad_id, _obj) { return function(w, button) {
+                if(!_pred_ok) {
+                    if(_pred_help) { _pred_help(); }
+                    return true; // stop dripper
+                }
+                if(player.squad_is_deployed(_squad_id) || player.squad_is_in_battle(_squad_id)) {
+                    var s = gamedata['errors']['CANNOT_ALTER_SQUAD_WHILE_TRAVELING'];
+                    invoke_child_message_dialog(s['ui_title'], s['ui_name']);
+                    return true; // stop dripper
+                }
+                if(player.squad_is_under_repair(_squad_id)) {
+                    var s = gamedata['errors']['CANNOT_ALTER_SQUAD_UNDER_REPAIR'];
+                    invoke_child_message_dialog(s['ui_title'], s['ui_name']);
+                    return true; // stop dripper
+                }
+
+                if(_obj['pending']) { return true; } // stop dripper
+
+                var to_unassign = null;
+
+                if('stack_list' in _obj) {
+                     // find healthiest (or unhealthiest) non-pending reserve unit of this type
+                    var extreme_hp_ratio;
+                    if(button.get_button(SPUI.MouseButton.RIGHT)) {
+                        extreme_hp_ratio = 1;
+                    } else {
+                        extreme_hp_ratio = -1;
                     }
-                    if(player.squad_is_under_repair(_squad_id)) {
-                        var s = gamedata['errors']['CANNOT_ALTER_SQUAD_UNDER_REPAIR'];
-                        invoke_child_message_dialog(s['ui_title'], s['ui_name']);
-                        return;
-                    }
-                    send_to_server.func(["CAST_SPELL", GameObject.VIRTUAL_ID, "SQUAD_UNASSIGN_UNIT", _squad_id, _obj['obj_id']]);
-                    unit_repair_sync_marker = synchronizer.request_sync();
+                    goog.object.forEach(_obj['stack_list'], function(o) {
+                        if(!o['pending']) {
+                            var curmax = army_unit_hp(o);
+                            var ratio = curmax[0]/Math.max(curmax[1],1);
+                            if((button.get_button(SPUI.MouseButton.RIGHT) && ratio <= extreme_hp_ratio) ||
+                               (!button.get_button(SPUI.MouseButton.RIGHT) && ratio > extreme_hp_ratio)) {
+                                extreme_hp_ratio = ratio;
+                                to_unassign = o;
+                            }
+                        }
+                    });
+                } else {
+                    to_unassign = _obj;
+                }
+
+                if(to_unassign) {
+                    send_to_server.func(["CAST_SPELL", GameObject.VIRTUAL_ID, "SQUAD_UNASSIGN_UNIT", _squad_id, to_unassign['obj_id']]);
+
                     if(gamedata['client']['predict_squad_assign']) { // client-side predict
-                        _obj['squad_id'] = SQUAD_IDS.RESERVES;
+                        to_unassign['squad_id'] = SQUAD_IDS.RESERVES;
                     }
-                    _obj['pending'] = 1;
-                }; })(dialog.user_data['squad_id'], obj)
-            }
+                    to_unassign['pending'] = 1;
+
+                    unit_repair_sync_marker = synchronizer.request_sync();
+                    return false; // do not stop dripper
+                } else {
+                    return true; // stop dripper
+                }
+            }; })(pred_ok, pred_help, dialog.user_data['squad_id'], obj);
+
+            var enable_dripper = !!gamedata['client']['squad_manage_dripper'];
+
             var icon_state = ((obj['pending'] || !pred_ok || squad_is_under_repair || squad_is_deployed || squad_in_battle) ? 'disabled_clickable' : null);
-            unit_icon_set(dialog.widgets[wname], obj['spec'], 1, obj, onclick, icon_state,
-                          (obj['in_manuf_queue'] ? gamedata['strings']['squads']['in_manuf_queue'] : null)
-                         );
+            unit_icon_set(dialog.widgets[wname], obj['spec'],
+                          ('stack' in obj ? obj['stack'] : 1),
+                          ('stack_list' in obj ? null : obj),
+                          onclick, icon_state,
+                          (obj['in_manuf_queue'] ? gamedata['strings']['squads']['in_manuf_queue'] : null),
+                          enable_dripper);
 
             if(!icon_state && dialog.widgets[wname].mouse_enter_time > 0) {
                 dialog.widgets['arrow'].show = true;
@@ -389,15 +443,29 @@ SquadManageDialog.update_squad_manage = function(dialog) {
                 dialog.widgets['arrow'].asset = dialog.data['widgets']['arrow']['asset_right'];
             }
 
+            // HP display
             var hp_wname = 'squad_hp_bar'+grid_x.toString()+','+grid_y.toString();
             if(!(hp_wname in dialog.widgets)) {
                 dialog.widgets[hp_wname] = SPUI.instantiate_widget(dialog.data['widgets']['squad_hp_bar']);
                 dialog.add_after(dialog.widgets[wname], dialog.widgets[hp_wname]);
             }
-            var curmax = army_unit_hp(obj);
+            var hp_ratio;
+            if('stack_list' in obj) {
+                // stacked units - show average health
+                var curmax = [0,0];
+                goog.array.forEach(obj['stack_list'], function(child) {
+                    var child_curmax = army_unit_hp(child);
+                    curmax[0] += child_curmax[0];
+                    curmax[1] += child_curmax[1];
+                });
+                hp_ratio = curmax[0]/Math.max(curmax[1],1);
+            } else {
+                var curmax = army_unit_hp(obj);
+                hp_ratio = curmax[0]/Math.max(curmax[1],1);
+            }
             dialog.widgets[hp_wname].show = true;
-            dialog.widgets[hp_wname].progress = curmax[0]/Math.max(curmax[1],1);
-            if(curmax[0] < curmax[1] && squad_is_under_repair) { request_unit_repair_update(); }
+            dialog.widgets[hp_wname].progress = hp_ratio;
+            if(hp_ratio < 1 && squad_is_under_repair) { request_unit_repair_update(); }
             dialog.widgets[hp_wname].full_color = SPUI.make_colorv(dialog.data['widgets']['squad_hp_bar']['full_color' + (obj['in_manuf_queue'] ? '_queued' : '')]);
             dialog.widgets[hp_wname].xy = vec_add(vec_add(dialog.data['widgets']['squad_hp_bar']['xy'], [-dialog.user_data['squad_scroll_pos'],0]),
                                                   vec_mul([grid_x,grid_y], dialog.data['widgets']['squad_hp_bar']['array_offset']));
@@ -413,7 +481,7 @@ SquadManageDialog.update_squad_manage = function(dialog) {
     dialog.widgets['recall_button'].show = (squad_is_deployed); // && !squad_is_moving);
     dialog.widgets['halt_button'].show = false; // (squad_is_deployed && squad_is_moving);
     dialog.widgets['disband_button'].show = !squad_is_deployed && SQUAD_IDS.is_mobile_squad_id(dialog.user_data['squad_id']);
-    dialog.widgets['deploy_button'].show = !squad_is_deployed && (cur_squad_space > 0) && SQUAD_IDS.is_mobile_squad_id(dialog.user_data['squad_id']);
+    dialog.widgets['deploy_button'].show = !squad_is_deployed && (squad_units.length > 0) && SQUAD_IDS.is_mobile_squad_id(dialog.user_data['squad_id']);
     dialog.widgets['deploy_button'].state = (!is_nosql_region || !deploy_pred_ok || squad_is_under_repair || squad_is_dead ? 'disabled_clickable' : 'normal');
 
     dialog.widgets['recall_button'].state = ((squad['pending'] || player.squad_get_client_data(squad['id'], 'squad_orders')) ? 'disabled' : 'normal');
@@ -428,7 +496,7 @@ SquadManageDialog.update_squad_manage = function(dialog) {
         };
     } else if(!deploy_pred_ok) {
         dialog.widgets['deploy_button'].onclick = deploy_pred_help;
-        dialog.widgets['deploy_button'].tooltip.str = deploy_rpred.ui_describe(player, null);
+        dialog.widgets['deploy_button'].tooltip.str = deploy_rpred.ui_describe(player);
     } else {
         dialog.widgets['deploy_button'].onclick = function(w) {
             var squad_id = w.parent.user_data['squad_id'];
@@ -455,4 +523,51 @@ SquadManageDialog.update_squad_manage = function(dialog) {
         };
     }
 
+};
+
+/** Given a flat array of army unit dicts, collapse together units with similar health/repair status for stacked GUI display.
+    Note: assumes input has already been sorted by army_unit_compare(), so stacking will only take place between adjacent entries. */
+SquadManageDialog.stack_squad_units = function(squad_units) {
+    var ret = [];
+    var last_unit = null;
+    goog.array.forEach(squad_units, function(unit) {
+        var hp_cur_max = army_unit_hp(unit);
+
+        if(last_unit && last_unit['spec'] === unit['spec'] &&
+           last_unit['level'] === unit['level'] &&
+           (hp_cur_max[0] === 0 || hp_cur_max[0] === hp_cur_max[1]) && // fully dead or fully alive
+           hp_cur_max[0] === army_unit_hp(last_unit)[0] && // and identical to last unit health
+           !last_unit['in_manuf_queue']) {
+
+            if(!('stack_list' in last_unit)) {
+                // make safe for mutation on first stacking
+                var old_last_unit = last_unit;
+                last_unit = ret[ret.length-1] = goog.object.clone(last_unit);
+                last_unit['stack_list'] = [old_last_unit];
+                delete last_unit['obj_id'];
+                if('pending' in last_unit) { delete last_unit['pending']; } // see below
+                last_unit['stack'] = 1;
+            }
+
+            // stack it
+            last_unit['stack'] += 1;
+            last_unit['stack_list'].push(unit);
+            return;
+        }
+        ret.push(unit);
+        last_unit = unit;
+    });
+
+    // mark each unit stack pending iff all child units in the stack are pending
+    goog.array.forEach(ret, function(unit) {
+        if('stack_list' in unit) {
+            if(goog.array.every(unit['stack_list'], function(child) {
+                return ('pending' in child) && child['pending'];
+            })) {
+                unit['pending'] = 1;
+            }
+        }
+    });
+
+    return ret;
 };

@@ -93,6 +93,7 @@ AStar.PathChecker;
 
 /** @constructor
     @struct
+    @implements {BinaryHeap.Element}
     @param {!Array.<number>} pos
 */
 AStar.AStarCell = function(pos) {
@@ -899,15 +900,7 @@ AStar.AStarContext.prototype.search = function(start_pos, end_pos, path_checker)
 
         // Grab the lowest f(x) to process next.  Heap keeps this sorted for us.
 
-        /** @type {!AStar.AStarCell} */
-        var currentNode;
-
-        // The Closure compiler always complains about pop() returning an unknown type, even if we cast it!
-        // This wrapper silences the false warning.
-        /** @suppress {reportUnknownTypes} */
-        (function() {
-            currentNode = (openHeap.pop());
-        })();
+        var currentNode = /** @type {!AStar.AStarCell} */ (openHeap.pop());
 
         // accumulate dots to draw into the scene graph
         if(PLAYFIELD_DEBUG) {

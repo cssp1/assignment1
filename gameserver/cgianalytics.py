@@ -2212,13 +2212,6 @@ def get_preference(user, name, default_value):
         return pref.get(name, default_value)
     return default_value
 
-def attacked_within(user, times, days):
-    if 'attacks_launched_at_time' not in user: return False
-    count = 0
-    for sage, n in user['attacks_launched_at_time'].iteritems():
-        age = int(sage)
-        if days < 0 or (age < days*24*60*60): count += n
-    return count >= times
 def money_spent_and_num_purchases_within(user, days):
     if 'money_spent_at_time' not in user: return 0, 0
     count = 0

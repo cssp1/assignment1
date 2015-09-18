@@ -5,12 +5,10 @@ goog.provide('Dripper');
 // found in the LICENSE file.
 
 /** @fileoverview
-    @suppress {reportUnknownTypes} XXX we are not typesafe yet
+    This is a little utility for making GUI buttons that you hold down
+    and then emit a stream of increasingly-fast events as it continues
+    to be held down. Mainly, unit deployment in SG.
 */
-
-// This is a little utility for making GUI buttons that you hold down
-// and then emit a stream of increasingly-fast events as it continues
-// to be held down. Mainly, unit deployment in SG.
 
 Dripper.rate_table = [
     [0, 1],
@@ -19,7 +17,15 @@ Dripper.rate_table = [
     [3, 8]  // after 3 seconds octuple the event rate
 ];
 
-/** @constructor */
+/** @typedef {function(?=): boolean} */
+Dripper.Callback;
+
+/** @constructor
+    @struct
+    @param {Dripper.Callback|null} cb
+    @param {number} rate
+    @param {number} origin_time
+*/
 Dripper.Dripper = function(cb, rate, origin_time) {
     this.cb = cb;
     this.origin_time = origin_time; // time at which the drip operation begins
@@ -29,6 +35,10 @@ Dripper.Dripper = function(cb, rate, origin_time) {
     this.times_fired = 0; // how many times the callback has been run
 };
 
+/** @param {Dripper.Callback|null} cb
+    @param {number} rate
+    @param {number} origin_time
+*/
 Dripper.Dripper.prototype.reset = function(cb, rate, origin_time) {
     this.cb = cb;
     this.rate = rate;
@@ -36,7 +46,9 @@ Dripper.Dripper.prototype.reset = function(cb, rate, origin_time) {
 };
 
 /** @param {boolean=} call_cb whether to call the callback
-    @param {?=} param parameter to pass the callback */
+    @param {?=} param parameter to pass the callback
+    @suppress {reportUnknownTypes} - Closure doesn't deal with the callback param being typeless
+*/
 Dripper.Dripper.prototype.stop = function(call_cb, param) {
     if(!this.is_active()) return;
 
@@ -52,7 +64,9 @@ Dripper.Dripper.prototype.stop = function(call_cb, param) {
 };
 
 /** @param {number} t
-    @param {?=} param to call the function with */
+    @param {?=} param to call the function with
+    @suppress {reportUnknownTypes} - Closure doesn't deal with the callback param being typeless
+*/
 Dripper.Dripper.prototype.activate = function(t, param) {
     if(!this.is_active() || t < this.origin_time) { return 0; } // not begun yet
 
@@ -60,7 +74,9 @@ Dripper.Dripper.prototype.activate = function(t, param) {
         // first press
         this.last_time = t;
         this.times_fired += 1;
-        this.cb(param);
+        if(this.cb(param)) {
+            this.stop();
+        }
         return 1;
     }
     // not first press
@@ -70,7 +86,7 @@ Dripper.Dripper.prototype.activate = function(t, param) {
     var r_scale = 1;
     for(var i = Dripper.rate_table.length-1; i >= 0; i -= 1) {
         if(t - this.origin_time >= Dripper.rate_table[i][0]) {
-            r_scale = Dripper.rate_table[i][1];
+            r_scale = /** @type {number} */ (Dripper.rate_table[i][1]);
             break;
         }
     }
@@ -79,13 +95,17 @@ Dripper.Dripper.prototype.activate = function(t, param) {
     while(count >= 1) {
         count -= 1;
         this.times_fired += 1;
-        this.cb(param);
+        if(this.cb(param)) {
+            this.stop();
+            return count;
+        }
     }
     this.resid = count; // record residual fraction
     this.last_time = t;
     return count;
 };
 
+/** @return {boolean} */
 Dripper.Dripper.prototype.is_active = function() {
     return this.origin_time >= 0;
 };

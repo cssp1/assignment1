@@ -6,18 +6,14 @@ goog.provide('SPay');
 
 /** @fileoverview
     Some common interfaces for payments backends.
-
-    @suppress {reportUnknownTypes} XXX we are not typesafe yet
 */
 
+goog.require('goog.array');
 goog.require('SPFB');
 goog.require('SPKongregate');
 
-// global namespace
-SPay = {
-    /** @type {string|null} */
-    api: null
-};
+/** @type {string|null} */
+SPay.api = null;
 
 /** @param {string} api - "fbpayments", "kgcredits", or "xsolla" */
 SPay.set_api = function(api) {
@@ -27,7 +23,12 @@ SPay.set_api = function(api) {
     SPay.api = api;
 };
 
-// NEW FB Payments order flow
+/** NEW FB Payments order flow
+    @param {string} product_url
+    @param {number} quantity
+    @param {string} request_id
+    @param {function(?)} callback
+    @param {string|null=} test_currency */
 SPay.place_order_fbpayments = function (product_url, quantity, request_id, callback, test_currency) {
     var props = {'method': 'pay', 'action': 'purchaseitem',
                  'product': product_url, 'quantity': quantity,
@@ -36,7 +37,10 @@ SPay.place_order_fbpayments = function (product_url, quantity, request_id, callb
     SPFB.ui(props, callback);
 };
 
-// OLD FB Credits order flow
+/** OLD FB Credits order flow
+    @param {!Object} order_info
+    @param {function(?)} callback
+    @param {boolean} use_local_currency */
 SPay.place_order_fbcredits = function (order_info, callback, use_local_currency) {
 
     // if use_oscif is true, this tells Facebook to use the simplified order pop-up
@@ -48,18 +52,24 @@ SPay.place_order_fbcredits = function (order_info, callback, use_local_currency)
              'dev_purchase_params': {'oscif':use_oscif}}, callback);
 };
 
+/** @param {string} order_info
+    @param {function(?)} callback */
 SPay.place_order_kgcredits = function (order_info, callback) {
-    return SPKongregate.purchaseItemsRemote(order_info, callback);
+    SPKongregate.purchaseItemsRemote(order_info, callback);
 };
 
+/** @param {function(?)} callback */
 SPay.buy_more_credits = function(callback) {
     SPFB.ui({'method':'pay', 'credits_purchase':true}, callback);
 };
 
+/** @param {function(?)} callback */
 SPay.redeem_fb_gift_card = function(callback) {
     SPFB.ui({'method':'pay', 'action':'redeem'}, callback);
 };
 
+/** @param {string} currency_url
+    @param {function(?)} callback */
 SPay.offer_payer_promo = function(currency_url, callback) {
     SPFB.ui({'method':'fbpromotion', 'display': 'popup',
              //'package_name': 'zero_promo',
@@ -69,6 +79,7 @@ SPay.offer_payer_promo = function(currency_url, callback) {
 
 // Xsolla API - see http://developers.xsolla.com/api.html#virtual-currency
 
+/** @return {boolean} */
 SPay.xsolla_available = function() {
     if(!spin_xsolla_sdk_loaded /* from XsollaSDK.js */ ||
        typeof XPayStationWidget === 'undefined') { return false; }
@@ -77,6 +88,7 @@ SPay.xsolla_available = function() {
 
 // TrialPay API - see http://help.trialpay.com/facebook/offer-wall/
 
+/** @return {boolean} */
 SPay.trialpay_available = function() {
     // client also needs to check frame_platform == 'fb' and facebook_third_party_id exists
     if(typeof TRIALPAY === 'undefined') { return false; }
@@ -89,6 +101,8 @@ SPay.trialpay_user_cb = null;
 
 SPay.trialpay_on_open = function() { SPay.trialpay_user_cb('open'); };
 SPay.trialpay_on_close = function() { SPay.trialpay_user_cb('close'); };
+
+/** @param {!Object.<string,number>} result */
 SPay.trialpay_on_transact = function(result) {
     if(result['completions'] > 0 && result['vc_amount'] > 0) {
         SPay.trialpay_user_cb('complete', result);
@@ -122,7 +136,7 @@ SPay.trialpay_invoke = function(app_id, vendor_id, callback_url, currency_url, t
                              });
 };
 
-// make sure compiler does not mangle these
+// make sure compiler does not mangle these names
 goog.exportSymbol('SPay.trialpay_on_open', SPay.trialpay_on_open);
 goog.exportSymbol('SPay.trialpay_on_transact', SPay.trialpay_on_transact);
 goog.exportSymbol('SPay.trialpay_on_close', SPay.trialpay_on_close);

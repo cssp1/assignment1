@@ -17,11 +17,11 @@ var spin_app_namespace;
 var spin_app_id;
 var spin_trialpay_vendor_id;
 var spin_http_origin;
-var spin_server_protocol;
-var spin_server_host;
-var spin_server_port;
-var spin_server_http_port;
-var spin_server_ssl_port;
+var /** string */ spin_server_protocol;
+var /** string */ spin_server_host;
+var /** string */ spin_server_port;
+var /** string */ spin_server_http_port;
+var /** string */ spin_server_ssl_port;
 var spin_game_server_host;
 var spin_game_server_http_port;
 var spin_game_server_ssl_port;
@@ -101,30 +101,50 @@ var FB = {
 };
 
 // Armor Games API
+/** @type {!Object} */
 var agi = {
+    /** @return {?} */
     "ping": function() {},
     "updateUserQuest": function() {},
-    "setIframeDimensions": function() {}
+    /** @param {!Object} arg */
+    "setIframeDimensions": function(arg) {}
 };
 
 // Kongregate API
+/** @type {!Object} */
 var kongregate = {
+    /** @type {!Object} */
     "mtx": {
-        "purchaseItemsRemote": function() {}
+        /** @param {string} arg0
+            @param {function(?)} arg1
+            @return {?} */
+        "purchaseItemsRemote": function(arg0, arg1) {}
     },
+    /** @type {!Object} */
     "services": {
-        "showInvitationBox": function() {}
+        /** @param {!Object} arg0
+            @return {?} */
+        "showInvitationBox": function(arg0) {}
     }
 };
 
 // TrialPay API
+
+/** @type {!Object} */
 var TRIALPAY = {
+    /** @type {!Object} */
     "fb": {
-        "show_overlay": function() {}
+        /** @param {string} app_id
+            @param {string} method
+            @param {!Object} params
+            @return {?} */
+        "show_overlay": function(app_id, method, params) {}
     }
 };
 
 // Xsolla API
+
+/** @type {!Object} */
 var XPayStationWidget = {
     "init": function() {},
     "open": function() {},

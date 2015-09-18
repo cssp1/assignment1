@@ -7,7 +7,6 @@
 {
     "default_quarry_landlord_id": 901, // used for abandoned quarries
 
-    "enable_muffin_on_map": 0, // whether to allow PvP attacking/spying via regional Map (OBSOLETE)
     "show_coords_in_player_info": 1, // whether to show home base location of other players in their Player Info
     "travel_time_per_hex": 0.5, // seconds of travel time per map hex
     "travel_time_per_id_gap": 5, // NOT USED ANYMORE - set travel time by difference in final digit of player/base IDs
@@ -15,7 +14,9 @@
     "deployments_per_travel": 1, // number of times you can attack/reinforce per travel "trip"
 
     "unit_travel_speed_factor": 0.25, // coefficient that relates unit maxvel to map travel_speed (in hexes per second)
+    "enable_quarry_guards": 1, // enable squads guarding quarries
     "enable_squad_combat": 1, // squads can fight squads
+    "enable_map_home_combat": 1, // squads can fight home bases
     "squad_block_mode": "after_move", // allow passing through the destination hex of a moving squad before the squad settles down there
     "pass_moving_squads_fudge_time": 5.0, // add some conservative leeway for network latency, otherwise players could get frustrated
 

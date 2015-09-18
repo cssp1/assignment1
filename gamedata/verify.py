@@ -2180,7 +2180,7 @@ def check_ai_base_contents(strid, base, owner, base_type, ensure_force_building_
                 error |= 1; print 'AI base %s has invalid base_resource_loot entry "%s"' % (strid, res)
         if 'base_richness' in base:
             error |= 1; print 'AI base %s has base_resource_loot, therefore the base_richness setting is irrelevant and should be removed' % (strid,)
-    elif not gamedata['ai_bases']['loot_table']:
+    elif not gamedata['ai_bases']['loot_table'] and base_type != 'quarry':
         error |= 1; print 'AI base %s needs a base_resource_loot table' % strid
 
     for KIND in ('scenery', 'buildings', 'units'):
@@ -2195,6 +2195,13 @@ def check_ai_base_contents(strid, base, owner, base_type, ensure_force_building_
                     if not climate_allows_unit(climate_data, gamedata['units'][item['spec']]):
                         error |= 1
                         print 'ERROR: AI base %s has unit %s not allowed by climate %s' % (strid, item['spec'], climate)
+
+                # check for climate-specific scenery with unspecified climate
+                # this will cause wrong-climate-specific sprites to appear in bases with the default climate
+                elif False and KIND == 'scenery' and base_type == 'home' and not (base.get('base_climate',None)) and ('base_climates' in gamedata['inert'][item['spec']]) and \
+                     not any(item['spec'].startswith(x) for x in ('roadway','dirt_road','lightpost','concrete')):
+                    error |= 1
+                    print 'ERROR: AI base %s has climate-specific scenery sprite %s but no explicit base_climate' % (strid, item['spec'])
 
                 max_level = -1
                 if KIND == 'buildings' and ('%RESOURCE' not in item['spec']):
@@ -3285,6 +3292,10 @@ def main(args):
     for name, data in gamedata['dialogs'].iteritems():
         error |= check_dialog('dialog:'+name, data)
 
+    for default_climate in (gamedata['default_climate'], gamedata.get('default_player_home_climate', gamedata['default_climate'])):
+        if default_climate not in gamedata['climates']:
+            error |= 1; print 'bad default climate %s' % default_climate
+
     for name, data in gamedata['climates'].iteritems():
         error |= check_climate(name, data)
 
@@ -3368,6 +3379,9 @@ def main(args):
     error |= check_hives(gamedata['hives'])
 
     error |= check_turf_reward(gamedata['quarries_client']['alliance_turf'].get('reward',{"auras":[]}))
+
+    if gamedata['territory'].get('enable_quarry_guards', True) and not gamedata.get('enable_defending_units',1):
+        error |= 1; print 'territory.enable_quarry_guards should be off if global enable_defending_units setting is off'
 
     error |= check_quests(gamedata['quests'])
     for name, data in gamedata['achievement_categories'].iteritems():

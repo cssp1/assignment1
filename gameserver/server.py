@@ -4862,6 +4862,7 @@ class GameObjectSpec(Spec):
         ["production_capacity", 0],
         ] + resource_fields("storage") + [
         ] + resource_fields("specific_pve_loot_fraction", default = -1) + [
+        ] + resource_fields("specific_pvp_loot_fraction", default = -1) + [
         ["spells", []],
         ["level_determined_by_tech", None],
         ["limit", -1],
@@ -5791,15 +5792,17 @@ class Building(GameObject):
                 ret[res] = ret.get(res,0) + amount
         return ret
 
-    # for SpecificPvEResLoot, optionally take a fraction of the base's total loot instead of using a capacity-weighted contribution
-    def specific_pve_loot_fraction(self):
+    # for Specific ResLoot, optionally take a fraction of the base's total loot instead of using a capacity-weighted contribution
+    def _specific_loot_fraction(self, pve_or_pvp):
         ret = None
         for res in gamedata['resources']:
-            amount = self.get_leveled_quantity(getattr(self.spec, 'specific_pve_loot_fraction_'+res))
+            amount = self.get_leveled_quantity(getattr(self.spec, 'specific_'+pve_or_pvp+'_loot_fraction_'+res))
             if amount >= 0: # note: treat -1 as "no effect", 0 as "fraction is zero"
                 if ret is None: ret = {}
                 ret[res] = amount
         return ret
+    def specific_pve_loot_fraction(self): return self._specific_loot_fraction('pve')
+    def specific_pvp_loot_fraction(self): return self._specific_loot_fraction('pvp')
 
     def affects_power(self):
         return bool(self.spec.provides_power) or \
@@ -6118,7 +6121,15 @@ class Base(object):
         self.base_ui_name = None
         self.base_type = base_type
         self.base_map_loc = None
-        self.base_climate = climate or gamedata.get('default_climate', None)
+
+        if climate:
+            self.base_climate = climate
+        elif ('default_player_home_climate' in gamedata) and (base_type == 'home') and (not is_ai_user_id_range(creator_id)):
+            # special-case override for player bases
+            self.base_climate = gamedata['default_player_home_climate']
+        else:
+            self.base_climate = gamedata.get('default_climate', None)
+
         self.base_ncells = None
         self.base_creation_time = server_time
         self.base_creator_id = creator_id # user_id of original creator
@@ -6136,7 +6147,7 @@ class Base(object):
         self.base_size = 0
         self.deployment_buffer = 1 # whether or not to add deployment buffer around base perimeter
 
-        # this is only used for some AI bases that have explicit loot amounts
+        # this is used for AI bases that have explicit loot amounts, and player bases to save state across attacks
         self.base_resource_loot = None # dictionary of {"resource": amount} remaining to be looted
 
         # list of GameObjects
@@ -7563,29 +7574,24 @@ class Player(AbstractPlayer):
 
     def squads_enabled(self):
         return Predicates.read_predicate({'predicate': 'LIBRARY', 'name': 'squads_enabled'}).is_satisfied(self, None)
-    def auto_resolve_enabled(self):
-        if self.get_any_abtest_value('enable_auto_resolve', False):
-            return True
-        elif self.home_region in gamedata['regions'] and \
-             'enable_auto_resolve' in gamedata['regions'][self.home_region]:
-            return gamedata['regions'][self.home_region]['enable_auto_resolve']
-        else:
-            return gamedata['territory'].get('enable_auto_resolve', False)
+
+
+    def get_territory_setting(self, name):
+        ret = gamedata['territory'].get(name, False)
+        if self.home_region in gamedata['regions'] and \
+           name in gamedata['regions'][self.home_region]:
+            ret = gamedata['regions'][self.home_region][name]
+        ret = self.get_any_abtest_value(name, ret)
+        return ret
 
     def squad_block_mode(self):
-        mode = gamedata['territory']['squad_block_mode']
-        if self.home_region in gamedata['regions']:
-            mode = gamedata['regions'][self.home_region].get('squad_block_mode', mode)
-        mode = self.get_any_abtest_value('squad_block_mode', mode)
+        mode = self.get_territory_setting('squad_block_mode')
         assert mode in ('after_move', 'always', 'never')
         return mode
-    def squad_combat_enabled(self):
-        ret = gamedata['territory']['enable_squad_combat']
-        if self.home_region in gamedata['regions'] and \
-           'enable_squad_combat' in gamedata['regions'][self.home_region]:
-            ret = gamedata['regions'][self.home_region]['enable_squad_combat']
-        ret = self.get_any_abtest_value('enable_squad_combat', ret)
-        return ret
+    def auto_resolve_enabled(self): return self.get_territory_setting('enable_auto_resolve')
+    def squad_combat_enabled(self): return self.get_territory_setting('enable_squad_combat')
+    def map_home_combat_enabled(self): return self.get_territory_setting('enable_map_home_combat')
+    def quarry_guards_enabled(self): return self.get_territory_setting('enable_quarry_guards')
 
     def unit_speedups_enabled(self):
         return self.is_cheater or gamedata.get('enable_unit_speedups', True)
@@ -8257,7 +8263,10 @@ class Player(AbstractPlayer):
                                                           old_loc=entry['base_map_loc'], old_path=entry.get('base_map_path',None),
                                                           exclusive=0, exclude_filter=exclude_filter, originator=self.user_id, reason='squad_step'):
                 # conflict - check if we're moving into a friendly quarry with no other squad there
-                conflict_list = list(gamesite.nosql_client.get_map_features_by_loc(self.home_region, destination, reason='squad_step(conflict)'))
+                if self.quarry_guards_enabled():
+                    conflict_list = list(gamesite.nosql_client.get_map_features_by_loc(self.home_region, destination, reason='squad_step(conflict)'))
+                else:
+                    conflict_list = []
                 if (len(conflict_list) == 1) and (conflict_list[0].get('base_type',None) == 'quarry') and \
                    (conflict_list[0].get('base_landlord_id',None) == self.user_id):
                     # guarding a friendly quarry - force the update
@@ -9920,6 +9929,24 @@ class Player(AbstractPlayer):
         # migrate base_size from playerdb to basedb
         self.my_home.base_size = max(self.my_home.base_size, self.resources.OLD_base_size)
 
+        # migrate scenery if regional map tile changed, or if young player's home climate no longer matches the default
+        new_climate = None
+        scenery_seed = None
+        if self.is_human():
+            if self.my_home.base_region:
+                if self.my_home.base_region in gamedata['regions'] and self.my_home.base_map_loc:
+                    region = Region(gamedata, self.my_home.base_region)
+                    new_climate = region.read_climate_name(self.my_home.base_map_loc)
+                    scenery_seed = self.user_id + self.my_home.base_map_loc[0] + region.dimensions()[0]*self.my_home.base_map_loc[1]
+            else: # not on map yet
+                if ('default_player_home_climate' in gamedata):
+                    new_climate = gamedata['default_player_home_climate']
+                    scenery_seed = self.user_id
+
+        if new_climate and (self.my_home.base_climate != new_climate):
+            self.my_home.base_climate = new_climate
+            self.my_home.spawn_scenery(self, scenery_seed, overwrite = True)
+
         # fix bad techs
         if ('' in self.tech):
             del self.tech['']
@@ -11476,7 +11503,7 @@ class LivePlayer(Player):
         # get rid of bloated obsolete history fields
         BLOAT = ['purchase_ui_log', 'resources_harvested_at_time', 'resources_looted_at_time', 'stored_iron_at_time', 'stored_water_at_time',
                  'units_manufactured_at_time', 'units_killed_at_time', 'units_lost_at_time', 'items_looted_at_time',
-                 'resources_stolen_at_time', 'attacks_launched_vs_human_at_time', 'attacks_launched_vs_ai_at_time', 'attacks_suffered_at_time',
+                 'resources_stolen_at_time', 'attacks_launched_at_time', 'attacks_launched_vs_human_at_time', 'attacks_launched_vs_ai_at_time', 'attacks_suffered_at_time',
                  'revenge_attacks_launched_vs_human_at_time', 'revenge_attacks_suffered_at_time']
         for field in BLOAT:
             if field in self.history: del self.history[field]
@@ -13932,7 +13959,7 @@ class Store:
                                                                          'gamebucks_balance': session.player.resources.gamebucks - amount_willing_to_pay,
                                                                          'description': descr})
 
-            session.increment_player_metric('gamebucks_spent', amount_willing_to_pay)
+            session.increment_player_metric('gamebucks_spent', amount_willing_to_pay, time_series = False)
             #session.increment_player_metric('num_gamebucks_purchases', 1)
             session.setvalue_player_metric('gamebucks_balance', session.player.resources.gamebucks - amount_willing_to_pay, bucket=True, bucket_size=15*60)
 
@@ -14116,14 +14143,14 @@ class Store:
             hist_type = speedup_type
             if hist_type == 'upgrade':
                 hist_type = 'building_upgrade'
-            session.increment_player_metric('speedups_purchased', 1)
+            session.increment_player_metric('speedups_purchased', 1, time_series = False)
             session.increment_player_metric(record_spend_type+'_spent_on_speedups', record_amount)
-            session.increment_player_metric(hist_type+'_speedups_purchased', 1)
+            session.increment_player_metric(hist_type+'_speedups_purchased', 1, time_series = False)
             session.increment_player_metric(record_spend_type+'_spent_on_'+hist_type+'_speedups', record_amount)
 
-            session.increment_player_metric('building:'+object.spec.name+':speedups_purchased', 1)
+            session.increment_player_metric('building:'+object.spec.name+':speedups_purchased', 1, time_series = False)
             session.increment_player_metric('building:'+object.spec.name+':'+record_spend_type+'_spent_on_speedups', record_amount)
-            session.increment_player_metric('building:'+object.spec.name+':'+hist_type+'_speedups_purchased', 1)
+            session.increment_player_metric('building:'+object.spec.name+':'+hist_type+'_speedups_purchased', 1, time_series = False)
             session.increment_player_metric('building:'+object.spec.name+':'+record_spend_type+'_spent_on_'+hist_type+'_speedups', record_amount)
 
         elif spellname == "PLAYER_AURA_SPEEDUP_FOR_MONEY":
@@ -14137,7 +14164,7 @@ class Store:
             aura['end_time'] = server_time - 1
             session.player.prune_player_auras()
             retmsg.append(["PLAYER_AURAS_UPDATE", session.player.player_auras])
-            session.increment_player_metric('player_aura_speedups_purchased', 1)
+            session.increment_player_metric('player_aura_speedups_purchased', 1, time_series = False)
             session.increment_player_metric(record_spend_type+'_spent_on_player_aura_speedups', record_amount)
 
         elif spellname == "UNIT_REPAIR_SPEEDUP_FOR_MONEY":
@@ -14151,9 +14178,9 @@ class Store:
             for item in session.player.unit_repair_queue:
                 item['finish_time'] = server_time - 1
             gameapi.do_unit_repair_tick(session, retmsg, must_reply = True)
-            session.increment_player_metric('speedups_purchased', 1)
+            session.increment_player_metric('speedups_purchased', 1, time_series = False)
             session.increment_player_metric(record_spend_type+'_spent_on_speedups', record_amount)
-            session.increment_player_metric('unit_repair_speedups_purchased', 1)
+            session.increment_player_metric('unit_repair_speedups_purchased', 1, time_series = False)
             session.increment_player_metric(record_spend_type+'_spent_on_unit_repair_speedups', record_amount)
             retmsg.append(["SQUADS_UPDATE", session.player.squads]) # to unblock GUI
 
@@ -14216,7 +14243,7 @@ class Store:
             metric_event_coded(session.user.user_id, '5060_purchase_base_repair', {'currency': currency,
                                                                                    'base_id': spellarg,
                                                                                    record_price_type: amount_willing_to_pay})
-            session.increment_player_metric('base_repairs_purchased', 1)
+            session.increment_player_metric('base_repairs_purchased', 1, time_series = False)
             session.increment_player_metric(record_spend_type+'_spent_on_base_repairs', record_amount)
 
         elif spellname == "UPGRADE_FOR_MONEY":
@@ -14226,9 +14253,9 @@ class Store:
                                                                                         'currency': currency,
                                                                                         record_price_type: amount_willing_to_pay
                                                                                         })
-            session.increment_player_metric('building_upgrades_purchased', 1)
+            session.increment_player_metric('building_upgrades_purchased', 1, time_series = False)
             session.increment_player_metric(record_spend_type+'_spent_on_building_upgrades', record_amount)
-            session.increment_player_metric('building:'+object.spec.name+':upgrades_purchased', 1)
+            session.increment_player_metric('building:'+object.spec.name+':upgrades_purchased', 1, time_series = False)
             session.increment_player_metric('building:'+object.spec.name+':'+record_spend_type+'_spent_on_upgrades', record_amount)
 
         elif spellname == "CRAFT_FOR_MONEY":
@@ -14253,7 +14280,7 @@ class Store:
             metric_event_coded(session.user.user_id, '5070_purchase_barrier_upgrade', {'level':new_level,
                                                                                        'currency':currency,
                                                                                        record_price_type: amount_willing_to_pay})
-            session.increment_player_metric('barrier_upgrades_purchased', 1)
+            session.increment_player_metric('barrier_upgrades_purchased', 1, time_series = False)
             session.increment_player_metric(record_spend_type+'_spent_on_barrier_upgrades', record_amount)
 
         elif spellname.startswith("GROW_BASE_PERIMETER"):
@@ -14266,13 +14293,13 @@ class Store:
             metric_event_coded(session.user.user_id, '5080_purchase_base_boundary_growth', {'level': new_level,
                                                                                             'currency': currency,
                                                                                             record_price_type: amount_willing_to_pay})
-            session.increment_player_metric('base_growth_purchased', 1)
+            session.increment_player_metric('base_growth_purchased', 1, time_series = False)
             session.increment_player_metric(record_spend_type+'_spent_on_base_growth', record_amount)
 
         elif spellname.startswith("CHANGE_REGION"):
             if not gameapi.execute_spell(session, retmsg, spellname, spellarg, reason = 'purchased_change_region'):
                 raise Exception('player %d %s(%s) purchase failure' % (session.player.user_id, spellname, repr(spellarg)))
-            session.increment_player_metric('base_relocations_purchased', 1)
+            session.increment_player_metric('base_relocations_purchased', 1, time_series = False)
             session.increment_player_metric(record_spend_type+'_spent_on_base_relocations', record_amount)
             session.player.send_history_update(retmsg)
 
@@ -14297,13 +14324,13 @@ class Store:
                                                                     'currency': currency,
                                                                     record_price_type: amount_willing_to_pay,
                                                                     })
-            session.increment_player_metric('techs_purchased', 1)
+            session.increment_player_metric('techs_purchased', 1, time_series = False)
             session.increment_player_metric(record_spend_type+'_spent_on_techs', record_amount)
-            session.increment_player_metric('tech:'+techname+':purchased', 1)
+            session.increment_player_metric('tech:'+techname+':purchased', 1, time_series = False)
             session.increment_player_metric('tech:'+techname+':'+record_spend_type+'_spent', record_amount)
 
             if session.player.tech[techname] == 1:
-                session.increment_player_metric('tech_unlocks_purchased', 1)
+                session.increment_player_metric('tech_unlocks_purchased', 1, time_series = False)
                 session.increment_player_metric(record_spend_type+'_spent_on_tech_unlocks', record_amount)
 
             session.activity_classifier.researched_tech()
@@ -14318,7 +14345,7 @@ class Store:
                                                                              'currency': currency,
                                                                              record_price_type: amount_willing_to_pay,
                                                                              })
-            session.increment_player_metric('resource_boosts_purchased', 1)
+            session.increment_player_metric('resource_boosts_purchased', 1, time_series = False)
             session.increment_player_metric(record_spend_type+'_spent_on_resource_boosts', record_amount)
 
         elif spellname.startswith("BUY_GAMEBUCKS_") or spellname in ("FB_PROMO_GAMEBUCKS", "FB_TRIALPAY_GAMEBUCKS", "XSOLLA_PAYMENT", "FB_GAMEBUCKS_PAYMENT"):
@@ -14437,7 +14464,7 @@ class Store:
 
         elif spellname.startswith("BUY_PROTECTION"):
             assert gameapi.execute_spell(session, retmsg, spellname, None, reason = 'purchased_protection')
-            session.increment_player_metric('protections_purchased', 1)
+            session.increment_player_metric('protections_purchased', 1, time_series = False)
             session.increment_player_metric(record_spend_type+'_spent_on_protection', record_amount)
 
         elif spellname.startswith("FREE_RANDOM_") or spellname.startswith("BUY_RANDOM_"):
@@ -14446,7 +14473,7 @@ class Store:
             assert items
             price_description.append(SpinJSON.dumps({'items':items}))
             if (not spellname.startswith("FREE_RANDOM_")):
-                session.increment_player_metric('random_items_purchased', 1)
+                session.increment_player_metric('random_items_purchased', 1, time_series = False)
                 session.increment_player_metric(record_spend_type+'_spent_on_random_items', record_amount)
             else:
                 session.increment_player_metric('free_random_items', 1, time_series = False)
@@ -14465,14 +14492,14 @@ class Store:
                 except:
                     err_arg = repr(spellarg)
                 raise Exception('player %d %s(%s) purchase failure' % (session.player.user_id, spellname, err_arg))
-            session.increment_player_metric('alias_changes_purchased', 1)
+            session.increment_player_metric('alias_changes_purchased', 1, time_series = False)
             session.player.send_history_update(retmsg)
 
         elif spellname == "BUY_LOTTERY_TICKET":
             scanner = session.player.find_lottery_building()
             assert scanner
             scanner.contents += 1
-            session.increment_player_metric('lottery_tickets_purchased', 1)
+            session.increment_player_metric('lottery_tickets_purchased', 1, time_series = False)
             session.increment_player_metric(record_spend_type+'_spent_on_lottery_tickets', record_amount)
             session.increment_player_metric(record_spend_type+'_spent_on_lottery', record_amount)
             retmsg.append(["OBJECT_STATE_UPDATE2", scanner.serialize_state()])
@@ -14488,8 +14515,8 @@ class Store:
             # only allow one purchase
             if spell.get('flash_offer',False): session.player.flash_offer = None
 
-            session.increment_player_metric('flash_offers_purchased', 1)
-            session.increment_player_metric('flash_offer:'+spellname+':purchased', 1)
+            session.increment_player_metric('flash_offers_purchased', 1, time_series = False)
+            session.increment_player_metric('flash_offer:'+spellname+':purchased', 1, time_series = False)
             session.increment_player_metric(record_spend_type+'_spent_on_flash_offers', record_amount)
 
         else:
@@ -15930,7 +15957,7 @@ class GAMEAPI(resource.Resource):
         # force repairs to start to avoid exploits where you leave your own buildings unrepaired
         # note: not sending updates to retmsg, so we assume a session change will come right after this
         if session.home_base:
-            self.do_start_repairs(None, session, None, session.player.my_home.base_id, repair_units = False)
+            self.do_start_repairs(session, None, session.player.my_home.base_id, repair_units = False)
             session.player.ladder_point_decay_check(session, None) # after attack - player
 
         end_time = time.time()
@@ -16027,7 +16054,8 @@ class GAMEAPI(resource.Resource):
                 if (not dest_feature) or \
                    (('base_map_path' in dest_feature) and (dest_feature['base_map_path'][-1]['eta']>server_time)) or \
                    (dest_feature['base_type'] not in ('hive', 'quarry', 'home', 'squad')) or \
-                   (dest_feature['base_type'] == 'squad' and not session.player.squad_combat_enabled()):
+                   (dest_feature['base_type'] == 'squad' and not session.player.squad_combat_enabled()) or \
+                   (dest_feature['base_type'] == 'home' and not session.player.map_home_combat_enabled()):
                     if gamedata['server'].get('log_nosql',0) < 2 and dest_base_id[0]=='s':
                         pass # do not bother logging failed attempts to spy on squads that have moved
                     else:
@@ -16079,7 +16107,7 @@ class GAMEAPI(resource.Resource):
                                                                       'base_landlord_id': dest_feature['base_landlord_id'],
                                                                       'squad_id': int(dest_feature['base_id'].split('_')[1])}}
 
-                    if client_props and client_props.get('pre_attack',False) and (dest_feature['base_landlord_id'] != session.player.user_id):
+                    if client_props and client_props.get('pre_attack',None) and (dest_feature['base_landlord_id'] != session.player.user_id):
                         # attempt to lock the destination squad immediately, to reduce the time window for the defender to manipulate it before the player can attack
                         state = gamesite.nosql_client.map_feature_lock_acquire(session.player.home_region, dest_base_id, session.player.user_id, reason='VISIT_BASE2_pre_attack')
                         if state != Player.LockState.being_attacked:
@@ -16141,7 +16169,7 @@ class GAMEAPI(resource.Resource):
 
         # first clean up any ongoing attack, then perform the actual session change
         return self.complete_attack(session, retmsg, functools.partial(self.change_session2, request, session, retmsg, dest_user_id, dest_base_id, dest_feature, new_ladder_state, new_deployable_squads, new_defending_squads, delay,
-                                                                       client_props and client_props.get('pre_attack', False)),
+                                                                       client_props.get('pre_attack', None) if client_props else None),
                                     client_props = client_props, reason='change_session')
 
     # ready to change sessions, begin the I/O
@@ -16175,7 +16203,7 @@ class GAMEAPI(resource.Resource):
 
         return ret
 
-    def _change_session_complete(self, request, session, retmsg, dest_user_id, dest_user, dest_player, dest_base_id, dest_feature, dest_base, outcome, old_battle_summary, new_ladder_state, new_deployable_squads, new_defending_squads, pre_attack = False):
+    def _change_session_complete(self, request, session, retmsg, dest_user_id, dest_user, dest_player, dest_base_id, dest_feature, dest_base, outcome, old_battle_summary, new_ladder_state, new_deployable_squads, new_defending_squads, pre_attack = None):
         if dest_base_id:
             ascdebug('change_session_complete (new) %d:%s -> %s (%d,%d,%d)' % (session.user.user_id, session.viewing_base.base_id, dest_base_id, bool(dest_user), bool(dest_player), bool(dest_base)))
         else:
@@ -16569,6 +16597,10 @@ class GAMEAPI(resource.Resource):
                 gamesite.exception_log.event(server_time, 'base already damaged above win threshold (%f) before ladder attack %s' % \
                                              (base_damage, repr(new_ladder_state)))
 
+        if pre_attack >= 2:
+            # if we're going to immediately auto-resolve, THROW AWAY session change messages so the client doesn't even seen them
+            retmsg = []
+
         retmsg.append(["SESSION_CHANGE",
                        session.viewing_user.user_id,
                        session.viewing_user.facebook_id,
@@ -16738,26 +16770,37 @@ class GAMEAPI(resource.Resource):
         # if visiting a quarry that you own, force repairs to start
         if session.viewing_base.base_landlord_id == session.player.user_id and \
            session.viewing_base is not session.player.my_home:
-            return self.do_start_repairs(request, session, retmsg, session.viewing_base.base_id, repair_units = False)
+            self.do_start_repairs(session, retmsg, session.viewing_base.base_id, repair_units = False)
 
-        # fire AI base on_visit consequent
-        on_visit_consequent = None
+        else:
+            # fire AI base on_visit consequent
+            on_visit_consequent = None
 
-        if (session.viewing_base is session.viewing_player.my_home) and \
-           session.viewing_player.is_ai():
-            base = gamedata['ai_bases']['bases'].get(str(session.viewing_player.user_id), None)
-            if base and ('on_visit' in base):
-                on_visit_consequent = base['on_visit']
-        elif session.viewing_base.base_type == 'hive':
-            template = gamedata['hives']['templates'].get(session.viewing_base.base_template, None)
-            if template and ('on_visit' in template):
-                on_visit_consequent = template['on_visit']
+            if (session.viewing_base is session.viewing_player.my_home) and \
+               session.viewing_player.is_ai():
+                base = gamedata['ai_bases']['bases'].get(str(session.viewing_player.user_id), None)
+                if base and ('on_visit' in base):
+                    on_visit_consequent = base['on_visit']
+            elif session.viewing_base.base_type == 'hive':
+                template = gamedata['hives']['templates'].get(session.viewing_base.base_template, None)
+                if template and ('on_visit' in template):
+                    on_visit_consequent = template['on_visit']
 
-        if on_visit_consequent:
-            session.execute_consequent_safe(on_visit_consequent, session.player, retmsg, reason='on_visit')
+            if on_visit_consequent:
+                session.execute_consequent_safe(on_visit_consequent, session.player, retmsg, reason='on_visit')
 
         if pre_attack: # immediately proceed with attack attempt
             self.do_attack(session, retmsg, [None, []])
+            if pre_attack >= 2:
+                self.auto_resolve(session, retmsg)
+
+                # this will go async to write the battle result, so we shouldn't call it in-line, since the async return isn't propagated out to the caller
+                def go_home_and_flush(self, session):
+                    session.visit_base_in_progress = True
+                    self.change_session(None, session, session.deferred_messages, dest_user_id = session.player.user_id, force = True)
+                    session.flush_deferred_messages()
+                reactor.callLater(0, lambda: go_home_and_flush(self, session))
+
         else:
             assert not session.pre_locks
 
@@ -19045,7 +19088,7 @@ class GAMEAPI(resource.Resource):
 
         return did_a_manufacture
 
-    def do_start_repairs(self, request, session, retmsg, base_id, repair_units = True):
+    def do_start_repairs(self, session, retmsg, base_id, repair_units = True):
         if base_id == session.player.my_home.base_id:
             base = session.player.my_home
             do_units = repair_units
@@ -19703,7 +19746,7 @@ class GAMEAPI(resource.Resource):
                 if session.damage_log: session.damage_log.init_multi(session.iter_objects())
                 if session.player.player_auras: session.attack_event(session.user.user_id, '3901_player_auras', {'player_auras':copy.copy(session.player.player_auras)})
 
-                session.increment_player_metric('attacks_launched', 1)
+                session.increment_player_metric('attacks_launched', 1, time_series = False)
                 session.increment_player_metric('attacks_launched_vs_'+session.viewing_player.ai_or_human(), 1, time_series = False)
 
                 if session.viewing_player.is_human() and session.player.cooldown_active('revenge_defender:%d' % session.viewing_player.user_id):
@@ -20806,7 +20849,7 @@ class GAMEAPI(resource.Resource):
                 session.viewing_base.nosql_write_one(obj, 'OBJECT_COMBAT_UPDATES')
                 # XXXXXX need to audit fields that we write - persist_state omits the -1 for x_start_time on buildings fields = ['xy','hp_ratio','orders','patrol','contents','repair_finish_time','disarmed','build_start_time','research_start_time','upgrade_start_time','produce_start_time','manuf_start_time'])
 
-            elif owning_player and obj.is_mobile() and SQUAD_IDS.is_mobile_squad_id(obj.squad_id or 0) and \
+            elif owning_player and obj.is_mobile() and (not obj.spec.consumable) and SQUAD_IDS.is_mobile_squad_id(obj.squad_id or 0) and \
                  ((owning_player is not session.player) or owning_player.squad_is_deployed(obj.squad_id or 0)):
                 #assert owning_player.squad_is_deployed(obj.squad_id) may be false due to out-of-date player state
                 # note - second part of the "and" above handles the case when attacking out of your home base to an enemy squad that is next door
@@ -21987,6 +22030,8 @@ class GAMEAPI(resource.Resource):
         player.migrate(session, user.user_id, user.account_creation_time, is_returning_user)
         player.prune_player_auras(is_session_change = True, is_login = True)
 
+        player.my_home.base_resource_loot = None # reset base_resource_loot state
+
         # check the data proxyserver attached to the session to see if there are other players logging in from the same IP
         # note: must be done AFTER migrate() since the format of known_alt_accounts has changed
         if client_session_data:
@@ -22282,7 +22327,7 @@ class GAMEAPI(resource.Resource):
         if session.player.tutorial_state == "COMPLETE":
             # force repairs to start to avoid exploits where you leave your own buildings unrepaired
             # XXXXXX this should be moved before initial session change!
-            self.do_start_repairs(None, session, None, session.player.my_home.base_id, repair_units = False)
+            self.do_start_repairs(session, None, session.player.my_home.base_id, repair_units = False)
 
             session.player.ladder_point_decay_check(session, retmsg) # login
 
@@ -22324,7 +22369,7 @@ class GAMEAPI(resource.Resource):
         # PRE-WRITE portion
 
         # force repairs to start to avoid exploits where you leave your own buildings unrepaired
-        self.do_start_repairs(None, session, None, session.player.my_home.base_id, repair_units = False)
+        self.do_start_repairs(session, None, session.player.my_home.base_id, repair_units = False)
         session.player.ladder_point_decay_check(session, None) # logout
 
         # log metric event
@@ -22639,8 +22684,11 @@ class GAMEAPI(resource.Resource):
             else:
                 client_props = None
 
-            if client_props and client_props.get('pre_attack',False):
+            if client_props and client_props.get('pre_attack',None):
                 # sanity check for pre_attack option
+                if client_props['pre_attack'] is True: # compatibility with old client
+                    client_props['pre_attack'] = 1
+                assert client_props['pre_attack'] in (1,2)
                 assert session.home_base
                 assert not session.has_attacked
                 assert arg[0] in ("VISIT_BASE", "VISIT_BASE2")
@@ -24769,7 +24817,7 @@ class GAMEAPI(resource.Resource):
                 self.do_speedup_for_free(session, retmsg, object)
 
             elif spellname == "REPAIR":
-                return self.do_start_repairs(request, session, retmsg, spellargs[0])
+                return self.do_start_repairs(session, retmsg, spellargs[0])
 
             elif spellname == "UPGRADE_FOR_FREE":
                 self.do_upgrade(session, retmsg, object)

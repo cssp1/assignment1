@@ -5,16 +5,9 @@ goog.provide('SPArmorGames');
 // found in the LICENSE file.
 
 /** @fileoverview
-    @suppress {reportUnknownTypes} XXX we are not typesafe yet
+    This is a wrapper around the Armor Gamess SDK that
+    detects cases where it failed to load asynchronously.
 */
-
-// this is a wrapper around Armor Gamess SDK that
-// detects cases whereit failed to load asynchronously
-
-// depends on client_time from main.js
-
-// global namespace
-SPArmorGames = {};
 
 SPArmorGames.ping = function() {
     if(typeof agi === 'undefined') {
@@ -25,6 +18,7 @@ SPArmorGames.ping = function() {
     agi.ping();
 };
 
+/** @param {!Object} arg */
 SPArmorGames.setIframeDimensions = function(arg) {
     if(typeof agi === 'undefined') {
         // note: calls back into main.js
