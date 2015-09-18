@@ -16791,29 +16791,33 @@ class GAMEAPI(resource.Resource):
                 session.execute_consequent_safe(on_visit_consequent, session.player, retmsg, reason='on_visit')
 
         if pre_attack: # immediately proceed with attack attempt
-            self.do_attack(session, retmsg, [None, []])
-            if pre_attack >= 2:
-                self.auto_resolve(session, retmsg)
+            attack_success = self.do_attack(session, retmsg, [None, []])
 
-                # the attack completion will go async to write the battle result, so we shouldn't call it in-line, since the async return isn't propagated out to the caller
+            if pre_attack >= 2: # pre-auto-resolve
+                if attack_success:
+                    self.auto_resolve(session, retmsg)
 
-                if True: # dangerous - skips session change on client side
-                    def go_home_and_flush_skip(self, session):
-                        session.visit_base_in_progress = True
-                        # divert the messages
-                        unused = []
-                        self.change_session(None, session, unused, dest_user_id = session.player.user_id, force = True)
-                        session.deferred_messages.append(["SESSION_CHANGE_SKIPPED"])
-                        session.flush_deferred_messages()
-                    reactor.callLater(0, functools.partial(self.complete_attack, session, session.deferred_messages, lambda sync: go_home_and_flush_skip(self, session)))
+                    # the attack completion will go async to write the battle result, so we shouldn't call it in-line, since the async return isn't propagated out to the caller
 
-                else: # safer, but sends ineffective session change to client
-                    def go_home_and_flush(self, session):
-                        session.visit_base_in_progress = True
-                        self.change_session(None, session, session.deferred_messages, dest_user_id = session.player.user_id, force = True)
-                        session.flush_deferred_messages()
+                    if True: # dangerous - skips session change on client side
+                        def go_home_and_flush_skip(self, session):
+                            session.visit_base_in_progress = True
+                            # divert the messages
+                            unused = []
+                            self.change_session(None, session, unused, dest_user_id = session.player.user_id, force = True)
+                            session.deferred_messages.append(["SESSION_CHANGE_SKIPPED"])
+                            session.flush_deferred_messages()
+                        reactor.callLater(0, functools.partial(self.complete_attack, session, session.deferred_messages, lambda sync: go_home_and_flush_skip(self, session)))
+                        return
 
-                    reactor.callLater(0, lambda: go_home_and_flush(self, session))
+                # safer, but sends ineffective session change to client
+                # also necessary in case do_attack() fails
+                def go_home_and_flush(self, session):
+                    session.visit_base_in_progress = True
+                    self.change_session(None, session, session.deferred_messages, dest_user_id = session.player.user_id, force = True)
+                    session.flush_deferred_messages()
+
+                reactor.callLater(0, lambda: go_home_and_flush(self, session))
 
         else:
             assert not session.pre_locks
@@ -19546,6 +19550,7 @@ class GAMEAPI(resource.Resource):
         return True
 
     # deploy units against a foreign (human or AI) player
+    # returns true if successful
     def do_attack(self, session, retmsg, spellargs):
         loc = spellargs[0]
         unit_id_list = spellargs[1]
@@ -19555,21 +19560,21 @@ class GAMEAPI(resource.Resource):
             # forcing attack completion and then the client sending
             # DEPLOY_UNITS before it becomes aware the battle is over.
             # Just ignore the invalid request.
-            return
+            return False
 
         if session.home_base:
             retmsg.append(["ERROR", "SERVER_PROTOCOL"])
-            return
+            return False
 
         if session.complete_attack_in_progress or session.visit_base_in_progress or session.logout_in_progress or (not session.has_attacked and (session.viewing_base_lock is not None)):
             retmsg.append(["ERROR", "SERVER_PROTOCOL"])
             gamesite.exception_log.event(server_time, 'do_attack() with invalid session state: %s args [%r,%r]' % (session.dump_exception_state(), loc, unit_id_list))
-            return
+            return False
 
         # if unit_id_list is empty, that means the client wants to start the fight but not deploy any units right away
         if len(unit_id_list) and (not session.viewing_base.is_deployment_location_valid(session.player, loc)):
             retmsg.append(["ERROR", "CANNOT_DEPLOY_INVALID_LOCATION"])
-            return
+            return False
 
         if not session.has_attacked:
             # first deployment - check for permission to attack, and acquire locks
@@ -19585,11 +19590,11 @@ class GAMEAPI(resource.Resource):
 
             if server_time < session.player.get_repeat_attack_cooldown_expire_time(session.viewing_player.user_id, session.viewing_base.base_id):
                 retmsg.append(["ERROR", "CANNOT_ATTACK_REPEAT_ATTACK_COOLDOWN"])
-                return
+                return False
 
             if session.pvp_balance == 'same_alliance':
                     retmsg.append(["ERROR", "CANNOT_ATTACK_SAME_ALLIANCE"])
-                    return
+                    return False
 
             if session.viewing_base is not session.viewing_player.my_home:
                 # quarry reinforcement or attack
@@ -19599,7 +19604,7 @@ class GAMEAPI(resource.Resource):
                    session.viewing_base.base_region and gamedata['regions'][session.viewing_base.base_region].get('limit_quarry_control',True):
                     if session.player.num_quarries_controlled() >= session.player.stattab.quarry_control_limit:
                         retmsg.append(["ERROR", "CANNOT_ATTACK_QUARRY_LIMIT_REACHED"])
-                        return
+                        return False
 
                 if (gamesite.nosql_client and session.player.home_region):
                     # nosql path
@@ -19607,7 +19612,7 @@ class GAMEAPI(resource.Resource):
                 else:
                     if (not session.player.travel_satisfied(session.viewing_base)):
                         retmsg.append(["ERROR", "CANNOT_DEPLOY_TRAVEL_NOT_ARRIVED"])
-                        return
+                        return False
                     else:
                         session.player.travel_deploy_at(session.viewing_base.base_id)
                         retmsg.append(["PLAYER_TRAVEL_UPDATE", session.player.travel_state])
@@ -19616,7 +19621,7 @@ class GAMEAPI(resource.Resource):
                 state = session.acquire_base(errors = lock_errors)
                 if state != Player.LockState.being_attacked:
                     retmsg.append(["ERROR", lock_errors[0], "attack_nonhome"])
-                    return
+                    return False
 
                 if session.viewing_player is not session.player:
                     self.broadcast_map_attack(session.viewing_base.base_region, session.viewing_base.base_id,
@@ -19629,71 +19634,71 @@ class GAMEAPI(resource.Resource):
 
                 if session.pvp_balance == 'player':
                     retmsg.append(["ERROR", "CANNOT_ATTACK_WEAKER_PLAYER"])
-                    return
+                    return False
                 elif session.pvp_balance == 'enemy_strict':
                     retmsg.append(["ERROR", "CANNOT_ATTACK_STRONGER_PLAYER"])
-                    return
+                    return False
 
                 if session.player.isolate_pvp and (not session.viewing_player.isolate_pvp):
                     retmsg.append(["ERROR", "CANNOT_ATTACK_YOU_ARE_ISOLATED"])
-                    return
+                    return False
 
                 if (not session.player.isolate_pvp) and session.viewing_player.isolate_pvp:
                     retmsg.append(["ERROR", "CANNOT_ATTACK_THEY_ARE_ISOLATED"])
-                    return
+                    return False
 
                 if session.viewing_player.resources.protection_end_time > server_time:
                     retmsg.append(["ERROR", "CANNOT_ATTACK_PLAYER_UNDER_PROTECTION"])
-                    return
+                    return False
 
                 # check for PvP ability
                 if (not session.player.is_pvp_player()):
                     retmsg.append(["ERROR", "CANNOT_ATTACK_NOPVP_YOU"])
-                    return
+                    return False
                 elif (not session.viewing_player.is_pvp_player()):
                     retmsg.append(["ERROR", "CANNOT_ATTACK_NOPVP_THEM"])
-                    return
+                    return False
 
                 # check for ladder/nonladder firewall violations
                 if (not session.using_squad_deployment()):
                     if session.player.is_ladder_player():
                         if (not session.viewing_player.is_ladder_player()):
                             retmsg.append(["ERROR", "CANNOT_ATTACK_LADDER_YOU"])
-                            return
+                            return False
                         elif (not session.is_ladder_battle()):
                             retmsg.append(["ERROR", "CANNOT_ATTACK_LADDER_YOU"])
-                            return
+                            return False
                     else:
                         if session.viewing_player.is_ladder_player():
                             retmsg.append(["ERROR", "CANNOT_ATTACK_LADDER_THEM"])
-                            return
+                            return False
 
                 # check for map/legacy firewall violations
                 if (not session.using_squad_deployment()) and (not session.is_ladder_battle()):
                     if (not session.viewing_player.is_legacy_pvp_player()):
                         retmsg.append(["ERROR", "CANNOT_ATTACK_MAP_THEM"])
-                        return
+                        return False
                     elif (not session.player.is_legacy_pvp_player()):
                         retmsg.append(["ERROR", "CANNOT_ATTACK_MAP_YOU"])
-                        return
+                        return False
 
                 if session.player.stattab.sandstorm_max:
                     retmsg.append(["ERROR", "CANNOT_ATTACK_SANDSTORM_MAX"])
-                    return
+                    return False
 
                 if session.player.is_alt_account_unattackable(session.viewing_player) and gamedata['prevent_alt_attacks']:
                     retmsg.append(["ERROR", "CANNOT_ATTACK_ALT_ACCOUNT"])
-                    return
+                    return False
                 else:
                     session.player.alt_record_attack(session.viewing_player)
 
                 state = gamesite.lock_client.player_lock_acquire_attack(session.viewing_user.user_id, session.viewing_player.generation, owner_id=session.player.user_id)
                 if state == -Player.LockState.logged_in:
                     retmsg.append(["ERROR", "CANNOT_ATTACK_PLAYER_WHILE_LOGGED_IN", 1])
-                    return
+                    return False
                 elif state == -Player.LockState.being_attacked or state < 0:
                     retmsg.append(["ERROR", "CANNOT_ATTACK_PLAYER_WHILE_ALREADY_UNDER_ATTACK"])
-                    return
+                    return False
 
                 lock_errors = []
                 state = session.do_acquire_base(session.viewing_player, session.viewing_player.my_home, session.deployable_squads, session.defending_squads, errors = lock_errors)
@@ -19701,7 +19706,7 @@ class GAMEAPI(resource.Resource):
                     gamesite.lock_client.player_lock_release(session.viewing_user.user_id, session.viewing_player.generation, Player.LockState.being_attacked,
                                                            expected_owner_id = session.player.user_id)
                     retmsg.append(["ERROR", lock_errors[0], "attack_home"])
-                    return
+                    return False
 
                 # make sure we *were* in read-only mode before starting the battle
                 assert (not session.viewing_player.has_write_lock)
@@ -20036,6 +20041,8 @@ class GAMEAPI(resource.Resource):
             session.deployed_units[unit.spec.name] = session.deployed_units.get(unit.spec.name,0) + 1
             if props['method'] == 'donated':
                 session.deployed_donated_units[unit.spec.name] = session.deployed_donated_units.get(unit.spec.name,0) + 1
+
+        return True # success!
 
     def push_gamedata(self, session, retmsg):
         data_str = open(SpinConfig.gamedata_filename()).read()
