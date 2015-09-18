@@ -4782,6 +4782,24 @@ function Base(id) {
     this.climate = new Climate(this.base_climate_data); // initialize to blank climate
 }
 
+Base.prototype.set_climate = function(new_climate_name) {
+    this.base_climate = new_climate_name;
+    this.base_climate_data = (gamedata['climates'][this.base_climate] || {});
+    this.climate = new Climate(this.base_climate_data);
+};
+
+Base.prototype.receive_state = function(base_data) {
+    this.deployment_buffer = base_data['deployment_buffer'];
+    this.base_landlord_id = base_data['base_landlord_id'];
+    this.set_climate(base_data['base_climate']);
+    this.base_map_loc = base_data['base_map_loc'];
+    this.base_expire_time = base_data['base_expire_time'];
+    this.base_ui_name = base_data['base_ui_name'];
+    this.base_type = base_data['base_type'];
+    this.base_ncells = base_data['base_ncells'];
+    this.base_last_attack_time = base_data['base_last_attakc_time'] || -1;
+};
+
 Base.prototype.ncells = function() {
     if(this.base_ncells !== null) { return this.base_ncells; }
     return gamedata['map']['default_ncells'];
@@ -9854,7 +9872,7 @@ function longpoll_send() {
 }
 
 // queue of user notifications that occur upon login or next session change
-// (not active during initial on-rails tutorial or in combat)
+// (not active during initial on-rails tutorial - unless priority >= 200, or in combat)
 /** @constructor */
 function NotificationQueue() {
     this.queue = [];
@@ -9862,22 +9880,25 @@ function NotificationQueue() {
     this.achievements = []; // buffer up achievements in case we get more than one in a single transaction
 }
 
+// set minimum priority to 200 for notifications to fire during tutorial
+NotificationQueue.TUTORIAL_MIN_PRIO = 200;
+
 // fire the next notification message in the queue
 // return true if one was succesfully fired
-NotificationQueue.prototype.fire_next = function() {
+NotificationQueue.prototype.fire_next = function(min_prio) {
     if(this.hold_time > 0 && client_time < this.hold_time) { return false; }
 
-    var item = null, item_i = -1, prio = -1000;
+    var item = null, item_i = -1;
 
     for(var i = 0; i < this.queue.length; i++) {
         // only fire notifications when at home OR at a friendly quarry OR if the show_if_away option is set
         if(session.home_base ||
            (session.is_quarry() && (session.viewing_user_id == session.user_id)) ||
            this.queue[i]['show_if_away']) {
-            if(this.queue[i]['priority'] > prio) {
+            if(this.queue[i]['priority'] > min_prio) {
                 item_i = i;
                 item = this.queue[i];
-                prio = item['priority'];
+                min_prio = item['priority'];
             }
         }
     }
@@ -42769,9 +42790,7 @@ function handle_server_message(data) {
         }
 
         // XXX does not set gravity parameters as in SESSION_CHANGE
-        session.viewing_base.base_climate = data[4];
-        session.viewing_base.base_climate_data = (gamedata['climates'][session.viewing_base.base_climate] || {});
-        session.viewing_base.climate = new Climate(session.viewing_base.base_climate_data);
+        session.viewing_base.set_climate(data[4]);
 
         if(global_chat_frame) { change_chat_tab(global_chat_frame, null); }
 
@@ -42923,57 +42942,70 @@ function handle_server_message(data) {
         }
         session.clear_building_idle_state_caches();
 
+    } else if(msg == "BATTLE_ENDED") {
+        var battle_outcome = data[1];
+        var battle_summary = data[2];
+        var base_data = data[3];
+        var battle_base = new Base(base_data['base_id']);
+        battle_base.receive_state(base_data);
+        var battle_ladder_state = data[4];
+
+        var battle_loot = battle_summary['loot'];
+
+        var battle_type = (battle_base.base_id === player.home_base_id ? 'home' :
+                           (battle_ladder_state ? 'ladder' :
+                            (battle_base.base_type === 'quarry' ? 'quarry' :
+                             (battle_base.base_type === 'squad' ? 'squad' :
+                              'away'))))
+        var opprole = (battle_summary['attacker_id'] === session.user_id ? 'defender' : 'attacker');
+
+        var battle_opponent_name = battle_summary[opprole+'_name'];
+        var battle_opponent_user_id = battle_summary[opprole+'_user_id'];
+        var battle_opponent_level = battle_summary[opprole+'_level'];
+
+        for(var res in battle_loot) { if(battle_loot[res]) { player.flash_res_time[res] = client_time; } }
+
+        var cb = null; // callback for post-battle GUI
+
+        if(battle_type === 'home') {
+            if(player.tutorial_state != "COMPLETE") {
+                cb = goog.bind(invoke_ai_attack_finish_dialog, battle_loot);
+            } else {
+                cb = (function (_type, _base, _uid, _fbid, _level, _fr, _name, out, loot, dmg, ladder_state) { return function() {
+                    invoke_defense_end_dialog(_type, _base, _uid, _fbid, _level, _fr, _name, out, loot, dmg, ladder_state);
+                }; })(battle_type, battle_base,
+                      null, // battle_opponent_user_id,
+                      null, // battle_opponent_fbid,
+                      -1, // battle_opponent_level,
+                      null, // battle_opponent_friend,
+                      battle_opponent_name,
+                      battle_outcome, battle_loot, battle_summary, battle_ladder_state);
+            }
+        } else if(battle_outcome != 'none') {
+            cb = (function (_type, _base, _uid, _fbid, _level, _fr, _name, out, loot, dmg, ladder_state) { return function() {
+                invoke_battle_end_dialog(_type, _base, _uid, _fbid, _level, _fr, _name, out, loot, dmg, ladder_state);
+            }; })(battle_type, battle_base,
+                  battle_opponent_user_id,
+                  null, // battle_opponent_fbid,
+                  battle_opponent_level,
+                  null, // battle_opponent_friend,
+                  battle_opponent_name,
+                  battle_outcome, battle_loot, battle_summary, battle_ladder_state);
+        }
+
+        if(cb) {
+            notification_queue.push_with_priority(cb, player.tutorial_state != "COMPLETE" ? NotificationQueue.TUTORIAL_MIN_PRIO : 0);
+        }
+
     } else if(msg == "SESSION_CHANGE") {
 
         APMCounter.reset();
-
-        // see if we need to display a battle-end message
-        var battle_ended = false, battle_loot = null, battle_summary = null, battle_type = null, battle_base = null, battle_ladder_state = session.ladder_state;
-        var battle_opponent_user_id = null, battle_opponent_fbid = null, battle_opponent_level = null, battle_opponent_friend = null, battle_opponent_name = null;
-        var battle_outcome = data[10];
 
         debug_session_change_history.push({'count': data[38],
                                            'from': data[39],
                                            'to': data[16], 'client_deployed': session.has_deployed, 'summary?': !!data[9]});
         if(debug_session_change_history.length > 5) { // limit to last few session changes
             debug_session_change_history.splice(0, 5 - debug_session_change_history.length);
-        }
-
-        if(session.has_deployed && (!session.is_quarry() || (session.viewing_user_id != session.user_id))) {
-            battle_ended = true;
-            battle_base = session.viewing_base;
-
-            // use the loot info sent from the server, because it may have been
-            // increased by victory bonus XP
-
-            battle_summary = data[9];
-            if(battle_summary && ('loot' in battle_summary)) {
-                battle_loot = battle_summary['loot']; // for legacy code
-            } else {
-                throw Error('received a bad battle summary: '+(battle_summary ? JSON.stringify(battle_summary) : 'null/undefined') +
-                            ' at '+ (session.viewing_base ? session.viewing_base.base_id.toString() : 'null') +
-                            ' going to '+data[16] + ' after '+(client_time - session.change_time).toFixed(1)+' sec, deployed '+(server_time - session.deploy_time).toFixed(1)+' sec ago, history '+JSON.stringify(debug_session_change_history));
-            }
-
-            if(session.home_base) {
-                battle_type = 'home';
-                battle_opponent_name = session.incoming_attacker_name;
-            } else {
-                battle_type = (battle_ladder_state ? 'ladder' : (session.viewing_base.base_type == 'quarry' ? 'quarry' : (session.viewing_base.base_type == 'squad' ? 'squad' : 'away')));
-                battle_opponent_user_id = session.viewing_user_id;
-                battle_opponent_fbid = null; // XXX this is obsolete and never used by callees (was session.viewing_fbid)
-                battle_opponent_level = enemy.resource_state['player_level'];
-                battle_opponent_name = session.ui_name;
-
-                // increment opponent's battle count
-                for(var i = 0; i < player.friends.length; i++) {
-                    if(player.friends[i].user_id === session.viewing_user_id) {
-                        battle_opponent_friend = player.friends[i];
-                        player.friends[i].battle_count += 1;
-                        break;
-                    }
-                }
-            }
         }
 
         // blow away the old session
@@ -43030,9 +43062,7 @@ function handle_server_message(data) {
         session.viewing_base = new Base(viewing_base_id);
         session.viewing_base.deployment_buffer = data[15];
         session.viewing_base.base_landlord_id = data[17];
-        session.viewing_base.base_climate = data[18];
-        session.viewing_base.base_climate_data = (gamedata['climates'][session.viewing_base.base_climate] || {});
-        session.viewing_base.climate = new Climate(session.viewing_base.base_climate_data);
+        session.viewing_base.set_climate(data[18]);
         session.viewing_base.base_map_loc = data[19];
         session.viewing_base.base_expire_time = data[20];
         session.viewing_base.base_ui_name = data[21];
@@ -43126,7 +43156,7 @@ function handle_server_message(data) {
             }
         }
 
-        if(battle_type != 'home' && !goog.array.contains(['repair_message', 'wait_for_battle_finish','build_cannon_message','open_buildings_dialog'], player.tutorial_state)) {
+        if(!goog.array.contains(['repair_message', 'wait_for_battle_finish','build_cannon_message','open_buildings_dialog'], player.tutorial_state)) {
             // recenter view, unless part of the "seamless" session change after home-base attack
             view_pos = [0,0];
             force_scroll_state.key = null;
@@ -43200,58 +43230,6 @@ function handle_server_message(data) {
             }; })(state), -3);
         }
 
-        // hack to short-cut tutorial for testing purposes
-        //battle_ended = true; battle_type = 'away'; battle_loot={}; player.tutorial_state = 'wait_battle_finish2';
-
-        var defense_end_queued = false;
-
-        if(battle_ended) {
-            for(var res in battle_loot) { if(battle_loot[res]) { player.flash_res_time[res] = client_time; } }
-
-            if(battle_type === 'home') {
-                if(player.tutorial_state != "COMPLETE") {
-                    invoke_ai_attack_finish_dialog(battle_loot);
-                } else {
-                    var cb = (function (_type, _base, _uid, _fbid, _level, _fr, _name, out, loot, dmg, ladder_state) { return function() {
-                        invoke_defense_end_dialog(_type, _base, _uid, _fbid, _level, _fr, _name, out, loot, dmg, ladder_state);
-                    }; })(battle_type, battle_base,
-                          null, // battle_opponent_user_id,
-                          null, // battle_opponent_fbid,
-                          -1, // battle_opponent_level,
-                          null, // battle_opponent_friend,
-                          battle_opponent_name,
-                          battle_outcome, battle_loot, battle_summary, battle_ladder_state);
-                    notification_queue.push(cb);
-                    //invoke_defense_end_dialog(battle_outcome, battle_loot);
-                    defense_end_queued = true;
-                }
-            } else {
-                if(battle_outcome != 'none') {
-                    if(player.tutorial_state != "COMPLETE") {
-                        // do not use notification queue, it tends to break the tutorial
-                        invoke_battle_end_dialog(battle_type, battle_base,
-                                                 battle_opponent_user_id,
-                                                 battle_opponent_fbid,
-                                                 battle_opponent_level,
-                                                 battle_opponent_friend,
-                                                 battle_opponent_name,
-                                                 battle_outcome, battle_loot, battle_summary, battle_ladder_state);
-                    } else {
-                        var cb = (function (_type, _base, _uid, _fbid, _level, _fr, _name, out, loot, dmg, ladder_state) { return function() {
-                            invoke_battle_end_dialog(_type, _base, _uid, _fbid, _level, _fr, _name, out, loot, dmg, ladder_state);
-                        }; })(battle_type, battle_base,
-                              battle_opponent_user_id,
-                              battle_opponent_fbid,
-                              battle_opponent_level,
-                              battle_opponent_friend,
-                              battle_opponent_name,
-                              battle_outcome, battle_loot, battle_summary, battle_ladder_state);
-                        notification_queue.push(cb);
-                    }
-                }
-            }
-        }
-
         if(player.tutorial_state != "COMPLETE") {
             tutorial_step(false);
         }
@@ -43263,7 +43241,7 @@ function handle_server_message(data) {
         }
 
         // show repair dialog if something was damaged and we didn't get a "you were attacked"
-        if(player.tutorial_state === "COMPLETE" && session.home_base && !defense_end_queued) {
+        if(player.tutorial_state === "COMPLETE" && session.home_base) {
             notification_queue.push_with_priority(invoke_repair_dialog_conditional, -2);
         } else if(session.is_quarry() && session.viewing_user_id == session.user_id) {
             notification_queue.push_with_priority(invoke_repair_dialog_conditional, -2);
@@ -47335,9 +47313,10 @@ function do_draw() {
             }
         } else {
             // fire pending notification(s) - one at a time until a GUI dialog appears
-            while(notification_queue.pending() && player.tutorial_state === "COMPLETE" && (selection.ui === null || (selection.ui.user_data && selection.ui.user_data['dialog']=='region_map_dialog')) &&
+            while(notification_queue.pending() && (selection.ui === null || (selection.ui.user_data && selection.ui.user_data['dialog']=='region_map_dialog')) &&
                   (!session.has_attacked || (session.viewing_base.base_type == 'quarry' && session.viewing_base.base_landlord_id == session.user_id))) {
-                if(!notification_queue.fire_next()) { break; }
+                // set minimum priority to 200 for notifications to fire during tutorial
+                if(!notification_queue.fire_next(player.tutorial_state !== "COMPLETE" ? NotificationQueue.TUTORIAL_MIN_PRIO-1 : -Infinity)) { break; }
             }
         }
 

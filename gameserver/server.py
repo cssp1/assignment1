@@ -6567,8 +6567,7 @@ class Base(object):
                   'base_landlord_id': self.base_landlord_id }
         assert self.base_type
         props['base_type'] = self.base_type
-        assert self.base_map_loc
-        props['base_map_loc'] = self.base_map_loc
+        if self.base_map_loc is not None: props['base_map_loc'] = self.base_map_loc
         if self.base_climate is not None: props['base_climate'] = self.base_climate
         if self.base_ncells is not None: props['base_ncells'] = self.base_ncells
         if self.base_ui_name is not None: props['base_ui_name'] = self.base_ui_name
@@ -15960,6 +15959,13 @@ class GAMEAPI(resource.Resource):
             self.do_start_repairs(session, None, session.player.my_home.base_id, repair_units = False)
             session.player.ladder_point_decay_check(session, None) # after attack - player
 
+        if summary:
+            retmsg.append(["BATTLE_ENDED",
+                           outcome,
+                           summary,
+                           session.viewing_base.get_cache_props(), # extra_props = {'deployment_buffer': session.viewing_base.deployment_buffer} ?
+                           session.ladder_state])
+
         end_time = time.time()
         admin_stats.record_latency('complete_attack', end_time - start_time)
 
@@ -16610,7 +16616,8 @@ class GAMEAPI(resource.Resource):
                        player_snapshot.serialize(),
                        enemy_snapshot.serialize(enemy = True),
                        -1, # conceal session.viewing_player.expiration_time
-                       old_battle_summary, outcome,
+                       old_battle_summary, # XXX obsolete
+                       outcome, # XXX obsolete
                        session.pvp_balance,
                        spyee_lock_state,
                        session.viewing_player.isolate_pvp,
