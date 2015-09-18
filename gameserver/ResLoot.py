@@ -306,7 +306,10 @@ class PvPResLoot(BaseResLoot):
             loot_attacker_gains_region_scale *= Predicates.eval_cond_or_literal(gamedata['regions'][session.viewing_player.home_region].get('loot_attacker_gains_scale_if_defender',1), session, session.viewing_player)
             loot_defender_loses_region_scale *= Predicates.eval_cond_or_literal(gamedata['regions'][session.viewing_player.home_region].get('loot_defender_loses_scale_if_defender',1), session, session.viewing_player)
 
-        base_loot_attacker_gains_table = session.viewing_player.get_any_abtest_value('loot_attacker_gains', gamedata['loot_attacker_gains'])
+        base_loot_attacker_gains_table = gamedata['loot_attacker_gains']
+        if session.viewing_player.home_region and session.viewing_player.home_region in gamedata['regions'] and 'loot_attacker_gains' in gamedata['regions'][session.viewing_player.home_region]:
+            base_loot_attacker_gains_table = gamedata['regions'][session.viewing_player.home_region]['loot_attacker_gains']
+        base_loot_attacker_gains_table = session.viewing_player.get_any_abtest_value('loot_attacker_gains', base_loot_attacker_gains_table)
 
         if type(base_loot_attacker_gains_table) is dict:
             # note: predicates evaluated on viewing_player, not player!
@@ -314,7 +317,10 @@ class PvPResLoot(BaseResLoot):
         else: # one value for all kinds
             base_loot_attacker_gains = dict((res, base_loot_attacker_gains_table) for res in gamedata['resources'])
 
-        base_loot_defender_loses_table = session.viewing_player.get_any_abtest_value('loot_defender_loses', gamedata['loot_defender_loses'])
+        base_loot_defender_loses_table = gamedata['loot_defender_loses']
+        if session.viewing_player.home_region and session.viewing_player.home_region in gamedata['regions'] and 'loot_defender_loses' in gamedata['regions'][session.viewing_player.home_region]:
+            base_loot_defender_loses_table = gamedata['regions'][session.viewing_player.home_region]['loot_defender_loses']
+        base_loot_defender_loses_table = session.viewing_player.get_any_abtest_value('loot_defender_loses', base_loot_defender_loses_table)
 
         if type(base_loot_defender_loses_table) is dict:
             # note: predicates evaluated on viewing_player, not player!
@@ -366,6 +372,11 @@ class HardcorePvPResLoot(PvPResLoot):
             # of THIS resource, weighted by capacity), but since this is very much incompatible with current JSON
             # numbers, we are enabling the "loot_storage_distribution_bug" in titles that haven't been updated yet.
 
+            loot_storage_distribution_bug = gamedata.get('loot_storage_distribution_bug', False)
+            if session.viewing_player.home_region and session.viewing_player.home_region in gamedata['regions'] and 'loot_storage_distribution_bug' in gamedata['regions'][session.viewing_player.home_region]:
+                loot_storage_distribution_bug = gamedata['regions'][session.viewing_player.home_region]['loot_storage_distribution_bug']
+            loot_storage_distribution_bug = session.viewing_player.get_any_abtest_value('loot_storage_distribution_bug', loot_storage_distribution_bug)
+
             nbuild = 0
             weights = dict((res, 0) for res in gamedata['resources'])
 
@@ -380,7 +391,7 @@ class HardcorePvPResLoot(PvPResLoot):
             assert nbuild > 0
 
 
-            if gamedata.get('loot_storage_distribution_bug', False):
+            if loot_storage_distribution_bug:
                 # legacy method for backwards compatibility
                 factors = dict((res, (1.0/nbuild)) for res in gamedata['resources'])
             else:
