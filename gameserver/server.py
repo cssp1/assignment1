@@ -16597,11 +16597,13 @@ class GAMEAPI(resource.Resource):
                 gamesite.exception_log.event(server_time, 'base already damaged above win threshold (%f) before ladder attack %s' % \
                                              (base_damage, repr(new_ladder_state)))
 
+        # if we're going to immediately auto-resolve, THROW AWAY session change messages so the client doesn't even seen them
         if pre_attack >= 2:
-            # if we're going to immediately auto-resolve, THROW AWAY session change messages so the client doesn't even seen them
-            retmsg = []
+            change_retmsg = []
+        else:
+            change_retmsg = retmsg
 
-        retmsg.append(["SESSION_CHANGE",
+        change_retmsg.append(["SESSION_CHANGE",
                        session.viewing_user.user_id,
                        session.viewing_user.facebook_id,
                        session.ui_name,
@@ -16647,10 +16649,10 @@ class GAMEAPI(resource.Resource):
                        ])
         session.debug_session_change_count += 1
         for astate in aura_states:
-            retmsg.append(["OBJECT_AURAS_UPDATE", astate])
+            change_retmsg.append(["OBJECT_AURAS_UPDATE", astate])
 
         if session.player.prune_inventory(session):
-            session.player.send_inventory_update(retmsg)
+            session.player.send_inventory_update(change_retmsg)
 
         session.player.prune_player_auras(is_session_change = True)
         session.viewing_player.prune_player_auras(is_session_change = True)
@@ -16736,42 +16738,42 @@ class GAMEAPI(resource.Resource):
                 session.player.do_apply_aura(spec['name'], strength = strength, duration = togo, stack = stack, ignore_limit = True)
 
         session.player.recalc_stattab(session.player)
-        session.player.stattab.send_update(session, retmsg)
+        session.player.stattab.send_update(session, change_retmsg)
         if session.viewing_player is not session.player:
             # also iterate through hive/quarry buildings - right now we restrict this to AIs just for safety, but in theory it should work for players too
             session.viewing_player.recalc_stattab(session.player, additional_base = session.viewing_base if ((session.viewing_base is not session.viewing_player.my_home) and session.viewing_player.is_ai()) else None)
-            session.viewing_player.stattab.send_update(session, retmsg)
+            session.viewing_player.stattab.send_update(session, change_retmsg)
 
         power_state = session.viewing_base.get_power_state()
 
         if session.home_base:
-            session.player.unit_repair_send(retmsg)
+            session.player.unit_repair_send(change_retmsg)
         else:
-            retmsg.append(["ENEMY_TECH_UPDATE", session.viewing_player.tech])
-            retmsg.append(["ENEMY_UNIT_EQUIP_UPDATE", session.viewing_player.unit_equipment])
+            change_retmsg.append(["ENEMY_TECH_UPDATE", session.viewing_player.tech])
+            change_retmsg.append(["ENEMY_UNIT_EQUIP_UPDATE", session.viewing_player.unit_equipment])
 
-        retmsg.append(["BASE_POWER_UPDATE", power_state])
-        retmsg.append(["BASE_SIZE_UPDATE", session.viewing_base.base_size])
+        change_retmsg.append(["BASE_POWER_UPDATE", power_state])
+        change_retmsg.append(["BASE_SIZE_UPDATE", session.viewing_base.base_size])
 
         if not session.home_base:
             # dump buffered loot when leaving home base
             # note: this means if you end an attack by visiting somewhere that isn't home base, you'll lose the loot
             session.player.loot_buffer_release('change_session_complete')
 
-        retmsg.append(["LOOT_BUFFER_UPDATE", session.player.loot_buffer, False])
-        retmsg.append(["DONATED_UNITS_UPDATE", session.player.donated_units])
+        change_retmsg.append(["LOOT_BUFFER_UPDATE", session.player.loot_buffer, False])
+        change_retmsg.append(["DONATED_UNITS_UPDATE", session.player.donated_units])
 
         session.res_looter = ResLoot.ResLoot(gamedata, session, session.viewing_player, session.viewing_base)
 
         # tell client about res looter state
-        session.res_looter.send_update(retmsg)
+        session.res_looter.send_update(change_retmsg)
 
         session.visit_base_in_progress = False
 
         # if visiting a quarry that you own, force repairs to start
         if session.viewing_base.base_landlord_id == session.player.user_id and \
            session.viewing_base is not session.player.my_home:
-            self.do_start_repairs(session, retmsg, session.viewing_base.base_id, repair_units = False)
+            self.do_start_repairs(session, change_retmsg, session.viewing_base.base_id, repair_units = False)
 
         else:
             # fire AI base on_visit consequent
@@ -16788,14 +16790,15 @@ class GAMEAPI(resource.Resource):
                     on_visit_consequent = template['on_visit']
 
             if on_visit_consequent:
-                session.execute_consequent_safe(on_visit_consequent, session.player, retmsg, reason='on_visit')
+                session.execute_consequent_safe(on_visit_consequent, session.player, change_retmsg, reason='on_visit')
 
         if pre_attack: # immediately proceed with attack attempt
-            attack_success = self.do_attack(session, retmsg, [None, []])
+            do_attack_retmsg = [] # collect error messages separately
+            attack_success = self.do_attack(session, do_attack_retmsg, [None, []])
 
             if pre_attack >= 2: # pre-auto-resolve
                 if attack_success:
-                    self.auto_resolve(session, retmsg)
+                    self.auto_resolve(session, change_retmsg) # will be thrown away
 
                     # the attack completion will go async to write the battle result, so we shouldn't call it in-line, since the async return isn't propagated out to the caller
 
@@ -16809,6 +16812,8 @@ class GAMEAPI(resource.Resource):
                             session.flush_deferred_messages()
                         reactor.callLater(0, functools.partial(self.complete_attack, session, session.deferred_messages, lambda sync: go_home_and_flush_skip(self, session)))
                         return
+                else:
+                    retmsg += do_attack_retmsg # send error messages to client
 
                 # safer, but sends ineffective session change to client
                 # also necessary in case do_attack() fails
@@ -16818,6 +16823,8 @@ class GAMEAPI(resource.Resource):
                     session.flush_deferred_messages()
 
                 reactor.callLater(0, lambda: go_home_and_flush(self, session))
+            else:
+                retmsg += do_attack_retmsg
 
         else:
             assert not session.pre_locks
