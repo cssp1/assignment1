@@ -42996,7 +42996,9 @@ function handle_server_message(data) {
         if(cb) {
             notification_queue.push_with_priority(cb, player.tutorial_state != "COMPLETE" ? NotificationQueue.TUTORIAL_MIN_PRIO : 0);
         }
-
+    } else if(msg == "SESSION_CHANGE_SKIPPED") {
+        visit_base_pending = false;
+        clear_loading_base_dialog();
     } else if(msg == "SESSION_CHANGE") {
 
         APMCounter.reset();
@@ -45274,6 +45276,7 @@ function flush_dirty_objects(options) {
 
 var change_region_pending = null;
 
+var loading_base_dialog = null;
 var loading_base_dialog_timer = null;
 
 function cancel_loading_base_timer() {
@@ -45282,11 +45285,18 @@ function cancel_loading_base_timer() {
         loading_base_dialog_timer = null;
     }
 };
-
+function clear_loading_base_dialog() {
+    if(loading_base_dialog) {
+        close_dialog(loading_base_dialog);
+    }
+};
 function invoke_loading_base_dialog(dialog_name) {
+    if(loading_base_dialog) { throw Error('should not be invoked twice'); }
     loading_base_dialog_timer = null;
     var dialog_data = gamedata['dialogs'][dialog_name];
     var dialog = new SPUI.Dialog(dialog_data);
+    loading_base_dialog = dialog; // set globally
+    dialog.on_destroy = function() { loading_base_dialog = null; };
     install_child_dialog(dialog);
     dialog.auto_center();
     dialog.modal = true;

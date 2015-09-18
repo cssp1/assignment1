@@ -16795,12 +16795,25 @@ class GAMEAPI(resource.Resource):
             if pre_attack >= 2:
                 self.auto_resolve(session, retmsg)
 
-                # this will go async to write the battle result, so we shouldn't call it in-line, since the async return isn't propagated out to the caller
-                def go_home_and_flush(self, session):
-                    session.visit_base_in_progress = True
-                    self.change_session(None, session, session.deferred_messages, dest_user_id = session.player.user_id, force = True)
-                    session.flush_deferred_messages()
-                reactor.callLater(0, lambda: go_home_and_flush(self, session))
+                # the attack completion will go async to write the battle result, so we shouldn't call it in-line, since the async return isn't propagated out to the caller
+
+                if True: # dangerous - skips session change on client side
+                    def go_home_and_flush_skip(self, session):
+                        session.visit_base_in_progress = True
+                        # divert the messages
+                        unused = []
+                        self.change_session(None, session, unused, dest_user_id = session.player.user_id, force = True)
+                        session.deferred_messages.append(["SESSION_CHANGE_SKIPPED"])
+                        session.flush_deferred_messages()
+                    reactor.callLater(0, functools.partial(self.complete_attack, session, session.deferred_messages, lambda sync: go_home_and_flush_skip(self, session)))
+
+                else: # safer, but sends ineffective session change to client
+                    def go_home_and_flush(self, session):
+                        session.visit_base_in_progress = True
+                        self.change_session(None, session, session.deferred_messages, dest_user_id = session.player.user_id, force = True)
+                        session.flush_deferred_messages()
+
+                    reactor.callLater(0, lambda: go_home_and_flush(self, session))
 
         else:
             assert not session.pre_locks
@@ -21484,7 +21497,7 @@ class GAMEAPI(resource.Resource):
         return r
 
     def complete_deferred_request(self, request, session, retmsg):
-        assert (request is not None) or (session and (retmsg is session.deferred_messages))
+        assert (request is not None) or (session and True) # (retmsg is session.deferred_messages)) - only in case of session_change_skip
 
         # session can be None on an async login failure
 
