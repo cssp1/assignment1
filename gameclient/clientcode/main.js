@@ -45307,10 +45307,9 @@ function cancel_loading_base_timer() {
 
 function invoke_loading_base_dialog(dialog_name) {
     loading_base_dialog_timer = null;
-    change_selection(null);
     var dialog_data = gamedata['dialogs'][dialog_name];
     var dialog = new SPUI.Dialog(dialog_data);
-    change_selection_ui(dialog);
+    install_child_dialog(dialog);
     dialog.auto_center();
     dialog.modal = true;
     return dialog;
