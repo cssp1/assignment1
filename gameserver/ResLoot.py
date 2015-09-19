@@ -532,7 +532,8 @@ class SpecificPvPResLoot(PvPResLoot):
                         self.starting_resource_loot[res] += loot_amounts[res]
                 if loot_amounts or lost_amounts:
                     self.producer_building_amounts[p.obj_id] = (PerBuildingGradualLoot(gamedata, p, loot_amounts),
-                                                                PerBuildingGradualLoot(gamedata, p, lost_amounts))
+                                                                PerBuildingGradualLoot(gamedata, p, lost_amounts),
+                                                                None)
 
         # apply caps
         for kind, amounts in (('storage', self.storage_building_amounts), ('producer', self.producer_building_amounts)):
@@ -546,7 +547,7 @@ class SpecificPvPResLoot(PvPResLoot):
                     factor = min(factor, defender_caps[kind][res] / float(total_lost))
                 if factor < 1:
                     # scale down all loot amounts to meet cap
-                    for amt_loot, amt_lost in amounts.itervalues():
+                    for amt_loot, amt_lost, amt_orig_or_none in amounts.itervalues():
                         old_loot = amt_loot.total().get(res,0)
                         # old_lost = amt_lost.total().get(res,0)
                         amt_loot.scale_by({res: factor})
