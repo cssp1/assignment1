@@ -15562,48 +15562,36 @@ function invoke_buy_resources_dialog(amounts, continuation) {
     return dialog;
 };
 
-var idle_check_state = {
-    timer: null,
-    start_time: -1
-};
-
-function invoke_idle_check_dialog(play_time) {
-    if(idle_check_state.timer) { return; }
-    idle_check_state.start_time = client_time;
-
+function invoke_idle_check_dialog(ui_question) {
     var dialog = new SPUI.Dialog(gamedata['dialogs']['icheck_dialog']);
+    dialog.user_data['dialog'] = 'icheck_dialog';
+    dialog.user_data['pending'] = false;
+    change_selection_ui(dialog);
     dialog.modal = true;
-    dialog.default_button = null; // do not allow Enter keypress to trigger
-    if('close_button' in dialog.widgets) { dialog.widgets['close_button'].show = false; } // do not allow Escape keypress to trigger
+    dialog.auto_center();
 
-    if(0 && selection.ui) {
-        selection.ui.add(dialog);
-    } else {
-        change_selection_ui(dialog);
-    }
-
-    dialog.xy[0] = Math.floor((dialog.parent.wh[0]-dialog.wh[0])/2);
-    dialog.xy[1] = Math.floor((dialog.parent.wh[1]-dialog.wh[1])/2);
     // randomize position
     dialog.xy[0] += Math.floor(Math.random()*200-100);
     dialog.xy[1] += Math.floor(Math.random()*200-100);
 
-    var go_away = function(w) {
-        if(idle_check_state.start_time > 0) {
-            send_to_server.func(["IDLE_CHECK_RESPONSE", client_time - idle_check_state.start_time]);
-            idle_check_state.start_time = -1;
+    dialog.widgets['ok_button'].onclick = dialog.widgets['input'].ontextready = function(w) {
+        var dialog = w.parent;
+        var response = dialog.widgets['input'].str;
+        if(!dialog.user_data['pending'] && response) {
+            dialog.user_data['pending'] = true;
+            send_to_server.func(["IDLE_CHECK_RESPONSE", response])
+            close_parent_dialog(w);
         }
-        if(idle_check_state.timer) {
-            window.clearTimeout(idle_check_state.timer);
-            idle_check_state.timer = null;
-        }
-        close_parent_dialog(w);
     };
 
-    dialog.widgets['ok_button'].onclick = go_away;
-    var str = dialog.data['widgets']['description']['ui_name'].replace('%s', pretty_print_time(play_time));
+    var str = dialog.data['widgets']['description']['ui_name'].replace('%s', ui_question);
     dialog.widgets['description'].set_text_with_linebreaking(str);
-    //idle_check_state.timer = window.setTimeout(function() { SPINPUNCHGAME.shutdown(); }, 15000);
+    dialog.ondraw = update_idle_check_dialog;
+    return dialog;
+}
+
+function update_idle_check_dialog(dialog) {
+    dialog.widgets['ok_button'].state = (dialog.widgets['input'].str ? 'normal' : 'disabled');
 }
 
 /** @type {!Array.< {user_id: number, info: Object, loot: Object} >} */
@@ -44799,8 +44787,8 @@ function handle_server_message(data) {
         var s = gamedata['strings']['server_going_down_short'];
         invoke_child_message_dialog(s['ui_title'], s['ui_description'], {dialog: s['dialog']});
     } else if(msg == "IDLE_CHECK") {
-        var play_time = data[1];
-        invoke_idle_check_dialog(play_time);
+        var ui_question = data[1];
+        invoke_idle_check_dialog(ui_question);
     } else if(msg == "UNSUPPORTED_BROWSER_REDIRECT") {
         do_unsupported_browser_redirect(data.length > 1 ? data[1] : null);
     } else if(msg == "ACCOUNT_BANNED") {

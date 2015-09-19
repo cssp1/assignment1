@@ -403,15 +403,21 @@
     },
 
     "icheck_dialog": { // idle check (name camouflaged)
-        "dimensions": [451, 151],
+        "dimensions": [360,250],
+        "default_button": "ok_button",
         "widgets": {
-            "bg": { "kind": "Dialog", "xy":[0,0], "dimensions":[451,151], "dialog": "message_dialog_bg" },
-            "title":  { "kind": "TextField", "xy": [108,19], "dimensions": [300, 24], "text_style": "bold", "text_hjustify": "left", "ui_name": "Incoming Transmission" },
-            //"close_button": { "kind": "ActionButton", "xy": [424,1], "dimensions": [19,22], "bg_image": "close_button_small", "push_bg_image": 1 },
-            "description": { "kind": "TextField", "xy": [108,43], "dimensions": [275,34], "text_hjustify": "left",  "text_size": 13, "text_leading": 15,
-                             "text_vjustify": "top", "ui_name": "You've been playing for %s today. Maybe a break is in order?" },
-            "ok_button": { "kind": "ActionButton", "xy": [308,110], "dimensions": [134,28],
-                           "bg_image": "action_button_134px", "text_size": 13, "text_style": "bold", "ui_name": "Keep Playing" }
+            "bg": {"kind": "StaticImage", "xy":[0,0], "dimensions":[360,250], "asset": "dialog_resizable", "bg_image_resizable":1 },
+            "sunken": {"kind": "StaticImage", "xy":[12,56], "dimensions":[335,180], "asset": "dialog_sunken_resizable", "bg_image_resizable":1 },
+
+            "title": { "kind": "TextField", "xy": [30,10], "dimensions": [221, 41], "text_size": 24, "text_style": "thick", "text_hjustify": "left", "ui_name": "Anti-Refresh-Cheat Check" },
+            "description": { "kind": "TextField", "xy": [34,71], "dimensions": [290, 41], "text_size": 13, "text_style": "thick", "text_hjustify": "left", "text_vjustify": "top", "text_color": [0.8,0.8,0.8],
+                             "ui_name": "Please prove that you are human by answering the following math question:\n\n%s" },
+
+            "input_bg": { "kind": "StaticImage", "xy": [30,147], "dimensions": [297,31], "asset": "dialog_sunken_white_resizable", "bg_image_resizable": 1 },
+            "input": { "kind": "TextInput", "xy": [38,148], "dimensions": [287,30], "text_size": 15, "text_hjustify": "left",
+                       "clip_to": [38,145,287,36], "max_chars": 15, "allowed_chars": "0123456789",
+                       "text_color": [0,0,0,1], "blank_on_enter": false },
+            "ok_button": { "kind": "ActionButton", "xy": [195,195], "dimensions": [134, 28], "bg_image": "action_button_134px", "text_size": 13, "text_style": "bold", "ui_name": "Send Answer"}
         }
     },
 
