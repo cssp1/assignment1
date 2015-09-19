@@ -79,7 +79,7 @@ reject_filter = re.compile('^T[0-9]+_|acquisition_game_version|account_creation_
 
 # "lite" mode
 lite_accept_filter = re.compile('|'.join('^'+x+'$' for x in \
-                                         ['account_creation_time', 'last_login_time', 'time_of_first_purchase',
+                                         ['account_creation_time', 'last_login_time', 'last_login_ip', 'time_of_first_purchase',
                                           'acquisition_campaign',
                                           'acquisition_ad_skynet',
                                           'country', 'country_tier', 'currency', 'timezone',
@@ -163,6 +163,7 @@ def setup_field(gamedata, sql_util, key, val, field_mode = None):
         elif key == 'browser_os': return 'VARCHAR(16)'
         elif key == 'browser_name': return 'VARCHAR(16)'
         elif key == 'birthday': return 'VARCHAR(10)'
+        elif key == 'last_login_ip': return 'VARCHAR(16)'
         else: return 'VARCHAR(128)'
 
     else: # not a recognized data type
