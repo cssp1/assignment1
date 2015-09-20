@@ -86,10 +86,6 @@
     // time window within which to merge successive player.sessions records (seconds)
     "session_merge_threshold": 90,
 
-    "enable_scores2": true, // enable writes to Scores2 (hot MongoDB) API
-    "enable_scores2_read": true, // enable reads from Scores2 (hot MongoDB) API
-    "enable_scores2_read_sql": true, // enable reads from Scores2 (cold SQL) API
-
     "log_scores2": 2, // Scores2 API logging level
     "scores2_publish_refresh": 1397194667, // force publish of all Scores2 stats (to hot MongoDB) if not already published since this UNIX time
 
