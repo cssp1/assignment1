@@ -15562,9 +15562,13 @@ function invoke_buy_resources_dialog(amounts, continuation) {
     return dialog;
 };
 
-function invoke_idle_check_dialog(ui_question) {
+function invoke_idle_check_dialog(request) {
+    var ui_question = request['ui_question'];
+    var tag = request['tag'];
+
     var dialog = new SPUI.Dialog(gamedata['dialogs']['icheck_dialog']);
     dialog.user_data['dialog'] = 'icheck_dialog';
+    dialog.user_data['tag'] = tag;
     dialog.user_data['pending'] = false;
     change_selection_ui(dialog);
     dialog.modal = true;
@@ -15579,7 +15583,7 @@ function invoke_idle_check_dialog(ui_question) {
         var response = dialog.widgets['input'].str;
         if(!dialog.user_data['pending'] && response) {
             dialog.user_data['pending'] = true;
-            send_to_server.func(["IDLE_CHECK_RESPONSE", response])
+            send_to_server.func(["IDLE_CHECK_RESPONSE", {'tag': dialog.user_data['tag'], 'answer': response}])
             close_parent_dialog(w);
         }
     };
@@ -44787,8 +44791,7 @@ function handle_server_message(data) {
         var s = gamedata['strings']['server_going_down_short'];
         invoke_child_message_dialog(s['ui_title'], s['ui_description'], {dialog: s['dialog']});
     } else if(msg == "IDLE_CHECK") {
-        var ui_question = data[1];
-        invoke_idle_check_dialog(ui_question);
+        invoke_idle_check_dialog(data[1]);
     } else if(msg == "UNSUPPORTED_BROWSER_REDIRECT") {
         do_unsupported_browser_redirect(data.length > 1 ? data[1] : null);
     } else if(msg == "ACCOUNT_BANNED") {

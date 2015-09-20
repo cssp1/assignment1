@@ -220,6 +220,12 @@ var method_give_gamebucks = function() {
         send_request('player', 'give_item', $.extend(ident, {'spec':'$GAMEBUCKS_ITEM$', 'stack':amount, 'undiscardable':1, 'log':'PCHECK', 'ui_reason':ui_reason}), function(result) { alert("Success!"); });
     }
 };
+var method_check_idle = function() {
+    var ident = get_ident();
+    if(ident) {
+        send_request('player', 'check_idle', ident, function(result) { alert("Success!"); });
+    }
+};
 var method_clear_cooldown = function() {
     var ident = get_ident();
     var name = $("#cooldown_name")[0].value;
@@ -1492,6 +1498,8 @@ $(function() {
     &nbsp;&nbsp;&nbsp;&nbsp;
       Cooldown Name: <input type="text" id="cooldown_name" name="cooldown_name" value="alliance_deserter">
       <button onclick="method_clear_cooldown()" class="spin_button">Clear</button>
+      <p>
+      <button onclick="method_check_idle()" class="spin_button">Send Anti-Bot CAPTCHA</button>
       <p>
       Reason for this action:
       <br>

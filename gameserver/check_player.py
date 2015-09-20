@@ -479,6 +479,12 @@ if __name__ == '__main__':
         if player.get('chat_official',0):
             print fmt % ('CHAT OFFICIAL (blue text) account', '')
 
+        if 'idle_check' in player and player['idle_check'].get('fails',0) + player['idle_check'].get('successes',0) > 0:
+            ui_captcha = '%d Passes, %d Fails' % (player['idle_check'].get('successes',0), player['idle_check'].get('fails',0))
+            if player['idle_check'].get('last_fail_time',-1) > 0:
+                ui_captcha += ' (last fail %s ago)' % pretty_print_time(time_now - player['idle_check']['last_fail_time'])
+            print fmt % ('Anti-Bot CAPTCHA:', ui_captcha)
+
         if 'known_alt_accounts' in player and player['known_alt_accounts']:
             print fmt % ('Known alt accounts:', '')
             for s_other_id in sorted(player['known_alt_accounts'].iterkeys(), key = int):

@@ -215,6 +215,12 @@ def MetricsLogFilter(child):
                                   '0270_activate_mana_icon',
                                   '0280_reward_activate_item_mission',
                                   '0399_tutorial_complete',
+
+                                  '0691_idle_check',
+                                  '0692_idle_check_success',
+                                  '0693_idle_check_fail',
+                                  '0694_idle_check_timeout',
+
                                   '0700_login_abuse_detected',
                                   '1500_server_restart',
                                   '3870_loot_given',

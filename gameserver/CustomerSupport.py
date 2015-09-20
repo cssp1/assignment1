@@ -166,6 +166,17 @@ class HandleMarkUninstalled(Handler):
         self.gamesite.pcache_client.player_cache_update(self.user_id, {'uninstalled': 1})
         return ReturnValue(result = 'ok')
 
+class HandleCheckIdle(Handler):
+    # trigger idle check at next chance
+    # note: no logging, directly override exec()
+    def exec_online(self, session, retmsg):
+        session.player.idle_check.last_end_playtime = -1
+        return ReturnValue(result = 'ok')
+    def exec_offline(self, user, player):
+        if 'idle_check' not in player: player['idle_check'] = {}
+        player['idle_check']['last_end_playtime'] = -1
+        return ReturnValue(result = 'ok')
+
 class HandleRecordAltLogin(Handler):
     def __init__(self, *args, **kwargs):
         Handler.__init__(self, *args, **kwargs)
@@ -770,6 +781,7 @@ methods = {
     'trigger_cooldown': HandleTriggerCooldown,
     'apply_aura': HandleApplyAura,
     'remove_aura': HandleRemoveAura,
+    'check_idle': HandleCheckIdle,
     'chat_gag': HandleChatGag,
     'chat_ungag': HandleChatUngag,
     'give_item': HandleGiveItem,

@@ -69,6 +69,7 @@ import SpinNoSQLLog
 import Scores2
 import CustomerSupport
 import ActivityClassifier
+import IdleCheck
 import ChatChannels
 import ChatFilter
 import ResLoot
@@ -2341,6 +2342,7 @@ class PlayerTable:
               ('history', None, None),
               ('cooldowns', None, None),
               ('scores2', lambda s: s.serialize(), lambda player, observer, data: Scores2.CurScores(data)),
+              ('idle_check', lambda s: s.serialize(), lambda player, observer, data: IdleCheck.IdleCheck(gamedata['server']['idle_check'], data)),
               ('creation_time', None, None),
               ('lottery_slate', None, None),
               ('ladder_match', None, None),
@@ -2997,9 +2999,6 @@ class Session(object):
         # for ADMIN purposes only, keep track of the last messages sent
         self.last_action = collections.deque([], gamedata['server']['ADMIN']['last_action_buf'])
 
-        # time at which manual client idle check was started
-        self.idle_check_time = -1
-
         # list of incoming bundles of game messages ([serial, messsages])
         # being held because earlier messages haven't been received yet
         self.message_buffer = []
@@ -3157,6 +3156,10 @@ class Session(object):
     def dump_exception_state(self):
         return 'player %d viewing %d at %s, is_async %r complete_attack_in_progress %r visit_base_in_progress %r logout_in_progress %r has_attacked %r viewing_base_lock %r' % \
                (self.player.user_id, self.viewing_player.user_id, self.viewing_base.base_id, self.is_async, bool(self.complete_attack_in_progress), bool(self.visit_base_in_progress), bool(self.logout_in_progress), self.has_attacked, self.viewing_base_lock)
+
+    # return current seconds of cumulative play time
+    def cur_playtime(self):
+        return (server_time - self.login_time) + self.player.history.get('time_in_game',0)
 
     def get_alliance_id(self, reason=''):
         if (not gamesite.sql_client) or \
@@ -7045,6 +7048,8 @@ class Player(AbstractPlayer):
 
         # time player last deployed units in an attack - used for throttling max attack rate
         self.attack_cooldown_start = -1
+
+        self.idle_check = IdleCheck.IdleCheck(gamedata['server']['idle_check'], None)
 
         # available items in the lottery slate
         # dictionary {"slot0": {"spec":"foo"}, "slot1": ... }
@@ -12960,9 +12965,6 @@ class CONTROLAPI(resource.Resource):
         session.player.lockout_until = server_time + lockout_time
         session.player.lockout_message = lockout_message
         return self.kill_session(request, session)
-    def handle_idle_check(self, request, session = None):
-        self.gameapi.send_idle_check(session, session.deferred_messages)
-        session.flush_deferred_messages()
     def handle_push_gamedata(self, request, session = None):
         self.gameapi.push_gamedata(session, session.deferred_messages)
         session.flush_deferred_messages()
@@ -20055,34 +20057,6 @@ class GAMEAPI(resource.Resource):
         data_str = open(SpinConfig.gamedata_filename()).read()
         retmsg.append(["PUSH_GAMEDATA", data_str, session.player.abtests])
 
-    def send_idle_check(self, session, retmsg):
-        session.idle_check_time = server_time
-        # count up time played in last day
-        play_time = server_time - session.login_time
-        sessions = session.player.history.get('sessions', [])
-        for i in xrange(len(sessions)-1, -1, -1):
-            s = sessions[i]
-            if s[0] < 0 or s[1] < 0: continue
-            if s[1] < server_time - 24*60*60: break
-            play_time += s[1]-s[0]
-
-        gamesite.exception_log.event(server_time, 'idle check on player %d: playtime %.2f hrs' % \
-                                     (session.user.user_id, play_time/3600.0))
-        retmsg.append(["IDLE_CHECK", play_time])
-
-    def do_idle_check_response(self, session, retmsg, client_elapsed = None):
-        if session.idle_check_time < 0: return
-        elapsed = server_time - session.idle_check_time
-        if elapsed >= gamedata['server']['idle_check_timeout']:
-            result = 'FAIL'
-        else:
-            result = 'OK'
-            session.player.login_pardoned_until = server_time + gamedata['server']['idle_check_pardon_time']
-
-        gamesite.exception_log.event(server_time, 'idle check on player %d: %s (%d sec)' % \
-                                     (session.user.user_id, result, elapsed))
-        session.idle_check_time = -1
-
     def do_send_gifts(self, session, retmsg, arg):
         if not session.player.get_any_abtest_value('enable_resource_gifts', gamedata.get('enable_resource_gifts',False)):
             return
@@ -24791,8 +24765,19 @@ class GAMEAPI(resource.Resource):
                         session.player.map_bookmarks[region].remove(session.player.map_bookmarks[region][0])
 
         elif arg[0] == "IDLE_CHECK_RESPONSE":
-            client_elapsed = arg[1]
-            self.do_idle_check_response(session, retmsg, client_elapsed = client_elapsed)
+            response_data = arg[1]
+            playtime = session.cur_playtime()
+            status = session.player.idle_check.got_response(session.login_time, server_time, playtime, response_data)
+            if status == IdleCheck.STATUS_NO_RESULT:
+                pass
+            elif status == IdleCheck.STATUS_SEND_AGAIN:
+                idle_check_msg = session.player.idle_check.start_check(session.login_time, server_time, playtime)
+                retmsg.append(["IDLE_CHECK", idle_check_msg])
+                metric_event_coded(session.user.user_id, '0691_idle_check', idle_check_msg)
+            elif status == IdleCheck.STATUS_FAIL:
+                metric_event_coded(session.user.user_id, '0693_idle_check_fail', response_data)
+            elif status == IdleCheck.STATUS_SUCCESS:
+                metric_event_coded(session.user.user_id, '0692_idle_check_success', response_data)
 
         elif arg[0] == "INVOKE_FACEBOOK_AUTH_RESPONSE":
             #wanted_scope = arg[1]
@@ -26416,6 +26401,7 @@ class GameSite(server.Site):
             session = session_table[id]
             if session.logout_in_progress: continue
 
+            need_flush = False
             kick_reason = None
 
             # check for expired idle sessions
@@ -26432,6 +26418,24 @@ class GameSite(server.Site):
                 kick_reason = 'long_session'
                 gamesite.exception_log.event(server_time, 'user %d - terminating extremely long session (%dmin)' % (session.user.user_id, (server_time-session.login_time)/60))
 
+            # perform idle check
+            playtime = session.cur_playtime()
+
+            idle_timeout_status = session.player.idle_check.timeout(session.login_time, server_time, playtime)
+            # gamesite.exception_log.event(server_time, 'user %d - playtime %d check status %d needed %d' % (session.user.user_id, playtime, idle_timeout_status, session.player.idle_check.check_needed(session.login_time, server_time, playtime)))
+
+            if idle_timeout_status == IdleCheck.STATUS_FAIL:
+                metric_event_coded(session.user.user_id, '0694_idle_check_timeout', {})
+            elif idle_timeout_status == IdleCheck.STATUS_SEND_AGAIN or \
+                 (idle_timeout_status == IdleCheck.STATUS_NO_RESULT and \
+                  (session.player.idle_check.forced_check_needed() or \
+                   Predicates.read_predicate(gamedata['server']['idle_check']['enable_if']).is_satisfied(session.player, None)) and \
+                  session.player.idle_check.check_needed(session.login_time, server_time, playtime)):
+                idle_check_msg = session.player.idle_check.start_check(session.login_time, server_time, playtime)
+                session.send_deferred_message([["IDLE_CHECK", idle_check_msg]])
+                need_flush = True
+                metric_event_coded(session.user.user_id, '0691_idle_check', idle_check_msg)
+
             if not kick_reason:
                 unused, abuse_warning_msg = session.player.detect_login_abuse(cur_session_length = server_time - session.login_time)
                 if (session.player.lockout_until > 0) and (server_time < session.player.lockout_until):
@@ -26441,6 +26445,7 @@ class GameSite(server.Site):
                     kick_reason = 'abuse'
                 elif abuse_warning_msg:
                     session.send_deferred_message(abuse_warning_msg)
+                    need_flush = True
 
             if kick_reason:
                 try:
@@ -26474,12 +26479,13 @@ class GameSite(server.Site):
                     gamesite.exception_log.event(server_time, 'deploying overdue AI attack (%s) on player %d' % \
                                                  (str(session.incoming_attack_type), session.player.user_id))
                 session.deploy_ai_attack(session.deferred_messages)
+                need_flush = True
             elif session.incoming_attack_wave_time > 0 and (server_time >= session.incoming_attack_wave_time):
                 if gamedata['server']['log_ai_attack_overdue'] and session.incoming_attack_type != 'tutorial':
                     gamesite.exception_log.event(server_time, 'deploying overdue AI attack wave (%s) on player %d' % \
                                                  (str(session.incoming_attack_type), session.player.user_id))
                 session.deploy_ai_attack_wave(session.deferred_messages)
-
+                need_flush = True
 
             # check for sessions where an attack has been going on for too long
             elif (not session.is_async) and \
@@ -26495,9 +26501,7 @@ class GameSite(server.Site):
                 # change_session will unlock the victim's state for us
                 session.visit_base_in_progress = True
                 session.is_async = self.gameapi.change_session(None, session, session.deferred_messages, dest_user_id = session.user.user_id, force = True)
-
-            if (session.idle_check_time > 0) and (server_time >= (session.idle_check_time + gamedata['server']['idle_check_timeout'])):
-                self.gameapi.do_idle_check_response(session, session.deferred_messages)
+                need_flush = True
 
             if (not session.sprobe_in_progress):
                 sprobe_config = gamedata['server'].get('sprobe',None)
@@ -26509,8 +26513,11 @@ class GameSite(server.Site):
                            ((when == 'anytime') and ((server_time - session.login_time) >= sprobe_config.get('sec_after_login',15))):
                             session.sprobe_in_progress = True
                             session.send_deferred_message([["SPROBE_RUN"]], flush_now = True)
+                            need_flush = True
 
             session.record_activity_sample()
+            if need_flush:
+                session.flush_deferred_messages()
 
         # send lock keepalive requests in one big batch
         messages_pending = gamesite.lock_client.player_lock_keepalive_batch(lock_keepalive_ids, lock_keepalive_generations, lock_keepalive_states, True, reason='bgfunc')
