@@ -9509,7 +9509,7 @@ class Player(AbstractPlayer):
 
     # increment score counters, where "stats" is like {"xp": 35, "trophies_pvp": -2, ...}
     def modify_scores(self, *args, **kwargs):
-        self.modify_scores1(*args, **kwargs)
+        #self.modify_scores1(*args, **kwargs) # XXXXXX remove when proven safe
         self.modify_scores2(*args, **kwargs)
 
     # old legacy score system
@@ -22393,8 +22393,9 @@ class GAMEAPI(resource.Resource):
         alliance_id = self.send_player_cache_update(session, 'log_out_preflush', alliance_id = alliance_id)
 
         # update all leaderboard stats - legacy only (scores2 gets updated on the fly)
-        if not session.player.isolate_pvp:
-            session.player.publish_scores1(alliance_id = alliance_id, reason = 'log_out_preflush')
+        # XXXXXX remove when proven safe
+        #if not session.player.isolate_pvp:
+        #    session.player.publish_scores1(alliance_id = alliance_id, reason = 'log_out_preflush')
 
     # record login/logout in MongoDB log
     # if recording logins (that are still active), set logout_time = -1
