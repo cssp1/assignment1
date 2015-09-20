@@ -562,11 +562,12 @@ def do_CONTROLAPI(args, host = None, port = None):
     return SpinJSON.loads(response)
 
 def do_lookup(args):
+    cmd_args = ['--live']
     if 'user_id' in args:
         user_id = int(args['user_id'])
-        cmd_args = [str(user_id)]
+        cmd_args += [str(user_id)]
     elif 'facebook_id' in args:
-        cmd_args = ['--facebook-id', args['facebook_id']]
+        cmd_args += ['--facebook-id', args['facebook_id']]
     else:
         raise Exception('must pass user_id or facebook_id')
     p = subprocess.Popen(['./check_player.py'] + cmd_args, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
