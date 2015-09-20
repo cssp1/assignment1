@@ -10665,7 +10665,7 @@ function init_desktop_dialogs() {
     // playfield controls bar
     var controls_bar = invoke_playfield_controls_bar();
     desktop_dialogs['playfield_controls_bar'] = controls_bar;
-    SPUI.root.add_under(controls_bar);
+    SPUI.root.add_after(dialog, controls_bar); // add controls_bar to SPUI.root right after desktop_top, because its update method depots on desktop_top's position
 
     // desktop bottom
 
