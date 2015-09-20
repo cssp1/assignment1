@@ -104,15 +104,37 @@ class S3 (object):
             self.urlopen = urlopen_robust if robust else urllib2.urlopen
 
     def protocol(self): return 'https://' if self.use_ssl else 'http://'
+    def bucket_endpoint(self, bucket):
+        if True: # NEW - necessary for read-after-write consistency (?)
+            # note: hardcoded to US-EAST-1
+            return self.protocol()+'s3-external-1.amazonaws.com/'+bucket
+        else: # OLD
+            return self.protocol()+bucket+'.s3.amazonaws.com'
+
+    # the CanonicalResource for inclusion in the request signature
+    # filename = '' for operations on root
+    # see http://docs.aws.amazon.com/AmazonS3/latest/dev/RESTAuthentication.html
+    def resource_name(self, bucket, filename):
+        resource = ''
+        if self.bucket_endpoint(bucket).endswith('amazonaws.com'): # Virtual host-style
+            resource += '/'+bucket
+            if filename:
+                resource += '/'+filename
+            else:
+                resource += '/'
+        else: # path-style
+            resource += '/'+bucket
+            if filename:
+                resource += '/'+filename
+        return resource
 
     # get/put_request do not actually perform I/O, they just return the right URLs and HTTP headers to use
     # filename = '' for operations on root
     def get_request(self, bucket, filename, method = 'GET', query = None):
-        resource = '/'+bucket+'/'+filename
-
-        url = self.protocol()+bucket+'.s3.amazonaws.com'
+        url = self.bucket_endpoint(bucket)
         if filename:
             url += '/'+filename
+        resource = self.resource_name(bucket, filename)
         if query:
             url += '?'+urlencode(query)
 
@@ -125,8 +147,8 @@ class S3 (object):
         return url, headers
 
     def delete_request(self, bucket, filename):
-        resource = '/'+bucket+'/'+filename
-        url = self.protocol()+bucket+'.s3.amazonaws.com/'+filename
+        url = self.bucket_endpoint(bucket)+'/'+filename
+        resource = self.resource_name(bucket, filename)
         date = time.strftime('%a, %d %b %Y %X GMT', time.gmtime())
         sig_data = 'DELETE\n\n\n'+date+'\n'+resource
         signature = base64.encodestring(hmac.new(self.secret, sig_data, hashlib.sha1).digest()).strip()
@@ -137,8 +159,8 @@ class S3 (object):
 
     def put_request(self, bucket, filename, length, md5sum = '', content_type = 'text/plain', acl = ''):
         md5sum_b64 = base64.encodestring(md5sum).strip() if md5sum else ''
-        resource = '/'+bucket+'/'+filename
-        url = self.protocol()+bucket+'.s3.amazonaws.com/'+filename
+        url = self.bucket_endpoint(bucket)+'/'+filename
+        resource = self.resource_name(bucket, filename)
         date = time.strftime('%a, %d %b %Y %X GMT', time.gmtime())
         acl_sig = 'x-amz-acl:'+acl+'\n' if acl else ''
         sig_data = 'PUT\n'+md5sum_b64+'\n'+content_type+'\n'+date+'\n'+acl_sig+resource
@@ -505,7 +527,7 @@ class S3 (object):
 if __name__ == '__main__':
     MAX_RETRIES = 1
     TEST_BUCKET = 'spinpunch-scratch'
-    TEST_KEY_FILE = os.getenv('HOME')+'/.ssh/drake-awssecret'
+    TEST_KEY_FILE = os.getenv('HOME')+'/.ssh/'+os.getenv('USER')+'-awssecret'
 
     # GET
     con = S3(TEST_KEY_FILE)
