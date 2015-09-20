@@ -1039,10 +1039,8 @@ class NoSQLClient (object):
         references_player_level = False
 
         # need to emulate a join on player_scores for the score range
-        score_api = None
         score_first = False # whether to perform the score query before the player cache query
         score_range_qs = None
-        score_qs = None
         score_stat = None
         score_axes = None
 
@@ -1054,27 +1052,15 @@ class NoSQLClient (object):
             if item[0] == 'player_level': references_player_level = True
 
             if type(key) is tuple:
-                assert key[0] in ('scores1', 'scores2')
-                assert score_api is None # once only
-                score_api = key[0]
+                assert key[0] == 'scores2' # scores1 is obsolete now
+                assert s2 is None # once only
 
                 # if score=0 is included, then do the player_cache query first, otherwise do the score query first
                 score_first = (not (item[1] <= 0 and item[2] >= 0))
                 score_range_qs = {'$gte':item[1], '$lte':item[2]}
-
-                if score_api == 'scores1':
-                    match = self.SCORE_RE.match(key[1])
-                    assert match
-                    if match:
-                        gr = match.groups()
-                        score_qs = self.parse_score_addr((gr[0], {'wk':'week','s':'season'}[gr[1]], int(gr[2])))
-                        score_qs['score'] = score_range_qs
-
-                elif score_api == 'scores2':
-                    score_stat, score_axes = key[1]
-                    import Scores2 # awkward
-                    s2 = Scores2.MongoScores2(self)
-
+                score_stat, score_axes = key[1]
+                import Scores2 # awkward
+                s2 = Scores2.MongoScores2(self)
                 continue
 
             if len(item) == 4 and item[3] == '!in':
@@ -1095,12 +1081,9 @@ class NoSQLClient (object):
 
         if score_first:
             # return list of candidates who have scores within the specified range
-            if score_api == 'scores1':
-                candidate_ids = [x['user_id'] for x in self.player_scores().find(score_qs,{'_id':0,'user_id':1})]
-            elif score_api == 'scores2':
-                candidate_ids = [x['user_id'] for x in s2._scores2_table('player', score_stat, score_axes).find({'key': s2._scores2_key(score_stat, score_axes),
-                                                                                                                 'val': score_range_qs},
-                                                                                                                {'_id':0,'user_id':1})]
+            candidate_ids = [x['user_id'] for x in s2._scores2_table('player', score_stat, score_axes).find({'key': s2._scores2_key(score_stat, score_axes),
+                                                                                                             'val': score_range_qs},
+                                                                                                            {'_id':0,'user_id':1})]
             qand.append({'_id':{'$in':candidate_ids}})
             cache_qs = {'$and':qand}
             return self._player_cache_query_randomized(cache_qs, maxret = maxret, randomize_quality = randomize_quality)
@@ -1111,15 +1094,10 @@ class NoSQLClient (object):
             for candidate_id in self._player_cache_query_randomized(cache_qs, maxret = -1, randomize_quality = randomize_quality,
                                                                     force_player_level_index = references_player_level):
                 # check if candidate's score is within the specified range
-                if score_api == 'scores1':
-                    score_qs['user_id'] = candidate_id
-                    if self.player_scores().find_one(score_qs, {'_id':0,'user_id':1}) is None:
-                        continue
-                elif score_api == 'scores2':
-                    if s2._scores2_table('player', score_stat, score_axes).find_one({'key': s2._scores2_key(score_stat, score_axes),
-                                                                                     'val': score_range_qs,
-                                                                                     'user_id': candidate_id},{'_id':0}) is None:
-                        continue
+                if s2._scores2_table('player', score_stat, score_axes).find_one({'key': s2._scores2_key(score_stat, score_axes),
+                                                                                 'val': score_range_qs,
+                                                                                 'user_id': candidate_id},{'_id':0}) is None:
+                    continue
                 ret.append(candidate_id)
                 if len(ret) >= maxret: break
 
@@ -2389,7 +2367,7 @@ if __name__ == '__main__':
     sys.stdout = codecs.getwriter('utf8')(sys.stdout)
 
     opts, args = getopt.gnu_getopt(sys.argv[1:], 'g:', ['reset', 'init', 'console', 'maint', 'region-maint=', 'clear-locks',
-                                                      'winners', 'leaders', 'tournament-stat=', 'week=', 'season=', 'score-api=', 'game-id=',
+                                                      'winners', 'leaders', 'tournament-stat=', 'week=', 'season=', 'game-id=',
                                                       'score-scope=', 'score-loc=', 'spend-week=',
                                                       'recache-player-ranks',
                                                       'recache-alliance-scores', 'test'])
@@ -2398,7 +2376,6 @@ if __name__ == '__main__':
     week = -1
     season = -1
     tournament_stat = None
-    score_api = 'scores2'
     score_space_scope = None
     score_space_loc = None
     spend_week = None
@@ -2418,9 +2395,6 @@ if __name__ == '__main__':
         elif key == '--season': season = int(val)
         elif key == '--tournament-stat':
             tournament_stat = val
-        elif key == '--score-api':
-            assert val in ('scores1', 'scores2')
-            score_api = val
         elif key == '--score-scope':
             import Scores2
             if val == 'ALL':
@@ -2495,40 +2469,30 @@ if __name__ == '__main__':
 
     elif mode == 'recache-alliance-scores':
         assert cur_week >= 0 and cur_season >= 0
-        s2 = None
-        if gamedata['server'].get('enable_scores2', False):
-            import Scores2
-            s2 = Scores2.MongoScores2(client)
+        import Scores2
+        s2 = Scores2.MongoScores2(client)
 
         alliance_list = client.get_alliance_list(-1)
         for alliance in alliance_list:
-            print 'Scores1: updating alliance', alliance['id'], 'week', cur_week, 'scores'
-            addrs = [(field, freq, period) for field in ('trophies_pvp', 'trophies_pve', 'trophies_pvv') for freq in ('week',) for period in (cur_week,)]
             offsets = {'trophies_pvp':gamedata['trophy_display_offset']['pvp'],
                        'trophies_pve':gamedata['trophy_display_offset']['pve'],
                        'trophies_pvv':gamedata['trophy_display_offset'].get('pvv',0),
                                                 }
-            client.update_alliance_score_cache(alliance['id'], addrs, gamedata['alliances']['trophy_weights'][0:gamedata['alliances']['max_members']], offsets)
-
-            if gamedata['server'].get('enable_scores2', False):
-                it_a = [{'stat': stat, 'axes': {'space':[space_scope,space_loc], 'time':[time_scope,time_loc]}} \
-                        for stat in ('trophies_pvp', 'trophies_pve', 'trophies_pvv') \
-                        for space_scope in (Scores2.SPACE_ALL, Scores2.SPACE_CONTINENT) \
-                        for space_loc in {Scores2.SPACE_ALL:[Scores2.SPACE_ALL_LOC], Scores2.SPACE_CONTINENT:gamedata['continents'].keys()}[space_scope] \
-                        for time_scope in (Scores2.FREQ_ALL, Scores2.FREQ_SEASON, Scores2.FREQ_WEEK) \
-                        for time_loc in {Scores2.FREQ_ALL:[0], Scores2.FREQ_SEASON:[cur_season], Scores2.FREQ_WEEK:[cur_week]}[time_scope]]
-                print 'Scores2: updating alliance', alliance['id'], 'scores' # , '\n'.join(map(repr,it_a))
-                s2.alliance_scores2_update_weighted(alliance['id'], it_a,
-                                                    gamedata['alliances']['trophy_weights'][0:gamedata['alliances']['max_members']],
-                                                    offsets)
+            it_a = [{'stat': stat, 'axes': {'space':[space_scope,space_loc], 'time':[time_scope,time_loc]}} \
+                    for stat in ('trophies_pvp', 'trophies_pve', 'trophies_pvv') \
+                    for space_scope in (Scores2.SPACE_ALL, Scores2.SPACE_CONTINENT) \
+                    for space_loc in {Scores2.SPACE_ALL:[Scores2.SPACE_ALL_LOC], Scores2.SPACE_CONTINENT:gamedata['continents'].keys()}[space_scope] \
+                    for time_scope in (Scores2.FREQ_ALL, Scores2.FREQ_SEASON, Scores2.FREQ_WEEK) \
+                    for time_loc in {Scores2.FREQ_ALL:[0], Scores2.FREQ_SEASON:[cur_season], Scores2.FREQ_WEEK:[cur_week]}[time_scope]]
+            print 'Scores2: updating alliance', alliance['id'], 'scores' # , '\n'.join(map(repr,it_a))
+            s2.alliance_scores2_update_weighted(alliance['id'], it_a,
+                                                gamedata['alliances']['trophy_weights'][0:gamedata['alliances']['max_members']],
+                                                offsets)
 
     elif mode in ('winners', 'leaders'):
         import SpinUserDB
-
-        s2 = None # scores2 API
-        if score_api == 'scores2':
-            import Scores2
-            s2 = Scores2.MongoScores2(client)
+        import Scores2
+        s2 = Scores2.MongoScores2(client)
 
         def display_point_count(gamedata, raw, tournament_stat):
             if tournament_stat in ('trophies_pvp', 'trophies_pve', 'trophies_pvv'):
@@ -2540,11 +2504,8 @@ if __name__ == '__main__':
         period = season if season >= 0 else week
 
         addr = (tournament_stat, freq, period)
-        if s2:
-            time_scope = {'season':Scores2.FREQ_SEASON, 'week':Scores2.FREQ_WEEK}[freq]
-            stat_axes = (tournament_stat, Scores2.make_point(time_scope, period, score_space_scope, score_space_loc))
-        else:
-            assert tournament_stat in ('trophies_pvp', 'trophies_pve', 'trophies_pvv')
+        time_scope = {'season':Scores2.FREQ_SEASON, 'week':Scores2.FREQ_WEEK}[freq]
+        stat_axes = (tournament_stat, Scores2.make_point(time_scope, period, score_space_scope, score_space_loc))
 
         if mode == 'leaders':
             # for STAT in conquests damage_inflicted resources_looted xp havoc_caused quarry_resources tokens_looted trophies_pvp hive_kill_points strongpoint_resources; do ./SpinNoSQL.py --leaders --season 3 --tournament-stat $STAT --score-scope continent --score-loc fb >> /tmp/`date +%Y%m%d`-tr-stat-leaders.txt; done
@@ -2571,10 +2532,7 @@ if __name__ == '__main__':
         elif mode == 'winners':
             assert tournament_stat in ('trophies_pvp', 'trophies_pve', 'trophies_pvv', 'strongpoint_resources', 'hive_kill_points')
 
-            if s2:
-                top_alliances = s2.alliance_scores2_get_leaders([stat_axes], 5)[0]
-            else:
-                top_alliances = client.get_alliance_score_leaders(addr, 5, 0)
+            top_alliances = s2.alliance_scores2_get_leaders([stat_axes], 5)[0]
 
             print '[color="#FFFF00"]TOP %s ALLIANCES FOR %sWEEK %d%s[/color]' % \
                   (tournament_stat, 'SEASON %d ' % (season+gamedata['matchmaking']['season_ui_offset']) if season >= 0 else '', week,
@@ -2600,10 +2558,7 @@ if __name__ == '__main__':
                 if i >= len(PRIZES): continue
                 alliance_prize = PRIZES[i]
 
-                if s2:
-                    scores = s2.player_scores2_get(members, [stat_axes], rank = False)
-                else:
-                    scores = client.get_player_scores(members, [addr], rank = False)
+                scores = s2.player_scores2_get(members, [stat_axes], rank = False)
 
                 scored_members = [{'user_id': members[x], 'absolute': scores[x][0]['absolute'] if scores[x][0] is not None else 0} for x in xrange(len(members))]
 

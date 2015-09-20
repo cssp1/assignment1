@@ -8663,19 +8663,7 @@ class Player(AbstractPlayer):
     def ladder_points(self): return self.get_master_score('trophies_pvp')
     def trophies_pvv(self): return self.get_master_score('trophies_pvv')
     def get_master_score(self, stat):
-        trophy_field = score_field_name(self, stat, gamedata['matchmaking']['ladder_point_frequency'])
-        points = self.history.get(trophy_field,0)
-
-        # check that legacy value matches Scores2 value
-        if gamedata['server'].get('enable_scores2', False):
-            scores2_points = self.scores2.get(stat, self.scores2_ladder_master_point()) or 0
-            if scores2_points != points:
-                if gamedata['server'].get('log_scores2',0) >= 3:
-                    gamesite.exception_log.event(server_time, 'player %d Scores2 %s mismatch legacy %s new %s' % (self.user_id, stat, repr(points), repr(scores2_points)))
-            if gamedata['server'].get('enable_scores2_read', False):
-                return scores2_points
-
-        return points
+        return self.scores2.get(stat, self.scores2_ladder_master_point()) or 0
 
     # return number of non-destroyed buildings that can yield loot to an attacker
     def get_lootable_buildings(self):
@@ -8688,10 +8676,7 @@ class Player(AbstractPlayer):
 
         if trophy_range or (min_trophies is not None):
             # note: SpinNoSQL translates this into a fake join on player score data - it's not really in player cache
-            if self.leaderboard_impl() == 'scores2':
-                trophy_field = ('scores2', ('trophies_pvp', self.scores2_ladder_master_point()))
-            else:
-                trophy_field = ('scores1', score_field_name(self, 'trophies_pvp', gamedata['matchmaking']['ladder_point_frequency']))
+            trophy_field = ('scores2', ('trophies_pvp', self.scores2_ladder_master_point()))
 
             if trophy_range:
                 mycount = self.ladder_points()
@@ -9585,13 +9570,6 @@ class Player(AbstractPlayer):
         # fall back to default assignment
         return Predicates.eval_cond_or_literal(gamedata['continent_assignment'], None, self) # predicates shouldn't need session access here
 
-    # temporary - allow toggling between different leaderboard read methods for debugging
-    def leaderboard_impl(self):
-        if (self.leaderboard_override and self.leaderboard_override.startswith('scores2')) or \
-           gamedata['server'].get('enable_scores2_read',False):
-            return 'scores2'
-        return 'legacy'
-
     # return space scope and location of the widest space the player should see on the leaderboard (continent or ALL)
     def scores2_wide_space(self):
         if self.leaderboard_override:
@@ -9705,7 +9683,7 @@ class Player(AbstractPlayer):
 
 
     def publish_scores2(self, alliance_id = None, reason=''):
-        if not gamedata['server'].get('enable_scores2', False) or self.history.get('scores2_migration',0) < SCORES2_MIGRATION_VERSION: return
+        if self.history.get('scores2_migration',0) < SCORES2_MIGRATION_VERSION: return
 
         # force publish of all scores?
         do_all = self.history.get('scores2_publish_refresh',-1) < gamedata['server'].get('scores2_publish_refresh',-1)
@@ -9757,7 +9735,7 @@ class Player(AbstractPlayer):
 
     def update_alliance_score_cache2(self, alliance_id, alliance_info = None, it_a = None, reason=''):
         assert alliance_id > 0
-        if not gamedata['server'].get('enable_scores2', False) or self.history.get('scores2_migration',0) < SCORES2_MIGRATION_VERSION: return
+        if self.history.get('scores2_migration',0) < SCORES2_MIGRATION_VERSION: return
 
         if it_a is None:
             # look for an ongoing stat tournament
@@ -10045,7 +10023,6 @@ class Player(AbstractPlayer):
     # migrate score counters from the old player.history['score_xp_s3'] = 123 counters to the new Scores2 system
     def migrate_scores2(self):
         if self.is_ai(): return
-        if not gamedata['server'].get('enable_scores2', False): return
         if self.history.get('scores2_migration',0) >= SCORES2_MIGRATION_VERSION: return
 
         creation_week = SpinConfig.get_pvp_week(gamedata['matchmaking']['week_origin'], self.creation_time)
@@ -16979,18 +16956,11 @@ class GAMEAPI(resource.Resource):
 
         if gamesite.sql_client and (not manual_fields) and get_trophies:
             # SPECIAL CASE - the client wants the current PvP trophy count as "trophies_pvp" for GUI display of matchmaking info
-            if session.player.leaderboard_impl() == 'scores2':
-                scores = gamesite.mongo_scores2_client.player_scores2_get(user_ids,
-                                                                          [('trophies_pvp', session.player.scores2_ladder_master_point()),
-                                                                           ('trophies_pvv', session.player.scores2_ladder_master_point()),
-                                                                           ],
-                                                                          rank = False, reason = 'do_query_player_cache(%s)' % reason)
-            else:
-                scores = gamesite.sql_client.get_player_scores(user_ids,
-                                                               [parse_score_field_for_sql(score_field_name(session.player, 'trophies_pvp', gamedata['matchmaking']['ladder_point_frequency'])),
-                                                                parse_score_field_for_sql(score_field_name(session.player, 'trophies_pvv', gamedata['matchmaking']['ladder_point_frequency'])),
-                                                                ],
-                                                               rank = False, reason = 'do_query_player_cache(%s)' % reason)
+            scores = gamesite.mongo_scores2_client.player_scores2_get(user_ids,
+                                                                      [('trophies_pvp', session.player.scores2_ladder_master_point()),
+                                                                       ('trophies_pvv', session.player.scores2_ladder_master_point()),
+                                                                       ],
+                                                                      rank = False, reason = 'do_query_player_cache(%s)' % reason)
         else:
             scores = [[None,None]] * len(user_ids) # inner array must be same length as score query!
 
@@ -23641,19 +23611,12 @@ class GAMEAPI(resource.Resource):
             LIST_MAX = 47 # 47 makes the display look nicer with current UI pagination
             LIST_NEAR_ME = 2
 
-            if session.player.leaderboard_impl() == 'scores2':
-                # note: region would need to be specified separately by the client to distinguish region vs continent-scope region_specific stat counters
-                addr = session.player.scores2_query_addr(field_name, period) # region = session.player.home_region
-            else:
-                addr = parse_score_field_for_sql(score_field_name(session.player, field_name, period))
-
+            # note: region would need to be specified separately by the client to distinguish region vs continent-scope region_specific stat counters
+            addr = session.player.scores2_query_addr(field_name, period) # region = session.player.home_region
 
             if success:
                 # get top 50 alliances
-                if session.player.leaderboard_impl() == 'scores2':
-                    result = gamesite.mongo_scores2_client.alliance_scores2_get_leaders([addr], LIST_MAX, reason = 'QUERY_ALLIANCE_SCORE_LEADERS')[0]
-                else:
-                    result = gamesite.sql_client.get_alliance_score_leaders(addr, LIST_MAX, 0, reason = 'QUERY_ALLIANCE_SCORE_LEADERS')
+                result = gamesite.mongo_scores2_client.alliance_scores2_get_leaders([addr], LIST_MAX, reason = 'QUERY_ALLIANCE_SCORE_LEADERS')[0]
                 if not result:
                     success = False
 
@@ -23661,17 +23624,11 @@ class GAMEAPI(resource.Resource):
                 # now query standings near your own alliance, if you're not in the top 50
                 alliance_id = gamesite.sql_client.get_users_alliance(session.user.user_id, reason = 'QUERY_ALLIANCE_SCORE_LEADERS')
                 if alliance_id > 0:
-                    if session.player.leaderboard_impl() == 'scores2':
-                        myscore = gamesite.mongo_scores2_client.alliance_scores2_get([alliance_id], [addr], rank = True, reason = 'QUERY_ALLIANCE_SCORE_LEADERS')[0][0]
-                    else:
-                        myscore = gamesite.sql_client.get_alliance_score(alliance_id, addr, rank = True, reason = 'QUERY_ALLIANCE_SCORE_LEADERS')
+                    myscore = gamesite.mongo_scores2_client.alliance_scores2_get([alliance_id], [addr], rank = True, reason = 'QUERY_ALLIANCE_SCORE_LEADERS')[0][0]
 
                     if myscore:
                         if myscore.get('rank',-1) > (LIST_MAX-1):
-                            if session.player.leaderboard_impl() == 'scores2':
-                                result += gamesite.mongo_scores2_client.alliance_scores2_get_leaders([addr], LIST_NEAR_ME*2+1, max(LIST_MAX, myscore['rank']-LIST_NEAR_ME), reason = 'QUERY_ALLIANCE_SCORE_LEADERS')[0]
-                            else:
-                                result += gamesite.sql_client.get_alliance_score_leaders(addr, LIST_NEAR_ME*2+1, max(LIST_MAX, myscore['rank']-LIST_NEAR_ME), reason = 'QUERY_ALLIANCE_SCORE_LEADERS')
+                            result += gamesite.mongo_scores2_client.alliance_scores2_get_leaders([addr], LIST_NEAR_ME*2+1, max(LIST_MAX, myscore['rank']-LIST_NEAR_ME), reason = 'QUERY_ALLIANCE_SCORE_LEADERS')[0]
 
             retmsg.append(["QUERY_ALLIANCE_SCORE_LEADERS_RESULT", field_name, period, result, tag])
 
@@ -23711,16 +23668,10 @@ class GAMEAPI(resource.Resource):
                 result = gamesite.sql_client.get_alliance_members(alliance_id, reason = 'QUERY_ALLIANCE_MEBERS')
 
                 if result and len(result) > 0 and score_fields_periods:
-                    if session.player.leaderboard_impl() == 'scores2':
-                        score_result = gamesite.mongo_scores2_client.player_scores2_get([r['user_id'] for r in result],
-                                                                                        [session.player.scores2_query_addr(field_name, period) \
-                                                                                         for field_name, period in score_fields_periods],
-                                                                                        reason = 'QUERY_ALLIANCE_MEMBERS(score)')
-                    else:
-                        score_result = gamesite.sql_client.get_player_scores([r['user_id'] for r in result],
-                                                                             [parse_score_field_for_sql(score_field_name(session.player, field_name, period)) \
-                                                                              for field_name, period in score_fields_periods],
-                                                                             reason = 'QUERY_ALLIANCE_MEMBERS(score)')
+                    score_result = gamesite.mongo_scores2_client.player_scores2_get([r['user_id'] for r in result],
+                                                                                    [session.player.scores2_query_addr(field_name, period) \
+                                                                                     for field_name, period in score_fields_periods],
+                                                                                    reason = 'QUERY_ALLIANCE_MEMBERS(score)')
                 else:
                     score_result = None
 
@@ -24094,96 +24045,91 @@ class GAMEAPI(resource.Resource):
             get_rank = bool(arg[4])
             offline_msg = None
 
-            if session.player.leaderboard_impl() == 'scores2':
-                query_addrs = [session.player.scores2_query_addr(entry[0], entry[1], time_loc = entry[2] if len(entry) >= 3 else None, region = session.player.home_region) \
-                               for entry in field_period_list]
+            query_addrs = [session.player.scores2_query_addr(entry[0], entry[1], time_loc = entry[2] if len(entry) >= 3 else None, region = session.player.home_region) \
+                           for entry in field_period_list]
 
-                result = []
+            result = []
+            for u in xrange(len(user_ids)):
+                result.append([None,]*len(query_addrs))
+
+            # split query into "hot" MongoDB and "cold" SQL parts
+            # the "hot" stats are updated basically in realtime via MongoDB
+            # "cold" stats are updated offline by scores2_to_sql.py (and may be in a maintenance window!)
+            # so, any query that affects competition/game rules should use the "hot" stats!
+            mongo_query_i_addrs = []
+            sql_query_i_addrs = []
+
+            def is_hot_point(point, cur_week, cur_season):
+                # note: time_scope "ALL" queries can go to cold SQL, even though they are otherwise "hot",
+                # if we need to cut down on synchronous MongoDB queries.
+                time_all_is_hot = gamedata.get('scores2_time_all_is_hot', True)
+                return (point[1]['time'][0] == Scores2.FREQ_WEEK and point[1]['time'][1] >= cur_week) or \
+                       (point[1]['time'][0] == Scores2.FREQ_SEASON and point[1]['time'][1] >= cur_season) or \
+                       (point[1]['time'][0] == Scores2.FREQ_ALL and time_all_is_hot)
+
+            for i in xrange(len(query_addrs)):
+                point = query_addrs[i]
+                if is_hot_point(point,
+                                SpinConfig.get_pvp_week(gamedata['matchmaking']['week_origin'], server_time), # note: use server_time, not player's override, since this is for talking to the database
+                                SpinConfig.get_pvp_season(gamedata['matchmaking']['season_starts'], server_time)):
+                    mongo_query_i_addrs.append((i, point))
+                else:
+                    sql_query_i_addrs.append((i, point))
+
+            if mongo_query_i_addrs: # do hot query
+                mongo_result = gamesite.mongo_scores2_client.player_scores2_get(user_ids, [x[1] for x in mongo_query_i_addrs], rank = get_rank, reason='QUERY_PLAYER_SCORES')
                 for u in xrange(len(user_ids)):
-                    result.append([None,]*len(query_addrs))
+                    for j in xrange(len(mongo_query_i_addrs)):
+                        result[u][mongo_query_i_addrs[j][0]] = mongo_result[u][j]
 
-                # split query into "hot" MongoDB and "cold" SQL parts
-                # the "hot" stats are updated basically in realtime via MongoDB
-                # "cold" stats are updated offline by scores2_to_sql.py (and may be in a maintenance window!)
-                # so, any query that affects competition/game rules should use the "hot" stats!
-                mongo_query_i_addrs = []
-                sql_query_i_addrs = []
+            if sql_query_i_addrs and gamesite.sql_scores2_client: # do cold query
+                # this technique to launch a chain of sequential SQL queries is based on the test code in Scores2.py
+                batch = gamesite.sql_scores2_client.player_scores2_get_async(user_ids, [x[1] for x in sql_query_i_addrs], rank = get_rank, reason='QUERY_PLAYER_SCORES')
+                bdict = batch.get_qs_dict()
+                rdict = {}
+                tag_list = sorted(bdict.keys())
 
-                def is_hot_point(point, cur_week, cur_season):
-                    # note: time_scope "ALL" queries can go to cold SQL, even though they are otherwise "hot",
-                    # if we need to cut down on synchronous MongoDB queries.
-                    time_all_is_hot = gamedata.get('scores2_time_all_is_hot', True)
-                    return (point[1]['time'][0] == Scores2.FREQ_WEEK and point[1]['time'][1] >= cur_week) or \
-                           (point[1]['time'][0] == Scores2.FREQ_SEASON and point[1]['time'][1] >= cur_season) or \
-                           (point[1]['time'][0] == Scores2.FREQ_ALL and time_all_is_hot)
+                # launch next query in chain
+                def next_query(request, session, retmsg, retmsg_tag, result, user_ids, sql_query_i_addrs, batch, bdict, rdict, tag_list, i, last_result):
+                    if i > 0: # remember result from previous successful query
+                        rdict[tag_list[i-1]] = last_result
 
-                for i in xrange(len(query_addrs)):
-                    point = query_addrs[i]
-                    if is_hot_point(point,
-                                    SpinConfig.get_pvp_week(gamedata['matchmaking']['week_origin'], server_time), # note: use server_time, not player's override, since this is for talking to the database
-                                    SpinConfig.get_pvp_season(gamedata['matchmaking']['season_starts'], server_time)):
-                        mongo_query_i_addrs.append((i, point))
-                    else:
-                        sql_query_i_addrs.append((i, point))
+                    if i >= len(tag_list): # last query - done!
+                        sql_result = gamesite.sql_scores2_client.player_scores2_get_async_complete(batch, rdict)
+                        # combine with mongo_result above
+                        for u in xrange(len(user_ids)):
+                            for j in xrange(len(sql_query_i_addrs)):
+                                result[u][sql_query_i_addrs[j][0]] = sql_result[u][j]
+                        # complete async request
+                        retmsg.append(["QUERY_PLAYER_SCORES_RESULT", user_ids, result, retmsg_tag, None])
+                        gamesite.gameapi.complete_deferred_request(request, session, retmsg)
+                        return
 
-                if mongo_query_i_addrs: # do hot query
-                    mongo_result = gamesite.mongo_scores2_client.player_scores2_get(user_ids, [x[1] for x in mongo_query_i_addrs], rank = get_rank, reason='QUERY_PLAYER_SCORES')
-                    for u in xrange(len(user_ids)):
-                        for j in xrange(len(mongo_query_i_addrs)):
-                            result[u][mongo_query_i_addrs[j][0]] = mongo_result[u][j]
+                    def on_error(request, session, retmsg, retmsg_tag, result, user_ids, failure):
+                        # complete async request, returning the incomplete results
+                        #retmsg.append(["ERROR", "SCORES_OFFLINE"])
+                        retmsg.append(["QUERY_PLAYER_SCORES_RESULT", user_ids, result, retmsg_tag, 'SCORES_OFFLINE'])
+                        gamesite.gameapi.complete_deferred_request(request, session, retmsg)
+                        return
 
-                if sql_query_i_addrs and gamesite.sql_scores2_client and gamedata['server'].get('enable_scores2_read_sql', False): # do cold query
-                    # this technique to launch a chain of sequential SQL queries is based on the test code in Scores2.py
-                    batch = gamesite.sql_scores2_client.player_scores2_get_async(user_ids, [x[1] for x in sql_query_i_addrs], rank = get_rank, reason='QUERY_PLAYER_SCORES')
-                    bdict = batch.get_qs_dict()
-                    rdict = {}
-                    tag_list = sorted(bdict.keys())
+                    if not gamesite.sql_scores2_client:
+                        on_error(request, session, retmsg, retmsg_tag, result, user_ids, Exception('Scores2 SQL client is down'))
+                        return
 
-                    # launch next query in chain
-                    def next_query(request, session, retmsg, retmsg_tag, result, user_ids, sql_query_i_addrs, batch, bdict, rdict, tag_list, i, last_result):
-                        if i > 0: # remember result from previous successful query
-                            rdict[tag_list[i-1]] = last_result
+                    qs, qs_args = bdict[tag_list[i]]
+                    d = gamesite.sql_scores2_client.sql_client.runQuery(qs, qs_args) # "SELECT pg_sleep(2); "+qs for latency testing
+                    if d is None:
+                        on_error(request, session, retmsg, retmsg_tag, result, user_ids, Exception('Scores2 SQL server is down'))
+                        return
 
-                        if i >= len(tag_list): # last query - done!
-                            sql_result = gamesite.sql_scores2_client.player_scores2_get_async_complete(batch, rdict)
-                            # combine with mongo_result above
-                            for u in xrange(len(user_ids)):
-                                for j in xrange(len(sql_query_i_addrs)):
-                                    result[u][sql_query_i_addrs[j][0]] = sql_result[u][j]
-                            # complete async request
-                            retmsg.append(["QUERY_PLAYER_SCORES_RESULT", user_ids, result, retmsg_tag, None])
-                            gamesite.gameapi.complete_deferred_request(request, session, retmsg)
-                            return
+                    d.addCallbacks(functools.partial(next_query, request, session, retmsg, retmsg_tag, result, user_ids, sql_query_i_addrs, batch, bdict, rdict, tag_list, i+1),
+                                   functools.partial(on_error, request, session, retmsg, retmsg_tag, result, user_ids))
 
-                        def on_error(request, session, retmsg, retmsg_tag, result, user_ids, failure):
-                            # complete async request, returning the incomplete results
-                            #retmsg.append(["ERROR", "SCORES_OFFLINE"])
-                            retmsg.append(["QUERY_PLAYER_SCORES_RESULT", user_ids, result, retmsg_tag, 'SCORES_OFFLINE'])
-                            gamesite.gameapi.complete_deferred_request(request, session, retmsg)
-                            return
+                reactor.callLater(0, functools.partial(next_query, request, session, retmsg, tag, result, user_ids, sql_query_i_addrs, batch, bdict, rdict, tag_list, -1, None))
+                return True # go async
 
-                        if not gamesite.sql_scores2_client:
-                            on_error(request, session, retmsg, retmsg_tag, result, user_ids, Exception('Scores2 SQL client is down'))
-                            return
-
-                        qs, qs_args = bdict[tag_list[i]]
-                        d = gamesite.sql_scores2_client.sql_client.runQuery(qs, qs_args) # "SELECT pg_sleep(2); "+qs for latency testing
-                        if d is None:
-                            on_error(request, session, retmsg, retmsg_tag, result, user_ids, Exception('Scores2 SQL server is down'))
-                            return
-
-                        d.addCallbacks(functools.partial(next_query, request, session, retmsg, retmsg_tag, result, user_ids, sql_query_i_addrs, batch, bdict, rdict, tag_list, i+1),
-                                       functools.partial(on_error, request, session, retmsg, retmsg_tag, result, user_ids))
-
-                    reactor.callLater(0, functools.partial(next_query, request, session, retmsg, tag, result, user_ids, sql_query_i_addrs, batch, bdict, rdict, tag_list, -1, None))
-                    return True # go async
-
-                elif sql_query_i_addrs: # client asked for historical scores, but we cannot provide them
-                    offline_msg = 'SCORES_OFFLINE'
-
-            else:
-                result = gamesite.sql_client.get_player_scores(user_ids, [parse_score_field_for_sql(score_field_name(session.player, field_name, period)) \
-                                                                          for field_name, period in field_period_list], rank = get_rank, reason='QUERY_PLAYER_SCORES')
+            elif sql_query_i_addrs: # client asked for historical scores, but we cannot provide them
+                offline_msg = 'SCORES_OFFLINE'
 
             retmsg.append(["QUERY_PLAYER_SCORES_RESULT", user_ids, result, tag, offline_msg])
 
@@ -24192,12 +24138,8 @@ class GAMEAPI(resource.Resource):
             period = arg[2]
             tag = arg[3]
 
-            if session.player.leaderboard_impl() == 'scores2':
-                result = gamesite.mongo_scores2_client.player_scores2_get_leaders([session.player.scores2_query_addr(field_name, period, region = session.player.home_region)],
-                                                                                  gamedata['matchmaking']['max_leaderboard_entries'], reason = 'QUERY_SCORE_LEADERS')[0]
-            else:
-                result = gamesite.sql_client.get_player_score_leaders(parse_score_field_for_sql(score_field_name(session.player, field_name, period)),
-                                                                      gamedata['matchmaking']['max_leaderboard_entries'], reason = 'QUERY_SCORE_LEADERS')
+            result = gamesite.mongo_scores2_client.player_scores2_get_leaders([session.player.scores2_query_addr(field_name, period, region = session.player.home_region)],
+                                                                              gamedata['matchmaking']['max_leaderboard_entries'], reason = 'QUERY_SCORE_LEADERS')[0]
 
             # decorate result with player cache properties
             if result:
@@ -26159,7 +26101,7 @@ class GameSite(server.Site):
 
     def sql_init(self):
         self.sql_scores2_client = None
-        if gamedata['server'].get('enable_scores2_read_sql', False) and ((game_id+'_scores2') in SpinConfig.config.get('pgsql_servers',{})):
+        if ((game_id+'_scores2') in SpinConfig.config.get('pgsql_servers',{})):
             import AsyncPostgres
             self.sql_scores2_client = Scores2.SQLScores2(AsyncPostgres.AsyncPostgres(SpinConfig.get_pgsql_config(game_id+'_scores2'),
                                                                                      verbosity = 0,
