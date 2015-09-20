@@ -28134,6 +28134,12 @@ function unit_icon_set(dialog, specname, qty, obj, onclick, frame_state_override
     dialog.user_data['spec'] = spec;
     dialog.user_data['obj'] = obj;
     dialog.user_data['frame_state_override'] = frame_state_override || null;
+
+    // persist this, since SPUI's dripper handling checks identity of callback
+    if(!dialog.user_data['my_dripper_cb']) {
+        dialog.user_data['my_dripper_cb'] = (function (_w) { return function(button) { return _w.onclick(_w, button); }; })(dialog.widgets['frame']);
+    }
+
     dialog.widgets['icon'].show = dialog.widgets['slot'].show = dialog.widgets['stack'].show = dialog.widgets['frame'].show = !!spec;
     if(spec) {
         dialog.widgets['icon'].asset = get_leveled_quantity(spec['art_asset'], 1);
@@ -28142,7 +28148,7 @@ function unit_icon_set(dialog, specname, qty, obj, onclick, frame_state_override
         dialog.widgets['frame'].onclick = (onclick ? onclick : null);
         dialog.widgets['frame'].tooltip.str = (tooltip_override ? tooltip_override : (onclick ? spec['ui_name'] + (('ui_tip' in spec) ? '\n'+spec['ui_tip'] : '') : null));
         if(enable_dripper) {
-            dialog.widgets['frame'].dripper_cb = (function (_w) { return function(button) { return _w.onclick(_w, button); }; })(dialog.widgets['frame']);
+            dialog.widgets['frame'].dripper_cb = dialog.user_data['my_dripper_cb'];
             dialog.widgets['frame'].dripper_rate = 4.0;
         } else {
             dialog.widgets['frame'].dripper_cb = null;
