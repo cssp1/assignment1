@@ -556,15 +556,21 @@ def collect_garbage():
     # kill sessions attached to dead servers?
 
 class GameProxyClient(proxy.ProxyClient):
-    pass
+    def handleResponseEnd(self):
+        request = self.father
+        if hasattr(request, '_disconnected') and request._disconnected:
+            # this can happen if the client (player's browser) drops the connection before the game server responds
+            #exception_log.event(proxy_time, 'proxy response from game server was dropped because player disconnected')
+            self.transport.loseConnection()
+            return
+        proxy.ProxyClient.handleResponseEnd(self)
 
 class GameProxyClientFactory(proxy.ProxyClientFactory):
     noisy = False
     protocol = GameProxyClient
     def clientConnectionFailed(self, connector, reason):
-        print 'connection to game server failed! ', reason
+        exception_log.event(proxy_time, 'proxy connection to game server failed: %r' % reason)
         return proxy.ProxyClientFactory.clientConnectionFailed(self, connector, reason)
-
 
 # launch an external process that sends out notifications when payments are disputed
 # "response" = the JSON for the payment graph object
