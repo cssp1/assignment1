@@ -25666,6 +25666,8 @@ class GAMEAPI(resource.Resource):
                 else:
                     self.do_unit_repair_cancel_all(session, retmsg)
                     assert len(session.player.unit_repair_queue) == 0
+                    # order units by repair time, lowest to highest
+                    to_repair.sort(key = lambda obj: obj.time_to_repair(session.player))
                     for obj in to_repair:
                         assert self.do_unit_repair_queue(session, obj.obj_id) is None
 
