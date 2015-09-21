@@ -784,7 +784,7 @@ class GameProxy(proxy.ReverseProxyResource):
 
     def index_visit_kg_verify(self, request, visitor):
         d = defer.Deferred()
-        d.addBoth(self.complete_deferred_request, request)
+        d.addBoth(SpinHTTP.complete_deferred_request, request)
         vc = self.KGVerifyCheck(self, request, visitor, d)
         kg_async_http.queue_request(proxy_time,
                                     'https://www.kongregate.com/api/authenticate.json?'+urllib.urlencode({'user_id':visitor.kongregate_id,
@@ -861,7 +861,7 @@ class GameProxy(proxy.ReverseProxyResource):
 
     def index_visit_ag_verify(self, request, visitor):
         d = defer.Deferred()
-        d.addBoth(self.complete_deferred_request, request)
+        d.addBoth(SpinHTTP.complete_deferred_request, request)
         vc = self.AGVerifyCheck(self, request, visitor, d)
         ag_async_http.queue_request(proxy_time,
                                     'https://services.armorgames.com/services/rest/v1/authenticate/user.json?' + \
@@ -1023,16 +1023,6 @@ class GameProxy(proxy.ReverseProxyResource):
         # fall back to auth request
         return self.index_visit_do_fb_auth(request, visitor)
 
-    # this is the final Deferred callback that finishes asynchronous HTTP request handling
-    # note that "body" is inserted by Twisted as the return value of the callback chain.
-    def complete_deferred_request(self, body, request):
-        if body == twisted.web.server.NOT_DONE_YET:
-            return body
-        assert type(body) in (str, unicode)
-        if hasattr(request, '_disconnected') and request._disconnected: return
-        request.write(body)
-        request.finish()
-
     #
     # ASYNC CALL TO /oauth/access_token TO GET AN OAUTH TOKEN
     #
@@ -1040,7 +1030,7 @@ class GameProxy(proxy.ReverseProxyResource):
     def index_visit_fetch_oauth_token(self, request, visitor, code):
         # asynchronously call Facebook API to retrieve an oauth_token using the "code" from the auth redirect
         d = defer.Deferred()
-        d.addBoth(self.complete_deferred_request, request)
+        d.addBoth(SpinHTTP.complete_deferred_request, request)
         sc = self.OAuthGetter(self, request, visitor, d)
 
         url = SpinFacebook.versioned_graph_endpoint('oauth', 'oauth')
@@ -1084,7 +1074,7 @@ class GameProxy(proxy.ReverseProxyResource):
     def index_visit_verify_oauth_token(self, request, visitor, token):
         # asynchronously call Facebook API to verify an oauth_token and get its associated facebook_id
         d = defer.Deferred()
-        d.addBoth(self.complete_deferred_request, request)
+        d.addBoth(SpinHTTP.complete_deferred_request, request)
         sc = self.OAuthVerifier(self, request, visitor, token, d)
         url = SpinFacebook.versioned_graph_endpoint('oauth', 'debug_token') + '?' + \
               urllib.urlencode({'input_token':token,
@@ -1140,7 +1130,7 @@ class GameProxy(proxy.ReverseProxyResource):
 
     def index_visit_check_scope(self, request, visitor):
         d = defer.Deferred()
-        d.addBoth(self.complete_deferred_request, request)
+        d.addBoth(SpinHTTP.complete_deferred_request, request)
         sc = self.ScopeCheck(self, request, visitor, d)
         sc.go()
         return twisted.web.server.NOT_DONE_YET
@@ -1522,7 +1512,7 @@ class GameProxy(proxy.ReverseProxyResource):
         if old_session:
             # invalidate the old session on this user, then try again
             d = defer.Deferred()
-            d.addBoth(self.complete_deferred_request, request)
+            d.addBoth(SpinHTTP.complete_deferred_request, request)
             if verbose(): print 'encountered old session on %s for %d, invalidating %s...' % (old_session.gameserver_name, user_id, old_session.session_id)
 
             # prev_session here is just for debugging messages
@@ -1828,7 +1818,7 @@ class GameProxy(proxy.ReverseProxyResource):
                 # it is NOT safe to just drop session immediately, because the server could still be busy doing the logout right now,
                 # and we need to wait until it completes before allowing another login to proceed.
                 d = defer.Deferred()
-                d.addBoth(self.complete_deferred_request, request)
+                d.addBoth(SpinHTTP.complete_deferred_request, request)
                 self.start_async_termination(request, session.session_id, session.user_id,
                                              session.gameserver_name, session.gameserver_ctrl,
                                              lambda success, is_latest: d.callback("true"), reason = 'proxy_logout')
@@ -1873,7 +1863,7 @@ class GameProxy(proxy.ReverseProxyResource):
                 def gather_responses(self, request, namelist, rlist):
                     response = [{'server_name':namelist[i], 'result':rlist[i][1]} if rlist[i][0] else {'server_name':namelist[i], 'error':rlist[i][1]} \
                                 for i in xrange(len(rlist))]
-                    self.complete_deferred_request(SpinJSON.dumps(response, newline=True), request)
+                    SpinHTTP.complete_deferred_request(SpinJSON.dumps(response, newline=True), request)
                 d.addBoth(functools.partial(gather_responses, self, request, namelist))
                 return twisted.web.server.NOT_DONE_YET
 
@@ -2463,7 +2453,7 @@ class PortraitProxy(twisted.web.resource.Resource):
             return 'invalid parameters'
         self.set_cdn_headers(request)
         d = defer.Deferred()
-        d.addBoth(self.complete_deferred_request, request)
+        d.addBoth(SpinHTTP.complete_deferred_request, request)
         fw = self.Forwarded(self, request, d)
         self.async_http.queue_request(proxy_time, source_url, fw.on_response, error_callback = fw.on_error, callback_type = self.async_http.CALLBACK_FULL)
         return twisted.web.server.NOT_DONE_YET
@@ -2484,14 +2474,6 @@ class PortraitProxy(twisted.web.resource.Resource):
             self.d.callback(body)
         def on_error(self, ui_reason = None, body = None, headers = None, status = None):
             self.d.errback(ui_reason)
-
-    def complete_deferred_request(self, body, request):
-        if body == twisted.web.server.NOT_DONE_YET:
-            return body
-        assert type(body) in (str, unicode)
-        if hasattr(request, '_disconnected') and request._disconnected: return
-        request.write(body)
-        request.finish()
 
 class FBPortraitProxy(PortraitProxy):
     def __init__(self):

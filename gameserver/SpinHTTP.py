@@ -17,6 +17,10 @@ def unwrap_string(input):
 def wrap_string(input):
     return base64.b64encode(input.encode('utf-8'))
 
+# below functions are specific to Twisted
+
+from twisted.web.server import NOT_DONE_YET
+
 # set cross-site allow headers on Twisted HTTP requests
 def _set_access_control_headers(request, origin, max_age):
     if origin:
@@ -54,3 +58,13 @@ def set_access_control_headers_for_cdn(request, max_age):
         origin = '*'
     _set_access_control_headers(request, origin, max_age)
 
+# this is the final Deferred callback that finishes asynchronous HTTP request handling
+# note that "body" is inserted by Twisted as the return value of the callback chain BEFORE other args.
+
+def complete_deferred_request(body, request):
+    if body == NOT_DONE_YET:
+        return body
+    assert type(body) in (str, unicode)
+    if hasattr(request, '_disconnected') and request._disconnected: return
+    request.write(body)
+    request.finish()
