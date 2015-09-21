@@ -12684,17 +12684,9 @@ class CONTROLAPI(resource.Resource):
         request.setResponseCode(http.BAD_REQUEST)
         return 'error\n'
 
-    def complete_deferred_request(self, body, request):
-        if not request: return
-        if body == twisted.web.server.NOT_DONE_YET:
-            return body
-        if body is None: body = 'ok\n'
-        if hasattr(request, '_disconnected') and request._disconnected: return
-        request.write(body)
-        request.finish()
-
     def kill_session(self, request, session, body = None):
-        self.gameapi.log_out_async(session, 'forced_relog', lambda : self.complete_deferred_request(body, request))
+        if not body: body = 'ok\n'
+        self.gameapi.log_out_async(session, 'forced_relog', lambda : SpinHTTP.complete_deferred_request(body, request))
         return server.NOT_DONE_YET
 
     # function for receiving cross-server IPC broadcasts
@@ -12809,11 +12801,11 @@ class CONTROLAPI(resource.Resource):
                     assert isinstance(val.async, defer.Deferred) # sanity check
                     ret = server.NOT_DONE_YET
 
-                    def after_async(self, request, session, async_result):
+                    def after_async(async_result, request, session):
                         # note: only handles one asynchronous step; if more are needed, this would have to recurse
                         session.flush_deferred_messages()
-                        self.complete_deferred_request(async_result.as_body(), request)
-                    val.async.addBoth(functools.partial(after_async, self, request, session))
+                        SpinHTTP.complete_deferred_request(async_result.as_body(), request)
+                    val.async.addBoth(after_async, request, session)
 
                 else:
                     if val.kill_session:
@@ -12834,9 +12826,9 @@ class CONTROLAPI(resource.Resource):
                         gamesite.lock_client.player_lock_release(uid, -1, Player.LockState.being_attacked, expected_owner_id = -1)
                         return val
                     d.addBoth(unlock, user_id)
-                    def complete(val, request, self):
-                        self.complete_deferred_request(val.as_body(), request)
-                    d.addBoth(complete, request, self)
+                    def complete(val, request):
+                        SpinHTTP.complete_deferred_request(val.as_body(), request)
+                    d.addBoth(complete, request)
 
                     self.AsyncSupport(user_id, method_name, handler, d).start()
                     ret = server.NOT_DONE_YET
@@ -12928,7 +12920,7 @@ class CONTROLAPI(resource.Resource):
         reload(globals()[module])
         gamesite.exception_log.event(server_time, 'reloaded module %s!' % module)
     def handle_setup_ai_base(self, request, idnum = None):
-        setup_ai_base(str(idnum), lambda: self.complete_deferred_request(SpinJSON.dumps({'result':'ok'}), request))
+        setup_ai_base(str(idnum), lambda: SpinHTTP.complete_deferred_request(SpinJSON.dumps({'result':'ok'}), request))
         return server.NOT_DONE_YET
     def handle_server_eval(self, request, expr = None):
         result = eval(expr)
