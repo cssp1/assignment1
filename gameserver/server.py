@@ -21228,18 +21228,17 @@ class GAMEAPI(resource.Resource):
         # CLIENT_HELLO message is handled as a special case, because it does not have a session yet
         if arg[0][0] == "CLIENT_HELLO":
 
-            session, go_async = self.handle_client_hello(http_request, client_ip, user_agent, arg[0], retmsg)
+            go_async = self.handle_client_hello(http_request, client_ip, user_agent, arg[0], retmsg)
 
             arg = arg[1:]
 
             if go_async:
-                if session: session.is_async = True
                 # go asynchronous, breaking out of message processing here
                 # eventually the relevant async callback should call complete_deferred_request()
                 return server.NOT_DONE_YET
 
-            if not session:
-                return SpinJSON.dumps({'serial':-1, 'clock': server_time, 'msg': retmsg})
+            # some kind of error happened
+            return SpinJSON.dumps({'serial':-1, 'clock': server_time, 'msg': retmsg})
 
         else:
             if session_id and session_table.has_key(session_id):
@@ -21248,8 +21247,7 @@ class GAMEAPI(resource.Resource):
                     session = None
 
             if not session:
-                retmsg.append(["ERROR", "UNKNOWN_SESSION"])
-                return SpinJSON.dumps({'serial':-1, 'clock': server_time, 'msg': retmsg})
+                return SpinJSON.dumps({'serial':-1, 'clock': server_time, 'msg': [["ERROR", "UNKNOWN_SESSION"]]})
 
             # after this point, session is guaranteed to be valid
 
@@ -21262,17 +21260,15 @@ class GAMEAPI(resource.Resource):
 
             # compare serial number of incoming message vs. the next expected serial number
             if (serial < session.incoming_serial):
-                retmsg.append(["ERROR", "SERVER_PROTOCOL"])
-                return SpinJSON.dumps({'serial':-1, 'clock': server_time, 'msg': retmsg})
+                return SpinJSON.dumps({'serial':-1, 'clock': server_time, 'msg': [["ERROR", "SERVER_PROTOCOL"]]})
 
             if len(session.message_buffer) >= gamedata['server']['session_message_buffer']:
                 # client is too far ahead of us
-                retmsg.append(["ERROR", "TOO_LAGGED"])
                 if not session.lagged_out:
                     session.lagged_out = True
                     metric_event_coded(session.user.user_id, '0955_lagged_out', {'method':str(len(session.message_buffer)),
                                                                                  'country': session.user.country })
-                return SpinJSON.dumps({'serial':-1, 'clock': server_time, 'msg': retmsg})
+                return SpinJSON.dumps({'serial':-1, 'clock': server_time, 'msg': [["ERROR", "TOO_LAGGED"]]})
 
         session.message_buffer.append([serial, arg])
         #if len(session.message_buffer) > 1: print 'client stream is lagging by %d AJAX requests' % len(session.message_buffer)
@@ -21616,17 +21612,18 @@ class GAMEAPI(resource.Resource):
         admin_stats.record_latency('handle_client_hello', end_time - start_time)
         return ret
 
+    # returns whether or not to go async
     def do_handle_client_hello(self, request, client_ip, user_agent, arg, retmsg):
         # check IP bans
         if client_ip and str(client_ip) in gamedata['server']['banned_ips']:
             gamesite.exception_log.event(server_time, 'prevented banned IP %s from logging in' % client_ip)
             retmsg.append(["ACCOUNT_BANNED"])
-            return None, None
+            return False
 
         # check arguments
         if len(arg) != 18:
             retmsg.append(["ERROR", "CANNOT_LOG_IN_VERSION_MISMATCH_GAMECODE"])
-            return None, None
+            return False
 
         query_string = SpinHTTP.unwrap_string(arg[1])
         #not_used = arg[2]
@@ -21652,7 +21649,7 @@ class GAMEAPI(resource.Resource):
                 gamesite.exception_log.event(server_time, 'user %d logged in with invalidated session %s' % \
                                              (client_user_id, client_session_id))
             retmsg.append(["ERROR", "CANNOT_LOG_IN_SIMULTANEOUS"])
-            return None, None
+            return False
 
         # check that proxyserver session signature is valid
         server_session_sig = SpinSignature.sign_session(client_user_id, client_login_country, client_session_id, client_session_time, spin_server_name, client_social_id, client_auth_token, client_session_data, SpinConfig.config['proxy_api_secret'])
@@ -21661,7 +21658,7 @@ class GAMEAPI(resource.Resource):
                                          (client_user_id, client_session_id, client_session_time, spin_server_name, client_session_data, client_session_sig, server_session_sig, repr(client_ip),
                                           user_agent))
             retmsg.append(["ERROR", "CANNOT_LOG_IN_PROXY_SIGNATURE_INVALID"])
-            return None, None
+            return False
 
         # check that proxyserver session signature is recent
         if (server_time >= client_session_time + gamedata['server']['session_signature_time_tolerance']):
@@ -21669,7 +21666,7 @@ class GAMEAPI(resource.Resource):
                 gamesite.exception_log.event(server_time, 'user %d logged in with outdated proxy signature (%d sec old)' % \
                                              (client_user_id, server_time - client_session_time))
             retmsg.append(["ERROR", "CANNOT_LOG_IN_PROXY_SIGNATURE_OUTDATED"])
-            return None, None
+            return False
 
         # we can now trust the client_ params that are in the session signature
         user_id = client_user_id
@@ -21678,7 +21675,7 @@ class GAMEAPI(resource.Resource):
         if io_system.overloaded() and (user_id not in SpinConfig.config.get('developer_user_id_list',[])):
             retmsg.append(["ERROR", "CANNOT_LOG_IN_SERVER_OVERLOAD"])
             gamesite.exception_log.event(server_time, 'I/O overload! denied login to %d' % user_id)
-            return None, None
+            return False
 
         frame_platform = client_social_id[0:2]
         assert frame_platform in ('fb','kg','ag')
@@ -21689,14 +21686,14 @@ class GAMEAPI(resource.Resource):
             gamesite.exception_log.event(server_time, 'user %d logged in with mismatched gamedata build date: client "%s" server "%s"' % \
                                          (user_id, client_gamedata_date, gamedata['gamedata_build_info']['date']))
             retmsg.append(["ERROR", "CANNOT_LOG_IN_VERSION_MISMATCH_GAMEDATA"])
-            return None, None
+            return False
 
         # check compiled client against server version
         if SpinConfig.config.get('use_compiled_client', False) and client_gamecode_build_date != gameclient_build_date:
             gamesite.exception_log.event(server_time, 'user %d logged in with mismatched compiled-client.js build: client "%s" server "%s"' % \
                                          (user_id, client_gamecode_build_date, gameclient_build_date))
             retmsg.append(["ERROR", "CANNOT_LOG_IN_VERSION_MISMATCH_GAMECODE"])
-            return None, None
+            return False
 
         # if there are any pre-existing sessions for this user, wait until they log out completely
         wait_for_session = None
@@ -21719,11 +21716,11 @@ class GAMEAPI(resource.Resource):
                 if gamedata['server']['log_abnormal_logins'] >= 2:
                     gamesite.exception_log.event(server_time, 'stopping login for user %d after %s' % (user_id, wait_reason))
                 retmsg.append(["ERROR", "CANNOT_LOG_IN_SIMULTANEOUS"])
-                return None, None
+                return False
 
             self.log_out_async(wait_for_session, wait_reason,
                                functools.partial(self.handle_client_hello, request, client_ip, user_agent, arg, retmsg))
-            return None, True
+            return True
 
         # ensure that only one login on a user_id runs to successful completion
         self.AsyncLogin.cancel_existing(user_id, client_session_id)
@@ -21734,7 +21731,7 @@ class GAMEAPI(resource.Resource):
         lockret, lockgen = gamesite.lock_client.player_lock_acquire_login(user_id, owner_id = user_id)
         if lockret == -Player.LockState.being_attacked or lockret == -Player.LockState.logged_in or lockret < 0:
             retmsg.append(["ERROR", "CANNOT_LOG_IN_WHILE_UNDER_ATTACK"])
-            return None, None
+            return False
 
         # open a new session, using the ID passed in by the client
         aslogin = self.AsyncLogin(self, request, retmsg, client_session_id, frame_platform, client_social_id, client_auth_token,
@@ -21749,7 +21746,7 @@ class GAMEAPI(resource.Resource):
         if gamesite.nosql_client and gamedata['server'].get('update_server_status_on_login', True):
             gamesite.nosql_client.server_status_update(spin_server_name, {'active_sessions':admin_stats.get_active_sessions()}, reason='login')
 
-        return None, True
+        return True
 
     def complete_client_hello(self, request, retmsg, user_id, *args):
         session = None
