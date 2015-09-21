@@ -1094,9 +1094,10 @@ class NoSQLClient (object):
             for candidate_id in self._player_cache_query_randomized(cache_qs, maxret = -1, randomize_quality = randomize_quality,
                                                                     force_player_level_index = references_player_level):
                 # check if candidate's score is within the specified range
-                if s2._scores2_table('player', score_stat, score_axes).find_one({'key': s2._scores2_key(score_stat, score_axes),
-                                                                                 'val': score_range_qs,
-                                                                                 'user_id': candidate_id},{'_id':0}) is None:
+                if score_stat and \
+                   (s2._scores2_table('player', score_stat, score_axes).find_one({'key': s2._scores2_key(score_stat, score_axes),
+                                                                                  'val': score_range_qs,
+                                                                                  'user_id': candidate_id},{'_id':0}) is None):
                     continue
                 ret.append(candidate_id)
                 if len(ret) >= maxret: break
