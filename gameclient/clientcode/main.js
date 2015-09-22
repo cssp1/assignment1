@@ -17332,6 +17332,12 @@ function update_tutorial_arrow_for_button(_dialog, _parent_path, _widget_name, _
             if(index >= 0) {
                 found_widget_name = 'button'+index.toString();
             }
+        } else if(widget_name && widget_name.indexOf('BUTTON:') == 0) {
+            var spellname = widget_name.split(':')[1];
+            var index = parent.user_data['buttons'].findIndex(function(but) { return but.spellname === spellname;});
+            if(index >= 0) {
+                found_widget_name = 'button'+index.toString();
+            }
         }
 
 
@@ -19276,6 +19282,7 @@ function add_deploy_squads_button(buttons) {
     var can_view_quarries = pred.is_satisfied(player, null);
     if(can_view_quarries) {
         buttons.push(new ContextMenuButton({ui_name: gamedata['spells']['DEPLOY_SQUADS']['ui_name'],
+                                            asset: 'menu_button_resizable',
                                             onclick: function() {
                                                change_selection_ui(null);
                                                var map = invoke_region_map();
@@ -19347,7 +19354,7 @@ function invoke_building_context_menu(mouse_xy) {
         }
 
         if(session.home_base && obj.spec['name'] == gamedata['squad_building'] && !obj.is_under_construction()) {
-            upgrade_is_active = false; // XXX may want to check for fullness!
+            if(obj.spec['name'] !== gamedata['townhall']) { upgrade_is_active = false; }
             if(0 && player.squad_bay_is_busy()) {
                 buttons.push(new ContextMenuButton({ui_name: gamedata['spells']['MANAGE_SQUADS']['ui_name'], state: 'disabled', ui_tooltip: gamedata['spells']['MANAGE_SQUADS']['ui_name_busy']}));
             } else if(player.squads_enabled()) {
@@ -19628,6 +19635,7 @@ function invoke_building_context_menu(mouse_xy) {
                 } else {
                     buttons.push(new ContextMenuButton({ui_name: spell['ui_name'+ (obj.level < obj.get_max_ui_level() ? (obj.is_emplacement() ? '_emplacement' : '') : '_maxlevel')],
                                                         onclick: (function (_obj) { return function() { invoke_upgrade_building_dialog(_obj); }; })(obj),
+                                                        spellname: 'INVOKE_UPGRADE_DIALOG',
                                                         asset: ((obj.level < obj.get_max_ui_level() && upgrade_is_active) ? 'action_button_resizable' : 'menu_button_resizable')}));
                 }
             }
@@ -19748,7 +19756,8 @@ function invoke_building_context_menu(mouse_xy) {
              text_color: (SPUI.Color|null|undefined),
              tooltip_text_color: (SPUI.Color|null|undefined),
              ui_tooltip: (string|null|undefined),
-             asset: (string|null|undefined)}} props
+             asset: (string|null|undefined),
+             spellname: (string|null|undefined)}} props - spellname is only for tutorial arrow identification
 */
 function ContextMenuButton(props) {
     this.ui_name = props.ui_name;
@@ -19758,6 +19767,7 @@ function ContextMenuButton(props) {
     this.tooltip_text_color = props.tooltip_text_color || null;
     this.ui_tooltip = props.ui_tooltip || null;
     this.asset = props.asset || null;
+    this.spellname = props.spellname || null;
 
     // sanity-check parameters
     if(this.asset && !goog.array.contains(['menu_button_resizable','action_button_resizable',null], this.asset)) {
@@ -19781,6 +19791,7 @@ function invoke_generic_context_menu(xy, buttons, dialog_name, special_buttons) 
 
     var dialog = new SPUI.Dialog(gamedata['dialogs'][dialog_name]);
     dialog.user_data['dialog'] = 'context_menu';
+    dialog.user_data['buttons'] = buttons;
     install_child_dialog(dialog);
 
     // construct button widgets dynamically
