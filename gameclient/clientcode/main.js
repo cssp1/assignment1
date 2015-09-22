@@ -5911,6 +5911,7 @@ function tutorial_opt_in(quest) {
 
 player.claim_achievements = function () {
     if(player.achievements === null) { return; } // not initialized yet
+    if(!session.home_base) { return; } // only try to claim achievements at home base
     for(var name in gamedata['achievements']) {
         if(name in player.achievements) { continue; }
         var spec = gamedata['achievements'][name];
