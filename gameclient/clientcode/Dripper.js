@@ -45,6 +45,13 @@ Dripper.Dripper.prototype.reset = function(cb, rate, origin_time) {
     this.origin_time = origin_time;
 };
 
+/** Just reset the speed-up scaling without changing anything else
+    @param {number} current_time
+*/
+Dripper.Dripper.prototype.reset_speed = function(current_time) {
+    this.origin_time = current_time;
+};
+
 /** @param {boolean=} call_cb whether to call the callback
     @param {?=} param parameter to pass the callback
     @suppress {reportUnknownTypes} - Closure doesn't deal with the callback param being typeless

@@ -29,6 +29,7 @@ SquadManageDialog.invoke_squad_manage = function(squad_id) {
     dialog.user_data['squad_scroll_pos'] = 0;
     dialog.user_data['squad_scroll_goal'] = 0;
     dialog.user_data['squad_scroll_limits'] = [0,0];
+    dialog.user_data['last_unit_specname'] = null; // for dripper speedup/slowdown, keep track of last unit manipulated
 
     install_child_dialog(dialog);
     dialog.auto_center();
@@ -281,6 +282,7 @@ SquadManageDialog.update_squad_manage = function(dialog) {
                                                vec_mul([grid_x,grid_y], dialog.data['widgets']['reserve_unit']['array_offset']));
 
             var onclick = (function (_pred_ok, _pred_help, _squad_id, _specname, _cur_squad_space, _max_squad_space) { return function(w, button) {
+                    var dialog = w.parent;
                     if(!_pred_ok) {
                         if(_pred_help) {
                             _pred_help();
@@ -328,6 +330,15 @@ SquadManageDialog.update_squad_manage = function(dialog) {
                         return true; // stop dripper
                     }
                     if(obj) {
+                        // slow dripper if we're switching to a new unit type
+                        if(dialog.user_data['last_unit_specname'] && dialog.user_data['last_unit_specname'] !== obj['spec']) {
+                            var dripper = w.get_dripper();
+                            if(dripper) {
+                                dripper.reset_speed(client_time);
+                            }
+                        }
+                        dialog.user_data['last_unit_specname'] = obj['spec'];
+
                         send_to_server.func(["CAST_SPELL", GameObject.VIRTUAL_ID, "SQUAD_ASSIGN_UNIT", _squad_id, obj['obj_id']]);
                         unit_repair_sync_marker = synchronizer.request_sync();
 
@@ -370,6 +381,8 @@ SquadManageDialog.update_squad_manage = function(dialog) {
                                                vec_mul([grid_x,grid_y], dialog.data['widgets']['squad_unit']['array_offset']));
 
             var onclick = (function (_pred_ok, _pred_help, _squad_id, _obj) { return function(w, button) {
+                var dialog = w.parent;
+
                 if(!_pred_ok) {
                     if(_pred_help) { _pred_help(); }
                     return true; // stop dripper
@@ -413,6 +426,14 @@ SquadManageDialog.update_squad_manage = function(dialog) {
                 }
 
                 if(to_unassign) {
+                    // slow dripper if we're switching to a new unit type
+                    if(dialog.user_data['last_unit_specname'] && dialog.user_data['last_unit_specname'] !== to_unassign['spec']) {
+                        var dripper = w.get_dripper();
+                        if(dripper) {
+                            dripper.reset_speed(client_time);
+                        }
+                    }
+                    dialog.user_data['last_unit_specname'] = to_unassign['spec'];
                     send_to_server.func(["CAST_SPELL", GameObject.VIRTUAL_ID, "SQUAD_UNASSIGN_UNIT", _squad_id, to_unassign['obj_id']]);
 
                     if(gamedata['client']['predict_squad_assign']) { // client-side predict

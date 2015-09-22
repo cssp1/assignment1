@@ -69,6 +69,7 @@ import SpinNoSQLLog
 import Scores2
 import CustomerSupport
 import ActivityClassifier
+import IdleCheck
 import ChatChannels
 import ChatFilter
 import ResLoot
@@ -2341,6 +2342,7 @@ class PlayerTable:
               ('history', None, None),
               ('cooldowns', None, None),
               ('scores2', lambda s: s.serialize(), lambda player, observer, data: Scores2.CurScores(data)),
+              ('idle_check', lambda s: s.serialize(), lambda player, observer, data: IdleCheck.IdleCheck(gamedata['server']['idle_check'], data)),
               ('creation_time', None, None),
               ('lottery_slate', None, None),
               ('ladder_match', None, None),
@@ -2997,9 +2999,6 @@ class Session(object):
         # for ADMIN purposes only, keep track of the last messages sent
         self.last_action = collections.deque([], gamedata['server']['ADMIN']['last_action_buf'])
 
-        # time at which manual client idle check was started
-        self.idle_check_time = -1
-
         # list of incoming bundles of game messages ([serial, messsages])
         # being held because earlier messages haven't been received yet
         self.message_buffer = []
@@ -3157,6 +3156,10 @@ class Session(object):
     def dump_exception_state(self):
         return 'player %d viewing %d at %s, is_async %r complete_attack_in_progress %r visit_base_in_progress %r logout_in_progress %r has_attacked %r viewing_base_lock %r' % \
                (self.player.user_id, self.viewing_player.user_id, self.viewing_base.base_id, self.is_async, bool(self.complete_attack_in_progress), bool(self.visit_base_in_progress), bool(self.logout_in_progress), self.has_attacked, self.viewing_base_lock)
+
+    # return current seconds of cumulative play time
+    def cur_playtime(self):
+        return (server_time - self.login_time) + self.player.history.get('time_in_game',0)
 
     def get_alliance_id(self, reason=''):
         if (not gamesite.sql_client) or \
@@ -4466,7 +4469,7 @@ class Session(object):
 # the session.user/session.player already in memory.
 
 class SessionChange(object):
-    def __init__(self, api, session, request, retmsg, dest_user_id, dest_base_id, dest_feature, is_ai, outcome, old_battle_summary, new_ladder_state, new_deployable_squads, new_defending_squads, delay, pre_attack):
+    def __init__(self, api, session, request, retmsg, dest_user_id, dest_base_id, dest_feature, is_ai, new_ladder_state, new_deployable_squads, new_defending_squads, delay, pre_attack):
         self.api = api
         self.session = session
         self.request = request
@@ -4475,8 +4478,6 @@ class SessionChange(object):
         self.dest_base_id = dest_base_id
         self.dest_feature = dest_feature
         self.is_ai = is_ai
-        self.outcome = outcome
-        self.old_battle_summary = old_battle_summary
         self.new_ladder_state = new_ladder_state
         self.new_deployable_squads = new_deployable_squads
         self.new_defending_squads = new_defending_squads
@@ -4560,7 +4561,7 @@ class SessionChangeOld(SessionChange): # legacy path
                 self.dest_player.country_tier = SpinConfig.country_tier_map.get(self.dest_user.country, 4)
                 self.dest_player.developer = self.dest_user.developer
             self.dest_player.migrate_proxy()
-        if not self.api.change_session_complete(self.request, self.session, self.retmsg, self.dest_user_id, self.dest_user, self.dest_player, None, None, None, self.outcome, self.old_battle_summary, self.new_ladder_state, self.new_deployable_squads, self.new_defending_squads, pre_attack = self.pre_attack):
+        if not self.api.change_session_complete(self.request, self.session, self.retmsg, self.dest_user_id, self.dest_user, self.dest_player, None, None, None, self.new_ladder_state, self.new_deployable_squads, self.new_defending_squads, pre_attack = self.pre_attack):
             self.api.complete_deferred_request(self.request, self.session, self.retmsg)
 
 class SessionChangeNew(SessionChange): # new basedb path
@@ -4665,7 +4666,7 @@ class SessionChangeNew(SessionChange): # new basedb path
         if (not self.got_base) or (not self.got_player) or (not self.got_user): return
 
         # note: this actually calls back into the "old" player.my_home path!
-        if not self.api.change_session_complete(self.request, self.session, self.retmsg, self.dest_user_id, self.dest_user, self.dest_player, None, None, None, self.outcome, self.old_battle_summary, self.new_ladder_state, self.new_deployable_squads, self.new_defending_squads):
+        if not self.api.change_session_complete(self.request, self.session, self.retmsg, self.dest_user_id, self.dest_user, self.dest_player, None, None, None, self.new_ladder_state, self.new_deployable_squads, self.new_defending_squads):
             self.api.complete_deferred_request(self.request, self.session, self.retmsg)
 
     def try_finish_remote(self):
@@ -4685,7 +4686,7 @@ class SessionChangeNew(SessionChange): # new basedb path
         if self.dest_base_pre and self.dest_player:
             # complete parsing of the base using the landlord Player
             self.dest_base = base_table.parse(self.session.player.home_region, self.dest_base_id, self.dest_base_pre, self.dest_player, self.session.player, reason='visit')
-        if not self.api.change_session_complete(self.request, self.session, self.retmsg, self.dest_user_id, self.dest_user, self.dest_player, self.dest_base_id, self.dest_feature, self.dest_base, self.outcome, self.old_battle_summary, self.new_ladder_state, self.new_deployable_squads, self.new_defending_squads, pre_attack = self.pre_attack):
+        if not self.api.change_session_complete(self.request, self.session, self.retmsg, self.dest_user_id, self.dest_user, self.dest_player, self.dest_base_id, self.dest_feature, self.dest_base, self.new_ladder_state, self.new_deployable_squads, self.new_defending_squads, pre_attack = self.pre_attack):
             self.api.complete_deferred_request(self.request, self.session, self.retmsg)
 
 # A collection of game objects indexed by ID
@@ -6532,7 +6533,11 @@ class Base(object):
         self.base_last_landlord_id = self.base_landlord_id
         self.base_last_conquer_time = server_time
 
-        self.base_landlord_id = gamedata['territory']['default_quarry_landlord_id']
+        if self.base_template in gamedata['quarries']['templates']:
+            self.base_landlord_id = gamedata['quarries']['templates'][self.base_template]['default_landlord_id']
+        else:
+            self.base_landlord_id = gamedata['territory']['default_quarry_landlord_id']
+
         to_remove = []
         for obj in self.iter_objects():
             if obj.is_mobile():
@@ -6567,8 +6572,7 @@ class Base(object):
                   'base_landlord_id': self.base_landlord_id }
         assert self.base_type
         props['base_type'] = self.base_type
-        assert self.base_map_loc
-        props['base_map_loc'] = self.base_map_loc
+        if self.base_map_loc is not None: props['base_map_loc'] = self.base_map_loc
         if self.base_climate is not None: props['base_climate'] = self.base_climate
         if self.base_ncells is not None: props['base_ncells'] = self.base_ncells
         if self.base_ui_name is not None: props['base_ui_name'] = self.base_ui_name
@@ -7048,6 +7052,8 @@ class Player(AbstractPlayer):
 
         # time player last deployed units in an attack - used for throttling max attack rate
         self.attack_cooldown_start = -1
+
+        self.idle_check = IdleCheck.IdleCheck(gamedata['server']['idle_check'], None)
 
         # available items in the lottery slate
         # dictionary {"slot0": {"spec":"foo"}, "slot1": ... }
@@ -8661,19 +8667,7 @@ class Player(AbstractPlayer):
     def ladder_points(self): return self.get_master_score('trophies_pvp')
     def trophies_pvv(self): return self.get_master_score('trophies_pvv')
     def get_master_score(self, stat):
-        trophy_field = score_field_name(self, stat, gamedata['matchmaking']['ladder_point_frequency'])
-        points = self.history.get(trophy_field,0)
-
-        # check that legacy value matches Scores2 value
-        if gamedata['server'].get('enable_scores2', False):
-            scores2_points = self.scores2.get(stat, self.scores2_ladder_master_point()) or 0
-            if scores2_points != points:
-                if gamedata['server'].get('log_scores2',0) >= 3:
-                    gamesite.exception_log.event(server_time, 'player %d Scores2 %s mismatch legacy %s new %s' % (self.user_id, stat, repr(points), repr(scores2_points)))
-            if gamedata['server'].get('enable_scores2_read', False):
-                return scores2_points
-
-        return points
+        return self.scores2.get(stat, self.scores2_ladder_master_point()) or 0
 
     # return number of non-destroyed buildings that can yield loot to an attacker
     def get_lootable_buildings(self):
@@ -8686,10 +8680,7 @@ class Player(AbstractPlayer):
 
         if trophy_range or (min_trophies is not None):
             # note: SpinNoSQL translates this into a fake join on player score data - it's not really in player cache
-            if self.leaderboard_impl() == 'scores2':
-                trophy_field = ('scores2', ('trophies_pvp', self.scores2_ladder_master_point()))
-            else:
-                trophy_field = ('scores1', score_field_name(self, 'trophies_pvp', gamedata['matchmaking']['ladder_point_frequency']))
+            trophy_field = ('scores2', ('trophies_pvp', self.scores2_ladder_master_point()))
 
             if trophy_range:
                 mycount = self.ladder_points()
@@ -9522,7 +9513,7 @@ class Player(AbstractPlayer):
 
     # increment score counters, where "stats" is like {"xp": 35, "trophies_pvp": -2, ...}
     def modify_scores(self, *args, **kwargs):
-        self.modify_scores1(*args, **kwargs)
+        #self.modify_scores1(*args, **kwargs) # XXXXXX remove when proven safe
         self.modify_scores2(*args, **kwargs)
 
     # old legacy score system
@@ -9582,13 +9573,6 @@ class Player(AbstractPlayer):
 
         # fall back to default assignment
         return Predicates.eval_cond_or_literal(gamedata['continent_assignment'], None, self) # predicates shouldn't need session access here
-
-    # temporary - allow toggling between different leaderboard read methods for debugging
-    def leaderboard_impl(self):
-        if (self.leaderboard_override and self.leaderboard_override.startswith('scores2')) or \
-           gamedata['server'].get('enable_scores2_read',False):
-            return 'scores2'
-        return 'legacy'
 
     # return space scope and location of the widest space the player should see on the leaderboard (continent or ALL)
     def scores2_wide_space(self):
@@ -9703,7 +9687,7 @@ class Player(AbstractPlayer):
 
 
     def publish_scores2(self, alliance_id = None, reason=''):
-        if not gamedata['server'].get('enable_scores2', False) or self.history.get('scores2_migration',0) < SCORES2_MIGRATION_VERSION: return
+        if self.history.get('scores2_migration',0) < SCORES2_MIGRATION_VERSION: return
 
         # force publish of all scores?
         do_all = self.history.get('scores2_publish_refresh',-1) < gamedata['server'].get('scores2_publish_refresh',-1)
@@ -9755,7 +9739,7 @@ class Player(AbstractPlayer):
 
     def update_alliance_score_cache2(self, alliance_id, alliance_info = None, it_a = None, reason=''):
         assert alliance_id > 0
-        if not gamedata['server'].get('enable_scores2', False) or self.history.get('scores2_migration',0) < SCORES2_MIGRATION_VERSION: return
+        if self.history.get('scores2_migration',0) < SCORES2_MIGRATION_VERSION: return
 
         if it_a is None:
             # look for an ongoing stat tournament
@@ -10043,7 +10027,6 @@ class Player(AbstractPlayer):
     # migrate score counters from the old player.history['score_xp_s3'] = 123 counters to the new Scores2 system
     def migrate_scores2(self):
         if self.is_ai(): return
-        if not gamedata['server'].get('enable_scores2', False): return
         if self.history.get('scores2_migration',0) >= SCORES2_MIGRATION_VERSION: return
 
         creation_week = SpinConfig.get_pvp_week(gamedata['matchmaking']['week_origin'], self.creation_time)
@@ -11230,6 +11213,10 @@ class LivePlayer(Player):
     def migrate(self, session, user_id, account_creation_time, is_returning_user):
         # do all proxy steps first
         self.migrate_proxy()
+
+        # update Base Defenders ui_name
+        if '0' in self.squads:
+            self.squads['0']['ui_name'] = gamedata['strings']['squads']['base_defenders']
 
         # ensure that player has all starting tech levels (if gamedata was changed after player was created)
         for key, start_level in gamedata['starting_conditions']['tech'].iteritems():
@@ -12705,17 +12692,9 @@ class CONTROLAPI(resource.Resource):
         request.setResponseCode(http.BAD_REQUEST)
         return 'error\n'
 
-    def complete_deferred_request(self, body, request):
-        if not request: return
-        if body == twisted.web.server.NOT_DONE_YET:
-            return body
-        if body is None: body = 'ok\n'
-        if hasattr(request, '_disconnected') and request._disconnected: return
-        request.write(body)
-        request.finish()
-
     def kill_session(self, request, session, body = None):
-        self.gameapi.log_out_async(session, 'forced_relog', lambda : self.complete_deferred_request(body, request))
+        if not body: body = 'ok\n'
+        self.gameapi.log_out_async(session, 'forced_relog', lambda : SpinHTTP.complete_deferred_request(body, request))
         return server.NOT_DONE_YET
 
     # function for receiving cross-server IPC broadcasts
@@ -12830,11 +12809,11 @@ class CONTROLAPI(resource.Resource):
                     assert isinstance(val.async, defer.Deferred) # sanity check
                     ret = server.NOT_DONE_YET
 
-                    def after_async(self, request, session, async_result):
+                    def after_async(async_result, request, session):
                         # note: only handles one asynchronous step; if more are needed, this would have to recurse
                         session.flush_deferred_messages()
-                        self.complete_deferred_request(async_result.as_body(), request)
-                    val.async.addBoth(functools.partial(after_async, self, request, session))
+                        SpinHTTP.complete_deferred_request(async_result.as_body(), request)
+                    val.async.addBoth(after_async, request, session)
 
                 else:
                     if val.kill_session:
@@ -12855,9 +12834,9 @@ class CONTROLAPI(resource.Resource):
                         gamesite.lock_client.player_lock_release(uid, -1, Player.LockState.being_attacked, expected_owner_id = -1)
                         return val
                     d.addBoth(unlock, user_id)
-                    def complete(val, request, self):
-                        self.complete_deferred_request(val.as_body(), request)
-                    d.addBoth(complete, request, self)
+                    def complete(val, request):
+                        SpinHTTP.complete_deferred_request(val.as_body(), request)
+                    d.addBoth(complete, request)
 
                     self.AsyncSupport(user_id, method_name, handler, d).start()
                     ret = server.NOT_DONE_YET
@@ -12949,7 +12928,7 @@ class CONTROLAPI(resource.Resource):
         reload(globals()[module])
         gamesite.exception_log.event(server_time, 'reloaded module %s!' % module)
     def handle_setup_ai_base(self, request, idnum = None):
-        setup_ai_base(str(idnum), lambda: self.complete_deferred_request(SpinJSON.dumps({'result':'ok'}), request))
+        setup_ai_base(str(idnum), lambda: SpinHTTP.complete_deferred_request(SpinJSON.dumps({'result':'ok'}), request))
         return server.NOT_DONE_YET
     def handle_server_eval(self, request, expr = None):
         result = eval(expr)
@@ -12963,9 +12942,6 @@ class CONTROLAPI(resource.Resource):
         session.player.lockout_until = server_time + lockout_time
         session.player.lockout_message = lockout_message
         return self.kill_session(request, session)
-    def handle_idle_check(self, request, session = None):
-        self.gameapi.send_idle_check(session, session.deferred_messages)
-        session.flush_deferred_messages()
     def handle_push_gamedata(self, request, session = None):
         self.gameapi.push_gamedata(session, session.deferred_messages)
         session.flush_deferred_messages()
@@ -15938,10 +15914,6 @@ class GAMEAPI(resource.Resource):
         session.defender_cc_standing = False
         session.reset_attack_log()
         session.attack_finish_time = -1
-        if summary:
-            old_battle_summary = summary
-        else:
-            old_battle_summary = None # {'loot':session.loot} preserve the loot? not sure if the client needs it when summary is blank?
         session.loot = {}
         session.starting_base_damage = None
         session.res_looter = None
@@ -15960,6 +15932,13 @@ class GAMEAPI(resource.Resource):
             self.do_start_repairs(session, None, session.player.my_home.base_id, repair_units = False)
             session.player.ladder_point_decay_check(session, None) # after attack - player
 
+        if summary:
+            retmsg.append(["BATTLE_ENDED",
+                           outcome,
+                           summary,
+                           session.viewing_base.get_cache_props(), # extra_props = {'deployment_buffer': session.viewing_base.deployment_buffer} ?
+                           session.ladder_state])
+
         end_time = time.time()
         admin_stats.record_latency('complete_attack', end_time - start_time)
 
@@ -15969,11 +15948,11 @@ class GAMEAPI(resource.Resource):
         if io_type is None:
             session.complete_attack_in_progress = False
             session.complete_attack_cbs = None
-            return cb(outcome, old_battle_summary, io_type is None)
+            return cb(io_type is None)
 
         # go async
 
-        def finish(session, io_type, outcome, old_battle_summary):
+        def finish(session, io_type):
             if io_type == 'store_viewing_player':
                 # release squads and home map feature lock
                 session.release_base(extra_base_props = {'protection_end_time': session.viewing_player.resources.protection_end_time})
@@ -15992,9 +15971,9 @@ class GAMEAPI(resource.Resource):
             cb_list = session.complete_attack_cbs
             session.complete_attack_cbs = None
             for cb in cb_list:
-                cb(outcome, old_battle_summary, io_type is None)
+                cb(io_type is None)
 
-        post_result = functools.partial(finish, session, io_type, outcome, old_battle_summary)
+        post_result = functools.partial(finish, session, io_type)
 
         if io_type == 'store_ai_instance':
             ai_instance_table.store_async(session.user.user_id, session.viewing_user.user_id, session.viewing_player, post_result, True, 'complete_attack')
@@ -16173,20 +16152,20 @@ class GAMEAPI(resource.Resource):
                                     client_props = client_props, reason='change_session')
 
     # ready to change sessions, begin the I/O
-    def change_session2(self, request, session, retmsg, dest_user_id, dest_base_id, dest_feature, new_ladder_state, new_deployable_squads, new_defending_squads, delay, pre_attack, outcome, old_battle_summary, is_sync):
+    def change_session2(self, request, session, retmsg, dest_user_id, dest_base_id, dest_feature, new_ladder_state, new_deployable_squads, new_defending_squads, delay, pre_attack, is_sync):
         if dest_user_id:
             ascdebug('change_session2 (old) %d -> %d (sync %d)' % (session.user.user_id, dest_user_id, is_sync))
             if dest_user_id == session.user.user_id:
                 # visiting self - complete synchronously
-                ret = self.change_session_complete(request, session, retmsg, dest_user_id, session.user, session.player, None, None, None, outcome, old_battle_summary, new_ladder_state, new_deployable_squads, new_defending_squads)
+                ret = self.change_session_complete(request, session, retmsg, dest_user_id, session.user, session.player, None, None, None, new_ladder_state, new_deployable_squads, new_defending_squads)
                 if not is_sync:
                     # UGLY - need to know if we are in the initial render() call stack or not
                     self.complete_deferred_request(request, session, retmsg)
                 return ret
-            change = SessionChangeOld(self, session, request, retmsg, dest_user_id, dest_base_id, dest_feature, is_ai_user_id_range(dest_user_id), outcome, old_battle_summary, new_ladder_state, new_deployable_squads, new_defending_squads, delay, pre_attack)
+            change = SessionChangeOld(self, session, request, retmsg, dest_user_id, dest_base_id, dest_feature, is_ai_user_id_range(dest_user_id), new_ladder_state, new_deployable_squads, new_defending_squads, delay, pre_attack)
         else:
             ascdebug('change_session2 (new) %d:%s -> %s' % (session.user.user_id, session.viewing_base.base_id, dest_base_id))
-            change = SessionChangeNew(self, session, request, retmsg, dest_user_id, dest_base_id, dest_feature, is_ai_user_id_range(dest_user_id), outcome, old_battle_summary, new_ladder_state, new_deployable_squads, new_defending_squads, delay, pre_attack)
+            change = SessionChangeNew(self, session, request, retmsg, dest_user_id, dest_base_id, dest_feature, is_ai_user_id_range(dest_user_id), new_ladder_state, new_deployable_squads, new_defending_squads, delay, pre_attack)
 
         change.begin()
         return True
@@ -16203,7 +16182,7 @@ class GAMEAPI(resource.Resource):
 
         return ret
 
-    def _change_session_complete(self, request, session, retmsg, dest_user_id, dest_user, dest_player, dest_base_id, dest_feature, dest_base, outcome, old_battle_summary, new_ladder_state, new_deployable_squads, new_defending_squads, pre_attack = None):
+    def _change_session_complete(self, request, session, retmsg, dest_user_id, dest_user, dest_player, dest_base_id, dest_feature, dest_base, new_ladder_state, new_deployable_squads, new_defending_squads, pre_attack = None):
         if dest_base_id:
             ascdebug('change_session_complete (new) %d:%s -> %s (%d,%d,%d)' % (session.user.user_id, session.viewing_base.base_id, dest_base_id, bool(dest_user), bool(dest_player), bool(dest_base)))
         else:
@@ -16597,11 +16576,13 @@ class GAMEAPI(resource.Resource):
                 gamesite.exception_log.event(server_time, 'base already damaged above win threshold (%f) before ladder attack %s' % \
                                              (base_damage, repr(new_ladder_state)))
 
+        # if we're going to immediately auto-resolve, THROW AWAY session change messages so the client doesn't even seen them
         if pre_attack >= 2:
-            # if we're going to immediately auto-resolve, THROW AWAY session change messages so the client doesn't even seen them
-            retmsg = []
+            change_retmsg = []
+        else:
+            change_retmsg = retmsg
 
-        retmsg.append(["SESSION_CHANGE",
+        change_retmsg.append(["SESSION_CHANGE",
                        session.viewing_user.user_id,
                        session.viewing_user.facebook_id,
                        session.ui_name,
@@ -16610,7 +16591,8 @@ class GAMEAPI(resource.Resource):
                        player_snapshot.serialize(),
                        enemy_snapshot.serialize(enemy = True),
                        -1, # conceal session.viewing_player.expiration_time
-                       old_battle_summary, outcome,
+                       None, # old_battle_summary - obsolete
+                       None, # outcome - obsolete
                        session.pvp_balance,
                        spyee_lock_state,
                        session.viewing_player.isolate_pvp,
@@ -16646,10 +16628,10 @@ class GAMEAPI(resource.Resource):
                        ])
         session.debug_session_change_count += 1
         for astate in aura_states:
-            retmsg.append(["OBJECT_AURAS_UPDATE", astate])
+            change_retmsg.append(["OBJECT_AURAS_UPDATE", astate])
 
         if session.player.prune_inventory(session):
-            session.player.send_inventory_update(retmsg)
+            session.player.send_inventory_update(change_retmsg)
 
         session.player.prune_player_auras(is_session_change = True)
         session.viewing_player.prune_player_auras(is_session_change = True)
@@ -16735,42 +16717,42 @@ class GAMEAPI(resource.Resource):
                 session.player.do_apply_aura(spec['name'], strength = strength, duration = togo, stack = stack, ignore_limit = True)
 
         session.player.recalc_stattab(session.player)
-        session.player.stattab.send_update(session, retmsg)
+        session.player.stattab.send_update(session, change_retmsg)
         if session.viewing_player is not session.player:
             # also iterate through hive/quarry buildings - right now we restrict this to AIs just for safety, but in theory it should work for players too
             session.viewing_player.recalc_stattab(session.player, additional_base = session.viewing_base if ((session.viewing_base is not session.viewing_player.my_home) and session.viewing_player.is_ai()) else None)
-            session.viewing_player.stattab.send_update(session, retmsg)
+            session.viewing_player.stattab.send_update(session, change_retmsg)
 
         power_state = session.viewing_base.get_power_state()
 
         if session.home_base:
-            session.player.unit_repair_send(retmsg)
+            session.player.unit_repair_send(change_retmsg)
         else:
-            retmsg.append(["ENEMY_TECH_UPDATE", session.viewing_player.tech])
-            retmsg.append(["ENEMY_UNIT_EQUIP_UPDATE", session.viewing_player.unit_equipment])
+            change_retmsg.append(["ENEMY_TECH_UPDATE", session.viewing_player.tech])
+            change_retmsg.append(["ENEMY_UNIT_EQUIP_UPDATE", session.viewing_player.unit_equipment])
 
-        retmsg.append(["BASE_POWER_UPDATE", power_state])
-        retmsg.append(["BASE_SIZE_UPDATE", session.viewing_base.base_size])
+        change_retmsg.append(["BASE_POWER_UPDATE", power_state])
+        change_retmsg.append(["BASE_SIZE_UPDATE", session.viewing_base.base_size])
 
         if not session.home_base:
             # dump buffered loot when leaving home base
             # note: this means if you end an attack by visiting somewhere that isn't home base, you'll lose the loot
             session.player.loot_buffer_release('change_session_complete')
 
-        retmsg.append(["LOOT_BUFFER_UPDATE", session.player.loot_buffer, False])
-        retmsg.append(["DONATED_UNITS_UPDATE", session.player.donated_units])
+        change_retmsg.append(["LOOT_BUFFER_UPDATE", session.player.loot_buffer, False])
+        change_retmsg.append(["DONATED_UNITS_UPDATE", session.player.donated_units])
 
         session.res_looter = ResLoot.ResLoot(gamedata, session, session.viewing_player, session.viewing_base)
 
         # tell client about res looter state
-        session.res_looter.send_update(retmsg)
+        session.res_looter.send_update(change_retmsg)
 
         session.visit_base_in_progress = False
 
         # if visiting a quarry that you own, force repairs to start
         if session.viewing_base.base_landlord_id == session.player.user_id and \
            session.viewing_base is not session.player.my_home:
-            self.do_start_repairs(session, retmsg, session.viewing_base.base_id, repair_units = False)
+            self.do_start_repairs(session, change_retmsg, session.viewing_base.base_id, repair_units = False)
 
         else:
             # fire AI base on_visit consequent
@@ -16787,19 +16769,41 @@ class GAMEAPI(resource.Resource):
                     on_visit_consequent = template['on_visit']
 
             if on_visit_consequent:
-                session.execute_consequent_safe(on_visit_consequent, session.player, retmsg, reason='on_visit')
+                session.execute_consequent_safe(on_visit_consequent, session.player, change_retmsg, reason='on_visit')
 
         if pre_attack: # immediately proceed with attack attempt
-            self.do_attack(session, retmsg, [None, []])
-            if pre_attack >= 2:
-                self.auto_resolve(session, retmsg)
+            do_attack_retmsg = [] # collect error messages separately
+            attack_success = self.do_attack(session, do_attack_retmsg, [None, []])
 
-                # this will go async to write the battle result, so we shouldn't call it in-line, since the async return isn't propagated out to the caller
+            if pre_attack >= 2: # pre-auto-resolve
+                if attack_success:
+                    self.auto_resolve(session, change_retmsg) # will be thrown away
+
+                    # the attack completion will go async to write the battle result, so we shouldn't call it in-line, since the async return isn't propagated out to the caller
+
+                    if True: # dangerous - skips session change on client side
+                        def go_home_and_flush_skip(self, session):
+                            session.visit_base_in_progress = True
+                            # divert the messages
+                            unused = []
+                            self.change_session(None, session, unused, dest_user_id = session.player.user_id, force = True)
+                            session.deferred_messages.append(["SESSION_CHANGE_SKIPPED"])
+                            session.flush_deferred_messages()
+                        reactor.callLater(0, functools.partial(self.complete_attack, session, session.deferred_messages, lambda sync: go_home_and_flush_skip(self, session)))
+                        return
+                else:
+                    retmsg += do_attack_retmsg # send error messages to client
+
+                # safer, but sends ineffective session change to client
+                # also necessary in case do_attack() fails
                 def go_home_and_flush(self, session):
                     session.visit_base_in_progress = True
                     self.change_session(None, session, session.deferred_messages, dest_user_id = session.player.user_id, force = True)
                     session.flush_deferred_messages()
+
                 reactor.callLater(0, lambda: go_home_and_flush(self, session))
+            else:
+                retmsg += do_attack_retmsg
 
         else:
             assert not session.pre_locks
@@ -16952,18 +16956,11 @@ class GAMEAPI(resource.Resource):
 
         if gamesite.sql_client and (not manual_fields) and get_trophies:
             # SPECIAL CASE - the client wants the current PvP trophy count as "trophies_pvp" for GUI display of matchmaking info
-            if session.player.leaderboard_impl() == 'scores2':
-                scores = gamesite.mongo_scores2_client.player_scores2_get(user_ids,
-                                                                          [('trophies_pvp', session.player.scores2_ladder_master_point()),
-                                                                           ('trophies_pvv', session.player.scores2_ladder_master_point()),
-                                                                           ],
-                                                                          rank = False, reason = 'do_query_player_cache(%s)' % reason)
-            else:
-                scores = gamesite.sql_client.get_player_scores(user_ids,
-                                                               [parse_score_field_for_sql(score_field_name(session.player, 'trophies_pvp', gamedata['matchmaking']['ladder_point_frequency'])),
-                                                                parse_score_field_for_sql(score_field_name(session.player, 'trophies_pvv', gamedata['matchmaking']['ladder_point_frequency'])),
-                                                                ],
-                                                               rank = False, reason = 'do_query_player_cache(%s)' % reason)
+            scores = gamesite.mongo_scores2_client.player_scores2_get(user_ids,
+                                                                      [('trophies_pvp', session.player.scores2_ladder_master_point()),
+                                                                       ('trophies_pvv', session.player.scores2_ladder_master_point()),
+                                                                       ],
+                                                                      rank = False, reason = 'do_query_player_cache(%s)' % reason)
         else:
             scores = [[None,None]] * len(user_ids) # inner array must be same length as score query!
 
@@ -19532,6 +19529,7 @@ class GAMEAPI(resource.Resource):
         return True
 
     # deploy units against a foreign (human or AI) player
+    # returns true if successful
     def do_attack(self, session, retmsg, spellargs):
         loc = spellargs[0]
         unit_id_list = spellargs[1]
@@ -19541,21 +19539,21 @@ class GAMEAPI(resource.Resource):
             # forcing attack completion and then the client sending
             # DEPLOY_UNITS before it becomes aware the battle is over.
             # Just ignore the invalid request.
-            return
+            return False
 
         if session.home_base:
             retmsg.append(["ERROR", "SERVER_PROTOCOL"])
-            return
+            return False
 
         if session.complete_attack_in_progress or session.visit_base_in_progress or session.logout_in_progress or (not session.has_attacked and (session.viewing_base_lock is not None)):
             retmsg.append(["ERROR", "SERVER_PROTOCOL"])
             gamesite.exception_log.event(server_time, 'do_attack() with invalid session state: %s args [%r,%r]' % (session.dump_exception_state(), loc, unit_id_list))
-            return
+            return False
 
         # if unit_id_list is empty, that means the client wants to start the fight but not deploy any units right away
         if len(unit_id_list) and (not session.viewing_base.is_deployment_location_valid(session.player, loc)):
             retmsg.append(["ERROR", "CANNOT_DEPLOY_INVALID_LOCATION"])
-            return
+            return False
 
         if not session.has_attacked:
             # first deployment - check for permission to attack, and acquire locks
@@ -19571,11 +19569,11 @@ class GAMEAPI(resource.Resource):
 
             if server_time < session.player.get_repeat_attack_cooldown_expire_time(session.viewing_player.user_id, session.viewing_base.base_id):
                 retmsg.append(["ERROR", "CANNOT_ATTACK_REPEAT_ATTACK_COOLDOWN"])
-                return
+                return False
 
             if session.pvp_balance == 'same_alliance':
                     retmsg.append(["ERROR", "CANNOT_ATTACK_SAME_ALLIANCE"])
-                    return
+                    return False
 
             if session.viewing_base is not session.viewing_player.my_home:
                 # quarry reinforcement or attack
@@ -19585,7 +19583,7 @@ class GAMEAPI(resource.Resource):
                    session.viewing_base.base_region and gamedata['regions'][session.viewing_base.base_region].get('limit_quarry_control',True):
                     if session.player.num_quarries_controlled() >= session.player.stattab.quarry_control_limit:
                         retmsg.append(["ERROR", "CANNOT_ATTACK_QUARRY_LIMIT_REACHED"])
-                        return
+                        return False
 
                 if (gamesite.nosql_client and session.player.home_region):
                     # nosql path
@@ -19593,7 +19591,7 @@ class GAMEAPI(resource.Resource):
                 else:
                     if (not session.player.travel_satisfied(session.viewing_base)):
                         retmsg.append(["ERROR", "CANNOT_DEPLOY_TRAVEL_NOT_ARRIVED"])
-                        return
+                        return False
                     else:
                         session.player.travel_deploy_at(session.viewing_base.base_id)
                         retmsg.append(["PLAYER_TRAVEL_UPDATE", session.player.travel_state])
@@ -19602,7 +19600,7 @@ class GAMEAPI(resource.Resource):
                 state = session.acquire_base(errors = lock_errors)
                 if state != Player.LockState.being_attacked:
                     retmsg.append(["ERROR", lock_errors[0], "attack_nonhome"])
-                    return
+                    return False
 
                 if session.viewing_player is not session.player:
                     self.broadcast_map_attack(session.viewing_base.base_region, session.viewing_base.base_id,
@@ -19615,71 +19613,71 @@ class GAMEAPI(resource.Resource):
 
                 if session.pvp_balance == 'player':
                     retmsg.append(["ERROR", "CANNOT_ATTACK_WEAKER_PLAYER"])
-                    return
+                    return False
                 elif session.pvp_balance == 'enemy_strict':
                     retmsg.append(["ERROR", "CANNOT_ATTACK_STRONGER_PLAYER"])
-                    return
+                    return False
 
                 if session.player.isolate_pvp and (not session.viewing_player.isolate_pvp):
                     retmsg.append(["ERROR", "CANNOT_ATTACK_YOU_ARE_ISOLATED"])
-                    return
+                    return False
 
                 if (not session.player.isolate_pvp) and session.viewing_player.isolate_pvp:
                     retmsg.append(["ERROR", "CANNOT_ATTACK_THEY_ARE_ISOLATED"])
-                    return
+                    return False
 
                 if session.viewing_player.resources.protection_end_time > server_time:
                     retmsg.append(["ERROR", "CANNOT_ATTACK_PLAYER_UNDER_PROTECTION"])
-                    return
+                    return False
 
                 # check for PvP ability
                 if (not session.player.is_pvp_player()):
                     retmsg.append(["ERROR", "CANNOT_ATTACK_NOPVP_YOU"])
-                    return
+                    return False
                 elif (not session.viewing_player.is_pvp_player()):
                     retmsg.append(["ERROR", "CANNOT_ATTACK_NOPVP_THEM"])
-                    return
+                    return False
 
                 # check for ladder/nonladder firewall violations
                 if (not session.using_squad_deployment()):
                     if session.player.is_ladder_player():
                         if (not session.viewing_player.is_ladder_player()):
                             retmsg.append(["ERROR", "CANNOT_ATTACK_LADDER_YOU"])
-                            return
+                            return False
                         elif (not session.is_ladder_battle()):
                             retmsg.append(["ERROR", "CANNOT_ATTACK_LADDER_YOU"])
-                            return
+                            return False
                     else:
                         if session.viewing_player.is_ladder_player():
                             retmsg.append(["ERROR", "CANNOT_ATTACK_LADDER_THEM"])
-                            return
+                            return False
 
                 # check for map/legacy firewall violations
                 if (not session.using_squad_deployment()) and (not session.is_ladder_battle()):
                     if (not session.viewing_player.is_legacy_pvp_player()):
                         retmsg.append(["ERROR", "CANNOT_ATTACK_MAP_THEM"])
-                        return
+                        return False
                     elif (not session.player.is_legacy_pvp_player()):
                         retmsg.append(["ERROR", "CANNOT_ATTACK_MAP_YOU"])
-                        return
+                        return False
 
                 if session.player.stattab.sandstorm_max:
                     retmsg.append(["ERROR", "CANNOT_ATTACK_SANDSTORM_MAX"])
-                    return
+                    return False
 
                 if session.player.is_alt_account_unattackable(session.viewing_player) and gamedata['prevent_alt_attacks']:
                     retmsg.append(["ERROR", "CANNOT_ATTACK_ALT_ACCOUNT"])
-                    return
+                    return False
                 else:
                     session.player.alt_record_attack(session.viewing_player)
 
                 state = gamesite.lock_client.player_lock_acquire_attack(session.viewing_user.user_id, session.viewing_player.generation, owner_id=session.player.user_id)
                 if state == -Player.LockState.logged_in:
                     retmsg.append(["ERROR", "CANNOT_ATTACK_PLAYER_WHILE_LOGGED_IN", 1])
-                    return
+                    return False
                 elif state == -Player.LockState.being_attacked or state < 0:
                     retmsg.append(["ERROR", "CANNOT_ATTACK_PLAYER_WHILE_ALREADY_UNDER_ATTACK"])
-                    return
+                    return False
 
                 lock_errors = []
                 state = session.do_acquire_base(session.viewing_player, session.viewing_player.my_home, session.deployable_squads, session.defending_squads, errors = lock_errors)
@@ -19687,7 +19685,7 @@ class GAMEAPI(resource.Resource):
                     gamesite.lock_client.player_lock_release(session.viewing_user.user_id, session.viewing_player.generation, Player.LockState.being_attacked,
                                                            expected_owner_id = session.player.user_id)
                     retmsg.append(["ERROR", lock_errors[0], "attack_home"])
-                    return
+                    return False
 
                 # make sure we *were* in read-only mode before starting the battle
                 assert (not session.viewing_player.has_write_lock)
@@ -20023,37 +20021,11 @@ class GAMEAPI(resource.Resource):
             if props['method'] == 'donated':
                 session.deployed_donated_units[unit.spec.name] = session.deployed_donated_units.get(unit.spec.name,0) + 1
 
+        return True # success!
+
     def push_gamedata(self, session, retmsg):
         data_str = open(SpinConfig.gamedata_filename()).read()
         retmsg.append(["PUSH_GAMEDATA", data_str, session.player.abtests])
-
-    def send_idle_check(self, session, retmsg):
-        session.idle_check_time = server_time
-        # count up time played in last day
-        play_time = server_time - session.login_time
-        sessions = session.player.history.get('sessions', [])
-        for i in xrange(len(sessions)-1, -1, -1):
-            s = sessions[i]
-            if s[0] < 0 or s[1] < 0: continue
-            if s[1] < server_time - 24*60*60: break
-            play_time += s[1]-s[0]
-
-        gamesite.exception_log.event(server_time, 'idle check on player %d: playtime %.2f hrs' % \
-                                     (session.user.user_id, play_time/3600.0))
-        retmsg.append(["IDLE_CHECK", play_time])
-
-    def do_idle_check_response(self, session, retmsg, client_elapsed = None):
-        if session.idle_check_time < 0: return
-        elapsed = server_time - session.idle_check_time
-        if elapsed >= gamedata['server']['idle_check_timeout']:
-            result = 'FAIL'
-        else:
-            result = 'OK'
-            session.player.login_pardoned_until = server_time + gamedata['server']['idle_check_pardon_time']
-
-        gamesite.exception_log.event(server_time, 'idle check on player %d: %s (%d sec)' % \
-                                     (session.user.user_id, result, elapsed))
-        session.idle_check_time = -1
 
     def do_send_gifts(self, session, retmsg, arg):
         if not session.player.get_any_abtest_value('enable_resource_gifts', gamedata.get('enable_resource_gifts',False)):
@@ -21264,18 +21236,19 @@ class GAMEAPI(resource.Resource):
         # CLIENT_HELLO message is handled as a special case, because it does not have a session yet
         if arg[0][0] == "CLIENT_HELLO":
 
-            session, go_async = self.handle_client_hello(http_request, client_ip, user_agent, arg[0], retmsg)
+            # with use_deferred_messages, initialize retmsg here
+
+            go_async = self.handle_client_hello(http_request, client_ip, user_agent, arg[0], retmsg)
 
             arg = arg[1:]
 
             if go_async:
-                if session: session.is_async = True
                 # go asynchronous, breaking out of message processing here
                 # eventually the relevant async callback should call complete_deferred_request()
                 return server.NOT_DONE_YET
 
-            if not session:
-                return SpinJSON.dumps({'serial':-1, 'clock': server_time, 'msg': retmsg})
+            # some kind of error happened
+            return SpinJSON.dumps({'serial':-1, 'clock': server_time, 'msg': retmsg})
 
         else:
             if session_id and session_table.has_key(session_id):
@@ -21284,8 +21257,7 @@ class GAMEAPI(resource.Resource):
                     session = None
 
             if not session:
-                retmsg.append(["ERROR", "UNKNOWN_SESSION"])
-                return SpinJSON.dumps({'serial':-1, 'clock': server_time, 'msg': retmsg})
+                return SpinJSON.dumps({'serial':-1, 'clock': server_time, 'msg': [["ERROR", "UNKNOWN_SESSION"]]})
 
             # after this point, session is guaranteed to be valid
 
@@ -21298,17 +21270,15 @@ class GAMEAPI(resource.Resource):
 
             # compare serial number of incoming message vs. the next expected serial number
             if (serial < session.incoming_serial):
-                retmsg.append(["ERROR", "SERVER_PROTOCOL"])
-                return SpinJSON.dumps({'serial':-1, 'clock': server_time, 'msg': retmsg})
+                return SpinJSON.dumps({'serial':-1, 'clock': server_time, 'msg': [["ERROR", "SERVER_PROTOCOL"]]})
 
             if len(session.message_buffer) >= gamedata['server']['session_message_buffer']:
                 # client is too far ahead of us
-                retmsg.append(["ERROR", "TOO_LAGGED"])
                 if not session.lagged_out:
                     session.lagged_out = True
                     metric_event_coded(session.user.user_id, '0955_lagged_out', {'method':str(len(session.message_buffer)),
                                                                                  'country': session.user.country })
-                return SpinJSON.dumps({'serial':-1, 'clock': server_time, 'msg': retmsg})
+                return SpinJSON.dumps({'serial':-1, 'clock': server_time, 'msg': [["ERROR", "TOO_LAGGED"]]})
 
         session.message_buffer.append([serial, arg])
         #if len(session.message_buffer) > 1: print 'client stream is lagging by %d AJAX requests' % len(session.message_buffer)
@@ -21319,12 +21289,18 @@ class GAMEAPI(resource.Resource):
                 session.longpoll_request = http_request
                 session.longpoll_request_time = -1 # no need to force a keepalive, and reuse this request multiple times
 
-        is_async = self.handle_message_buffer(http_request, session, retmsg)
-        if is_async:
+        if gamedata['server'].get('use_deferred_messages',False):
+            is_async = self.handle_message_buffer(http_request, session, session.deferred_messages)
+            if not is_async:
+                reactor.callLater(0, self.complete_deferred_request, http_request, session, [])
             return server.NOT_DONE_YET
-        if session and (not session.is_async): # could have been set async by a previous request
-            self.run_deferred_actions(session, retmsg)
-        return self.make_response(session, retmsg)
+        else:
+            is_async = self.handle_message_buffer(http_request, session, retmsg)
+            if is_async:
+                return server.NOT_DONE_YET
+            if session and (not session.is_async): # could have been set async by a previous request
+                self.run_deferred_actions(session, retmsg)
+            return self.make_response(session, retmsg)
 
     # process as many bundles of AJAX messages on a session as possible
     # may terminate early if bundles are out of order, or may go asynchronous
@@ -21462,6 +21438,7 @@ class GAMEAPI(resource.Resource):
             retmsg.append(["PLAYER_TITLES_UPDATE", session.player.title])
             retmsg.append(["PLAYER_CACHE_UPDATE", [self.get_player_cache_props(session.user, session.player)]])
 
+    # obsoleted by use_deferred_messages
     def make_response(self, session, retmsg):
         # can happen on async login failure
         if not session:
@@ -21483,27 +21460,55 @@ class GAMEAPI(resource.Resource):
         return r
 
     def complete_deferred_request(self, request, session, retmsg):
-        assert (request is not None) or (session and (retmsg is session.deferred_messages))
+        if not session: # can happen on async login failure
+            assert request
+            # DO pay attention to retmsg here
+            r = SpinJSON.dumps({'serial':-1, 'clock': server_time, 'msg': retmsg})
 
-        # session can be None on an async login failure
-
-        if session:
+        else:
             session.is_async = False
 
-            # process any new pending messages
-            self.handle_message_buffer(request, session, retmsg)
-            if session.is_async: # hmm, if another request set this to async, we might miss the response?
-                return
+            if gamedata['server'].get('use_deferred_messages',False):
+                # note: IGNORE retmsg here - all traffic is on session.deferred_messages
 
-            self.run_deferred_actions(session, retmsg)
+                # process any new pending messages
+                self.handle_message_buffer(request, session, session.deferred_messages)
+                if session.is_async:
+                    return
 
-        # sometimes this is called from a non-request context (e.g. bgtask calling complete_attack() on a timed-out session)
-        # if so, don't run the normal path. But flush deferred messages.
-        if request is None:
-            session.flush_deferred_messages()
-            return
+                self.run_deferred_actions(session, session.deferred_messages)
 
-        r = self.make_response(session, retmsg)
+                # sometimes this is called from a non-request context (e.g. bgtask calling complete_attack() on a timed-out session)
+                # if so, don't run the normal path. But flush deferred messages.
+                if request is None:
+                    session.flush_deferred_messages()
+                    return
+
+                if gamesite.raw_log:
+                    client_str = 'sid %s' % pretty_print_session(session.session_id)
+                    log.msg(('to   client (%s:%d): ' % (client_str, session.outgoing_serial))+repr(retmsg))
+
+                r = SpinJSON.dumps({'serial': session.outgoing_serial,
+                                    'clock': time.time() if gamedata['server'].get('send_high_precision_time',True) else server_time,
+                                    'msg': session.deferred_messages})
+                session.outgoing_serial += 1
+                del session.deferred_messages[:] # note: do not create a new array
+
+            else:
+                # process any new pending messages
+                self.handle_message_buffer(request, session, retmsg)
+                if session.is_async: # hmm, if another request set this to async, we might miss the response?
+                    return
+
+                self.run_deferred_actions(session, retmsg)
+
+                # sometimes this is called from a non-request context (e.g. bgtask calling complete_attack() on a timed-out session)
+                # if so, don't run the normal path. But flush deferred messages.
+                if request is None:
+                    session.flush_deferred_messages()
+                    return
+
+                r = self.make_response(session, retmsg)
 
         # works for both standard HTTP request and WSFakeRequest
         if hasattr(request, '_disconnected') and request._disconnected: return
@@ -21652,17 +21657,18 @@ class GAMEAPI(resource.Resource):
         admin_stats.record_latency('handle_client_hello', end_time - start_time)
         return ret
 
+    # returns whether or not to go async
     def do_handle_client_hello(self, request, client_ip, user_agent, arg, retmsg):
         # check IP bans
         if client_ip and str(client_ip) in gamedata['server']['banned_ips']:
             gamesite.exception_log.event(server_time, 'prevented banned IP %s from logging in' % client_ip)
             retmsg.append(["ACCOUNT_BANNED"])
-            return None, None
+            return False
 
         # check arguments
         if len(arg) != 18:
             retmsg.append(["ERROR", "CANNOT_LOG_IN_VERSION_MISMATCH_GAMECODE"])
-            return None, None
+            return False
 
         query_string = SpinHTTP.unwrap_string(arg[1])
         #not_used = arg[2]
@@ -21688,7 +21694,7 @@ class GAMEAPI(resource.Resource):
                 gamesite.exception_log.event(server_time, 'user %d logged in with invalidated session %s' % \
                                              (client_user_id, client_session_id))
             retmsg.append(["ERROR", "CANNOT_LOG_IN_SIMULTANEOUS"])
-            return None, None
+            return False
 
         # check that proxyserver session signature is valid
         server_session_sig = SpinSignature.sign_session(client_user_id, client_login_country, client_session_id, client_session_time, spin_server_name, client_social_id, client_auth_token, client_session_data, SpinConfig.config['proxy_api_secret'])
@@ -21697,7 +21703,7 @@ class GAMEAPI(resource.Resource):
                                          (client_user_id, client_session_id, client_session_time, spin_server_name, client_session_data, client_session_sig, server_session_sig, repr(client_ip),
                                           user_agent))
             retmsg.append(["ERROR", "CANNOT_LOG_IN_PROXY_SIGNATURE_INVALID"])
-            return None, None
+            return False
 
         # check that proxyserver session signature is recent
         if (server_time >= client_session_time + gamedata['server']['session_signature_time_tolerance']):
@@ -21705,7 +21711,7 @@ class GAMEAPI(resource.Resource):
                 gamesite.exception_log.event(server_time, 'user %d logged in with outdated proxy signature (%d sec old)' % \
                                              (client_user_id, server_time - client_session_time))
             retmsg.append(["ERROR", "CANNOT_LOG_IN_PROXY_SIGNATURE_OUTDATED"])
-            return None, None
+            return False
 
         # we can now trust the client_ params that are in the session signature
         user_id = client_user_id
@@ -21714,7 +21720,7 @@ class GAMEAPI(resource.Resource):
         if io_system.overloaded() and (user_id not in SpinConfig.config.get('developer_user_id_list',[])):
             retmsg.append(["ERROR", "CANNOT_LOG_IN_SERVER_OVERLOAD"])
             gamesite.exception_log.event(server_time, 'I/O overload! denied login to %d' % user_id)
-            return None, None
+            return False
 
         frame_platform = client_social_id[0:2]
         assert frame_platform in ('fb','kg','ag')
@@ -21725,14 +21731,14 @@ class GAMEAPI(resource.Resource):
             gamesite.exception_log.event(server_time, 'user %d logged in with mismatched gamedata build date: client "%s" server "%s"' % \
                                          (user_id, client_gamedata_date, gamedata['gamedata_build_info']['date']))
             retmsg.append(["ERROR", "CANNOT_LOG_IN_VERSION_MISMATCH_GAMEDATA"])
-            return None, None
+            return False
 
         # check compiled client against server version
         if SpinConfig.config.get('use_compiled_client', False) and client_gamecode_build_date != gameclient_build_date:
             gamesite.exception_log.event(server_time, 'user %d logged in with mismatched compiled-client.js build: client "%s" server "%s"' % \
                                          (user_id, client_gamecode_build_date, gameclient_build_date))
             retmsg.append(["ERROR", "CANNOT_LOG_IN_VERSION_MISMATCH_GAMECODE"])
-            return None, None
+            return False
 
         # if there are any pre-existing sessions for this user, wait until they log out completely
         wait_for_session = None
@@ -21755,11 +21761,11 @@ class GAMEAPI(resource.Resource):
                 if gamedata['server']['log_abnormal_logins'] >= 2:
                     gamesite.exception_log.event(server_time, 'stopping login for user %d after %s' % (user_id, wait_reason))
                 retmsg.append(["ERROR", "CANNOT_LOG_IN_SIMULTANEOUS"])
-                return None, None
+                return False
 
             self.log_out_async(wait_for_session, wait_reason,
                                functools.partial(self.handle_client_hello, request, client_ip, user_agent, arg, retmsg))
-            return None, True
+            return True
 
         # ensure that only one login on a user_id runs to successful completion
         self.AsyncLogin.cancel_existing(user_id, client_session_id)
@@ -21770,7 +21776,7 @@ class GAMEAPI(resource.Resource):
         lockret, lockgen = gamesite.lock_client.player_lock_acquire_login(user_id, owner_id = user_id)
         if lockret == -Player.LockState.being_attacked or lockret == -Player.LockState.logged_in or lockret < 0:
             retmsg.append(["ERROR", "CANNOT_LOG_IN_WHILE_UNDER_ATTACK"])
-            return None, None
+            return False
 
         # open a new session, using the ID passed in by the client
         aslogin = self.AsyncLogin(self, request, retmsg, client_session_id, frame_platform, client_social_id, client_auth_token,
@@ -21785,7 +21791,7 @@ class GAMEAPI(resource.Resource):
         if gamesite.nosql_client and gamedata['server'].get('update_server_status_on_login', True):
             gamesite.nosql_client.server_status_update(spin_server_name, {'active_sessions':admin_stats.get_active_sessions()}, reason='login')
 
-        return None, True
+        return True
 
     def complete_client_hello(self, request, retmsg, user_id, *args):
         session = None
@@ -22017,6 +22023,10 @@ class GAMEAPI(resource.Resource):
 
         # create the new session
         session = Session(session_id, user, player, server_time)
+
+        if gamedata['server'].get('use_deferred_messages',False):
+            # upon success, retmsg will be ignored, and client messages should go via deferred_messages
+            session.deferred_messages = retmsg # !!!
 
         # get rid of old combat debris
         player.update_inerts()
@@ -22421,8 +22431,9 @@ class GAMEAPI(resource.Resource):
         alliance_id = self.send_player_cache_update(session, 'log_out_preflush', alliance_id = alliance_id)
 
         # update all leaderboard stats - legacy only (scores2 gets updated on the fly)
-        if not session.player.isolate_pvp:
-            session.player.publish_scores1(alliance_id = alliance_id, reason = 'log_out_preflush')
+        # XXXXXX remove when proven safe
+        #if not session.player.isolate_pvp:
+        #    session.player.publish_scores1(alliance_id = alliance_id, reason = 'log_out_preflush')
 
     # record login/logout in MongoDB log
     # if recording logins (that are still active), set logout_time = -1
@@ -22631,7 +22642,7 @@ class GAMEAPI(resource.Resource):
         else:
             # if an attack was going on, clean it up
             # then continue with log_out_async2
-            def continue_log_out(self, session, method, cb, force, outcome, old_battle_summary, is_sync):
+            def continue_log_out(self, session, method, cb, force, is_sync):
                 self.log_out_async2(session, method, cb, force = force)
             self.complete_attack(session, session.deferred_messages, functools.partial(continue_log_out, self, session, method, cb, force), reason='log_out_async')
 
@@ -23639,19 +23650,12 @@ class GAMEAPI(resource.Resource):
             LIST_MAX = 47 # 47 makes the display look nicer with current UI pagination
             LIST_NEAR_ME = 2
 
-            if session.player.leaderboard_impl() == 'scores2':
-                # note: region would need to be specified separately by the client to distinguish region vs continent-scope region_specific stat counters
-                addr = session.player.scores2_query_addr(field_name, period) # region = session.player.home_region
-            else:
-                addr = parse_score_field_for_sql(score_field_name(session.player, field_name, period))
-
+            # note: region would need to be specified separately by the client to distinguish region vs continent-scope region_specific stat counters
+            addr = session.player.scores2_query_addr(field_name, period) # region = session.player.home_region
 
             if success:
                 # get top 50 alliances
-                if session.player.leaderboard_impl() == 'scores2':
-                    result = gamesite.mongo_scores2_client.alliance_scores2_get_leaders([addr], LIST_MAX, reason = 'QUERY_ALLIANCE_SCORE_LEADERS')[0]
-                else:
-                    result = gamesite.sql_client.get_alliance_score_leaders(addr, LIST_MAX, 0, reason = 'QUERY_ALLIANCE_SCORE_LEADERS')
+                result = gamesite.mongo_scores2_client.alliance_scores2_get_leaders([addr], LIST_MAX, reason = 'QUERY_ALLIANCE_SCORE_LEADERS')[0]
                 if not result:
                     success = False
 
@@ -23659,17 +23663,11 @@ class GAMEAPI(resource.Resource):
                 # now query standings near your own alliance, if you're not in the top 50
                 alliance_id = gamesite.sql_client.get_users_alliance(session.user.user_id, reason = 'QUERY_ALLIANCE_SCORE_LEADERS')
                 if alliance_id > 0:
-                    if session.player.leaderboard_impl() == 'scores2':
-                        myscore = gamesite.mongo_scores2_client.alliance_scores2_get([alliance_id], [addr], rank = True, reason = 'QUERY_ALLIANCE_SCORE_LEADERS')[0][0]
-                    else:
-                        myscore = gamesite.sql_client.get_alliance_score(alliance_id, addr, rank = True, reason = 'QUERY_ALLIANCE_SCORE_LEADERS')
+                    myscore = gamesite.mongo_scores2_client.alliance_scores2_get([alliance_id], [addr], rank = True, reason = 'QUERY_ALLIANCE_SCORE_LEADERS')[0][0]
 
                     if myscore:
                         if myscore.get('rank',-1) > (LIST_MAX-1):
-                            if session.player.leaderboard_impl() == 'scores2':
-                                result += gamesite.mongo_scores2_client.alliance_scores2_get_leaders([addr], LIST_NEAR_ME*2+1, max(LIST_MAX, myscore['rank']-LIST_NEAR_ME), reason = 'QUERY_ALLIANCE_SCORE_LEADERS')[0]
-                            else:
-                                result += gamesite.sql_client.get_alliance_score_leaders(addr, LIST_NEAR_ME*2+1, max(LIST_MAX, myscore['rank']-LIST_NEAR_ME), reason = 'QUERY_ALLIANCE_SCORE_LEADERS')
+                            result += gamesite.mongo_scores2_client.alliance_scores2_get_leaders([addr], LIST_NEAR_ME*2+1, max(LIST_MAX, myscore['rank']-LIST_NEAR_ME), reason = 'QUERY_ALLIANCE_SCORE_LEADERS')[0]
 
             retmsg.append(["QUERY_ALLIANCE_SCORE_LEADERS_RESULT", field_name, period, result, tag])
 
@@ -23709,16 +23707,10 @@ class GAMEAPI(resource.Resource):
                 result = gamesite.sql_client.get_alliance_members(alliance_id, reason = 'QUERY_ALLIANCE_MEBERS')
 
                 if result and len(result) > 0 and score_fields_periods:
-                    if session.player.leaderboard_impl() == 'scores2':
-                        score_result = gamesite.mongo_scores2_client.player_scores2_get([r['user_id'] for r in result],
-                                                                                        [session.player.scores2_query_addr(field_name, period) \
-                                                                                         for field_name, period in score_fields_periods],
-                                                                                        reason = 'QUERY_ALLIANCE_MEMBERS(score)')
-                    else:
-                        score_result = gamesite.sql_client.get_player_scores([r['user_id'] for r in result],
-                                                                             [parse_score_field_for_sql(score_field_name(session.player, field_name, period)) \
-                                                                              for field_name, period in score_fields_periods],
-                                                                             reason = 'QUERY_ALLIANCE_MEMBERS(score)')
+                    score_result = gamesite.mongo_scores2_client.player_scores2_get([r['user_id'] for r in result],
+                                                                                    [session.player.scores2_query_addr(field_name, period) \
+                                                                                     for field_name, period in score_fields_periods],
+                                                                                    reason = 'QUERY_ALLIANCE_MEMBERS(score)')
                 else:
                     score_result = None
 
@@ -24092,96 +24084,91 @@ class GAMEAPI(resource.Resource):
             get_rank = bool(arg[4])
             offline_msg = None
 
-            if session.player.leaderboard_impl() == 'scores2':
-                query_addrs = [session.player.scores2_query_addr(entry[0], entry[1], time_loc = entry[2] if len(entry) >= 3 else None, region = session.player.home_region) \
-                               for entry in field_period_list]
+            query_addrs = [session.player.scores2_query_addr(entry[0], entry[1], time_loc = entry[2] if len(entry) >= 3 else None, region = session.player.home_region) \
+                           for entry in field_period_list]
 
-                result = []
+            result = []
+            for u in xrange(len(user_ids)):
+                result.append([None,]*len(query_addrs))
+
+            # split query into "hot" MongoDB and "cold" SQL parts
+            # the "hot" stats are updated basically in realtime via MongoDB
+            # "cold" stats are updated offline by scores2_to_sql.py (and may be in a maintenance window!)
+            # so, any query that affects competition/game rules should use the "hot" stats!
+            mongo_query_i_addrs = []
+            sql_query_i_addrs = []
+
+            def is_hot_point(point, cur_week, cur_season):
+                # note: time_scope "ALL" queries can go to cold SQL, even though they are otherwise "hot",
+                # if we need to cut down on synchronous MongoDB queries.
+                time_all_is_hot = gamedata.get('scores2_time_all_is_hot', True)
+                return (point[1]['time'][0] == Scores2.FREQ_WEEK and point[1]['time'][1] >= cur_week) or \
+                       (point[1]['time'][0] == Scores2.FREQ_SEASON and point[1]['time'][1] >= cur_season) or \
+                       (point[1]['time'][0] == Scores2.FREQ_ALL and time_all_is_hot)
+
+            for i in xrange(len(query_addrs)):
+                point = query_addrs[i]
+                if is_hot_point(point,
+                                SpinConfig.get_pvp_week(gamedata['matchmaking']['week_origin'], server_time), # note: use server_time, not player's override, since this is for talking to the database
+                                SpinConfig.get_pvp_season(gamedata['matchmaking']['season_starts'], server_time)):
+                    mongo_query_i_addrs.append((i, point))
+                else:
+                    sql_query_i_addrs.append((i, point))
+
+            if mongo_query_i_addrs: # do hot query
+                mongo_result = gamesite.mongo_scores2_client.player_scores2_get(user_ids, [x[1] for x in mongo_query_i_addrs], rank = get_rank, reason='QUERY_PLAYER_SCORES')
                 for u in xrange(len(user_ids)):
-                    result.append([None,]*len(query_addrs))
+                    for j in xrange(len(mongo_query_i_addrs)):
+                        result[u][mongo_query_i_addrs[j][0]] = mongo_result[u][j]
 
-                # split query into "hot" MongoDB and "cold" SQL parts
-                # the "hot" stats are updated basically in realtime via MongoDB
-                # "cold" stats are updated offline by scores2_to_sql.py (and may be in a maintenance window!)
-                # so, any query that affects competition/game rules should use the "hot" stats!
-                mongo_query_i_addrs = []
-                sql_query_i_addrs = []
+            if sql_query_i_addrs and gamesite.sql_scores2_client: # do cold query
+                # this technique to launch a chain of sequential SQL queries is based on the test code in Scores2.py
+                batch = gamesite.sql_scores2_client.player_scores2_get_async(user_ids, [x[1] for x in sql_query_i_addrs], rank = get_rank, reason='QUERY_PLAYER_SCORES')
+                bdict = batch.get_qs_dict()
+                rdict = {}
+                tag_list = sorted(bdict.keys())
 
-                def is_hot_point(point, cur_week, cur_season):
-                    # note: time_scope "ALL" queries can go to cold SQL, even though they are otherwise "hot",
-                    # if we need to cut down on synchronous MongoDB queries.
-                    time_all_is_hot = gamedata.get('scores2_time_all_is_hot', True)
-                    return (point[1]['time'][0] == Scores2.FREQ_WEEK and point[1]['time'][1] >= cur_week) or \
-                           (point[1]['time'][0] == Scores2.FREQ_SEASON and point[1]['time'][1] >= cur_season) or \
-                           (point[1]['time'][0] == Scores2.FREQ_ALL and time_all_is_hot)
+                # launch next query in chain
+                def next_query(request, session, retmsg, retmsg_tag, result, user_ids, sql_query_i_addrs, batch, bdict, rdict, tag_list, i, last_result):
+                    if i > 0: # remember result from previous successful query
+                        rdict[tag_list[i-1]] = last_result
 
-                for i in xrange(len(query_addrs)):
-                    point = query_addrs[i]
-                    if is_hot_point(point,
-                                    SpinConfig.get_pvp_week(gamedata['matchmaking']['week_origin'], server_time), # note: use server_time, not player's override, since this is for talking to the database
-                                    SpinConfig.get_pvp_season(gamedata['matchmaking']['season_starts'], server_time)):
-                        mongo_query_i_addrs.append((i, point))
-                    else:
-                        sql_query_i_addrs.append((i, point))
+                    if i >= len(tag_list): # last query - done!
+                        sql_result = gamesite.sql_scores2_client.player_scores2_get_async_complete(batch, rdict)
+                        # combine with mongo_result above
+                        for u in xrange(len(user_ids)):
+                            for j in xrange(len(sql_query_i_addrs)):
+                                result[u][sql_query_i_addrs[j][0]] = sql_result[u][j]
+                        # complete async request
+                        retmsg.append(["QUERY_PLAYER_SCORES_RESULT", user_ids, result, retmsg_tag, None])
+                        gamesite.gameapi.complete_deferred_request(request, session, retmsg)
+                        return
 
-                if mongo_query_i_addrs: # do hot query
-                    mongo_result = gamesite.mongo_scores2_client.player_scores2_get(user_ids, [x[1] for x in mongo_query_i_addrs], rank = get_rank, reason='QUERY_PLAYER_SCORES')
-                    for u in xrange(len(user_ids)):
-                        for j in xrange(len(mongo_query_i_addrs)):
-                            result[u][mongo_query_i_addrs[j][0]] = mongo_result[u][j]
+                    def on_error(request, session, retmsg, retmsg_tag, result, user_ids, failure):
+                        # complete async request, returning the incomplete results
+                        #retmsg.append(["ERROR", "SCORES_OFFLINE"])
+                        retmsg.append(["QUERY_PLAYER_SCORES_RESULT", user_ids, result, retmsg_tag, 'SCORES_OFFLINE'])
+                        gamesite.gameapi.complete_deferred_request(request, session, retmsg)
+                        return
 
-                if sql_query_i_addrs and gamesite.sql_scores2_client and gamedata['server'].get('enable_scores2_read_sql', False): # do cold query
-                    # this technique to launch a chain of sequential SQL queries is based on the test code in Scores2.py
-                    batch = gamesite.sql_scores2_client.player_scores2_get_async(user_ids, [x[1] for x in sql_query_i_addrs], rank = get_rank, reason='QUERY_PLAYER_SCORES')
-                    bdict = batch.get_qs_dict()
-                    rdict = {}
-                    tag_list = sorted(bdict.keys())
+                    if not gamesite.sql_scores2_client:
+                        on_error(request, session, retmsg, retmsg_tag, result, user_ids, Exception('Scores2 SQL client is down'))
+                        return
 
-                    # launch next query in chain
-                    def next_query(request, session, retmsg, retmsg_tag, result, user_ids, sql_query_i_addrs, batch, bdict, rdict, tag_list, i, last_result):
-                        if i > 0: # remember result from previous successful query
-                            rdict[tag_list[i-1]] = last_result
+                    qs, qs_args = bdict[tag_list[i]]
+                    d = gamesite.sql_scores2_client.sql_client.runQuery(qs, qs_args) # "SELECT pg_sleep(2); "+qs for latency testing
+                    if d is None:
+                        on_error(request, session, retmsg, retmsg_tag, result, user_ids, Exception('Scores2 SQL server is down'))
+                        return
 
-                        if i >= len(tag_list): # last query - done!
-                            sql_result = gamesite.sql_scores2_client.player_scores2_get_async_complete(batch, rdict)
-                            # combine with mongo_result above
-                            for u in xrange(len(user_ids)):
-                                for j in xrange(len(sql_query_i_addrs)):
-                                    result[u][sql_query_i_addrs[j][0]] = sql_result[u][j]
-                            # complete async request
-                            retmsg.append(["QUERY_PLAYER_SCORES_RESULT", user_ids, result, retmsg_tag, None])
-                            gamesite.gameapi.complete_deferred_request(request, session, retmsg)
-                            return
+                    d.addCallbacks(functools.partial(next_query, request, session, retmsg, retmsg_tag, result, user_ids, sql_query_i_addrs, batch, bdict, rdict, tag_list, i+1),
+                                   functools.partial(on_error, request, session, retmsg, retmsg_tag, result, user_ids))
 
-                        def on_error(request, session, retmsg, retmsg_tag, result, user_ids, failure):
-                            # complete async request, returning the incomplete results
-                            #retmsg.append(["ERROR", "SCORES_OFFLINE"])
-                            retmsg.append(["QUERY_PLAYER_SCORES_RESULT", user_ids, result, retmsg_tag, 'SCORES_OFFLINE'])
-                            gamesite.gameapi.complete_deferred_request(request, session, retmsg)
-                            return
+                reactor.callLater(0, functools.partial(next_query, request, session, retmsg, tag, result, user_ids, sql_query_i_addrs, batch, bdict, rdict, tag_list, -1, None))
+                return True # go async
 
-                        if not gamesite.sql_scores2_client:
-                            on_error(request, session, retmsg, retmsg_tag, result, user_ids, Exception('Scores2 SQL client is down'))
-                            return
-
-                        qs, qs_args = bdict[tag_list[i]]
-                        d = gamesite.sql_scores2_client.sql_client.runQuery(qs, qs_args) # "SELECT pg_sleep(2); "+qs for latency testing
-                        if d is None:
-                            on_error(request, session, retmsg, retmsg_tag, result, user_ids, Exception('Scores2 SQL server is down'))
-                            return
-
-                        d.addCallbacks(functools.partial(next_query, request, session, retmsg, retmsg_tag, result, user_ids, sql_query_i_addrs, batch, bdict, rdict, tag_list, i+1),
-                                       functools.partial(on_error, request, session, retmsg, retmsg_tag, result, user_ids))
-
-                    reactor.callLater(0, functools.partial(next_query, request, session, retmsg, tag, result, user_ids, sql_query_i_addrs, batch, bdict, rdict, tag_list, -1, None))
-                    return True # go async
-
-                elif sql_query_i_addrs: # client asked for historical scores, but we cannot provide them
-                    offline_msg = 'SCORES_OFFLINE'
-
-            else:
-                result = gamesite.sql_client.get_player_scores(user_ids, [parse_score_field_for_sql(score_field_name(session.player, field_name, period)) \
-                                                                          for field_name, period in field_period_list], rank = get_rank, reason='QUERY_PLAYER_SCORES')
+            elif sql_query_i_addrs: # client asked for historical scores, but we cannot provide them
+                offline_msg = 'SCORES_OFFLINE'
 
             retmsg.append(["QUERY_PLAYER_SCORES_RESULT", user_ids, result, tag, offline_msg])
 
@@ -24190,12 +24177,8 @@ class GAMEAPI(resource.Resource):
             period = arg[2]
             tag = arg[3]
 
-            if session.player.leaderboard_impl() == 'scores2':
-                result = gamesite.mongo_scores2_client.player_scores2_get_leaders([session.player.scores2_query_addr(field_name, period, region = session.player.home_region)],
-                                                                                  gamedata['matchmaking']['max_leaderboard_entries'], reason = 'QUERY_SCORE_LEADERS')[0]
-            else:
-                result = gamesite.sql_client.get_player_score_leaders(parse_score_field_for_sql(score_field_name(session.player, field_name, period)),
-                                                                      gamedata['matchmaking']['max_leaderboard_entries'], reason = 'QUERY_SCORE_LEADERS')
+            result = gamesite.mongo_scores2_client.player_scores2_get_leaders([session.player.scores2_query_addr(field_name, period, region = session.player.home_region)],
+                                                                              gamedata['matchmaking']['max_leaderboard_entries'], reason = 'QUERY_SCORE_LEADERS')[0]
 
             # decorate result with player cache properties
             if result:
@@ -24763,8 +24746,19 @@ class GAMEAPI(resource.Resource):
                         session.player.map_bookmarks[region].remove(session.player.map_bookmarks[region][0])
 
         elif arg[0] == "IDLE_CHECK_RESPONSE":
-            client_elapsed = arg[1]
-            self.do_idle_check_response(session, retmsg, client_elapsed = client_elapsed)
+            response_data = arg[1]
+            playtime = session.cur_playtime()
+            status = session.player.idle_check.got_response(session.login_time, server_time, playtime, response_data)
+            if status == IdleCheck.STATUS_NO_RESULT:
+                pass
+            elif status == IdleCheck.STATUS_SEND_AGAIN:
+                idle_check_msg = session.player.idle_check.start_check(session.login_time, server_time, playtime)
+                retmsg.append(["IDLE_CHECK", idle_check_msg])
+                metric_event_coded(session.user.user_id, '0691_idle_check', idle_check_msg)
+            elif status == IdleCheck.STATUS_FAIL:
+                metric_event_coded(session.user.user_id, '0693_idle_check_fail', response_data)
+            elif status == IdleCheck.STATUS_SUCCESS:
+                metric_event_coded(session.user.user_id, '0692_idle_check_success', response_data)
 
         elif arg[0] == "INVOKE_FACEBOOK_AUTH_RESPONSE":
             #wanted_scope = arg[1]
@@ -25680,6 +25674,8 @@ class GAMEAPI(resource.Resource):
                 else:
                     self.do_unit_repair_cancel_all(session, retmsg)
                     assert len(session.player.unit_repair_queue) == 0
+                    # order units by repair time, lowest to highest
+                    to_repair.sort(key = lambda obj: obj.time_to_repair(session.player))
                     for obj in to_repair:
                         assert self.do_unit_repair_queue(session, obj.obj_id) is None
 
@@ -26146,7 +26142,7 @@ class GameSite(server.Site):
 
     def sql_init(self):
         self.sql_scores2_client = None
-        if gamedata['server'].get('enable_scores2_read_sql', False) and ((game_id+'_scores2') in SpinConfig.config.get('pgsql_servers',{})):
+        if ((game_id+'_scores2') in SpinConfig.config.get('pgsql_servers',{})):
             import AsyncPostgres
             self.sql_scores2_client = Scores2.SQLScores2(AsyncPostgres.AsyncPostgres(SpinConfig.get_pgsql_config(game_id+'_scores2'),
                                                                                      verbosity = 0,
@@ -26388,6 +26384,7 @@ class GameSite(server.Site):
             session = session_table[id]
             if session.logout_in_progress: continue
 
+            need_flush = False
             kick_reason = None
 
             # check for expired idle sessions
@@ -26404,6 +26401,24 @@ class GameSite(server.Site):
                 kick_reason = 'long_session'
                 gamesite.exception_log.event(server_time, 'user %d - terminating extremely long session (%dmin)' % (session.user.user_id, (server_time-session.login_time)/60))
 
+            # perform idle check
+            playtime = session.cur_playtime()
+
+            idle_timeout_status = session.player.idle_check.timeout(session.login_time, server_time, playtime)
+            # gamesite.exception_log.event(server_time, 'user %d - playtime %d check status %d needed %d' % (session.user.user_id, playtime, idle_timeout_status, session.player.idle_check.check_needed(session.login_time, server_time, playtime)))
+
+            if idle_timeout_status == IdleCheck.STATUS_FAIL:
+                metric_event_coded(session.user.user_id, '0694_idle_check_timeout', {})
+            elif idle_timeout_status == IdleCheck.STATUS_SEND_AGAIN or \
+                 (idle_timeout_status == IdleCheck.STATUS_NO_RESULT and \
+                  (session.player.idle_check.forced_check_needed() or \
+                   Predicates.read_predicate(gamedata['server']['idle_check']['enable_if']).is_satisfied(session.player, None)) and \
+                  session.player.idle_check.check_needed(session.login_time, server_time, playtime)):
+                idle_check_msg = session.player.idle_check.start_check(session.login_time, server_time, playtime)
+                session.send_deferred_message([["IDLE_CHECK", idle_check_msg]])
+                need_flush = True
+                metric_event_coded(session.user.user_id, '0691_idle_check', idle_check_msg)
+
             if not kick_reason:
                 unused, abuse_warning_msg = session.player.detect_login_abuse(cur_session_length = server_time - session.login_time)
                 if (session.player.lockout_until > 0) and (server_time < session.player.lockout_until):
@@ -26413,6 +26428,7 @@ class GameSite(server.Site):
                     kick_reason = 'abuse'
                 elif abuse_warning_msg:
                     session.send_deferred_message(abuse_warning_msg)
+                    need_flush = True
 
             if kick_reason:
                 try:
@@ -26446,12 +26462,13 @@ class GameSite(server.Site):
                     gamesite.exception_log.event(server_time, 'deploying overdue AI attack (%s) on player %d' % \
                                                  (str(session.incoming_attack_type), session.player.user_id))
                 session.deploy_ai_attack(session.deferred_messages)
+                need_flush = True
             elif session.incoming_attack_wave_time > 0 and (server_time >= session.incoming_attack_wave_time):
                 if gamedata['server']['log_ai_attack_overdue'] and session.incoming_attack_type != 'tutorial':
                     gamesite.exception_log.event(server_time, 'deploying overdue AI attack wave (%s) on player %d' % \
                                                  (str(session.incoming_attack_type), session.player.user_id))
                 session.deploy_ai_attack_wave(session.deferred_messages)
-
+                need_flush = True
 
             # check for sessions where an attack has been going on for too long
             elif (not session.is_async) and \
@@ -26467,9 +26484,7 @@ class GameSite(server.Site):
                 # change_session will unlock the victim's state for us
                 session.visit_base_in_progress = True
                 session.is_async = self.gameapi.change_session(None, session, session.deferred_messages, dest_user_id = session.user.user_id, force = True)
-
-            if (session.idle_check_time > 0) and (server_time >= (session.idle_check_time + gamedata['server']['idle_check_timeout'])):
-                self.gameapi.do_idle_check_response(session, session.deferred_messages)
+                need_flush = True
 
             if (not session.sprobe_in_progress):
                 sprobe_config = gamedata['server'].get('sprobe',None)
@@ -26481,8 +26496,11 @@ class GameSite(server.Site):
                            ((when == 'anytime') and ((server_time - session.login_time) >= sprobe_config.get('sec_after_login',15))):
                             session.sprobe_in_progress = True
                             session.send_deferred_message([["SPROBE_RUN"]], flush_now = True)
+                            need_flush = True
 
             session.record_activity_sample()
+            if need_flush:
+                session.flush_deferred_messages()
 
         # send lock keepalive requests in one big batch
         messages_pending = gamesite.lock_client.player_lock_keepalive_batch(lock_keepalive_ids, lock_keepalive_generations, lock_keepalive_states, True, reason='bgfunc')

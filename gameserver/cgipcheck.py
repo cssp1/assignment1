@@ -160,7 +160,7 @@ def do_action(path, method, args, spin_token_data, nosql_client):
             if method == 'lookup':
                 result = {'result':do_lookup(control_args)}
             elif method in ('give_item','send_message','chat_gag','chat_ungag','chat_block','chat_unblock','apply_aura','remove_aura','get_raw_player','ban','unban',
-                            'make_developer','unmake_developer','clear_alias','chat_official','chat_unofficial','clear_lockout','clear_cooldown','change_region','ignore_alt','unignore_alt','demote_alliance_leader','kick_alliance_member'):
+                            'make_developer','unmake_developer','clear_alias','chat_official','chat_unofficial','clear_lockout','clear_cooldown','check_idle','change_region','ignore_alt','unignore_alt','demote_alliance_leader','kick_alliance_member'):
                 result = do_CONTROLAPI(control_args)
             else:
                 raise Exception('unknown player method '+method)
@@ -562,11 +562,12 @@ def do_CONTROLAPI(args, host = None, port = None):
     return SpinJSON.loads(response)
 
 def do_lookup(args):
+    cmd_args = ['--live']
     if 'user_id' in args:
         user_id = int(args['user_id'])
-        cmd_args = [str(user_id)]
+        cmd_args += [str(user_id)]
     elif 'facebook_id' in args:
-        cmd_args = ['--facebook-id', args['facebook_id']]
+        cmd_args += ['--facebook-id', args['facebook_id']]
     else:
         raise Exception('must pass user_id or facebook_id')
     p = subprocess.Popen(['./check_player.py'] + cmd_args, stdout=subprocess.PIPE, stderr=subprocess.PIPE)

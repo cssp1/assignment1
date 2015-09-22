@@ -86,10 +86,6 @@
     // time window within which to merge successive player.sessions records (seconds)
     "session_merge_threshold": 90,
 
-    "enable_scores2": true, // enable writes to Scores2 (hot MongoDB) API
-    "enable_scores2_read": true, // enable reads from Scores2 (hot MongoDB) API
-    "enable_scores2_read_sql": true, // enable reads from Scores2 (cold SQL) API
-
     "log_scores2": 2, // Scores2 API logging level
     "scores2_publish_refresh": 1397194667, // force publish of all Scores2 stats (to hot MongoDB) if not already published since this UNIX time
 
@@ -218,8 +214,13 @@
     "anti_bullying_defender_filter": { "predicate": "ALWAYS_TRUE" },
     "anti_bullying_in_ladder": false, // deactivate anti-bullying log in ladder battles
 
-    "idle_check_timeout": 35, // time limit for responding to manual idle checks (seconds)
-    "idle_check_pardon_time": 14400, // after passing a manual idle check, don't check for login abuse again for this many seconds
+    "idle_check": {
+        "enable_if": { "predicate": "ALWAYS_FALSE" },
+        "interval": 14400, // check every 4 hours
+        "max_tries": 3, // allow this many incorrect answers before failing
+        "timeout": 60, // time limit for response
+        "max_timeouts": 2 // allow this many timeouts before failing
+    },
 
     "suspicious_user_id_list": [],
     "banned_ips": [],

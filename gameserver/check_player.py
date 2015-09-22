@@ -13,6 +13,7 @@ import SpinJSON
 
 # load some standard Python libraries
 import sys, time, getopt, string
+import requests, urllib
 
 time_now = int(time.time())
 
@@ -71,6 +72,19 @@ def check_bloat(input, min_size = 1024, print_max = 20):
     for key, slen in sizes[0:print_max]:
         print '%-50s %-10.2f kB' % (key, slen/1024.0)
 
+def do_CONTROLAPI(args):
+    host = SpinConfig.config['proxyserver'].get('external_listen_host','localhost')
+    proto = 'http' if host == 'localhost' else 'https'
+    url = '%s://%s:%d/CONTROLAPI' % (proto, host, SpinConfig.config['proxyserver']['external_http_port' if proto == 'http' else 'external_ssl_port'])
+    args['spin_user'] = 'check_player.py'
+    args['secret'] = SpinConfig.config['proxy_api_secret']
+    response = requests.post(url+'?'+urllib.urlencode(args))
+    assert response.status_code == 200
+    ret = SpinJSON.loads(response.text)
+    if 'error' in ret:
+        raise Exception('CONTROLAPI error: %r' % ret['error'])
+    return ret['result']
+
 # main program
 if __name__ == '__main__':
     import codecs
@@ -78,7 +92,7 @@ if __name__ == '__main__':
 
     opts, args = getopt.gnu_getopt(sys.argv[1:], 'g:', ['bloat', 'abtests', 'get', 'put', 'get-user', 'put-user', 'stdio', 'stdin', 'stdout',
                                                       'ban', 'ban-days=', 'unban', 'gag', 'ungag', 'isolate', 'unisolate', 'make-chat-mod', 'unmake-chat-mod',
-                                                      'db-host=', 'db-port=', 'db-secret=',
+                                                      'db-host=', 'db-port=', 'db-secret=', 'live',
                                                       's3', 's3-key-file=', 's3-userdb-bucket=', 's3-playerdb-bucket=',
                                                       'user-id=', 'facebook-id=', 'game-id=',
                                                       'give-alloy=', 'give-protection-time=', 'give-item=', 'melt-hours=', 'item-stack=', 'item-log-reason=',
@@ -96,6 +110,7 @@ if __name__ == '__main__':
     db_host = None
     db_port = None
     db_secret = None
+    use_controlapi = False
     force_s3 = False
     s3_key_file = None
     s3_userdb_bucket = None
@@ -166,6 +181,8 @@ if __name__ == '__main__':
             db_port = int(val)
         elif key == '--db-secret':
             db_secret = val
+        elif key == '--live':
+            use_controlapi = True
         elif key == '--s3':
             force_s3 = True
         elif key == '--s3-key-file':
@@ -231,6 +248,7 @@ if __name__ == '__main__':
         print ''
         print '    --game-id ID        look up users for game ID (either mf or tr)'
         print ''
+        print '    --live                       use CustomerSupport API where applicable instead of manipulating backing store'
         print '    --s3                         force usage of S3 userdb/playerdb'
         print '    --s3-key-file FILE           get S3 credentials from this file'
         print '    --s3-userdb-bucket BUCKET    specify S3 bucket used for userdb'
@@ -294,7 +312,10 @@ if __name__ == '__main__':
             player = SpinJSON.load(open(player_filename))
         else:
             try:
-                player = SpinJSON.loads(driver.sync_download_player(user_id))
+                if use_controlapi:
+                    player = do_CONTROLAPI({'method':'get_raw_player', 'user_id': user_id})
+                else:
+                    player = SpinJSON.loads(driver.sync_download_player(user_id))
             except Exception as e:
                 print 'Error: Unable to access playerdb for %s player ID %d' % (gamedata['strings']['game_name'], user_id), '(%s)' % repr(e)
                 print 'Possible reasons for this error:'
@@ -307,7 +328,10 @@ if __name__ == '__main__':
         if do_put_user:
             user = SpinJSON.load(open(user_filename))
         else:
-            user = SpinJSON.loads(driver.sync_download_user(user_id))
+            if use_controlapi:
+                user = do_CONTROLAPI({'method': 'get_raw_user', 'user_id': user_id})
+            else:
+                user = SpinJSON.loads(driver.sync_download_user(user_id))
 
         if do_get:
             SpinJSON.dump(player, sys.stdout if use_stdio else open(player_filename,'w'), pretty=True)
@@ -478,6 +502,12 @@ if __name__ == '__main__':
             print fmt % ('DEVELOPER account', '')
         if player.get('chat_official',0):
             print fmt % ('CHAT OFFICIAL (blue text) account', '')
+
+        if 'idle_check' in player and player['idle_check'].get('fails',0) + player['idle_check'].get('successes',0) > 0:
+            ui_captcha = '%d Passes, %d Fails' % (player['idle_check'].get('successes',0), player['idle_check'].get('fails',0))
+            if player['idle_check'].get('last_fail_time',-1) > 0:
+                ui_captcha += ' (last fail %s ago)' % pretty_print_time(time_now - player['idle_check']['last_fail_time'])
+            print fmt % ('Anti-Bot CAPTCHA:', ui_captcha)
 
         if 'known_alt_accounts' in player and player['known_alt_accounts']:
             print fmt % ('Known alt accounts:', '')

@@ -403,15 +403,21 @@
     },
 
     "icheck_dialog": { // idle check (name camouflaged)
-        "dimensions": [451, 151],
+        "dimensions": [360,250],
+        "default_button": "ok_button",
         "widgets": {
-            "bg": { "kind": "Dialog", "xy":[0,0], "dimensions":[451,151], "dialog": "message_dialog_bg" },
-            "title":  { "kind": "TextField", "xy": [108,19], "dimensions": [300, 24], "text_style": "bold", "text_hjustify": "left", "ui_name": "Incoming Transmission" },
-            //"close_button": { "kind": "ActionButton", "xy": [424,1], "dimensions": [19,22], "bg_image": "close_button_small", "push_bg_image": 1 },
-            "description": { "kind": "TextField", "xy": [108,43], "dimensions": [275,34], "text_hjustify": "left",  "text_size": 13, "text_leading": 15,
-                             "text_vjustify": "top", "ui_name": "You've been playing for %s today. Maybe a break is in order?" },
-            "ok_button": { "kind": "ActionButton", "xy": [308,110], "dimensions": [134,28],
-                           "bg_image": "action_button_134px", "text_size": 13, "text_style": "bold", "ui_name": "Keep Playing" }
+            "bg": {"kind": "StaticImage", "xy":[0,0], "dimensions":[360,250], "asset": "dialog_resizable", "bg_image_resizable":1 },
+            "sunken": {"kind": "StaticImage", "xy":[12,56], "dimensions":[335,180], "asset": "dialog_sunken_resizable", "bg_image_resizable":1 },
+
+            "title": { "kind": "TextField", "xy": [30,10], "dimensions": [221, 41], "text_size": 24, "text_style": "thick", "text_hjustify": "left", "ui_name": "Anti-Refresh-Cheat Check" },
+            "description": { "kind": "TextField", "xy": [34,71], "dimensions": [290, 41], "text_size": 13, "text_style": "thick", "text_hjustify": "left", "text_vjustify": "top", "text_color": [0.8,0.8,0.8],
+                             "ui_name": "Please prove that you are human by answering the following math question:\n\n%s" },
+
+            "input_bg": { "kind": "StaticImage", "xy": [30,147], "dimensions": [297,31], "asset": "dialog_sunken_white_resizable", "bg_image_resizable": 1 },
+            "input": { "kind": "TextInput", "xy": [38,148], "dimensions": [287,30], "text_size": 15, "text_hjustify": "left",
+                       "clip_to": [38,145,287,36], "max_chars": 15, "allowed_chars": "0123456789",
+                       "text_color": [0,0,0,1], "blank_on_enter": false },
+            "ok_button": { "kind": "ActionButton", "xy": [195,195], "dimensions": [134, 28], "bg_image": "action_button_134px", "text_size": 13, "text_style": "bold", "ui_name": "Send Answer"}
         }
     },
 
@@ -898,7 +904,7 @@
                                "ui_name_attack_revenge": "Attack", "ui_tooltip_attack_revenge": "Take revenge (one attack only)",
                                "ui_name_attack_hitlist": "Attack Once", "ui_tooltip_attack_hitlist": "Hit List enemy - one attack only!",
 
-                               "ui_name_stop_reinforcing": "Back to Map", "ui_tooltip_stop_reinforcing": "Stop reinforcing and go back to the Regional Map",
+                               "ui_name_stop_reinforcing": "Back to Map", "ui_tooltip_stop_reinforcing": "Stop editing and go back to the Regional Map",
                                "ui_name_stop_attack": "End Attack", "ui_tooltip_stop_attack": "Stop attacking",
                                "ui_name_retreating": "Retreating...",
                                "ui_name_collect": "Collect", "ui_tooltip_collect": "Collect resources from the quarry's harvesters",
@@ -7666,8 +7672,8 @@
             "turf_winner": { "kind": "ActionButton", "xy": [52,105], "dimensions": [250,20], "text_size": 15, "text_style": "bold", "drop_shadow": 1, "show": 0,
                              "text_hjustify": "left",
                              "ui_name": "Ruler: %s", "text_color": [1,0,1,1],
-                             "ui_name_tie": "Ruler: (Tied at %d Strongpoints)", "text_color_tie": [1,0,0,1],
-                             "ui_name_insufficient_points": "Ruler: None (%d Strongpoints needed)", "text_color_insufficient_points": [1,1,1,1],
+                             "ui_name_tie": "Ruler: (Tied at %d Strongpoint influence)", "text_color_tie": [1,0,0,1],
+                             "ui_name_insufficient_points": "Ruler: None (%d Strongpoint influence needed)", "text_color_insufficient_points": [1,1,1,1],
                              "layout": { "hjustify": "left", "vjustify": "top" } },
             "turf_standings_label": { "kind": "TextField", "xy": [52,131], "dimensions": [100,20], "text_size": 13, "text_style": "normal", "drop_shadow": 1, "show": 0,
                                       "text_hjustify": "left", "text_color": [0.8,0.8,0.8,1],
@@ -7677,7 +7683,7 @@
                                       "layout": { "hjustify": "left", "vjustify": "top" } },
             "turf_standings": { "kind": "TextField", "xy": [52,148], "dimensions": [100,20], "text_size": 13, "text_style": "normal", "drop_shadow": 1, "show": 0,
                                 "text_hjustify": "left", "text_vjustify": "top", "text_color": [1,1,1,1],
-                                "ui_name": "%rank%tied. %alliance - %cur/%max Strongpoints", "ui_name_tie": "(TIE)",
+                                "ui_name": "%rank%tied. %alliance - %cur/%max influence", "ui_name_tie": "(TIE)",
                                 "ui_name_loading": "Loading...",
                                 "ui_name_separator": "---",
                                 "layout": { "hjustify": "left", "vjustify": "top" } },

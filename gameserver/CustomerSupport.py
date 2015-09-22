@@ -166,6 +166,17 @@ class HandleMarkUninstalled(Handler):
         self.gamesite.pcache_client.player_cache_update(self.user_id, {'uninstalled': 1})
         return ReturnValue(result = 'ok')
 
+class HandleCheckIdle(Handler):
+    # trigger idle check at next chance
+    # note: no logging, directly override exec()
+    def exec_online(self, session, retmsg):
+        session.player.idle_check.last_end_playtime = -1
+        return ReturnValue(result = 'ok')
+    def exec_offline(self, user, player):
+        if 'idle_check' not in player: player['idle_check'] = {}
+        player['idle_check']['last_end_playtime'] = -1
+        return ReturnValue(result = 'ok')
+
 class HandleRecordAltLogin(Handler):
     def __init__(self, *args, **kwargs):
         Handler.__init__(self, *args, **kwargs)
@@ -498,10 +509,10 @@ class HandleChangeRegion(Handler):
         return ReturnValue(async = self.d)
 
     # then after complete_attack...
-    def do_exec_online2(self, session, retmsg, outcome, old_battle_summary, is_sync):
+    def do_exec_online2(self, session, retmsg, is_sync):
         # force a synchronous session change back to home base
         if session.viewing_base is not session.player.my_home:
-            self.gamesite.gameapi.change_session_complete(None, session, retmsg, self.user_id, session.user, session.player, None, None, None, outcome, old_battle_summary, None, {}, {})
+            self.gamesite.gameapi.change_session_complete(None, session, retmsg, self.user_id, session.user, session.player, None, None, None, None, {}, {})
         success = session.player.change_region(self.new_region, None, session, retmsg, reason = 'CustomerSupport')
         if success:
             ret = ReturnValue(result = 'ok')
@@ -770,6 +781,7 @@ methods = {
     'trigger_cooldown': HandleTriggerCooldown,
     'apply_aura': HandleApplyAura,
     'remove_aura': HandleRemoveAura,
+    'check_idle': HandleCheckIdle,
     'chat_gag': HandleChatGag,
     'chat_ungag': HandleChatUngag,
     'give_item': HandleGiveItem,
