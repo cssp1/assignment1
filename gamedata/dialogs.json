@@ -904,7 +904,7 @@
                                "ui_name_attack_revenge": "Attack", "ui_tooltip_attack_revenge": "Take revenge (one attack only)",
                                "ui_name_attack_hitlist": "Attack Once", "ui_tooltip_attack_hitlist": "Hit List enemy - one attack only!",
 
-                               "ui_name_stop_reinforcing": "Back to Map", "ui_tooltip_stop_reinforcing": "Stop reinforcing and go back to the Regional Map",
+                               "ui_name_stop_reinforcing": "Back to Map", "ui_tooltip_stop_reinforcing": "Stop editing and go back to the Regional Map",
                                "ui_name_stop_attack": "End Attack", "ui_tooltip_stop_attack": "Stop attacking",
                                "ui_name_retreating": "Retreating...",
                                "ui_name_collect": "Collect", "ui_tooltip_collect": "Collect resources from the quarry's harvesters",
