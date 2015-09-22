@@ -1490,7 +1490,7 @@ RegionMap.RegionMap.update_feature_popup = function(dialog) {
     if(ftype == 'quarry') {
         var template = (('base_template' in feature) ? (gamedata['quarries_client']['templates'][feature['base_template']] || null) : null);
         if(template && template['turf_points']) {
-            descr = gamedata['strings']['regional_map']['strongpoint'].replace('%s',feature['base_ui_name']);
+            descr = gamedata['strings']['regional_map']['strongpoint'].replace('%s',feature['base_ui_name']).replace('%TURF_POINTS', pretty_print_number(template['turf_points']));
         } else {
             descr = gamedata['strings']['regional_map']['quarry'].replace('%s',feature['base_ui_name']);
         }
