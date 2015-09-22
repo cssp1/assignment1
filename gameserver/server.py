@@ -6533,7 +6533,11 @@ class Base(object):
         self.base_last_landlord_id = self.base_landlord_id
         self.base_last_conquer_time = server_time
 
-        self.base_landlord_id = gamedata['territory']['default_quarry_landlord_id']
+        if self.base_template in gamedata['quarries']['templates']:
+            self.base_landlord_id = gamedata['quarries']['templates'][self.base_template]['default_landlord_id']
+        else:
+            self.base_landlord_id = gamedata['territory']['default_quarry_landlord_id']
+
         to_remove = []
         for obj in self.iter_objects():
             if obj.is_mobile():
