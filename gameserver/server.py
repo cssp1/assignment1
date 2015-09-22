@@ -11214,6 +11214,10 @@ class LivePlayer(Player):
         # do all proxy steps first
         self.migrate_proxy()
 
+        # update Base Defenders ui_name
+        if '0' in self.squads:
+            self.squads['0']['ui_name'] = gamedata['strings']['squads']['base_defenders']
+
         # ensure that player has all starting tech levels (if gamedata was changed after player was created)
         for key, start_level in gamedata['starting_conditions']['tech'].iteritems():
             if self.tech.get(key, 0) < start_level:
