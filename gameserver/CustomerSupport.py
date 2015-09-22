@@ -509,10 +509,10 @@ class HandleChangeRegion(Handler):
         return ReturnValue(async = self.d)
 
     # then after complete_attack...
-    def do_exec_online2(self, session, retmsg, outcome, old_battle_summary, is_sync):
+    def do_exec_online2(self, session, retmsg, is_sync):
         # force a synchronous session change back to home base
         if session.viewing_base is not session.player.my_home:
-            self.gamesite.gameapi.change_session_complete(None, session, retmsg, self.user_id, session.user, session.player, None, None, None, outcome, old_battle_summary, None, {}, {})
+            self.gamesite.gameapi.change_session_complete(None, session, retmsg, self.user_id, session.user, session.player, None, None, None, None, {}, {})
         success = session.player.change_region(self.new_region, None, session, retmsg, reason = 'CustomerSupport')
         if success:
             ret = ReturnValue(result = 'ok')
