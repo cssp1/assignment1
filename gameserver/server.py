@@ -22290,9 +22290,10 @@ class GAMEAPI(resource.Resource):
         alliance_id = gamesite.sql_client.get_users_alliance(session.user.user_id, reason = 'log_out_preflush')
         if alliance_id >= 0:
             session.player.history['alliance_id_cache'] = alliance_id
-        elif 'alliance_id_cache' in session.player.history:
-            del session.player.history['alliance_id_cache']
+        else:
             alliance_id = None
+            if 'alliance_id_cache' in session.player.history:
+                del session.player.history['alliance_id_cache']
 
         self.send_player_cache_update(session, 'log_out_preflush', alliance_id = alliance_id)
 
