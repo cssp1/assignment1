@@ -199,34 +199,10 @@ def is_valid_alias(name):
     if 'spinpunch' in name.lower(): return False
     return True
 
-# decorate the name of a history key with a suffix for the current PvP season
-def seasonal_name(key, season_num): return key + '_s%d' % season_num
-
-# same for current PvP week
-def weekly_name(key, week_num): return key + '_wk%d' % week_num
-
-weekly_score_re = re.compile('(.+)_wk([0-9]+)$')
-season_score_re = re.compile('(.+)_s([0-9]+)$')
-score_time_series_re = re.compile('^(.+)_wk([0-9]+)_at_time$|^(.+)_s([0-9]+)_at_time$')
-
-# inverse of the above functions -
-# turn a string field name like quarry_resources_meridiani256_wk23 into a field, frequency, period tuple
-# for interfacing with the SQL score database e.g. ('quarry_resources_meridiani256', SpinSQL.SQLClient.SCORE_FREQ_WEEKLY, 23)
-def parse_score_field_for_sql(field_name):
-    if not gamesite.sql_client: raise Exception('SQL connection not active')
-
-    match = weekly_score_re.match(field_name)
-    if match:
-        gr = match.groups()
-        return (gr[0], gamesite.sql_client.SCORE_FREQ_WEEKLY, int(gr[1]))
-    match = season_score_re.match(field_name)
-    if match:
-        gr = match.groups()
-        return (gr[0], gamesite.sql_client.SCORE_FREQ_SEASON, int(gr[1]))
-    raise Exception('could not parse field_name = ' + field_name)
+# recognize obsolete time-series history fields for deletion
+obsolete_time_series_re = re.compile('^unit:(.+):manufactured_at_time$|^(.+)_manufactured_at_time$|^(.+)recycled_at_time$|^(.+)_wk([0-9]+)_at_time$|^(.+)_s([0-9]+)_at_time$')
 
 # leaderboard score fields
-# history_prefix: element in player.history (that will be decorated with seasonal_name()/weekly_name() above)
 
 SCORE_FIELDS = {
     'xp': {'history_prefix': 'score_xp'},
@@ -244,35 +220,8 @@ SCORE_FIELDS = {
     'tokens_looted': {'history_prefix': 'tokens_looted'},
     'achievement_points': {'history_prefix': 'achievement_points'},
     }
-SCORE_PERIODS = ['week', 'season']
-
-# the client uses generic names like 'xp' and 'conquests' for scoreboard entries
-# map those into the weekly or seasonal specific names
-def score_field_name(player, client_name, period, force_global = False):
-    entry = SCORE_FIELDS[client_name]
-    name = entry['history_prefix']
-    if (not force_global) and player.home_region and entry.get('region_specific', False):
-        name += '_'+player.home_region
-
-    if period == 'week':
-        return weekly_name(name, SpinConfig.get_pvp_week(gamedata['matchmaking']['week_origin'], player.get_absolute_time()))
-    elif period == 'season':
-        return seasonal_name(name, SpinConfig.get_pvp_season(gamedata['matchmaking']['season_starts'], player.get_absolute_time()))
-    else:
-        raise Exception('unhandled period '+period)
 
 SCORES2_MIGRATION_VERSION = 9
-
-# return complete list of all player.history fields used for leaderboard rankings
-def score_field_names(player):
-    # note this includes trophy counts, for which the primary cache is in SQL. We are putting trophy counts into the dbserver player
-    # cache as well, but ONLY for GUI/backup/redundancy purposes.
-    return [score_field_name(player, name, period) for name in SCORE_FIELDS.iterkeys() for period in SCORE_PERIODS]
-
-# list of player.history fields used for alliance rankings, stored in SQL
-def trophy_field_names(player):
-    return [score_field_name(player, name, period) for name in SCORE_FIELDS.iterkeys() for period in SCORE_PERIODS \
-            if name.startswith('trophies_')]
 
 def conceal_protection_time(x):
     if gamedata['server']['conceal_protection_time']:
@@ -9513,56 +9462,8 @@ class Player(AbstractPlayer):
 
     # increment score counters, where "stats" is like {"xp": 35, "trophies_pvp": -2, ...}
     def modify_scores(self, *args, **kwargs):
-        #self.modify_scores1(*args, **kwargs) # XXXXXX remove when proven safe
+        # scores1 API is obsolete now
         self.modify_scores2(*args, **kwargs)
-
-    # old legacy score system
-    def modify_scores1(self, stats, reason='', method = '+=', trophy_decay_k = 0, trophy_decay_elapsed = 0):
-        mutated = set()
-
-        # add to player score counters
-        for name, value in stats.iteritems():
-            for period in SCORE_PERIODS:
-                field_name = score_field_name(self, name, period)
-                incr = value
-                if name.startswith('trophies_'):
-                    kind = name[9:12]; assert kind in ('pve','pvp','pvv')
-
-                    # handle trophy floor
-                    cur_val = self.history.get(field_name, 0)
-                    if trophy_decay_k != 0:
-                        # special case for decay aura
-                        assert method == 'decay'
-                        assert value == 0
-                        if cur_val > gamedata['trophy_floor'].get(kind,0):
-                            new_val = int(gamedata['trophy_floor'].get(kind,0) + (cur_val - gamedata['trophy_floor'].get(kind,0)) * math.exp(trophy_decay_k * trophy_decay_elapsed) + 0.5)
-                            incr = new_val - cur_val
-                        else:
-                            incr = 0
-                    else:
-                        new_val = cur_val + incr
-                        if new_val < gamedata['trophy_floor'].get(kind,0):
-                            incr = gamedata['trophy_floor'].get(kind,0) - cur_val
-
-                if method == '=':
-                    func = dict_setvalue
-                elif method == '+=' or method == 'decay':
-                    func = dict_increment
-                else:
-                    raise Exception('unhandled method '+method)
-
-                if record_player_metric(self, func, field_name, incr, time_series = False, bucket = True):
-                    mutated.add(field_name)
-
-                # update global version of region-specific scores
-                if SCORE_FIELDS[name].get('region_specific',False):
-                    global_name = name+'_global'
-                    if global_name in SCORE_FIELDS:
-                        global_field_name = score_field_name(self, global_name, period, force_global = True)
-                        if record_player_metric(self, func, global_field_name, incr, time_series = False, bucket = True):
-                            mutated.add(global_field_name)
-
-        self.publish_scores1(mutated = mutated, reason = 'modify_scores1')
 
     # new score system
 
@@ -9666,26 +9567,6 @@ class Player(AbstractPlayer):
 
         self.publish_scores2(reason = 'modify_scores2')
 
-    # send updated personal scores to live database. Also recache any affected alliance scores.
-    # "mutated" = iterator containing the names of score fields to send (if None, send all our scores).
-    def publish_scores1(self, mutated = None, alliance_id = None, reason=''):
-        reason = 'publish_scores1(%s:%s)' % (reason, 'ALL' if mutated is None else 'incremental')
-        if (mutated is None):
-            # publish all currently recorded stats
-            mutated = (field for field in score_field_names(self) if field in self.history)
-
-        if mutated:
-            updates = [(parse_score_field_for_sql(field), int(self.history.get(field,0))) for field in mutated]
-            gamesite.sql_client.update_player_scores(self.user_id, updates, reason = reason)
-
-            mutated_trophies = (field for field in mutated if field.startswith('trophies_'))
-            if mutated_trophies:
-                # recache alliance scores
-                if alliance_id is None: alliance_id = gamesite.sql_client.get_users_alliance(self.user_id, reason = reason)
-                if alliance_id > 0:
-                    self.update_alliance_score_cache1(alliance_id, addrs = [parse_score_field_for_sql(field) for field in mutated_trophies], reason = reason)
-
-
     def publish_scores2(self, alliance_id = None, reason=''):
         if self.history.get('scores2_migration',0) < SCORES2_MIGRATION_VERSION: return
 
@@ -9723,19 +9604,8 @@ class Player(AbstractPlayer):
 
     # this gets called when leaving/joining an alliance, to update affected scores
     def update_alliance_score_cache(self, alliance_id, alliance_info = None, reason=''):
-        self.update_alliance_score_cache1(alliance_id, alliance_info = alliance_info, addrs = None, reason = reason)
+        # scores1 API is obsolete now
         self.update_alliance_score_cache2(alliance_id, alliance_info = alliance_info, it_a = None, reason = reason)
-
-    def update_alliance_score_cache1(self, alliance_id, alliance_info = None, addrs = None, reason = ''):
-        assert alliance_id > 0
-        if addrs is None:
-            addrs = [parse_score_field_for_sql(field) for field in trophy_field_names(self) if field in self.history] # note: only recache values that we affect
-        gamesite.sql_client.update_alliance_score_cache(alliance_id, addrs,
-                                                        gamedata['alliances']['trophy_weights'][0:gamedata['alliances']['max_members']],
-                                                        {'trophies_pvp':gamedata['trophy_display_offset']['pvp'],
-                                                         'trophies_pve':gamedata['trophy_display_offset']['pve'],
-                                                         'trophies_pvv':gamedata['trophy_display_offset'].get('pvv',0)},
-                                                        reason = reason)
 
     def update_alliance_score_cache2(self, alliance_id, alliance_info = None, it_a = None, reason=''):
         assert alliance_id > 0
@@ -10061,7 +9931,7 @@ class Player(AbstractPlayer):
             for season in xrange(0, len(gamedata['matchmaking']['season_starts'])+1):
                 season_total = 0
                 for region_id in region_ids:
-                    key = seasonal_name(prefix + (('_%s' % region_id) if region_id else ''), season_num = season)
+                    key = prefix + (('_%s' % region_id) if region_id else '') + ('_s%d' % season)
                     if self.history.get(key, 0) != 0:
                         season_total = space_accum(season_total, self.history[key])
                         total_s = time_accum(total_s, self.history[key])
@@ -10081,7 +9951,7 @@ class Player(AbstractPlayer):
             for week in xrange(creation_week, SpinConfig.get_pvp_week(gamedata['matchmaking']['week_origin'], server_time)+1):
                 week_total = 0
                 for region_id in region_ids:
-                    key = weekly_name(prefix + (('_%s' % region_id) if region_id else ''), week_num = week)
+                    key = prefix + (('_%s' % region_id) if region_id else '') + ('_wk%d' % week)
                     if self.history.get(key, 0) != 0:
                         week_total = space_accum(week_total, self.history[key])
                         total_w = time_accum(total_w, self.history[key])
@@ -11497,9 +11367,7 @@ class LivePlayer(Player):
 
         # get rid of obsolete Scores1 time series history fields
         for k in self.history.keys():
-            manuf_re = re.compile('^unit:(.+):manufactured_at_time$|^(.+)_manufactured_at_time$|^(.+)recycled_at_time$')
-            if score_time_series_re.match(k) or manuf_re.match(k):
-                #gamesite.exception_log.event(server_time, k)
+            if obsolete_time_series_re.match(k):
                 del self.history[k]
 
         # fix bad intro mails
@@ -22419,21 +22287,14 @@ class GAMEAPI(resource.Resource):
         self.send_fb_achievements(session)
         self.log_out_preflush_open_graph(session)
 
-        if gamesite.sql_client:
-            alliance_id = gamesite.sql_client.get_users_alliance(session.user.user_id, reason = 'log_out_preflush')
-            if alliance_id >= 0:
-                session.player.history['alliance_id_cache'] = alliance_id
-            elif 'alliance_id_cache' in session.player.history:
-                del session.player.history['alliance_id_cache']
-        else:
+        alliance_id = gamesite.sql_client.get_users_alliance(session.user.user_id, reason = 'log_out_preflush')
+        if alliance_id >= 0:
+            session.player.history['alliance_id_cache'] = alliance_id
+        elif 'alliance_id_cache' in session.player.history:
+            del session.player.history['alliance_id_cache']
             alliance_id = None
 
-        alliance_id = self.send_player_cache_update(session, 'log_out_preflush', alliance_id = alliance_id)
-
-        # update all leaderboard stats - legacy only (scores2 gets updated on the fly)
-        # XXXXXX remove when proven safe
-        #if not session.player.isolate_pvp:
-        #    session.player.publish_scores1(alliance_id = alliance_id, reason = 'log_out_preflush')
+        self.send_player_cache_update(session, 'log_out_preflush', alliance_id = alliance_id)
 
     # record login/logout in MongoDB log
     # if recording logins (that are still active), set logout_time = -1
@@ -22611,6 +22472,7 @@ class GAMEAPI(resource.Resource):
             cache_props['units_donated_cur_alliance'] = session.player.history['units_donated_cur_alliance']
 
         if alliance_id != 'skip': # might be None
+            if alliance_id is not None: assert alliance_id >= 0 # don't pass negative alliance_ids
             cache_props['alliance_id'] = alliance_id
 
         if session.player.isolate_pvp:

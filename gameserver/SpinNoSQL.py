@@ -145,11 +145,6 @@ class NoSQLClient (object):
     # the longest period of time a server could reasonably have stale (spied but not locked) player/base data
     LOCK_GEN_TIME = 6*3600
 
-    # XXXXXX temp - for compatibility with SpinSQL
-    SCORE_FREQ_SEASON = 'season'
-    SCORE_FREQ_WEEKLY = 'week'
-    SCORE_RE = re.compile('(.+)_(wk|s)([0-9]+)$')
-
     ROLE_DEFAULT = 0
     ROLE_LEADER = 4
 
@@ -181,8 +176,6 @@ class NoSQLClient (object):
         self.seen_regions = {}
         self.seen_alliances = False
         self.seen_turf = False
-        self.seen_player_scores = False
-        self.seen_alliance_score_cache = False
         self.time = 0 # need to be updated by caller!
         self.slaves = {}
         self.connect()
@@ -409,22 +402,6 @@ class NoSQLClient (object):
         n = self.unit_donation_requests_table().delete_many({'time':{'$lt':earliest}}).deleted_count
         if n > 0:
             print '  Deleted', n, 'old unit_donation_requests'
-
-        print 'Checking for old player_scores entries...'
-        n = self.player_scores().delete_many({'$or': [ {'frequency': 'season', 'period': {'$ne': cur_season} },
-                                                       {'frequency': 'week', 'period': {'$lt': cur_week-5} } ]}).deleted_count
-        if n > 0:
-            print '  Deleted', n, 'old player_scores entries'
-
-        print 'Checking for old or dangling alliance_score_cache entries...'
-        n = 0
-        for row in list(self.alliance_score_cache().find()):
-            if row['alliance_id'] not in valid_alliance_ids or \
-               (row['frequency'] == 'season' and row['period'] != cur_season) or \
-               (row['frequency'] == 'week' and row['period'] < cur_week - 5):
-                n += self.alliance_score_cache().delete_one({'_id':row['_id']}).deleted_count
-        if n > 0:
-            print '  Deleted', n, 'old or dangling alliance_score_cache entries'
 
         print 'Dropping old DAU tables...'
         n = 0
@@ -1816,7 +1793,7 @@ class NoSQLClient (object):
         self.alliance_table('alliance_members').delete_many({'alliance_id':id})
         self.alliance_table('alliance_invites').delete_many({'alliance_id':id})
         self.alliance_table('alliance_join_requests').delete_many({'alliance_id':id})
-        self.alliance_score_cache().delete_many({'alliance_id':id})
+        # XXXXXX clear Scores2 data for this alliance
 
     # note: modifications are rejected unless modifier_id has permission
     def modify_alliance(self, alliance_id, modifier_id, ui_name = None, ui_description = None, join_type = None, logo = None, leader_id = None, continent = None, chat_motd = None, chat_tag = None, reason = ''):
@@ -2153,213 +2130,6 @@ class NoSQLClient (object):
                 return (ret['max_space'] - ret['space_left'], ret['max_space']) # return cur, max
         return None
 
-    ###### SCORES ######
-
-    def parse_score_addr(self, addr):
-        field_name, frequency, period = addr
-        assert frequency in ('season', 'week')
-        assert period >= 0
-        return {'field':field_name, 'frequency':frequency, 'period':period}
-    def hash_score_addr(self, addr):
-        return '%s_%s_%d' % (addr['field'], addr['frequency'], addr['period'])
-
-    ###### PLAYER SCORE TABLE ######
-
-    def player_scores(self):
-        tbl = self._table('player_scores')
-        if not self.seen_player_scores:
-            # necessary for correctness (unique scores per user/board), and per-user lookups
-            tbl.create_index([('user_id',pymongo.ASCENDING),('field',pymongo.ASCENDING),('frequency',pymongo.ASCENDING),('period',pymongo.ASCENDING)], unique=True)
-            # used for the "Top 10" query
-            tbl.create_index([('field',pymongo.ASCENDING),('frequency',pymongo.ASCENDING),('period',pymongo.ASCENDING),('score',pymongo.DESCENDING)])
-            self.seen_player_scores = True
-        return tbl
-
-    def player_scores_rank_cache_update(self, cur_season = None, cur_week = None):
-        self._table('player_scores_rank_cache_inprogress').drop()
-        try:
-            prog = self._table('player_scores_rank_cache_inprogress')
-
-            # obtain all in-use combinations of field/freq/period
-            all_addrs = [x['_id'] for x in self.player_scores().aggregate([{'$group':{'_id':{'field':'$field','frequency':'$frequency','period':'$period'}}}])]
-
-            if cur_season is not None: all_addrs = filter(lambda x: (x['frequency']!='season') or (x['period']==cur_season), all_addrs)
-            if cur_week is not None: all_addrs = filter(lambda x: (x['frequency']!='week') or (x['period']==cur_week), all_addrs)
-
-            for addr in all_addrs:
-                print 'Caching ranks for %-80s...' % repr(addr),
-                sys.stdout.flush()
-                start_time = time.time()
-
-                data = self.player_scores().find(addr,{'_id':0,'user_id':1,'score':1})
-                all_scores = set()
-                users_by_score = {}
-                for x in data:
-                    all_scores.add(x['score'])
-                    if x['score'] not in users_by_score: users_by_score[x['score']] = []
-                    users_by_score[x['score']].append(x['user_id'])
-
-                # rank=0 for highest score
-                all_scores = sorted(list(all_scores), reverse=True)
-
-                def row_generator(addr, all_scores, users_by_score):
-                    for rank in xrange(len(all_scores)):
-                        for user_id in users_by_score[all_scores[rank]]:
-                            row = addr.copy()
-                            row['user_id'] = user_id
-                            row['score'] = all_scores[rank]
-                            row['rank'] = rank
-                            row['n'] = len(all_scores)
-                            yield row
-
-                prog.insert_many(row_generator(addr, all_scores, users_by_score))
-
-                end_time = time.time()
-                print 'done (%.2f ms)' % (1000.0*(end_time-start_time))
-
-            # build index for per-user percentile/rank queries
-            # note, we need to index this by user_id rather than by score, because scores used for ranking become stale
-            prog.create_index([('user_id',pymongo.ASCENDING),('field',pymongo.ASCENDING),('frequency',pymongo.ASCENDING),('period',pymongo.ASCENDING)], unique=True, background=True)
-
-            # atomically replace old cache with the new one
-            prog.rename(self.slave_for_table('player_scores_rank_cache').dbconfig['table_prefix']+'player_scores_rank_cache', dropTarget=True)
-        except:
-            # clean up inprogress table
-            prog.drop()
-            raise
-
-    # the "updates" parameter here is a list of (address, score) tuples
-    def update_player_scores(self, player_id, updates, reason=''): return self.instrument('update_player_scores(%s)'%reason, self._update_player_scores, (player_id, updates))
-    def _update_player_scores(self, player_id, updates):
-        for addr, score in updates:
-            qs = self.parse_score_addr(addr)
-            qs['user_id'] = player_id
-            # send asynchronously - this is a performance hotspot
-            self.player_scores().with_options(write_concern = pymongo.write_concern.WriteConcern(w=0)).update_one(qs, {'$set':{'score': score}}, upsert=True)
-        return True
-
-    def get_player_score_leaders(self, addr, num, start = 0, reason = ''): return self.instrument('get_player_score_leaders(%s)'%reason, self._get_player_score_leaders, (addr, num, start))
-    def _get_player_score_leaders(self, addr, num, start):
-        addr = self.parse_score_addr(addr)
-        ret = list(self.player_scores().find(addr, {'_id':0, 'user_id':1, 'score':1}).sort([('score',pymongo.DESCENDING)]).skip(start).limit(num))
-        for i in xrange(len(ret)):
-            ret[i]['absolute'] = ret[i]['score']; del ret[i]['score']
-            ret[i]['rank'] = start+i
-        return ret
-
-    def get_player_scores(self, player_ids, addrs, rank = False, reason=''): return self.instrument('get_player_scores' + '+RANK' if rank else '' + '(%s)'%reason, self._get_player_scores, (player_ids, addrs, rank))
-    def _get_player_scores(self, player_ids, addrs, rank):
-        ret = [[None,]*len(addrs) for u in xrange(len(player_ids))]
-        addrs = map(self.parse_score_addr, addrs)
-        need_totals = {}
-
-#        start_time = time.time()
-
-        for i in xrange(len(addrs)):
-            qs = addrs[i].copy(); qs['user_id'] = {'$in': player_ids}
-            scores = list(self.player_scores().find(qs, {'_id':0, 'user_id':1, 'score':1}))
-            for score in scores:
-                u = player_ids.index(score['user_id'])
-                ret[u][i] = {'absolute': score['score']}
-                if rank and score['score'] > 0:
-                    need_totals[self.hash_score_addr(addrs[i])] = True
-
-#        end_time = time.time(); print "A %.2fms" % (1000.0*(end_time-start_time)); start_time = end_time
-
-        if rank:
-            n_totals = {}
-            for addr in addrs:
-                if need_totals.get(self.hash_score_addr(addr),False):
-                    # this is actually the slowest part of the query - getting the total number of scores this addr
-                    qs = addr.copy()
-                    n_totals[self.hash_score_addr(addr)] = self.player_scores().find(qs,{'_id':0}).count()
-
-#            end_time = time.time(); print "B %d of %d %.2fms" % (len(n_totals), len(addrs), 1000.0*(end_time-start_time)); start_time = end_time
-            for u in xrange(len(player_ids)):
-                for i in xrange(len(addrs)):
-                    if ret[u][i]:
-                        addr = addrs[i]
-                        if ret[u][i]['absolute'] <= 0:
-                            # if absolute score is zero, don't bother querying
-                            total = 1000000 # use a fictional total so that the rank is like #999,999
-                            ret[u][i]['rank'] = max(total-1, 0)
-                            ret[u][i]['percentile'] = 1.0
-                        else:
-                            total = n_totals[self.hash_score_addr(addr)]
-                            if total > 0:
-                                qs = addr.copy()
-                                qs['score'] = {'$gt': ret[u][i]['absolute']}
-                                n_above_me = self.player_scores().find(qs,{'_id':0}).count()
-                                ret[u][i]['rank'] = n_above_me
-                                ret[u][i]['percentile'] = n_above_me/float(total)
-
-#            end_time = time.time(); print "C %.2fms" % (1000.0*(end_time-start_time)); start_time = end_time
-        return ret
-
-    ###### ALLIANCE SCORE CACHE ######
-
-    def alliance_score_cache(self):
-        tbl = self._table('alliance_score_cache')
-        if not self.seen_alliance_score_cache:
-            tbl.create_index([('alliance_id',pymongo.ASCENDING),('field',pymongo.ASCENDING),('frequency',pymongo.ASCENDING),('period',pymongo.ASCENDING)], unique=True)
-            tbl.create_index([('field',pymongo.ASCENDING),('frequency',pymongo.ASCENDING),('period',pymongo.ASCENDING),('score',pymongo.DESCENDING)])
-            self.seen_alliance_score_cache = True
-        return tbl
-
-    def update_alliance_score_cache(self, alliance_id, addrs, weights, offset, reason = ''):
-        return self.instrument('update_alliance_score_cache(%s)'%reason, self._update_alliance_score_cache, (alliance_id, addrs, weights, offset))
-    def _update_alliance_score_cache(self, alliance_id, addrs, weights, offset):
-        member_ids = self.get_alliance_member_ids(alliance_id)
-        if len(member_ids) <= 0: return True
-        addrs = map(self.parse_score_addr, addrs)
-        for addr in addrs:
-            if len(member_ids) > 0:
-                qs = addr.copy(); qs['user_id'] = {'$in': member_ids}
-                player_scores = list(self.player_scores().find(qs, {'user_id':1, 'score':1}))
-            else:
-                player_scores = []
-
-            score_map = {}
-            for row in player_scores:
-                score_map[row['user_id']] = row['score']
-            member_ids.sort(key = lambda id: -score_map.get(id,0))
-
-            #print "SCORE_MAP", score_map
-
-            total = 0.0
-            for i in xrange(min(len(member_ids), len(weights))):
-                sc = score_map.get(member_ids[i],0)
-                total += weights[i] * (sc + offset.get(addr['field'],0))
-            total = int(total)
-
-            qs = addr.copy(); qs['alliance_id'] = alliance_id
-            self.alliance_score_cache().update_one(qs, {'$set': {'score': total}}, upsert = True)
-        return True
-
-    def get_alliance_score_leaders(self, addr, num, start = 0, reason = ''): return self.instrument('get_alliance_score_leaders(%s)'%reason, self._get_alliance_score_leaders, (addr, num, start))
-    def _get_alliance_score_leaders(self, addr, num, start):
-        addr = self.parse_score_addr(addr)
-        ret = list(self.alliance_score_cache().find(addr, {'_id':0, 'alliance_id':1, 'score':1}).sort([('score',pymongo.DESCENDING)]).skip(start).limit(num))
-        for i in xrange(len(ret)):
-            ret[i]['absolute'] = ret[i]['score']; del ret[i]['score']
-            ret[i]['rank'] = start+i
-        return ret
-
-    def get_alliance_score(self, alliance_id, addr, rank = False, reason=''): return self.instrument('get_alliance_score' + '+RANK' if rank else '' + '(%s)'%reason, self._get_alliance_score, (alliance_id, addr, rank))
-    def _get_alliance_score(self, alliance_id, addr, rank):
-        addr = self.parse_score_addr(addr)
-        ret = None
-        myscore = self.alliance_score_cache().find_one({'alliance_id':alliance_id, 'field':addr['field'], 'frequency':addr['frequency'], 'period':addr['period']},{'score':1})
-        if myscore:
-            ret = {'absolute':myscore['score']}
-            if rank:
-                n_total = self.alliance_score_cache().find({'field':addr['field'], 'frequency':addr['frequency'], 'period':addr['period']}).count()
-                if n_total > 0:
-                    n_above_me = self.alliance_score_cache().find({'field':addr['field'], 'frequency':addr['frequency'], 'period':addr['period'], 'score':{'$gt':myscore['score']}}).count()
-                    ret['rank'] = n_above_me
-                    ret['percentile'] = n_above_me/float(n_total)
-        return ret
-
 if __name__ == '__main__':
     import getopt
     import codecs
@@ -2370,7 +2140,6 @@ if __name__ == '__main__':
     opts, args = getopt.gnu_getopt(sys.argv[1:], 'g:', ['reset', 'init', 'console', 'maint', 'region-maint=', 'clear-locks',
                                                       'winners', 'leaders', 'tournament-stat=', 'week=', 'season=', 'game-id=',
                                                       'score-scope=', 'score-loc=', 'spend-week=',
-                                                      'recache-player-ranks',
                                                       'recache-alliance-scores', 'test'])
     game_instance = SpinConfig.config['game_id']
     mode = None
@@ -2409,7 +2178,6 @@ if __name__ == '__main__':
             score_space_loc = val
         elif key == '--spend-week': spend_week = int(val)
         elif key == '--recache-alliance-scores': mode = 'recache-alliance-scores'
-        elif key == '--recache-player-ranks': mode = 'recache-player-ranks'
         elif key == '--test': mode = 'test'
         elif key == '-g' or key == '--game-id':
             game_instance = val
@@ -2421,7 +2189,6 @@ if __name__ == '__main__':
         print 'Modes:'
         print '    --maint                             Prune stale/invalid data from global tables'
         print '    --region-maint REGION_ID            Prune stale/invalid data from region tables'
-        print '    --recache-player-ranks              Update player score rank cache'
         print '    --recache-alliance-scores --week N --season S  Recalculate all alliance scores for week N season S'
         print '    --winners --week N --season N --tournament-stat STAT  Report Alliance Tournament winners for week N (or season N) and trophy type TYPE (pve or pvp)'
         print '                       ^ if season is missing or < 0, then weekly score is used for standings, otherwise seasonal score is used'
@@ -2433,7 +2200,7 @@ if __name__ == '__main__':
     id_generator = SpinNoSQLId.Generator()
     id_generator.set_time(time_now)
 
-    if mode in ('maint', 'winners', 'leaders', 'recache-player-ranks', 'recache-alliance-scores', 'test'):
+    if mode in ('maint', 'winners', 'leaders', 'recache-alliance-scores', 'test'):
         # these modes need access to gamedata for season/week or gamebucks info
         import SpinJSON
         gamedata = SpinJSON.load(open(SpinConfig.gamedata_filename(override_game_id = game_id)))
@@ -2464,9 +2231,6 @@ if __name__ == '__main__':
                 console.push(arg)
         else:
             console.interact()
-
-    elif mode == 'recache-player-ranks':
-        client.player_scores_rank_cache_update(season if season >= 0 else cur_season, week if week >= 0 else cur_week)
 
     elif mode == 'recache-alliance-scores':
         assert cur_week >= 0 and cur_season >= 0
@@ -2919,32 +2683,6 @@ if __name__ == '__main__':
         assert client.make_unit_donation(1112, alliance_1, TAG, [100]) is None
         assert client.make_unit_donation(1112, alliance_1, TAG, [100,80,10]) == (100, 100)
         assert client.make_unit_donation(1112, alliance_1, TAG, [1]) is None
-
-        # test scores
-        client.player_scores().drop(); client.seen_player_scores = False
-        client.alliance_score_cache().drop(); client.seen_alliance_score_cache = False
-
-        client.update_player_scores(1112, [[('trophies_pvp','season',0),150],[('trophies_pvp','week',0),100],[('trophies_pvp','week',1),50]])
-        client.update_player_scores(1113, [[('trophies_pvp','season',0),170],[('trophies_pvp','week',0),110],[('trophies_pvp','week',1),60]])
-        client.update_player_scores(1114, [[('trophies_pvp','season',0),75],[('trophies_pvp','week',0),50],[('trophies_pvp','week',1),25]])
-        client.update_player_scores(1115, [[('trophies_pvp','season',0),10],[('trophies_pvp','week',0),10],[('trophies_pvp','week',1),5]])
-        assert client.get_player_score_leaders(('trophies_pvp','season',0), 2, start = 1) == \
-               [{'user_id': 1112, 'rank': 1, 'absolute': 150}, {'user_id': 1114, 'rank': 2, 'absolute': 75}]
-        assert client.get_player_scores([1112,1114], [('trophies_pvp','season',0),('trophies_pvp','week',1)], rank = True) == \
-               [[{'percentile': 0.25, 'rank': 1, 'absolute': 150}, {'percentile': 0.25, 'rank': 1, 'absolute': 50}], [{'percentile': 0.5, 'rank': 2, 'absolute': 75}, {'percentile': 0.5, 'rank': 2, 'absolute': 25}]]
-
-        client.update_player_scores(1115, [[('trophies_pvp','season',0),12],[('trophies_pvp','week',0),12],[('trophies_pvp','week',1),6]])
-        for ALLIANCE in (alliance_1, alliance_2):
-            client.update_alliance_score_cache(ALLIANCE, [('trophies_pvp','season',0), ('trophies_pvp','week',1)],
-                                               gamedata['alliances']['trophy_weights'][0:gamedata['alliances']['max_members']],
-                                               {'trophies_pvp':gamedata['trophy_display_offset']['pvp'],
-                                                'trophies_pve':gamedata['trophy_display_offset']['pve']})
-        assert client.get_alliance_score_leaders(('trophies_pvp','week',1), 5) == \
-               [{'rank': 0, 'alliance_id': 2, 'absolute': 30}, {'rank': 1, 'alliance_id': 1, 'absolute': 28}]
-        assert client.get_alliance_score(alliance_1, ('trophies_pvp','week',1), rank = True) == \
-               {'percentile': 0.5, 'rank': 1, 'absolute': 28}
-        assert client.get_alliance_score(alliance_2, ('trophies_pvp','week',1), rank = True) == \
-               {'percentile': 0, 'rank': 0, 'absolute': 30}
 
         # test maintenance
         #client.do_maint(time_now, cur_season, cur_week)
