@@ -217,16 +217,18 @@ BattleLog.parse = function(my_id, summary, metlist) {
 
     // special handling for "Mr. Skilling" -> "Skilling" and "The Hammers" -> "The Hammers" (instead of "Hammers")
     if(1) {
+        var n = summary[opprole+'_name'];
         var name_start = 0, name_end = 0;
-        if(summary[opprole+'_name'].indexOf('Mr. ') == 0) {
+        if(n.indexOf('Mr. ') == 0) {
             name_start = 1; name_end = 1;
-        } else if(summary[opprole+'_name'].indexOf('The ') == 0) {
+        } else if(n.indexOf('The ') == 0) {
             name_start = 0; name_end = 1;
+        } else if(!is_ai_user_id_range(summary[opprole+'_id'])) {
+            // for player opponents, strip off the rank/title prefix
+            n = PlayerCache.strip_title_prefix(n);
         }
-        var broken_name = summary[opprole+'_name'].split(' ');
+        var broken_name = n.split(' ');
         names[opprole] = names[summary[opprole+'_id']] = broken_name.slice(name_start, name_end+1).join(' ');
-    } else {
-        names[opprole] = names[summary[opprole+'_id']] = summary[opprole+'_name'].split(' ')[0];
     }
 
     poss[opprole] = poss[summary[opprole+'_id']] = names[opprole]+(names[opprole][names[opprole].length-1] == 's' ? "'" : "'s");
