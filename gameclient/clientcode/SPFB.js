@@ -144,7 +144,7 @@ SPFB.api_version_number = function(feature) {
     if(s) {
         return parseFloat(s.slice(1, s.length-1));
     } else {
-        return 2.2; // fallback default (sync with: FacebookSDK.js, fb_guest.html, gameserver/SpinFacebook.py, gameclient/clientcode/SPFB.js)
+        return 2.4; // fallback default (sync with: FacebookSDK.js, fb_guest.html, gameserver/SpinFacebook.py, gameclient/clientcode/SPFB.js)
     }
 };
 

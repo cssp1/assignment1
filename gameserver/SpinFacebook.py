@@ -107,7 +107,7 @@ def api_version_number(feature):
     elif api_versions and ('default' in api_versions):
         ver = float(api_versions['default'][1:])
     else:
-        ver = 2.2
+        ver = 2.4
     return ver
 
 def versioned_graph_endpoint(feature, path, protocol = 'https://', subdomain = 'graph'):
