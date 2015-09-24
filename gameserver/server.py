@@ -3431,10 +3431,7 @@ class Session(object):
 
     def flush_outgoing_messages(self, sync = False):
         if self.longpoll_request:
-            if self.deferred_ping_squads:
-                self.deferred_ping_squads = False
-                if (not self.logout_in_progress):
-                    self.player.ping_squads_and_send_update(self, self.outgoing_messages, originator = self.player.user_id, reason='deferred_ping_squads(longpoll)')
+            gamesite.gameapi.run_deferred_actions(self, self.outgoing_messages, reason = 'longpoll')
 
             if len(self.outgoing_messages) > 0 or self.logout_in_progress:
                 request = self.longpoll_request
@@ -21249,10 +21246,11 @@ class GAMEAPI(resource.Resource):
         return False
 
     # we're about to send a response to the client. Run any pending batched actions.
-    def run_deferred_actions(self, session, retmsg):
+    def run_deferred_actions(self, session, retmsg, reason = 'unknown'):
         if session.deferred_ping_squads:
             session.deferred_ping_squads = False
-            session.player.ping_squads_and_send_update(session, retmsg, originator = session.player.user_id, reason='deferred_ping_squads(sync)')
+            if not session.logout_in_progress:
+                session.player.ping_squads_and_send_update(session, retmsg, originator = session.player.user_id, reason='run_deferred_actions(%s)' % reason)
 
         if session.deferred_ladder_point_decay_check:
             session.deferred_ladder_point_decay_check = False
@@ -21317,7 +21315,7 @@ class GAMEAPI(resource.Resource):
             if session.is_async:
                 return
 
-            self.run_deferred_actions(session, session.outgoing_messages)
+            self.run_deferred_actions(session, session.outgoing_messages, reason = 'complete_deferred_request')
 
             # sometimes this is called from a non-request context (e.g. bgtask calling complete_attack() on a timed-out session)
             # if so, don't run the normal path. But flush deferred messages.
