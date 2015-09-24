@@ -1196,7 +1196,7 @@ class User:
 
     def populate_friends_who_play(self, retmsg):
         if retmsg is None:
-            retmsg = self.active_session.deferred_messages
+            retmsg = self.active_session.outgoing_messages
             assert retmsg is not None
 
         assert self.active_session
@@ -1295,7 +1295,7 @@ class User:
 
         if retmsg is None:
             if self.active_session:
-                retmsg = self.active_session.deferred_messages
+                retmsg = self.active_session.outgoing_messages
         if retmsg is not None:
             retmsg.append(["PLAYER_CACHE_UPDATE", [gamesite.gameapi.get_player_cache_props(self, session.player)]])
             retmsg.append(["PLAYER_UI_NAME_UPDATE", self.get_ui_name(session.player)])
@@ -1356,7 +1356,7 @@ class User:
 
         if retmsg is None:
             if self.active_session:
-                retmsg = self.active_session.deferred_messages
+                retmsg = self.active_session.outgoing_messages
         if retmsg is not None:
             retmsg.append(["PLAYER_CACHE_UPDATE", [gamesite.gameapi.get_player_cache_props(self, session.player)]])
             retmsg.append(["PLAYER_UI_NAME_UPDATE", self.get_ui_name(session.player)])
@@ -1384,7 +1384,7 @@ class User:
         self.ag_friend_ids = [str(friend['uid']) for friend in previous_results if int(friend['plays_game'])]
         if retmsg is None:
             if self.active_session:
-                retmsg = self.active_session.deferred_messages
+                retmsg = self.active_session.outgoing_messages
         if retmsg is not None:
             self.populate_friends_who_play(retmsg)
 
@@ -1875,7 +1875,7 @@ class User:
             # update the credit balance for any active sessions
             if self.active_session:
                 self.active_session.player.resources.facebook_credits = self.fb_credit_balance
-                self.active_session.send_deferred_message([["PLAYER_STATE_UPDATE", self.active_session.player.resources.calc_snapshot().serialize()]])
+                self.active_session.send([["PLAYER_STATE_UPDATE", self.active_session.player.resources.calc_snapshot().serialize()]])
 
         #print 'obtained gamer_status',self.fb_gamer_status,'credit_balance',self.fb_credit_balance,'for user',self.user_id,'fbid',self.facebook_id
 
@@ -2163,7 +2163,7 @@ class User:
 
         if retmsg is None:
             if self.active_session:
-                retmsg = self.active_session.deferred_messages
+                retmsg = self.active_session.outgoing_messages
 
         if retmsg is not None:
             retmsg.append(["FACEBOOK_NAME_UPDATE", self.facebook_name])
@@ -2961,7 +2961,7 @@ class Session(object):
         self.longpoll_request_time = -1 # note! if longpoll_request is not None, and this is <0, that means "reuse the same longpoll_request after flush" (for websockets)
 
         # list of outgoing game messages to deliver to the client's browser next time it contacts the server
-        self.deferred_messages = []
+        self.outgoing_messages = []
 
         # flags that we need to perform a recaculation and send the results to the client on next transmission
         self.deferred_ping_squads = False
@@ -3069,7 +3069,7 @@ class Session(object):
         gamesite.chat_mgr.join(self, 'BROADCAST')
         if self.player.is_developer():
             gamesite.chat_mgr.join(self, 'DEVELOPER')
-            self.do_chat_catchup('DEVELOPER', self.deferred_messages)
+            self.do_chat_catchup('DEVELOPER', self.outgoing_messages)
 
     def record_activity_sample(self, force = False):
         interval = gamedata['server'].get('activity_classifier_interval',300)
@@ -3421,22 +3421,22 @@ class Session(object):
             # do not increment for automated messages like alliance join/kick/achieve/etc
             dict_increment(self.player.history, 'chat_messages_sent', 1)
 
-    def send_deferred_message(self, msglist, flush_now = False, sync = False):
-        self.deferred_messages += msglist
+    def send(self, msglist, flush_now = False, sync = False):
+        self.outgoing_messages += msglist
         if flush_now or gamedata['server'].get('deferred_message_coalesce_time',1) < 0:
-            return self.flush_deferred_messages(sync = sync)
+            return self.flush_outgoing_messages(sync = sync)
         else:
             gamesite.gameapi.add_deferred_session(self)
         return None
 
-    def flush_deferred_messages(self, sync = False):
+    def flush_outgoing_messages(self, sync = False):
         if self.longpoll_request:
             if self.deferred_ping_squads:
                 self.deferred_ping_squads = False
                 if (not self.logout_in_progress):
-                    self.player.ping_squads_and_send_update(self, self.deferred_messages, originator = self.player.user_id, reason='deferred_ping_squads(longpoll)')
+                    self.player.ping_squads_and_send_update(self, self.outgoing_messages, originator = self.player.user_id, reason='deferred_ping_squads(longpoll)')
 
-            if len(self.deferred_messages) > 0 or self.logout_in_progress:
+            if len(self.outgoing_messages) > 0 or self.logout_in_progress:
                 request = self.longpoll_request
                 if (not self.logout_in_progress) and self.longpoll_request_time < 0:
                     pass # reuse the same request again!
@@ -3463,7 +3463,7 @@ class Session(object):
         if retmsg is not None:
             retmsg.append(msg)
         else:
-            self.send_deferred_message([msg], flush_now = False) # coalesce to avoid ping storms
+            self.send([msg], flush_now = False) # coalesce to avoid ping storms
 
     # "pending" means the client has been notified and the clock is already ticking
     def incoming_attack_pending(self): return (self.incoming_attack_time > 0)
@@ -12668,7 +12668,7 @@ class CONTROLAPI(resource.Resource):
             if session:
                 # ONLINE edit
                 try:
-                    val = handler.exec_online(session, session.deferred_messages)
+                    val = handler.exec_online(session, session.outgoing_messages)
                 except:
                     gamesite.exception_log.event(server_time, 'CustomerSupport online exception player %d method %r args %r:\n%s' % (user_id, method_name, args, traceback.format_exc()))
                     val = CustomerSupport.ReturnValue(error = traceback.format_exc())
@@ -12679,7 +12679,7 @@ class CONTROLAPI(resource.Resource):
 
                     def after_async(async_result, request, session):
                         # note: only handles one asynchronous step; if more are needed, this would have to recurse
-                        session.flush_deferred_messages()
+                        session.flush_outgoing_messages()
                         SpinHTTP.complete_deferred_request(async_result.as_body(), request)
                     val.async.addBoth(after_async, request, session)
 
@@ -12689,7 +12689,7 @@ class CONTROLAPI(resource.Resource):
                     else:
                         ret = val.as_body()
 
-                session.flush_deferred_messages()
+                session.flush_outgoing_messages()
 
             else:
                 # OFFLINE edit
@@ -12805,32 +12805,32 @@ class CONTROLAPI(resource.Resource):
         session.player.banned_until = server_time + gamedata['server']['default_ban_time']
         return self.kill_session(request, session)
     def handle_ai_attack(self, request, session = None, attack_type = None):
-        session.start_ai_attack(session.deferred_messages, attack_type, override_protection = True, verbose = True)
+        session.start_ai_attack(session.outgoing_messages, attack_type, override_protection = True, verbose = True)
     def handle_lockout(self, request, session = None, lockout_time = None, lockout_message = None):
         session.player.lockout_until = server_time + lockout_time
         session.player.lockout_message = lockout_message
         return self.kill_session(request, session)
     def handle_push_gamedata(self, request, session = None):
-        self.gameapi.push_gamedata(session, session.deferred_messages)
-        session.flush_deferred_messages()
+        self.gameapi.push_gamedata(session, session.outgoing_messages)
+        session.flush_outgoing_messages()
     def handle_force_reload(self, request, session = None):
-        session.send_deferred_message([["FORCE_RELOAD"]], flush_now = True)
+        session.send([["FORCE_RELOAD"]], flush_now = True)
     def handle_client_eval(self, request, session = None, expr = None):
-        session.send_deferred_message([["CLIENT_EVAL", expr]], flush_now = True)
+        session.send([["CLIENT_EVAL", expr]], flush_now = True)
     def handle_offer_payer_promo(self, request, session = None):
-        session.user.offer_payer_promo(session, session.deferred_messages)
-        session.flush_deferred_messages()
+        session.user.offer_payer_promo(session, session.outgoing_messages)
+        session.flush_outgoing_messages()
     def handle_invoke_facebook_auth(self, request, session = None, scope = None):
         if not scope: scope = SpinConfig.config.get('facebook_auth_scope', 'email')
-        session.send_deferred_message([["INVOKE_FACEBOOK_AUTH", scope, "Test", "Test authorization"]], flush_now = True)
+        session.send([["INVOKE_FACEBOOK_AUTH", scope, "Test", "Test authorization"]], flush_now = True)
     def handle_join_abtest(self, request, session = None, name = None, group = None):
         assert group in gamedata['abtests'][name]['groups']
         session.player.abtests[name] = group
         # note: does NOT update object specs, will likely require a reload to work
-        session.deferred_messages.append(["ABTEST_UPDATE", session.player.abtests])
+        session.outgoing_messages.append(["ABTEST_UPDATE", session.player.abtests])
     def handle_clear_abtest(self, request, session = None, name = None):
         if name in session.player.abtests: del session.player.abtests[name]
-        session.deferred_messages.append(["ABTEST_UPDATE", session.player.abtests])
+        session.outgoing_messages.append(["ABTEST_UPDATE", session.player.abtests])
     def handle_pvp_isolate(self, request, session = None):
         session.player.isolate_pvp = True
     def handle_pvp_unisolate(self, request, session = None):
@@ -12861,7 +12861,7 @@ class CONTROLAPI(resource.Resource):
         for session in session_table.itervalues():
             if not session.logout_in_progress:
                 if session.player.home_region == region_id:
-                    session.send_deferred_message([["REGION_TURF_UPDATE", session.player.home_region, data]])
+                    session.send([["REGION_TURF_UPDATE", session.player.home_region, data]])
 
 class Store:
 
@@ -13717,7 +13717,7 @@ class Store:
         if network_id != receiver:
             gamesite.exception_log.event(server_time, 'execute_order: strange, receiver is mismatched (%s %s)' % (network_id, receiver))
 
-        price_description, detail_props = Store.execute_order(gameapi, request, session, session.deferred_messages,
+        price_description, detail_props = Store.execute_order(gameapi, request, session, session.outgoing_messages,
                                                               currency, credits_amount,
                                                               unit_id, spellname, spellarg,
                                                               server_time_according_to_client,
@@ -13772,14 +13772,14 @@ class Store:
                                                                  'order_id': order_id,
                                                                  'description': descr})
 
-        session.send_adnetwork_purchase_event(session.deferred_messages, order_id, dollar_amount) # note: post-FB-tax
-        session.send_adnetwork_events(session.deferred_messages)
+        session.send_adnetwork_purchase_event(session.outgoing_messages, order_id, dollar_amount) # note: post-FB-tax
+        session.send_adnetwork_events(session.outgoing_messages)
 
         # update client's version of spend metrics
-        session.player.send_history_update(session.deferred_messages)
+        session.player.send_history_update(session.outgoing_messages)
         if tag: # send acknowledgement to client
-            session.deferred_messages.append([{'fbcredits':"FBCREDITS_ORDER_ACK",'kgcredits':"KGCREDITS_ORDER_ACK"}[currency], tag])
-        session.flush_deferred_messages()
+            session.outgoing_messages.append([{'fbcredits':"FBCREDITS_ORDER_ACK",'kgcredits':"KGCREDITS_ORDER_ACK"}[currency], tag])
+        session.flush_outgoing_messages()
         return session
 
     @classmethod
@@ -14861,7 +14861,7 @@ class GAMEAPI(resource.Resource):
         myset = self.deferred_sessions
         self.deferred_sessions = set()
         for session in myset:
-            session.flush_deferred_messages()
+            session.flush_outgoing_messages()
 
     def render_OPTIONS(self, request):
         # necessary for FireFox 3.6
@@ -16655,9 +16655,9 @@ class GAMEAPI(resource.Resource):
                             # divert the messages
                             unused = []
                             self.change_session(None, session, unused, dest_user_id = session.player.user_id, force = True)
-                            session.deferred_messages.append(["SESSION_CHANGE_SKIPPED"])
-                            session.flush_deferred_messages()
-                        reactor.callLater(0, functools.partial(self.complete_attack, session, session.deferred_messages, lambda sync: go_home_and_flush_skip(self, session)))
+                            session.outgoing_messages.append(["SESSION_CHANGE_SKIPPED"])
+                            session.flush_outgoing_messages()
+                        reactor.callLater(0, functools.partial(self.complete_attack, session, session.outgoing_messages, lambda sync: go_home_and_flush_skip(self, session)))
                         return
                 else:
                     retmsg += do_attack_retmsg # send error messages to client
@@ -16666,8 +16666,8 @@ class GAMEAPI(resource.Resource):
                 # also necessary in case do_attack() fails
                 def go_home_and_flush(self, session):
                     session.visit_base_in_progress = True
-                    self.change_session(None, session, session.deferred_messages, dest_user_id = session.player.user_id, force = True)
-                    session.flush_deferred_messages()
+                    self.change_session(None, session, session.outgoing_messages, dest_user_id = session.player.user_id, force = True)
+                    session.flush_outgoing_messages()
 
                 reactor.callLater(0, lambda: go_home_and_flush(self, session))
             else:
@@ -21103,7 +21103,7 @@ class GAMEAPI(resource.Resource):
         # CLIENT_HELLO message is handled as a special case, because it does not have a session yet
         if arg[0][0] == "CLIENT_HELLO":
 
-            retmsg = [] # to trap errors only - will be connected to session.deferred_messages after session set-up
+            retmsg = [] # to trap errors only - will be connected to session.outgoing_messages after session set-up
             go_async = self.handle_client_hello(http_request, client_ip, user_agent, arg[0], retmsg)
 
             arg = arg[1:]
@@ -21155,7 +21155,7 @@ class GAMEAPI(resource.Resource):
                 session.longpoll_request = http_request
                 session.longpoll_request_time = -1 # no need to force a keepalive, and reuse this request multiple times
 
-        is_async = self.handle_message_buffer(http_request, session, session.deferred_messages)
+        is_async = self.handle_message_buffer(http_request, session, session.outgoing_messages)
         if not is_async:
             reactor.callLater(0, self.complete_deferred_request, http_request, session, [])
         return server.NOT_DONE_YET
@@ -21299,7 +21299,7 @@ class GAMEAPI(resource.Resource):
 
     def complete_deferred_request(self, request, session, retmsg):
         # note: retmsg is ONLY used to convey error messages that happen prior to session set-up
-        # once the session is alive, only session.deferred_messages is used for transmission
+        # once the session is alive, only session.outgoing_messages is used for transmission
 
         if not session: # can happen on async login failure
             assert request
@@ -21308,21 +21308,21 @@ class GAMEAPI(resource.Resource):
 
         else:
 
-            # note: IGNORE retmsg here - all traffic is on session.deferred_messages
+            # note: IGNORE retmsg here - all traffic is on session.outgoing_messages
 
             session.is_async = False
 
             # process any new pending messages
-            self.handle_message_buffer(request, session, session.deferred_messages)
+            self.handle_message_buffer(request, session, session.outgoing_messages)
             if session.is_async:
                 return
 
-            self.run_deferred_actions(session, session.deferred_messages)
+            self.run_deferred_actions(session, session.outgoing_messages)
 
             # sometimes this is called from a non-request context (e.g. bgtask calling complete_attack() on a timed-out session)
             # if so, don't run the normal path. But flush deferred messages.
             if request is None:
-                session.flush_deferred_messages()
+                session.flush_outgoing_messages()
                 return
 
             if gamesite.raw_log:
@@ -21331,9 +21331,9 @@ class GAMEAPI(resource.Resource):
 
             r = SpinJSON.dumps({'serial': session.outgoing_serial,
                                 'clock': time.time() if gamedata['server'].get('send_high_precision_time',True) else server_time,
-                                'msg': session.deferred_messages})
+                                'msg': session.outgoing_messages})
             session.outgoing_serial += 1
-            del session.deferred_messages[:] # note: do not create a new array, since there may be external references
+            del session.outgoing_messages[:] # note: do not create a new array, since there may be external references
 
         # works for both standard HTTP request and WSFakeRequest
         if hasattr(request, '_disconnected') and request._disconnected: return
@@ -21341,8 +21341,8 @@ class GAMEAPI(resource.Resource):
         request.finish()
 
     def complete_longpoll(self, request, session, sync = False):
-        msg = session.deferred_messages[:]
-        del session.deferred_messages[:] # note: do not create a new array, since in-flight async requests may reference it
+        msg = session.outgoing_messages[:]
+        del session.outgoing_messages[:] # note: do not create a new array, since in-flight async requests may reference it
 
         if len(msg) == 0: # must send something
             msg.append(["NOMESSAGE"])
@@ -21364,9 +21364,9 @@ class GAMEAPI(resource.Resource):
             self.complete_longpoll(session.longpoll_request, session)
         session.longpoll_request = request
         session.longpoll_request_time = server_time
-        if len(session.deferred_messages) > 0 or session.logout_in_progress:
+        if len(session.outgoing_messages) > 0 or session.logout_in_progress:
             # plan to return immediately if messages are pending, or if we're on our way out
-            ret = session.send_deferred_message([], flush_now = False, sync = True)
+            ret = session.send([], flush_now = False, sync = True)
             if ret is not None: return ret
         return server.NOT_DONE_YET # park the request
 
@@ -21849,8 +21849,8 @@ class GAMEAPI(resource.Resource):
         # create the new session
         session = Session(session_id, user, player, server_time)
 
-        # upon success, retmsg will be ignored, and future client messages should go via session.deferred_messages
-        session.deferred_messages = retmsg # !!!
+        # upon success, retmsg will be ignored, and future client messages should go via session.outgoing_messages
+        session.outgoing_messages = retmsg # !!!
 
         # get rid of old combat debris
         player.update_inerts()
@@ -22463,7 +22463,7 @@ class GAMEAPI(resource.Resource):
             # then continue with log_out_async2
             def continue_log_out(self, session, method, cb, force, is_sync):
                 self.log_out_async2(session, method, cb, force = force)
-            self.complete_attack(session, session.deferred_messages, functools.partial(continue_log_out, self, session, method, cb, force), reason='log_out_async')
+            self.complete_attack(session, session.outgoing_messages, functools.partial(continue_log_out, self, session, method, cb, force), reason='log_out_async')
 
     def log_out_async2(self, session, method, cb, force = False):
         ascdebug('log_out_async2 %d' % (session.user.user_id))
@@ -22901,7 +22901,7 @@ class GAMEAPI(resource.Resource):
             if d:
                 # let's try doing this asynchronously to the other session traffic...
                 d.addBoth(lambda result, _session = session, _tag = tag: \
-                          _session.send_deferred_message([["XSOLLA_GET_TOKEN_RESULT", _tag, result]], flush_now = True))
+                          _session.send([["XSOLLA_GET_TOKEN_RESULT", _tag, result]], flush_now = True))
             return # do not go async
 
         # pay with gamebucks
@@ -25716,7 +25716,7 @@ class GAMEAPI(resource.Resource):
                     session.deferred_ping_squads = True
 
                 if (originator != session.player.user_id): # is async to session
-                    session.send_deferred_message([upd])
+                    session.send([upd])
 
         if send_to_net:
             gamesite.chat_mgr.send('CONTROL', {'secret':SpinConfig.config['proxy_api_secret'],
@@ -25732,7 +25732,7 @@ class GAMEAPI(resource.Resource):
         upd = [msg, region_id, base_id, attacker_id, defender_id, summary, pcache_info]
         for session in session_table.itervalues():
             if session.player.user_id == defender_id and session.player.home_region == region_id and attacker_id != session.player.user_id:
-                session.send_deferred_message([upd], flush_now = True)
+                session.send([upd], flush_now = True)
 
         if send_to_net:
             gamesite.chat_mgr.send('CONTROL', {'secret':SpinConfig.config['proxy_api_secret'],
@@ -26073,7 +26073,7 @@ class GameSite(server.Site):
     # note: this does not prevent NEW log-ins, so make sure the proxyserver is not routing any new logins here
     def start_maint_kick(self):
         for session in session_table.itervalues():
-            session.send_deferred_message([["SERVER_MAINTENANCE_WARNING"]], flush_now = True)
+            session.send([["SERVER_MAINTENANCE_WARNING"]], flush_now = True)
         self.maint_kick_time = server_time + gamedata['server']['maint_kick_time']
         self.server_state = 'maint_kick'
         status_json = admin_stats.get_server_status_json()
@@ -26234,7 +26234,7 @@ class GameSite(server.Site):
                    Predicates.read_predicate(gamedata['server']['idle_check']['enable_if']).is_satisfied(session.player, None)) and \
                   session.player.idle_check.check_needed(session.login_time, server_time, playtime)):
                 idle_check_msg = session.player.idle_check.start_check(session.login_time, server_time, playtime)
-                session.send_deferred_message([["IDLE_CHECK", idle_check_msg]])
+                session.send([["IDLE_CHECK", idle_check_msg]])
                 need_flush = True
                 metric_event_coded(session.user.user_id, '0691_idle_check', idle_check_msg)
 
@@ -26243,10 +26243,10 @@ class GameSite(server.Site):
                 if (session.player.lockout_until > 0) and (server_time < session.player.lockout_until):
                     # abuse detected, kick them out
                     m = session.player.lockout_message if (session.player.lockout_message and (session.player.lockout_message in gamedata['errors'])) else gamedata['server']['login_abuse_error_code']
-                    session.send_deferred_message([["ERROR", m]], flush_now = True)
+                    session.send([["ERROR", m]], flush_now = True)
                     kick_reason = 'abuse'
                 elif abuse_warning_msg:
-                    session.send_deferred_message(abuse_warning_msg)
+                    session.send(abuse_warning_msg)
                     need_flush = True
 
             if kick_reason:
@@ -26280,13 +26280,13 @@ class GameSite(server.Site):
                 if gamedata['server']['log_ai_attack_overdue'] and session.incoming_attack_type != 'tutorial':
                     gamesite.exception_log.event(server_time, 'deploying overdue AI attack (%s) on player %d' % \
                                                  (str(session.incoming_attack_type), session.player.user_id))
-                session.deploy_ai_attack(session.deferred_messages)
+                session.deploy_ai_attack(session.outgoing_messages)
                 need_flush = True
             elif session.incoming_attack_wave_time > 0 and (server_time >= session.incoming_attack_wave_time):
                 if gamedata['server']['log_ai_attack_overdue'] and session.incoming_attack_type != 'tutorial':
                     gamesite.exception_log.event(server_time, 'deploying overdue AI attack wave (%s) on player %d' % \
                                                  (str(session.incoming_attack_type), session.player.user_id))
-                session.deploy_ai_attack_wave(session.deferred_messages)
+                session.deploy_ai_attack_wave(session.outgoing_messages)
                 need_flush = True
 
             # check for sessions where an attack has been going on for too long
@@ -26302,7 +26302,7 @@ class GameSite(server.Site):
                 session.attack_finish_time = -1
                 # change_session will unlock the victim's state for us
                 session.visit_base_in_progress = True
-                session.is_async = self.gameapi.change_session(None, session, session.deferred_messages, dest_user_id = session.user.user_id, force = True)
+                session.is_async = self.gameapi.change_session(None, session, session.outgoing_messages, dest_user_id = session.user.user_id, force = True)
                 need_flush = True
 
             if (not session.sprobe_in_progress):
@@ -26314,12 +26314,12 @@ class GameSite(server.Site):
                         if ((when == 'only_during_attack') and session.has_attacked) or \
                            ((when == 'anytime') and ((server_time - session.login_time) >= sprobe_config.get('sec_after_login',15))):
                             session.sprobe_in_progress = True
-                            session.send_deferred_message([["SPROBE_RUN"]], flush_now = True)
+                            session.send([["SPROBE_RUN"]], flush_now = True)
                             need_flush = True
 
             session.record_activity_sample()
             if need_flush:
-                session.flush_deferred_messages()
+                session.flush_outgoing_messages()
 
         # send lock keepalive requests in one big batch
         messages_pending = gamesite.lock_client.player_lock_keepalive_batch(lock_keepalive_ids, lock_keepalive_generations, lock_keepalive_states, True, reason='bgfunc')
@@ -26343,11 +26343,11 @@ class GameSite(server.Site):
                 session = lock_keepalive_sessions[i]
                 if session.has_attacked: continue
                 try:
-                    stat = self.gameapi.do_receive_mail(session, session.deferred_messages)
+                    stat = self.gameapi.do_receive_mail(session, session.outgoing_messages)
                     if stat['new_mail']:
-                        session.player.send_mailbox_update(session.deferred_messages)
-                        session.player.send_history_update(session.deferred_messages)
-                        session.flush_deferred_messages()
+                        session.player.send_mailbox_update(session.outgoing_messages)
+                        session.player.send_history_update(session.outgoing_messages)
+                        session.flush_outgoing_messages()
                 except:
                     self.exception_log.event(server_time, ('bgfunc exception while processing mail for player %d: ' % session.user.user_id) + \
                                              traceback.format_exc())

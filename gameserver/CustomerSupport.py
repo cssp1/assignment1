@@ -411,7 +411,7 @@ class HandleChatGag(Handler):
         if 'duration' in self.args:
             # new-style gag
             if session.player.apply_aura('chat_gagged', duration = int(self.args['duration']), ignore_limit = True):
-                session.player.stattab.send_update(session, session.deferred_messages)
+                session.player.stattab.send_update(session, session.outgoing_messages)
         else:
             # old-style gag
             session.user.chat_gagged = True
@@ -435,7 +435,7 @@ class HandleChatUngag(Handler):
     AURAS = ('chat_gagged', 'chat_warned')
     def do_exec_online(self, session, retmsg):
         for aura_name in self.AURAS:
-            session.player.remove_aura(session, session.deferred_messages, aura_name, force = True)
+            session.player.remove_aura(session, session.outgoing_messages, aura_name, force = True)
         session.user.chat_gagged = False
         self.gamesite.pcache_client.player_cache_update(self.user_id, {'chat_gagged': session.user.chat_gagged})
         return ReturnValue(result = 'ok')
