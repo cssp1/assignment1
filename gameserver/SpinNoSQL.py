@@ -2138,11 +2138,12 @@ if __name__ == '__main__':
     sys.stdout = codecs.getwriter('utf8')(sys.stdout)
 
     opts, args = getopt.gnu_getopt(sys.argv[1:], 'g:', ['reset', 'init', 'console', 'maint', 'region-maint=', 'clear-locks',
-                                                      'winners', 'leaders', 'tournament-stat=', 'week=', 'season=', 'game-id=',
-                                                      'score-scope=', 'score-loc=', 'spend-week=',
-                                                      'recache-alliance-scores', 'test'])
+                                                        'winners', 'send-prizes', 'leaders', 'tournament-stat=', 'week=', 'season=', 'game-id=',
+                                                        'score-scope=', 'score-loc=', 'spend-week=',
+                                                        'recache-alliance-scores', 'test'])
     game_instance = SpinConfig.config['game_id']
     mode = None
+    send_prizes = False
     week = -1
     season = -1
     tournament_stat = None
@@ -2160,6 +2161,7 @@ if __name__ == '__main__':
         elif key == '--maint': mode = 'maint' # global maintenance
         elif key == '--region-maint': mode = 'region-maint'; maint_region = val # region maintenance
         elif key == '--winners': mode = 'winners'
+        elif key == '--send-prizes': send_prizes = True
         elif key == '--leaders': mode = 'leaders'
         elif key == '--week': week = int(val)
         elif key == '--season': season = int(val)
@@ -2391,10 +2393,24 @@ if __name__ == '__main__':
                     else:
                         print "    #%2d%s %-24s with %5d points WINS %6d %s (id %7d continent %s spend %s)" % (j+1 if (not is_tie) else WINNERS, '(tie)' if is_tie else '',
                                                                                         detail, display_point_count(gamedata, member['absolute'], tournament_stat), my_prize, gamedata['store']['gamebucks_ui_name'], member['user_id'], ui_continent, spend_data)
-                        commands.append("./check_player.py %d --give-item gamebucks --melt-hours -1 --item-stack %d --give-item-subject 'Tournament Prize' --give-item-body 'Congratulations, here is your Tournament prize for %sWeek %d!  Click the prize to collect it.' --item-log-reason 'tournament_prize_s%d_w%d'" % (member['user_id'], my_prize, ('Season %d ' % (season+gamedata['matchmaking']['season_ui_offset'])) if season >= 0 else '', week, season, week))
+                        commands.append(['./check_player.py', '%d' % member['user_id'],
+                                         '--give-item', 'gamebucks', '--melt-hours', '-1',
+                                         '--item-stack', '%d' % my_prize,
+                                         '--give-item-subject', 'Tournament Prize',
+                                         '--give-item-body', 'Congratulations, here is your Tournament prize for %sWeek %d! Click the prize to collect it.' % (('Season %d ' % (season+gamedata['matchmaking']['season_ui_offset'])) if season >= 0 else '', week),
+                                         '--item-log-reason', 'tournament_prize_s%d_w%d' % (season, week)])
 
             print "COMMANDS"
-            print '\n'.join(commands)
+            def quote(s):
+                if ' ' in s: return "'"+s+"'"
+                return s
+            print '\n'.join(' '.join(quote(word) for word in cmd) for cmd in commands)
+            if send_prizes:
+                import subprocess, os
+                print "SENDING PRIZES"
+                for cmd in commands:
+                    subprocess.check_call(cmd, stdout=open(os.devnull,"w"))
+                print "PRIZES ALL SENT OK"
 
     elif mode == 'test':
         print 'TEST'
