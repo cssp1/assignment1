@@ -14689,18 +14689,23 @@ class TRIALPAYAPI(resource.Resource):
                                         'session_id': session.session_id,
                                         'currency_url': str(request_args['currency_url'][0])})
 
-            # do not return HTTP response until player state is fully flushed
-            def complete_settlement(request, session):
-                # send mtime/spend update to player cache so upcache will pick it up immediately
-                gamesite.pcache_client.player_cache_update(session.user.user_id,
-                                                           {'last_mtime': server_time,
-                                                            'money_spent': session.player.history.get('money_spent',0.0)}, reason = 'purchase')
-                if request:
-                    request.write('1')
-                    request.finish()
+            # As of September 2015, TrialPay is now doing rapid-fire transactions on small amounts (~2 gamebucks)
+            # that cause asynchronous stores to overlap. So, only synchronize on large transactions.
 
-            player_table.store_async(session.player, functools.partial(complete_settlement, request, session), True, 'TRIALPAYAPI')
-            return server.NOT_DONE_YET
+            if gamebucks_amount >= gamedata['server'].get('trialpay_sync_threshold',50):
+                # do not return HTTP response until player state is fully flushed
+
+                def complete_settlement(request, session):
+                    # send mtime/spend update to player cache so upcache will pick it up immediately
+                    gamesite.pcache_client.player_cache_update(session.user.user_id,
+                                                               {'last_mtime': server_time,
+                                                                'money_spent': session.player.history.get('money_spent',0.0)}, reason = 'purchase')
+                    if request:
+                        request.write('1')
+                        request.finish()
+
+                player_table.store_async(session.player, functools.partial(complete_settlement, request, session), True, 'TRIALPAYAPI')
+                return server.NOT_DONE_YET
 
         return str('1')
 
