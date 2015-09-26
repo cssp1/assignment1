@@ -4774,6 +4774,7 @@ class GameObjectSpec(Spec):
     fields = [
         ["kind", "REQUIRED"],
         ["max_hp", "REQUIRED"],
+        ["armor", 0],
         ["maxvel", 0],
         ["travel_speed", 0],
         ["gridsize", [0,0]],

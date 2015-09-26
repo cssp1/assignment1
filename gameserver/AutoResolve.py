@@ -24,25 +24,34 @@ def compute_dps(shooter, target, session):
     #cooldown = shooter.get_leveled_quantity(spell.get('cooldown', 1))
     #range = shooter.get_leveled_quantity(spell.get('range', 0)) # include somehow?
 
-    damage_coeff = 1.0
+    damage_coeff_pre_armor = 1.0
+    damage_coeff_post_armor = 1.0
 
-    damage_coeff *= shooter.owner.stattab.get_unit_stat(shooter.spec.name, 'weapon_damage', 1)
-    damage_coeff *= target.owner.stattab.get_unit_stat(target.spec.name, 'damage_taken', 1)
+    damage_coeff_pre_armor *= shooter.owner.stattab.get_unit_stat(shooter.spec.name, 'weapon_damage', 1)
+    damage_coeff_post_armor *= target.owner.stattab.get_unit_stat(target.spec.name, 'damage_taken', 1)
 
     for key in target.spec.defense_types:
-        damage_coeff *= shooter.owner.stattab.get_unit_stat(shooter.spec.name, 'weapon_damage_vs:%s' % key, 1)
+        damage_coeff_pre_armor *= shooter.owner.stattab.get_unit_stat(shooter.spec.name, 'weapon_damage_vs:%s' % key, 1)
 
     damage_vs_table = shooter.get_leveled_quantity(spell.get('damage_vs',{}))
     if damage_vs_table:
         if not target.spec.defense_types:
-            damage_coeff *= damage_vs_table.get('default',1)
+            damage_coeff_pre_armor *= damage_vs_table.get('default',1)
         else:
             for key in target.spec.defense_types:
                 if key in damage_vs_table:
-                    damage_coeff *= shooter.get_leveled_quantity(damage_vs_table[key])
-                    damage_coeff *= target.owner.stattab.get_unit_stat(target.spec.name, 'damage_taken_from:%s' % key, 1)
+                    damage_coeff_pre_armor *= shooter.get_leveled_quantity(damage_vs_table[key])
+                    damage_coeff_post_armor *= target.owner.stattab.get_unit_stat(target.spec.name, 'damage_taken_from:%s' % key, 1)
 
-    damage = int(damage * damage_coeff + 0.5)
+    damage *= damage_coeff_pre_armor
+
+    armor = max(target.get_leveled_quantity(target.spec.armor), target.owner.stattab.get_unit_stat(target.spec.name, 'armor', 0))
+    if armor > 0: damage = max(1, damage - armor)
+
+    damage *= damage_coeff_post_armor
+
+    damage = max(1, int(damage + 0.5))
+
     return damage
 
 # return two lists of arguments to call the server functions destroy_object()
