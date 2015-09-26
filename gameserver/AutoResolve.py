@@ -8,7 +8,7 @@
 
 # pretty-print a list of GameObjects
 def pretty_obj_list(ls):
-    return '['+', '.join('%s L%d' % (x.spec.name, x.level) for x in ls)+']'
+    return '['+', '.join('%s L%d %d/%d' % (x.spec.name, x.level, x.hp, x.max_hp) for x in ls)+']'
 
 # compute damage per second done by "shooter" against "target"
 def compute_dps(shooter, target, session):
@@ -77,8 +77,6 @@ def resolve(session, log_func = None):
 
     # iterate until nothing that can shoot is left alive OR
     # nothing can be damaged by what's left.
-
-    # XXX things that will break this: kills_self spells, security team spawning
 
     iter_max = 10000 # protect against infinite loop
     cur_iter = 0
@@ -161,11 +159,15 @@ def resolve(session, log_func = None):
             combat_updates.append([next.obj_id, next.spec.name, None, new_hp, None, killer_info, None])
 
         # the opposing team doesn't suffer a death, but we need to
-        # subtract HP from its most vulnerable target
+        # subtract HP from its most vulnerable target for the time taken during the kill
         for next_ttk, next_damaged_id, unused2 in kill_list[1:]:
             next_damaged = session.get_object(next_damaged_id)
             if next_damaged.owner is not next.owner:
-                target_cur_hp[next_damaged.obj_id] *= (ttk/next_ttk)
+                old_hp = target_cur_hp[next_damaged.obj_id]
+                target_cur_hp[next_damaged.obj_id] = int((1.0 - ttk/next_ttk) * old_hp)
+                log_func('opposition damage: %s %s L%d HP %d -> %d (ttk %f next_ttk %f)' % \
+                         (('player' if next_damaged.owner is session.player else 'enemy'), next_damaged.spec.name, next_damaged.level,
+                          old_hp, target_cur_hp[next_damaged.obj_id], ttk, next_ttk))
                 break
 
         cur_iter += 1
