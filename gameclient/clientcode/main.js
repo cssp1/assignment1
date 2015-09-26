@@ -17332,10 +17332,10 @@ function update_tutorial_arrow_for_button(_dialog, _parent_path, _widget_name, _
             if(index >= 0) {
                 found_widget_name = 'button'+index.toString();
             }
-        } else if(widget_name && widget_name.indexOf('BUTTON:') == 0 && parent.user_data['buttons']) {
-            // XXXXXX somehow we were getting here with parent.user_data missing 'buttons'. Band-aid fix for now.
+        } else if(widget_name && widget_name.indexOf('BUTTON:') == 0 /* && parent.user_data['buttons'] */) {
+            // XXX somehow we were getting here with parent.user_data missing 'buttons'. Band-aid fix for now.
             var spellname = widget_name.split(':')[1];
-            var index = parent.user_data['buttons'].findIndex(function(but) { return but.spellname === spellname;});
+            var index = goog.array.findIndex(parent.user_data['buttons'], function(but) { return but.spellname === spellname;});
             if(index >= 0) {
                 found_widget_name = 'button'+index.toString();
             }
