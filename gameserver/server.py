@@ -14903,7 +14903,7 @@ class GAMEAPI(resource.Resource):
             session.complete_attack_cbs = None
             if cb_list:
                 for cb in cb_list:
-                    cb('defeat', {}, not is_async)
+                    cb(not is_async)
 
         return is_async
 
