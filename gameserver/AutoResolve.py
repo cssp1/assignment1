@@ -174,9 +174,10 @@ def resolve(session, log_func = None):
             if next_damaged.owner is not next.owner:
                 old_hp = target_cur_hp[next_damaged.obj_id]
                 target_cur_hp[next_damaged.obj_id] = max(1, int((1.0 - ttk/next_ttk) * old_hp))
-                log_func('opposition damage: %s %s L%d HP %d -> %d (ttk %f next_ttk %f)' % \
-                         (('player' if next_damaged.owner is session.player else 'enemy'), next_damaged.spec.name, next_damaged.level,
-                          old_hp, target_cur_hp[next_damaged.obj_id], ttk, next_ttk))
+                if log_func:
+                    log_func('opposition damage: %s %s L%d HP %d -> %d (ttk %f next_ttk %f)' % \
+                             (('player' if next_damaged.owner is session.player else 'enemy'), next_damaged.spec.name, next_damaged.level,
+                              old_hp, target_cur_hp[next_damaged.obj_id], ttk, next_ttk))
                 break
 
         cur_iter += 1
