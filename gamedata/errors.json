@@ -198,7 +198,6 @@
     "CANNOT_DONATE_UNITS_NO_SPACE": { "ui_name": "Recipient has no space for more reinforcements.\n\nAnother player may have donated units ahead of you, or this request may be too old.\n\nYou have not donated any units." },
     "CANNOT_CREATE_SQUAD_LIMIT_REACHED": { "ui_name": "Maximum number of battalions already created." },
     "CANNOT_CREATE_SQUAD_MAX_LIMIT_REACHED": { "ui_name": "No more battalions can be created." },
-    "CANNOT_SQUAD_ASSIGN_UNIT_LIMIT_REACHED": { "ui_title": "Not Enough Space", "ui_name": "Battalion does not have enough space for this unit. Upgrade Reserves Bay to raise limit." },
     "CANNOT_ALTER_SQUAD_UNDER_REPAIR": { "ui_title": "Battalion Under Repair", "ui_name": "Battalions cannot be edited while under repair. Finish or cancel repairs, then try again." },
     "CANNOT_DEPLOY_SQUAD_UNDER_REPAIR": { "ui_title": "Battalion Under Repair", "ui_name": "Battalions cannot be deployed while under repair. Finish or cancel repairs, then try again." },
     "CANNOT_DEPLOY_SQUAD_LIMIT_REACHED": { "ui_title": "Deployment Limit Reached", "ui_name": "Reserves Bay cannot support more deployed battalions. Upgrade Reserves Bay to raise limit." },

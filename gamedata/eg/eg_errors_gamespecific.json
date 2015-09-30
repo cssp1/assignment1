@@ -22,6 +22,7 @@
 "CANNOT_LOG_IN_LOGIN_ABUSE_FREQUENCY": { "ui_name": "Your account is on login cooldown",
                                          "redirect": "//www.XXXXXX.com/error-login-spam/" },
 
-"CANNOT_SQUAD_ASSIGN_UNIT_LIMIT_REACHED_BASE_DEFENDERS": { "ui_title": "Not Enough Space", "ui_name": "Base Defenders does not have enough space for this unit. Upgrade Tactical Ops Center to raise limit." },
+"CANNOT_SQUAD_ASSIGN_UNIT_LIMIT_REACHED": { "ui_title": "Not Enough Space", "ui_name": "Battalion does not have enough space for new unit. Upgrade Reserves Bay to raise limit." },
+"CANNOT_SQUAD_ASSIGN_UNIT_LIMIT_REACHED_BASE_DEFENDERS": { "ui_title": "Not Enough Space", "ui_name": "Base Defenders does not have enough space for new unit. Upgrade Tactical Ops Center to raise limit." },
 
 "CANNOT_DEPLOY_SQUAD_NO_NOSQL": { "ui_title": "Deployment Unavailable", "ui_name": "Your current region does not support battalion combat.\n\nUse \"Relocate Base\" option on Tactical Ops Center or Transmitter to enter a NEW Multiplayer region." }
