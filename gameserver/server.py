@@ -1297,7 +1297,7 @@ class User:
             if self.active_session:
                 retmsg = self.active_session.outgoing_messages
         if retmsg is not None:
-            retmsg.append(["PLAYER_CACHE_UPDATE", [gamesite.gameapi.get_player_cache_props(self, session.player)]])
+            retmsg.append(["PLAYER_CACHE_UPDATE", [gamesite.gameapi.get_player_cache_props(self, session.player, session.alliance_id_cache)]])
             retmsg.append(["PLAYER_UI_NAME_UPDATE", self.get_ui_name(session.player)])
 
     def retrieve_ag_info(self, session, retmsg):
@@ -1358,7 +1358,7 @@ class User:
             if self.active_session:
                 retmsg = self.active_session.outgoing_messages
         if retmsg is not None:
-            retmsg.append(["PLAYER_CACHE_UPDATE", [gamesite.gameapi.get_player_cache_props(self, session.player)]])
+            retmsg.append(["PLAYER_CACHE_UPDATE", [gamesite.gameapi.get_player_cache_props(self, session.player, session.alliance_id_cache)]])
             retmsg.append(["PLAYER_UI_NAME_UPDATE", self.get_ui_name(session.player)])
 
     def retrieve_ag_friends_start(self, session, offset = 0, previous_results = None):
@@ -15369,7 +15369,7 @@ class GAMEAPI(resource.Resource):
                                 for feature in defense_features:
                                     self.broadcast_map_attack(session.player.home_region, feature['base_id'], session.player.user_id, session.viewing_player.user_id,
                                                               None,
-                                                              [self.get_player_cache_props(u,p) for u,p in ((session.user,session.player),(session.viewing_user,session.viewing_player))],
+                                                              [self.get_player_cache_props(u,p,aid) for u,p,aid in ((session.user,session.player,session.alliance_id_cache),(session.viewing_user,session.viewing_player,session.viewing_alliance_id_cache))],
                                                               msg = "REGION_MAP_ATTACK_DIVERT")
                                     gamesite.nosql_client.drop_map_feature(session.player.home_region, feature['base_id'])
 
@@ -15770,7 +15770,7 @@ class GAMEAPI(resource.Resource):
                         self.broadcast_map_attack(summary['base_region'], summary['base_id'],
                                                   summary['attacker_id'], summary['defender_id'],
                                                   summary,
-                                                  [self.get_player_cache_props(u,p) for u,p in ((session.user,session.player),(session.viewing_user,session.viewing_player))],
+                                                  [self.get_player_cache_props(u,p,aid) for u,p,aid in ((session.user,session.player,session.alliance_id_cache),(session.viewing_user,session.viewing_player,session.viewing_alliance_id_cache))],
                                                   msg = "REGION_MAP_ATTACK_COMPLETE")
 
             session.player.send_history_update(retmsg)
@@ -16491,7 +16491,7 @@ class GAMEAPI(resource.Resource):
 
                        [x['squad_id'] for x in session.defending_squads.itervalues()],
                        session.viewing_player.is_pvp_player(),
-                       [self.get_player_cache_props(session.user, session.player)] + \
+                       [self.get_player_cache_props(session.user, session.player, session.alliance_id_cache)] + \
                        ([self.get_player_cache_props(session.viewing_user, session.viewing_player, session.viewing_alliance_id_cache)] if ((session.viewing_player is not session.player) and (not session.viewing_player.is_ai())) else []),
                        list(session.player.equipped_items_serialize()),
                        session.debug_session_change_count,
@@ -16785,7 +16785,7 @@ class GAMEAPI(resource.Resource):
         return True # async
 
     # simulate player cache query results by just reading from the in-memory player
-    def get_player_cache_props(self, user, player, alliance_id = None):
+    def get_player_cache_props(self, user, player, alliance_id):
         #base_damage, base_repair_time = player.my_home.report_base_damage_and_repair_time_for_ladder(player)
         ret =  {'user_id': user.user_id,
                 'ui_name': user.get_ui_name(player),
@@ -19476,7 +19476,7 @@ class GAMEAPI(resource.Resource):
                 if session.viewing_player is not session.player:
                     self.broadcast_map_attack(session.viewing_base.base_region, session.viewing_base.base_id,
                                               session.player.user_id, session.viewing_player.user_id, None, # no summary -> attack start
-                                              [self.get_player_cache_props(u,p) for u,p in ((session.user,session.player),(session.viewing_user,session.viewing_player))],
+                                              [self.get_player_cache_props(u,p,aid) for u,p,aid in ((session.user,session.player,session.alliance_id_cache),(session.viewing_user,session.viewing_player,session.viewing_alliance_id_cache))],
                                               msg = "REGION_MAP_ATTACK_START")
 
             elif session.viewing_player.is_human():
@@ -19909,7 +19909,7 @@ class GAMEAPI(resource.Resource):
                        'to': [], # will be filled in below
                        'type': 'resource_gift',
                        'expire_time': server_time + gamedata['server']['message_expire_time']['resource_gift'],
-                       'from_pcache': self.get_player_cache_props(session.user, session.player),
+                       'from_pcache': self.get_player_cache_props(session.user, session.player, session.alliance_id_cache),
                        'unique_per_sender': 'resource_gift'}
 
         for recipient_user_id in recipient_user_id_list:
@@ -21299,7 +21299,7 @@ class GAMEAPI(resource.Resource):
             retmsg.append(["PLAYER_UI_NAME_UPDATE", session.user.get_ui_name(session.player)])
             retmsg.append(["PLAYER_ALIAS_UPDATE", session.player.alias])
             retmsg.append(["PLAYER_TITLES_UPDATE", session.player.title])
-            retmsg.append(["PLAYER_CACHE_UPDATE", [self.get_player_cache_props(session.user, session.player)]])
+            retmsg.append(["PLAYER_CACHE_UPDATE", [self.get_player_cache_props(session.user, session.player, session.alliance_id_cache)]])
 
     def complete_deferred_request(self, request, session, retmsg):
         # note: retmsg is ONLY used to convey error messages that happen prior to session set-up
@@ -24834,7 +24834,7 @@ class GAMEAPI(resource.Resource):
                                                        'type': 'resource_gift',
                                                        'msg_id': generate_mail_id(),
                                                        'expire_time': server_time + gamedata['server']['message_expire_time']['resource_gift'],
-                                                       'from_pcache': self.get_player_cache_props(session.user, session.player),
+                                                       'from_pcache': self.get_player_cache_props(session.user, session.player, session.alliance_id_cache),
                                                        'unique_per_sender': 'resource_gift'}])
                     if self.do_receive_mail(session, retmsg)['new_mail']:
                         session.player.send_mailbox_update(retmsg)

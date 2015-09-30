@@ -764,8 +764,8 @@ PlayerInfoDialog.update_profile_tab = function(dialog) {
                 dialog.widgets['gift_button'].show = false;
             }
 
-            if(player.get_any_abtest_value('enable_alliances', gamedata['client']['enable_alliances']) && ('alliance_id' in r)) {
-                if(r['alliance_id'] <= 0) {
+            if(player.get_any_abtest_value('enable_alliances', gamedata['client']['enable_alliances'])) {
+                if(!('alliance_id' in r) || r['alliance_id'] <= 0) {
                     // player is not currently in an alliance
                     dialog.widgets['alliance'].str = dialog.data['widgets']['alliance']['ui_name_none'];
 
