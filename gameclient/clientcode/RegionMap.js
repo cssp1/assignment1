@@ -10,6 +10,7 @@ goog.provide('RegionMap');
 
 goog.require('SPUI');
 goog.require('GameArt');
+goog.require('SquadControlDialog');
 goog.require('PlayerInfoDialog');
 goog.require('goog.array');
 goog.require('goog.string');
@@ -1062,7 +1063,7 @@ RegionMap.RegionMap.update_feature_popup_menu = function(dialog) {
                         buttons.push([gamedata['strings']['regional_map']['deploy'],
                                       (function(_mapwidget, _feature) { return function() {
                                           _mapwidget.set_popup(null);
-                                          var picker = do_invoke_squad_control('deploy', {'deploy_from':_feature['base_map_loc']});
+                                          SquadControlDialog.invoke_deploy(_feature['base_map_loc']);
                                       }; })(mapwidget, feature), 'passive']);
                     }
                 }
@@ -1104,7 +1105,7 @@ RegionMap.RegionMap.update_feature_popup_menu = function(dialog) {
                         buttons.push([gamedata['strings']['regional_map']['call'],
                                       (function(_mapwidget, _feature) { return function() {
                                           _mapwidget.set_popup(null);
-                                          var picker = do_invoke_squad_control('call', {'call_to':_feature['base_map_loc']});
+                                          SquadControlDialog.invoke_call(_feature['base_map_loc']);
                                       }; })(mapwidget, feature), 'passive']);
                     }
                 }
@@ -1153,7 +1154,7 @@ RegionMap.RegionMap.update_feature_popup_menu = function(dialog) {
                 buttons.push([gamedata['strings']['regional_map']['call'],
                               (function(_mapwidget, _feature) { return function() {
                                   _mapwidget.set_popup(null);
-                                  var picker = do_invoke_squad_control('call', {'call_to':_feature['base_map_loc']});
+                                  SquadControlDialog.invoke_call(_feature['base_map_loc']);
                               }; })(mapwidget, feature), 'passive']);
             }
             buttons.push(mapwidget.make_bookmark_button(feature));
@@ -1181,7 +1182,7 @@ RegionMap.RegionMap.update_feature_popup_menu = function(dialog) {
             buttons.push([gamedata['strings']['regional_map']['call'],
                           (function(_mapwidget, _feature) { return function() {
                               _mapwidget.set_popup(null);
-                              var picker = do_invoke_squad_control('call', {'call_to':_feature['base_map_loc']});
+                              SquadControlDialog.invoke_call(_feature['base_map_loc']);
                           }; })(mapwidget, feature), 'passive']);
         }
         // GET INFO
@@ -1211,7 +1212,7 @@ RegionMap.RegionMap.update_feature_popup_menu = function(dialog) {
                     buttons.push([gamedata['strings']['regional_map']['call'],
                                   (function(_mapwidget, _feature) { return function() {
                                       _mapwidget.set_popup(null);
-                                      var picker = do_invoke_squad_control('call', {'call_to':_feature['base_map_loc']});
+                                      SquadControlDialog.invoke_call(_feature['base_map_loc']);
                                   }; })(mapwidget, feature), 'passive']);
                 }
             } else {

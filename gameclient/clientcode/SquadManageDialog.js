@@ -62,7 +62,7 @@ SquadManageDialog.invoke_squad_manage = function(squad_id) {
             var maybe_squad_control = __dialog.parent;
             close_parent_dialog(__dialog.widgets['disband_button']);
             if(maybe_squad_control && maybe_squad_control.user_data && maybe_squad_control.user_data['dialog'] == 'squad_control') {
-                squad_control_block(maybe_squad_control);
+                SquadControlDialog.block(maybe_squad_control);
             }
             send_to_server.func(["CAST_SPELL", GameObject.VIRTUAL_ID, "SQUAD_DELETE", __squad_data['id']]);
         }; })(_dialog, _squad_data);
