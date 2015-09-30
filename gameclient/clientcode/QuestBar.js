@@ -157,16 +157,21 @@ QuestBar.update = function(dialog) {
             var quest = quest_list[i];
             var can_complete = player.can_complete_quest(quest);
 
-            var tip = dialog.data['widgets']['frame'][(can_complete ? 'ui_tooltip_complete' : 'ui_tooltip_available')].replace('%s', quest['ui_name']);
-            var show_text = 'ui_description'; // 'ui_instructions';
-            if(!can_complete && quest[show_text]) {
-                var instr = eval_cond_or_literal(quest[show_text], player, null);
-                if(instr) {
-                    instr = SPUI.break_lines(instr, dialog.widgets['frame'+wname].tooltip.font, [dialog.data['widgets']['frame']['tooltip_width_'+show_text],0])[0];
-                    tip += '\n\n' + instr;
+            var show_tip = !selection.ui;
+            if(show_tip) {
+                var tip = dialog.data['widgets']['frame'][(can_complete ? 'ui_tooltip_complete' : 'ui_tooltip_available')].replace('%s', quest['ui_name']);
+                var show_text = 'ui_description'; // 'ui_instructions';
+                if(!can_complete && quest[show_text]) {
+                    var instr = eval_cond_or_literal(quest[show_text], player, null);
+                    if(instr) {
+                        instr = SPUI.break_lines(instr, dialog.widgets['frame'+wname].tooltip.font, [dialog.data['widgets']['frame']['tooltip_width_'+show_text],0])[0];
+                        tip += '\n\n' + instr;
+                    }
                 }
+                dialog.widgets['frame'+wname].tooltip.str = tip;
+            } else {
+                dialog.widgets['frame'+wname].tooltip.str = null;
             }
-            dialog.widgets['frame'+wname].tooltip.str = tip;
             dialog.widgets['frame'+wname].state = (player.quest_tracked == quest ? 'highlight' : dialog.data['widgets']['frame']['state']);
             dialog.widgets['icon'+wname].asset = quest['icon'] || 'inventory_unknown';
 
