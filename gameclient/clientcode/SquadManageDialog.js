@@ -111,6 +111,8 @@ SquadManageDialog.invoke_squad_manage = function(squad_id) {
     dialog.widgets['reserve_scroll_right'].onclick = scroller('reserve', 2);
     dialog.widgets['squad_scroll_left'].onclick = scroller('squad', -4);
     dialog.widgets['squad_scroll_right'].onclick = scroller('squad', 4);
+    dialog.widgets['squad_loading_spinner'].xy = dialog.data['widgets']['squad_loading_spinner'][(squad_id === SQUAD_IDS.BASE_DEFENDERS ? 'xy_base_defenders' : 'xy')];
+
     dialog.ondraw = SquadManageDialog.update_squad_manage;
 };
 
@@ -149,6 +151,8 @@ SquadManageDialog.update_squad_manage = function(dialog) {
 
     // mapping of specname -> quantity in reserves
     var reserve_units_by_type = {};
+    var reserve_pending_by_type = {};
+
     // list of army units in this squad
     var squad_units = [];
 
@@ -165,6 +169,7 @@ SquadManageDialog.update_squad_manage = function(dialog) {
         var obj_squad_id = obj['squad_id'] || 0;
         if(obj_squad_id === SQUAD_IDS.RESERVES) {
             reserve_units_by_type[obj['spec']] = (reserve_units_by_type[obj['spec']]||0) + 1;
+            if(obj['pending']) { reserve_pending_by_type[obj['spec']] = true; }
         } else if(obj_squad_id === dialog.user_data['squad_id']) {
             squad_units.push(obj);
             cur_squad_space += get_leveled_quantity(gamedata['units'][obj['spec']]['consumes_space']||0, obj['level']||1);
@@ -234,11 +239,13 @@ SquadManageDialog.update_squad_manage = function(dialog) {
     });
 
     // show/hide right-hand widgets as appropriate
-    dialog.widgets['reserve_topbar_label'].show =
+    dialog.widgets['assign_all_button'].show =
+        dialog.widgets['unassign_all_button'].show =
+        dialog.widgets['reserve_topbar_label'].show =
         dialog.widgets['reserve_scroll_left'].show =
         dialog.widgets['reserve_scroll_right'].show = !squad_is_deployed;
-    dialog.widgets['deployed_topbar_label'].show =
 
+    dialog.widgets['deployed_topbar_label'].show =
         dialog.widgets['deployed_midbar'].show =
         dialog.widgets['deployed_decoration'].show =
         dialog.widgets['deployed_unit_icon'].show =
@@ -267,7 +274,14 @@ SquadManageDialog.update_squad_manage = function(dialog) {
         dialog.widgets['squad_none_label'].str = dialog.data['widgets']['squad_none_label']['ui_name'+(reserve_types_to_show.length >= 1 ? '' : '_reserves_empty')];
     }
 
+    dialog.widgets['squad_loading_spinner'].show = false;
+    dialog.widgets['reserve_loading_spinner'].show = false;
+
     dialog.widgets['arrow'].show = false;
+
+    // note: buttons can be turned off below
+    var can_assign_all = !squad_is_deployed && (reserve_types_to_show.length >= 1);
+    var can_unassign_all = !squad_is_deployed && (squad_units.length >= 1)
 
     // RESERVES
     if(!squad_is_deployed) {
@@ -354,6 +368,12 @@ SquadManageDialog.update_squad_manage = function(dialog) {
             }; })(pred_ok, pred_help, dialog.user_data['squad_id'], specname, cur_squad_space, max_squad_space);
 
             var icon_state = ((!pred_ok || squad_is_under_repair || squad_is_deployed || squad_in_battle) ? 'disabled_clickable' : null);
+
+            dialog.widgets['reserve_loading_spinner'].show |= !!(reserve_pending_by_type[specname]);
+
+            if(icon_state || reserve_pending_by_type[specname]) {
+                can_assign_all = false;
+            }
 
             var enable_dripper = !!gamedata['client']['squad_manage_dripper'];
 
@@ -464,6 +484,11 @@ SquadManageDialog.update_squad_manage = function(dialog) {
                 dialog.widgets['arrow'].asset = dialog.data['widgets']['arrow']['asset_right'];
             }
 
+            if(icon_state) {
+                can_unassign_all = can_assign_all = false;
+            }
+            dialog.widgets['squad_loading_spinner'].show |= !!obj['pending'];
+
             // HP display
             var hp_wname = 'squad_hp_bar'+grid_x.toString()+','+grid_y.toString();
             if(!(hp_wname in dialog.widgets)) {
@@ -494,7 +519,145 @@ SquadManageDialog.update_squad_manage = function(dialog) {
         });
     }
 
-    // BUTTONS
+    // "ALL" << >> BUTTONS
+    dialog.widgets['assign_all_button'].state = (can_assign_all ? 'normal' : 'disabled_clickable');
+    dialog.widgets['assign_all_button'].onclick = (function (_pred_ok, _pred_help, _squad_id, _cur_squad_space, _max_squad_space) { return function(w, button) {
+        var dialog = w.parent;
+        if(!_pred_ok) {
+            if(_pred_help) {
+                _pred_help();
+            }
+            return true; // stop dripper
+        }
+        if(player.squad_is_deployed(_squad_id) || player.squad_is_in_battle(_squad_id)) {
+            var s = gamedata['errors']['CANNOT_ALTER_SQUAD_WHILE_TRAVELING'];
+            invoke_child_message_dialog(s['ui_title'], s['ui_name']);
+            return true; // stop dripper
+        }
+        if(player.squad_is_under_repair(_squad_id)) {
+            var s = gamedata['errors']['CANNOT_ALTER_SQUAD_UNDER_REPAIR'];
+            invoke_child_message_dialog(s['ui_title'], s['ui_name']);
+            return true; // stop dripper
+        }
+
+        // find healthiest (or unhealthiest) non-pending reserve units
+        var to_assign_list = [];
+        goog.object.forEach(player.my_army, function(o) {
+            if(o['squad_id'] === SQUAD_IDS.RESERVES && !o['pending']) {
+                to_assign_list.push(o);
+            }
+        });
+
+        // sort by health and space
+        to_assign_list.sort(function(a, b) {
+            var a_curmax = army_unit_hp(a);
+            var a_ratio = a_curmax[0]/Math.max(a_curmax[1],1);
+            var b_curmax = army_unit_hp(b);
+            var b_ratio = b_curmax[0]/Math.max(b_curmax[1],1);
+
+            var hp_sign = button.get_button(SPUI.MouseButton.RIGHT) ? -1 : 1;
+            if(a_ratio > b_ratio) {
+                return hp_sign;
+            } else if(a_ratio < b_ratio) {
+                return -hp_sign;
+            }
+
+            var a_space = get_leveled_quantity(gamedata['units'][a['spec']]['consumes_space']||0, a['level']||1);
+            var b_space = get_leveled_quantity(gamedata['units'][b['spec']]['consumes_space']||0, b['level']||1);
+            if(a_space > b_space) {
+                return 1;
+            } else if(a_space < b_space) {
+                return -1;
+            } else if(a['obj_id'] > b['obj_id']) { // tie-break with obj_id for stable sort
+                return 1;
+            } else {
+                return -1;
+            }
+        });
+
+        var assigned = 0;
+
+        // iterate through list multiple times until nothing can be assigned
+        while(true) {
+            var assigned_this_pass = false;
+
+            for(var i = 0; i < to_assign_list.length; i++) {
+                var obj = to_assign_list[i];
+                var space = get_leveled_quantity(gamedata['units'][obj['spec']]['consumes_space']||0, obj['level']||1);
+
+                if(_cur_squad_space+space > _max_squad_space) {
+                    continue; // ran out of space
+                }
+
+                dialog.user_data['last_unit_specname'] = obj['spec'];
+
+                send_to_server.func(["CAST_SPELL", GameObject.VIRTUAL_ID, "SQUAD_ASSIGN_UNIT", _squad_id, obj['obj_id']]);
+                if(gamedata['client']['predict_squad_assign']) { // client-side predict
+                    obj['squad_id'] = _squad_id;
+                }
+                obj['pending'] = 1;
+                assigned += 1;
+                _cur_squad_space += space;
+                assigned_this_pass = true;
+                to_assign_list.splice(i,1);
+                i -= 1;
+            }
+            if(!assigned_this_pass) { break; }
+        }
+
+        if(assigned > 0) { unit_repair_sync_marker = synchronizer.request_sync(); }
+
+        if(to_assign_list.length > 0 && assigned < 1) {
+            var s = gamedata['errors']['CANNOT_SQUAD_ASSIGN_UNIT_LIMIT_REACHED'+(_squad_id == SQUAD_IDS.BASE_DEFENDERS ? '_BASE_DEFENDERS' : '')];
+            invoke_child_message_dialog(s['ui_title'], s['ui_name']);
+            return true; // stop dripper
+        }
+
+        return true; // stop dripper
+
+    }; })(pred_ok, pred_help, dialog.user_data['squad_id'], cur_squad_space, max_squad_space);
+
+    dialog.widgets['unassign_all_button'].state = (can_unassign_all ? 'normal' : 'disabled_clickable');
+    dialog.widgets['unassign_all_button'].onclick = (function (_pred_ok, _pred_help, _squad_id) { return function(w, button) {
+        var dialog = w.parent;
+
+        if(!_pred_ok) {
+            if(_pred_help) { _pred_help(); }
+            return true; // stop dripper
+        }
+        if(player.squad_is_deployed(_squad_id) || player.squad_is_in_battle(_squad_id)) {
+            var s = gamedata['errors']['CANNOT_ALTER_SQUAD_WHILE_TRAVELING'];
+            invoke_child_message_dialog(s['ui_title'], s['ui_name']);
+            return true; // stop dripper
+        }
+        if(player.squad_is_under_repair(_squad_id)) {
+            var s = gamedata['errors']['CANNOT_ALTER_SQUAD_UNDER_REPAIR'];
+            invoke_child_message_dialog(s['ui_title'], s['ui_name']);
+            return true; // stop dripper
+        }
+
+        var to_unassign_list = [];
+        goog.object.forEach(player.my_army, function(obj, obj_id) {
+            var obj_squad_id = obj['squad_id'] || 0;
+            if(obj_squad_id === _squad_id) {
+                to_unassign_list.push(obj);
+            }
+        });
+
+        goog.array.forEach(to_unassign_list, function(obj) {
+            dialog.user_data['last_unit_specname'] = obj['spec'];
+            send_to_server.func(["CAST_SPELL", GameObject.VIRTUAL_ID, "SQUAD_UNASSIGN_UNIT", _squad_id, obj['obj_id']]);
+
+            if(gamedata['client']['predict_squad_assign']) { // client-side predict
+                obj['squad_id'] = SQUAD_IDS.RESERVES;
+            }
+            obj['pending'] = 1;
+        });
+        unit_repair_sync_marker = synchronizer.request_sync();
+        return true; // stop dripper
+    }; })(pred_ok, pred_help, dialog.user_data['squad_id']);
+
+    // LOWER BUTTONS
 
     var is_nosql_region = (session.region.data && session.region.data['storage'] == 'nosql') && session.region.map_enabled();
 

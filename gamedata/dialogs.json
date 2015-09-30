@@ -6927,7 +6927,14 @@
             "reserve_unit": { "kind": "Dialog", "xy": [485,86], "dimensions": [50,50], "dialog": "unit_icon", "clip_to": [475,36,222,387],
                               "array": [0,6], "array_max": [4,6], "array_offset": [52,52] },
 
-            "arrow": { "show": 0, "kind": "StaticImage", "xy": [0,0], "dimensions": [50,50], "asset_left": "inventory_arrow_left_green", "asset_right": "inventory_arrow_right_green", "alpha": 1, "transparent_to_mouse": 1 }
+            "squad_loading_spinner": { "kind": "StaticImage", "xy":[127,54], "xy_base_defenders": [180,54], "dimensions":[16,16], "asset":"loading_spinner", "show": 0 },
+            "reserve_loading_spinner": { "kind": "StaticImage", "xy":[500,49], "dimensions":[16,16], "asset":"loading_spinner", "show": 0 },
+
+            "arrow": { "show": 0, "kind": "StaticImage", "xy": [0,0], "dimensions": [50,50], "asset_left": "inventory_arrow_left_green", "asset_right": "inventory_arrow_right_green", "alpha": 1, "transparent_to_mouse": 1 },
+
+            "unassign_all_button": { "kind": "ActionButton", "xy": [395,94], "dimensions": [74,28],  "bg_image": "action_button_resizable", "bg_image_resizable": 1, "text_size": 13, "text_style": "bold", "ui_name": "All >>", "ui_tooltip": "Assign all Battalion units to Reserves" },
+            "assign_all_button": { "kind": "ActionButton", "xy": [395,290], "dimensions": [74,28],  "bg_image": "action_button_resizable", "bg_image_resizable": 1, "text_size": 13, "text_style": "bold", "ui_name": "<< All", "ui_tooltip": "Assign as many Reserve units as possible to this Battalion" }
+
         }
     },
 
