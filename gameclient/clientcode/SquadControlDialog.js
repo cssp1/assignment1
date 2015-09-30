@@ -131,16 +131,27 @@ SquadControlDialog.refresh = function(dialog) {
           (builder && (builder.level < builder.get_max_ui_level()))));
     var need_tiles = cur_squads + (show_add_button ? 1 : 0);
     dialog.user_data['columns'] = (need_tiles <= (dialog.data['widgets']['squad']['array_max'][0]*dialog.data['widgets']['squad']['array_max'][1]) ? Math.min(dialog.data['widgets']['squad']['array_max'][0], need_tiles) : Math.floor((need_tiles+1)/2));
-    // sort squads by ID
-    var squad_ids = goog.array.map(goog.object.getKeys(player.squads), function(x) { return parseInt(x,10); }).sort();
+
     var grid_x = 0, grid_y = 0;
+
+    // Reserves
+    if(dialog.user_data['dlg_mode'] == 'normal' || dialog.user_data['dlg_mode'] == 'manage') {
+        SquadControlDialog.make_squad_tile(dialog, SQUAD_IDS.RESERVES, [0,0], dialog.user_data['dlg_mode'], 'squad_tile');
+        grid_x += 1; if(grid_x >= dialog.user_data['columns']) { grid_x = 0; grid_y += 1; }
+    }
+
+    // Base Defenders + other squads, sorted by ID
+    var squad_ids = goog.array.map(goog.object.getKeys(player.squads), function(x) { return parseInt(x,10); }).sort();
+
     goog.array.forEach(squad_ids, function (id) {
-        SquadControlDialog.make_squad_tile(dialog, player.squads[id.toString()], [grid_x,grid_y], dialog.user_data['dlg_mode']);
+        if(id === SQUAD_IDS.BASE_DEFENDERS && (dialog.user_data['dlg_mode'] == 'call' || dialog.user_data['dlg_mode'] == 'deploy')) { return; }
+        SquadControlDialog.make_squad_tile(dialog, id, [grid_x,grid_y], dialog.user_data['dlg_mode'], 'squad_tile');
         grid_x += 1; if(grid_x >= dialog.user_data['columns']) { grid_x = 0; grid_y += 1; }
     });
     // add-squad button
     if(show_add_button) {
-        SquadControlDialog.make_squad_tile(dialog, null, [grid_x, grid_y], dialog.user_data['dlg_mode']);
+        SquadControlDialog.make_squad_tile(dialog, null, [grid_x, grid_y], dialog.user_data['dlg_mode'], 'create_squad_tile');
+        grid_x += 1; if(grid_x >= dialog.user_data['columns']) { grid_x = 0; grid_y += 1; }
     }
 
     dialog.user_data['scroll_limits'] = [0, Math.max(0, (dialog.user_data['columns']-1) * dialog.data['widgets']['squad']['array_offset'][0] - dialog.widgets['sunken'].wh[0] - dialog.widgets['sunken'].xy[0] + dialog.data['widgets']['squad']['xy'][0] + dialog.data['widgets']['squad']['dimensions'][0] + 1)];
@@ -234,16 +245,7 @@ SquadControlDialog.update_create_squad_tile = function(d) {
     });
 };
 
-SquadControlDialog.make_squad_tile = function(dialog, squad_data, ij, dlg_mode) {
-    var template;
-    if(squad_data) {
-        // display a squad
-        template = 'squad_tile';
-    } else {
-        // display a message instead
-        template = 'create_squad_tile';
-    }
-
+SquadControlDialog.make_squad_tile = function(dialog, squad_id, ij, dlg_mode, template) {
     var d = new SPUI.Dialog(gamedata['dialogs'][template], dialog.data['widgets']['squad']);
     d.xy = vec_add(dialog.data['widgets']['squad']['xy'], vec_mul(ij, dialog.data['widgets']['squad']['array_offset']));
     var name = 'squad'+ij[0].toString()+','+ij[1].toString();
@@ -255,8 +257,8 @@ SquadControlDialog.make_squad_tile = function(dialog, squad_data, ij, dlg_mode) 
 
     if(template === 'create_squad_tile') {
         d.ondraw = SquadControlDialog.update_create_squad_tile;
-    } else if(squad_data) {
-        d.user_data['squad_id'] = squad_data['id'];
+    } else if(template === 'squad_tile') {
+        d.user_data['squad_id'] = squad_id;
         d.user_data['icon_unit_specname'] = null;
         d.widgets['manage_button'].onclick = function(w) {
             SquadManageDialog.invoke_squad_manage(w.parent.user_data['squad_id']);
@@ -370,13 +372,19 @@ SquadControlDialog.update_squad_tile = function(dialog) {
     // treat manage the same as normal here
     if(dlg_mode == 'manage') { dlg_mode = 'normal'; }
 
-    var squad_data = player.squads[dialog.user_data['squad_id'].toString()];
+    var squad_data = (dialog.user_data['squad_id'] === SQUAD_IDS.RESERVES ?
+                      {'ui_name': gamedata['strings']['squads']['reserves'], 'id': SQUAD_IDS.RESERVES } :
+                      player.squads[dialog.user_data['squad_id'].toString()]);
     dialog.widgets['name'].str = squad_data['ui_name'];
 
     var units_by_type = {};
-    var max_space = (dialog.user_data['squad_id'] === SQUAD_IDS.BASE_DEFENDERS ? player.stattab['main_squad_space'] : player.stattab['squad_space']);
+    var max_space = (dialog.user_data['squad_id'] === SQUAD_IDS.RESERVES ?
+                     player.stattab['total_space'] :
+                     (dialog.user_data['squad_id'] === SQUAD_IDS.BASE_DEFENDERS ?
+                      player.stattab['main_squad_space'] :
+                      player.stattab['squad_space']));
     var cur_space = 0, max_hp = 0, cur_hp = 0, cur_units = 0;
-    var squad_is_damaged = false, squad_is_destroyed = true;
+    var squad_is_damaged = false, squad_is_destroyed = (dialog.user_data['squad_id'] === SQUAD_IDS.RESERVES ? false : true);
     var cost_to_repair = {};
 
     goog.object.forEach(player.my_army, function(obj, obj_id) {
@@ -406,11 +414,16 @@ SquadControlDialog.update_squad_tile = function(dialog) {
     var squad_is_under_repair = player.squad_is_under_repair(squad_data['id']);
     var squad_in_battle = player.squad_is_in_battle(squad_data['id']);
 
+    dialog.widgets['space_bar'].show = dialog.widgets['space_label'].show =
+        dialog.widgets['hp_bar'].show = dialog.widgets['hp_label'].show =
+        (dialog.user_data['squad_id'] !== SQUAD_IDS.RESERVES);
     dialog.widgets['space_bar'].progress = cur_space / Math.max(max_space,1);
     dialog.widgets['hp_bar'].progress = (max_hp > 0 ? (cur_hp/max_hp) : 0);
 
     var my_status, my_status_s = '';
-    if(squad_data['id'] === SQUAD_IDS.BASE_DEFENDERS) {
+    if(squad_data['id'] === SQUAD_IDS.RESERVES) {
+        my_status = 'in_reserve';
+    } else if(squad_data['id'] === SQUAD_IDS.BASE_DEFENDERS) {
         my_status = 'defending_home_base';
     } else if(squad_in_battle) {
         my_status = 'in_battle';
@@ -448,6 +461,7 @@ SquadControlDialog.update_squad_tile = function(dialog) {
     dialog.widgets['status'].str = gamedata['strings']['squads']['status'][my_status].replace('%s', my_status_s);
     dialog.widgets['bg'].color = SPUI.make_colorv(dialog.data['widgets']['bg']['color_'+my_status]);
     dialog.widgets['status'].text_color = dialog.widgets['bg'].outline_color = SPUI.make_colorv(dialog.data['widgets']['bg']['outline_color_'+my_status]);
+    dialog.widgets['name'].text_color = SPUI.make_colorv(dialog.data['widgets']['name'][('text_color_'+my_status in dialog.data['widgets']['name'] ? 'text_color_'+my_status : 'text_color')]);
 
     var types_to_show = goog.object.getKeys(units_by_type);
     types_to_show.sort(army_unit_compare_specnames);
@@ -458,7 +472,7 @@ SquadControlDialog.update_squad_tile = function(dialog) {
     while(i < types_to_show.length && grid_y < dialog.data['widgets']['unit_icon']['array'][1]) {
         var wname = grid_x.toString()+','+grid_y.toString();
         unit_icon_set(dialog.widgets['unit_icon'+wname], types_to_show[i], units_by_type[types_to_show[i]], null, null,
-                      (squad_is_under_repair || squad_is_deployed ? 'disabled' : null));
+                      (squad_is_under_repair || squad_is_deployed || (squad_data['id'] === SQUAD_IDS.RESERVES) ? 'disabled' : null));
         i += 1;
         grid_x += 1;
         if(grid_x >= dialog.data['widgets']['unit_icon']['array'][0]) { grid_x = 0; grid_y += 1; }
@@ -476,7 +490,9 @@ SquadControlDialog.update_squad_tile = function(dialog) {
     var can_do_action = false; // apples when dlg_mode is deploy or call
     var repair_in_sync = synchronizer.is_in_sync(unit_repair_sync_marker);
 
-    if(dlg_mode == 'normal') {
+    if(dialog.user_data['squad_id'] === SQUAD_IDS.RESERVES) {
+        dialog.widgets['coverup'].show = false;
+    } else if(dlg_mode == 'normal') {
         dialog.widgets['coverup'].show = hover || squad_is_under_repair || squad_in_battle || (!squad_is_deployed && squad_is_damaged);
     } else if(dlg_mode == 'deploy' || dlg_mode == 'call') {
         can_do_action = !(squad_is_under_repair || squad_in_battle || !SQUAD_IDS.is_mobile_squad_id(dialog.user_data['squad_id']) || ((dlg_mode=='deploy') && squad_is_deployed) || squad_is_destroyed || (cur_units <= 0)); // || (my_status == 'quarry'));
@@ -484,7 +500,7 @@ SquadControlDialog.update_squad_tile = function(dialog) {
     }
 
     dialog.widgets['delete_button'].show = (dlg_mode=='normal') && hover && SQUAD_IDS.is_mobile_squad_id(dialog.user_data['squad_id']) && !squad_is_deployed && !squad_in_battle;
-    dialog.widgets['manage_button'].show = (dlg_mode=='normal') && hover && !squad_in_battle;
+    dialog.widgets['manage_button'].show = (dlg_mode=='normal') && hover && dialog.user_data['squad_id'] != SQUAD_IDS.RESERVES && !squad_in_battle;
 
     dialog.widgets['deploy_button'].show = (dlg_mode=='deploy') && hover && can_do_action;
     dialog.widgets['call_button'].show = (dlg_mode=='call') && hover && can_do_action;
@@ -541,10 +557,10 @@ SquadControlDialog.update_squad_tile = function(dialog) {
 
     //console.log('squad ' +player.squads[dialog.user_data['squad_id'].toString()]['ui_name']+' mode '+dlg_mode+' damaged '+squad_is_damaged+' under_rep '+squad_is_under_repair+' is deployed '+squad_is_deployed+' in battle '+squad_in_battle);
 
-    dialog.widgets['start_repair_button'].show = (dlg_mode=='normal') && (squad_is_damaged && !squad_is_under_repair && !squad_is_deployed && !squad_in_battle);
+    dialog.widgets['start_repair_button'].show = (dlg_mode=='normal') && (squad_is_damaged && !squad_is_under_repair && !squad_is_deployed && !squad_in_battle && (dialog.user_data['squad_id'] !== SQUAD_IDS.RESERVES));
     dialog.widgets['requirements_bg'].show =
         dialog.widgets['requirements_time_icon'].show =
-        dialog.widgets['requirements_time_value'].show = (dlg_mode=='normal') && (squad_is_damaged && !squad_is_under_repair && !squad_is_deployed && !squad_in_battle && hover);
+        dialog.widgets['requirements_time_value'].show = (dialog.widgets['start_repair_button'].show && hover);
     for(var res in gamedata['resources']) {
         if('requirements_'+res+'_icon' in dialog.widgets) {
             dialog.widgets['requirements_'+res+'_icon'].show =
@@ -552,7 +568,7 @@ SquadControlDialog.update_squad_tile = function(dialog) {
         }
     }
 
-    if(squad_is_damaged && !squad_is_under_repair && !squad_is_deployed && !squad_in_battle) {
+    if(dialog.widgets['start_repair_button'].show) {
         if(hover) {
             for(var resname in gamedata['resources']) {
                 if('requirements_'+resname+'_value' in dialog.widgets) {

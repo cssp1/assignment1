@@ -41,9 +41,11 @@
     },
 
     "squads": { "squad": "Battalion", // what squads are called in this game
+                "reserves": "Reserves",
                 "base_defenders": "Base Defenders",
                 "in_manuf_queue": "In training queue",
                 "status": { "defending_home_base": "Defending Home Base",
+                            "in_reserve": "Awaiting Assignment",
                             "ready": "Ready to Deploy",
                             "deployed": "Deployed at %s",
                             "traveling": "Traveling to %s",

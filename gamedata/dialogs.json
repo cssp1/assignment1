@@ -6755,6 +6755,7 @@
             "bg": { "kind": "SolidRect", "xy": [0,0], "dimensions": [164,164], "outline_width": 1, "bevel": 4,
                     "color_ready": [0.05,0.05,0.05,1], "outline_color_ready": [1,1,1,1],
                     "color_empty": [0.05,0.05,0.05,1], "outline_color_empty": [1,1,1,1],
+                    "color_in_reserve": [0.04,0.0125,0.0,1], "outline_color_in_reserve": [0.4,0.1,0.0,1],
                     "color_defending_home_base": [0.08,0.025,0.0,1], "outline_color_defending_home_base": [0.8,0.2,0.0,1],
                     "color_damaged": [0.05,0.05,0,1], "outline_color_damaged": [1,1,0,1],
                     "color_under_repair": [0.05,0.05,0,1], "outline_color_under_repair": [1,1,0,1],
@@ -6767,7 +6768,9 @@
                     "color_traveling" :[0,0.05,0.025,1], "outline_color_traveling": [0.4,0.8,0.4,1],
                     "color_quarry": [0,0.025,0.05,1], "outline_color_quarry": [0.4,0.8,0.8,1]
                   },
-            "name": { "kind": "TextField", "xy": [0,1], "dimensions": [164,17], "clip_to": [0,1,164,25], "text_size": 15, "text_hjustify": "center", "text_style": "bold" },
+            "name": { "kind": "TextField", "xy": [0,1], "dimensions": [164,17], "clip_to": [0,1,164,25],
+                      "text_size": 15, "text_hjustify": "center", "text_style": "bold",
+                      "text_color": [1,1,1,1], "text_color_in_reserve": [0.5,0.5,0.5,1] },
 
             // note: gets its color from "bg":"outline_color"
             "status": { "kind": "TextField", "xy": [0,16], "dimensions": [164,17], "text_size": 11, "text_hjustify": "center", "text_style": "normal" },
