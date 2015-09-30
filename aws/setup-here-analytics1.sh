@@ -12,11 +12,9 @@ echo "Building overlay tarball..."
 (cd analytics1 && find . -not -path '*.svn*' | cpio -o | gzip -c > /tmp/overlay-analytics1.cpio.gz)
 
 # bash conveniences
-FILESTOGO=$HOME/.bashrc $HOME/.bash_profile $HOME/.dir_colors
-
-# remote setup scripts
 FILESTOGO="$HOME/.bashrc \
            $HOME/.bash_profile \
+           $HOME/.screenrc \
            $HOME/.dir_colors"
 
 # remote setup scripts

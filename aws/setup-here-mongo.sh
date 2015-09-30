@@ -15,6 +15,7 @@ echo "Building overlay tarball..."
 # bash conveniences
 FILESTOGO="$HOME/.bashrc \
            $HOME/.bash_profile \
+           $HOME/.screenrc \
            $HOME/.dir_colors"
 
 # remote setup scripts
