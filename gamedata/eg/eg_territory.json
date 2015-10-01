@@ -5,7 +5,7 @@
 // found in the LICENSE file.
 
 {
-    "default_quarry_landlord_id": 901, // used for abandoned quarries
+    "default_quarry_landlord_id": 1001, // used for abandoned quarries
 
     "show_coords_in_player_info": 1, // whether to show home base location of other players in their Player Info
     "travel_time_per_hex": 0.5, // seconds of travel time per map hex

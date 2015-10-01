@@ -92,6 +92,10 @@
     // controls availability of ONP Event Prizes in store.
     "token_event_store_open": { "predicate": "OR", "subpredicates": [
         //{"predicate": "EVENT_TIME", "event_kind": "current_event_store", "event_name": "event_queen_store", "method": "inprogress", "ignore_activation": 1},
-    ],  "ui_name": "Wait for next ONP event" }
+    ],  "ui_name": "Wait for next ONP event" },
 
+    "anti_alt_ok": {"predicate": "AURA_INACTIVE", "aura_name": "region_banished", "match_data": {"tag": "anti_alt"},
+                    "ui_name": "You are banished from this map for violating the alt-account policy.\nTerms of Service: http://www.spinpunch.com/terms"},
+    "anti_refresh_ok": {"predicate": "AURA_INACTIVE", "aura_name": "region_banished", "match_data": {"tag": "anti_refresh"},
+                        "ui_name": "You are banished from this map for violating the anti-refresh policy.\nTerms of Service: http://www.spinpunch.com/terms"}
 }
