@@ -503,10 +503,12 @@ if __name__ == '__main__':
         if player.get('chat_official',0):
             print fmt % ('CHAT OFFICIAL (blue text) account', '')
 
-        if 'idle_check' in player and player['idle_check'].get('fails',0) + player['idle_check'].get('successes',0) > 0:
-            ui_captcha = '%d Passes, %d Fails' % (player['idle_check'].get('successes',0), player['idle_check'].get('fails',0))
-            if player['idle_check'].get('last_fail_time',-1) > 0:
-                ui_captcha += ' (last fail %s ago)' % pretty_print_time(time_now - player['idle_check']['last_fail_time'])
+        if 'idle_check' in player and len(player['idle_check'].get('history',[])) > 0:
+            successes = len(filter(lambda x: x['result'] == 'success', player['idle_check']['history']))
+            fails = len(filter(lambda x: x['result'] == 'fail', player['idle_check']['history']))
+            ui_captcha = '%d Passes, %d Fails (%.1f%% fail rate) within last %s' % (successes, fails, (100.0*fails)/(fails+successes), pretty_print_time(time_now - player['idle_check']['history'][-1]['time']))
+            if fails > 0:
+                ui_captcha += ' (last fail %s ago)' % pretty_print_time(time_now - max(x['time'] for x in player['idle_check']['history'] if x['result'] == 'fail'))
             print fmt % ('Anti-Bot CAPTCHA:', ui_captcha)
 
         if 'known_alt_accounts' in player and player['known_alt_accounts']:

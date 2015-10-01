@@ -2291,7 +2291,7 @@ class PlayerTable:
               ('history', None, None),
               ('cooldowns', None, None),
               ('scores2', lambda s: s.serialize(), lambda player, observer, data: Scores2.CurScores(data)),
-              ('idle_check', lambda s: s.serialize(), lambda player, observer, data: IdleCheck.IdleCheck(gamedata['server']['idle_check'], data)),
+              ('idle_check', lambda s: s.serialize(), lambda player, observer, data: IdleCheck.IdleCheck(gamedata['server']['idle_check'], data, server_time)),
               ('creation_time', None, None),
               ('lottery_slate', None, None),
               ('ladder_match', None, None),
@@ -7000,7 +7000,7 @@ class Player(AbstractPlayer):
         # time player last deployed units in an attack - used for throttling max attack rate
         self.attack_cooldown_start = -1
 
-        self.idle_check = IdleCheck.IdleCheck(gamedata['server']['idle_check'], None)
+        self.idle_check = IdleCheck.IdleCheck(gamedata['server']['idle_check'], None, server_time)
 
         # available items in the lottery slate
         # dictionary {"slot0": {"spec":"foo"}, "slot1": ... }
