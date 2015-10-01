@@ -711,11 +711,14 @@ AuraActivePredicate.prototype.is_satisfied = function(player, qdata) {
             if(('end_time' in aura) && (aura['end_time'] > 0) && (aura['end_time'] < server_time)) { continue; }
             if(this.match_data !== null) {
                 var theirs = aura['data'] || null;
+                var is_matched = true;
                 for(var k in this.match_data) {
                     if(!theirs || theirs[k] !== this.match_data[k]) {
-                        return false;
+                        is_matched = false;
+                        break;
                     }
                 }
+                if(!is_matched) { continue; }
             }
             return true;
         }

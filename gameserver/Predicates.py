@@ -316,9 +316,12 @@ class AuraActivePredicate(Predicate):
         for aura in player.player_auras:
             if aura['spec'] == self.aura_name and aura.get('stack',1) >= self.min_stack:
                 if self.match_data is not None:
+                    is_matched = True
                     for k, v in self.match_data.iteritems():
                         if aura.get('data',{}).get(k, None) != v:
-                            return False
+                            is_matched = False
+                            break
+                    if not is_matched: continue
                 return True
         return False
 class AuraInactivePredicate(Predicate):
