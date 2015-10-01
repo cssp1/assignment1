@@ -123,21 +123,12 @@ SquadControlDialog.refresh = function(dialog) {
 
     goog.array.forEach(to_remove, function(name) { dialog.remove(dialog.widgets[name]); delete dialog.widgets[name]; });
 
-    var cur_squads = goog.object.getCount(player.squads);
-    var builder = find_object_by_type(gamedata['squad_building']);
-    var show_add_button = (dialog.user_data['dlg_mode'] == 'normal' || dialog.user_data['dlg_mode'] == 'manage') &&
-        ((cur_squads-1 < player.stattab['max_squads'] ||
-          !builder ||
-          (builder && (builder.level < builder.get_max_ui_level()))));
-    var need_tiles = cur_squads + (show_add_button ? 1 : 0);
-    dialog.user_data['columns'] = (need_tiles <= (dialog.data['widgets']['squad']['array_max'][0]*dialog.data['widgets']['squad']['array_max'][1]) ? Math.min(dialog.data['widgets']['squad']['array_max'][0], need_tiles) : Math.floor((need_tiles+1)/2));
-
-    var grid_x = 0, grid_y = 0;
+    // make list of tiles we're going to create
+    var make_squad_tile_args = [];
 
     // Reserves
     if(dialog.user_data['dlg_mode'] == 'normal' || dialog.user_data['dlg_mode'] == 'manage') {
-        SquadControlDialog.make_squad_tile(dialog, SQUAD_IDS.RESERVES, [0,0], dialog.user_data['dlg_mode'], 'squad_tile');
-        grid_x += 1; if(grid_x >= dialog.user_data['columns']) { grid_x = 0; grid_y += 1; }
+        make_squad_tile_args.push({squad_id: SQUAD_IDS.RESERVES, template: 'squad_tile'});
     }
 
     // Base Defenders + other squads, sorted by ID
@@ -145,14 +136,28 @@ SquadControlDialog.refresh = function(dialog) {
 
     goog.array.forEach(squad_ids, function (id) {
         if(id === SQUAD_IDS.BASE_DEFENDERS && (dialog.user_data['dlg_mode'] == 'call' || dialog.user_data['dlg_mode'] == 'deploy')) { return; }
-        SquadControlDialog.make_squad_tile(dialog, id, [grid_x,grid_y], dialog.user_data['dlg_mode'], 'squad_tile');
+        make_squad_tile_args.push({squad_id: id, template: 'squad_tile'});
+    });
+
+    // Create Squad button
+    var builder = find_object_by_type(gamedata['squad_building']);
+    if((dialog.user_data['dlg_mode'] == 'normal' || dialog.user_data['dlg_mode'] == 'manage') &&
+       (((goog.object.getCount(player.squads)-1) < player.stattab['max_squads'] ||
+         !builder ||
+         (builder && (builder.level < builder.get_max_ui_level()))))) {
+        make_squad_tile_args.push({squad_id: null, template: 'create_squad_tile'});
+    }
+
+    // determine number of columns needed to show all tiles
+    var need_tiles = make_squad_tile_args.length;
+    dialog.user_data['columns'] = (need_tiles <= (dialog.data['widgets']['squad']['array_max'][0]*dialog.data['widgets']['squad']['array_max'][1]) ? Math.min(dialog.data['widgets']['squad']['array_max'][0], need_tiles) : Math.floor((need_tiles+1)/2));
+
+    // creawte the tiles
+    var grid_x = 0, grid_y = 0;
+    goog.array.forEach(make_squad_tile_args, function(args) {
+        SquadControlDialog.make_squad_tile(dialog, args.squad_id, [grid_x, grid_y], dialog.user_data['dlg_mode'], args.template);
         grid_x += 1; if(grid_x >= dialog.user_data['columns']) { grid_x = 0; grid_y += 1; }
     });
-    // add-squad button
-    if(show_add_button) {
-        SquadControlDialog.make_squad_tile(dialog, null, [grid_x, grid_y], dialog.user_data['dlg_mode'], 'create_squad_tile');
-        grid_x += 1; if(grid_x >= dialog.user_data['columns']) { grid_x = 0; grid_y += 1; }
-    }
 
     dialog.user_data['scroll_limits'] = [0, Math.max(0, (dialog.user_data['columns']-1) * dialog.data['widgets']['squad']['array_offset'][0] - dialog.widgets['sunken'].wh[0] - dialog.widgets['sunken'].xy[0] + dialog.data['widgets']['squad']['xy'][0] + dialog.data['widgets']['squad']['dimensions'][0] + 1)];
     var scroller = function(incr) { return function(w) {
