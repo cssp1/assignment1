@@ -7197,9 +7197,11 @@ class Player(AbstractPlayer):
         for aura in to_remove: self.player_auras.remove(aura)
         return bool(to_remove)
 
-    def do_remove_aura(self, aura_name, remove_stack = -1):
+    def do_remove_aura(self, aura_name, remove_stack = -1, data = None):
         for aura in self.player_auras:
-            if aura['spec'] == aura_name:
+            if aura['spec'] == aura_name and \
+               (data is None or \
+                all(aura.get('data',{}).get(k,None) == v for k,v in data.iteritems())):
                 if remove_stack > 0:
                     new_stack = aura.get('stack',1) - remove_stack
                     if new_stack <= 0:
@@ -7213,13 +7215,13 @@ class Player(AbstractPlayer):
         return False
 
     # confusing: remove_aura sends stattab update, apply_aura does not (both recalc stattab)
-    def remove_aura(self, session, retmsg, aura_name, remove_stack = -1, force = False):
+    def remove_aura(self, session, retmsg, aura_name, remove_stack = -1, force = False, data = None):
         spec = gamedata['auras'][aura_name]
         if (not force) and (not spec.get('cancelable', True)):
             if retmsg is not None: retmsg.append(["ERROR", "HARMLESS_RACE_CONDITION"])
             return
 
-        if self.do_remove_aura(aura_name, remove_stack = remove_stack):
+        if self.do_remove_aura(aura_name, remove_stack = remove_stack, data = data):
             self.recalc_stattab(self)
             if retmsg is not None:
                 self.stattab.send_update(session, retmsg) # also sends PLAYER_AURAS_UPDATE
@@ -7231,9 +7233,11 @@ class Player(AbstractPlayer):
         spec = gamedata['auras'][aura_name]
         aura = None
 
-        # find any existing aura with same spec and level
+        # find any existing aura with same spec, level, and data
         for a in self.player_auras:
-            if a['spec'] == aura_name and a.get('level',1) == level:
+            if a['spec'] == aura_name and a.get('level',1) == level and \
+               (data is None or \
+                all(a.get('data',{}).get(k,None) == v for k,v in data.iteritems())):
                 aura = a
                 break
 
@@ -7261,7 +7265,7 @@ class Player(AbstractPlayer):
             max_stack = spec.get('max_stack',-1)
             if max_stack > 0: aura['stack'] = min(aura['stack'], max_stack)
 
-            # overwrite data
+            # overwrite data (but note match requirement above)
             if (data is None) and 'data' in aura: del aura['data']
             if (data is not None): aura['data'] = data
 

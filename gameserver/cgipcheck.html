@@ -234,21 +234,29 @@ var method_clear_cooldown = function() {
         send_request('player', 'clear_cooldown', $.extend(ident, {'name':name, 'ui_reason':ui_reason}), function(result) { alert("Success!"); });
     }
 };
-var method_remove_aura = function(aura_name) {
+var method_remove_aura = function(aura_name, optional_data) {
     var ident = get_ident();
     if(ident && aura_name) {
-        send_request('player', 'remove_aura', $.extend(ident, {'aura_name':aura_name}), function(result) { alert("Success!"); });
+        var params = $.extend(ident, {'aura_name':aura_name});
+        if(optional_data) {
+            params['data'] = JSON.stringify(optional_data);
+        }
+        send_request('player', 'remove_aura', params, function(result) { alert("Success!"); });
     }
 };
-var has_anti_alt_regions = function() {
+
+var has_regions_with_tag = function(t) {
     for(var i = 0; i < spin_regions.length; i++) {
         var region = spin_regions[i];
-        if(('tags' in region) && region['tags'].indexOf('anti_alt') >= 0) {
+        if(('tags' in region) && region['tags'].indexOf(t) >= 0) {
             return true;
         }
     }
     return false;
 };
+var has_anti_alt_regions = function() { return has_regions_with_tag('anti_alt'); };
+var has_anti_refresh_regions = function() { return has_regions_with_tag('anti_refresh'); };
+
 var has_non_anti_alt_regions = function() {
     for(var i = 0; i < spin_regions.length; i++) {
         var region = spin_regions[i];
@@ -265,7 +273,8 @@ var method_change_region = function() {
     var ident = get_ident();
     var new_region = $("#change_region_destination")[0].value;
     var ui_reason = check_ui_reason($("#change_region_reason")[0].value);
-    var banish_duration = (has_anti_alt_regions() && $("#change_region_do_banish")[0].checked) ? ($("#region_banish_duration").spinner("value") * 3600) : 0;
+    var alt_banish_duration = (has_anti_alt_regions() && $("#change_region_do_alt_banish")[0].checked) ? ($("#region_alt_banish_duration").spinner("value") * 3600) : 0;
+    var refresh_banish_duration = (has_anti_refresh_regions() && $("#change_region_do_refresh_banish")[0].checked) ? ($("#region_refresh_banish_duration").spinner("value") * 3600) : 0;
 
     var on_complete = function(result) {
         alert("Success! Remember to send the player a message explaining what happened!");
@@ -273,14 +282,20 @@ var method_change_region = function() {
 
     if(ident && new_region && ui_reason) {
         send_request('player', 'change_region', $.extend({}, ident, {'new_region':new_region, 'ui_reason':ui_reason}),
-                     (function (_ident, _on_complete, _banish_duration) { return function(result) {
-                         if(_banish_duration === 0) {
+                     (function (_ident, _on_complete, _alt_banish_duration, _refresh_banish_duration) { return function(result) {
+                         if(_alt_banish_duration === 0 && _refresh_banish_duration === 0) {
                              _on_complete(result);
                          } else {
-                             send_request('player', 'apply_aura', $.extend({}, _ident, {'aura_name':'region_banished','duration':banish_duration,'data':JSON.stringify({'tag':'anti_alt'})}),
-                                          _on_complete);
+                             send_request('player', 'apply_aura', $.extend({}, _ident, {'aura_name':'region_banished','duration':_alt_banish_duration,'data':JSON.stringify({'tag':'anti_alt'})}),
+                                          (function (__ident, __on_complete, __refresh_banish_duration) { return function(result) {
+                                              if(__refresh_banish_duration === 0) {
+                                                  __on_complete(result);
+                                              } else {
+                                                  send_request('player', 'apply_aura', $.extend({}, __ident, {'aura_name':'region_banished','duration':__refresh_banish_duration,'data':JSON.stringify({'tag':'anti_refresh'})}), __on_complete);
+                                              }
+                                          }; })(_ident, _on_complete, _refresh_banish_duration));
                          }
-                     }; })(ident, on_complete, banish_duration));
+                     }; })(ident, on_complete, alt_banish_duration, refresh_banish_duration));
     }
 };
 var method_give_item = function() {
@@ -1344,9 +1359,14 @@ $(function() {
     $('#ignore_alt_other_id').spinner({min:0, step:1});
     $('#clear_alias_duration').spinner({max:999999, min:0, step:1});
     if(has_anti_alt_regions()) {
-        $('#region_banish_duration').spinner({max:999999, min:1, step:1});
+        $('#region_alt_banish_duration').spinner({max:999999, min:1, step:1});
     } else {
-        $('#change_region_banishment_controls').remove();
+        $('#change_region_alt_banishment_controls').remove();
+    }
+    if(has_anti_refresh_regions()) {
+        $('#region_refresh_banish_duration').spinner({max:999999, min:1, step:1});
+    } else {
+        $('#change_region_refresh_banishment_controls').remove();
     }
 
     $('#gamebucks_amount').spinner({max:50000, min:0, step:100});
@@ -1511,11 +1531,17 @@ $(function() {
       <p>
       <select id="change_region_destination" name="change_region_destination" class="spin_select"></select>
       <button onclick="method_change_region()" class="spin_button">Apply</button>
-      <span id="change_region_banishment_controls">
+      <span id="change_region_alt_banishment_controls">
         <p>
-        <input id="change_region_do_banish" type="checkbox" checked="1" style="height:initial;"></input>Also banish from anti-alt regions for:
-        <input type="text" id="region_banish_duration" name="region_banish_duration" value="720" style="width:100px"> Hours
-        <button onclick="method_remove_aura('region_banished')" class="spin_button" style="width:180px;">Undo Banishment</button>
+        <input id="change_region_do_alt_banish" type="checkbox" checked="1" style="height:initial;"></input>Also banish from anti-alt regions for:
+        <input type="text" id="region_alt_banish_duration" name="region_alt_banish_duration" value="720" style="width:100px"> Hours
+        <button onclick="method_remove_aura('region_banished', {'tag': 'anti_alt'})" class="spin_button" style="width:260px;">Undo Anti-Alt Banishment</button>
+      </span>
+      <span id="change_region_refresh_banishment_controls">
+        <br>
+        <input id="change_region_do_refresh_banish" type="checkbox" style="height:initial;"></input>Also banish from anti-refresh regions for:
+        <input type="text" id="region_refresh_banish_duration" name="region_refresh_banish_duration" value="720" style="width:100px"> Hours
+        <button onclick="method_remove_aura('region_banished', {'tag': 'anti_refresh'})" class="spin_button" style="width:260px;">Undo Anti-Refresh Banishment</button>
       </span>
       <p>
       Reason for this action:

@@ -355,20 +355,7 @@ class HandleTriggerCooldown(Handler):
 
         return ReturnValue(result = 'ok')
 
-class HandleRemoveAura(Handler):
-    def do_exec_online(self, session, retmsg):
-        session.player.remove_aura(session, retmsg, self.args['aura_name'], force = True)
-        return ReturnValue(result = 'ok')
-    def do_exec_offline(self, user, player):
-        to_remove = []
-        for aura in player.get('player_auras',[]):
-            if aura['spec'] == self.args['aura_name']:
-                to_remove.append(aura)
-        for aura in to_remove:
-            player['player_auras'].remove(aura)
-        return ReturnValue(result = 'ok')
-
-class HandleApplyAura(Handler):
+class HandleApplyOrRemoveAura(Handler):
     def __init__(self, *args, **kwargs):
         Handler.__init__(self, *args, **kwargs)
         if 'data' in self.args:
@@ -376,6 +363,23 @@ class HandleApplyAura(Handler):
             assert isinstance(self.aura_data, dict)
         else:
             self.aura_data = None
+
+class HandleRemoveAura(HandleApplyOrRemoveAura):
+    def do_exec_online(self, session, retmsg):
+        session.player.remove_aura(session, retmsg, self.args['aura_name'], force = True, data = self.aura_data)
+        return ReturnValue(result = 'ok')
+    def do_exec_offline(self, user, player):
+        to_remove = []
+        for aura in player.get('player_auras',[]):
+            if aura['spec'] == self.args['aura_name'] and \
+               (self.aura_data is None or \
+                all(aura.get('data',{}).get(k,None) == v for k,v in self.aura_data.iteritems())):
+                to_remove.append(aura)
+        for aura in to_remove:
+            player['player_auras'].remove(aura)
+        return ReturnValue(result = 'ok')
+
+class HandleApplyAura(HandleApplyOrRemoveAura):
     def do_exec_online(self, session, retmsg):
         session.player.apply_aura(self.args['aura_name'], duration = int(self.args.get('duration','-1')), ignore_limit = True, data = self.aura_data)
         session.player.stattab.send_update(session, retmsg) # also sends PLAYER_AURAS_UPDATE
@@ -385,7 +389,9 @@ class HandleApplyAura(Handler):
         found = False
         if 'player_auras' not in player: player['player_auras'] = []
         for aura in player.get('player_auras',[]):
-            if aura['spec'] == self.args['aura_name']:
+            if aura['spec'] == self.args['aura_name'] and \
+               (self.aura_data is None or \
+                all(aura.get('data',{}).get(k,None) == v for k,v in self.aura_data.iteritems())):
                 found = True
                 if 'duration' in self.args:
                     duration = int(self.args['duration'])
