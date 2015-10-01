@@ -62,6 +62,13 @@ class IdleCheck(object):
         limit = self.config.get('keep_history_for', 604800)
         self.history = filter(lambda x: cur_time - x['time'] < limit, self.history)
 
+    def count_fails(self): return sum((1 for x in self.history if x['result'] == 'fail'), 0)
+    def last_fail_time(self):
+        for i in xrange(len(self.history)-1, -1, -1):
+            if self.history[i]['result'] == 'fail':
+                return self.history[i]['time']
+        return -1
+
     def forced_check_needed(self): return self.last_end_playtime < 0
 
     def check_needed(self, login_time, cur_time, playtime):

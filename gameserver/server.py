@@ -22449,6 +22449,15 @@ class GAMEAPI(resource.Resource):
         else:
             cache_props['known_alt_count'] = None
 
+        session.player.idle_check.prune_history(server_time)
+        idle_check_fails = session.player.idle_check.count_fails()
+        if idle_check_fails >= 1:
+            cache_props['idle_check_fails'] = idle_check_fails
+            cache_props['idle_check_last_fail_time'] = session.player.idle_check.last_fail_time()
+        else:
+            cache_props['idle_check_fails'] = None
+            cache_props['idle_check_last_fail_time'] = None
+
         gamesite.pcache_client.player_cache_update(session.user.user_id, cache_props, reason = reason)
 
     # new asynchronous logout
