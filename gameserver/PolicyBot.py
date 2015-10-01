@@ -175,6 +175,7 @@ class Sender(object):
         if new_region is None:
             # pick any pro-alt region (which will be prison in a majority anti-alt game)
             candidate_regions = filter(lambda x: x.get('continent_id',None) == cur_continent_id and \
+                                       (is_majority_anti_alt_game or x.get('auto_join',1)) and \
                                        x.get('open_join',1) and x.get('enable_map',1) and \
                                        not x.get('developer_only',0),
                                        pro_alt_regions)
