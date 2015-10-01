@@ -4009,7 +4009,7 @@ class Session(object):
                                              (api, self.user.user_id, self.player.generation, name, history_key))
             return
 
-        if not Predicates.read_predicate(data['predicate']).is_satisfied(self.player, None): return
+        if not Predicates.read_predicate(data['predicate']).is_satisfied2(self, self.player, None): return
 
         if gamedata['server'].get('log_'+api,1) and 0:
             gamesite.exception_log.event(server_time, '%s API for user %d gen %d: event %s (%s) status %s' % \
@@ -26239,7 +26239,7 @@ class GameSite(server.Site):
             elif idle_timeout_status == IdleCheck.STATUS_SEND_AGAIN or \
                  (idle_timeout_status == IdleCheck.STATUS_NO_RESULT and \
                   (session.player.idle_check.forced_check_needed() or \
-                   Predicates.read_predicate(gamedata['server']['idle_check']['enable_if']).is_satisfied(session.player, None)) and \
+                   Predicates.read_predicate(gamedata['server']['idle_check']['enable_if']).is_satisfied2(session, session.player, None)) and \
                   session.player.idle_check.check_needed(session.login_time, server_time, playtime)):
                 idle_check_msg = session.player.idle_check.start_check(session.login_time, server_time, playtime)
                 session.send([["IDLE_CHECK", idle_check_msg]])
