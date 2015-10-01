@@ -162,24 +162,61 @@ class SessionLengthTrendPredicate(Predicate):
 class TimeInGamePredicate(Predicate):
     def __init__(self, data):
         Predicate.__init__(self, data)
-        self.seconds = 60*60*data['hours']
-        self.by_age = 24*60*60*data['by_day']
-    def is_satisfied(self, player, qdata):
+        if 'seconds' in data:
+            self.seconds = data['seconds']
+        else:
+            self.seconds = 60*60*data['hours']
+        if 'by_day' in data:
+            self.by_age = 24*60*60*data['by_day']
+        else:
+            self.by_age = None
+        if 'within_last' in data:
+            self.within_last = data['within_last']
+        else:
+            self.within_last = None
+
+    def is_satisfied2(self, session, player, qdata):
         if player.creation_time < 0: return False
-        by_time = player.creation_time + self.by_age
-
         if ('sessions' not in player.history): return False
-        sessions = player.history['sessions']
-        count = 0
 
-        for s in sessions:
+        cur_time = player.get_absolute_time()
+        sessions = player.history['sessions']
+
+        time_range = [player.creation_time, cur_time]
+        direction = 1
+
+        if self.by_age is not None:
+            time_range[1] = player.creation_time + self.by_age
+        if self.within_last is not None:
+            time_range[0] = cur_time - self.within_last
+            direction = -1 # iterate backwards, it's likely faster
+
+        total_seconds = 0
+
+        if direction > 0:
+            sessions_iter = xrange(0, len(sessions), 1)
+        else:
+            sessions_iter = xrange(len(sessions)-1, -1, -1)
+
+        for i in sessions_iter:
+            s = sessions[i]
             if s[0] < 0 or s[1] < 0: continue
-            if s[0] >= by_time: break
-            end = min(s[1], by_time)
-            if (end-s[0]) >= 0:
-                count += end-s[0]
-            if count >= self.seconds: break
-        return count >= self.seconds
+            if s[1] < time_range[0]: continue
+            if s[0] >= time_range[1]: continue
+            clipped_start = max(s[0], time_range[0])
+            clipped_end = min(s[1], time_range[1])
+            if clipped_end > clipped_start:
+                total_seconds += clipped_end - clipped_start
+            if total_seconds >= self.seconds: break
+
+        # add the current session
+        if session.login_time < time_range[1]:
+            clipped_start = max(session.login_time, time_range[0])
+            clipped_end = min(cur_time, time_range[1])
+            if clipped_end > clipped_start:
+                total_seconds += clipped_end - clipped_start
+
+        return total_seconds >= self.seconds
 
 class AccountCreationTimePredicate(Predicate):
     def __init__(self, data):
