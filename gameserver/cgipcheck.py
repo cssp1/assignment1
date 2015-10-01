@@ -115,8 +115,8 @@ def do_gui(spin_token_data, spin_token_raw, spin_token_cookie_name, my_endpoint,
 def get_regions(gamedata):
     ret = []
     for key, val in gamedata['regions'].iteritems():
-        # skip obsolete regions - these tend to have auto_join off plus a "requires" predicate
-        if not (val.get('auto_join',1) or ('requires' not in val) or val['requires']['predicate'] == 'AURA_INACTIVE'): continue
+        # skip obsolete regions
+        if not (val.get('open_join',1)): continue
         val = copy.copy(val)
         val['name'] = key
         ret.append(val)
