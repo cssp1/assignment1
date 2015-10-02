@@ -994,6 +994,7 @@ class NoSQLClient (object):
     def player_cache_query_tutorial_complete_and_mtime_between_or_ctime_between(self, mtime_ranges, ctime_ranges,
                                                                                 townhall_name = None, min_townhall_level = None,
                                                                                 include_home_regions = None,
+                                                                                exclude_home_regions = None,
                                                                                 min_known_alt_count = None,
                                                                                 min_idle_check_fails = None,
                                                                                 min_idle_check_last_fail_time = None,
@@ -1010,6 +1011,8 @@ class NoSQLClient (object):
             qs = {'$and': [qs, {'idle_check_last_fail_time': {'$gte': min_idle_check_last_fail_time}}]}
         if include_home_regions:
             qs = {'$and': [qs, {'home_region': {'$in': include_home_regions}}]}
+        if exclude_home_regions:
+            qs = {'$and': [qs, {'home_region': {'$nin': exclude_home_regions}}]}
         return self.instrument('player_cache_query_tutorial_complete_and_mtime_between_or_ctime_between(%s)'%reason,
                                lambda qs: map(lambda x: x['_id'], self.player_cache().find(qs, {'_id':1})), (qs,))
 

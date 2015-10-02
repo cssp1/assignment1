@@ -54,8 +54,10 @@ def master_account(a, b):
     return a
 
 def is_anti_alt_region(region): return 'anti_alt' in region.get('tags',[])
+def is_anti_refresh_region(region): return 'anti_refresh' in region.get('tags',[])
 
 anti_alt_region_names = [name for name, data in gamedata['regions'].iteritems() if is_anti_alt_region(data)]
+allow_refresh_region_names = [name for name, data in gamedata['regions'].iteritems() if not is_anti_refresh_region(data)]
 
 class Policy(object):
     # duration of repeat-offender state
@@ -86,6 +88,8 @@ class AntiRefreshPolicy(Policy):
         return db_client.player_cache_query_tutorial_complete_and_mtime_between_or_ctime_between([time_range], [],
                                                                                                  townhall_name = gamedata['townhall'],
                                                                                                  min_townhall_level = 3,
+                                                                                                 # use exclude to catch un-regioned players
+                                                                                                 exclude_home_regions = allow_refresh_region_names,
                                                                                                  min_idle_check_fails = 2,
                                                                                                  min_idle_check_last_fail_time = time_now - cls.IGNORE_AGE)
     def check_player(self, user_id, player):
