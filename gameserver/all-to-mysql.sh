@@ -18,6 +18,9 @@ done
 echo `date` "${GAME_ID} === ${FREQ} ETL run start ===" >> ${LOG}
 
 if [[ "$FREQ" == "daily" ]]; then
+
+  # BEGIN daily
+
   # things needed for battles and battles_risk_reward
   ./stats_to_sql.py -q > /dev/null
   echo `date` "${GAME_ID} stats done" >> ${LOG}
@@ -111,6 +114,9 @@ if [[ "$FREQ" == "daily" ]]; then
   # END daily
 
 elif [[ "$FREQ" == "hourly" ]]; then
+
+  # BEGIN hourly
+
   ./credits_to_mysql.py -q > /dev/null
   echo `date` "${GAME_ID} credits done" >> ${LOG}
 
@@ -126,8 +132,13 @@ elif [[ "$FREQ" == "hourly" ]]; then
   ./fb_notifications_to_sql.py -q --prune > /dev/null
   echo `date` "${GAME_ID} fb_notifications done" >> ${LOG}
 
+  ./policy_bot_to_sql.py -q --prune > /dev/null
+  echo `date` "${GAME_ID} policy_bot done" >> ${LOG}
+
   ./sessions_to_sql.py -q --prune > /dev/null
   echo `date` "${GAME_ID} sessions done" >> ${LOG}
+
+  # END hourly
 
 else
     echo 'unknown frequency: specify "-f hourly" or "-f daily"'
