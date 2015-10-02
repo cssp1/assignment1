@@ -1158,15 +1158,26 @@ class GameProxy(proxy.ReverseProxyResource):
         def on_response(self, response):
             self.d.callback(self.parent.index_visit_check_scope_response(self.request, self.visitor, response))
 
+        def is_recoverable_error(self, reason):
+            if not reason: return False
+            # awkward - un-parse the stringified version!
+            if ('500' in reason) and ('"is_transient":true' in reason): return True
+            if 'TimeoutError' in reason: return True
+            return False
+
         def on_error(self, reason):
-            if reason and ('500' in reason) and ('"is_transient":true' in reason) and self.attempt < 1:
-                # manually retry - this does not use the normal
-                # AsyncHTTP retry mechanism, since we want most
-                # failures (e.g. 400 Bad Request) to give up
-                # immediately, in order to not delay the user's login
-                # process any further. However, a 500 Internal Server Error should be retried at least once.
+            # manually retry - this does not use the normal
+            # AsyncHTTP retry mechanism, since we want most
+            # failures (e.g. 400 Bad Request) to give up
+            # immediately, in order not to delay the user's login
+            # process any further. However, a 500 Internal Server Error
+            # and timeouts should be retried at least once.
+
+            config = SpinConfig.config['proxyserver'].get('AsyncHTTP_Facebook', {})
+
+            if self.attempt < config.get('scope_check_max_tries', 2) - 1 and self.is_recoverable_error(reason):
                 self.attempt += 1
-                self.go()
+                reactor.callLater(config.get('scope_check_retry_delay', 1.0), self.go)
                 return
 
             # in the event of an API failure, return a fake JSON response that encodes the error so that we can detect and handle it below
