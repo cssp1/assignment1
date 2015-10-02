@@ -4,30 +4,18 @@
 # Use of this source code is governed by an MIT-style license that can be
 # found in the LICENSE file.
 
-# Script that runs externally to main server process to enforce alt-account policy.
+# Script that runs externally to main server process to enforce anti-alt/anti-refresh policies.
 
 import sys, time, urllib, requests, getopt, traceback, random
 import SpinConfig, SpinJSON, SpinParallel
 import SpinNoSQL, SpinLog, SpinNoSQLLog
 import SpinSingletonProcess
 
-# min number of simultaneous logins to trigger action
-MIN_LOGINS = 10
-# ignore simultaneous logins that last happened over a week ago
-IGNORE_AGE = 7*86400
-
 # load gamedata
 gamedata = SpinJSON.load(open(SpinConfig.gamedata_filename()))
 
 # process batches of this many users at once
 BATCH_SIZE = 5
-
-# cooldown that identifies a player as a repeat offender
-REPEAT_OFFENDER_COOLDOWN_NAME = 'alt_account_violation'
-REPEAT_OFFENDER_COOLDOWN_DURATION = 30*86400
-
-# duration of banishment from anti-alt regions
-REGION_BANISH_DURATION=30*86400
 
 time_now = int(time.time())
 
@@ -67,23 +55,62 @@ def master_account(a, b):
 
 def is_anti_alt_region(region): return 'anti_alt' in region.get('tags',[])
 
-class Sender(object):
+anti_alt_region_names = [name for name, data in gamedata['regions'].iteritems() if is_anti_alt_region(data)]
+
+class Policy(object):
+    # duration of repeat-offender state
+    REPEAT_OFFENDER_COOLDOWN_DURATION = 30*86400
+
+    # duration of banishment from prohibited regions
+    REGION_BANISH_DURATION=30*86400
+
     def __init__(self, db_client, dry_run = True, test = False, msg_fd = None, verbose = 0):
         self.db_client = db_client
         self.dry_run = dry_run
         self.test = test
-        self.seen = 0
         self.msg_fd = msg_fd
         self.verbose = verbose
         self.policy_bot_log = open_log(self.db_client)
 
-    def check_user(self, user_id, index = -1, total_count = -1):
+class AntiRefreshPolicy(Policy):
+    # ignore anything that happened more than a week ago
+    # note: server.json idle_check keep_history_for setting should be at least this long
+    IGNORE_AGE = 7*86400
 
-        self.seen += 1
-        print >> self.msg_fd, '(%6.2f%%) %7d' % (100*float(index+1)/float(total_count), user_id)
+    # cooldown that identifies a player as a repeat offender
+    REPEAT_OFFENDER_COOLDOWN_NAME = 'idle_check_violation'
 
-        player = do_CONTROLAPI({'user_id':user_id, 'method':'get_raw_player'})['result']
+    # query for candidate violators from player cache
+    @classmethod
+    def player_cache_query(cls, db_client, time_range):
+        return db_client.player_cache_query_tutorial_complete_and_mtime_between_or_ctime_between([time_range], [],
+                                                                                                 townhall_name = gamedata['townhall'],
+                                                                                                 min_townhall_level = 3,
+                                                                                                 min_idle_check_fails = 2,
+                                                                                                 min_idle_check_last_fail_time = time_now - cls.IGNORE_AGE)
+    def check_player(self, user_id, player):
+        pass # XXXXXX raise Exception('not implemented')
 
+class AntiAltPolicy(Policy):
+    # min number of simultaneous logins to trigger action
+    MIN_LOGINS = 10
+
+    # ignore alt-account logins that last happened over a week ago
+    IGNORE_AGE = 7*86400
+
+    # cooldown that identifies a player as a repeat offender
+    REPEAT_OFFENDER_COOLDOWN_NAME = 'alt_account_violation'
+
+    # query for candidate violators from player cache
+    @classmethod
+    def player_cache_query(cls, db_client, time_range):
+        return db_client.player_cache_query_tutorial_complete_and_mtime_between_or_ctime_between([time_range], [],
+                                                                                                 townhall_name = gamedata['townhall'],
+                                                                                                 min_townhall_level = 3,
+                                                                                                 include_home_regions = anti_alt_region_names,
+                                                                                                 min_known_alt_count = 1)
+
+    def check_player(self, user_id, player):
         if self.test:
             alt_accounts = {str(user_id+1): {'logins': 99, 'last_login': time_now-60}}
         else:
@@ -95,8 +122,8 @@ class Sender(object):
 
         for salt_id, alt_data in alt_accounts.iteritems():
             if alt_data.get('ignore',0): continue
-            if alt_data.get('logins',0) < MIN_LOGINS: continue
-            if alt_data.get('last_login',0) < time_now - IGNORE_AGE: continue
+            if alt_data.get('logins',0) < self.MIN_LOGINS: continue
+            if alt_data.get('last_login',0) < time_now - self.IGNORE_AGE: continue
             alt_ids.append(int(salt_id))
 
         if self.verbose >= 2:
@@ -109,7 +136,7 @@ class Sender(object):
         our_pcache = {'user_id': user_id, 'money_spent': player['history'].get('money_spent',0), 'account_creation_time': player['creation_time']}
 
         if self.verbose >= 2:
-            print >> self.msg_fd, 'player %d has possible alts: %r' % (user_id, alt_pcaches)
+            print >> self.msg_fd, 'player %d in %s has possible alts: %r' % (user_id, player['home_region'], alt_pcaches)
 
         interfering_alt_pcaches = []
 
@@ -135,8 +162,8 @@ class Sender(object):
                 other_alt_region_names = set([pc['home_region'] for pc in interfering_alt_pcaches if pc is not alt_pcache] + [player['home_region'],])
 
                 # update the alt's home region so next pass will get the right data
-                new_region_name = self.punish_user(alt_pcache['user_id'], user_id, player['home_region'], other_alt_region_names,
-                                                   [pc['user_id'] for pc in interfering_alt_pcaches]+[user_id,])
+                new_region_name = self.punish_player(alt_pcache['user_id'], user_id, player['home_region'], other_alt_region_names,
+                                                     [pc['user_id'] for pc in interfering_alt_pcaches]+[user_id,])
 
                 alt_pcache['home_region'] = new_region_name
                 print >> self.msg_fd, 'moved to region %s' % (new_region_name)
@@ -144,7 +171,7 @@ class Sender(object):
             except:
                 sys.stderr.write(('error punishing user %d: '%(alt_pcache['user_id'])) + traceback.format_exc())
 
-    def punish_user(self, user_id, master_id, cur_region_name, other_alt_region_names, all_alt_ids):
+    def punish_player(self, user_id, master_id, cur_region_name, other_alt_region_names, all_alt_ids):
 
         cur_region = gamedata['regions'][cur_region_name]
         cur_continent_id = cur_region.get('continent_id',None)
@@ -157,7 +184,7 @@ class Sender(object):
         is_majority_anti_alt_game = len(anti_alt_regions) > len(pro_alt_regions)
 
         # check repeat offender status via cooldown
-        togo = do_CONTROLAPI({'user_id':user_id, 'method':'cooldown_togo', 'name':REPEAT_OFFENDER_COOLDOWN_NAME})['result']
+        togo = do_CONTROLAPI({'user_id':user_id, 'method':'cooldown_togo', 'name':self.REPEAT_OFFENDER_COOLDOWN_NAME})['result']
         is_repeat_offender = (togo > 0)
 
         # pick destination region
@@ -186,12 +213,12 @@ class Sender(object):
             assert new_region['id'] != cur_region_name
 
         if not self.dry_run:
-            assert do_CONTROLAPI({'user_id':user_id, 'method':'trigger_cooldown', 'name':REPEAT_OFFENDER_COOLDOWN_NAME, 'duration': REPEAT_OFFENDER_COOLDOWN_DURATION})['result'] == 'ok'
+            assert do_CONTROLAPI({'user_id':user_id, 'method':'trigger_cooldown', 'name':self.REPEAT_OFFENDER_COOLDOWN_NAME, 'duration': self.REPEAT_OFFENDER_COOLDOWN_DURATION})['result'] == 'ok'
 
             if is_repeat_offender:
                 # only repeat offenders get the banishment aura
                 assert do_CONTROLAPI({'user_id':user_id, 'method':'apply_aura', 'aura_name':'region_banished',
-                                      'duration': REGION_BANISH_DURATION,
+                                      'duration': self.REGION_BANISH_DURATION,
                                       'data':SpinJSON.dumps({'tag':'anti_alt'})})['result'] == 'ok'
 
             assert do_CONTROLAPI({'user_id':user_id, 'method':'change_region', 'new_region':new_region['id']})['result'] == 'ok'
@@ -238,20 +265,31 @@ def open_log(db_client):
 class NullFD(object):
     def write(self, stuff): pass
 
+POLICIES = [AntiAltPolicy, AntiRefreshPolicy]
+
 def my_slave(input):
     msg_fd = sys.stderr if input['verbose'] else NullFD()
 
     # reconnect to DB to avoid subprocesses sharing conenctions
     db_client = connect_to_db()
 
-    sender = Sender(db_client, dry_run = input['dry_run'], msg_fd = msg_fd, test = input['test'], verbose = input['verbose'])
+    checks = [pol(db_client, dry_run = input['dry_run'], msg_fd = msg_fd, test = input['test'], verbose = input['verbose']) \
+              for pol in POLICIES]
 
     for i in xrange(len(input['batch'])):
         time_now = int(time.time())
         db_client.set_time(time_now)
 
+        user_id = input['batch'][i]
+        index = input['batch_start_index'] + i
+        total_count = input['total_count']
+
+        print >> msg_fd, '(%6.2f%%) %7d' % (100*float(index+1)/float(total_count), user_id)
+
         try:
-            sender.check_user(input['batch'][i], index = input['batch_start_index'] + i, total_count = input['total_count'])
+            player = do_CONTROLAPI({'user_id':user_id, 'method':'get_raw_player'})['result']
+            for check in checks:
+                check.check_player(user_id, player)
         except KeyboardInterrupt:
             raise # allow Ctrl-C to abort
         except:
@@ -286,8 +324,6 @@ if __name__ == '__main__':
         elif key == '-v' or key == '--verbose':
             verbose = 2
 
-    anti_alt_region_names = [name for name, data in gamedata['regions'].iteritems() if is_anti_alt_region(data)]
-
     if not manual_user_list and not anti_alt_region_names:
         sys.exit(0) # nothing to do
 
@@ -297,7 +333,7 @@ if __name__ == '__main__':
         db_client.set_time(time_now)
 
         run_start_time = time_now
-        start_time = time_now - IGNORE_AGE
+        start_time = time_now - max(pol.IGNORE_AGE for pol in POLICIES)
 
         if manual_user_list:
             id_list = manual_user_list
@@ -305,7 +341,7 @@ if __name__ == '__main__':
         else:
             # if we can find a recent run in the log, start from where it left off
             if verbose: print 'checking for recent completed run...'
-            for last_run in db_client.log_retrieve('log_policy_bot', time_range = [time_now - IGNORE_AGE, time_now], code = 7300, sort_direction = -1, limit = 1):
+            for last_run in db_client.log_retrieve('log_policy_bot', time_range = [start_time, time_now], code = 7300, sort_direction = -1, limit = 1):
                 start_time = max(start_time, last_run['time'])
                 if verbose: print 'found previous run - starting at', start_time
 
@@ -315,12 +351,9 @@ if __name__ == '__main__':
                 id_list += [1112,]
             else:
                 if verbose: print 'querying player_cache...'
-                id_list += db_client.player_cache_query_tutorial_complete_and_mtime_between_or_ctime_between([[start_time, time_now]], [],
-                                                                                                             townhall_name = gamedata['townhall'],
-                                                                                                             min_townhall_level = 3,
-                                                                                                             include_home_regions = anti_alt_region_names,
-                                                                                                             min_known_alt_count = 1)
+                id_list += sum((pol.player_cache_query(db_client, [start_time, time_now]) for pol in POLICIES), [])
 
+        id_list = list(set(id_list)) # uniquify
         id_list.sort(reverse=True)
 
         if not dry_run and not manual_user_list:
@@ -335,7 +368,7 @@ if __name__ == '__main__':
                         'verbose':verbose, 'test':test,
                         'dry_run':dry_run} for i in xrange(0, len(id_list), BATCH_SIZE)]
 
-            if verbose: print 'player_cache_query returned %d users -> %d batches' % (len(id_list), len(batches))
+            if verbose: print 'candidate set of %d users -> %d batches' % (len(id_list), len(batches))
 
             if parallel <= 1:
                 for batch_num in xrange(len(batches)):

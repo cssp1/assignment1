@@ -995,6 +995,8 @@ class NoSQLClient (object):
                                                                                 townhall_name = None, min_townhall_level = None,
                                                                                 include_home_regions = None,
                                                                                 min_known_alt_count = None,
+                                                                                min_idle_check_fails = None,
+                                                                                min_idle_check_last_fail_time = None,
                                                                                 reason = None):
         qs = {'$or': [{'tutorial_complete':1,'last_mtime':{'$gte':r[0], '$lt':r[1]}} for r in mtime_ranges] + \
                      [{'tutorial_complete':1,'account_creation_time':{'$gte':r[0], '$lt':r[1]}} for r in ctime_ranges]}
@@ -1002,6 +1004,10 @@ class NoSQLClient (object):
             qs = {'$and': [qs, {townhall_name+'_level': {'$gte': min_townhall_level}}]}
         if min_known_alt_count:
             qs = {'$and': [qs, {'known_alt_count': {'$gte': min_known_alt_count}}]}
+        if min_idle_check_fails:
+            qs = {'$and': [qs, {'idle_check_fails': {'$gte': min_idle_check_fails}}]}
+        if min_idle_check_last_fail_time:
+            qs = {'$and': [qs, {'idle_check_last_fail_time': {'$gte': min_idle_check_last_fail_time}}]}
         if include_home_regions:
             qs = {'$and': [qs, {'home_region': {'$in': include_home_regions}}]}
         return self.instrument('player_cache_query_tutorial_complete_and_mtime_between_or_ctime_between(%s)'%reason,
