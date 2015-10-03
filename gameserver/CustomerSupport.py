@@ -321,6 +321,7 @@ class HandleClearCooldown(Handler):
         return ReturnValue(result = 'ok')
 
 class HandleCooldownTogo(Handler):
+    # note: returns duration remaining
     # note: no logging, directly override exec()
     def exec_online(self, session, retmsg):
         return ReturnValue(result = session.player.cooldown_togo(self.args['name']))
@@ -329,6 +330,19 @@ class HandleCooldownTogo(Handler):
         if self.args['name'] in player['cooldowns']:
             togo = max(-1, player['cooldowns'][self.args['name']]['end'] - self.time_now)
         return ReturnValue(result = togo)
+
+class HandleCooldownActive(Handler):
+    # note: returns number of active stacks
+    # note: no logging, directly override exec()
+    def exec_online(self, session, retmsg):
+        return ReturnValue(result = session.player.cooldown_active(self.args['name']))
+    def exec_offline(self, user, player):
+        stacks = 0
+        if self.args['name'] in player['cooldowns']:
+            cd = player['cooldowns'][self.args['name']]
+            if cd['end'] > self.time_now:
+                stacks = cd.get('stack', 1)
+        return ReturnValue(result = stacks)
 
 class HandleTriggerCooldown(Handler):
     def __init__(self, *args, **kwargs):
@@ -793,6 +807,7 @@ methods = {
     'clear_lockout': HandleClearLockout,
     'clear_cooldown': HandleClearCooldown,
     'cooldown_togo': HandleCooldownTogo,
+    'cooldown_active': HandleCooldownActive,
     'trigger_cooldown': HandleTriggerCooldown,
     'apply_aura': HandleApplyAura,
     'remove_aura': HandleRemoveAura,
