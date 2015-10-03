@@ -79,6 +79,15 @@ class AntiRefreshPolicy(Policy):
     # note: server.json idle_check keep_history_for setting should be at least this long
     IGNORE_AGE = 7*86400
 
+    # don't take action until this many tests (regardless of success or failure)
+    MIN_TESTS = 4
+
+    # don't take action until this many failures
+    MIN_FAILS = 2
+
+    # don't take action unless failure rate is this high
+    MIN_FAIL_RATE = 0.5
+
     # cooldown that identifies a player as a repeat offender
     REPEAT_OFFENDER_COOLDOWN_NAME = 'idle_check_violation'
 
@@ -90,10 +99,154 @@ class AntiRefreshPolicy(Policy):
                                                                                                  min_townhall_level = 3,
                                                                                                  # use exclude to catch un-regioned players
                                                                                                  exclude_home_regions = allow_refresh_region_names,
-                                                                                                 min_idle_check_fails = 2,
+                                                                                                 min_idle_check_fails = cls.MIN_FAILS,
                                                                                                  min_idle_check_last_fail_time = time_now - cls.IGNORE_AGE)
     def check_player(self, user_id, player):
-        pass # XXXXXX raise Exception('not implemented')
+        if self.test:
+            idle_check = {'history': [
+                {'time': time_now - 5000, 'result': 'fail'},
+                {'time': time_now - 4000, 'result': 'fail'},
+                {'time': time_now - 3000, 'result': 'fail'},
+                {'time': time_now - 2000, 'result': 'fail'},
+                {'time': time_now - 1000, 'result': 'success'},
+                ]}
+        else:
+            idle_check = player.get('idle_check', {})
+
+        history = idle_check.get('history', [])
+
+        num_tests = len(history)
+        if num_tests < self.MIN_TESTS:
+            return # not enough tests
+
+        num_fails = sum((1 for x in history if x['time'] >= time_now - self.IGNORE_AGE and x['result'] == 'fail'), 0)
+        num_successes = sum((1 for x in history if x['time'] >= time_now - self.IGNORE_AGE and x['result'] == 'success'), 0)
+        if num_fails < self.MIN_FAILS:
+            return # not enough fails
+        fail_rate = (1.0*num_fails) / (num_fails + num_successes)
+
+        last_fail_time = -1
+        for i in xrange(len(history)-1, -1, -1):
+            if history[i]['result'] == 'fail':
+                last_fail_time = history[i]['time']
+                break
+
+        if self.verbose >= 2:
+            print >> self.msg_fd, 'num_fails %d num_successes %d fail_rate %.1f last_fail_time %d' % (num_fails, num_successes, fail_rate, last_fail_time)
+
+        if last_fail_time < time_now - self.IGNORE_AGE:
+            return # last failure was too long ago
+
+        if fail_rate < self.MIN_FAIL_RATE:
+            return # not enough failures to worry about
+
+        try:
+            new_region_name = self.punish_player(user_id, player['home_region'])
+        except:
+            sys.stderr.write(('error punishing player %d: '%(user_id)) + traceback.format_exc())
+
+    def punish_player(self, user_id, cur_region_name):
+
+        # check repeat offender status via cooldown
+        # note: anti-refresh uses a stacked cooldown for repeat offenses
+
+        active_stacks = do_CONTROLAPI({'user_id':user_id, 'method':'cooldown_active', 'name':self.REPEAT_OFFENDER_COOLDOWN_NAME})['result']
+        repeat_offender_level = max(active_stacks, 0)
+
+        # things we might do to the player...
+        message_body = None
+        do_banish = False
+        event_name = None
+        new_region = None
+        clear_repeat_stacks = False
+        add_repeat_stack = False
+
+        if True: # XXX for now, only flag, don't act
+            event_name = '7305_policy_bot_flagged'
+
+        elif repeat_offender_level >= 2:
+            # full punishment - removal from region and banishment
+            clear_repeat_stacks = True
+            message_body = 'Our systems have again detected that you may be using a browser plugin or script to stay logged in to the game for long periods of time, and therefore relocated your base to %s and locked you out of the main map regions due to repeated violations of our Terms of Service. If you would like to appeal your case, please contact support and our team will be able to assist you.' % (new_region['ui_name'])
+            do_banish = True
+
+            cur_region = gamedata['regions'][cur_region_name]
+            cur_continent_id = cur_region.get('continent_id',None)
+
+            # find pro-refresh regions in the same continent
+            pro_refresh_regions = filter(lambda x: not is_anti_refresh_region(x) and x.get('continent_id',None) == cur_continent_id, gamedata['regions'].itervalues())
+
+            assert len(pro_refresh_regions) >= 1
+
+            # pick any pro-refresh region (which will usually be prison)
+            candidate_regions = filter(lambda x: x.get('continent_id',None) == cur_continent_id and \
+                                       x.get('open_join',1) and x.get('enable_map',1) and \
+                                       not x.get('developer_only',0),
+                                       pro_refresh_regions)
+            assert len(candidate_regions) >= 1
+            new_region = candidate_regions[random.randint(0, len(candidate_regions)-1)]
+
+            if not self.test:
+                assert new_region['id'] != cur_region_name
+
+            event_name = '7301_policy_bot_punished'
+
+        elif repeat_offender_level >= 1:
+            message_body = 'Our systems have again detected that you may be using a browser plugin or script to stay logged in to the game for long periods of time. Please note that unattended gameplay - also known as \"auto-refreshing\" or \"botting\" - is strictly prohibited in our Terms of Service. Continued abuse may result in a permanent ban. Thank you in advance for your cooperation and understanding.'
+            add_repeat_stack = True
+            event_name = '7304_policy_bot_warned'
+
+        else:
+            message_body = 'Our systems have detected that you may be using a browser plugin or script to stay logged in to the game for long periods of time. Please note that unattended gameplay - also known as \"auto-refreshing\" or \"botting\" - is strictly prohibited in our Terms of Service. Continued abuse may result in a permanent ban. Thank you in advance for your cooperation and understanding.'
+            add_repeat_stack = True
+            event_name = '7304_policy_bot_warned'
+
+        print >> self.msg_fd, 'punishing player %d... %r' % (user_id, {'repeat_offender_level': repeat_offender_level,
+                                                                       'message_body': message_body,
+                                                                       'do_banish': do_banish,
+                                                                       'event_name': event_name,
+                                                                       'new_region': new_region,
+                                                                       'clear_repeat_stacks': clear_repeat_stacks,
+                                                                       'add_repeat_stack': add_repeat_stack})
+
+        if not self.dry_run:
+            # region change should go first, since if it fails, we don't want to leave player in a strange state
+            if new_region:
+                assert do_CONTROLAPI({'user_id':user_id, 'method':'change_region', 'new_region':new_region['id']})['result'] == 'ok'
+
+            if clear_repeat_stacks:
+                assert do_CONTROLAPI({'user_id':user_id, 'method':'clear_cooldown', 'name':self.REPEAT_OFFENDER_COOLDOWN_NAME})['result'] == 'ok'
+
+            if add_repeat_stack:
+                assert do_CONTROLAPI({'user_id':user_id, 'method':'trigger_cooldown', 'add_stack': 1, 'name':self.REPEAT_OFFENDER_COOLDOWN_NAME, 'duration': self.REPEAT_OFFENDER_COOLDOWN_DURATION})['result'] == 'ok'
+
+            if do_banish:
+                assert do_CONTROLAPI({'user_id':user_id, 'method':'apply_aura', 'aura_name':'region_banished',
+                                      'duration': self.REGION_BANISH_DURATION,
+                                      'data':SpinJSON.dumps({'tag':'anti_refresh'})})['result'] == 'ok'
+
+            # always give player a fresh start on the idle check
+            assert do_CONTROLAPI({'user_id':user_id, 'method':'reset_idle_check_state'})['result'] == 'ok'
+
+            if message_body:
+                assert do_CONTROLAPI({'user_id':user_id, 'method':'send_message',
+                                      'message_body': message_body,
+                                      'message_subject': 'Anti-Refresh Policy',
+                                      })['result'] == 'ok'
+
+        event_props = {'user_id': user_id, 'event_name': event_name, 'code': int(event_name[0:4]),
+                       'reason':'anti_refresh_violation', 'repeat_offender': repeat_offender_level}
+        if new_region:
+            event_props['old_region'] = cur_region_name
+            event_props['new_region'] = new_region['id']
+
+        if not self.dry_run:
+            self.policy_bot_log.event(time_now, event_props)
+        else:
+            print >> self.msg_fd, event_props
+
+        return new_region['id'] if new_region else None
+
 
 class AntiAltPolicy(Policy):
     # min number of simultaneous logins to trigger action
