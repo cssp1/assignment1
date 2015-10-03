@@ -23,7 +23,7 @@ from Region import Region
 # and an "async" Deferred to hold the CONTROLAPI request until an async operation finishes
 class ReturnValue(object):
     def __init__(self, result = None, error = None, kill_session = False, async = None):
-        assert result or error or async
+        assert (result is not None) or (error is not None) or (async is not None)
         self.result = result
         self.error = error
         self.kill_session = kill_session
