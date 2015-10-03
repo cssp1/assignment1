@@ -7000,7 +7000,8 @@ class Player(AbstractPlayer):
         # time player last deployed units in an attack - used for throttling max attack rate
         self.attack_cooldown_start = -1
 
-        self.idle_check = IdleCheck.IdleCheck(gamedata['server']['idle_check'], None, server_time)
+        self.idle_check = None
+        self.reset_idle_check_state()
 
         # available items in the lottery slate
         # dictionary {"slot0": {"spec":"foo"}, "slot1": ... }
@@ -7043,6 +7044,9 @@ class Player(AbstractPlayer):
 
         # persist unrecognized data from JSON file
         self.foreign_data = {}
+
+    def reset_idle_check_state(self):
+        self.idle_check = IdleCheck.IdleCheck(gamedata['server']['idle_check'], None, server_time)
 
     # call this function right after tutorial_state becomes "COMPLETE" to set up post-tutorial state
     def set_post_tutorial_state(self):

@@ -765,6 +765,15 @@ class HandleKickAllianceMember(Handler):
                                                             'reason':'CustomerSupport'})
         return ReturnValue(result = 'ok')
 
+class HandleResetIdleCheckState(Handler):
+    def do_exec_online(self, session, retmsg):
+        session.player.reset_idle_check_state()
+        return ReturnValue(result = 'ok')
+    def do_exec_offline(self, user, player):
+        if 'idle_check' in player:
+            del player['idle_check']
+        return ReturnValue(result = 'ok')
+
 methods = {
     'get_raw_player': HandleGetRawPlayer,
     'get_raw_user': HandleGetRawUser,
@@ -795,4 +804,5 @@ methods = {
     'change_region': HandleChangeRegion,
     'demote_alliance_leader': HandleDemoteAllianceLeader,
     'kick_alliance_member': HandleKickAllianceMember,
+    'reset_idle_check_state': HandleResetIdleCheckState,
 }
