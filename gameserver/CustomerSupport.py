@@ -116,8 +116,8 @@ class HandleGetRawPlayer(HandleGetRaw):
     need_user = False
     # note: no logging, directly override exec()
     def exec_online(self, session, retmsg):
-        player_raw = self.gamesite.player_table.unparse(session.player)
-        return ReturnValue(result = self.format_from_raw(player_raw))
+        player_json = self.gamesite.player_table.jsonize(session.player)
+        return ReturnValue(result = self.format_from_json(player_json))
     def exec_offline(self, user, player):
         return ReturnValue(result = self.format_from_json(player))
     def exec_offline_raw(self, user_raw, player_raw):
@@ -127,8 +127,8 @@ class HandleGetRawUser(HandleGetRaw):
     need_player = False
     # note: no logging, directly override exec()
     def exec_online(self, session, retmsg):
-        user_raw = self.gamesite.user_table.unparse(session.user)
-        return ReturnValue(result = self.format_from_raw(user_raw))
+        user_json = self.gamesite.user_table.jsonize(session.user)
+        return ReturnValue(result = self.format_from_json(user_json))
     def exec_offline(self, user, player):
         return ReturnValue(result = self.format_from_json(user))
     def exec_offline_raw(self, user_raw, player_raw):

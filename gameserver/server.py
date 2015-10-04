@@ -654,8 +654,7 @@ class UserTable:
     def __init__(self):
         pass
 
-    def unparse(self, user):
-        start_time = time.time()
+    def jsonize(self, user):
         jsonobj = {}
         for name, coerce in (self.WRITE_ONLY_FIELDS + self.FIELDS):
             val = getattr(user, name)
@@ -667,9 +666,13 @@ class UserTable:
         # store unrecognized data
         for name, val in user.foreign_data.iteritems():
             jsonobj[name] = val
+        return jsonobj
 
+    def unparse(self, user):
+        start_time = time.time()
+        jsonobj = self.jsonize(user)
         end_time = time.time()
-        admin_stats.record_latency('user_table:unparse', end_time-start_time)
+        admin_stats.record_latency('user_table:jsonize', end_time-start_time)
         start_time = end_time
 
         ret = SpinJSON.dumps(jsonobj, pretty = True, newline = True, size_hint = 65536, double_precision = 5)
@@ -2428,8 +2431,7 @@ class PlayerTable:
         self.current_loads[user_id].append(aread)
         io_system.async_read_player(user_id, aread.success, aread.fail)
 
-    def unparse(self, player):
-        start_time = time.time()
+    def jsonize(self, player):
         jsonobj = {}
         for name, val in player.foreign_data.iteritems():
             jsonobj[name] = val
@@ -2442,9 +2444,13 @@ class PlayerTable:
 #                player.my_home.nosql_pluck('PlayerTable:unparse(XXXunnecessary)') # should be done from drop_object()
 #                player.my_home.nosql_plant('PlayerTable:unparse(XXXunnecessary)')
             write_json_field(player.my_home, jsonobj, field)
+        return jsonobj
 
+    def unparse(self, player):
+        start_time = time.time()
+        jsonobj = self.jsonize(player)
         end_time = time.time()
-        admin_stats.record_latency('player_table:unparse', end_time-start_time)
+        admin_stats.record_latency('player_table:jsonize', end_time-start_time)
         start_time = end_time
 
         ret = SpinJSON.dumps(jsonobj, pretty = True, newline = True, size_hint = 1024*1024, double_precision = 5)
