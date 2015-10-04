@@ -22,13 +22,12 @@ from Region import Region
 # there is also a "kill_session" option that tells the server to (asynchronously) log the player out after we return.
 # and an "async" Deferred to hold the CONTROLAPI request until an async operation finishes
 class ReturnValue(object):
-    def __init__(self, result = None, error = None, kill_session = False, async = None, read_only = False):
+    def __init__(self, result = None, error = None, kill_session = False, async = None):
         assert (result is not None) or (error is not None) or (async is not None)
         self.result = result
         self.error = error
         self.kill_session = kill_session
         self.async = async
-        self.read_only = read_only
     def as_body(self):
         assert not self.async
         if self.error:
@@ -38,6 +37,13 @@ class ReturnValue(object):
         return SpinJSON.dumps(ret, newline = True)
 
 class Handler(object):
+    # flags that userdb/playerdb entries need to be provided
+    # can be turned off to optimize methods that don't need access to one of them
+    need_user = True
+    need_player = True
+    read_only = False
+    want_raw = False # prefer the raw strings instead of parsed JSON for offline execution
+
     def __init__(self, time_now, user_id, gamedata, gamesite, args):
         self.time_now = time_now
         self.user_id = user_id
@@ -86,27 +92,51 @@ class Handler(object):
             player['history']['customer_support'].append(log_entry)
         return ret
 
+    # optional execution method that can be called if want_raw is true
+    def exec_offline_raw(self, user_raw, player_raw): raise Exception('not implemented')
+
 class HandleGetRaw(Handler):
-    def format(self, result):
-        if bool(int(self.args.get('stringify',False))):
+    read_only = True
+    def __init__(self, *args, **kwargs):
+        Handler.__init__(self, *args, **kwargs)
+        self.stringify = bool(int(self.args.get('stringify',False)))
+        # if caller wants stringified result, we can operate faster by skipping the parsing step
+        self.want_raw = self.stringify
+
+    def format_from_json(self, result):
+        if self.stringify:
             result = SpinJSON.dumps(result, pretty = True, newline = True, size_hint = 1024*1024, double_precision = 5)
         return result
+    def format_from_raw(self, result):
+        if not self.stringify:
+            result = SpinJSON.loads(result)
+        return result
+
 class HandleGetRawPlayer(HandleGetRaw):
+    need_user = False
     # note: no logging, directly override exec()
     def exec_online(self, session, retmsg):
-        player_json = SpinJSON.loads(self.gamesite.player_table.unparse(session.player))
-        return ReturnValue(result = self.format(player_json), read_only = True)
+        player_raw = self.gamesite.player_table.unparse(session.player)
+        return ReturnValue(result = self.format_from_raw(player_raw))
     def exec_offline(self, user, player):
-        return ReturnValue(result = self.format(player), read_only = True)
+        return ReturnValue(result = self.format_from_json(player))
+    def exec_offline_raw(self, user_raw, player_raw):
+        assert self.stringify
+        return ReturnValue(result = player_raw)
 class HandleGetRawUser(HandleGetRaw):
+    need_player = False
     # note: no logging, directly override exec()
     def exec_online(self, session, retmsg):
-        user_json = SpinJSON.loads(self.gamesite.user_table.unparse(session.user))
-        return ReturnValue(result = self.format(user_json), read_only = True)
+        user_raw = self.gamesite.user_table.unparse(session.user)
+        return ReturnValue(result = self.format_from_raw(user_raw))
     def exec_offline(self, user, player):
-        return ReturnValue(result = self.format(user), read_only = True)
+        return ReturnValue(result = self.format_from_json(user))
+    def exec_offline_raw(self, user_raw, player_raw):
+        assert self.stringify
+        return ReturnValue(result = user_raw)
 
 class HandleBan(Handler):
+    need_user = False
     def do_exec_online(self, session, retmsg):
         session.player.banned_until = self.time_now + int(self.args.get('ban_time',self.gamedata['server']['default_ban_time']))
         return ReturnValue(result = 'ok', kill_session = True)
@@ -114,6 +144,7 @@ class HandleBan(Handler):
         player['banned_until'] = self.time_now + int(self.args.get('ban_time',self.gamedata['server']['default_ban_time']))
         return ReturnValue(result = 'ok')
 class HandleUnban(Handler):
+    need_user = False
     def do_exec_online(self, session, retmsg):
         session.player.banned_until = -1
         return ReturnValue(result = 'ok')
@@ -322,28 +353,30 @@ class HandleClearCooldown(Handler):
         return ReturnValue(result = 'ok')
 
 class HandleCooldownTogo(Handler):
+    read_only = True
     # note: returns duration remaining
     # note: no logging, directly override exec()
     def exec_online(self, session, retmsg):
-        return ReturnValue(result = session.player.cooldown_togo(self.args['name']), read_only = True)
+        return ReturnValue(result = session.player.cooldown_togo(self.args['name']))
     def exec_offline(self, user, player):
         togo = -1
         if self.args['name'] in player['cooldowns']:
             togo = max(-1, player['cooldowns'][self.args['name']]['end'] - self.time_now)
-        return ReturnValue(result = togo, read_only = True)
+        return ReturnValue(result = togo)
 
 class HandleCooldownActive(Handler):
+    read_only = True
     # note: returns number of active stacks
     # note: no logging, directly override exec()
     def exec_online(self, session, retmsg):
-        return ReturnValue(result = session.player.cooldown_active(self.args['name']), read_only = True)
+        return ReturnValue(result = session.player.cooldown_active(self.args['name']))
     def exec_offline(self, user, player):
         stacks = 0
         if self.args['name'] in player['cooldowns']:
             cd = player['cooldowns'][self.args['name']]
             if cd['end'] > self.time_now:
                 stacks = cd.get('stack', 1)
-        return ReturnValue(result = stacks, read_only = True)
+        return ReturnValue(result = stacks)
 
 class HandleTriggerCooldown(Handler):
     def __init__(self, *args, **kwargs):

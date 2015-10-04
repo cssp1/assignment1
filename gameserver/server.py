@@ -12589,8 +12589,8 @@ class CONTROLAPI(resource.Resource):
             self.method_name = method_name
             self.handler = handler
             self.d = d
-            self.player_json = None
-            self.user_json = None
+            self.player_raw = None
+            self.user_raw = None
             self.has_player = False
             self.has_user = False
             self.wrote_player = False
@@ -12598,8 +12598,17 @@ class CONTROLAPI(resource.Resource):
             self.error = None
             self.val = None # return value
         def start(self):
-            io_system.async_read_player(self.user_id, self.player_read_success, self.player_read_error, reason='CustomerSupport')
-            io_system.async_read_user(self.user_id, self.user_read_success, self.user_read_error, reason='CustomerSupport')
+            if self.handler.need_player:
+                io_system.async_read_player(self.user_id, self.player_read_success, self.player_read_error, reason='CustomerSupport')
+            else:
+                self.has_player = True
+                self.player_raw = ''
+            if self.handler.need_user:
+                io_system.async_read_user(self.user_id, self.user_read_success, self.user_read_error, reason='CustomerSupport')
+            else:
+                self.has_user = True
+                self.user_raw = ''
+            self.try_mutate()
         def player_read_error(self, reason):
             self.has_player = True
             self.error = reason
@@ -12607,7 +12616,7 @@ class CONTROLAPI(resource.Resource):
         def player_read_success(self, buf):
             self.has_player = True
             if buf != 'NOTFOUND':
-                self.player_json = SpinJSON.loads(buf)
+                self.player_raw = buf
             else:
                 self.error = 'player not found'
             self.try_mutate()
@@ -12618,33 +12627,56 @@ class CONTROLAPI(resource.Resource):
         def user_read_success(self, buf):
             self.has_user = True
             if buf != 'NOTFOUND':
-                self.user_json = SpinJSON.loads(buf)
+                self.user_raw = buf
             else:
                 self.error = 'user not found'
             self.try_mutate()
         def try_mutate(self):
             if (not self.has_player) or (not self.has_user): return # I/O not done yet
-            if (not self.player_json) or (not self.user_json) or self.error:
+            if (self.player_raw is None) or (self.user_raw is None) or self.error:
                 # failed reading - stop here, don't write
                 self.d.callback(CustomerSupport.ReturnValue(error = 'error on player %d: %s' % (self.user_id, self.error or 'unknown')))
                 return
             try:
-                self.val = self.handler.exec_offline(self.user_json, self.player_json)
+                if self.handler.want_raw:
+                    player_json = None
+                    user_json = None
+                    self.val = self.handler.exec_offline_raw(self.user_raw, self.player_raw)
+                else:
+                    if self.handler.need_player:
+                        player_json = SpinJSON.loads(self.player_raw)
+                    else:
+                        player_json = None
+                    if self.handler.need_user:
+                        user_json = SpinJSON.loads(self.user_raw)
+                    else:
+                        user_json = None
+                    self.val = self.handler.exec_offline(user_json, player_json)
             except:
                 gamesite.exception_log.event(server_time, 'CustomerSupport offline exception player %d method %r args %r:\n%s' % (self.user_id, self.method_name, self.handler.args, traceback.format_exc()))
                 self.d.callback(CustomerSupport.ReturnValue(error = traceback.format_exc()))
                 return
 
             assert self.val
-            if not self.val.read_only:
-                self.player_json['generation'] = self.player_json.get('generation',-1)+1
-                player_buf = SpinJSON.dumps(self.player_json, pretty = True, newline = True, size_hint = 1024*1024, double_precision = 5)
-                user_buf = SpinJSON.dumps(self.user_json, pretty = True, newline = True, size_hint = 1024*1024, double_precision = 5)
-                io_system.async_write_player(self.user_id, player_buf, self.player_write_success, False, reason='CustomerSupport')
-                io_system.async_write_user(self.user_id, user_buf, self.user_write_success, False, reason='CustomerSupport')
-            else:
-                # skip the write
+            if self.handler.read_only:
                 self.d.callback(self.val)
+                return
+            else:
+                if self.handler.need_player:
+                    assert player_json
+                    player_json['generation'] = player_json.get('generation',-1)+1
+                    player_buf = SpinJSON.dumps(player_json, pretty = True, newline = True, size_hint = 1024*1024, double_precision = 5)
+                    io_system.async_write_player(self.user_id, player_buf, self.player_write_success, False, reason='CustomerSupport')
+                else:
+                    self.wrote_player = True
+                if self.handler.need_user:
+                    assert user_json
+                    user_buf = SpinJSON.dumps(user_json, pretty = True, newline = True, size_hint = 1024*1024, double_precision = 5)
+                    io_system.async_write_user(self.user_id, user_buf, self.user_write_success, False, reason='CustomerSupport')
+                else:
+                    self.wrote_user = True
+                self.try_finish()
+
         def player_write_success(self):
             self.wrote_player = True
             self.try_finish()

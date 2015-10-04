@@ -313,7 +313,8 @@ if __name__ == '__main__':
         else:
             try:
                 if use_controlapi:
-                    player = do_CONTROLAPI({'method':'get_raw_player', 'user_id': user_id})
+                    # requesting "stringify" is faster in the logged-out case (since the server doesn't parse/unparse) and probably same speed in logged-in case
+                    player = SpinJSON.loads(do_CONTROLAPI({'method':'get_raw_player', 'stringify': '1', 'user_id': user_id}))
                 else:
                     player = SpinJSON.loads(driver.sync_download_player(user_id))
             except Exception as e:
@@ -329,7 +330,7 @@ if __name__ == '__main__':
             user = SpinJSON.load(open(user_filename))
         else:
             if use_controlapi:
-                user = do_CONTROLAPI({'method': 'get_raw_user', 'user_id': user_id})
+                user = SpinJSON.loads(do_CONTROLAPI({'method': 'get_raw_user', 'stringify': '1', 'user_id': user_id}))
             else:
                 user = SpinJSON.loads(driver.sync_download_user(user_id))
 
