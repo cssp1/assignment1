@@ -6,7 +6,7 @@
 
 # Script that runs externally to main server process to enforce anti-alt/anti-refresh policies.
 
-import sys, time, urllib, requests, getopt, traceback, random
+import sys, time, urllib, requests, getopt, traceback, random, socket
 import SpinConfig, SpinJSON, SpinParallel
 import SpinNoSQL, SpinLog, SpinNoSQLLog
 import SpinSingletonProcess
@@ -21,7 +21,7 @@ time_now = int(time.time())
 
 def do_CONTROLAPI(args):
     host = SpinConfig.config['proxyserver'].get('external_listen_host','localhost')
-    proto = 'http' if host == 'localhost' else 'https'
+    proto = 'http' if host in ('localhost', socket.gethostname()) else 'https'
     url = '%s://%s:%d/CONTROLAPI' % (proto, host, SpinConfig.config['proxyserver']['external_http_port' if proto == 'http' else 'external_ssl_port'])
     args['ui_reason'] = 'PolicyBot'
     args['spin_user'] = 'PolicyBot'

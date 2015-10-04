@@ -13,7 +13,7 @@ import SpinJSON
 
 # load some standard Python libraries
 import sys, time, getopt, string
-import requests, urllib
+import requests, urllib, socket
 
 time_now = int(time.time())
 
@@ -74,7 +74,7 @@ def check_bloat(input, min_size = 1024, print_max = 20):
 
 def do_CONTROLAPI(args):
     host = SpinConfig.config['proxyserver'].get('external_listen_host','localhost')
-    proto = 'http' if host == 'localhost' else 'https'
+    proto = 'http' if host in ('localhost', socket.gethostname()) else 'https'
     url = '%s://%s:%d/CONTROLAPI' % (proto, host, SpinConfig.config['proxyserver']['external_http_port' if proto == 'http' else 'external_ssl_port'])
     args['spin_user'] = 'check_player.py'
     args['secret'] = SpinConfig.config['proxy_api_secret']

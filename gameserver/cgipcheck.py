@@ -7,7 +7,7 @@
 # CGI script for customer support and server management
 
 import os, sys, subprocess, traceback, time, re, copy
-import cgi, cgitb
+import cgi, cgitb, socket
 import urllib, urllib2
 import SpinFacebook
 import SpinNoSQL
@@ -555,8 +555,9 @@ def do_action(path, method, args, spin_token_data, nosql_client):
         return {"error":traceback.format_exc()}
 
 def do_CONTROLAPI(args, host = None, port = None):
-    url = 'http://%s:%d/CONTROLAPI' % (host or SpinConfig.config['proxyserver'].get('external_listen_host','localhost'),
-                                       port or SpinConfig.config['proxyserver']['external_http_port'])
+    host = host or SpinConfig.config['proxyserver'].get('external_listen_host','localhost')
+    proto = 'http' if host in ('localhost', socket.gethostname()) else 'https'
+    url = '%s://%s:%d/CONTROLAPI' % (proto, host, port or SpinConfig.config['proxyserver']['external_http_port'])
     args['secret'] = SpinConfig.config['proxy_api_secret']
     response = urllib2.urlopen(url+'?'+urllib.urlencode(args)).read().strip()
     return SpinJSON.loads(response)
