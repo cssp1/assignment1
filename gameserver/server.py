@@ -12743,15 +12743,21 @@ class CONTROLAPI(resource.Resource):
 
             else:
                 # OFFLINE edit
-                state = gamesite.lock_client.player_lock_acquire_attack(user_id, -1, owner_id=-1)
-                if state != Player.LockState.being_attacked:
-                    ret = CustomerSupport.ReturnValue(error = 'player %d offline but locked' % user_id).as_body()
-                else:
-                    d = defer.Deferred()
-                    def unlock(val, uid):
-                        gamesite.lock_client.player_lock_release(uid, -1, Player.LockState.being_attacked, expected_owner_id = -1)
-                        return val
-                    d.addBoth(unlock, user_id)
+                ret = None
+                d = defer.Deferred()
+
+                if not handler.read_only:
+                    # get lock
+                    state = gamesite.lock_client.player_lock_acquire_attack(user_id, -1, owner_id=-1)
+                    if state != Player.LockState.being_attacked:
+                        ret = CustomerSupport.ReturnValue(error = 'player %d offline but locked' % user_id).as_body()
+                    else:
+                        def unlock(val, uid):
+                            gamesite.lock_client.player_lock_release(uid, -1, Player.LockState.being_attacked, expected_owner_id = -1)
+                            return val
+                        d.addBoth(unlock, user_id)
+
+                if ret is None: # no lock error
                     def complete(val, request):
                         SpinHTTP.complete_deferred_request(val.as_body(), request)
                     d.addBoth(complete, request)
