@@ -12630,15 +12630,21 @@ class CONTROLAPI(resource.Resource):
                 return
             try:
                 self.val = self.handler.exec_offline(self.user_json, self.player_json)
-                self.player_json['generation'] = self.player_json.get('generation',-1)+1
             except:
                 gamesite.exception_log.event(server_time, 'CustomerSupport offline exception player %d method %r args %r:\n%s' % (self.user_id, self.method_name, self.handler.args, traceback.format_exc()))
                 self.d.callback(CustomerSupport.ReturnValue(error = traceback.format_exc()))
                 return
-            player_buf = SpinJSON.dumps(self.player_json, pretty = True, newline = True, size_hint = 1024*1024, double_precision = 5)
-            user_buf = SpinJSON.dumps(self.user_json, pretty = True, newline = True, size_hint = 1024*1024, double_precision = 5)
-            io_system.async_write_player(self.user_id, player_buf, self.player_write_success, False, reason='CustomerSupport')
-            io_system.async_write_user(self.user_id, user_buf, self.user_write_success, False, reason='CustomerSupport')
+
+            assert self.val
+            if not self.val.read_only:
+                self.player_json['generation'] = self.player_json.get('generation',-1)+1
+                player_buf = SpinJSON.dumps(self.player_json, pretty = True, newline = True, size_hint = 1024*1024, double_precision = 5)
+                user_buf = SpinJSON.dumps(self.user_json, pretty = True, newline = True, size_hint = 1024*1024, double_precision = 5)
+                io_system.async_write_player(self.user_id, player_buf, self.player_write_success, False, reason='CustomerSupport')
+                io_system.async_write_user(self.user_id, user_buf, self.user_write_success, False, reason='CustomerSupport')
+            else:
+                # skip the write
+                self.d.callback(self.val)
         def player_write_success(self):
             self.wrote_player = True
             self.try_finish()

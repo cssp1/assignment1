@@ -22,12 +22,13 @@ from Region import Region
 # there is also a "kill_session" option that tells the server to (asynchronously) log the player out after we return.
 # and an "async" Deferred to hold the CONTROLAPI request until an async operation finishes
 class ReturnValue(object):
-    def __init__(self, result = None, error = None, kill_session = False, async = None):
+    def __init__(self, result = None, error = None, kill_session = False, async = None, read_only = False):
         assert (result is not None) or (error is not None) or (async is not None)
         self.result = result
         self.error = error
         self.kill_session = kill_session
         self.async = async
+        self.read_only = read_only
     def as_body(self):
         assert not self.async
         if self.error:
@@ -94,16 +95,16 @@ class HandleGetRawPlayer(HandleGetRaw):
     # note: no logging, directly override exec()
     def exec_online(self, session, retmsg):
         player_json = SpinJSON.loads(self.gamesite.player_table.unparse(session.player))
-        return ReturnValue(result = self.format(player_json))
+        return ReturnValue(result = self.format(player_json), read_only = True)
     def exec_offline(self, user, player):
-        return ReturnValue(result = self.format(player))
+        return ReturnValue(result = self.format(player), read_only = True)
 class HandleGetRawUser(HandleGetRaw):
     # note: no logging, directly override exec()
     def exec_online(self, session, retmsg):
         user_json = SpinJSON.loads(self.gamesite.user_table.unparse(session.user))
-        return ReturnValue(result = self.format(user_json))
+        return ReturnValue(result = self.format(user_json), read_only = True)
     def exec_offline(self, user, player):
-        return ReturnValue(result = self.format(user))
+        return ReturnValue(result = self.format(user), read_only = True)
 
 class HandleBan(Handler):
     def do_exec_online(self, session, retmsg):
@@ -324,25 +325,25 @@ class HandleCooldownTogo(Handler):
     # note: returns duration remaining
     # note: no logging, directly override exec()
     def exec_online(self, session, retmsg):
-        return ReturnValue(result = session.player.cooldown_togo(self.args['name']))
+        return ReturnValue(result = session.player.cooldown_togo(self.args['name']), read_only = True)
     def exec_offline(self, user, player):
         togo = -1
         if self.args['name'] in player['cooldowns']:
             togo = max(-1, player['cooldowns'][self.args['name']]['end'] - self.time_now)
-        return ReturnValue(result = togo)
+        return ReturnValue(result = togo, read_only = True)
 
 class HandleCooldownActive(Handler):
     # note: returns number of active stacks
     # note: no logging, directly override exec()
     def exec_online(self, session, retmsg):
-        return ReturnValue(result = session.player.cooldown_active(self.args['name']))
+        return ReturnValue(result = session.player.cooldown_active(self.args['name']), read_only = True)
     def exec_offline(self, user, player):
         stacks = 0
         if self.args['name'] in player['cooldowns']:
             cd = player['cooldowns'][self.args['name']]
             if cd['end'] > self.time_now:
                 stacks = cd.get('stack', 1)
-        return ReturnValue(result = stacks)
+        return ReturnValue(result = stacks, read_only = True)
 
 class HandleTriggerCooldown(Handler):
     def __init__(self, *args, **kwargs):
