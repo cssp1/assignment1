@@ -79,9 +79,6 @@ if __name__ == '__main__':
                "P175D1_NOK": { "kind": "D1",
                                "currency": "NOK",
                                "force_output": True, "unit_bonus_format": "short", "ui_warning": "Limited time special offers:", "unit_bonus": None,
-                               "requires": [{"predicate": "NOT", "subpredicates": [{"predicate": "LIBRARY", "name": "fbpayments_D1SALE_in_effect"}]},
-                                            {"predicate": "NOT", "subpredicates": [{"predicate": "ANY_ABTEST", "key": "fbpayments_D2_in_effect", "value": 1}]}
-                               ],
                                "skus": [{'alloy': 24000, 'NOK': 1999.99, 'nominal_alloy': 20000, 'ui_comment': 'Best Value', 'ui_pile_size': 5},
                                         {'alloy': 11500, 'NOK': 999.99, 'nominal_alloy': 10000, 'ui_comment': None, 'ui_pile_size': 4},
                                         {'alloy': 5500, 'NOK': 499.99, 'nominal_alloy': 5000, 'ui_comment': 'Most Popular', 'ui_pile_size': 3},
@@ -91,7 +88,6 @@ if __name__ == '__main__':
                "P175D1SALE_NOK": { "kind": "D1SALE",
                                "currency": "NOK",
                                "force_output": True, "unit_bonus_format": "short", "ui_warning": "Limited time special offers:", "unit_bonus": None,
-                               "requires": [{"predicate": "LIBRARY", "name": "fbpayments_D1SALE_in_effect"}],
                                "skus": [{'alloy': 26500, 'NOK': 1999.99, 'nominal_alloy': 20000, 'ui_comment': 'Best Value', 'ui_pile_size': 5, 'ui_banner': 'SALE'},
                                         {'alloy': 13200, 'NOK': 999.99, 'nominal_alloy': 10000, 'ui_comment': None, 'ui_pile_size': 4, 'ui_banner': 'SALE'},
                                         {'alloy': 6575, 'NOK': 499.99, 'nominal_alloy': 5000, 'ui_comment': 'Most Popular', 'ui_pile_size': 3, 'ui_banner': 'SALE'},
@@ -101,8 +97,6 @@ if __name__ == '__main__':
                "P175D2_NOK": { "kind": "D2", # Add 249.99 SKU following T238_purchase_ui_slates A/B test
                                "currency": "NOK",
                                "force_output": True, "unit_bonus_format": "short", "ui_warning": "Limited time special offers:", "unit_bonus": None,
-                               "requires": [{"predicate": "NOT", "subpredicates": [{"predicate": "LIBRARY", "name": "fbpayments_D2SALE_in_effect"}]},
-                                            {"predicate": "ANY_ABTEST", "key": "fbpayments_D2_in_effect", "value": 1}],
                                "skus": [{'alloy': 24000, 'NOK': 1999.99, 'nominal_alloy': 20000, 'ui_comment': 'Best Value', 'ui_pile_size': 5},
                                         {'alloy': 11500, 'NOK': 999.99, 'nominal_alloy': 10000, 'ui_comment': None, 'ui_pile_size': 4},
                                         {'alloy': 5500, 'NOK': 499.99, 'nominal_alloy': 5000, 'ui_comment': 'Most Popular', 'ui_pile_size': 3},
@@ -113,7 +107,6 @@ if __name__ == '__main__':
                "P175D2SALE_NOK": { "kind": "D2SALE",
                                "currency": "NOK",
                                "force_output": True, "unit_bonus_format": "short", "ui_warning": "Limited time special offers:", "unit_bonus": None,
-                               "requires": [{"predicate": "LIBRARY", "name": "fbpayments_D2SALE_in_effect"}],
                                "skus": [{'alloy': 26500, 'NOK': 1999.99, 'nominal_alloy': 20000, 'ui_comment': 'Best Value', 'ui_pile_size': 5, 'ui_banner': 'SALE'},
                                         {'alloy': 13200, 'NOK': 999.99, 'nominal_alloy': 10000, 'ui_comment': None, 'ui_pile_size': 4, 'ui_banner': 'SALE'},
                                         {'alloy': 6575, 'NOK': 499.99, 'nominal_alloy': 5000, 'ui_comment': 'Most Popular', 'ui_pile_size': 3, 'ui_banner': 'SALE'},
@@ -134,9 +127,6 @@ if __name__ == '__main__':
                "P135D1_SEK": { "kind": "D1",
                                "currency": "SEK",
                                "force_output": True, "unit_bonus_format": "short", "ui_warning": "Limited time special offers:", "unit_bonus": None,
-                               "requires": [{"predicate": "NOT", "subpredicates": [{"predicate": "LIBRARY", "name": "fbpayments_D1SALE_in_effect"}]},
-                                            {"predicate": "NOT", "subpredicates": [{"predicate": "ANY_ABTEST", "key": "fbpayments_D2_in_effect", "value": 1}]}
-                               ],
                                "skus": [{'alloy': 24000, 'SEK': 1999.99, 'nominal_alloy': 20000, 'ui_comment': 'Best Value', 'ui_pile_size': 5},
                                         {'alloy': 11500, 'SEK': 999.99, 'nominal_alloy': 10000, 'ui_comment': None, 'ui_pile_size': 4},
                                         {'alloy': 5500, 'SEK': 499.99, 'nominal_alloy': 5000, 'ui_comment': 'Most Popular', 'ui_pile_size': 3},
@@ -146,7 +136,6 @@ if __name__ == '__main__':
                "P135D1SALE_SEK": { "kind": "D1SALE",
                                "currency": "SEK",
                                "force_output": True, "unit_bonus_format": "short", "ui_warning": "Limited time special offers:", "unit_bonus": None,
-                               "requires": [{"predicate": "LIBRARY", "name": "fbpayments_D1SALE_in_effect"}],
                                "skus": [{'alloy': 26500, 'SEK': 1999.99, 'nominal_alloy': 20000, 'ui_comment': 'Best Value', 'ui_pile_size': 5, 'ui_banner': 'SALE'},
                                         {'alloy': 13200, 'SEK': 999.99, 'nominal_alloy': 10000, 'ui_comment': None, 'ui_pile_size': 4, 'ui_banner': 'SALE'},
                                         {'alloy': 6575, 'SEK': 499.99, 'nominal_alloy': 5000, 'ui_comment': 'Most Popular', 'ui_pile_size': 3, 'ui_banner': 'SALE'},
@@ -156,8 +145,6 @@ if __name__ == '__main__':
                "P135D2_SEK": { "kind": "D2", # Add 249.99 SKU following T238_purchase_ui_slates A/B test
                                "currency": "SEK",
                                "force_output": True, "unit_bonus_format": "short", "ui_warning": "Limited time special offers:", "unit_bonus": None,
-                               "requires": [{"predicate": "NOT", "subpredicates": [{"predicate": "LIBRARY", "name": "fbpayments_D2SALE_in_effect"}]},
-                                            {"predicate": "ANY_ABTEST", "key": "fbpayments_D2_in_effect", "value": 1}],
                                "skus": [{'alloy': 24000, 'SEK': 1999.99, 'nominal_alloy': 20000, 'ui_comment': 'Best Value', 'ui_pile_size': 5},
                                         {'alloy': 11500, 'SEK': 999.99, 'nominal_alloy': 10000, 'ui_comment': None, 'ui_pile_size': 4},
                                         {'alloy': 5500, 'SEK': 499.99, 'nominal_alloy': 5000, 'ui_comment': 'Most Popular', 'ui_pile_size': 3},
@@ -168,7 +155,6 @@ if __name__ == '__main__':
                "P135D2SALE_SEK": { "kind": "D2SALE",
                                "currency": "SEK",
                                "force_output": True, "unit_bonus_format": "short", "ui_warning": "Limited time special offers:", "unit_bonus": None,
-                               "requires": [{"predicate": "LIBRARY", "name": "fbpayments_D2SALE_in_effect"}],
                                "skus": [{'alloy': 26500, 'SEK': 1999.99, 'nominal_alloy': 20000, 'ui_comment': 'Best Value', 'ui_pile_size': 5, 'ui_banner': 'SALE'},
                                         {'alloy': 13200, 'SEK': 999.99, 'nominal_alloy': 10000, 'ui_comment': None, 'ui_pile_size': 4, 'ui_banner': 'SALE'},
                                         {'alloy': 6575, 'SEK': 499.99, 'nominal_alloy': 5000, 'ui_comment': 'Most Popular', 'ui_pile_size': 3, 'ui_banner': 'SALE'},
@@ -198,9 +184,6 @@ if __name__ == '__main__':
                "P135D1_GBP": { "kind": "D1",
                                "currency": "GBP",
                                "force_output": True, "unit_bonus_format": "short", "ui_warning": "Limited time special offers:", "unit_bonus": None,
-                               "requires": [{"predicate": "NOT", "subpredicates": [{"predicate": "LIBRARY", "name": "fbpayments_D1SALE_in_effect"}]},
-                                            {"predicate": "NOT", "subpredicates": [{"predicate": "ANY_ABTEST", "key": "fbpayments_D2_in_effect", "value": 1}]}
-                               ],
                                "skus": [{'alloy': 24000, 'GBP': 199.99, 'nominal_alloy': 20000, 'ui_comment': 'Best Value', 'ui_pile_size': 5},
                                         {'alloy': 11500, 'GBP': 99.99, 'nominal_alloy': 10000, 'ui_comment': None, 'ui_pile_size': 4},
                                         {'alloy': 5500, 'GBP': 49.99, 'nominal_alloy': 5000, 'ui_comment': 'Most Popular', 'ui_pile_size': 3},
@@ -210,7 +193,6 @@ if __name__ == '__main__':
                "P135D1SALE_GBP": { "kind": "D1SALE",
                                "currency": "GBP",
                                "force_output": True, "unit_bonus_format": "short", "ui_warning": "Limited time special offers:", "unit_bonus": None,
-                               "requires": [{"predicate": "LIBRARY", "name": "fbpayments_D1SALE_in_effect"}],
                                "skus": [{'alloy': 26500, 'GBP': 199.99, 'nominal_alloy': 20000, 'ui_comment': 'Best Value', 'ui_pile_size': 5, 'ui_banner': 'SALE'},
                                         {'alloy': 13200, 'GBP': 99.99, 'nominal_alloy': 10000, 'ui_comment': None, 'ui_pile_size': 4, 'ui_banner': 'SALE'},
                                         {'alloy': 6575, 'GBP': 49.99, 'nominal_alloy': 5000, 'ui_comment': 'Most Popular', 'ui_pile_size': 3, 'ui_banner': 'SALE'},
@@ -220,8 +202,6 @@ if __name__ == '__main__':
                "P135D2_GBP": { "kind": "D2", # Add 24.99 SKU following T238_purchase_ui_slates A/B test
                                "currency": "GBP",
                                "force_output": True, "unit_bonus_format": "short", "ui_warning": "Limited time special offers:", "unit_bonus": None,
-                               "requires": [{"predicate": "NOT", "subpredicates": [{"predicate": "LIBRARY", "name": "fbpayments_D2SALE_in_effect"}]},
-                                            {"predicate": "ANY_ABTEST", "key": "fbpayments_D2_in_effect", "value": 1}],
                                "skus": [{'alloy': 24000, 'GBP': 199.99, 'nominal_alloy': 20000, 'ui_comment': 'Best Value', 'ui_pile_size': 5},
                                         {'alloy': 11500, 'GBP': 99.99, 'nominal_alloy': 10000, 'ui_comment': None, 'ui_pile_size': 4},
                                         {'alloy': 5500, 'GBP': 49.99, 'nominal_alloy': 5000, 'ui_comment': 'Most Popular', 'ui_pile_size': 3},
@@ -232,7 +212,6 @@ if __name__ == '__main__':
                "P135D2SALE_GBP": { "kind": "D2SALE",
                                "currency": "GBP",
                                "force_output": True, "unit_bonus_format": "short", "ui_warning": "Limited time special offers:", "unit_bonus": None,
-                               "requires": [{"predicate": "LIBRARY", "name": "fbpayments_D2SALE_in_effect"}],
                                "skus": [{'alloy': 26500, 'GBP': 199.99, 'nominal_alloy': 20000, 'ui_comment': 'Best Value', 'ui_pile_size': 5, 'ui_banner': 'SALE'},
                                         {'alloy': 13200, 'GBP': 99.99, 'nominal_alloy': 10000, 'ui_comment': None, 'ui_pile_size': 4, 'ui_banner': 'SALE'},
                                         {'alloy': 6575, 'GBP': 49.99, 'nominal_alloy': 5000, 'ui_comment': 'Most Popular', 'ui_pile_size': 3, 'ui_banner': 'SALE'},
@@ -262,9 +241,6 @@ if __name__ == '__main__':
               "P135D1_EUR": { "kind": "D1", # volume discount test 20140621
                               "currency": "EUR",
                               "force_output": True, "unit_bonus_format": "short", "ui_warning": "Limited time special offers:", "unit_bonus": None,
-                              "requires": [{"predicate": "NOT", "subpredicates": [{"predicate": "LIBRARY", "name": "fbpayments_D1SALE_in_effect"}]},
-                                           {"predicate": "NOT", "subpredicates": [{"predicate": "ANY_ABTEST", "key": "fbpayments_D2_in_effect", "value": 1}]}
-                              ],
                               "skus": [{'alloy': 24000, 'EUR': 199.99, 'nominal_alloy': 20000, 'ui_comment': 'Best Value', 'ui_pile_size': 5},
                                        {'alloy': 11500, 'EUR': 99.99, 'nominal_alloy': 10000, 'ui_comment': None, 'ui_pile_size': 4},
                                        {'alloy': 5500, 'EUR': 49.99, 'nominal_alloy': 5000, 'ui_comment': 'Most Popular', 'ui_pile_size': 3},
@@ -274,7 +250,6 @@ if __name__ == '__main__':
               "P135D1SALE_EUR": { "kind": "D1SALE",
                               "currency": "EUR",
                               "force_output": True, "unit_bonus_format": "short", "ui_warning": "Limited time special offers:", "unit_bonus": None,
-                              "requires": [{"predicate": "LIBRARY", "name": "fbpayments_D1SALE_in_effect"}],
                               "skus": [{'alloy': 26500, 'EUR': 199.99, 'nominal_alloy': 20000, 'ui_comment': 'Best Value', 'ui_pile_size': 5, 'ui_banner': 'SALE'},
                                        {'alloy': 13200, 'EUR': 99.99, 'nominal_alloy': 10000, 'ui_comment': None, 'ui_pile_size': 4, 'ui_banner': 'SALE'},
                                        {'alloy': 6575, 'EUR': 49.99, 'nominal_alloy': 5000, 'ui_comment': 'Most Popular', 'ui_pile_size': 3, 'ui_banner': 'SALE'},
@@ -284,8 +259,6 @@ if __name__ == '__main__':
               "P135D2_EUR": { "kind": "D2", # Add 24.99 SKU following T238_purchase_ui_slates A/B test
                               "currency": "EUR",
                               "force_output": True, "unit_bonus_format": "short", "ui_warning": "Limited time special offers:", "unit_bonus": None,
-                              "requires": [{"predicate": "NOT", "subpredicates": [{"predicate": "LIBRARY", "name": "fbpayments_D2SALE_in_effect"}]},
-                                           {"predicate": "ANY_ABTEST", "key": "fbpayments_D2_in_effect", "value": 1}],
                               "skus": [{'alloy': 24000, 'EUR': 199.99, 'nominal_alloy': 20000, 'ui_comment': 'Best Value', 'ui_pile_size': 5},
                                        {'alloy': 11500, 'EUR': 99.99, 'nominal_alloy': 10000, 'ui_comment': None, 'ui_pile_size': 4},
                                        {'alloy': 5500, 'EUR': 49.99, 'nominal_alloy': 5000, 'ui_comment': 'Most Popular', 'ui_pile_size': 3},
@@ -296,7 +269,6 @@ if __name__ == '__main__':
               "P135D2SALE_EUR": { "kind": "D2SALE",
                               "currency": "EUR",
                               "force_output": True, "unit_bonus_format": "short", "ui_warning": "Limited time special offers:", "unit_bonus": None,
-                              "requires": [{"predicate": "LIBRARY", "name": "fbpayments_D2SALE_in_effect"}],
                               "skus": [{'alloy': 26500, 'EUR': 199.99, 'nominal_alloy': 20000, 'ui_comment': 'Best Value', 'ui_pile_size': 5, 'ui_banner': 'SALE'},
                                        {'alloy': 13200, 'EUR': 99.99, 'nominal_alloy': 10000, 'ui_comment': None, 'ui_pile_size': 4, 'ui_banner': 'SALE'},
                                        {'alloy': 6575, 'EUR': 49.99, 'nominal_alloy': 5000, 'ui_comment': 'Most Popular', 'ui_pile_size': 3, 'ui_banner': 'SALE'},
@@ -327,9 +299,6 @@ if __name__ == '__main__':
                "P150D1_QAR": { "kind": "D1", # volume discount test 20140621
                                "currency": "QAR",
                                "force_output": True, "unit_bonus_format": "short", "ui_warning": "Limited time special offers:", "unit_bonus": None,
-                               "requires": [{"predicate": "NOT", "subpredicates": [{"predicate": "LIBRARY", "name": "fbpayments_D1SALE_in_effect"}]},
-                                            {"predicate": "NOT", "subpredicates": [{"predicate": "ANY_ABTEST", "key": "fbpayments_D2_in_effect", "value": 1}]}
-                               ],
                                "skus": [{'alloy': 24000, 'QAR': 999.99, 'nominal_alloy': 20000, 'ui_comment': 'Best Value', 'ui_pile_size': 5},
                                         {'alloy': 11500, 'QAR': 499.99, 'nominal_alloy': 10000, 'ui_comment': None, 'ui_pile_size': 4},
                                         {'alloy': 5500, 'QAR': 249.99, 'nominal_alloy': 5000, 'ui_comment': 'Most Popular', 'ui_pile_size': 3},
@@ -339,7 +308,6 @@ if __name__ == '__main__':
                "P150D1SALE_QAR": { "kind": "D1SALE",
                                "currency": "QAR",
                                "force_output": True, "unit_bonus_format": "short", "ui_warning": "Limited time special offers:", "unit_bonus": None,
-                               "requires": [{"predicate": "LIBRARY", "name": "fbpayments_D1SALE_in_effect"}],
                                "skus": [{'alloy': 26500, 'QAR': 999.99, 'nominal_alloy': 20000, 'ui_comment': 'Best Value', 'ui_pile_size': 5, 'ui_banner': 'SALE'},
                                         {'alloy': 13200, 'QAR': 499.99, 'nominal_alloy': 10000, 'ui_comment': None, 'ui_pile_size': 4, 'ui_banner': 'SALE'},
                                         {'alloy': 6575, 'QAR': 249.99, 'nominal_alloy': 5000, 'ui_comment': 'Most Popular', 'ui_pile_size': 3, 'ui_banner': 'SALE'},
@@ -349,8 +317,6 @@ if __name__ == '__main__':
                "P150D2_QAR": { "kind": "D2", # Add 124.99 SKU following T238_purchase_ui_slates A/B test
                                "currency": "QAR",
                                "force_output": True, "unit_bonus_format": "short", "ui_warning": "Limited time special offers:", "unit_bonus": None,
-                               "requires": [{"predicate": "NOT", "subpredicates": [{"predicate": "LIBRARY", "name": "fbpayments_D2SALE_in_effect"}]},
-                                            {"predicate": "ANY_ABTEST", "key": "fbpayments_D2_in_effect", "value": 1}],
                                "skus": [{'alloy': 24000, 'QAR': 999.99, 'nominal_alloy': 20000, 'ui_comment': 'Best Value', 'ui_pile_size': 5},
                                         {'alloy': 11500, 'QAR': 499.99, 'nominal_alloy': 10000, 'ui_comment': None, 'ui_pile_size': 4},
                                         {'alloy': 5500, 'QAR': 249.99, 'nominal_alloy': 5000, 'ui_comment': 'Most Popular', 'ui_pile_size': 3},
@@ -361,7 +327,6 @@ if __name__ == '__main__':
                "P150D2SALE_QAR": { "kind": "D2SALE",
                                "currency": "QAR",
                                "force_output": True, "unit_bonus_format": "short", "ui_warning": "Limited time special offers:", "unit_bonus": None,
-                               "requires": [{"predicate": "LIBRARY", "name": "fbpayments_D2SALE_in_effect"}],
                                "skus": [{'alloy': 26500, 'QAR': 999.99, 'nominal_alloy': 20000, 'ui_comment': 'Best Value', 'ui_pile_size': 5, 'ui_banner': 'SALE'},
                                         {'alloy': 13200, 'QAR': 499.99, 'nominal_alloy': 10000, 'ui_comment': None, 'ui_pile_size': 4, 'ui_banner': 'SALE'},
                                         {'alloy': 6575, 'QAR': 249.99, 'nominal_alloy': 5000, 'ui_comment': 'Most Popular', 'ui_pile_size': 3, 'ui_banner': 'SALE'},
@@ -382,9 +347,6 @@ if __name__ == '__main__':
               "P100D1_BRL": { "kind": "D1", # volume discount test 20140621
                               "currency": "BRL",
                               "force_output": True, "unit_bonus_format": "short", "ui_warning": "Limited time special offers:", "unit_bonus": None,
-                              "requires": [{"predicate": "NOT", "subpredicates": [{"predicate": "LIBRARY", "name": "fbpayments_D1SALE_in_effect"}]},
-                                           {"predicate": "NOT", "subpredicates": [{"predicate": "ANY_ABTEST", "key": "fbpayments_D2_in_effect", "value": 1}]}
-                              ],
                               "skus": [{'alloy': 24000, 'BRL': 399.99, 'nominal_alloy': 20000, 'ui_comment': 'Best Value', 'ui_pile_size': 5},
                                        {'alloy': 11500, 'BRL': 199.99, 'nominal_alloy': 10000, 'ui_comment': None, 'ui_pile_size': 4},
                                        {'alloy': 5500, 'BRL': 99.99, 'nominal_alloy': 5000, 'ui_comment': 'Most Popular', 'ui_pile_size': 3},
@@ -394,7 +356,6 @@ if __name__ == '__main__':
               "P100D1SALE_BRL": { "kind": "D1SALE",
                               "currency": "BRL",
                               "force_output": True, "unit_bonus_format": "short", "ui_warning": "Limited time special offers:", "unit_bonus": None,
-                              "requires": [{"predicate": "LIBRARY", "name": "fbpayments_D1SALE_in_effect"}],
                               "skus": [{'alloy': 26500, 'BRL': 399.99, 'nominal_alloy': 20000, 'ui_comment': 'Best Value', 'ui_pile_size': 5, 'ui_banner': 'SALE'},
                                        {'alloy': 13200, 'BRL': 199.99, 'nominal_alloy': 10000, 'ui_comment': None, 'ui_pile_size': 4, 'ui_banner': 'SALE'},
                                        {'alloy': 6575, 'BRL': 99.99, 'nominal_alloy': 5000, 'ui_comment': 'Most Popular', 'ui_pile_size': 3, 'ui_banner': 'SALE'},
@@ -404,8 +365,6 @@ if __name__ == '__main__':
               "P100D2_BRL": { "kind": "D2", # Add 49.99 SKU following T238_purchase_ui_slates A/B test
                               "currency": "BRL",
                               "force_output": True, "unit_bonus_format": "short", "ui_warning": "Limited time special offers:", "unit_bonus": None,
-                              "requires": [{"predicate": "NOT", "subpredicates": [{"predicate": "LIBRARY", "name": "fbpayments_D2SALE_in_effect"}]},
-                                           {"predicate": "ANY_ABTEST", "key": "fbpayments_D2_in_effect", "value": 1}],
                               "skus": [{'alloy': 24000, 'BRL': 399.99, 'nominal_alloy': 20000, 'ui_comment': 'Best Value', 'ui_pile_size': 5},
                                        {'alloy': 11500, 'BRL': 199.99, 'nominal_alloy': 10000, 'ui_comment': None, 'ui_pile_size': 4},
                                        {'alloy': 5500, 'BRL': 99.99, 'nominal_alloy': 5000, 'ui_comment': 'Most Popular', 'ui_pile_size': 3},
@@ -416,7 +375,6 @@ if __name__ == '__main__':
               "P100D2SALE_BRL": { "kind": "D2SALE",
                               "currency": "BRL",
                               "force_output": True, "unit_bonus_format": "short", "ui_warning": "Limited time special offers:", "unit_bonus": None,
-                              "requires": [{"predicate": "LIBRARY", "name": "fbpayments_D2SALE_in_effect"}],
                               "skus": [{'alloy': 26500, 'BRL': 399.99, 'nominal_alloy': 20000, 'ui_comment': 'Best Value', 'ui_pile_size': 5, 'ui_banner': 'SALE'},
                                        {'alloy': 13200, 'BRL': 199.99, 'nominal_alloy': 10000, 'ui_comment': None, 'ui_pile_size': 4, 'ui_banner': 'SALE'},
                                        {'alloy': 6575, 'BRL': 99.99, 'nominal_alloy': 5000, 'ui_comment': 'Most Popular', 'ui_pile_size': 3, 'ui_banner': 'SALE'},
@@ -437,9 +395,6 @@ if __name__ == '__main__':
                "P100D1_AED": { "kind": "D1", # volume discount test 20140621
                                "currency": "AED",
                                "force_output": True, "unit_bonus_format": "short", "ui_warning": "Limited time special offers:", "unit_bonus": None,
-                               "requires": [{"predicate": "NOT", "subpredicates": [{"predicate": "LIBRARY", "name": "fbpayments_D1SALE_in_effect"}]},
-                                            {"predicate": "NOT", "subpredicates": [{"predicate": "ANY_ABTEST", "key": "fbpayments_D2_in_effect", "value": 1}]}
-                               ],
                                "skus": [{'alloy': 24000, 'AED': 799.99, 'nominal_alloy': 20000, 'ui_comment': 'Best Value', 'ui_pile_size': 5},
                                         {'alloy': 11500, 'AED': 399.99, 'nominal_alloy': 10000, 'ui_comment': None, 'ui_pile_size': 4},
                                         {'alloy': 5500, 'AED': 199.99, 'nominal_alloy': 5000, 'ui_comment': 'Most Popular', 'ui_pile_size': 3},
@@ -449,7 +404,6 @@ if __name__ == '__main__':
                "P100D1SALE_AED": { "kind": "D1SALE",
                                "currency": "AED",
                                "force_output": True, "unit_bonus_format": "short", "ui_warning": "Limited time special offers:", "unit_bonus": None,
-                               "requires": [{"predicate": "LIBRARY", "name": "fbpayments_D1SALE_in_effect"}],
                                "skus": [{'alloy': 26500, 'AED': 799.99, 'nominal_alloy': 20000, 'ui_comment': 'Best Value', 'ui_pile_size': 5, 'ui_banner': 'SALE'},
                                         {'alloy': 13200, 'AED': 399.99, 'nominal_alloy': 10000, 'ui_comment': None, 'ui_pile_size': 4, 'ui_banner': 'SALE'},
                                         {'alloy': 6575, 'AED': 199.99, 'nominal_alloy': 5000, 'ui_comment': 'Most Popular', 'ui_pile_size': 3, 'ui_banner': 'SALE'},
@@ -459,8 +413,6 @@ if __name__ == '__main__':
                "P100D2_AED": { "kind": "D2", # Add 99.99 SKU following T238_purchase_ui_slates A/B test
                                "currency": "AED",
                                "force_output": True, "unit_bonus_format": "short", "ui_warning": "Limited time special offers:", "unit_bonus": None,
-                               "requires": [{"predicate": "NOT", "subpredicates": [{"predicate": "LIBRARY", "name": "fbpayments_D2SALE_in_effect"}]},
-                                            {"predicate": "ANY_ABTEST", "key": "fbpayments_D2_in_effect", "value": 1}],
                                "skus": [{'alloy': 24000, 'AED': 799.99, 'nominal_alloy': 20000, 'ui_comment': 'Best Value', 'ui_pile_size': 5},
                                         {'alloy': 11500, 'AED': 399.99, 'nominal_alloy': 10000, 'ui_comment': None, 'ui_pile_size': 4},
                                         {'alloy': 5500, 'AED': 199.99, 'nominal_alloy': 5000, 'ui_comment': 'Most Popular', 'ui_pile_size': 3},
@@ -471,7 +423,6 @@ if __name__ == '__main__':
                "P100D2SALE_AED": { "kind": "D2SALE",
                                "currency": "AED",
                                "force_output": True, "unit_bonus_format": "short", "ui_warning": "Limited time special offers:", "unit_bonus": None,
-                               "requires": [{"predicate": "LIBRARY", "name": "fbpayments_D2SALE_in_effect"}],
                                "skus": [{'alloy': 26500, 'AED': 799.99, 'nominal_alloy': 20000, 'ui_comment': 'Best Value', 'ui_pile_size': 5, 'ui_banner': 'SALE'},
                                         {'alloy': 13200, 'AED': 399.99, 'nominal_alloy': 10000, 'ui_comment': None, 'ui_pile_size': 4, 'ui_banner': 'SALE'},
                                         {'alloy': 6575, 'AED': 199.99, 'nominal_alloy': 5000, 'ui_comment': 'Most Popular', 'ui_pile_size': 3, 'ui_banner': 'SALE'},
@@ -492,9 +443,6 @@ if __name__ == '__main__':
                "P100D1_DKK": { "kind": "D1",
                                "currency": "DKK",
                                "force_output": True, "unit_bonus_format": "short", "ui_warning": "Limited time special offers:", "unit_bonus": None,
-                               "requires": [{"predicate": "NOT", "subpredicates": [{"predicate": "LIBRARY", "name": "fbpayments_D1SALE_in_effect"}]},
-                                            {"predicate": "NOT", "subpredicates": [{"predicate": "ANY_ABTEST", "key": "fbpayments_D2_in_effect", "value": 1}]}
-                               ],
                                "skus": [{'alloy': 24000, 'DKK': 999.99, 'nominal_alloy': 20000, 'ui_comment': 'Best Value', 'ui_pile_size': 5},
                                         {'alloy': 11500, 'DKK': 499.99, 'nominal_alloy': 10000, 'ui_comment': None, 'ui_pile_size': 4},
                                         {'alloy': 5500, 'DKK': 249.99, 'nominal_alloy': 5000, 'ui_comment': 'Most Popular', 'ui_pile_size': 3},
@@ -504,7 +452,6 @@ if __name__ == '__main__':
                "P100D1SALE_DKK": { "kind": "D1SALE",
                                "currency": "DKK",
                                "force_output": True, "unit_bonus_format": "short", "ui_warning": "Limited time special offers:", "unit_bonus": None,
-                               "requires": [{"predicate": "LIBRARY", "name": "fbpayments_D1SALE_in_effect"}],
                                "skus": [{'alloy': 26500, 'DKK': 999.99, 'nominal_alloy': 20000, 'ui_comment': 'Best Value', 'ui_pile_size': 5, 'ui_banner': 'SALE'},
                                         {'alloy': 13200, 'DKK': 499.99, 'nominal_alloy': 10000, 'ui_comment': None, 'ui_pile_size': 4, 'ui_banner': 'SALE'},
                                         {'alloy': 6575, 'DKK': 249.99, 'nominal_alloy': 5000, 'ui_comment': 'Most Popular', 'ui_pile_size': 3, 'ui_banner': 'SALE'},
@@ -514,8 +461,6 @@ if __name__ == '__main__':
                "P100D2_DKK": { "kind": "D2", # Add 124.99 SKU following T238_purchase_ui_slates A/B test
                                "currency": "DKK",
                                "force_output": True, "unit_bonus_format": "short", "ui_warning": "Limited time special offers:", "unit_bonus": None,
-                               "requires": [{"predicate": "NOT", "subpredicates": [{"predicate": "LIBRARY", "name": "fbpayments_D2SALE_in_effect"}]},
-                                            {"predicate": "ANY_ABTEST", "key": "fbpayments_D2_in_effect", "value": 1}],
                                "skus": [{'alloy': 24000, 'DKK': 999.99, 'nominal_alloy': 20000, 'ui_comment': 'Best Value', 'ui_pile_size': 5},
                                         {'alloy': 11500, 'DKK': 499.99, 'nominal_alloy': 10000, 'ui_comment': None, 'ui_pile_size': 4},
                                         {'alloy': 5500, 'DKK': 249.99, 'nominal_alloy': 5000, 'ui_comment': 'Most Popular', 'ui_pile_size': 3},
@@ -526,7 +471,6 @@ if __name__ == '__main__':
                "P100D2SALE_DKK": { "kind": "D2SALE",
                                "currency": "DKK",
                                "force_output": True, "unit_bonus_format": "short", "ui_warning": "Limited time special offers:", "unit_bonus": None,
-                               "requires": [{"predicate": "LIBRARY", "name": "fbpayments_D2SALE_in_effect"}],
                                "skus": [{'alloy': 26500, 'DKK': 999.99, 'nominal_alloy': 20000, 'ui_comment': 'Best Value', 'ui_pile_size': 5, 'ui_banner': 'SALE'},
                                         {'alloy': 13200, 'DKK': 499.99, 'nominal_alloy': 10000, 'ui_comment': None, 'ui_pile_size': 4, 'ui_banner': 'SALE'},
                                         {'alloy': 6575, 'DKK': 249.99, 'nominal_alloy': 5000, 'ui_comment': 'Most Popular', 'ui_pile_size': 3, 'ui_banner': 'SALE'},
@@ -568,9 +512,6 @@ if __name__ == '__main__':
                "P100D1_AUD": { "kind": "D1",
                                "currency": "AUD",
                                "force_output": True, "unit_bonus_format": "short", "ui_warning": "Limited time special offers:", "unit_bonus": None,
-                               "requires": [{"predicate": "NOT", "subpredicates": [{"predicate": "LIBRARY", "name": "fbpayments_D1SALE_in_effect"}]},
-                                            {"predicate": "NOT", "subpredicates": [{"predicate": "ANY_ABTEST", "key": "fbpayments_D2_in_effect", "value": 1}]}
-                               ],
                                "skus": [{'alloy': 24000, 'AUD': 199.99, 'nominal_alloy': 20000, 'ui_comment': 'Best Value', 'ui_pile_size': 5},
                                         {'alloy': 11500, 'AUD': 99.99, 'nominal_alloy': 10000, 'ui_comment': None, 'ui_pile_size': 4},
                                         {'alloy': 5500, 'AUD': 49.99, 'nominal_alloy': 5000, 'ui_comment': 'Most Popular', 'ui_pile_size': 3},
@@ -580,7 +521,6 @@ if __name__ == '__main__':
                "P100D1SALE_AUD": { "kind": "D1SALE",
                                "currency": "AUD",
                                "force_output": True, "unit_bonus_format": "short", "ui_warning": "Limited time special offers:", "unit_bonus": None,
-                               "requires": [{"predicate": "LIBRARY", "name": "fbpayments_D1SALE_in_effect"}],
                                "skus": [{'alloy': 26500, 'AUD': 199.99, 'nominal_alloy': 20000, 'ui_comment': 'Best Value', 'ui_pile_size': 5, 'ui_banner': 'SALE'},
                                         {'alloy': 13200, 'AUD': 99.99, 'nominal_alloy': 10000, 'ui_comment': None, 'ui_pile_size': 4, 'ui_banner': 'SALE'},
                                         {'alloy': 6575, 'AUD': 49.99, 'nominal_alloy': 5000, 'ui_comment': 'Most Popular', 'ui_pile_size': 3, 'ui_banner': 'SALE'},
@@ -590,8 +530,6 @@ if __name__ == '__main__':
                "P100D2_AUD": { "kind": "D2", # Add 24.99 SKU following T238_purchase_ui_slates A/B test
                                "currency": "AUD",
                                "force_output": True, "unit_bonus_format": "short", "ui_warning": "Limited time special offers:", "unit_bonus": None,
-                               "requires": [{"predicate": "NOT", "subpredicates": [{"predicate": "LIBRARY", "name": "fbpayments_D2SALE_in_effect"}]},
-                                            {"predicate": "ANY_ABTEST", "key": "fbpayments_D2_in_effect", "value": 1}],
                                "skus": [{'alloy': 24000, 'AUD': 199.99, 'nominal_alloy': 20000, 'ui_comment': 'Best Value', 'ui_pile_size': 5},
                                         {'alloy': 11500, 'AUD': 99.99, 'nominal_alloy': 10000, 'ui_comment': None, 'ui_pile_size': 4},
                                         {'alloy': 5500, 'AUD': 49.99, 'nominal_alloy': 5000, 'ui_comment': 'Most Popular', 'ui_pile_size': 3},
@@ -602,7 +540,6 @@ if __name__ == '__main__':
                "P100D2SALE_AUD": { "kind": "D2SALE",
                                "currency": "AUD",
                                "force_output": True, "unit_bonus_format": "short", "ui_warning": "Limited time special offers:", "unit_bonus": None,
-                               "requires": [{"predicate": "LIBRARY", "name": "fbpayments_D2SALE_in_effect"}],
                                "skus": [{'alloy': 26500, 'AUD': 199.99, 'nominal_alloy': 20000, 'ui_comment': 'Best Value', 'ui_pile_size': 5, 'ui_banner': 'SALE'},
                                         {'alloy': 13200, 'AUD': 99.99, 'nominal_alloy': 10000, 'ui_comment': None, 'ui_pile_size': 4, 'ui_banner': 'SALE'},
                                         {'alloy': 6575, 'AUD': 49.99, 'nominal_alloy': 5000, 'ui_comment': 'Most Popular', 'ui_pile_size': 3, 'ui_banner': 'SALE'},
@@ -634,9 +571,6 @@ if __name__ == '__main__':
                "P080D1_NZD": { "kind": "D1",
                                "currency": "NZD",
                                "force_output": True, "unit_bonus_format": "short", "ui_warning": "Limited time special offers:", "unit_bonus": None,
-                               "requires": [{"predicate": "NOT", "subpredicates": [{"predicate": "LIBRARY", "name": "fbpayments_D1SALE_in_effect"}]},
-                                            {"predicate": "NOT", "subpredicates": [{"predicate": "ANY_ABTEST", "key": "fbpayments_D2_in_effect", "value": 1}]}
-                               ],
                                "skus": [{'alloy': 24000, 'NZD': 199.99, 'nominal_alloy': 20000, 'ui_comment': 'Best Value', 'ui_pile_size': 5},
                                         {'alloy': 11500, 'NZD': 99.99, 'nominal_alloy': 10000, 'ui_comment': None, 'ui_pile_size': 4},
                                         {'alloy': 5500, 'NZD': 49.99, 'nominal_alloy': 5000, 'ui_comment': 'Most Popular', 'ui_pile_size': 3},
@@ -646,7 +580,6 @@ if __name__ == '__main__':
                "P080D1SALE_NZD": { "kind": "D1SALE",
                                "currency": "NZD",
                                "force_output": True, "unit_bonus_format": "short", "ui_warning": "Limited time special offers:", "unit_bonus": None,
-                               "requires": [{"predicate": "LIBRARY", "name": "fbpayments_D1SALE_in_effect"}],
                                "skus": [{'alloy': 26500, 'NZD': 199.99, 'nominal_alloy': 20000, 'ui_comment': 'Best Value', 'ui_pile_size': 5, 'ui_banner': 'SALE'},
                                         {'alloy': 13200, 'NZD': 99.99, 'nominal_alloy': 10000, 'ui_comment': None, 'ui_pile_size': 4, 'ui_banner': 'SALE'},
                                         {'alloy': 6575, 'NZD': 49.99, 'nominal_alloy': 5000, 'ui_comment': 'Most Popular', 'ui_pile_size': 3, 'ui_banner': 'SALE'},
@@ -656,8 +589,6 @@ if __name__ == '__main__':
                "P080D2_NZD": { "kind": "D2", # Add 24.99 SKU following T238_purchase_ui_slates A/B test
                                "currency": "NZD",
                                "force_output": True, "unit_bonus_format": "short", "ui_warning": "Limited time special offers:", "unit_bonus": None,
-                               "requires": [{"predicate": "NOT", "subpredicates": [{"predicate": "LIBRARY", "name": "fbpayments_D2SALE_in_effect"}]},
-                                            {"predicate": "ANY_ABTEST", "key": "fbpayments_D2_in_effect", "value": 1}],
                                "skus": [{'alloy': 24000, 'NZD': 199.99, 'nominal_alloy': 20000, 'ui_comment': 'Best Value', 'ui_pile_size': 5},
                                         {'alloy': 11500, 'NZD': 99.99, 'nominal_alloy': 10000, 'ui_comment': None, 'ui_pile_size': 4},
                                         {'alloy': 5500, 'NZD': 49.99, 'nominal_alloy': 5000, 'ui_comment': 'Most Popular', 'ui_pile_size': 3},
@@ -668,7 +599,6 @@ if __name__ == '__main__':
                "P080D2SALE_NZD": { "kind": "D2SALE",
                                "currency": "NZD",
                                "force_output": True, "unit_bonus_format": "short", "ui_warning": "Limited time special offers:", "unit_bonus": None,
-                               "requires": [{"predicate": "LIBRARY", "name": "fbpayments_D2SALE_in_effect"}],
                                "skus": [{'alloy': 26500, 'NZD': 199.99, 'nominal_alloy': 20000, 'ui_comment': 'Best Value', 'ui_pile_size': 5, 'ui_banner': 'SALE'},
                                         {'alloy': 13200, 'NZD': 99.99, 'nominal_alloy': 10000, 'ui_comment': None, 'ui_pile_size': 4, 'ui_banner': 'SALE'},
                                         {'alloy': 6575, 'NZD': 49.99, 'nominal_alloy': 5000, 'ui_comment': 'Most Popular', 'ui_pile_size': 3, 'ui_banner': 'SALE'},
@@ -700,9 +630,6 @@ if __name__ == '__main__':
                "P100D1_USD": { "kind": "D1", # volume discount test 20140621
                                "currency": "USD",
                                "force_output": True, "unit_bonus_format": "short", "ui_warning": "Limited time special offers:", "unit_bonus": None,
-                               "requires": [{"predicate": "NOT", "subpredicates": [{"predicate": "LIBRARY", "name": "fbpayments_D1SALE_in_effect"}]},
-                                            {"predicate": "NOT", "subpredicates": [{"predicate": "ANY_ABTEST", "key": "fbpayments_D2_in_effect", "value": 1}]}
-                               ],
                                "skus": [{'alloy': 24000, 'USD': 199.99, 'nominal_alloy': 20000, 'ui_comment': 'Best Value', 'ui_pile_size': 5},
                                         {'alloy': 11500, 'USD': 99.99, 'nominal_alloy': 10000, 'ui_comment': None, 'ui_pile_size': 4},
                                         {'alloy': 5500, 'USD': 49.99, 'nominal_alloy': 5000, 'ui_comment': 'Most Popular', 'ui_pile_size': 3},
@@ -712,7 +639,6 @@ if __name__ == '__main__':
                "P100D1SALE_USD": { "kind": "D1SALE",
                                "currency": "USD",
                                "force_output": True, "unit_bonus_format": "short", "ui_warning": "Limited time special offers:", "unit_bonus": None,
-                               "requires": [{"predicate": "LIBRARY", "name": "fbpayments_D1SALE_in_effect"}],
                                "skus": [{'alloy': 26500, 'USD': 199.99, 'nominal_alloy': 20000, 'ui_comment': 'Best Value', 'ui_pile_size': 5, 'ui_banner': 'SALE'},
                                         {'alloy': 13200, 'USD': 99.99, 'nominal_alloy': 10000, 'ui_comment': None, 'ui_pile_size': 4, 'ui_banner': 'SALE'},
                                         {'alloy': 6575, 'USD': 49.99, 'nominal_alloy': 5000, 'ui_comment': 'Most Popular', 'ui_pile_size': 3, 'ui_banner': 'SALE'},
@@ -722,8 +648,6 @@ if __name__ == '__main__':
                "P100D2_USD": { "kind": "D2", # Add 24.99 SKU following T238_purchase_ui_slates A/B test
                                "currency": "USD",
                                "force_output": True, "unit_bonus_format": "short", "ui_warning": "Limited time special offers:", "unit_bonus": None,
-                               "requires": [{"predicate": "NOT", "subpredicates": [{"predicate": "LIBRARY", "name": "fbpayments_D2SALE_in_effect"}]},
-                                            {"predicate": "ANY_ABTEST", "key": "fbpayments_D2_in_effect", "value": 1}],
                                "skus": [{'alloy': 24000, 'USD': 199.99, 'nominal_alloy': 20000, 'ui_comment': 'Best Value', 'ui_pile_size': 5},
                                         {'alloy': 11500, 'USD': 99.99, 'nominal_alloy': 10000, 'ui_comment': None, 'ui_pile_size': 4},
                                         {'alloy': 5500, 'USD': 49.99, 'nominal_alloy': 5000, 'ui_comment': 'Most Popular', 'ui_pile_size': 3},
@@ -734,7 +658,6 @@ if __name__ == '__main__':
                "P100D2SALE_USD": { "kind": "D2SALE",
                                "currency": "USD",
                                "force_output": True, "unit_bonus_format": "short", "ui_warning": "Limited time special offers:", "unit_bonus": None,
-                               "requires": [{"predicate": "LIBRARY", "name": "fbpayments_D2SALE_in_effect"}],
                                "skus": [{'alloy': 26500, 'USD': 199.99, 'nominal_alloy': 20000, 'ui_comment': 'Best Value', 'ui_pile_size': 5, 'ui_banner': 'SALE'},
                                         {'alloy': 13200, 'USD': 99.99, 'nominal_alloy': 10000, 'ui_comment': None, 'ui_pile_size': 4, 'ui_banner': 'SALE'},
                                         {'alloy': 6575, 'USD': 49.99, 'nominal_alloy': 5000, 'ui_comment': 'Most Popular', 'ui_pile_size': 3, 'ui_banner': 'SALE'},
@@ -765,9 +688,6 @@ if __name__ == '__main__':
                "P100D1_CAD": { "kind": "D1",
                                "currency": "CAD",
                                "force_output": True, "unit_bonus_format": "short", "ui_warning": "Limited time special offers:", "unit_bonus": None,
-                               "requires": [{"predicate": "NOT", "subpredicates": [{"predicate": "LIBRARY", "name": "fbpayments_D1SALE_in_effect"}]},
-                                            {"predicate": "NOT", "subpredicates": [{"predicate": "ANY_ABTEST", "key": "fbpayments_D2_in_effect", "value": 1}]}
-                               ],
                                "skus": [{'alloy': 24000, 'CAD': 199.99, 'nominal_alloy': 20000, 'ui_comment': 'Best Value', 'ui_pile_size': 5},
                                         {'alloy': 11500, 'CAD': 99.99, 'nominal_alloy': 10000, 'ui_comment': None, 'ui_pile_size': 4},
                                         {'alloy': 5500, 'CAD': 49.99, 'nominal_alloy': 5000, 'ui_comment': 'Most Popular', 'ui_pile_size': 3},
@@ -777,7 +697,6 @@ if __name__ == '__main__':
                "P100D1SALE_CAD": { "kind": "D1SALE",
                                "currency": "CAD",
                                "force_output": True, "unit_bonus_format": "short", "ui_warning": "Limited time special offers:", "unit_bonus": None,
-                               "requires": [{"predicate": "LIBRARY", "name": "fbpayments_D1SALE_in_effect"}],
                                "skus": [{'alloy': 26500, 'CAD': 199.99, 'nominal_alloy': 20000, 'ui_comment': 'Best Value', 'ui_pile_size': 5, 'ui_banner': 'SALE'},
                                         {'alloy': 13200, 'CAD': 99.99, 'nominal_alloy': 10000, 'ui_comment': None, 'ui_pile_size': 4, 'ui_banner': 'SALE'},
                                         {'alloy': 6575, 'CAD': 49.99, 'nominal_alloy': 5000, 'ui_comment': 'Most Popular', 'ui_pile_size': 3, 'ui_banner': 'SALE'},
@@ -787,8 +706,6 @@ if __name__ == '__main__':
                "P100D2_CAD": { "kind": "D2", # Add $24.99 SKU following T238_purchase_ui_slates A/B test
                                "currency": "CAD",
                                "force_output": True, "unit_bonus_format": "short", "ui_warning": "Limited time special offers:", "unit_bonus": None,
-                               "requires": [{"predicate": "NOT", "subpredicates": [{"predicate": "LIBRARY", "name": "fbpayments_D2SALE_in_effect"}]},
-                                            {"predicate": "ANY_ABTEST", "key": "fbpayments_D2_in_effect", "value": 1}],
                                "skus": [{'alloy': 24000, 'CAD': 199.99, 'nominal_alloy': 20000, 'ui_comment': 'Best Value', 'ui_pile_size': 5},
                                         {'alloy': 11500, 'CAD': 99.99, 'nominal_alloy': 10000, 'ui_comment': None, 'ui_pile_size': 4},
                                         {'alloy': 5500, 'CAD': 49.99, 'nominal_alloy': 5000, 'ui_comment': 'Most Popular', 'ui_pile_size': 3},
@@ -799,7 +716,6 @@ if __name__ == '__main__':
                "P100D2SALE_CAD": { "kind": "D2SALE",
                                "currency": "CAD",
                                "force_output": True, "unit_bonus_format": "short", "ui_warning": "Limited time special offers:", "unit_bonus": None,
-                               "requires": [{"predicate": "LIBRARY", "name": "fbpayments_D2SALE_in_effect"}],
                                "skus": [{'alloy': 26500, 'CAD': 199.99, 'nominal_alloy': 20000, 'ui_comment': 'Best Value', 'ui_pile_size': 5, 'ui_banner': 'SALE'},
                                         {'alloy': 13200, 'CAD': 99.99, 'nominal_alloy': 10000, 'ui_comment': None, 'ui_pile_size': 4, 'ui_banner': 'SALE'},
                                         {'alloy': 6575, 'CAD': 49.99, 'nominal_alloy': 5000, 'ui_comment': 'Most Popular', 'ui_pile_size': 3, 'ui_banner': 'SALE'},
@@ -821,9 +737,6 @@ if __name__ == '__main__':
                "P100D1_ZAR": { "kind": "D1",
                                "currency": "ZAR",
                                "force_output": True, "unit_bonus_format": "short", "ui_warning": "Limited time special offers:", "unit_bonus": None,
-                               "requires": [{"predicate": "NOT", "subpredicates": [{"predicate": "LIBRARY", "name": "fbpayments_D1SALE_in_effect"}]},
-                                            {"predicate": "NOT", "subpredicates": [{"predicate": "ANY_ABTEST", "key": "fbpayments_D2_in_effect", "value": 1}]}
-                               ],
                                "skus": [{'alloy': 24000, 'ZAR': 1999.99, 'nominal_alloy': 20000, 'ui_comment': 'Best Value', 'ui_pile_size': 5},
                                         {'alloy': 11500, 'ZAR': 999.99, 'nominal_alloy': 10000, 'ui_comment': None, 'ui_pile_size': 4},
                                         {'alloy': 5500, 'ZAR': 499.99, 'nominal_alloy': 5000, 'ui_comment': 'Most Popular', 'ui_pile_size': 3},
@@ -833,7 +746,6 @@ if __name__ == '__main__':
                "P100D1SALE_ZAR": { "kind": "D1SALE",
                                "currency": "ZAR",
                                "force_output": True, "unit_bonus_format": "short", "ui_warning": "Limited time special offers:", "unit_bonus": None,
-                               "requires": [{"predicate": "LIBRARY", "name": "fbpayments_D1SALE_in_effect"}],
                                "skus": [{'alloy': 26500, 'ZAR': 1999.99, 'nominal_alloy': 20000, 'ui_comment': 'Best Value', 'ui_pile_size': 5, 'ui_banner': 'SALE'},
                                         {'alloy': 13200, 'ZAR': 999.99, 'nominal_alloy': 10000, 'ui_comment': None, 'ui_pile_size': 4, 'ui_banner': 'SALE'},
                                         {'alloy': 6575, 'ZAR': 499.99, 'nominal_alloy': 5000, 'ui_comment': 'Most Popular', 'ui_pile_size': 3, 'ui_banner': 'SALE'},
@@ -843,8 +755,6 @@ if __name__ == '__main__':
                "P100D2_ZAR": { "kind": "D2", # Add 249.99 SKU following T238_purchase_ui_slates A/B test
                                "currency": "ZAR",
                                "force_output": True, "unit_bonus_format": "short", "ui_warning": "Limited time special offers:", "unit_bonus": None,
-                               "requires": [{"predicate": "NOT", "subpredicates": [{"predicate": "LIBRARY", "name": "fbpayments_D2SALE_in_effect"}]},
-                                            {"predicate": "ANY_ABTEST", "key": "fbpayments_D2_in_effect", "value": 1}],
                                "skus": [{'alloy': 24000, 'ZAR': 1999.99, 'nominal_alloy': 20000, 'ui_comment': 'Best Value', 'ui_pile_size': 5},
                                         {'alloy': 11500, 'ZAR': 999.99, 'nominal_alloy': 10000, 'ui_comment': None, 'ui_pile_size': 4},
                                         {'alloy': 5500, 'ZAR': 499.99, 'nominal_alloy': 5000, 'ui_comment': 'Most Popular', 'ui_pile_size': 3},
@@ -855,7 +765,6 @@ if __name__ == '__main__':
                "P100D2SALE_ZAR": { "kind": "D2SALE",
                                "currency": "ZAR",
                                "force_output": True, "unit_bonus_format": "short", "ui_warning": "Limited time special offers:", "unit_bonus": None,
-                               "requires": [{"predicate": "LIBRARY", "name": "fbpayments_D2SALE_in_effect"}],
                                "skus": [{'alloy': 26500, 'ZAR': 1999.99, 'nominal_alloy': 20000, 'ui_comment': 'Best Value', 'ui_pile_size': 5, 'ui_banner': 'SALE'},
                                         {'alloy': 13200, 'ZAR': 999.99, 'nominal_alloy': 10000, 'ui_comment': None, 'ui_pile_size': 4, 'ui_banner': 'SALE'},
                                         {'alloy': 6575, 'ZAR': 499.99, 'nominal_alloy': 5000, 'ui_comment': 'Most Popular', 'ui_pile_size': 3, 'ui_banner': 'SALE'},
@@ -877,9 +786,6 @@ if __name__ == '__main__':
                "P100D1_ISK": { "kind": "D1",
                                "currency": "ISK",
                                "force_output": True, "unit_bonus_format": "short", "ui_warning": "Limited time special offers:", "unit_bonus": None,
-                               "requires": [{"predicate": "NOT", "subpredicates": [{"predicate": "LIBRARY", "name": "fbpayments_D1SALE_in_effect"}]},
-                                            {"predicate": "NOT", "subpredicates": [{"predicate": "ANY_ABTEST", "key": "fbpayments_D2_in_effect", "value": 1}]}
-                               ],
                                "skus": [{'alloy': 24000, 'ISK': 19999, 'nominal_alloy': 20000, 'ui_comment': 'Best Value', 'ui_pile_size': 5},
                                         {'alloy': 11500, 'ISK': 9999, 'nominal_alloy': 10000, 'ui_comment': None, 'ui_pile_size': 4},
                                         {'alloy': 5500, 'ISK': 4999, 'nominal_alloy': 5000, 'ui_comment': 'Most Popular', 'ui_pile_size': 3},
@@ -889,7 +795,6 @@ if __name__ == '__main__':
                "P100D1SALE_ISK": { "kind": "D1SALE",
                                "currency": "ISK",
                                "force_output": True, "unit_bonus_format": "short", "ui_warning": "Limited time special offers:", "unit_bonus": None,
-                               "requires": [{"predicate": "LIBRARY", "name": "fbpayments_D1SALE_in_effect"}],
                                "skus": [{'alloy': 26500, 'ISK': 19999, 'nominal_alloy': 20000, 'ui_comment': 'Best Value', 'ui_pile_size': 5, 'ui_banner': 'SALE'},
                                         {'alloy': 13200, 'ISK': 9999, 'nominal_alloy': 10000, 'ui_comment': None, 'ui_pile_size': 4, 'ui_banner': 'SALE'},
                                         {'alloy': 6575, 'ISK': 4999, 'nominal_alloy': 5000, 'ui_comment': 'Most Popular', 'ui_pile_size': 3, 'ui_banner': 'SALE'},
@@ -899,8 +804,6 @@ if __name__ == '__main__':
                "P100D2_ISK": { "kind": "D2", # Add 2499 SKU following T238_purchase_ui_slates A/B test
                                "currency": "ISK",
                                "force_output": True, "unit_bonus_format": "short", "ui_warning": "Limited time special offers:", "unit_bonus": None,
-                               "requires": [{"predicate": "NOT", "subpredicates": [{"predicate": "LIBRARY", "name": "fbpayments_D2SALE_in_effect"}]},
-                                            {"predicate": "ANY_ABTEST", "key": "fbpayments_D2_in_effect", "value": 1}],
                                "skus": [{'alloy': 24000, 'ISK': 19999, 'nominal_alloy': 20000, 'ui_comment': 'Best Value', 'ui_pile_size': 5},
                                         {'alloy': 11500, 'ISK': 9999, 'nominal_alloy': 10000, 'ui_comment': None, 'ui_pile_size': 4},
                                         {'alloy': 5500, 'ISK': 4999, 'nominal_alloy': 5000, 'ui_comment': 'Most Popular', 'ui_pile_size': 3},
@@ -911,7 +814,6 @@ if __name__ == '__main__':
                "P100D2SALE_ISK": { "kind": "D2SALE",
                                "currency": "ISK",
                                "force_output": True, "unit_bonus_format": "short", "ui_warning": "Limited time special offers:", "unit_bonus": None,
-                               "requires": [{"predicate": "LIBRARY", "name": "fbpayments_D2SALE_in_effect"}],
                                "skus": [{'alloy': 26500, 'ISK': 19999, 'nominal_alloy': 20000, 'ui_comment': 'Best Value', 'ui_pile_size': 5, 'ui_banner': 'SALE'},
                                         {'alloy': 13200, 'ISK': 9999, 'nominal_alloy': 10000, 'ui_comment': None, 'ui_pile_size': 4, 'ui_banner': 'SALE'},
                                         {'alloy': 6575, 'ISK': 4999, 'nominal_alloy': 5000, 'ui_comment': 'Most Popular', 'ui_pile_size': 3, 'ui_banner': 'SALE'},
@@ -921,7 +823,7 @@ if __name__ == '__main__':
                                         ] },
 
                # this is maintained ONLY for special-casing a few whales who got used to deprecated low-priced SKU slates
-               "P050XY_TRY": {
+               "P050XY_TRY": { "kind": "XY",
                               "currency": "TRY",
                               "force_output": True,
                               "skus": [{'alloy': 25000, 'TRY': 150.00},
@@ -936,7 +838,6 @@ if __name__ == '__main__':
 
                "FALLBACK_P100M_USD": { # same as P100M_USD
                                        "currency": "USD",
-                                       "requires": [{"predicate": "ALWAYS_FALSE" }], # not available unless specifically overriden via A/B test
                                        "force_output": True, # necessary for legacy open graph objects
                                        "skus": [{'alloy': 20000, 'USD': 200.0},
                                                 {'alloy': 10000, 'USD': 100.0},
@@ -949,10 +850,6 @@ if __name__ == '__main__':
                "FALLBACK_P100D1_USD": {"kind": "D1", # same as P100D1_USD
                                        "currency": "USD",
                                        "force_output": True, "unit_bonus_format": "short", "ui_warning": "Limited time special offers:", "unit_bonus": None,
-                                       "requires": [{"predicate": "NOT", "subpredicates": [{"predicate": "LIBRARY", "name": "fbpayments_D1SALE_in_effect"}]},
-                                                    {"predicate": "NOT", "subpredicates": [{"predicate": "ANY_ABTEST", "key": "fbpayments_D2_in_effect", "value": 1}]},
-                                                    {"predicate": "NOT", "subpredicates": [{"predicate": "ANY_ABTEST", "key": "fbpayments_D3_in_effect", "value": 1}]},
-                                                    ],
                                        "skus": [{'alloy': 24000, 'USD': 199.99, 'nominal_alloy': 20000, 'ui_comment': 'Best Value', 'ui_pile_size': 5},
                                                 {'alloy': 11500, 'USD': 99.99, 'nominal_alloy': 10000, 'ui_comment': None, 'ui_pile_size': 4},
                                                 {'alloy': 5500, 'USD': 49.99, 'nominal_alloy': 5000, 'ui_comment': 'Most Popular', 'ui_pile_size': 3},
@@ -962,7 +859,6 @@ if __name__ == '__main__':
                "FALLBACK_P100D1SALE_USD": {"kind": "D1SALE", # same as P100D1SALE_USD
                                        "currency": "USD",
                                        "force_output": True, "unit_bonus_format": "short", "ui_warning": "Limited time special offers:", "unit_bonus": None,
-                                       "requires": [{"predicate": "LIBRARY", "name": "fbpayments_D1SALE_in_effect"}],
                                        "skus": [{'alloy': 26500, 'USD': 199.99, 'nominal_alloy': 20000, 'ui_comment': 'Best Value', 'ui_pile_size': 5, 'ui_banner': 'SALE'},
                                                 {'alloy': 13200, 'USD': 99.99, 'nominal_alloy': 10000, 'ui_comment': None, 'ui_pile_size': 4, 'ui_banner': 'SALE'},
                                                 {'alloy': 6575, 'USD': 49.99, 'nominal_alloy': 5000, 'ui_comment': 'Most Popular', 'ui_pile_size': 3, 'ui_banner': 'SALE'},
@@ -974,8 +870,6 @@ if __name__ == '__main__':
                "FALLBACK_P100D2_USD": { "kind": "D2", # ADD $24.99 SKU
                                         "currency": "USD",
                                         "force_output": True, "unit_bonus_format": "short", "ui_warning": "Limited time special offers:", "unit_bonus": None,
-                                        "requires": [{"predicate": "NOT", "subpredicates": [{"predicate": "LIBRARY", "name": "fbpayments_D2SALE_in_effect"}]},
-                                                     {"predicate": "ANY_ABTEST", "key": "fbpayments_D2_in_effect", "value": 1}],
                                         "skus": [{'alloy': 24000, 'USD': 199.99, 'nominal_alloy': 20000, 'ui_comment': 'Best Value', 'ui_pile_size': 5},
                                                  {'alloy': 11500, 'USD': 99.99, 'nominal_alloy': 10000, 'ui_comment': None, 'ui_pile_size': 4},
                                                  {'alloy': 5500, 'USD': 49.99, 'nominal_alloy': 5000, 'ui_comment': 'Most Popular', 'ui_pile_size': 3},
@@ -986,7 +880,6 @@ if __name__ == '__main__':
                "FALLBACK_P100D2SALE_USD": {"kind": "D2SALE", # same as P100D2SALE_USD
                                        "currency": "USD",
                                        "force_output": True, "unit_bonus_format": "short", "ui_warning": "Limited time special offers:", "unit_bonus": None,
-                                       "requires": [{"predicate": "LIBRARY", "name": "fbpayments_D2SALE_in_effect"}],
                                        "skus": [{'alloy': 26500, 'USD': 199.99, 'nominal_alloy': 20000, 'ui_comment': 'Best Value', 'ui_pile_size': 5, 'ui_banner': 'SALE'},
                                                 {'alloy': 13200, 'USD': 99.99, 'nominal_alloy': 10000, 'ui_comment': None, 'ui_pile_size': 4, 'ui_banner': 'SALE'},
                                                 {'alloy': 6575, 'USD': 49.99, 'nominal_alloy': 5000, 'ui_comment': 'Most Popular', 'ui_pile_size': 3, 'ui_banner': 'SALE'},
@@ -998,7 +891,6 @@ if __name__ == '__main__':
                "FALLBACK_P100D3_USD": { "kind": "D3", # REPLACE $4.99 SKU at low end with $24.99 SKU in middle
                                         "currency": "USD",
                                         "force_output": True, "unit_bonus_format": "short", "ui_warning": "Limited time special offers:", "unit_bonus": None,
-                                        "requires": [{"predicate": "ANY_ABTEST", "key": "fbpayments_D3_in_effect", "value": 1}],
                                         "skus": [{'alloy': 24000, 'USD': 199.99, 'nominal_alloy': 20000, 'ui_comment': 'Best Value', 'ui_pile_size': 5},
                                                  {'alloy': 11500, 'USD': 99.99, 'nominal_alloy': 10000, 'ui_comment': None, 'ui_pile_size': 4},
                                                  {'alloy': 5500, 'USD': 49.99, 'nominal_alloy': 5000, 'ui_comment': 'Most Popular', 'ui_pile_size': 3},
@@ -1011,7 +903,6 @@ if __name__ == '__main__':
                # this is maintained ONLY for special-casing a few whales who got used to deprecated low-priced SKU slates
                "P050XY_USD": { # same as P050XY
                                "currency": "USD",
-                               "requires": [{"predicate": "ALWAYS_FALSE" }], # not available unless specifically overriden via A/B test
                                "force_output": True,
                                "skus": [{'alloy': 25000, 'USD': 75.00},
                                         #{'alloy': 16000, 'USD': 50.00},
@@ -1023,86 +914,11 @@ if __name__ == '__main__':
                                         ] },
               }
 
-    COUNTRY_MAP = {
-        # note: contains list of slates that apply to that country
-        # the FIRST listed slate is the default one
-        # other listed slates are for per-country A/B tests
-
-        # US/CA
-        "us": ["P100D1_USD","P100D1SALE_USD","P100D2_USD","P100D2SALE_USD",],
-        "ca": ["P100D1_CAD","P100D1SALE_CAD","P100D2_CAD","P100D2SALE_CAD",],
-        # AU/NZ
-        "au": ["P100D1_AUD","P100D1SALE_AUD","P100D2_AUD","P100D2SALE_AUD",],
-        "nz": ["P080D1_NZD","P080D1SALE_NZD","P080D2_NZD","P080D2SALE_NZD",],
-
-        # UK
-        "gb": ["P135D1_GBP","P135D1SALE_GBP","P135D2_GBP","P135D2SALE_GBP"],
-
-        # other Tier 1/2ish
-        "za": ["P100D1_ZAR","P100D1SALE_ZAR","P100D2_ZAR","P100D2SALE_ZAR"], # south africa
-        "is": ["P100D1_ISK","P100D1SALE_ISK","P100D2_ISK","P100D2SALE_ISK"], # iceland
-
-        # Scandinavia
-        "no": ["P175D1_NOK","P175D1SALE_NOK","P175D2_NOK","P175D2SALE_NOK"],
-        "se": ["P135D1_SEK","P135D1SALE_SEK","P135D2_SEK","P135D2SALE_SEK"],
-        "dk": ["P100D1_DKK","P100D1SALE_DKK","P100D2_DKK","P100D2SALE_DKK"],
-        "fi": ["P135D1_EUR","P135D1SALE_EUR","P135D2_EUR","P135D2SALE_EUR"],
-
-        # Europe
-        "at": ["P135D1_EUR","P135D1SALE_EUR","P135D2_EUR","P135D2SALE_EUR"],
-        "nl": ["P135D1_EUR","P135D1SALE_EUR","P135D2_EUR","P135D2SALE_EUR"],
-        "be": ["P135D1_EUR","P135D1SALE_EUR","P135D2_EUR","P135D2SALE_EUR"],
-        "de": ["P135D1_EUR","P135D1SALE_EUR","P135D2_EUR","P135D2SALE_EUR"],
-        "fr": ["P135D1_EUR","P135D1SALE_EUR","P135D2_EUR","P135D2SALE_EUR"],
-        "es": ["P135D1_EUR","P135D1SALE_EUR","P135D2_EUR","P135D2SALE_EUR"],
-        "it": ["P135D1_EUR","P135D1SALE_EUR","P135D2_EUR","P135D2SALE_EUR"],
-        "ie": ["P135D1_EUR","P135D1SALE_EUR","P135D2_EUR","P135D2SALE_EUR"],
-
-        # middle east
-        "qa": ["P150D1_QAR","P150D1SALE_QAR","P150D2_QAR","P150D2SALE_QAR"],
-        "ae": ["P100D1_AED","P100D1SALE_AED","P100D2_AED","P100D2SALE_AED"],
-        # south america
-        "br": ["P100D1_BRL","P100D1SALE_BRL","P100D2_BRL","P100D2SALE_BRL"],
-
-        # turkey
-#        "tr": ["P050XY_TRY"] # REMOVED 2013 August 8
-        }
-
-    # Portugal and Lithuania were originally using the USD fallback slate, and we
-    # have many payers there in legacy games, so don't change them to (the proper currency) Euros.
-    if game_id not in ('mf','tr','mf2','bfm'):
-        COUNTRY_MAP["pt"] = ["P135D1_EUR","P135D1SALE_EUR","P135D2_EUR","P135D2SALE_EUR"]
-        COUNTRY_MAP["lt"] = ["P135D1_EUR","P135D1SALE_EUR","P135D2_EUR","P135D2SALE_EUR"]
-
-    REVERSE_MAP = {}
-
-    for country, slatelist in COUNTRY_MAP.iteritems():
-       for slate in slatelist:
-           if slate not in SLATES:
-               sys.stderr.write('missing slate %s\n' % slate)
-               sys.exit(1)
-           if slate not in REVERSE_MAP: REVERSE_MAP[slate] = []
-           REVERSE_MAP[slate].append(country)
-
     for slate_name, val in sorted(SLATES.items()):
         slate_kind = val.get('kind', None)
         check_level = None
         last_level = None
         last_sku = None
-
-        country_set = set()
-        negate_country_list = False
-        if slate_name.startswith("FALLBACK"):
-            # special handling for fallback slate
-            [country_set.add(k) for k in COUNTRY_MAP.iterkeys()]
-            negate_country_list = True
-        else:
-            [country_set.add(k) for k, slatelist in COUNTRY_MAP.iteritems() if (slate_name in slatelist)]
-        country_list = sorted(list(country_set))
-
-        if not country_list and (not val.get('force_output',False)):
-            if verbose: sys.stderr.write('skipping unused gamebucks SKU slate %s\n' % slate_name)
-            continue
 
         for sku_index in xrange(len(val['skus'])):
             data = val['skus'][sku_index]
@@ -1164,68 +980,12 @@ if __name__ == '__main__':
             if ui_bonus_list:
                 sku['ui_bonus'] = '\n'.join(ui_bonus_list)
 
-            # country detection
-            country_pred = { 'predicate': "COUNTRY", "countries": country_list }
-            if negate_country_list: country_pred = { 'predicate': "NOT", "subpredicates": [country_pred,] }
-
-            # get manual "requires" predicate
-            sku_requires_list = val.get('requires',[]) + data.get('requires',[])
-
-            # is this sku slate a possible default for the countries in which it is used?
-            is_country_default = True
-
-            # any manually-disabled SKU cannot be a country default
-            if {'predicate': 'ALWAYS_FALSE'} in sku_requires_list:
-                is_country_default = False
-            else:
-                # check country-assigned slates to see whether they are listed first for all applicable countries in COUNTRY_MAP
-                if not negate_country_list:
-                    country_map_index = None
-                    for country in country_list:
-                        i = COUNTRY_MAP[country].index(slate_name)
-                        if country_map_index is None:
-                            country_map_index = i
-                        elif i != country_map_index:
-                            raise Exception('sku slate %s has inconsistent index in COUNTRY_MAP' % slate_name)
-
-                    # disable this check - we now use 'requires' predicates to select one of many country-based defaults
-                    #if country_map_index > 0:
-                    #    is_country_default = False # not the first listed for this country - do not fall back to it
-
-            # note: this method of activating individual SKUs is rather archaic. If we ever move beyond the D1 slates,
-            # we should probably replace this with a cond chain to select an entire slate, like the continent_assignment system.
-            pred = {'predicate': 'AND', 'subpredicates':[
-                       # Facebook only
-                       {'predicate': 'FRAME_PLATFORM', 'platform': 'fb'},
-
-                       # how the predicate works:
-                       # SKU is enabled if:
-                       # an A/B test override selects this SKU slate
-                       # OR
-                       # an A/B test override selects this SKU slate kind AND this slate is assigned as the country's default
-                       # OR
-                       # no A/B test override exists AND this slate is assigned as the country's default AND any explicit "requires" predicates are satisfied
-
-                       {'predicate': 'OR', 'subpredicates':
-                           # fbpayments_sku_slate_override matches the slate_name
-                           [{'predicate': "ANY_ABTEST", 'key': 'fbpayments_sku_slate_override', 'value': slate_name }] +
-
-                           # fbpayments_sku_slate_kind_override matches the slate_kind AND this slate is assigned as the country's default
-                        (([{'predicate':'AND', 'subpredicates':
-                            [{'predicate': "ANY_ABTEST", 'key': 'fbpayments_sku_slate_kind_override', 'value': slate_kind }] +
-                            [country_pred]}]) if slate_kind else []) +
-
-                           # no A/B test override exists AND this slate is assigned as the country's default AND any explicit "requires" predicates are satisfied
-                           (([{'predicate': "AND", 'subpredicates':
-                                [{'predicate': "ANY_ABTEST", 'key': 'fbpayments_sku_slate_override', 'value': 'DEFAULT', 'default': 'DEFAULT' }] + \
-                                [{'predicate': "ANY_ABTEST", 'key': 'fbpayments_sku_slate_kind_override', 'value': 'DEFAULT', 'default': 'DEFAULT' }] + \
-                                [country_pred] + sku_requires_list
-                               }]) if is_country_default else [])
-                        }
-
-                       ] }
-
-            sku['requires'] = pred
+            sku['requires'] = {'predicate': 'AND', 'subpredicates':[
+                # Facebook only
+                {'predicate': 'FRAME_PLATFORM', 'platform': 'fb'},
+                {'predicate': 'GAMEDATA_VAR', 'name': 'store.buy_gamebucks_sku_currency', 'value': val['currency']},
+                {'predicate': 'GAMEDATA_VAR', 'name': 'store.buy_gamebucks_sku_kind', 'value': val.get('kind','UNUSED')},
+                ]}
 
             out[sku_name] = sku
 
@@ -1235,7 +995,7 @@ if __name__ == '__main__':
             xsolla_sku['currency'] = 'xsolla:'+val['currency']
             del xsolla_sku['open_graph_prices']
             assert xsolla_sku['requires']['subpredicates'][0] == {'predicate':'FRAME_PLATFORM', 'platform': 'fb'}
-            xsolla_sku['requires']['subpredicates'].remove(xsolla_sku['requires']['subpredicates'][0])
+            xsolla_sku['requires']['subpredicates'][0] = {"predicate": "GAMEDATA_VAR", "name": "store.payments_api", "value":"xsolla"}
             out[xsolla_sku_name] = xsolla_sku
 
     out_keys = sorted(out.keys(), key = lambda x: -int(x.split('_')[2]))

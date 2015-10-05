@@ -102,6 +102,50 @@
         [{"predicate": "FRAME_PLATFORM", "platform": "fb"}, "fbpayments"]
     ],
 
+    // SKU slate selection variables for fbpayments and xsolla APIs.
+    // These aren't referenced by game code directly - they are checked by individual SKU "requires" predicates, see gamedata/make_country_skus2.py.
+    // NOTE: kgcredits uses a global fixed slate, see gamedata/make_kgcredits_skus.py.
+    "buy_gamebucks_sku_currency": [
+        // assertion that we're using fbpayments or xsolla
+        [{"predicate": "NOT", "subpredicates":[{"predicate": "GAMEDATA_VAR", "name": "store.payments_api", "method": "in", "value": ["fbpayments","xsolla"]}]}, null],
+
+        // US, CA, AU, NZ, UK
+        [{"predicate": "COUNTRY", "countries": ["us"]}, "USD"],
+        [{"predicate": "COUNTRY", "countries": ["ca"]}, "CAD"],
+        [{"predicate": "COUNTRY", "countries": ["au"]}, "AUD"],
+        [{"predicate": "COUNTRY", "countries": ["nz"]}, "NZD"],
+        [{"predicate": "COUNTRY", "countries": ["gb"]}, "GBP"],
+
+        // other Tier 1/2ish: South Africa, Iceland
+        [{"predicate": "COUNTRY", "countries": ["za"]}, "ZAR"],
+        [{"predicate": "COUNTRY", "countries": ["is"]}, "ISK"],
+
+        // Scandinavia
+        [{"predicate": "COUNTRY", "countries": ["no"]}, "NOK"],
+        [{"predicate": "COUNTRY", "countries": ["se"]}, "SEK"],
+        [{"predicate": "COUNTRY", "countries": ["dk"]}, "DKK"],
+        [{"predicate": "COUNTRY", "countries": ["fi"]}, "EUR"],
+
+        // Euro
+        [{"predicate": "COUNTRY", "countries": ["at","nl","be","de","fr","es","it","ie","pt","lt"]}, "EUR"],
+
+        // Middle East
+        [{"predicate": "COUNTRY", "countries": ["qa"]}, "QAR"],
+        [{"predicate": "COUNTRY", "countries": ["ae"]}, "AED"],
+
+        // South America
+        [{"predicate": "COUNTRY", "countries": ["br"]}, "BRL"],
+
+        [{"predicate": "ALWAYS_TRUE"}, "USD"]
+    ],
+
+    "buy_gamebucks_sku_kind": [
+        // assertion that we're using fbpayments or xsolla
+        [{"predicate": "NOT", "subpredicates":[{"predicate": "GAMEDATA_VAR", "name": "store.payments_api", "method": "in", "value": ["fbpayments","xsolla"]}]}, null],
+        [{"predicate": "AND", "subpredicates": [{"predicate": "FRAME_PLATFORM", "platform": "fb"}, {"predicate": "LIBRARY", "name": "fbpayments_D2SALE_in_effect"}]}, "D2SALE"],
+        [{"predicate": "ALWAYS_TRUE"}, "D2"]
+    ],
+
     "buy_gamebucks_dialog_version": 3,
 
     "lock_buy_gamebucks_dialog_during_payment": true,

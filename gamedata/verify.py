@@ -3366,8 +3366,11 @@ def main(args):
     if type(gamedata['strings']['footer_linkbar_content']) is list:
         error |= check_cond_chain(gamedata['strings']['footer_linkbar_content'], reason = 'strings.footer_linkbar_content')
     error |= check_cond_or_literal(gamedata['continent_assignment'], reason = 'continent_assignment')
-    if type(gamedata['store']['payments_api']) is list:
-        error |= check_cond_chain(gamedata['store']['payments_api'], reason = 'store.payments_api')
+
+    # check some cond chains in the store
+    for checkable in ('payments_api', 'buy_gamebucks_sku_kind', 'buy_gamebucks_sku_currency'):
+        if type(gamedata['store'][checkable]) is list:
+            error |= check_cond_chain(gamedata['store'][checkable], reason = 'store.'+checkable)
 
     for name, data in gamedata['strings']['idle_buildings'].iteritems():
         if data.get('icon',None):
