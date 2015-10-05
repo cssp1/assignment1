@@ -35899,7 +35899,7 @@ function update_buy_gamebucks_dialog2(dialog) {
         */
         var n_up = dialog.user_data['spell_list'].length;
         if(!('array_offset_'+n_up.toString()+'up' in dialog.data['widgets']['sku'])) {
-            throw Error('unhandled number of skus: '+n_up.toString());
+            throw Error('unhandled number of skus: '+n_up.toString()+' ('+JSON.stringify(spell_list)+')');
         }
         var offset = dialog.data['widgets']['sku']['array_offset_'+n_up.toString()+'up'];
         var base = dialog.data['widgets']['sku'][('xy_'+n_up.toString()+'up' in dialog.data['widgets']['sku'] ? 'xy_'+n_up.toString()+'up' : 'xy')];

@@ -835,6 +835,9 @@ if __name__ == '__main__':
                                        ] },
 
                # FALLBACK OPTIONS if country is not identified
+               # note: obsolete with switch to new two-level indirection
+               # if we want to try using different USD price points for non-US players, we
+               # can do that by creating an alternate "kind" and switching based on country in the store variables.
 
                "FALLBACK_P100M_USD": { # same as P100M_USD
                                        "currency": "USD",
@@ -980,23 +983,27 @@ if __name__ == '__main__':
             if ui_bonus_list:
                 sku['ui_bonus'] = '\n'.join(ui_bonus_list)
 
-            sku['requires'] = {'predicate': 'AND', 'subpredicates':[
-                # Facebook only
-                {'predicate': 'FRAME_PLATFORM', 'platform': 'fb'},
-                {'predicate': 'GAMEDATA_VAR', 'name': 'store.buy_gamebucks_sku_currency', 'value': val['currency']},
-                {'predicate': 'GAMEDATA_VAR', 'name': 'store.buy_gamebucks_sku_kind', 'value': val.get('kind','UNUSED')},
-                ]}
+            if 'FALLBACK' in slate_name:
+                sku['requires'] = {'predicate': 'ALWAYS_FALSE'} # not used anymore
+            else:
+                sku['requires'] = {'predicate': 'AND', 'subpredicates':[
+                    # Facebook only
+                    {'predicate': 'FRAME_PLATFORM', 'platform': 'fb'},
+                    {'predicate': 'GAMEDATA_VAR', 'name': 'store.buy_gamebucks_sku_currency', 'value': val['currency']},
+                    {'predicate': 'GAMEDATA_VAR', 'name': 'store.buy_gamebucks_sku_kind', 'value': val.get('kind','UNUSED')},
+                    ]}
 
             out[sku_name] = sku
 
             # temporary hack - generate Xsolla SKUS as well
-            xsolla_sku_name = 'BUY_GAMEBUCKS_%d' % data['alloy'] + ('_UNITS' if unit_bonus else '') + '_XS_'+slate_name
-            xsolla_sku = copy.deepcopy(sku)
-            xsolla_sku['currency'] = 'xsolla:'+val['currency']
-            del xsolla_sku['open_graph_prices']
-            assert xsolla_sku['requires']['subpredicates'][0] == {'predicate':'FRAME_PLATFORM', 'platform': 'fb'}
-            xsolla_sku['requires']['subpredicates'][0] = {"predicate": "GAMEDATA_VAR", "name": "store.payments_api", "value":"xsolla"}
-            out[xsolla_sku_name] = xsolla_sku
+            if 'FALLBACK' not in slate_name:
+                xsolla_sku_name = 'BUY_GAMEBUCKS_%d' % data['alloy'] + ('_UNITS' if unit_bonus else '') + '_XS_'+slate_name
+                xsolla_sku = copy.deepcopy(sku)
+                xsolla_sku['currency'] = 'xsolla:'+val['currency']
+                del xsolla_sku['open_graph_prices']
+                assert xsolla_sku['requires']['subpredicates'][0] == {'predicate':'FRAME_PLATFORM', 'platform': 'fb'}
+                xsolla_sku['requires']['subpredicates'][0] = {"predicate": "GAMEDATA_VAR", "name": "store.payments_api", "value":"xsolla"}
+                out[xsolla_sku_name] = xsolla_sku
 
     out_keys = sorted(out.keys(), key = lambda x: -int(x.split('_')[2]))
     for name in out_keys:
