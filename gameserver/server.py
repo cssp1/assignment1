@@ -13084,7 +13084,7 @@ class Store:
 
         for PRED in ('requires',): # XXXXXX this never checked show_if - should it?
             if PRED in spell:
-                if session and (not Predicates.read_predicate(spell[PRED]).is_satisfied(session.player, None)):
+                if session and (not Predicates.read_predicate(spell[PRED]).is_satisfied2(session, session.player, None)):
                     error_reason.append('spell "%s" predicate is not satisfied' % PRED)
                     return -1, p_currency
 
@@ -14888,7 +14888,7 @@ class XSAPI(resource.Resource):
         spell = gamedata['spells'][spellname]
         assert spell['currency'].startswith('xsolla:')
         for PRED in ('show_if', 'requires'):
-            if (PRED in spell) and (not Predicates.read_predicate(spell[PRED]).is_satisfied(session.player, None)):
+            if (PRED in spell) and (not Predicates.read_predicate(spell[PRED]).is_satisfied2(session, session.player, None)):
                 retmsg.append(["ERROR", "REQUIREMENTS_NOT_SATISFIED", spell[PRED]])
                 return None
         real_currency = spell['currency'].split(':')[1]
