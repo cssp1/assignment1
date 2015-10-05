@@ -62,6 +62,15 @@ def send_reminder_mattermost(sender_name, channel, ats, subject, body):
     req.add_data(urllib.urlencode({'payload':req_body}))
     urllib2.urlopen(req).read()
 
+def send_reminder_amazon_sns(region, topic_arn, subject, body):
+    if not region:
+        #import boto.utils
+        #region = boto.utils.get_instance_metadata()['placement']['availability-zone'][0:-1]
+        region = topic_arn.split(':')[3] # is this consistently the region?
+    import boto.sns
+    con = boto.sns.connect_to_region(region)
+    con.publish(topic = topic_arn, message = body, subject = subject)
+
 def send_reminders(sender_name, recip_list, subject, body, dry_run = False):
     if dry_run:
         print 'body is:', body
@@ -74,4 +83,23 @@ def send_reminders(sender_name, recip_list, subject, body, dry_run = False):
         elif recip['type'] == 'slack':
             send_reminder_slack(sender_name, recip['channel'], recip.get('ats',[]), subject, body)
         elif recip['type'] == 'mattermost':
-            send_reminder_mattermost(sender_name, recip.get('channel',None), recip.get('ats',[]), subject, body)
+            send_reminder_mattermost(sender_name, recip.get('channel'), recip.get('ats',[]), subject, body)
+        elif recip['type'] == 'amazon_sns':
+            send_reminder_amazon_sns(recip.get('region'), recip['topic_arn'], subject, body)
+
+if __name__=='__main__':
+    import getopt, sys, SpinJSON
+    opts, args = getopt.gnu_getopt(sys.argv[1:], '', ['dry-run','from=','subject=','body=','recipient='])
+    dry_run = False
+    subject = 'SpinReminders Subject'
+    body = 'SpinReminders Body'
+    sender_name = 'SpinReminders'
+    recipients = []
+    for key, val in opts:
+        if key == '--dry-run': dry_run = True
+        elif key == '--from': sender_name = val
+        elif key == '--subject': subject = val
+        elif key == '--body': body = val
+        elif key == '--recipient': recipients.append(SpinJSON.loads(val))
+
+    send_reminders(sender_name, recipients, subject, body, dry_run=dry_run)
