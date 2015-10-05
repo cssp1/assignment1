@@ -20,8 +20,9 @@ if __name__ == '__main__':
     dry_run = False
     min_sec = 75
     email_to = []
+    mattermost_channel = None
 
-    opts, args = getopt.gnu_getopt(sys.argv[1:], 'q', ['prune','min-sec=','dry-run','email='])
+    opts, args = getopt.gnu_getopt(sys.argv[1:], 'q', ['prune','min-sec=','dry-run','email=','mattermost='])
 
     for key, val in opts:
         if key == '-q': verbose = False
@@ -29,6 +30,7 @@ if __name__ == '__main__':
         elif key == '--min-sec': min_sec = int(val)
         elif key == '--dry-run': dry_run = True
         elif key == '--email': email_to.append(val)
+        elif key == '--mattermost': mattermost_channel = val
 
     if len(args) < 1:
         sys.stderr.write('please specify mysql_servers entry\n')
@@ -71,6 +73,9 @@ if __name__ == '__main__':
                       ]
         if email_to:
             recip_list.append({'type': 'email', 'to':[{'name': 'Analytics Tech', 'address': addr} for addr in email_to]})
+
+        if mattermost_channel:
+            recip_list.append({'type': 'mattermost', 'channel': mattermost_channel})
 
         if body:
             SpinReminders.send_reminders('SpinPunch', recip_list, subject, body, dry_run = dry_run)

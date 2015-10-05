@@ -6,7 +6,7 @@
 
 # utility for sending out reminders via email or hipchat, used by dev_reminders.py and report_slow_mysql.py
 
-import smtplib, urllib2, getpass, os
+import smtplib, urllib, urllib2, getpass, os
 from email.mime.text import MIMEText
 from email.header import Header
 import SpinJSON
@@ -48,6 +48,20 @@ def send_reminder_slack(sender_name, channel, ats, subject, body):
     req.add_data(req_body)
     urllib2.urlopen(req).read()
 
+def send_reminder_mattermost(sender_name, channel, ats, subject, body):
+    webhook_url = os.getenv('MATTERMOST_WEBHOOK_URL') or SpinConfig.config.get('mattermost_webhook_url','') or open(os.path.join(os.getenv('HOME'), '.ssh', 'mattermost-webhook-url')).read().strip()
+    assert webhook_url.startswith('https://')
+    MAXLEN = 2500
+    ellipsis = '\n... (and more)' if len(body) > MAXLEN else ''
+    req_json = {'text':', '.join(ats) + ' ' + subject + ': ' + body[:MAXLEN] + ellipsis}
+    if channel:
+        req_json['channel'] = channel
+    req_body = SpinJSON.dumps(req_json)
+    req = urllib2.Request(webhook_url)
+    #req.add_header('Content-Type', 'application/json')
+    req.add_data(urllib.urlencode({'payload':req_body}))
+    urllib2.urlopen(req).read()
+
 def send_reminders(sender_name, recip_list, subject, body, dry_run = False):
     if dry_run:
         print 'body is:', body
@@ -58,4 +72,6 @@ def send_reminders(sender_name, recip_list, subject, body, dry_run = False):
         elif recip['type'] == 'hipchat':
             send_reminder_hipchat(recip['room'], recip['ats'], subject, body)
         elif recip['type'] == 'slack':
-            send_reminder_slack(sender_name, recip['channel'], recip['ats'], subject, body)
+            send_reminder_slack(sender_name, recip['channel'], recip.get('ats',[]), subject, body)
+        elif recip['type'] == 'mattermost':
+            send_reminder_mattermost(sender_name, recip.get('channel',None), recip.get('ats',[]), subject, body)
