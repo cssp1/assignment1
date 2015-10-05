@@ -495,6 +495,23 @@ class PurchasedRecentlyPredicate(Predicate):
         now = player.get_absolute_time()
         return player.history.get('last_purchase_time',-1) >= (now - self.seconds_ago)
 
+class GamedataVarPredicate(Predicate):
+    def __init__(self, data, name, value, method):
+        Predicate.__init__(self, data)
+        self.name = name
+        self.value = value
+        self.method = method or '=='
+
+    def is_satisfied2(self, session, player, qdata):
+        test_value = eval_cond_or_literal(player.get_gamedata_var(self.name), session, player)
+        if self.method == '==':
+            return test_value == self.value
+        elif self.method == 'in':
+            assert isinstance(self.value, list)
+            return test_value in self.value
+        else:
+            raise Exception('unknown method '+self.method)
+
 # generic predicate that searches player history stats for a specific minimum value
 class PlayerHistoryPredicate(Predicate):
     def __init__(self, data, key, value, method):
@@ -906,6 +923,7 @@ def read_predicate(data):
     elif kind == 'PVP_AGGRESSED_RECENTLY': return PvPAggressedRecentlyPredicate(data)
     elif kind == 'PURCHASED_RECENTLY': return PurchasedRecentlyPredicate(data)
     elif kind == 'PLAYER_HISTORY': return PlayerHistoryPredicate(data, data['key'], data['value'], data['method'])
+    elif kind == 'GAMEDATA_VAR': return GamedataVarPredicate(data, data['name'], data['value'], data.get('method', None))
     elif kind == 'ATTACKS_LAUNCHED': return PlayerHistoryPredicate(data, 'attacks_launched', data['number'], ">=")
     elif kind == 'ATTACKS_VICTORY': return PlayerHistoryPredicate(data, 'attacks_victory', data['number'], ">=")
     elif kind == 'CONQUESTS': return PlayerHistoryPredicate(data, data['key'], data['value'], data['method'])

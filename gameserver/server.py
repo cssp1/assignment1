@@ -8445,6 +8445,11 @@ class Player(AbstractPlayer):
         return gamedata['ai_bases']['bases'].get(str(user_id), None)
     def get_abtest_title(self, name):
         return gamedata['titles'].get(name, None)
+    def get_gamedata_var(self, name): # similar to get_abtest(), for use by Predicates, but does not support overrides
+        v = gamedata
+        for elem in name.split('.'):
+            v = v[elem]
+        return v
 
     # check for ANY active abtest group we're in that contains a value named 'key'
     # but, do NOT apply "default_group" behavior

@@ -786,6 +786,33 @@ CooldownInactivePredicate.prototype.do_ui_describe = function(player) {
     return new PredicateUIDescription(template.replace('%s', this.act_pred.name).replace('%togo', pretty_print_time(player.cooldown_togo(this.act_pred.name))));
 };
 
+
+/** @constructor
+  * @extends Predicate */
+function GamedataVarPredicate(data, name, value, method) {
+    goog.base(this, data);
+    this.name = name;
+    this.value = value;
+    this.method = method || '==';
+}
+goog.inherits(GamedataVarPredicate, Predicate);
+GamedataVarPredicate.prototype.is_satisfied = function(player, qdata) {
+    var path = this.name.split('.');
+    var v = gamedata;
+    for(var i = 0; i < path.length; i++) {
+        if(!(path[i] in v)) { throw Error('lookup of undefined var "'+this.name+'"'); }
+        v = v[path[i]];
+    }
+    var test_value = eval_cond_or_literal(v, player, null);
+    if(this.method == '==') {
+        return test_value == this.value;
+    } else if(this.method == 'in') {
+        return goog.array.contains(this.value, test_value);
+    } else {
+        throw Error('unknown method '+this.method);
+    }
+};
+
 /** @constructor
   * @extends Predicate */
 function PlayerHistoryPredicate(data, key, minvalue, ui_name_s, ui_name_d, method) {
@@ -1737,6 +1764,7 @@ function read_predicate(data) {
     else if(kind === 'AI_BASE_ACTIVE') { return new AIBaseActivePredicate(data); }
     else if(kind === 'AI_BASE_SHOWN') { return new AIBaseShownPredicate(data); }
     else if(kind === 'PLAYER_HISTORY') { return new PlayerHistoryPredicate(data, data['key'], data['value'], data['key'], data['value'].toString(), data['method']); }
+    else if(kind === 'GAMEDATA_VAR') { return new GamedataVarPredicate(data, data['name'], data['value'], ('method' in data ? data['method'] : null)); }
     else if(kind === 'ATTACKS_LAUNCHED') { return new PlayerHistoryPredicate(data, 'attacks_launched', data['number'], '', data['number'].toString(), '>='); }
     else if(kind === 'ATTACKS_VICTORY') { return new PlayerHistoryPredicate(data, 'attacks_victory', data['number'], '', data['number'].toString(), '>='); }
     else if(kind === 'CONQUESTS') { return new PlayerHistoryPredicate(data, data['key'], data['value'], data['key'], data['value'].toString(), data['method']); }

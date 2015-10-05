@@ -1420,7 +1420,7 @@ def check_cond_chain(chain, **kwargs):
 PREDICATE_TYPES = set(['AND', 'OR', 'NOT', 'ALWAYS_TRUE', 'ALWAYS_FALSE', 'TUTORIAL_COMPLETE', 'ACCOUNT_CREATION_TIME',
                    'ALL_BUILDINGS_UNDAMAGED', 'OBJECT_UNDAMAGED', 'OBJECT_UNBUSY', 'BUILDING_DESTROYED', 'BUILDING_QUANTITY',
                    'BUILDING_LEVEL', 'UNIT_QUANTITY', 'TECH_LEVEL', 'QUEST_COMPLETED', 'COOLDOWN_ACTIVE', 'COOLDOWN_INACTIVE',
-                   'ABTEST', 'ANY_ABTEST', 'RANDOM', 'LIBRARY', 'AI_BASE_ACTIVE', 'AI_BASE_SHOWN', 'PLAYER_HISTORY',
+                   'ABTEST', 'ANY_ABTEST', 'RANDOM', 'LIBRARY', 'AI_BASE_ACTIVE', 'AI_BASE_SHOWN', 'PLAYER_HISTORY', 'GAMEDATA_VAR',
                    'RETAINED', 'TIME_IN_GAME',
                    'ATTACKS_LAUNCHED', 'ATTACKS_VICTORY', 'CONQUESTS', 'UNITS_MANUFACTURED', 'LOGGED_IN_TIMES',
                    'RESOURCES_HARVESTED_TOTAL', 'RESOURCES_HARVESTED_AT_ONCE', 'FRIENDS_JOINED', 'FACEBOOK_APP_NAMESPACE', 'FACEBOOK_LIKES_SERVER',
@@ -1552,6 +1552,18 @@ def check_predicate(pred, reason = '', context = None, context_data = None,
         VALID_PLATFORMS = ('fb','kg','ag')
         if pred.get('platform',None) not in VALID_PLATFORMS:
             error |= 1; print '%s: FRAME_PLATFORM predicate needs a "platform" in %r' % (reason, VALID_PLATFORMS)
+    elif pred['predicate'] == 'GAMEDATA_VAR':
+        for mandatory in ('name', 'value'):
+            if mandatory not in pred: error |= 1; print '%s: %s predicate missing "%s"' % (reason, pred['predicate'], mandatory)
+        if 'method' in pred and pred['method'] not in ('==', 'in'):
+            error |= 1; print '%s: %s predicate has bad "method" %s' % (reason, pred['predicate'], pred['method'])
+        path = pred['name'].split('.')
+        v = gamedata
+        for elem in path:
+            if elem not in v:
+                error |= 1; print '%s: %s predicate has looks up undefined value "%s"' % (reason, pred['predicate'], pred['name'])
+                break
+            v = v[elem]
     elif pred['predicate'] == 'PLAYER_HISTORY':
         if 'key' not in pred: error |= 1; print '%s: %s predicate missing "key"' % (reason, pred['predicate'])
         else:
