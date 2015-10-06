@@ -34382,6 +34382,14 @@ function apply_dialog_hacks(dialog, _tip, consequent_context) {
                     var now = player.get_absolute_time();
                     var this_period_end = ((Math.floor( (now - _hack['reset_origin_time']) / _hack['reset_interval'] ) + 1) * _hack['reset_interval']) + _hack['reset_origin_time'];
                     time_to_print = (this_period_end - now);
+                } else if(_hack['aura_name']) {
+                    // count down remaining aura duration
+                    var aura = goog.array.find(player.player_auras, function(a) { return a['spec'] === _hack['aura_name']; });
+                    if(aura) {
+                        time_to_print = aura['end_time'] - server_time;
+                    } else {
+                        time_to_print = 0;
+                    }
                 } else {
                     // count down to start or end of event
                     time_to_print = -player.get_event_time(_hack['event_kind'] || 'current_event', _hack['event_name'] || null, _hack['method'], true);
