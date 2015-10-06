@@ -104,6 +104,7 @@ class AntiRefreshPolicy(Policy):
     def check_player(self, user_id, player):
         if self.test:
             idle_check = {'history': [
+                {'time': time_now - 6000, 'result': 'fail', 'seen': 1},
                 {'time': time_now - 5000, 'result': 'fail'},
                 {'time': time_now - 4000, 'result': 'fail'},
                 {'time': time_now - 3000, 'result': 'fail'},
@@ -115,19 +116,19 @@ class AntiRefreshPolicy(Policy):
 
         history = idle_check.get('history', [])
 
-        num_tests = len(history)
+        num_tests = sum((1 for x in history if x['time'] >= time_now - self.IGNORE_AGE and not x.get('seen',0)), 0)
         if num_tests < self.MIN_TESTS:
             return # not enough tests
 
-        num_fails = sum((1 for x in history if x['time'] >= time_now - self.IGNORE_AGE and x['result'] == 'fail'), 0)
-        num_successes = sum((1 for x in history if x['time'] >= time_now - self.IGNORE_AGE and x['result'] == 'success'), 0)
+        num_fails = sum((1 for x in history if x['time'] >= time_now - self.IGNORE_AGE and not x.get('seen',0) and x['result'] == 'fail'), 0)
+        num_successes = sum((1 for x in history if x['time'] >= time_now - self.IGNORE_AGE and not x.get('seen',0) and x['result'] == 'success'), 0)
         if num_fails < self.MIN_FAILS:
             return # not enough fails
         fail_rate = (1.0*num_fails) / (num_fails + num_successes)
 
         last_fail_time = -1
         for i in xrange(len(history)-1, -1, -1):
-            if history[i]['result'] == 'fail':
+            if not history[i].get('seen',0) and history[i]['result'] == 'fail':
                 last_fail_time = history[i]['time']
                 break
 
@@ -142,6 +143,9 @@ class AntiRefreshPolicy(Policy):
 
         try:
             new_region_name = self.punish_player(user_id, player['home_region'])
+            if self.verbose >= 2:
+                print >> self.msg_fd, 'moved to region %s' % (new_region_name)
+
         except:
             sys.stderr.write(('error punishing player %d: '%(user_id)) + traceback.format_exc())
 

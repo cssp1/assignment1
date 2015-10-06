@@ -58,14 +58,20 @@ class IdleCheck(object):
                 # note: inflight state is not preserved 'inflight': self.inflight,
                 'history': self.history}
 
+    def reset_state(self):
+        # This isn't a full reset, but it just marks existing history
+        # entries as "seen" so that we don't take action on them again.
+        for entry in self.history:
+            entry['seen'] = 1
+
     def prune_history(self, cur_time):
         limit = self.config.get('keep_history_for', 604800)
         self.history = filter(lambda x: cur_time - x['time'] < limit, self.history)
 
-    def count_fails(self): return sum((1 for x in self.history if x['result'] == 'fail'), 0)
+    def count_fails(self): return sum((1 for x in self.history if not x.get('seen',0) and x['result'] == 'fail'), 0)
     def last_fail_time(self):
         for i in xrange(len(self.history)-1, -1, -1):
-            if self.history[i]['result'] == 'fail':
+            if not self.history[i].get('seen',0) and self.history[i]['result'] == 'fail':
                 return self.history[i]['time']
         return -1
 

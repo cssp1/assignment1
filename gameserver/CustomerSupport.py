@@ -815,11 +815,13 @@ class HandleKickAllianceMember(Handler):
 
 class HandleResetIdleCheckState(Handler):
     def do_exec_online(self, session, retmsg):
-        session.player.reset_idle_check_state()
+        session.player.idle_check.reset_state()
         return ReturnValue(result = 'ok')
     def do_exec_offline(self, user, player):
         if 'idle_check' in player:
-            del player['idle_check']
+            if 'history' in player['idle_check']:
+                for entry in player['idle_check']['history']:
+                    entry['seen'] = 1
         return ReturnValue(result = 'ok')
 
 methods = {
