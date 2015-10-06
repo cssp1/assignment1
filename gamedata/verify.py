@@ -656,7 +656,7 @@ def check_aura(auraname, spec, maxlevel):
     if spec['name'] != ':'.join(auraname.split(':')[1:]):
         error |= 1
         print '%s:name mismatch' % auraname
-    if ('icon' in spec):
+    if ('icon' in spec) and spec['icon'] != 'gamebucks_inventory_icon':
         error |= require_art_asset(spec['icon'], auraname+':icon')
     if ('affects_manufacture_category' in spec) and (spec['affects_manufacture_category'] not in ('ALL','rovers','transports','starcraft')):
         error |= 1
@@ -673,6 +673,9 @@ def check_aura(auraname, spec, maxlevel):
         if not spec.get('server',False):
             error |= 1; print '%s: has on_apply but server != 1' % auraname
         error |= check_consequent(spec['on_apply'], reason = 'aura %s: on_apply' % auraname, context='aura')
+
+    if 'on_click' in spec:
+        error |= check_consequent(spec['on_click'], reason = 'aura %s: on_click' % auraname, context='aura')
 
     if 'code' in spec:
         replacement = 'unknown (ask Dan)'

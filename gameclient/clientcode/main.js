@@ -12081,7 +12081,16 @@ function update_aura_bar(dialog) {
             dialog.widgets['aura_glow'+i].show = false;
             dialog.widgets['aura_slot'+i].show = false;
             dialog.widgets['aura_icon'+i].show = true;
-            dialog.widgets['aura_icon'+i].asset = aura_spec['icon'] || 'inventory_unknown';
+            if(aura_spec['icon']) {
+                if(aura_spec['icon'] == 'gamebucks_inventory_icon') {
+                    dialog.widgets['aura_icon'+i].asset = player.get_any_abtest_value('gamebucks_inventory_icon', gamedata['store']['gamebucks_inventory_icon']);
+                } else {
+                    dialog.widgets['aura_icon'+i].asset = aura_spec['icon'];
+                }
+            } else {
+                dialog.widgets['aura_icon'+i].asset = 'inventory_unknown';
+            }
+
             dialog.widgets['aura_stack'+i].str = ('stack' in aura ? (('stack_prefix' in aura_spec) ? aura_spec['stack_prefix'] : '') + pretty_print_number(aura['stack']) : null);
             dialog.widgets['aura_stack'+i].show = ('stack' in aura) && (aura['stack'] != 1) && (!('show_stack' in aura_spec) || aura_spec['show_stack']);
             if(dialog.widgets['aura_stack'+i].show) {
@@ -12098,13 +12107,20 @@ function update_aura_bar(dialog) {
                    dialog.user_data['aura_context'].user_data['slot'] == _i) { return; }
                 invoke_aura_context(dialog, w.xy, _i, _aura, false);
             }; })(i, aura);
-            dialog.widgets['aura_frame'+i].onclick = (function (_i, _aura) { return function(w) {
-                var dialog = w.parent;
-                if(dialog.user_data['aura_context'] &&
-                   dialog.user_data['aura_context'].user_data['slot'] == _i) {
-                    invoke_aura_context(dialog, w.xy, _i, _aura, true);
-                }
-            }; })(i, aura);
+
+            if(aura_spec['on_click']) {
+                dialog.widgets['aura_frame'+i].onclick = (function (_cons) { return function(w) {
+                    read_consequent(_cons).execute();
+                }; })(aura_spec['on_click']);
+            } else {
+                dialog.widgets['aura_frame'+i].onclick = (function (_i, _aura) { return function(w) {
+                    var dialog = w.parent;
+                    if(dialog.user_data['aura_context'] &&
+                       dialog.user_data['aura_context'].user_data['slot'] == _i) {
+                        invoke_aura_context(dialog, w.xy, _i, _aura, true);
+                    }
+                }; })(i, aura);
+            }
             dialog.widgets['aura_frame'+i].onleave_cb = (function (_i) { return function(w) {
                 var dialog = w.parent;
                 var c = dialog.user_data['aura_context'];
@@ -24046,6 +24062,9 @@ function invoke_aura_context(inv_dialog, slot_xy, slot, aura, show_dropdown) {
     }
     if(descr.indexOf('%level') >= 0) {
         descr = descr.replace('%level', pretty_print_number(level));
+    }
+    if(descr.indexOf('%gamebucks') >= 0) {
+        descr = descr.replace('%gamebucks', player.get_any_abtest_value('gamebucks_ui_name', gamedata['store']['gamebucks_ui_name']));
     }
     if(descr.indexOf('%modstats') >= 0) {
         var ui_modstat_buff_list = [], ui_modstat_nerf_list = [];
