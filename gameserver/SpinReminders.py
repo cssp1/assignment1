@@ -88,7 +88,7 @@ def send_reminders(sender_name, recip_list, subject, body, dry_run = False):
             send_reminder_amazon_sns(recip.get('region'), recip['topic_arn'], subject, body)
 
 if __name__=='__main__':
-    import getopt, sys, SpinJSON
+    import getopt, sys
     opts, args = getopt.gnu_getopt(sys.argv[1:], '', ['dry-run','from=','subject=','body=','recipient='])
     dry_run = False
     subject = 'SpinReminders Subject'
