@@ -251,6 +251,10 @@ class ApplyAuraConsequent(Consequent):
         self.duration = data.get('aura_duration',-1)
         self.strength = data.get('aura_strength',1)
         self.level = data.get('aura_level',1)
+        if 'aura_data' in data:
+            self.aura_data = copy.deepcopy(data['aura_data'])
+        else:
+            self.aura_data = None
         self.stack = data.get('stack',-1)
         self.stack_decay = data.get('stack_decay', None)
         if self.stack_decay:
@@ -286,7 +290,7 @@ class ApplyAuraConsequent(Consequent):
                 # override with the context value
                 stack = context.get(self.stack_from_context, stack)
 
-        if session.player.apply_aura(self.name, strength = self.strength, duration = duration, stack = stack, level = self.level, ignore_limit = True):
+        if session.player.apply_aura(self.name, strength = self.strength, duration = duration, stack = stack, level = self.level, data = self.aura_data, ignore_limit = True):
             session.player.stattab.send_update(session, retmsg)
             spec = session.player.get_abtest_aura(self.name)
             if ('on_apply' in spec):
