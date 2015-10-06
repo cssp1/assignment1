@@ -10931,7 +10931,9 @@ class LivePlayer(Player):
 
     # update the player's membership in any ongoing A/B tests
     # called once per login
-    def update_abtests(self, user, is_first_visit):
+    def update_abtests(self, session, is_first_visit):
+        user = session.user
+
         want_tests = []
         want_cohorts = []
         want_limits = []
@@ -10957,7 +10959,7 @@ class LivePlayer(Player):
                 if 'eligible' in data:
                     # predicate-based eligibility
                     if type(data['eligible']) == dict and 'predicate' in data['eligible']:
-                        if not Predicates.read_predicate(data['eligible']).is_satisfied(self,None):
+                        if not Predicates.read_predicate(data['eligible']).is_satisfied2(session,self,None):
                             #print 'FAILED PREDICATE', data['eligible'], self.price_region
                             continue
                     elif data['eligible'].startswith('browser_name:'):
@@ -11026,7 +11028,7 @@ class LivePlayer(Player):
                 if data.get('assign_by_predicate', False):
                     group = None
                     for grname in groups:
-                        if ('assign_if' in data['groups'][grname]) and Predicates.read_predicate(data['groups'][grname]['assign_if']).is_satisfied(self,None):
+                        if ('assign_if' in data['groups'][grname]) and Predicates.read_predicate(data['groups'][grname]['assign_if']).is_satisfied2(session,self,None):
                             group = grname
                             break
                     if group is None:
@@ -21922,18 +21924,18 @@ class GAMEAPI(resource.Resource):
         else:
             is_paying_user = 0
 
+        # create the new session
+        session = Session(session_id, user, player, server_time)
+
         # assign player to A/B test cohorts
         player.read_url_overrides(user, url_qs)
-        player.update_abtests(user, not is_returning_user)
+        player.update_abtests(session, not is_returning_user)
 
         if needs_tutorial_units:
             # note: this must come AFTER abtests are set up, since they may override starting conditions
             init_game(player, 0)
 
         player.my_home.spawn_scenery(player, user.user_id)
-
-        # create the new session
-        session = Session(session_id, user, player, server_time)
 
         # upon success, retmsg will be ignored, and future client messages should go via session.outgoing_messages
         session.outgoing_messages = retmsg # !!!
