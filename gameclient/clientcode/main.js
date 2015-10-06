@@ -11989,9 +11989,19 @@ function update_aura_bar(dialog) {
         }; })(first_aura, aura);
         dialog.widgets['aura_frame'+first_aura].onleave_cb = (function (_i) { return function(w) {
             var dialog = w.parent;
+            var c = dialog.user_data['aura_context'];
+            var out_of_bounds = true;
+            if(c) {
+                var abs_xy = c.get_absolute_xy();
+                if((mouse_state.last_raw_x >= abs_xy[0]) && (mouse_state.last_raw_x < (abs_xy[0]+c.wh[0])) &&
+                   (mouse_state.last_raw_y >= abs_xy[1])) { // note: no check on Y max
+                        out_of_bounds = false;
+                }
+            }
+
             if(dialog.user_data['aura_context'] &&
                dialog.user_data['aura_context'].user_data['slot'] == _i &&
-               (1 || !dialog.user_data['aura_context'].user_data['show_dropdown'])) {
+               (out_of_bounds || !dialog.user_data['aura_context'].user_data['show_dropdown'])) {
                 invoke_aura_context(dialog, w.xy, -1, null, false);
             }
         }; })(first_aura);

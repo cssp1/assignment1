@@ -291,7 +291,8 @@ def DamageProtectionLogFilter(child):
                                   '3882_protection_from_nonladder_battle',
                                   '3883_protection_from_spell',
                                   '3884_protection_removed',
-                                  '3885_i_got_attacked'
+                                  '3885_i_got_attacked',
+                                  '3886_protection_removed_manually'
                                   ])
 def QuestsLogFilter(child):
     return JSONLogFilter(child,

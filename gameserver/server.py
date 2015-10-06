@@ -24173,7 +24173,18 @@ class GAMEAPI(resource.Resource):
 
         elif arg[0] == "CANCEL_PLAYER_AURA":
             specname = arg[1]
-            session.player.remove_aura(session, retmsg, specname)
+            if specname == 'damage_protection': # special case
+                old_end_time = session.player.resources.protection_end_time
+                if old_end_time > server_time:
+                    session.player.record_protection_event('3886_protection_removed_manually',
+                                                           {'prev_end_time': session.player.resources.protection_end_time,
+                                                            'new_end_time': 0})
+                    session.player.resources.protection_end_time = 0
+                    session.player.protection_attack_count = 0
+                    session.deferred_player_state_update = True
+                    # XXXXXX all things that affect protection_end_time should probably cause a map and/or player_cache update!
+            else:
+                session.player.remove_aura(session, retmsg, specname)
 
         elif arg[0] in ("INVENTORY_TRASH", "INVENTORY_TRASH_ALL", "INVENTORY_REFUND", "INVENTORY_REFUND_ALL"):
             if session.player.warehouse_is_busy():

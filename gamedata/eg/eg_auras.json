@@ -32,7 +32,7 @@
     "damage_protection": {
         "name": "damage_protection",
         "icon": "inventory_protection",
-        "help": 1, "cancelable": 0,
+        "help": 1, "cancelable": 1,
         "ui_name": "Damage Protection", "name_color": [1,0.5,0,1],
         "ui_description": "Your base is protected from attack."
     },
