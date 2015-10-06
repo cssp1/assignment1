@@ -3104,8 +3104,24 @@ class Session(object):
         return (len(deployable_squads) != 1 or (deployable_squads.values()[0]['squad_id'] != SQUAD_IDS.BASE_DEFENDERS))
 
     # this is exposed so that MetricEventConsequent can call it without depending on the global function from server.py
-    def metric_event_coded(self, player, event_name, props):
-        metric_event_coded(player.user_id, event_name, props)
+    def metric_event_coded(self, player, event_name, val):
+        if val:
+            assert type(val) is dict
+            if val.get('attack_event', False):
+                # write to attack log instead of main metrics log
+                self.attack_event(player.user_id, event_name, val)
+                return
+            elif val.get('purchase_ui_event', False):
+                # write to purchase_ui log instead of main metrics log
+                if gamedata['server'].get('log_purchase_ui',False):
+                    val['user_id'] = player.user_id
+                    val['event_name'] = event_name
+                    assert ('alloy' not in val['event_name']) # don't record previous-generation events
+                    val['code'] = int(event_name[0:4])
+                    del val['purchase_ui_event']
+                    gamesite.purchase_ui_log.event(server_time, val)
+                    return
+        metric_event_coded(player.user_id, event_name, val)
 
     # just return a string describing the current session state, for exception logging only
     def dump_exception_state(self):
@@ -22802,25 +22818,7 @@ class GAMEAPI(resource.Resource):
             key = arg[1]
             val = arg[2]
 
-            if val:
-                assert type(val) is dict
-                if val.get('attack_event', False):
-                    # write to attack log instead of main metrics log
-                    session.attack_event(session.user.user_id, key, val)
-                    return
-                elif val.get('purchase_ui_event', False):
-                    # write to purchase ui log instead of main metrics log
-                    if gamedata['server'].get('log_purchase_ui',False):
-                        val['user_id'] = session.user.user_id
-                        val['event_name'] = key
-                        assert ('alloy' not in val['event_name']) # don't record previous-generation events
-                        val['code'] == int(key[0:4])
-                        assert val['client_time']
-                        del val['purchase_ui_event']
-                        gamesite.purchase_ui_log.event(server_time, val)
-                    return
-
-            metric_event(session.user.user_id, key, val)
+            session.metric_event_coded(session.player, key, val)
 
             # save canvas_width/height from framerate events
             if key == '0960_framerate' and 'canvas_width' in val:
