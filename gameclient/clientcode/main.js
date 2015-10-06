@@ -35290,6 +35290,30 @@ player.gift_orders_enabled = function() {
     return player.get_any_abtest_value('enable_gift_orders', default_value);
 };
 
+/** wrapper around metric_event for adding purchase UI properties
+    @param {string} event_name
+    @param {Object=} extra_props */
+function purchase_ui_event(event_name, extra_props) {
+    var props = {'purchase_ui_event': true, 'api':SPay.api, 'client_time': Math.floor(client_time)};
+
+    // look for an active flash sale
+    var aura = goog.array.find(player.player_auras, function(a) {
+        return a['spec'] === 'flash_sale' && a['end_time'] > server_time;
+    });
+    if(aura) {
+        props['flash_sale_kind'] = aura['data']['kind'];
+        props['flash_sale_duration'] = aura['data']['duration'];
+        if('tag' in aura['data']) {
+            props['flash_sale_tag'] = aura['data']['tag'];
+        }
+    }
+
+    if(extra_props) {
+        goog.object.extend(props, extra_props);
+    }
+    metric_event(event_name, props);
+}
+
 function invoke_buy_gamebucks_dialog(reason, amount, order) {
     var ver = eval_cond_or_literal(player.get_any_abtest_value('buy_gamebucks_dialog_version', gamedata['store']['buy_gamebucks_dialog_version'] || 1), player, null);
 
@@ -35407,7 +35431,7 @@ function invoke_buy_gamebucks_dialog1(reason, amount, order) {
     dialog.modal = true;
 
     var go_away = function(w) {
-        metric_event('4410_buy_gamebucks_dialog_close', {'purchase_ui_event': true, 'api':SPay.api, 'client_time': Math.floor(client_time)});
+        purchase_ui_event('4420_buy_gamebucks_dialog_close');
         close_parent_dialog(w);
     };
 
@@ -35422,12 +35446,11 @@ function invoke_buy_gamebucks_dialog1(reason, amount, order) {
         player.record_client_history('purchase_ui_opens_preftd', 1);
     }
     var default_spellname = spell_list[default_selection];
-    metric_event('4410_buy_gamebucks_dialog_open', {'purchase_ui_event': true, 'client_time': Math.floor(client_time),
-                                                    'sku': default_spellname, 'api':SPay.api,
-                                                    'gamebucks': gamedata['spells'][default_spellname]['quantity'],
-                                                    'currency': gamedata['spells'][default_spellname]['currency'],
-                                                    'currency_price': gamedata['spells'][default_spellname]['price'],
-                                                    'method': reason});
+    purchase_ui_event('4410_buy_gamebucks_dialog_open', {'sku': default_spellname,
+                                                         'gamebucks': gamedata['spells'][default_spellname]['quantity'],
+                                                         'currency': gamedata['spells'][default_spellname]['currency'],
+                                                         'currency_price': gamedata['spells'][default_spellname]['price'],
+                                                         'method': reason});
     SPFB.AppEvents.logEvent('SP_PURCHASE_DIALOG_OPEN');
 
     dialog.widgets['gift_order_cancel_button'].onclick = function(w) { w.parent.user_data['gift_order'] = null; };
@@ -35683,11 +35706,10 @@ function buy_gamebucks_dialog_select(dialog, num) {
                 _order = null;
             }
 
-            metric_event('4440_buy_gamebucks_init_payment', {'purchase_ui_event': true, 'client_time': Math.floor(client_time),
-                                                             'sku': spname, 'api': SPay.api,
-                                                             'gamebucks': _alloy_qty,
-                                                             'currency': _payment_currency,
-                                                             'currency_price': _payment_price});
+            purchase_ui_event('4440_buy_gamebucks_init_payment', {'sku': spname,
+                                                                  'gamebucks': _alloy_qty,
+                                                                  'currency': _payment_currency,
+                                                                  'currency_price': _payment_price});
             var credits_props = {'no_clear': true};
             var gift_order = dialog.user_data['chapter'] == 'gifts' && dialog.user_data['gift_order'];
             if(gift_order) {
@@ -35895,7 +35917,7 @@ function invoke_buy_gamebucks_dialog23(ver, reason, amount, order) {
     }
 
     var go_away = function(w) {
-        metric_event('4410_buy_gamebucks_dialog_close', {'gui_version': w.parent.user_data['ver'], 'api':SPay.api, 'purchase_ui_event': true, 'client_time': Math.floor(client_time)});
+        purchase_ui_event('4420_buy_gamebucks_dialog_close', {'gui_version': w.parent.user_data['ver']});
         close_parent_dialog(w);
     };
 
@@ -35907,7 +35929,7 @@ function invoke_buy_gamebucks_dialog23(ver, reason, amount, order) {
     if((player.history['money_spent'] || 0) <= 0) {
         player.record_client_history('purchase_ui_opens_preftd', 1);
     }
-    metric_event('4410_buy_gamebucks_dialog_open', {'gui_version': dialog.user_data['ver'], 'api':SPay.api, 'purchase_ui_event': true, 'client_time': Math.floor(client_time), 'method': reason});
+    purchase_ui_event('4410_buy_gamebucks_dialog_open', {'gui_version': dialog.user_data['ver'], 'method': reason});
     SPFB.AppEvents.logEvent('SP_PURCHASE_DIALOG_OPEN');
     return dialog;
 }
@@ -36141,11 +36163,11 @@ function update_buy_gamebucks_sku2(dialog) {
                 _order = null;
             }
 
-            metric_event('4440_buy_gamebucks_init_payment', {'gui_version': dialog.parent.user_data['ver'], 'purchase_ui_event': true, 'client_time': Math.floor(client_time),
-                                                             'sku': spname, 'api': SPay.api,
-                                                             'gamebucks': _alloy_qty,
-                                                             'currency': _payment_currency,
-                                                             'currency_price': _payment_price});
+            purchase_ui_event('4440_buy_gamebucks_init_payment', {'gui_version': dialog.parent.user_data['ver'],
+                                                                  'sku': spname,
+                                                                  'gamebucks': _alloy_qty,
+                                                                  'currency': _payment_currency,
+                                                                  'currency_price': _payment_price});
             var credits_props = {'no_clear': true};
             var gift_order = dialog.parent.user_data['chapter'] == 'gifts' && dialog.parent.user_data['gift_order'];
             if(gift_order) {

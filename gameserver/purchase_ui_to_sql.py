@@ -30,6 +30,10 @@ purchase_ui_schema = {
                ('currency_price', 'FLOAT4'),
                ('currency', 'VARCHAR(64)'),
                ('usd_receipts_cents', 'INT4'),
+
+               ('flash_sale_kind', 'VARCHAR(64)'),
+               ('flash_sale_duration', 'INT4'),
+               ('flash_sale_tag', 'VARCHAR(64)'),
                ],
     'indices': {'by_time': {'keys': [('time','ASC')]},
                 'by_user_id_time': {'keys': [('user_id','ASC'),('time','ASC')]},
@@ -102,7 +106,8 @@ if __name__ == '__main__':
                     gui_version = row['gui_version']
                 keyvals.append(('gui_version', gui_version))
 
-            for FIELD in ('client_time', 'sku', 'method', 'gamebucks', 'currency_price', 'currency'):
+            for FIELD in ('client_time', 'sku', 'method', 'gamebucks', 'currency_price', 'currency',
+                          'flash_sale_kind', 'flash_sale_duration', 'flash_sale_tag'):
                 if FIELD in row:
                     keyvals.append((FIELD, row[FIELD]))
 

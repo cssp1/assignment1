@@ -14263,14 +14263,21 @@ class Store:
             if gamedata['server'].get('log_purchase_ui',False):
                 # the other purchase_ui_log events are all client-side, but we have to do this on the server
                 # because Facebook's credit API callback is unreliable :(
-                gamesite.purchase_ui_log.event(server_time, {'code':4450, 'event_name': '4450_buy_gamebucks_payment_complete',
-                                                             'user_id': session.player.user_id, 'sku': spellname, 'api': currency.split(':')[0],
-                                                             'gamebucks': bucks,
-                                                             'currency': currency, 'currency_price': amount_willing_to_pay,
-                                                             'usd_equivalent': usd_equivalent,
-                                                             'gift_order': gift_order,
-                                                             'gui_version': Predicates.eval_cond_or_literal(session.player.get_any_abtest_value('buy_gamebucks_dialog_version', gamedata['store'].get('buy_gamebucks_dialog_version',1)), session, session.player)
-                                                             })
+                purchase_ui_event_props = {'code':4450, 'event_name': '4450_buy_gamebucks_payment_complete',
+                                           'user_id': session.player.user_id, 'sku': spellname, 'api': currency.split(':')[0],
+                                           'gamebucks': bucks,
+                                           'currency': currency, 'currency_price': amount_willing_to_pay,
+                                           'usd_equivalent': usd_equivalent,
+                                           'gift_order': gift_order,
+                                           'gui_version': Predicates.eval_cond_or_literal(session.player.get_any_abtest_value('buy_gamebucks_dialog_version', gamedata['store'].get('buy_gamebucks_dialog_version',1)), session, session.player)
+                                           }
+                for aura in session.player.player_auras:
+                    if aura['spec'] == 'flash_sale' and aura.get('end_time', -1) > server_time:
+                        purchase_ui_event_props['flash_sale_kind'] = aura['data']['kind']
+                        purchase_ui_event_props['flash_sale_duration'] = aura['data']['duration']
+                        if 'tag' in aura['data']:
+                            purchase_ui_event_props['flash_sale_tag'] = aura['data']['tag']
+                gamesite.purchase_ui_log.event(server_time, purchase_ui_event_props)
 
             session.increment_player_metric('gamebucks_purchased', bucks)
             session.increment_player_metric(record_spend_type+'_spent_on_gamebucks', record_amount)
