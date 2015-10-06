@@ -35751,8 +35751,15 @@ function invoke_buy_gamebucks_dialog23(ver, reason, amount, order) {
 
             dialog.user_data['max_displayed_quantity'] = Math.max(dialog.user_data['max_displayed_quantity'], spell['quantity']);
             var bonus_lines = 0;
-            if(spell['ui_bonus']) { bonus_lines += 1; }
-            if(('nominal_quantity' in spell) && spell['nominal_quantity'] < spell['quantity']) { bonus_lines += 1; }
+            if(spell['ui_bonus']) {
+                bonus_lines += spell['ui_bonus'].split('\n').length;
+                // special-case hack for backwards compatibility with old SKUs ("Unit Bonus" -> "BONUS:\nUnits")
+                if(spell['ui_bonus'].indexOf('Unit Bonus') !== -1) { bonus_lines += 1; }
+            }
+            if((('nominal_quantity' in spell) && spell['nominal_quantity'] < spell['quantity'])) {
+                bonus_lines += gamedata['dialogs'][dialog.data['widgets']['sku']['dialog']]['widgets']['name2']['ui_name_bonus_quantity'].split('\n').length;
+            }
+
             dialog.user_data['any_sku_has_bonus'] = Math.max(dialog.user_data['any_sku_has_bonus'], bonus_lines);
 
             // note: picks up last ui_warning among all SKUs
@@ -35982,9 +35989,9 @@ function update_buy_gamebucks_sku2(dialog) {
                 }
                 if(spell['ui_bonus']) {
                     var b = spell['ui_bonus'];
-                    // special-case hack for backwards compatibility with old SKUs ("Unit Bonus" -> "Units")
+                    // special-case hack for backwards compatibility with old SKUs ("Unit Bonus" -> "BONUS:\nUnits")
                     if(b.indexOf('Unit Bonus') != -1) {
-                        b = b.replace('Unit Bonus', 'Units');
+                        b = b.replace('Unit Bonus', 'BONUS:\nUnits');
                     }
 
                     bonus_list.push(b);
@@ -36020,7 +36027,7 @@ function update_buy_gamebucks_sku2(dialog) {
     } else {
         dialog.widgets['name'].text_vjustify = 'top';
         // note: if any_sku_has_bonus, then use max of number of bonus lines among all SKUs
-        var bonus_lines = (dialog.parent.user_data['any_sku_has_bonus'] && ('name2' in dialog.widgets) ? Math.max(dialog.parent.user_data['any_sku_has_bonus']+1, dialog.widgets['name2'].str.split('\n').length) : 0);
+        var bonus_lines = (dialog.parent.user_data['any_sku_has_bonus'] && ('name2' in dialog.widgets) ? Math.max(dialog.parent.user_data['any_sku_has_bonus'], dialog.widgets['name2'].str.split('\n').length) : 0);
         if(bonus_lines == 1) {
             dialog.widgets['name2'].text_vjustify = 'bottom';
             dialog.widgets['name'].text_offset = dialog.data['widgets']['name']['text_offset_oneline'];

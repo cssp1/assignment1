@@ -976,6 +976,8 @@ if __name__ == '__main__':
             if comment: sku['ui_comment'] = comment
 
             ui_bonus_list = []
+            if 'ui_bonus' in data:
+                ui_bonus_list.append(data['ui_bonus'])
             if unit_bonus:
                 ui_bonus_list.append(unit_bonus['ui_bonus_short' if val.get('unit_bonus_format',None) == 'short' else 'ui_bonus'])
                 sku['give_units'] = unit_bonus['give_units']
