@@ -102,6 +102,10 @@ class AntiRefreshPolicy(Policy):
                                                                                                  min_idle_check_fails = cls.MIN_FAILS,
                                                                                                  min_idle_check_last_fail_time = time_now - cls.IGNORE_AGE)
     def check_player(self, user_id, player):
+
+        # possible race condition after player cache lookup (?)
+        if player['home_region'] in allow_refresh_region_names: return
+
         if self.test:
             idle_check = {'history': [
                 {'time': time_now - 6000, 'result': 'fail', 'seen': 1},
@@ -271,7 +275,12 @@ class AntiAltPolicy(Policy):
                                                                                                  include_home_regions = anti_alt_region_names,
                                                                                                  min_known_alt_count = 1)
 
+
     def check_player(self, user_id, player):
+
+        # possible race condition after player cache lookup (?)
+        if player['home_region'] not in anti_alt_region_names: return
+
         if self.test:
             alt_accounts = {str(user_id+1): {'logins': 99, 'last_login': time_now-60}}
         else:
