@@ -1521,7 +1521,7 @@ class User:
                spell.get('price_formula') == 'constant':
                 match = True
                 for PRED in ('show_if','requires'):
-                    if PRED in spell and (not Predicates.read_predicate(spell[PRED]).is_satisfied(session.player, None)):
+                    if PRED in spell and (not Predicates.read_predicate(spell[PRED]).is_satisfied2(session, session.player, None)):
                         match = False; break
                 if not match: continue
 
