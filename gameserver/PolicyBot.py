@@ -86,7 +86,7 @@ class AntiRefreshPolicy(Policy):
     MIN_FAILS = 2
 
     # don't take action unless failure rate is this high
-    MIN_FAIL_RATE = 0.5
+    MIN_FAIL_RATE = 0.51
 
     # cooldown that identifies a player as a repeat offender
     REPEAT_OFFENDER_COOLDOWN_NAME = 'idle_check_violation'
