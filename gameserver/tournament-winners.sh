@@ -36,16 +36,16 @@ for CONT in $GAME_TOURNAMENT_CONTINENTS; do
     DROPBOX_PATH="/tournament_winners/${DROPBOX_FILENAME}"
 
     curl -s -X POST https://content.dropboxapi.com/2-beta-2/files/upload \
-	 --header "Authorization: Bearer ${DROPBOX_ACCESS_TOKEN}" \
-	 --header "Content-Type: application/octet-stream" \
-	 --header "Dropbox-API-Arg: {\"path\": \"${DROPBOX_PATH}\",\"mode\": \"overwrite\",\"autorename\": false,\"mute\": false}" \
-	 --data-binary "@${LOGFILE}" > /dev/null
+     --header "Authorization: Bearer ${DROPBOX_ACCESS_TOKEN}" \
+     --header "Content-Type: application/octet-stream" \
+     --header "Dropbox-API-Arg: {\"path\": \"${DROPBOX_PATH}\",\"mode\": \"overwrite\",\"autorename\": false,\"mute\": false}" \
+     --data-binary "@${LOGFILE}" > /dev/null
 
     # get dropbox shared link
     SHARED_LINK_RESULT=`curl -s -X POST https://api.dropboxapi.com/2-beta-2/sharing/create_shared_link \
-	 --header "Authorization: Bearer ${DROPBOX_ACCESS_TOKEN}" \
-	 --header "Content-Type: application/json" \
-	 --data "{\"path\": \"${DROPBOX_PATH}\",\"short_url\": false}"`
+     --header "Authorization: Bearer ${DROPBOX_ACCESS_TOKEN}" \
+     --header "Content-Type: application/json" \
+     --data "{\"path\": \"${DROPBOX_PATH}\",\"short_url\": false}"`
     SHARED_LINK_URL=`echo $SHARED_LINK_RESULT | python -c 'import json, sys; print json.load(sys.stdin)["url"];'`
 
     # compile notification
@@ -59,7 +59,7 @@ for CONT in $GAME_TOURNAMENT_CONTINENTS; do
 
     # send SpinReminder notification
     ./SpinReminders.py --from "tournament-winners.sh" --subject "${NOTIFICATION_SUBJECT}" --body "${NOTIFICATION_MESSAGE_BRIEF}" \
-		       --recipient '{"type":"mattermost", "channel":"marketing"}'
+               --recipient '{"type":"mattermost", "channel":"marketing"}'
 done
 
 
