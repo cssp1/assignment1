@@ -215,7 +215,8 @@
     "anti_bullying_in_ladder": false, // deactivate anti-bullying log in ladder battles
 
     "idle_check": {
-        "enable_if": { "predicate": "ALWAYS_FALSE" },
+        "enable_if": {"predicate": "TIME_IN_GAME", "seconds": 151200, "within_last": 604800}, // logged in at least 1/4th of the time for the last week
+        "keep_history_for": 604800, // keep 1 week of success/fail history
         "interval": 14400, // check every 4 hours
         "max_tries": 3, // allow this many incorrect answers before failing
         "timeout": 60, // time limit for response
