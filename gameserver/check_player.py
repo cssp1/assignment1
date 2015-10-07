@@ -507,7 +507,7 @@ if __name__ == '__main__':
         if 'idle_check' in player and len(player['idle_check'].get('history',[])) > 0:
             successes = len(filter(lambda x: x['result'] == 'success', player['idle_check']['history']))
             fails = len(filter(lambda x: x['result'] == 'fail', player['idle_check']['history']))
-            ui_captcha = '%d Passes, %d Fails (%.1f%% fail rate) within last %s' % (successes, fails, (100.0*fails)/(fails+successes), pretty_print_time(time_now - player['idle_check']['history'][-1]['time']))
+            ui_captcha = '%d Passes, %d Fails (%.1f%% fail rate) within last %s' % (successes, fails, (100.0*fails)/(fails+successes), pretty_print_time(time_now - player['idle_check']['history'][0]['time']))
             if fails > 0:
                 ui_captcha += ' (last fail %s ago)' % pretty_print_time(time_now - max(x['time'] for x in player['idle_check']['history'] if x['result'] == 'fail'))
             print fmt % ('Anti-Bot CAPTCHA:', ui_captcha)
