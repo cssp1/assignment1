@@ -66,7 +66,7 @@ class IOAPI(resource.Resource):
         assert request.args['secret'][0] == self.secret
 
         if ('shutdown' in request.args):
-            reactor.callLater(0.1, reactor.stop)
+            reactor.callLater(0, reactor.stop)
             return 'ok'
 
         if self.simulate_fault():

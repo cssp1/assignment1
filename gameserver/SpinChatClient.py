@@ -175,7 +175,7 @@ if __name__ == '__main__':
 
     def after_connect(client):
         client.chat_send({'channel':message_channel, 'sender':message_sender, 'text':message_text})
-        reactor.callLater(0.01, lambda: reactor.stop())
+        reactor.callLater(0, lambda: reactor.stop())
 
     client.connect_sem.addCallback(after_connect)
 

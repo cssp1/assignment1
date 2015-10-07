@@ -89,7 +89,7 @@ class AsyncHTTPRequester(object):
         self.idle_cb = cb
         # defer so that if we are in the shutdown path, we don't
         # prematurely shut down before other shutdown callbacks start their own I/O requests
-        self.reactor.callLater(0.01, self.idlecheck)
+        self.reactor.callLater(0, self.idlecheck)
 
 
     def idlecheck(self):

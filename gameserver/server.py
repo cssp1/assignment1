@@ -484,15 +484,15 @@ class FileIOSystem (IOSystem):
             buf = open(filename).read()
         except:
             buf = 'NOTFOUND'
-        reactor.callLater(0.01, success_cb, buf)
+        reactor.callLater(0, success_cb, buf)
     def do_async_write(self, filename, buf, success_cb, fsync, procnum):
         atom = AtomicFileWrite.AtomicFileWrite(filename, 'w')
         atom.fd.write(buf)
         atom.complete(fsync = fsync)
-        reactor.callLater(0.01, success_cb)
+        reactor.callLater(0, success_cb)
     def do_async_delete(self, filename, success_cb, procnum):
         safe_unlink(filename)
-        reactor.callLater(0.01, success_cb)
+        reactor.callLater(0, success_cb)
 
 class IOSlaveIOSystem (IOSystem):
     def __init__(self, config):
@@ -1276,7 +1276,7 @@ class User:
         else:
             # note: must match proxyserver.py test credentials
             test_response = SpinJSON.dumps({"friends":[],"muted_users":[],"friend_ids":[12345],"muted_user_ids":[],"user_id":12345,"username":"example1","private":False,"page_num":1,"num_pages":1,"success":True,"user_vars":{"username":"example1","level":1,"points":15,"avatar_url":"http://cdn4.kongcdn.com/assets/resize-image/50x50/assets/avatars/defaults/frog.png","chat_avatar_url":"http://cdn4.kongcdn.com/assets/resize-image/16x16/assets/avatars/defaults/frog.png","developer":False,"moderator":False,"admin":False,"gender":None,"age":32,"game_title":"Test Game","game_url":"http://www.kongregate.com/games/example1/test-game"}})
-            reactor.callLater(0.01, lambda _self=self, _session=session, _retmsg=retmsg: _self.retrieve_kg_info_complete(_session, None, test_response))
+            reactor.callLater(0, lambda _self=self, _session=session, _retmsg=retmsg: _self.retrieve_kg_info_complete(_session, None, test_response))
 
     def retrieve_kg_info_start(self, session):
         gamesite.AsyncHTTP_Kongregate.queue_request(server_time,
@@ -1324,7 +1324,7 @@ class User:
                 'birthday': "0000-00-00",
                 'gender':"Male",
                 'created_on': "1335466318" } })
-            reactor.callLater(0.01, lambda _self=self, _session=session, _retmsg=retmsg: _self.retrieve_ag_info_complete(_session, None, test_response))
+            reactor.callLater(0, lambda _self=self, _session=session, _retmsg=retmsg: _self.retrieve_ag_info_complete(_session, None, test_response))
             friends_response = SpinJSON.dumps({'version': 1, 'code': 200, 'message': "OK", 'payload': [
                 {
                 'uid':"example2" if self.ag_id == "example1" else "example1",
@@ -1335,7 +1335,7 @@ class User:
                 'gender': "Female",
                 'created_on': "1198082452",
                 'plays_game': "1"}]})
-            reactor.callLater(0.01, lambda _self=self, _session=session, _retmsg=retmsg: _self.retrieve_ag_friends_complete(_session, None, friends_response))
+            reactor.callLater(0, lambda _self=self, _session=session, _retmsg=retmsg: _self.retrieve_ag_friends_complete(_session, None, friends_response))
 
     def retrieve_ag_info_start(self, session):
         gamesite.AsyncHTTP_ArmorGames.queue_request(server_time,
@@ -2608,7 +2608,7 @@ class AIInstanceTable:
         # special case - never store Lion Stone state to avoid bloating aistate storage
         # (client is only allowed to visit once during the tutorial)
         if ai_id == LION_STONE_ID:
-            reactor.callLater(0.01, cb)
+            reactor.callLater(0, cb)
             return
         buf = self.unparse(ai_id, player)
         io_system.async_write_aistate(user_id, game_id, ai_id, buf, cb, fsync)
@@ -2663,7 +2663,7 @@ class BaseTable:
     def delete_async(self, region_id, base_id, cb):
         if gamesite.nosql_client:
             gamesite.nosql_client.drop_all_objects_by_base(region_id, base_id, reason='BaseTable.delete_async')
-        reactor.callLater(0.01, cb)
+        reactor.callLater(0, cb)
 
     # note: deserialization is broken into two parts, preparse() and
     # parse(), because the base must first tell us who the landlord
@@ -2727,7 +2727,7 @@ class BaseTable:
 
     def lookup_async(self, region_id, base_id, feature, cb, reason):
         if not gamesite.nosql_client:
-            reactor.callLater(0.01, functools.partial(cb, False, None, None))
+            reactor.callLater(0, functools.partial(cb, False, None, None))
             return
 
         if not feature:
@@ -2735,20 +2735,20 @@ class BaseTable:
             if ('base_landlord_id' not in feature):
                 gamesite.exception_log.event(server_time, 'BaseTable.lookup_async(%s): bad feature for region %s base %s: %s' % \
                                              (reason, region_id, base_id, repr(feature)))
-                reactor.callLater(0.01, functools.partial(cb, False, None, None))
+                reactor.callLater(0, functools.partial(cb, False, None, None))
                 return
 
         assert 'base_landlord_id' in feature
 
         # simulate preparse success - note, we send 'feature' as the preparse result
-        reactor.callLater(0.01, functools.partial(cb, True, feature, feature['base_landlord_id']))
+        reactor.callLater(0, functools.partial(cb, True, feature, feature['base_landlord_id']))
 
     def store_async(self, base, cb, fsync, reason):
         base.base_generation += 1
         # ideally, if all server code correctly updates objects as they mutate, no I/O should be necessary here
         base.nosql_pluck('BaseTable:unparse(XXXunnecessary:%s)' % str(reason))
         base.nosql_plant('BaseTable:unparse(XXXunnecessary:%s)' % str(reason))
-        if cb: reactor.callLater(0.01, cb)
+        if cb: reactor.callLater(0, cb)
 
     def unparse(self, base):
         start_time = time.time()
@@ -4573,7 +4573,7 @@ class SessionChangeNew(SessionChange): # new basedb path
                 self.got_player = True
                 self.dest_user = self.session.user
                 self.got_user = True
-                reactor.callLater(0.01, self.try_finish)
+                reactor.callLater(0, self.try_finish)
             else:
                 player_table.lookup_async(self.session.player, self.dest_user_id, False, self.player_cb, 'change_session')
                 user_table.lookup_async(self.dest_user_id, self.user_cb, 'change_session')
@@ -15941,7 +15941,7 @@ class GAMEAPI(resource.Resource):
             return True
         elif io_type == 'store_viewing_base':
             if not gamedata['server'].get('nosql_full_store', True):
-                reactor.callLater(0.01, post_result)
+                reactor.callLater(0, post_result)
             else:
                 base_table.store_async(session.viewing_base, post_result, True, 'complete_attack')
             return True
@@ -16855,7 +16855,7 @@ class GAMEAPI(resource.Resource):
             result = session.viewing_player.achievements
 
         if result is not None:
-            reactor.callLater(0.01, functools.partial(complete_query, self, session, retmsg, tag, result))
+            reactor.callLater(0, functools.partial(complete_query, self, session, retmsg, tag, result))
         else:
             # otherwise do an async load
             # XXX this could be vulnerable to DDOS
@@ -22548,7 +22548,7 @@ class GAMEAPI(resource.Resource):
             if session.logout_in_progress.cbs is None:
                 # session has ALREADY finished logging out - this is a dangling reference!
                 # we must call the callback, but callers of this function assume it's async, so use callLater
-                reactor.callLater(0.01, cb)
+                reactor.callLater(0, cb)
             else:
                 if force:
                     # do not call complete_attack(), just kill the session
@@ -22589,7 +22589,7 @@ class GAMEAPI(resource.Resource):
                 gamesite.exception_log.event(server_time, 'log_out_async2: force-dropping broken session for player %d - possible data loss!' % (session.user.user_id))
                 session.logout_in_progress.wrote_user = True
                 session.logout_in_progress.wrote_player = True
-                reactor.callLater(0.01, session.logout_in_progress.try_finish)
+                reactor.callLater(0, session.logout_in_progress.try_finish)
 
     def handle_message_guts(self, request, session, arg, retmsg):
 
@@ -27112,7 +27112,7 @@ def do_main(pidfile, do_ai_setup, do_daemonize, cmdline_config):
 
     if do_ai_setup:
         # have to do this after the loop starts, because we need to wait for io_system to be fully alive
-        reactor.callLater(0.1, do_account_setup)
+        reactor.callLater(0, do_account_setup)
 
     TwistedLatency.setup(reactor, admin_stats.record_latency)
 
