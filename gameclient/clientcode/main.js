@@ -15147,6 +15147,10 @@ function confirm_instant_repairs(price, ok_cb) {
     dialog.auto_center();
     dialog.modal = true;
 
+    var default_button_name = player.get_any_abtest_value('confirm_instant_repairs_default_button', gamedata['client']['confirm_instant_repairs_default_button'] || "close_button");
+    if(!(default_button_name in dialog.widgets)) { throw Error('bad default_button_name '+default_button_name); }
+    dialog.default_button = dialog.widgets[default_button_name];
+
     dialog.widgets['description'].set_text_with_linebreaking(dialog.data['widgets']['description']['ui_name'].replace('%GAMEBUCKS', Store.gamebucks_ui_name()));
     dialog.widgets['price_display'].bg_image = player.get_any_abtest_value('price_display_asset', gamedata['store']['price_display_asset']);
     dialog.widgets['price_display'].state = Store.get_user_currency();

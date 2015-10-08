@@ -244,7 +244,7 @@
 
     "instant_repair_confirm_dialog": {
         "dimensions": [451, 173],
-        "default_button": "close_button",
+        // "default_button" is set via JavaScript for A/B testing
         "clip_children": 0,
         "widgets": {
             "bg": {"kind": "StaticImage", "xy":[0,0], "dimensions":[451,173], "asset": "dialog_resizable", "bg_image_resizable": 1 },
