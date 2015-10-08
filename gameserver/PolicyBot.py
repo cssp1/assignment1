@@ -13,6 +13,7 @@ import SpinSingletonProcess
 
 # load gamedata
 gamedata = SpinJSON.load(open(SpinConfig.gamedata_filename()))
+gamedata['server'] = SpinConfig.load(SpinConfig.gamedata_component_filename("server_compiled.json"))
 
 # process batches of this many users at once
 BATCH_SIZE = 5
@@ -169,7 +170,7 @@ class AntiRefreshPolicy(Policy):
         clear_repeat_stacks = False
         add_repeat_stack = False
 
-        if True: # XXX for now, only flag, don't act
+        if not gamedata['server']['idle_check'].get('enforce',False): # flag only, don't act
             event_name = '7305_policy_bot_flagged'
 
         elif repeat_offender_level >= 2:
