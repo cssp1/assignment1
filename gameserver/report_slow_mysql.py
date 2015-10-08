@@ -19,18 +19,15 @@ if __name__ == '__main__':
     do_prune = False
     dry_run = False
     min_sec = 75
-    email_to = []
-    mattermost_channel = None
+    recipients = SpinConfig.config['alarms_recipients']
 
-    opts, args = getopt.gnu_getopt(sys.argv[1:], 'q', ['prune','min-sec=','dry-run','email=','mattermost='])
+    opts, args = getopt.gnu_getopt(sys.argv[1:], 'q', ['prune','min-sec=','dry-run'])
 
     for key, val in opts:
         if key == '-q': verbose = False
         elif key == '--prune': do_prune = True
         elif key == '--min-sec': min_sec = int(val)
         elif key == '--dry-run': dry_run = True
-        elif key == '--email': email_to.append(val)
-        elif key == '--mattermost': mattermost_channel = val
 
     if len(args) < 1:
         sys.stderr.write('please specify mysql_servers entry\n')
@@ -67,18 +64,8 @@ if __name__ == '__main__':
     if dry_run:
         print "HERE", '\n', subject, '\n', body
     else:
-        recip_list = [
-                      #{"type":"hipchat", "room":"Analysis", "ats":[]},
-                      #{"type":"slack", "channel":"#analysis", "ats":[]}
-                      ]
-        if email_to:
-            recip_list.append({'type': 'email', 'to':[{'name': 'Analytics Tech', 'address': addr} for addr in email_to]})
-
-        if mattermost_channel:
-            recip_list.append({'type': 'mattermost', 'channel': mattermost_channel})
-
         if body:
-            SpinReminders.send_reminders('SpinPunch', recip_list, subject, body, dry_run = dry_run)
+            SpinReminders.send_reminders('SpinPunch', recipients, subject, body, dry_run = dry_run)
 
     if do_prune:
         if verbose: print 'pruning', 'mysql.slow_log'
