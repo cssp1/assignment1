@@ -114,6 +114,26 @@ if __name__ == '__main__':
                                         {'alloy': 1050, 'NOK': 99.99, 'nominal_alloy': 1000, 'ui_comment': None, 'ui_pile_size': 1},
                                         {'alloy': 500, 'NOK': 49.99, 'ui_comment': None, 'ui_pile_size': 0},
                                         ] },
+               "P175FLASH50_NOK": { "kind": "FLASH50", # 50% Off sale for flash offers
+                                    "currency": "NOK",
+                                    "force_output": True, "unit_bonus_format": "short", "ui_warning": "Limited time special offers:", "unit_bonus": None,
+                                    "skus": [{'alloy': 24000, 'NOK': 999.99, 'ui_pile_size': 5, 'ui_bonus': '50% Off', 'nominal_alloy': 20000, 'ui_banner': 'SALE', 'ui_comment': 'Best Value'},
+                                             {'alloy': 11500, 'NOK': 499.99, 'ui_pile_size': 4, 'ui_bonus': '50% Off', 'nominal_alloy': 10000, 'ui_banner': 'SALE', 'ui_comment': None},
+                                             {'alloy':  5500, 'NOK': 249.99, 'ui_pile_size': 3, 'ui_bonus': '50% Off', 'nominal_alloy': 5000, 'ui_banner': 'SALE', 'ui_comment': 'Most Popular'},
+                                             {'alloy':  2650, 'NOK': 124.99, 'ui_pile_size': 2, 'ui_bonus': '50% Off', 'nominal_alloy': 2500, 'ui_banner': 'SALE', 'ui_comment': None},
+                                             {'alloy':  1050, 'NOK':  49.99, 'ui_pile_size': 1, 'ui_bonus': '50% Off', 'nominal_alloy': 1000, 'ui_banner': 'SALE', 'ui_comment': None},
+                                             {'alloy':   500, 'NOK':  24.99, 'ui_pile_size': 0, 'ui_bonus': '50% Off', 'ui_banner': 'SALE', 'ui_comment': None},
+                                             ] },
+               "P175FLASH25_NOK": { "kind": "FLASH25", # 75% Off sale for flash offers
+                                    "currency": "NOK",
+                                    "force_output": True, "unit_bonus_format": "short", "ui_warning": "Limited time special offers:", "unit_bonus": None,
+                                    "skus": [{'alloy': 24000, 'NOK': 499.99, 'ui_pile_size': 5, 'ui_bonus': '75% Off', 'nominal_alloy': 20000, 'ui_banner': 'SALE', 'ui_comment': 'Best Value'},
+                                             {'alloy': 11500, 'NOK': 249.99, 'ui_pile_size': 4, 'ui_bonus': '75% Off', 'nominal_alloy': 10000, 'ui_banner': 'SALE', 'ui_comment': None},
+                                             {'alloy':  5500, 'NOK': 124.99, 'ui_pile_size': 3, 'ui_bonus': '75% Off', 'nominal_alloy': 5000, 'ui_banner': 'SALE', 'ui_comment': 'Most Popular'},
+                                             {'alloy':  2650, 'NOK':  62.49, 'ui_pile_size': 2, 'ui_bonus': '75% Off', 'nominal_alloy': 2500, 'ui_banner': 'SALE', 'ui_comment': None},
+                                             {'alloy':  1050, 'NOK':  24.99, 'ui_pile_size': 1, 'ui_bonus': '75% Off', 'nominal_alloy': 1000, 'ui_banner': 'SALE', 'ui_comment': None},
+                                             {'alloy':   500, 'NOK':  12.49, 'ui_pile_size': 0, 'ui_bonus': '75% Off', 'ui_banner': 'SALE', 'ui_comment': None},
+                                             ] },
 
                "P135_SEK": {
                              "currency": "SEK",
@@ -163,6 +183,27 @@ if __name__ == '__main__':
                                         {'alloy': 1050, 'SEK': 99.99, 'nominal_alloy': 1050, 'ui_comment': None, 'ui_pile_size': 1},
                                         {'alloy': 500, 'SEK': 49.99, 'nominal_alloy': 500, 'ui_comment': None, 'ui_pile_size': 0},
                                         ] },
+               "P135FLASH50_SEK": { "kind": "FLASH50", # 50% Off sale for flash offers
+                                    "currency": "SEK",
+                                    "force_output": True, "unit_bonus_format": "short", "ui_warning": "Limited time special offers:", "unit_bonus": None,
+                                    "skus": [{'alloy': 24000, 'SEK': 999.99, 'ui_pile_size': 5, 'ui_bonus': '50% Off', 'nominal_alloy': 20000, 'ui_banner': 'SALE', 'ui_comment': 'Best Value'},
+                                             {'alloy': 11500, 'SEK': 499.99, 'ui_pile_size': 4, 'ui_bonus': '50% Off', 'nominal_alloy': 10000, 'ui_banner': 'SALE', 'ui_comment': None},
+                                             {'alloy':  5500, 'SEK': 249.99, 'ui_pile_size': 3, 'ui_bonus': '50% Off', 'nominal_alloy': 5000, 'ui_banner': 'SALE', 'ui_comment': 'Most Popular'},
+                                             {'alloy':  2650, 'SEK': 124.99, 'ui_pile_size': 2, 'ui_bonus': '50% Off', 'nominal_alloy': 2500, 'ui_banner': 'SALE', 'ui_comment': None},
+                                             {'alloy':  1050, 'SEK':  49.99, 'ui_pile_size': 1, 'ui_bonus': '50% Off', 'nominal_alloy': 1000, 'ui_banner': 'SALE', 'ui_comment': None},
+                                             {'alloy':   500, 'SEK':  24.99, 'ui_pile_size': 0, 'ui_bonus': '50% Off', 'ui_banner': 'SALE', 'ui_comment': None},
+                                             ] },
+               "P135FLASH25_SEK": { "kind": "FLASH25", # 75% Off sale for flash offers
+                                    "currency": "SEK",
+                                    "force_output": True, "unit_bonus_format": "short", "ui_warning": "Limited time special offers:", "unit_bonus": None,
+                                    "skus": [{'alloy': 24000, 'SEK': 499.99, 'ui_pile_size': 5, 'ui_bonus': '75% Off', 'nominal_alloy': 20000, 'ui_banner': 'SALE', 'ui_comment': 'Best Value'},
+                                             {'alloy': 11500, 'SEK': 249.99, 'ui_pile_size': 4, 'ui_bonus': '75% Off', 'nominal_alloy': 10000, 'ui_banner': 'SALE', 'ui_comment': None},
+                                             {'alloy':  5500, 'SEK': 124.99, 'ui_pile_size': 3, 'ui_bonus': '75% Off', 'nominal_alloy': 5000, 'ui_banner': 'SALE', 'ui_comment': 'Most Popular'},
+                                             {'alloy':  2650, 'SEK':  62.49, 'ui_pile_size': 2, 'ui_bonus': '75% Off', 'nominal_alloy': 2500, 'ui_banner': 'SALE', 'ui_comment': None},
+                                             {'alloy':  1050, 'SEK':  24.99, 'ui_pile_size': 1, 'ui_bonus': '75% Off', 'nominal_alloy': 1000, 'ui_banner': 'SALE', 'ui_comment': None},
+                                             {'alloy':   500, 'SEK':  12.49, 'ui_pile_size': 0, 'ui_bonus': '75% Off', 'ui_banner': 'SALE', 'ui_comment': None},
+                                             ] },
+
                # same for GBP
                "P135L_GBP": {
                               "currency": "GBP",
@@ -219,6 +260,26 @@ if __name__ == '__main__':
                                         {'alloy': 1050, 'GBP': 9.99, 'nominal_alloy': 1050, 'ui_comment': None, 'ui_pile_size': 1},
                                         {'alloy': 500, 'GBP': 4.99, 'nominal_alloy': 500, 'ui_comment': None, 'ui_pile_size': 0},
                                         ] },
+               "P135FLASH50_GBP": { "kind": "FLASH50", # 50% Off sale for flash offers
+                                    "currency": "GBP",
+                                    "force_output": True, "unit_bonus_format": "short", "ui_warning": "Limited time special offers:", "unit_bonus": None,
+                                    "skus": [{'alloy': 24000, 'GBP': 99.99, 'ui_pile_size': 5, 'ui_bonus': '50% Off', 'nominal_alloy': 20000, 'ui_banner': 'SALE', 'ui_comment': 'Best Value'},
+                                             {'alloy': 11500, 'GBP': 49.99, 'ui_pile_size': 4, 'ui_bonus': '50% Off', 'nominal_alloy': 10000, 'ui_banner': 'SALE', 'ui_comment': None},
+                                             {'alloy':  5500, 'GBP': 24.99, 'ui_pile_size': 3, 'ui_bonus': '50% Off', 'nominal_alloy': 5000, 'ui_banner': 'SALE', 'ui_comment': 'Most Popular'},
+                                             {'alloy':  2650, 'GBP': 12.49, 'ui_pile_size': 2, 'ui_bonus': '50% Off', 'nominal_alloy': 2500, 'ui_banner': 'SALE', 'ui_comment': None},
+                                             {'alloy':  1050, 'GBP':  4.99, 'ui_pile_size': 1, 'ui_bonus': '50% Off', 'nominal_alloy': 1000, 'ui_banner': 'SALE', 'ui_comment': None},
+                                             {'alloy':   500, 'GBP':  2.49, 'ui_pile_size': 0, 'ui_bonus': '50% Off', 'ui_banner': 'SALE', 'ui_comment': None},
+                                             ] },
+               "P135FLASH25_GBP": { "kind": "FLASH25", # 75% Off sale for flash offers
+                                    "currency": "GBP",
+                                    "force_output": True, "unit_bonus_format": "short", "ui_warning": "Limited time special offers:", "unit_bonus": None,
+                                    "skus": [{'alloy': 24000, 'GBP': 49.99, 'ui_pile_size': 5, 'ui_bonus': '75% Off', 'nominal_alloy': 20000, 'ui_banner': 'SALE', 'ui_comment': 'Best Value'},
+                                             {'alloy': 11500, 'GBP': 24.99, 'ui_pile_size': 4, 'ui_bonus': '75% Off', 'nominal_alloy': 10000, 'ui_banner': 'SALE', 'ui_comment': None},
+                                             {'alloy':  5500, 'GBP': 12.49, 'ui_pile_size': 3, 'ui_bonus': '75% Off', 'nominal_alloy': 5000, 'ui_banner': 'SALE', 'ui_comment': 'Most Popular'},
+                                             {'alloy':  2650, 'GBP':  6.24, 'ui_pile_size': 2, 'ui_bonus': '75% Off', 'nominal_alloy': 2500, 'ui_banner': 'SALE', 'ui_comment': None},
+                                             {'alloy':  1050, 'GBP':  2.49, 'ui_pile_size': 1, 'ui_bonus': '75% Off', 'nominal_alloy': 1000, 'ui_banner': 'SALE', 'ui_comment': None},
+                                             {'alloy':   500, 'GBP':  1.24, 'ui_pile_size': 0, 'ui_bonus': '75% Off', 'ui_banner': 'SALE', 'ui_comment': None},
+                                             ] },
 
                # same for EUR at the P135 level
                "P135L_EUR": {
@@ -276,6 +337,26 @@ if __name__ == '__main__':
                                        {'alloy': 1050, 'EUR': 9.99, 'nominal_alloy': 1050, 'ui_comment': None, 'ui_pile_size': 1},
                                        {'alloy': 500, 'EUR': 4.99, 'nominal_alloy': 500, 'ui_comment': None, 'ui_pile_size': 0},
                                        ] },
+               "P135FLASH50_EUR": { "kind": "FLASH50", # 50% Off sale for flash offers
+                                    "currency": "EUR",
+                                    "force_output": True, "unit_bonus_format": "short", "ui_warning": "Limited time special offers:", "unit_bonus": None,
+                                    "skus": [{'alloy': 24000, 'EUR': 99.99, 'ui_pile_size': 5, 'ui_bonus': '50% Off', 'nominal_alloy': 20000, 'ui_banner': 'SALE', 'ui_comment': 'Best Value'},
+                                             {'alloy': 11500, 'EUR': 49.99, 'ui_pile_size': 4, 'ui_bonus': '50% Off', 'nominal_alloy': 10000, 'ui_banner': 'SALE', 'ui_comment': None},
+                                             {'alloy':  5500, 'EUR': 24.99, 'ui_pile_size': 3, 'ui_bonus': '50% Off', 'nominal_alloy': 5000, 'ui_banner': 'SALE', 'ui_comment': 'Most Popular'},
+                                             {'alloy':  2650, 'EUR': 12.49, 'ui_pile_size': 2, 'ui_bonus': '50% Off', 'nominal_alloy': 2500, 'ui_banner': 'SALE', 'ui_comment': None},
+                                             {'alloy':  1050, 'EUR':  4.99, 'ui_pile_size': 1, 'ui_bonus': '50% Off', 'nominal_alloy': 1000, 'ui_banner': 'SALE', 'ui_comment': None},
+                                             {'alloy':   500, 'EUR':  2.49, 'ui_pile_size': 0, 'ui_bonus': '50% Off', 'ui_banner': 'SALE', 'ui_comment': None},
+                                             ] },
+               "P135FLASH25_EUR": { "kind": "FLASH25", # 75% Off sale for flash offers
+                                    "currency": "EUR",
+                                    "force_output": True, "unit_bonus_format": "short", "ui_warning": "Limited time special offers:", "unit_bonus": None,
+                                    "skus": [{'alloy': 24000, 'EUR': 49.99, 'ui_pile_size': 5, 'ui_bonus': '75% Off', 'nominal_alloy': 20000, 'ui_banner': 'SALE', 'ui_comment': 'Best Value'},
+                                             {'alloy': 11500, 'EUR': 24.99, 'ui_pile_size': 4, 'ui_bonus': '75% Off', 'nominal_alloy': 10000, 'ui_banner': 'SALE', 'ui_comment': None},
+                                             {'alloy':  5500, 'EUR': 12.49, 'ui_pile_size': 3, 'ui_bonus': '75% Off', 'nominal_alloy': 5000, 'ui_banner': 'SALE', 'ui_comment': 'Most Popular'},
+                                             {'alloy':  2650, 'EUR':  6.24, 'ui_pile_size': 2, 'ui_bonus': '75% Off', 'nominal_alloy': 2500, 'ui_banner': 'SALE', 'ui_comment': None},
+                                             {'alloy':  1050, 'EUR':  2.49, 'ui_pile_size': 1, 'ui_bonus': '75% Off', 'nominal_alloy': 1000, 'ui_banner': 'SALE', 'ui_comment': None},
+                                             {'alloy':   500, 'EUR':  1.24, 'ui_pile_size': 0, 'ui_bonus': '75% Off', 'ui_banner': 'SALE', 'ui_comment': None},
+                                             ] },
 
                # XXX make even?
                "P150_EUR": {
@@ -334,6 +415,26 @@ if __name__ == '__main__':
                                         {'alloy': 1050, 'QAR': 49.99, 'nominal_alloy': 1050, 'ui_comment': None, 'ui_pile_size': 1},
                                         {'alloy': 500, 'QAR': 24.99, 'nominal_alloy': 500, 'ui_comment': None, 'ui_pile_size': 0},
                                         ] },
+               "P150FLASH50_QAR": { "kind": "FLASH50", # 50% Off sale for flash offers
+                                    "currency": "QAR",
+                                    "force_output": True, "unit_bonus_format": "short", "ui_warning": "Limited time special offers:", "unit_bonus": None,
+                                    "skus": [{'alloy': 24000, 'QAR': 499.99, 'ui_pile_size': 5, 'ui_bonus': '50% Off', 'nominal_alloy': 20000, 'ui_banner': 'SALE', 'ui_comment': 'Best Value'},
+                                             {'alloy': 11500, 'QAR': 249.99, 'ui_pile_size': 4, 'ui_bonus': '50% Off', 'nominal_alloy': 10000, 'ui_banner': 'SALE', 'ui_comment': None},
+                                             {'alloy':  5500, 'QAR': 124.99, 'ui_pile_size': 3, 'ui_bonus': '50% Off', 'nominal_alloy': 5000, 'ui_banner': 'SALE', 'ui_comment': 'Most Popular'},
+                                             {'alloy':  2650, 'QAR':  62.49, 'ui_pile_size': 2, 'ui_bonus': '50% Off', 'nominal_alloy': 2500, 'ui_banner': 'SALE', 'ui_comment': None},
+                                             {'alloy':  1050, 'QAR':  24.99, 'ui_pile_size': 1, 'ui_bonus': '50% Off', 'nominal_alloy': 1000, 'ui_banner': 'SALE', 'ui_comment': None},
+                                             {'alloy':   500, 'QAR':  12.49, 'ui_pile_size': 0, 'ui_bonus': '50% Off', 'ui_banner': 'SALE', 'ui_comment': None},
+                                             ] },
+               "P150FLASH25_QAR": { "kind": "FLASH25", # 75% Off sale for flash offers
+                                    "currency": "QAR",
+                                    "force_output": True, "unit_bonus_format": "short", "ui_warning": "Limited time special offers:", "unit_bonus": None,
+                                    "skus": [{'alloy': 24000, 'QAR': 249.99, 'ui_pile_size': 5, 'ui_bonus': '75% Off', 'nominal_alloy': 20000, 'ui_banner': 'SALE', 'ui_comment': 'Best Value'},
+                                             {'alloy': 11500, 'QAR': 124.99, 'ui_pile_size': 4, 'ui_bonus': '75% Off', 'nominal_alloy': 10000, 'ui_banner': 'SALE', 'ui_comment': None},
+                                             {'alloy':  5500, 'QAR':  62.49, 'ui_pile_size': 3, 'ui_bonus': '75% Off', 'nominal_alloy': 5000, 'ui_banner': 'SALE', 'ui_comment': 'Most Popular'},
+                                             {'alloy':  2650, 'QAR':  31.24, 'ui_pile_size': 2, 'ui_bonus': '75% Off', 'nominal_alloy': 2500, 'ui_banner': 'SALE', 'ui_comment': None},
+                                             {'alloy':  1050, 'QAR':  12.49, 'ui_pile_size': 1, 'ui_bonus': '75% Off', 'nominal_alloy': 1000, 'ui_banner': 'SALE', 'ui_comment': None},
+                                             {'alloy':   500, 'QAR':   6.25, 'ui_pile_size': 0, 'ui_bonus': '75% Off', 'ui_banner': 'SALE', 'ui_comment': None},
+                                             ] },
 
                "P100_BRL": {
                              "currency": "BRL",
@@ -382,6 +483,26 @@ if __name__ == '__main__':
                                        {'alloy': 1050, 'BRL': 19.99, 'nominal_alloy': 1050, 'ui_comment': None, 'ui_pile_size': 1},
                                        {'alloy': 500, 'BRL': 9.99, 'nominal_alloy': 500, 'ui_comment': None, 'ui_pile_size': 0},
                                        ] },
+               "P100FLASH50_BRL": { "kind": "FLASH50", # 50% Off sale for flash offers
+                                    "currency": "BRL",
+                                    "force_output": True, "unit_bonus_format": "short", "ui_warning": "Limited time special offers:", "unit_bonus": None,
+                                    "skus": [{'alloy': 24000, 'BRL': 199.99, 'ui_pile_size': 5, 'ui_bonus': '50% Off', 'nominal_alloy': 20000, 'ui_banner': 'SALE', 'ui_comment': 'Best Value'},
+                                             {'alloy': 11500, 'BRL':  99.99, 'ui_pile_size': 4, 'ui_bonus': '50% Off', 'nominal_alloy': 10000, 'ui_banner': 'SALE', 'ui_comment': None},
+                                             {'alloy':  5500, 'BRL':  49.99, 'ui_pile_size': 3, 'ui_bonus': '50% Off', 'nominal_alloy': 5000, 'ui_banner': 'SALE', 'ui_comment': 'Most Popular'},
+                                             {'alloy':  2650, 'BRL':  24.99, 'ui_pile_size': 2, 'ui_bonus': '50% Off', 'nominal_alloy': 2500, 'ui_banner': 'SALE', 'ui_comment': None},
+                                             {'alloy':  1050, 'BRL':   9.99, 'ui_pile_size': 1, 'ui_bonus': '50% Off', 'nominal_alloy': 1000, 'ui_banner': 'SALE', 'ui_comment': None},
+                                             {'alloy':   500, 'BRL':   4.99, 'ui_pile_size': 0, 'ui_bonus': '50% Off', 'ui_banner': 'SALE', 'ui_comment': None},
+                                             ] },
+               "P100FLASH25_BRL": { "kind": "FLASH25", # 75% Off sale for flash offers
+                                    "currency": "BRL",
+                                    "force_output": True, "unit_bonus_format": "short", "ui_warning": "Limited time special offers:", "unit_bonus": None,
+                                    "skus": [{'alloy': 24000, 'BRL': 99.99, 'ui_pile_size': 5, 'ui_bonus': '75% Off', 'nominal_alloy': 20000, 'ui_banner': 'SALE', 'ui_comment': 'Best Value'},
+                                             {'alloy': 11500, 'BRL': 49.99, 'ui_pile_size': 4, 'ui_bonus': '75% Off', 'nominal_alloy': 10000, 'ui_banner': 'SALE', 'ui_comment': None},
+                                             {'alloy':  5500, 'BRL': 24.99, 'ui_pile_size': 3, 'ui_bonus': '75% Off', 'nominal_alloy': 5000, 'ui_banner': 'SALE', 'ui_comment': 'Most Popular'},
+                                             {'alloy':  2650, 'BRL': 12.49, 'ui_pile_size': 2, 'ui_bonus': '75% Off', 'nominal_alloy': 2500, 'ui_banner': 'SALE', 'ui_comment': None},
+                                             {'alloy':  1050, 'BRL':  4.99, 'ui_pile_size': 1, 'ui_bonus': '75% Off', 'nominal_alloy': 1000, 'ui_banner': 'SALE', 'ui_comment': None},
+                                             {'alloy':   500, 'BRL':  2.49, 'ui_pile_size': 0, 'ui_bonus': '75% Off', 'ui_banner': 'SALE', 'ui_comment': None},
+                                             ] },
 
                "P100_AED": {
                              "currency": "AED",
@@ -430,6 +551,26 @@ if __name__ == '__main__':
                                         {'alloy': 1050, 'AED': 39.99, 'nominal_alloy': 1050, 'ui_comment': None, 'ui_pile_size': 1},
                                         {'alloy': 500, 'AED': 19.99, 'nominal_alloy': 500, 'ui_comment': None, 'ui_pile_size': 0},
                                         ] },
+               "P100FLASH50_AED": { "kind": "FLASH50", # 50% Off sale for flash offers
+                                    "currency": "AED",
+                                    "force_output": True, "unit_bonus_format": "short", "ui_warning": "Limited time special offers:", "unit_bonus": None,
+                                    "skus": [{'alloy': 24000, 'AED': 399.99, 'ui_pile_size': 5, 'ui_bonus': '50% Off', 'nominal_alloy': 20000, 'ui_banner': 'SALE', 'ui_comment': 'Best Value'},
+                                             {'alloy': 11500, 'AED': 199.99, 'ui_pile_size': 4, 'ui_bonus': '50% Off', 'nominal_alloy': 10000, 'ui_banner': 'SALE', 'ui_comment': None},
+                                             {'alloy':  5500, 'AED':  99.99, 'ui_pile_size': 3, 'ui_bonus': '50% Off', 'nominal_alloy': 5000, 'ui_banner': 'SALE', 'ui_comment': 'Most Popular'},
+                                             {'alloy':  2650, 'AED':  49.99, 'ui_pile_size': 2, 'ui_bonus': '50% Off', 'nominal_alloy': 2500, 'ui_banner': 'SALE', 'ui_comment': None},
+                                             {'alloy':  1050, 'AED':  19.99, 'ui_pile_size': 1, 'ui_bonus': '50% Off', 'nominal_alloy': 1000, 'ui_banner': 'SALE', 'ui_comment': None},
+                                             {'alloy':   500, 'AED':   9.99, 'ui_pile_size': 0, 'ui_bonus': '50% Off', 'ui_banner': 'SALE', 'ui_comment': None},
+                                             ] },
+               "P100FLASH25_AED": { "kind": "FLASH25", # 75% Off sale for flash offers
+                                    "currency": "AED",
+                                    "force_output": True, "unit_bonus_format": "short", "ui_warning": "Limited time special offers:", "unit_bonus": None,
+                                    "skus": [{'alloy': 24000, 'AED': 199.99, 'ui_pile_size': 5, 'ui_bonus': '75% Off', 'nominal_alloy': 20000, 'ui_banner': 'SALE', 'ui_comment': 'Best Value'},
+                                             {'alloy': 11500, 'AED':  99.99, 'ui_pile_size': 4, 'ui_bonus': '75% Off', 'nominal_alloy': 10000, 'ui_banner': 'SALE', 'ui_comment': None},
+                                             {'alloy':  5500, 'AED':  49.99, 'ui_pile_size': 3, 'ui_bonus': '75% Off', 'nominal_alloy': 5000, 'ui_banner': 'SALE', 'ui_comment': 'Most Popular'},
+                                             {'alloy':  2650, 'AED':  24.99, 'ui_pile_size': 2, 'ui_bonus': '75% Off', 'nominal_alloy': 2500, 'ui_banner': 'SALE', 'ui_comment': None},
+                                             {'alloy':  1050, 'AED':   9.99, 'ui_pile_size': 1, 'ui_bonus': '75% Off', 'nominal_alloy': 1000, 'ui_banner': 'SALE', 'ui_comment': None},
+                                             {'alloy':   500, 'AED':   4.99, 'ui_pile_size': 0, 'ui_bonus': '75% Off', 'ui_banner': 'SALE', 'ui_comment': None},
+                                             ] },
 
                "P100_DKK": {
                              "currency": "DKK",
@@ -478,6 +619,26 @@ if __name__ == '__main__':
                                         {'alloy': 1050, 'DKK': 49.99, 'nominal_alloy': 1050, 'ui_comment': None, 'ui_pile_size': 1},
                                         {'alloy': 500, 'DKK': 24.99, 'nominal_alloy': 500, 'ui_comment': None, 'ui_pile_size': 0},
                                         ] },
+               "P100FLASH50_DKK": { "kind": "FLASH50", # 50% Off sale for flash offers
+                                    "currency": "DKK",
+                                    "force_output": True, "unit_bonus_format": "short", "ui_warning": "Limited time special offers:", "unit_bonus": None,
+                                    "skus": [{'alloy': 24000, 'DKK': 499.99, 'ui_pile_size': 5, 'ui_bonus': '50% Off', 'nominal_alloy': 20000, 'ui_banner': 'SALE', 'ui_comment': 'Best Value'},
+                                             {'alloy': 11500, 'DKK': 249.99, 'ui_pile_size': 4, 'ui_bonus': '50% Off', 'nominal_alloy': 10000, 'ui_banner': 'SALE', 'ui_comment': None},
+                                             {'alloy':  5500, 'DKK': 124.99, 'ui_pile_size': 3, 'ui_bonus': '50% Off', 'nominal_alloy': 5000, 'ui_banner': 'SALE', 'ui_comment': 'Most Popular'},
+                                             {'alloy':  2650, 'DKK':  62.49, 'ui_pile_size': 2, 'ui_bonus': '50% Off', 'nominal_alloy': 2500, 'ui_banner': 'SALE', 'ui_comment': None},
+                                             {'alloy':  1050, 'DKK':  24.99, 'ui_pile_size': 1, 'ui_bonus': '50% Off', 'nominal_alloy': 1000, 'ui_banner': 'SALE', 'ui_comment': None},
+                                             {'alloy':   500, 'DKK':  12.49, 'ui_pile_size': 0, 'ui_bonus': '50% Off', 'ui_banner': 'SALE', 'ui_comment': None},
+                                             ] },
+               "P100FLASH25_DKK": { "kind": "FLASH25", # 75% Off sale for flash offers
+                                    "currency": "DKK",
+                                    "force_output": True, "unit_bonus_format": "short", "ui_warning": "Limited time special offers:", "unit_bonus": None,
+                                    "skus": [{'alloy': 24000, 'DKK': 249.99, 'ui_pile_size': 5, 'ui_bonus': '75% Off', 'nominal_alloy': 20000, 'ui_banner': 'SALE', 'ui_comment': 'Best Value'},
+                                             {'alloy': 11500, 'DKK': 124.99, 'ui_pile_size': 4, 'ui_bonus': '75% Off', 'nominal_alloy': 10000, 'ui_banner': 'SALE', 'ui_comment': None},
+                                             {'alloy':  5500, 'DKK':  62.49, 'ui_pile_size': 3, 'ui_bonus': '75% Off', 'nominal_alloy': 5000, 'ui_banner': 'SALE', 'ui_comment': 'Most Popular'},
+                                             {'alloy':  2650, 'DKK':  31.24, 'ui_pile_size': 2, 'ui_bonus': '75% Off', 'nominal_alloy': 2500, 'ui_banner': 'SALE', 'ui_comment': None},
+                                             {'alloy':  1050, 'DKK':  12.49, 'ui_pile_size': 1, 'ui_bonus': '75% Off', 'nominal_alloy': 1000, 'ui_banner': 'SALE', 'ui_comment': None},
+                                             {'alloy':   500, 'DKK':   6.24, 'ui_pile_size': 0, 'ui_bonus': '75% Off', 'ui_banner': 'SALE', 'ui_comment': None},
+                                             ] },
 
                # XXX make even?
                "P150_USD": {
@@ -547,6 +708,26 @@ if __name__ == '__main__':
                                         {'alloy': 1050, 'AUD': 9.99, 'nominal_alloy': 1050, 'ui_comment': None, 'ui_pile_size': 1},
                                         {'alloy': 500, 'AUD': 4.99, 'nominal_alloy': 500, 'ui_comment': None, 'ui_pile_size': 0},
                                         ] },
+               "P100FLASH50_AUD": { "kind": "FLASH50", # 50% Off sale for flash offers
+                                    "currency": "AUD",
+                                    "force_output": True, "unit_bonus_format": "short", "ui_warning": "Limited time special offers:", "unit_bonus": None,
+                                    "skus": [{'alloy': 24000, 'AUD': 99.99, 'ui_pile_size': 5, 'ui_bonus': '50% Off', 'nominal_alloy': 20000, 'ui_banner': 'SALE', 'ui_comment': 'Best Value'},
+                                             {'alloy': 11500, 'AUD': 49.99, 'ui_pile_size': 4, 'ui_bonus': '50% Off', 'nominal_alloy': 10000, 'ui_banner': 'SALE', 'ui_comment': None},
+                                             {'alloy':  5500, 'AUD': 24.99, 'ui_pile_size': 3, 'ui_bonus': '50% Off', 'nominal_alloy': 5000, 'ui_banner': 'SALE', 'ui_comment': 'Most Popular'},
+                                             {'alloy':  2650, 'AUD': 12.49, 'ui_pile_size': 2, 'ui_bonus': '50% Off', 'nominal_alloy': 2500, 'ui_banner': 'SALE', 'ui_comment': None},
+                                             {'alloy':  1050, 'AUD':  4.99, 'ui_pile_size': 1, 'ui_bonus': '50% Off', 'nominal_alloy': 1000, 'ui_banner': 'SALE', 'ui_comment': None},
+                                             {'alloy':   500, 'AUD':  2.49, 'ui_pile_size': 0, 'ui_bonus': '50% Off', 'ui_banner': 'SALE', 'ui_comment': None},
+                                             ] },
+               "P100FLASH25_AUD": { "kind": "FLASH25", # 75% Off sale for flash offers
+                                    "currency": "AUD",
+                                    "force_output": True, "unit_bonus_format": "short", "ui_warning": "Limited time special offers:", "unit_bonus": None,
+                                    "skus": [{'alloy': 24000, 'AUD': 49.99, 'ui_pile_size': 5, 'ui_bonus': '75% Off', 'nominal_alloy': 20000, 'ui_banner': 'SALE', 'ui_comment': 'Best Value'},
+                                             {'alloy': 11500, 'AUD': 24.99, 'ui_pile_size': 4, 'ui_bonus': '75% Off', 'nominal_alloy': 10000, 'ui_banner': 'SALE', 'ui_comment': None},
+                                             {'alloy':  5500, 'AUD': 12.49, 'ui_pile_size': 3, 'ui_bonus': '75% Off', 'nominal_alloy': 5000, 'ui_banner': 'SALE', 'ui_comment': 'Most Popular'},
+                                             {'alloy':  2650, 'AUD':  6.24, 'ui_pile_size': 2, 'ui_bonus': '75% Off', 'nominal_alloy': 2500, 'ui_banner': 'SALE', 'ui_comment': None},
+                                             {'alloy':  1050, 'AUD':  2.49, 'ui_pile_size': 1, 'ui_bonus': '75% Off', 'nominal_alloy': 1000, 'ui_banner': 'SALE', 'ui_comment': None},
+                                             {'alloy':   500, 'AUD':  1.24, 'ui_pile_size': 0, 'ui_bonus': '75% Off', 'ui_banner': 'SALE', 'ui_comment': None},
+                                             ] },
 
                "P080_NZD": {
                              "currency": "NZD",
@@ -606,6 +787,26 @@ if __name__ == '__main__':
                                         {'alloy': 1050, 'NZD': 9.99, 'nominal_alloy': 1050, 'ui_comment': None, 'ui_pile_size': 1},
                                         {'alloy': 500, 'NZD': 4.99, 'nominal_alloy': 500, 'ui_comment': None, 'ui_pile_size': 0},
                                         ] },
+               "P080FLASH50_NZD": { "kind": "FLASH50", # 50% Off sale for flash offers
+                                    "currency": "NZD",
+                                    "force_output": True, "unit_bonus_format": "short", "ui_warning": "Limited time special offers:", "unit_bonus": None,
+                                    "skus": [{'alloy': 24000, 'NZD': 99.99, 'ui_pile_size': 5, 'ui_bonus': '50% Off', 'nominal_alloy': 20000, 'ui_banner': 'SALE', 'ui_comment': 'Best Value'},
+                                             {'alloy': 11500, 'NZD': 49.99, 'ui_pile_size': 4, 'ui_bonus': '50% Off', 'nominal_alloy': 10000, 'ui_banner': 'SALE', 'ui_comment': None},
+                                             {'alloy':  5500, 'NZD': 24.99, 'ui_pile_size': 3, 'ui_bonus': '50% Off', 'nominal_alloy': 5000, 'ui_banner': 'SALE', 'ui_comment': 'Most Popular'},
+                                             {'alloy':  2650, 'NZD': 12.49, 'ui_pile_size': 2, 'ui_bonus': '50% Off', 'nominal_alloy': 2500, 'ui_banner': 'SALE', 'ui_comment': None},
+                                             {'alloy':  1050, 'NZD':  4.99, 'ui_pile_size': 1, 'ui_bonus': '50% Off', 'nominal_alloy': 1000, 'ui_banner': 'SALE', 'ui_comment': None},
+                                             {'alloy':   500, 'NZD':  2.49, 'ui_pile_size': 0, 'ui_bonus': '50% Off', 'ui_banner': 'SALE', 'ui_comment': None},
+                                             ] },
+               "P080FLASH25_NZD": { "kind": "FLASH25", # 75% Off sale for flash offers
+                                    "currency": "NZD",
+                                    "force_output": True, "unit_bonus_format": "short", "ui_warning": "Limited time special offers:", "unit_bonus": None,
+                                    "skus": [{'alloy': 24000, 'NZD': 49.99, 'ui_pile_size': 5, 'ui_bonus': '75% Off', 'nominal_alloy': 20000, 'ui_banner': 'SALE', 'ui_comment': 'Best Value'},
+                                             {'alloy': 11500, 'NZD': 24.99, 'ui_pile_size': 4, 'ui_bonus': '75% Off', 'nominal_alloy': 10000, 'ui_banner': 'SALE', 'ui_comment': None},
+                                             {'alloy':  5500, 'NZD': 12.49, 'ui_pile_size': 3, 'ui_bonus': '75% Off', 'nominal_alloy': 5000, 'ui_banner': 'SALE', 'ui_comment': 'Most Popular'},
+                                             {'alloy':  2650, 'NZD':  6.24, 'ui_pile_size': 2, 'ui_bonus': '75% Off', 'nominal_alloy': 2500, 'ui_banner': 'SALE', 'ui_comment': None},
+                                             {'alloy':  1050, 'NZD':  2.49, 'ui_pile_size': 1, 'ui_bonus': '75% Off', 'nominal_alloy': 1000, 'ui_banner': 'SALE', 'ui_comment': None},
+                                             {'alloy':   500, 'NZD':  1.24, 'ui_pile_size': 0, 'ui_bonus': '75% Off', 'ui_banner': 'SALE', 'ui_comment': None},
+                                             ] },
 
                "P100L_USD": { # "straight across" - no discounts, $1 min buy, $200 max
                               "currency": "USD",
@@ -666,6 +867,27 @@ if __name__ == '__main__':
                                         {'alloy': 500, 'USD': 4.99, 'nominal_alloy': 500, 'ui_comment': None, 'ui_pile_size': 0},
                                         ] },
 
+               "P100FLASH50_USD": { "kind": "FLASH50", # 50% Off sale for flash offers
+                                    "currency": "USD",
+                                    "force_output": True, "unit_bonus_format": "short", "ui_warning": "Limited time special offers:", "unit_bonus": None,
+                                    "skus": [{'alloy': 24000, 'USD': 99.99, 'ui_pile_size': 5, 'ui_bonus': '50% Off', 'nominal_alloy': 20000, 'ui_banner': 'SALE', 'ui_comment': 'Best Value'},
+                                             {'alloy': 11500, 'USD': 49.99, 'ui_pile_size': 4, 'ui_bonus': '50% Off', 'nominal_alloy': 10000, 'ui_banner': 'SALE', 'ui_comment': None},
+                                             {'alloy':  5500, 'USD': 24.99, 'ui_pile_size': 3, 'ui_bonus': '50% Off', 'nominal_alloy': 5000, 'ui_banner': 'SALE', 'ui_comment': 'Most Popular'},
+                                             {'alloy':  2650, 'USD': 12.49, 'ui_pile_size': 2, 'ui_bonus': '50% Off', 'nominal_alloy': 2500, 'ui_banner': 'SALE', 'ui_comment': None},
+                                             {'alloy':  1050, 'USD':  4.99, 'ui_pile_size': 1, 'ui_bonus': '50% Off', 'nominal_alloy': 1000, 'ui_banner': 'SALE', 'ui_comment': None},
+                                             {'alloy':   500, 'USD':  2.49, 'ui_pile_size': 0, 'ui_bonus': '50% Off', 'ui_banner': 'SALE', 'ui_comment': None},
+                                             ] },
+               "P100FLASH25_USD": { "kind": "FLASH25", # 75% Off sale for flash offers
+                                    "currency": "USD",
+                                    "force_output": True, "unit_bonus_format": "short", "ui_warning": "Limited time special offers:", "unit_bonus": None,
+                                    "skus": [{'alloy': 24000, 'USD': 49.99, 'ui_pile_size': 5, 'ui_bonus': '75% Off', 'nominal_alloy': 20000, 'ui_banner': 'SALE', 'ui_comment': 'Best Value'},
+                                             {'alloy': 11500, 'USD': 24.99, 'ui_pile_size': 4, 'ui_bonus': '75% Off', 'nominal_alloy': 10000, 'ui_banner': 'SALE', 'ui_comment': None},
+                                             {'alloy':  5500, 'USD': 12.49, 'ui_pile_size': 3, 'ui_bonus': '75% Off', 'nominal_alloy': 5000, 'ui_banner': 'SALE', 'ui_comment': 'Most Popular'},
+                                             {'alloy':  2650, 'USD':  6.24, 'ui_pile_size': 2, 'ui_bonus': '75% Off', 'nominal_alloy': 2500, 'ui_banner': 'SALE', 'ui_comment': None},
+                                             {'alloy':  1050, 'USD':  2.49, 'ui_pile_size': 1, 'ui_bonus': '75% Off', 'nominal_alloy': 1000, 'ui_banner': 'SALE', 'ui_comment': None},
+                                             {'alloy':   500, 'USD':  1.24, 'ui_pile_size': 0, 'ui_bonus': '75% Off', 'ui_banner': 'SALE', 'ui_comment': None},
+                                             ] },
+
                "P100L_CAD": { # "straight across" - no discounts, $1 min buy, $200 max
                               "currency": "CAD",
                               "skus": [{'alloy': 20000, 'CAD': 200.0},
@@ -723,6 +945,26 @@ if __name__ == '__main__':
                                         {'alloy': 1050, 'CAD': 9.99, 'nominal_alloy': 1050, 'ui_comment': None, 'ui_pile_size': 1},
                                         {'alloy': 500, 'CAD': 4.99, 'nominal_alloy': 500, 'ui_comment': None, 'ui_pile_size': 0},
                                         ] },
+               "P100FLASH50_CAD": { "kind": "FLASH50", # 50% Off sale for flash offers
+                                    "currency": "CAD",
+                                    "force_output": True, "unit_bonus_format": "short", "ui_warning": "Limited time special offers:", "unit_bonus": None,
+                                    "skus": [{'alloy': 24000, 'CAD': 99.99, 'ui_pile_size': 5, 'ui_bonus': '50% Off', 'nominal_alloy': 20000, 'ui_banner': 'SALE', 'ui_comment': 'Best Value'},
+                                             {'alloy': 11500, 'CAD': 49.99, 'ui_pile_size': 4, 'ui_bonus': '50% Off', 'nominal_alloy': 10000, 'ui_banner': 'SALE', 'ui_comment': None},
+                                             {'alloy':  5500, 'CAD': 24.99, 'ui_pile_size': 3, 'ui_bonus': '50% Off', 'nominal_alloy': 5000, 'ui_banner': 'SALE', 'ui_comment': 'Most Popular'},
+                                             {'alloy':  2650, 'CAD': 12.49, 'ui_pile_size': 2, 'ui_bonus': '50% Off', 'nominal_alloy': 2500, 'ui_banner': 'SALE', 'ui_comment': None},
+                                             {'alloy':  1050, 'CAD':  4.99, 'ui_pile_size': 1, 'ui_bonus': '50% Off', 'nominal_alloy': 1000, 'ui_banner': 'SALE', 'ui_comment': None},
+                                             {'alloy':   500, 'CAD':  2.49, 'ui_pile_size': 0, 'ui_bonus': '50% Off', 'ui_banner': 'SALE', 'ui_comment': None},
+                                             ] },
+               "P100FLASH25_CAD": { "kind": "FLASH25", # 75% Off sale for flash offers
+                                    "currency": "CAD",
+                                    "force_output": True, "unit_bonus_format": "short", "ui_warning": "Limited time special offers:", "unit_bonus": None,
+                                    "skus": [{'alloy': 24000, 'CAD': 49.99, 'ui_pile_size': 5, 'ui_bonus': '75% Off', 'nominal_alloy': 20000, 'ui_banner': 'SALE', 'ui_comment': 'Best Value'},
+                                             {'alloy': 11500, 'CAD': 24.99, 'ui_pile_size': 4, 'ui_bonus': '75% Off', 'nominal_alloy': 10000, 'ui_banner': 'SALE', 'ui_comment': None},
+                                             {'alloy':  5500, 'CAD': 12.49, 'ui_pile_size': 3, 'ui_bonus': '75% Off', 'nominal_alloy': 5000, 'ui_banner': 'SALE', 'ui_comment': 'Most Popular'},
+                                             {'alloy':  2650, 'CAD':  6.24, 'ui_pile_size': 2, 'ui_bonus': '75% Off', 'nominal_alloy': 2500, 'ui_banner': 'SALE', 'ui_comment': None},
+                                             {'alloy':  1050, 'CAD':  2.49, 'ui_pile_size': 1, 'ui_bonus': '75% Off', 'nominal_alloy': 1000, 'ui_banner': 'SALE', 'ui_comment': None},
+                                             {'alloy':   500, 'CAD':  1.24, 'ui_pile_size': 0, 'ui_bonus': '75% Off', 'ui_banner': 'SALE', 'ui_comment': None},
+                                             ] },
 
                "P100L_ZAR": { # "straight across" - no discounts, $1 min buy, $200 max
                               "currency": "ZAR",
@@ -772,6 +1014,26 @@ if __name__ == '__main__':
                                         {'alloy': 1050, 'ZAR': 99.99, 'nominal_alloy': 1050, 'ui_comment': None, 'ui_pile_size': 1},
                                         {'alloy': 500, 'ZAR': 49.99, 'nominal_alloy': 500, 'ui_comment': None, 'ui_pile_size': 0},
                                         ] },
+               "P100FLASH50_ZAR": { "kind": "FLASH50", # 50% Off sale for flash offers
+                                    "currency": "ZAR",
+                                    "force_output": True, "unit_bonus_format": "short", "ui_warning": "Limited time special offers:", "unit_bonus": None,
+                                    "skus": [{'alloy': 24000, 'ZAR': 999.99, 'ui_pile_size': 5, 'ui_bonus': '50% Off', 'nominal_alloy': 20000, 'ui_banner': 'SALE', 'ui_comment': 'Best Value'},
+                                             {'alloy': 11500, 'ZAR': 499.99, 'ui_pile_size': 4, 'ui_bonus': '50% Off', 'nominal_alloy': 10000, 'ui_banner': 'SALE', 'ui_comment': None},
+                                             {'alloy':  5500, 'ZAR': 249.99, 'ui_pile_size': 3, 'ui_bonus': '50% Off', 'nominal_alloy': 5000, 'ui_banner': 'SALE', 'ui_comment': 'Most Popular'},
+                                             {'alloy':  2650, 'ZAR': 124.99, 'ui_pile_size': 2, 'ui_bonus': '50% Off', 'nominal_alloy': 2500, 'ui_banner': 'SALE', 'ui_comment': None},
+                                             {'alloy':  1050, 'ZAR':  49.99, 'ui_pile_size': 1, 'ui_bonus': '50% Off', 'nominal_alloy': 1000, 'ui_banner': 'SALE', 'ui_comment': None},
+                                             {'alloy':   500, 'ZAR':  24.99, 'ui_pile_size': 0, 'ui_bonus': '50% Off', 'ui_banner': 'SALE', 'ui_comment': None},
+                                             ] },
+               "P100FLASH25_ZAR": { "kind": "FLASH25", # 75% Off sale for flash offers
+                                    "currency": "ZAR",
+                                    "force_output": True, "unit_bonus_format": "short", "ui_warning": "Limited time special offers:", "unit_bonus": None,
+                                    "skus": [{'alloy': 24000, 'ZAR': 499.99, 'ui_pile_size': 5, 'ui_bonus': '75% Off', 'nominal_alloy': 20000, 'ui_banner': 'SALE', 'ui_comment': 'Best Value'},
+                                             {'alloy': 11500, 'ZAR': 249.99, 'ui_pile_size': 4, 'ui_bonus': '75% Off', 'nominal_alloy': 10000, 'ui_banner': 'SALE', 'ui_comment': None},
+                                             {'alloy':  5500, 'ZAR': 124.99, 'ui_pile_size': 3, 'ui_bonus': '75% Off', 'nominal_alloy': 5000, 'ui_banner': 'SALE', 'ui_comment': 'Most Popular'},
+                                             {'alloy':  2650, 'ZAR':  62.49, 'ui_pile_size': 2, 'ui_bonus': '75% Off', 'nominal_alloy': 2500, 'ui_banner': 'SALE', 'ui_comment': None},
+                                             {'alloy':  1050, 'ZAR':  24.99, 'ui_pile_size': 1, 'ui_bonus': '75% Off', 'nominal_alloy': 1000, 'ui_banner': 'SALE', 'ui_comment': None},
+                                             {'alloy':   500, 'ZAR':  12.49, 'ui_pile_size': 0, 'ui_bonus': '75% Off', 'ui_banner': 'SALE', 'ui_comment': None},
+                                             ] },
 
                "P100L_ISK": { # "straight across" - no discounts, $1 min buy, $200 max
                               "currency": "ISK",
@@ -821,6 +1083,26 @@ if __name__ == '__main__':
                                         {'alloy': 1050, 'ISK': 999, 'nominal_alloy': 1050, 'ui_comment': None, 'ui_pile_size': 1},
                                         {'alloy': 500, 'ISK': 499, 'nominal_alloy': 500, 'ui_comment': None, 'ui_pile_size': 0},
                                         ] },
+               "P100FLASH50_ISK": { "kind": "FLASH50", # 50% Off sale for flash offers
+                                    "currency": "ISK",
+                                    "force_output": True, "unit_bonus_format": "short", "ui_warning": "Limited time special offers:", "unit_bonus": None,
+                                    "skus": [{'alloy': 24000, 'ISK': 9999, 'ui_pile_size': 5, 'ui_bonus': '50% Off', 'nominal_alloy': 20000, 'ui_banner': 'SALE', 'ui_comment': 'Best Value'},
+                                             {'alloy': 11500, 'ISK': 4999, 'ui_pile_size': 4, 'ui_bonus': '50% Off', 'nominal_alloy': 10000, 'ui_banner': 'SALE', 'ui_comment': None},
+                                             {'alloy':  5500, 'ISK': 2499, 'ui_pile_size': 3, 'ui_bonus': '50% Off', 'nominal_alloy': 5000, 'ui_banner': 'SALE', 'ui_comment': 'Most Popular'},
+                                             {'alloy':  2650, 'ISK': 1249, 'ui_pile_size': 2, 'ui_bonus': '50% Off', 'nominal_alloy': 2500, 'ui_banner': 'SALE', 'ui_comment': None},
+                                             {'alloy':  1050, 'ISK':  499, 'ui_pile_size': 1, 'ui_bonus': '50% Off', 'nominal_alloy': 1000, 'ui_banner': 'SALE', 'ui_comment': None},
+                                             {'alloy':   500, 'ISK':  249, 'ui_pile_size': 0, 'ui_bonus': '50% Off', 'ui_banner': 'SALE', 'ui_comment': None},
+                                             ] },
+               "P100FLASH25_ISK": { "kind": "FLASH25", # 75% Off sale for flash offers
+                                    "currency": "ISK",
+                                    "force_output": True, "unit_bonus_format": "short", "ui_warning": "Limited time special offers:", "unit_bonus": None,
+                                    "skus": [{'alloy': 24000, 'ISK': 4999, 'ui_pile_size': 5, 'ui_bonus': '75% Off', 'nominal_alloy': 20000, 'ui_banner': 'SALE', 'ui_comment': 'Best Value'},
+                                             {'alloy': 11500, 'ISK': 2499, 'ui_pile_size': 4, 'ui_bonus': '75% Off', 'nominal_alloy': 10000, 'ui_banner': 'SALE', 'ui_comment': None},
+                                             {'alloy':  5500, 'ISK': 1249, 'ui_pile_size': 3, 'ui_bonus': '75% Off', 'nominal_alloy': 5000, 'ui_banner': 'SALE', 'ui_comment': 'Most Popular'},
+                                             {'alloy':  2650, 'ISK':  625, 'ui_pile_size': 2, 'ui_bonus': '75% Off', 'nominal_alloy': 2500, 'ui_banner': 'SALE', 'ui_comment': None},
+                                             {'alloy':  1050, 'ISK':  249, 'ui_pile_size': 1, 'ui_bonus': '75% Off', 'nominal_alloy': 1000, 'ui_banner': 'SALE', 'ui_comment': None},
+                                             {'alloy':   500, 'ISK':  125, 'ui_pile_size': 0, 'ui_bonus': '75% Off', 'ui_banner': 'SALE', 'ui_comment': None},
+                                             ] },
 
                # this is maintained ONLY for special-casing a few whales who got used to deprecated low-priced SKU slates
                "P050XY_TRY": { "kind": "XY",
@@ -890,6 +1172,26 @@ if __name__ == '__main__':
                                                 {'alloy': 1050, 'USD': 9.99, 'nominal_alloy': 1050, 'ui_comment': None, 'ui_pile_size': 1},
                                                 {'alloy': 500, 'USD': 4.99, 'nominal_alloy': 500, 'ui_comment': None, 'ui_pile_size': 0},
                                                 ] },
+               "FALLBACK_P100FLASH50_USD": { "kind": "FLASH50", # 50% Off sale for flash offers
+                                    "currency": "USD",
+                                    "force_output": True, "unit_bonus_format": "short", "ui_warning": "Limited time special offers:", "unit_bonus": None,
+                                    "skus": [{'alloy': 24000, 'USD': 99.99, 'ui_pile_size': 5, 'ui_bonus': '50% Off', 'nominal_alloy': 20000, 'ui_banner': 'SALE', 'ui_comment': 'Best Value'},
+                                             {'alloy': 11500, 'USD': 49.99, 'ui_pile_size': 4, 'ui_bonus': '50% Off', 'nominal_alloy': 10000, 'ui_banner': 'SALE', 'ui_comment': None},
+                                             {'alloy':  5500, 'USD': 24.99, 'ui_pile_size': 3, 'ui_bonus': '50% Off', 'nominal_alloy': 5000, 'ui_banner': 'SALE', 'ui_comment': 'Most Popular'},
+                                             {'alloy':  2650, 'USD': 12.49, 'ui_pile_size': 2, 'ui_bonus': '50% Off', 'nominal_alloy': 2500, 'ui_banner': 'SALE', 'ui_comment': None},
+                                             {'alloy':  1050, 'USD':  4.99, 'ui_pile_size': 1, 'ui_bonus': '50% Off', 'nominal_alloy': 1000, 'ui_banner': 'SALE', 'ui_comment': None},
+                                             {'alloy':   500, 'USD':  2.49, 'ui_pile_size': 0, 'ui_bonus': '50% Off', 'ui_banner': 'SALE', 'ui_comment': None},
+                                             ] },
+               "FALLBACK_P100FLASH25_USD": { "kind": "FLASH25", # 75% Off sale for flash offers
+                                    "currency": "USD",
+                                    "force_output": True, "unit_bonus_format": "short", "ui_warning": "Limited time special offers:", "unit_bonus": None,
+                                    "skus": [{'alloy': 24000, 'USD': 49.99, 'ui_pile_size': 5, 'ui_bonus': '75% Off', 'nominal_alloy': 20000, 'ui_banner': 'SALE', 'ui_comment': 'Best Value'},
+                                             {'alloy': 11500, 'USD': 24.99, 'ui_pile_size': 4, 'ui_bonus': '75% Off', 'nominal_alloy': 10000, 'ui_banner': 'SALE', 'ui_comment': None},
+                                             {'alloy':  5500, 'USD': 12.49, 'ui_pile_size': 3, 'ui_bonus': '75% Off', 'nominal_alloy': 5000, 'ui_banner': 'SALE', 'ui_comment': 'Most Popular'},
+                                             {'alloy':  2650, 'USD':  6.24, 'ui_pile_size': 2, 'ui_bonus': '75% Off', 'nominal_alloy': 2500, 'ui_banner': 'SALE', 'ui_comment': None},
+                                             {'alloy':  1050, 'USD':  2.49, 'ui_pile_size': 1, 'ui_bonus': '75% Off', 'nominal_alloy': 1000, 'ui_banner': 'SALE', 'ui_comment': None},
+                                             {'alloy':   500, 'USD':  1.24, 'ui_pile_size': 0, 'ui_bonus': '75% Off', 'ui_banner': 'SALE', 'ui_comment': None},
+                                             ] },
 
                "FALLBACK_P100D3_USD": { "kind": "D3", # REPLACE $4.99 SKU at low end with $24.99 SKU in middle
                                         "currency": "USD",
@@ -946,7 +1248,7 @@ if __name__ == '__main__':
             # make sure discount factor does not decline for larger purchases
             if last_level is not None:
                 if this_level > last_level:
-                    raise Exception('alloy exchange rate declines on SKU: '+sku_name)
+                    raise Exception('alloy exchange rate declines between SKUs %s %d -> %d from %.4f to %.4f' % (sku_name, last_sku['alloy'], data['alloy'], last_level, this_level))
             last_level = this_level
             last_sku = data
 
