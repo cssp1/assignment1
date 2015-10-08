@@ -16,6 +16,7 @@ TOURNAMENT_STAT=$4
 
 DROPBOX_ACCESS_TOKEN=`cat ${HOME}/.ssh/dropbox-access-token`
 GAME_ID_UPPER=`echo ${GAME_ID} | tr a-z A-Z`
+GAME_TOURNAMENT_CONTINENTS=`./SpinConfig.py --getvar tournament_continents | python -c 'import json, sys; print " ".join(json.load(sys.stdin))'`
 
 declare -A PLATFORM_UI_NAMES
 PLATFORM_UI_NAMES[fb]=Facebook
@@ -55,11 +56,11 @@ for CONT in $GAME_TOURNAMENT_CONTINENTS; do
     NOTIFICATION_MESSAGE_FULL="${NOTIFICATION_MESSAGE_BRIEF}${NEWLINE}`cat ${LOGFILE}`"
 
     # send SNS notification
-    /usr/bin/aws sns publish --topic-arn "${GAME_TOURNAMENT_WINNERS_SNS_TOPIC}" --subject "${NOTIFICATION_SUBJECT}" --message "${NOTIFICATION_MESSAGE_FULL}" > /dev/null
+    /usr/bin/aws sns publish --topic-arn "`./SpinConfig.py --getvar tournament_winners_sns_topic`" --subject "${NOTIFICATION_SUBJECT}" --message "${NOTIFICATION_MESSAGE_FULL}" > /dev/null
 
     # send SpinReminder notification
     ./SpinReminders.py --from "tournament-winners.sh" --subject "${NOTIFICATION_SUBJECT}" --body "${NOTIFICATION_MESSAGE_BRIEF}" \
-               --recipient '{"type":"mattermost", "channel":"marketing"}'
+               --recipients "`./SpinConfig.py --getvar tournament_winners_recipients`"
 done
 
 

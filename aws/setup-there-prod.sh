@@ -28,8 +28,6 @@ echo "GAME_ID=${GAME_ID}" > /tmp/spinpunch
 echo "GAME_ID_LONG=${GAME_ID_LONG}" >> /tmp/spinpunch
 echo "GAME_DIR=/home/ec2-user/${GAME_ID_LONG}" >> /tmp/spinpunch
 echo "GAME_MAIL_FROM=Alina" >> /tmp/spinpunch
-echo "GAME_TOURNAMENT_WINNERS_SNS_TOPIC=" >> /tmp/spinpunch
-echo "GAME_TOURNAMENT_CONTINENTS=" >> /tmp/spinpunch
 sudo mv /tmp/spinpunch /etc/spinpunch
 sudo chmod 0644 /etc/spinpunch
 
