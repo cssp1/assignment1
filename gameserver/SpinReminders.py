@@ -89,7 +89,7 @@ def send_reminders(sender_name, recip_list, subject, body, dry_run = False):
 
 if __name__=='__main__':
     import getopt, sys
-    opts, args = getopt.gnu_getopt(sys.argv[1:], '', ['dry-run','from=','subject=','body=','recipient='])
+    opts, args = getopt.gnu_getopt(sys.argv[1:], '', ['dry-run','from=','subject=','body=','body-from=','recipient=','recipients='])
     dry_run = False
     subject = 'SpinReminders Subject'
     body = 'SpinReminders Body'
@@ -100,6 +100,8 @@ if __name__=='__main__':
         elif key == '--from': sender_name = val
         elif key == '--subject': subject = val
         elif key == '--body': body = val
+        elif key == '--body-from': body = open(val).read().strip()
         elif key == '--recipient': recipients.append(SpinJSON.loads(val))
+        elif key == '--recipients': recipients += SpinJSON.loads(val)
 
     send_reminders(sender_name, recipients, subject, body, dry_run=dry_run)

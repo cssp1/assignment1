@@ -411,14 +411,16 @@ if __name__ == '__main__':
         assert in_maintenance_window(cfg, 1397544797)
 
     import sys, getopt
-    opts, args = getopt.gnu_getopt(sys.argv[1:], '', ['get','put','force','launch-date'])
+    opts, args = getopt.gnu_getopt(sys.argv[1:], '', ['get','put','force','launch-date','getvar='])
     mode = 'test'
+    getvar_name = None
     force = False
     for key, val in opts:
         if key == '--get': mode = 'get'
         elif key == '--put': mode = 'put'
         elif key == '--force': force = True
         elif key == '--launch-date': mode = 'launch-date'
+        elif key == '--getvar': mode = 'getvar'; getvar_name = val
 
     if mode in ('get','put'):
         import SpinS3
@@ -442,6 +444,8 @@ if __name__ == '__main__':
         print 'uploaded config.json to', s3_name
     elif mode == 'launch-date':
         print game_launch_date()
+    elif mode == 'getvar':
+        print SpinJSON.dumps(config[getvar_name], pretty = True)
     else:
         load('config.json', verbose = True)
         print 'config.json OK!'

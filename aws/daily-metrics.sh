@@ -21,7 +21,7 @@ do
         GAME_DIR="$OPTARG"
         ;;
     m)
-        MAIL_RECIPIENTS="$OPTARG"
+        UNUSED_MAIL_RECIPIENTS="$OPTARG" # replaced by SpinConfig heartbeat_recipients
         ;;
     esac
 done
@@ -146,7 +146,7 @@ done
 
 # send SMS update
 echo "sending SMS message..."
-$GAME_DIR/aws/text-message.py --body-from "$SMSFILE" --sender-name "$UI_MAIL_SENDER" --recipients-json "$MAIL_RECIPIENTS"
+$GAME_DIR/gameserver/SpinReminders.py --body-from "$SMSFILE" --from "$UI_MAIL_SENDER" --recipients "`${GAME_DIR}/gameserver/SpinConfig.py --getvar heartbeat_recipients`"
 rm -f "$SMSFILE"
 
 exit $ERROR
