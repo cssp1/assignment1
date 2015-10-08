@@ -10,6 +10,7 @@ import sys, time, getopt, socket
 import SpinReminders
 import SpinConfig
 import SpinSQLUtil
+import SpinJSON
 import MySQLdb
 from SpinLog import pretty_time
 
@@ -39,17 +40,17 @@ def get_issues(data):
 if __name__ == '__main__':
     verbose = True
     dry_run = False
-    email_to = []
     game_id = SpinConfig.game()
+    recipients = SpinConfig.config.get('alarms_recipients', [])
     dbname = None
 
-    opts, args = getopt.gnu_getopt(sys.argv[1:], 'q', ['dry-run','email=','dbname='])
+    opts, args = getopt.gnu_getopt(sys.argv[1:], 'q', ['dry-run','dbname=','recipients='])
 
     for key, val in opts:
         if key == '-q': verbose = False
         elif key == '--dry-run': dry_run = True
-        elif key == '--email': email_to.append(val)
         elif key == '--dbname': dbname = key
+        elif key == '--recipients': recipients = SpinJSON.loads(val)
 
     sql_util = SpinSQLUtil.MySQLUtil()
     if not verbose: sql_util.disable_warnings()
@@ -122,8 +123,4 @@ if __name__ == '__main__':
         print '--- SUBJECT ---\n', subject, '\n--- BODY ---\n', body
 
     elif body:
-        recip_list = []
-        if email_to:
-            recip_list.append({'type': 'email', 'to':[{'name': 'Analytics Tech', 'address': addr} for addr in email_to]})
-
-        SpinReminders.send_reminders('SpinPunch', recip_list, subject, body, dry_run = dry_run)
+        SpinReminders.send_reminders('SpinPunch', recipients, subject, body, dry_run = dry_run)
