@@ -5437,6 +5437,8 @@ session.set_battle_outcome_dirty = function() {
 
 // player state
 var player = {};
+
+/** @dict */
 player.resource_state = {
     "space": [0,0], // [provided,occupied]
     "gamebucks": -1,
@@ -15146,6 +15148,10 @@ function confirm_instant_repairs(price, ok_cb) {
     install_child_dialog(dialog);
     dialog.auto_center();
     dialog.modal = true;
+
+    var default_button_name = player.get_any_abtest_value('confirm_instant_repairs_default_button', gamedata['client']['confirm_instant_repairs_default_button'] || "close_button");
+    if(!(default_button_name in dialog.widgets)) { throw Error('bad default_button_name '+default_button_name); }
+    dialog.default_button = dialog.widgets[default_button_name];
 
     dialog.widgets['description'].set_text_with_linebreaking(dialog.data['widgets']['description']['ui_name'].replace('%GAMEBUCKS', Store.gamebucks_ui_name()));
     dialog.widgets['price_display'].bg_image = player.get_any_abtest_value('price_display_asset', gamedata['store']['price_display_asset']);
@@ -36701,6 +36707,10 @@ function invoke_new_store_category(catdata, parent_catdata, scroll_to_sku_name, 
         d.user_data['anim_start'] = client_time + d.data['widgets']['info']['blink_offset'] * i;
         d.user_data['sound_start'] = -1;
 
+        // these fields are for use by the purchase confirmation dialog. They are updated dynamically by the update function.
+        d.user_data['ui_price_str'] = '?';
+        d.user_data['should_confirm_purchase'] = false; // controls whether the purchase confirmation is enabled (false if the player doesn't have sufficient resources to buy the thing)
+
         var banner_text = ('ui_banner' in skudata ? eval_cond_or_literal(skudata['ui_banner'], player, null) : null);
         d.widgets['sale_bg'].show = d.widgets['sale_label'].show = (!!banner_text && (banner_text.length > 0));
         d.widgets['sale_label'].str = banner_text;
@@ -37289,14 +37299,21 @@ function update_new_store_sku(d) {
         if(sale_currency == 'gamebucks' || sale_currency == 'fbcredits') {
             d.widgets['price_display'].str = Store.display_user_currency_price(shown_price);
             d.widgets['price_display'].tooltip.str = Store.display_user_currency_price_tooltip(shown_price);
+            d.user_data['ui_price_str'] = Store.display_user_currency_amount(shown_price, 'full');
+            d.user_data['should_confirm_purchase'] = (price >= 0) && (sale_currency == 'fbcredits' || (player.resource_state['gamebucks'] >= shown_price));
         } else if(sale_currency.indexOf('item:') === 0) {
             d.widgets['price_display'].str = (shown_price > 0 ? pretty_print_number(shown_price) : '-');
             var currency_item_spec = ItemDisplay.get_inventory_item_spec(sale_currency.split(':')[1]);
             d.widgets['price_display'].tooltip.str = (shown_price > 0 ? gamedata['strings']['store']['buy_for'].replace('%s',
                                                                                                                         ItemDisplay.get_inventory_item_stack_prefix(currency_item_spec, shown_price)+ItemDisplay.get_inventory_item_ui_name(currency_item_spec)) : null);
+            d.user_data['ui_price_str'] = (shown_price > 0 ? ItemDisplay.get_inventory_item_stack_prefix(currency_item_spec, shown_price)+ItemDisplay.get_inventory_item_ui_name(currency_item_spec) : '-');
+            d.user_data['should_confirm_purchase'] = (price >= 0) && (player.inventory_item_quantity(currency_item_spec['name']) >= price);
+
         } else if(sale_currency in gamedata['resources']) {
             d.widgets['price_display'].str = (shown_price > 0 ? pretty_print_number(shown_price) : '-');
             d.widgets['price_display'].tooltip.str = (shown_price > 0 ? gamedata['strings']['store']['buy_for'].replace('%s', pretty_print_number(shown_price) + ' ' +gamedata['resources'][sale_currency]['ui_name']) : null);
+            d.user_data['ui_price_str'] = (shown_price > 0 ? pretty_print_number(shown_price) + ' ' +gamedata['resources'][sale_currency]['ui_name'] : '-');
+            d.user_data['should_confirm_purchase'] = (price >= 0) && (player.resource_state[sale_currency][1] >= price);
         }
     }
 
@@ -37366,7 +37383,12 @@ function update_new_store_sku(d) {
             // fire order immediately, or need further GUI?
             var spell = gamedata['spells'][order_spell];
             if(((!('activation' in spell)) || spell['activation'] == 'instant')) {
-                order_cb(null);
+                if(d.user_data['should_confirm_purchase']) {
+                    var ui_name = d.widgets['name'].str.replace(/\n/g, ' ');
+                    confirm_purchase(goog.partial(order_cb, null), ui_name, d.user_data['ui_price_str'], skudata['ui_purchase_confirm'] || spell['ui_purchase_confirm'] || null);
+                } else {
+                    order_cb(null);
+                }
                 return;
             }
 
@@ -37386,6 +37408,50 @@ function update_new_store_sku(d) {
     } else {
         d.widgets['bg'].state = 'disabled';
     }
+}
+
+/** @param {function()} action_cb
+    @param {string} ui_item_name
+    @param {string} ui_price
+    @param {string|null=} ui_text_override */
+function confirm_purchase(action_cb, ui_item_name, ui_price, ui_text_override) {
+    if(!player.get_any_abtest_value('store_purchase_confirm', eval_cond_or_literal(gamedata['store']['purchase_confirm'] || false, player, null))) {
+        action_cb();
+        return;
+    }
+    invoke_purchase_confirm_dialog(action_cb, ui_item_name, ui_price, ui_text_override);
+}
+
+/** @param {function()} action_cb
+    @param {string} ui_item_name
+    @param {string} ui_price
+    @param {string|null=} ui_text_override */
+function invoke_purchase_confirm_dialog(action_cb, ui_item_name, ui_price, ui_text_override) {
+    var dialog = new SPUI.Dialog(gamedata['dialogs']['purchase_confirm_dialog']);
+    dialog.user_data['dialog'] = 'purchase_confirm_dialog';
+    dialog.user_data['action_cb'] = action_cb;
+
+    dialog.modal = true;
+    install_child_dialog(dialog);
+    dialog.auto_center();
+
+    dialog.widgets['cancel_button'].onclick = close_parent_dialog;
+
+    var ui_descr = ui_text_override || dialog.data['widgets']['description']['ui_name'];
+    dialog.widgets['description'].set_text_with_linebreaking(ui_descr.replace('%thing',ui_item_name).replace('%price', ui_price));
+
+//    dialog.widgets['price_display'].bg_image = player.get_any_abtest_value('price_display_asset', gamedata['store']['price_display_asset']);
+//    dialog.widgets['price_display'].state = Store.get_user_currency();
+//    dialog.widgets['price_display'].str = Store.display_user_currency_price(price); // PRICE
+//    dialog.widgets['price_display'].tooltip.str = Store.display_user_currency_price_tooltip(price);
+//    dialog.widgets['price_display'].onclick =
+    dialog.widgets['ok_button'].onclick = function(w) {
+        var cb = w.parent.user_data['action_cb'];
+        close_parent_dialog(w);
+        cb();
+    };
+
+    return dialog;
 }
 
 /** @param {string=} purpose

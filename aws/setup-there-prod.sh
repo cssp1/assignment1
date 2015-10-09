@@ -133,7 +133,7 @@ echo "    key /home/ec2-user/.ssh/hipchat.token for automated messages"
 echo "    key /home/ec2-user/.ssh/slack.token (with incoming webhook for game channel) for automated messages"
 echo "    key /home/ec2-user/.ssh/mattermost-webhook-url for automated messages"
 echo "    key /home/ec2-user/.ssh/dropbox-access-token for tournament winner list uploads"
-echo "/home/ec2-user/.aws/credentials file with host awssecret for CloudWatch metrics and SNS transmission"
+echo "/home/ec2-user/.aws/credentials, and config file with host awssecret for CloudWatch metrics and SNS transmission"
 
 # CUSTOMIZED PYTHON PACKAGES
 echo "build/install ujson, blist, and lz4 libraries. (python setup.py build; sudo python setup.py install)"
