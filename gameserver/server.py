@@ -4530,8 +4530,8 @@ class SessionChangeOld(SessionChange): # legacy path
                 self.dest_player.country_tier = SpinConfig.country_tier_map.get(self.dest_user.country, 4)
                 self.dest_player.developer = self.dest_user.developer
             self.dest_player.migrate_proxy()
-        self.api.change_session_complete(self.request, self.session, self.retmsg, self.dest_user_id, self.dest_user, self.dest_player, None, None, None, self.new_ladder_state, self.new_deployable_squads, self.new_defending_squads, pre_attack = self.pre_attack)
-        self.d.callback(True) # XXX note: does not pass failure!
+        success = self.api.change_session_complete(self.request, self.session, self.retmsg, self.dest_user_id, self.dest_user, self.dest_player, None, None, None, self.new_ladder_state, self.new_deployable_squads, self.new_defending_squads, pre_attack = self.pre_attack)
+        self.d.callback(success)
 
 class SessionChangeNew(SessionChange): # new basedb path
     def __init__(self, *args):
@@ -4635,8 +4635,8 @@ class SessionChangeNew(SessionChange): # new basedb path
         if (not self.got_base) or (not self.got_player) or (not self.got_user): return
 
         # note: this actually calls back into the "old" player.my_home path!
-        self.api.change_session_complete(self.request, self.session, self.retmsg, self.dest_user_id, self.dest_user, self.dest_player, None, None, None, self.new_ladder_state, self.new_deployable_squads, self.new_defending_squads)
-        self.d.callback(True) # XXX note: does not pass failure!
+        success = self.api.change_session_complete(self.request, self.session, self.retmsg, self.dest_user_id, self.dest_user, self.dest_player, None, None, None, self.new_ladder_state, self.new_deployable_squads, self.new_defending_squads, pre_attack = self.pre_attack)
+        self.d.callback(success)
 
     def try_finish_remote(self):
         if (not self.got_base) or (not self.got_player) or (not self.got_user): return
@@ -4655,8 +4655,8 @@ class SessionChangeNew(SessionChange): # new basedb path
         if self.dest_base_pre and self.dest_player:
             # complete parsing of the base using the landlord Player
             self.dest_base = base_table.parse(self.session.player.home_region, self.dest_base_id, self.dest_base_pre, self.dest_player, self.session.player, reason='visit')
-        self.api.change_session_complete(self.request, self.session, self.retmsg, self.dest_user_id, self.dest_user, self.dest_player, self.dest_base_id, self.dest_feature, self.dest_base, self.new_ladder_state, self.new_deployable_squads, self.new_defending_squads, pre_attack = self.pre_attack)
-        self.d.callback(True) # XXX note: does not pass failure!
+        success = self.api.change_session_complete(self.request, self.session, self.retmsg, self.dest_user_id, self.dest_user, self.dest_player, self.dest_base_id, self.dest_feature, self.dest_base, self.new_ladder_state, self.new_deployable_squads, self.new_defending_squads, pre_attack = self.pre_attack)
+        self.d.callback(success)
 
 # A collection of game objects indexed by ID
 class ObjectCollection:
@@ -15975,7 +15975,7 @@ class GAMEAPI(resource.Resource):
             if (not force) and (session.viewing_base.base_id == dest_base_id) and (not session.has_attacked):
                 session.visit_base_in_progress = False
                 reactor.callLater(0, functools.partial(d.callback, False))
-                return
+                return d
 
             if gamesite.nosql_client and session.player.home_region:
 
@@ -16113,8 +16113,8 @@ class GAMEAPI(resource.Resource):
             ascdebug('change_session2 (old) %d -> %d' % (session.user.user_id, dest_user_id))
             if dest_user_id == session.user.user_id:
                 # visiting self - complete synchronously
-                self.change_session_complete(request, session, retmsg, dest_user_id, session.user, session.player, None, None, None, new_ladder_state, new_deployable_squads, new_defending_squads)
-                reactor.callLater(0, functools.partial(d.callback, True))
+                success = self.change_session_complete(request, session, retmsg, dest_user_id, session.user, session.player, None, None, None, new_ladder_state, new_deployable_squads, new_defending_squads)
+                reactor.callLater(0, functools.partial(d.callback, success))
                 return
 
             change = SessionChangeOld(self, d, session, request, retmsg, dest_user_id, dest_base_id, dest_feature, is_ai_user_id_range(dest_user_id), new_ladder_state, new_deployable_squads, new_defending_squads, delay, pre_attack)
@@ -16126,12 +16126,14 @@ class GAMEAPI(resource.Resource):
 
     # wrap change_session_complete so that exceptions cannot break a session that went async
     def change_session_complete(self, request, session, retmsg, *args, **kwargs):
+        success = False
         try:
-            self._change_session_complete(request, session, retmsg, *args, **kwargs)
+            success = self._change_session_complete(request, session, retmsg, *args, **kwargs)
         except:
             gamesite.exception_log.event(server_time, 'change_session_complete exception on player %d: %s' % (session.user.user_id, traceback.format_exc()))
         finally:
             session.release_pre_locks()
+        return success
 
     def _change_session_complete(self, request, session, retmsg, dest_user_id, dest_user, dest_player, dest_base_id, dest_feature, dest_base, new_ladder_state, new_deployable_squads, new_defending_squads, pre_attack = None):
         if dest_base_id:
@@ -16722,7 +16724,7 @@ class GAMEAPI(resource.Resource):
             if on_visit_consequent:
                 session.execute_consequent_safe(on_visit_consequent, session.player, change_retmsg, reason='on_visit')
 
-        if pre_attack: # immediately proceed with attack attempt
+        if pre_attack and (not cannot_spy): # immediately proceed with attack attempt
             do_attack_retmsg = [] # collect error messages separately
             attack_success = self.do_attack(session, do_attack_retmsg, [None, []])
 
@@ -16746,7 +16748,7 @@ class GAMEAPI(resource.Resource):
                             d.addBoth(functools.partial(flush_skip, self, session))
 
                         self.complete_attack(session, session.outgoing_messages).addBoth(functools.partial(go_home_and_flush_skip, self, session))
-                        return
+                        return True # success
                 else:
                     retmsg += do_attack_retmsg # send error messages to client
 
@@ -16765,6 +16767,8 @@ class GAMEAPI(resource.Resource):
 
         else:
             assert not session.pre_locks
+
+        return (not cannot_spy) # success
 
     def query_battle_history(self, session, retmsg, arg):
         target = arg[1] # look up battles against this player (-1 for anyone)
@@ -21718,10 +21722,11 @@ class GAMEAPI(resource.Resource):
             end_time = time.time()
             admin_stats.record_latency('complete_client_hello', end_time - start_time)
             if d is not None:
+                # note: if complete_client_hello2() fails, the session arg here will be None
                 d.addBoth(lambda session, request=request, retmsg=retmsg: self.complete_deferred_request(request, session, retmsg))
 
         except:
-            retmsg = [["ERROR", "SERVER_EXCEPTION"]] # blow away old message, because session is not going to be set up
+            retmsg[:] = [["ERROR", "SERVER_EXCEPTION"]] # blow away old message, because session is not going to be set up
             gamesite.exception_log.event(server_time, ('complete_client_hello Exception (player %d): ' % user_id) + traceback.format_exc())
 
         if d is None: # failure path
@@ -21881,6 +21886,9 @@ class GAMEAPI(resource.Resource):
                     if gamedata['server']['log_mobile_successes']:
                         gamesite.exception_log.event(server_time, 'mobile hit from player %d ACCEPTED' % player.user_id)
 
+        if abuse_warning_msg:
+            retmsg += abuse_warning_msg
+
         # if player is new or didn't finish the tutorial, or stale, reset
         # their state to the starting conditions
 
@@ -21904,10 +21912,6 @@ class GAMEAPI(resource.Resource):
 
         if player.tutorial_state != "COMPLETE":
             player.reset()
-            needs_tutorial_units = True
-        else:
-            needs_tutorial_units = False
-
 
         # record that the player is logged in now
         player.lock_state = Player.LockState.logged_in
@@ -21930,7 +21934,7 @@ class GAMEAPI(resource.Resource):
         player.read_url_overrides(user, url_qs)
         player.update_abtests(session, not is_returning_user)
 
-        if needs_tutorial_units:
+        if player.tutorial_state != "COMPLETE":
             # note: this must come AFTER abtests are set up, since they may override starting conditions
             init_game(player, 0)
 
@@ -21973,27 +21977,6 @@ class GAMEAPI(resource.Resource):
 
         admin_stats.add_visit(user.user_id, not is_returning_user, is_paying_user)
 
-        # set up alliance state, but catch errors so the login doesn't bug out
-        alliance_info = None
-        alliance_membership = None
-        alliance_chat_catchup_messages = []
-        alliance_join_requests = None
-        try:
-            alliance_info, alliance_membership = session.init_alliance(alliance_chat_catchup_messages, reason = 'SERVER_HELLO')
-
-            # fix missing alliances_joined count in player_history, for quest purposes
-            if alliance_info and ('alliances_joined' not in session.player.history): session.player.history['alliances_joined'] = 1
-
-            # for leaders, get pending join requests
-            if alliance_info and (alliance_info.get('leader_id', -1) == session.player.user_id):
-                alliance_join_requests = gamesite.sql_client.poll_join_requests(session.player.user_id, alliance_info['id'], server_time, reason='SERVER_HELLO')
-
-            if session.alliance_chat_channel and gamedata['server']['chat_alliance_logins']:
-                session.do_chat_send(session.alliance_chat_channel, 'I logged in!', bypass_gag = True, props = {'type':'logged_in'})
-        except:
-            gamesite.exception_log.event(server_time, 'Error setting up alliance state for player %d for SERVER_HELLO:\n%s' % \
-                                         (user.user_id, traceback.format_exc()))
-
         session.increment_player_metric('logged_in_times', 1, time_series = False)
         if 'sessions' not in player.history:
             player.history['sessions'] = []
@@ -22017,71 +22000,6 @@ class GAMEAPI(resource.Resource):
             if gamedata['server']['login_abuse_detector']['enable_auto_attack'] and player_is_naughty:
                 gamesite.exception_log.event(server_time, 'player %d has logged in excessively - triggering AI attack!' % player.user_id)
                 needs_daily_attack = True
-
-        # record acquisition data (for this visit)
-        user.update_acquisition_data(acq_data, session.player)
-
-        retmsg.append(["SERVER_HELLO",
-                       gamedata["version"],
-                       session.user.user_id,
-                       session_id,
-                       server_time, # not used anymore!
-                       session.user.facebook_name,
-                       session.player.tutorial_state,
-                       session.player.player_preferences,
-                       needs_daily_attack,
-                       session.user.country,
-                       session.player.country_tier,
-                       session.player.price_region,
-                       session.player.history['logged_in_times'],
-                       session.player.abtests,
-                       session.player.is_developer(),
-                       session.user.is_suspicious(),
-                       session.player.isolate_pvp,
-                       session.user.acquisition_campaign,
-                       session.player.my_home.base_id,
-                       session.player.history.get('money_spent',0),
-                       session.player.creation_time,
-                       session.player.chat_seen,
-                       session.user.is_chat_mod(),
-                       session.player.get_daily_banner(session, retmsg)
-                       ])
-        retmsg.append(["PLAYER_UI_NAME_UPDATE", session.user.get_ui_name(session.player)])
-        retmsg.append(["PLAYER_ALIAS_UPDATE", session.player.alias])
-        retmsg.append(["PLAYER_TITLES_UPDATE", session.player.title])
-
-        if session.user.frame_platform == 'fb':
-            retmsg.append(["FACEBOOK_CURRENCY_UPDATE", session.user.facebook_currency])
-            if session.user.facebook_third_party_id:
-                retmsg.append(["FACEBOOK_THIRD_PARTY_ID_UPDATE", session.user.facebook_third_party_id])
-
-        # note: sends both SQUADS_UPDATE and PLAYER_ARMY_UPDATE
-        session.player.ping_squads_and_send_update(session, retmsg, originator=session.player.user_id, reason='SERVER_HELLO')
-
-        d = defer.Deferred() # we'll return this for the caller
-        self.change_session(request, session, retmsg, dest_user_id = user.user_id, force = True).addBoth(lambda success, self=self, session=session, retmsg=retmsg, needs_tutorial_units=needs_tutorial_units, alliance_join_requests=alliance_join_requests, d=d: self.do_complete_client_hello2(d, session, retmsg, needs_tutorial_units, alliance_join_requests))
-        return d
-
-    def do_complete_client_hello2(self, d, session, retmsg, needs_tutorial_units, alliance_join_requests):
-        user = session.user
-
-        if needs_tutorial_units:
-            spawn_tutorial_units(session, retmsg)
-
-        retmsg.append(["TECH_UPDATE", session.player.tech])
-        retmsg.append(["COOLDOWNS_UPDATE", session.player.cooldowns])
-        session.player.send_inventory_update(retmsg)
-
-        retmsg.append(["PLAYER_UNIT_EQUIP_UPDATE", session.player.unit_equipment])
-        assert session.player.stattab.player is session.player
-        session.player.stattab.send_update(session, retmsg) # should be up to date from load_tech/auras_and_init_stattab()
-
-        retmsg.append(["QUEST_STATE_UPDATE", session.player.completed_quests])
-
-        retmsg.append(["PLAYER_TRAVEL_UPDATE", session.player.travel_state])
-
-        # check cache and begin background retrieval of user's Facebook info
-        user.populate_friends_who_play(retmsg)
 
         if session.user.frame_platform == 'fb':
             user.retrieve_facebook_info(retmsg)
@@ -22169,17 +22087,132 @@ class GAMEAPI(resource.Resource):
         session.send_adnetwork_visit_event(retmsg)
         session.send_adnetwork_events(retmsg)
 
-        # accept any queued messages the user has received
-        mail_stat = self.do_receive_mail(session, retmsg, is_login = True)
-        show_battle_history = mail_stat.get('was_attacked', False)
+        # record acquisition data (for this visit)
+        user.update_acquisition_data(acq_data, session.player)
 
-        # send applicable daily messages
-        session.player.get_daily_messages(session, retmsg)
+        retmsg.append(["SERVER_HELLO",
+                       gamedata["version"],
+                       session.user.user_id,
+                       session_id,
+                       server_time, # not used anymore!
+                       session.user.facebook_name,
+                       session.player.tutorial_state,
+                       session.player.player_preferences,
+                       needs_daily_attack,
+                       session.user.country,
+                       session.player.country_tier,
+                       session.player.price_region,
+                       session.player.history['logged_in_times'],
+                       session.player.abtests,
+                       session.player.is_developer(),
+                       session.user.is_suspicious(),
+                       session.player.isolate_pvp,
+                       session.user.acquisition_campaign,
+                       session.player.my_home.base_id,
+                       session.player.history.get('money_spent',0),
+                       session.player.creation_time,
+                       session.player.chat_seen,
+                       session.user.is_chat_mod(),
+                       session.player.get_daily_banner(session, retmsg)
+                       ])
+        retmsg.append(["PLAYER_UI_NAME_UPDATE", session.user.get_ui_name(session.player)])
+        retmsg.append(["PLAYER_ALIAS_UPDATE", session.player.alias])
+        retmsg.append(["PLAYER_TITLES_UPDATE", session.player.title])
 
         # check for promo codes
         if ('spin_promo_code' in url_qs):
             for code in url_qs['spin_promo_code']:
                 session.player.apply_promo_code(session, retmsg, code)
+
+        if session.player.tutorial_state == "COMPLETE":
+            # force repairs to start to avoid exploits where you leave your own buildings unrepaired
+            self.do_start_repairs(session, None, session.player.my_home.base_id, repair_units = False)
+
+            session.player.ladder_point_decay_check(session, retmsg) # login
+
+        if session.user.frame_platform == 'fb':
+            retmsg.append(["FACEBOOK_CURRENCY_UPDATE", session.user.facebook_currency])
+            if session.user.facebook_third_party_id:
+                retmsg.append(["FACEBOOK_THIRD_PARTY_ID_UPDATE", session.user.facebook_third_party_id])
+
+        # note: sends both SQUADS_UPDATE and PLAYER_ARMY_UPDATE
+        session.player.ping_squads_and_send_update(session, retmsg, originator=session.player.user_id, reason='SERVER_HELLO')
+
+        d = defer.Deferred() # we'll return this for the caller
+        self.change_session(request, session, retmsg, dest_user_id = user.user_id, force = True).addBoth(lambda success, self=self, session=session, retmsg=retmsg, d=d: self.complete_client_hello2(d, session, retmsg))
+        return d
+
+    def complete_client_hello2(self, d, session, retmsg):
+        try:
+            start_time = time.time()
+            self.do_complete_client_hello2(d, session, retmsg)
+            end_time = time.time()
+            admin_stats.record_latency('complete_client_hello2', end_time - start_time)
+            return
+        except:
+            retmsg[:] = [["ERROR", "SERVER_EXCEPTION"]] # blow away old message, because session is not going to be set up
+            gamesite.exception_log.event(server_time, ('complete_client_hello2 Exception (player %d): ' % session.user.user_id) + traceback.format_exc())
+
+        # failure path
+        gamesite.lock_client.player_lock_release(session.user.user_id, -1, Player.LockState.logged_in, expected_owner_id = session.user.user_id)
+        d.callback(None) # return error instead of session
+
+    def do_complete_client_hello2(self, d, session, retmsg):
+        user = session.user
+        player = session.player
+
+        if player.tutorial_state != "COMPLETE":
+            spawn_tutorial_units(session, retmsg)
+
+        retmsg.append(["TECH_UPDATE", session.player.tech])
+        retmsg.append(["COOLDOWNS_UPDATE", session.player.cooldowns])
+        session.player.send_inventory_update(retmsg)
+
+        retmsg.append(["PLAYER_UNIT_EQUIP_UPDATE", session.player.unit_equipment])
+        assert session.player.stattab.player is session.player
+        session.player.stattab.send_update(session, retmsg) # should be up to date from load_tech/auras_and_init_stattab()
+
+        retmsg.append(["QUEST_STATE_UPDATE", session.player.completed_quests])
+
+        retmsg.append(["PLAYER_TRAVEL_UPDATE", session.player.travel_state])
+
+        # set up alliance state, but catch errors so the login doesn't bug out
+        alliance_info = None
+        alliance_membership = None
+        alliance_chat_catchup_messages = []
+        alliance_join_requests = None
+        try:
+            alliance_info, alliance_membership = session.init_alliance(alliance_chat_catchup_messages, reason = 'SERVER_HELLO')
+
+            # fix missing alliances_joined count in player_history, for quest purposes
+            if alliance_info and ('alliances_joined' not in session.player.history): session.player.history['alliances_joined'] = 1
+
+            # for leaders, get pending join requests
+            if alliance_info and (alliance_info.get('leader_id', -1) == session.player.user_id):
+                alliance_join_requests = gamesite.sql_client.poll_join_requests(session.player.user_id, alliance_info['id'], server_time, reason='SERVER_HELLO')
+
+            if session.alliance_chat_channel and gamedata['server']['chat_alliance_logins']:
+                session.do_chat_send(session.alliance_chat_channel, 'I logged in!', bypass_gag = True, props = {'type':'logged_in'})
+        except:
+            gamesite.exception_log.event(server_time, 'Error setting up alliance state for player %d for SERVER_HELLO:\n%s' % \
+                                         (user.user_id, traceback.format_exc()))
+
+        # accept any queued messages the user has received
+        mail_stat = self.do_receive_mail(session, retmsg, is_login = True)
+        show_battle_history = mail_stat.get('was_attacked', False)
+
+        # send alliance state
+        retmsg.append(["ALLIANCE_UPDATE", alliance_info['id'] if alliance_info else -1, (not mail_stat.get('new_alliance', False)), alliance_info, alliance_membership, mail_stat.get('new_alliance_role', False)])
+        if alliance_chat_catchup_messages: retmsg += alliance_chat_catchup_messages
+        if alliance_join_requests:
+            pcache_data = self.do_query_player_cache(session, alliance_join_requests, reason = 'ALLIANCE_JOIN_REQUESTS')
+            retmsg.append(["ALLIANCE_JOIN_REQUESTS", alliance_join_requests, pcache_data])
+
+        # check cache and begin background retrieval of user's Facebook info
+        user.populate_friends_who_play(retmsg)
+
+        # send applicable daily messages
+        session.player.get_daily_messages(session, retmsg)
 
         session.player.send_mailbox_update(retmsg)
 
@@ -22188,13 +22221,6 @@ class GAMEAPI(resource.Resource):
 
         # note: achievements update should come AFTER history update, so that client will resolve PLAYER_HISTORY predicates in achievements correctly
         retmsg.append(["ACHIEVEMENTS_UPDATE", session.player.achievements])
-
-        # send alliance state
-        retmsg.append(["ALLIANCE_UPDATE", alliance_info['id'] if alliance_info else -1, (not mail_stat.get('new_alliance', False)), alliance_info, alliance_membership, mail_stat.get('new_alliance_role', False)])
-        if alliance_chat_catchup_messages: retmsg += alliance_chat_catchup_messages
-        if alliance_join_requests:
-            pcache_data = self.do_query_player_cache(session, alliance_join_requests, reason = 'ALLIANCE_JOIN_REQUESTS')
-            retmsg.append(["ALLIANCE_JOIN_REQUESTS", alliance_join_requests, pcache_data])
 
         if session.player.tutorial_state == "COMPLETE" and Predicates.read_predicate(gamedata['client']['motd_filter']).is_satisfied(session.player,None):
             # check if player is due for various popups
@@ -22248,16 +22274,6 @@ class GAMEAPI(resource.Resource):
 
         retmsg.append(["MAP_BOOKMARKS_UPDATE", session.player.map_bookmarks])
 
-        if session.player.tutorial_state == "COMPLETE":
-            # force repairs to start to avoid exploits where you leave your own buildings unrepaired
-            # XXXXXX this should be moved before initial session change!
-            self.do_start_repairs(session, None, session.player.my_home.base_id, repair_units = False)
-
-            session.player.ladder_point_decay_check(session, retmsg) # login
-
-        if abuse_warning_msg:
-            retmsg += abuse_warning_msg
-
         self.send_player_cache_update(session, 'login') # mainly for uninstalled flag and last_login_time
 
         # mark end of login messages
@@ -22269,7 +22285,7 @@ class GAMEAPI(resource.Resource):
         # we have to bump the expected next serial number here
         session.incoming_serial += 1
         session_table[session.session_id] = session
-        d.callback(True)
+        d.callback(session)
 
     # like login, logout is broken into pre- and post-I/O portions
 
@@ -26409,11 +26425,12 @@ class GameSite(server.Site):
                 session.attack_finish_time = -1
                 # change_session will unlock the victim's state for us
                 session.visit_base_in_progress = True
-                # session.is_async = True # ?
+                session.is_async = True
                 d = self.gameapi.change_session(None, session, session.outgoing_messages, dest_user_id = session.user.user_id, force = True)
-                d.addBoth(lambda _: session.flush_outgoing_messages())
-
-                need_flush = True
+                def after_change_session(session, change_session_result):
+                    session.is_async = False
+                    session.flush_outgoing_messages()
+                d.addBoth(functools.partial(after_change_session, session))
 
             if (not session.sprobe_in_progress):
                 sprobe_config = gamedata['server'].get('sprobe',None)
