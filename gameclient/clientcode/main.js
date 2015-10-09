@@ -5437,6 +5437,8 @@ session.set_battle_outcome_dirty = function() {
 
 // player state
 var player = {};
+
+/** @dict */
 player.resource_state = {
     "space": [0,0], // [provided,occupied]
     "gamebucks": -1,
@@ -37298,7 +37300,7 @@ function update_new_store_sku(d) {
             d.widgets['price_display'].str = Store.display_user_currency_price(shown_price);
             d.widgets['price_display'].tooltip.str = Store.display_user_currency_price_tooltip(shown_price);
             d.user_data['ui_price_str'] = Store.display_user_currency_amount(shown_price, 'full');
-            d.user_data['should_confirm_purchase'] = (price >= 0) && (sale_currency == 'fbcredits' || (player.resource_state.gamebucks >= shown_price));
+            d.user_data['should_confirm_purchase'] = (price >= 0) && (sale_currency == 'fbcredits' || (player.resource_state['gamebucks'] >= shown_price));
         } else if(sale_currency.indexOf('item:') === 0) {
             d.widgets['price_display'].str = (shown_price > 0 ? pretty_print_number(shown_price) : '-');
             var currency_item_spec = ItemDisplay.get_inventory_item_spec(sale_currency.split(':')[1]);
