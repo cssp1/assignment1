@@ -2919,7 +2919,7 @@ SPUI.TextInput = function(data) {
     this.multiline = ('multiline' in data ? data['multiline'] : false);
     this.clip_to = data['clip_to'] || null;
     this.allowed_chars = data['allowed_chars'] || null;
-    this.disallowed_chars = null;
+    this.disallowed_chars = data['disallowed_chars'] || null;
     this.force_uppercase = data['force_uppercase'] || false;
     this.state = 'normal';
 

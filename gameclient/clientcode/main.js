@@ -22346,6 +22346,83 @@ function update_mail_dialog_context(dialog) {
     }
 }
 
+/** If any items in item_list is marked "ui_precious", pop up a confirmation dialog about deleting them.
+    Otherwise run the callback immediately.
+    @param {!Array.<!Object>} item_list
+    @param {function()} action_cb */
+function confirm_item_delete(item_list, action_cb) {
+    var need_confirm = goog.array.some(item_list, function(item) {
+        var spec = ItemDisplay.get_inventory_item_spec(item['spec']);
+        return !!spec['ui_precious'];
+    });
+    if(need_confirm) {
+        var precious_first = goog.array.clone(item_list);
+        precious_first.sort(function(a, b) {
+            var a_is_precious = !!(ItemDisplay.get_inventory_item_spec(a['spec'])['ui_precious']);
+            var b_is_precious = !!(ItemDisplay.get_inventory_item_spec(b['spec'])['ui_precious']);
+            if(a_is_precious && !b_is_precious) {
+                return -1;
+            } else if(!a_is_precious && b_is_precious) {
+                return 1;
+            } else {
+                return 0;
+            }
+        });
+
+        var ui_item_list = goog.array.map(precious_first, function(item) {
+            var spec = ItemDisplay.get_inventory_item_spec(item['spec']);
+            var ui_name = ItemDisplay.get_inventory_item_ui_name(spec);
+            var descr = ('stack' in item ? ItemDisplay.get_inventory_item_stack_prefix(spec, item['stack']) : '') + ui_name;
+            return descr;
+        });
+        invoke_item_delete_confirm_dialog(action_cb, ui_item_list);
+        return;
+    } else {
+        action_cb();
+    }
+}
+
+/** @param {function()} action_cb
+    @param {!Array.<string>} ui_item_list */
+function invoke_item_delete_confirm_dialog(action_cb, ui_item_list) {
+    var dialog = new SPUI.Dialog(gamedata['dialogs']['item_delete_confirm_dialog']);
+    dialog.user_data['dialog'] = 'item_delete_confirm_dialog';
+    dialog.user_data['action_cb'] = action_cb;
+
+    dialog.modal = true;
+    install_child_dialog(dialog);
+
+    dialog.widgets['close_button'].onclick = close_parent_dialog;
+
+    var ui_descr = dialog.data['widgets']['description']['ui_name'];
+    dialog.widgets['description'].set_text_bbcode(ui_descr.replace('%thing',ui_item_list.join(', ')));
+
+    dialog.widgets['ok_button'].onclick = dialog.widgets['input'].ontextready = function(w) {
+        var dialog = w.parent;
+        if(dialog.widgets['input'].str.toUpperCase() != dialog.data['widgets']['input']['require_string']) { return; } // mismatch
+        var cb = dialog.user_data['action_cb'];
+        close_parent_dialog(w);
+        cb();
+    };
+    dialog.widgets['input'].ontype = function(w) {
+        var dialog = w.parent;
+        dialog.widgets['ok_button'].state = (dialog.widgets['input'].str.toUpperCase() == dialog.data['widgets']['input']['require_string']) ? 'normal' : 'disabled';
+    };
+    SPUI.set_keyboard_focus(dialog.widgets['input']);
+
+    // dynamic resizing, making room for description text
+//    dialog.widgets['description'].wh = [dialog.data['widgets']['description']['dimensions'][0],
+//                                        dialog.widgets['description'].font.leading * (dialog.widgets['description'].str.split('\n').length - 1)];
+    dialog.widgets['description'].update_dims();
+    dialog.wh = [dialog.data['dimensions'][0],
+                 dialog.data['dimensions'][1] + Math.max(0, dialog.widgets['description'].wh[1] - dialog.data['widgets']['description']['dimensions'][1] )];
+    dialog.widgets['bg'].wh = dialog.wh;
+    dialog.apply_layout();
+    dialog.auto_center();
+
+    return dialog;
+}
+
 /** @param {string=} msg */
 function invoke_loot_dialog(msg) {
     if(player.loot_buffer.length < 1) { return null; }
@@ -22380,9 +22457,13 @@ function invoke_loot_dialog(msg) {
                                     {'cancel_button': true,
                                      'ok_button_ui_name': s['ui_button'],
                                      'on_ok': (function (_w) { return function() {
-                                         send_to_server.func(["LOOT_BUFFER_RELEASE", player.loot_buffer]);
-                                         player.loot_buffer = [];
-                                         close_parent_dialog(_w);
+
+                                         confirm_item_delete(player.loot_buffer, (function (__w) { return function() {
+                                             if(__w.parent) { close_parent_dialog(__w); }
+                                             send_to_server.func(["LOOT_BUFFER_RELEASE", player.loot_buffer]);
+                                             player.loot_buffer = [];
+                                         }; })(_w));
+
                                      }; })(w)});
     };
     init_inventory_grid(dialog);
@@ -23372,7 +23453,12 @@ function invoke_inventory_context(inv_dialog, parent_widget, slot, item, show_dr
                     invoke_child_message_dialog(s['ui_title'].replace('%s', ui_name), descr,
                                                 {'cancel_button': true,
                                                  'ok_button_ui_name': s['ui_button'],
-                                                 'on_ok': (function (__cb, _w) { return function() { __cb(_w); }; })(_cb, w)});
+                                                 'on_ok': (function (__cb, _w, __item) { return function() {
+                                                     // extra layer of confirmation for precious items
+                                                     confirm_item_delete([__item], (function (___cb, __w) { return function() {
+                                                         ___cb(__w);
+                                                     }; })(__cb, _w));
+                                                 }; })(_cb, w, _item)});
                 }; })(cb, item, i, want_refund);
             } else {
                 widget.onclick = cb;
