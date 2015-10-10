@@ -2955,10 +2955,10 @@ class Session(object):
 
         # list of incoming bundles of game messages ([serial, messsages])
         # being held because earlier messages haven't been received yet
-        self.message_buffer = []
+        self.message_buffer = [] # XXXXXX rename to incoming_messages
         self.lagged_out = False
 
-        # flag indicating we have an async HTTP request in progress
+        # flag indicating we have an async HTTP request in progress, and should wait before handling any new messages
         self.is_async = False
 
         # park the longpoll HTTP request here
@@ -3442,26 +3442,23 @@ class Session(object):
             # do not increment for automated messages like alliance join/kick/achieve/etc
             dict_increment(self.player.history, 'chat_messages_sent', 1)
 
-    def send(self, msglist, flush_now = False, sync = False):
+    def send(self, msglist, flush_now = False):
         self.outgoing_messages += msglist
         if flush_now or gamedata['server'].get('deferred_message_coalesce_time',1) < 0:
-            return self.flush_outgoing_messages(sync = sync)
+            self.flush_outgoing_messages()
         else:
             gamesite.gameapi.add_deferred_session(self)
-        return None
 
-    def flush_outgoing_messages(self, sync = False):
+    def flush_outgoing_messages(self):
         if self.longpoll_request:
-            gamesite.gameapi.run_deferred_actions(self, self.outgoing_messages, reason = 'longpoll')
-
+            gamesite.gameapi.run_deferred_actions(self, self.outgoing_messages, reason = 'flush_outgoing_messages')
             if len(self.outgoing_messages) > 0 or self.logout_in_progress:
                 request = self.longpoll_request
                 if (not self.logout_in_progress) and self.longpoll_request_time < 0:
                     pass # reuse the same request again!
                 else:
                     self.longpoll_request = None
-                return gamesite.gameapi.complete_longpoll(request, self, sync = sync)
-        return None
+                gamesite.gameapi.complete_longpoll(request, self)
 
     # function for sending chat messages to the client
     def chat_recv(self, channel, sender_info, text, force = False, retmsg = None):
@@ -21434,7 +21431,7 @@ class GAMEAPI(resource.Resource):
         request.write(r)
         request.finish()
 
-    def complete_longpoll(self, request, session, sync = False):
+    def complete_longpoll(self, request, session):
         msg = session.outgoing_messages[:]
         del session.outgoing_messages[:] # note: do not create a new array, since in-flight async requests may reference it
 
@@ -21446,22 +21443,21 @@ class GAMEAPI(resource.Resource):
                             'msg': msg})
         session.outgoing_serial += 1
 
-        if sync:
-            assert request.__class__ is not WSFakeRequest
-            return r
+#        if sync:
+#            assert request.__class__ is not WSFakeRequest
+#            return r
         if hasattr(request, '_disconnected') and request._disconnected: return
         request.write(r)
         request.finish()
 
     def handle_longpoll(self, request, session):
-        if session.longpoll_request: # overlapped request, return the previous one
+        if session.longpoll_request: # overlapped request, respond to the previous one immediately
             self.complete_longpoll(session.longpoll_request, session)
         session.longpoll_request = request
         session.longpoll_request_time = server_time
         if len(session.outgoing_messages) > 0 or session.logout_in_progress:
-            # plan to return immediately if messages are pending, or if we're on our way out
-            ret = session.send([], flush_now = False, sync = True)
-            if ret is not None: return ret
+            # plan to respond immediately if messages are pending, or if we're on our way out
+            reactor.callLater(0, session.flush_outgoing_messages)
         return server.NOT_DONE_YET # park the request
 
     # the login process is broken into two parts:
