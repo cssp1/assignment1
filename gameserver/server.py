@@ -2917,7 +2917,7 @@ class Session(object):
     class AsyncLogout:
         def __init__(self, parent):
             self.parent = parent
-            self.cbs = []
+            self.defers = []
             self.wrote_user = False
             self.wrote_player = False
         def user_cb(self):
@@ -2928,12 +2928,11 @@ class Session(object):
             self.try_finish()
         def try_finish(self):
             if (self.wrote_user) and (self.wrote_player):
-                cblist = self.cbs
-                self.cbs = []
-                if cblist:
-                    for cb in cblist:
-                        cb()
-
+                d_list = self.defers
+                self.defers = []
+                if d_list:
+                    for d in d_list:
+                        d.callback(True)
 
     def __init__(self, session_id, user, player, login_time):
         assert user.active_session is None
@@ -2994,7 +2993,7 @@ class Session(object):
         self.complete_attack_in_progress = False
         self.complete_attack_defers = None
 
-        # prevents overlapping logouts and maintains callback list
+        # prevents overlapping logouts and maintains deferred list
         self.logout_in_progress = None
 
         # these are reset each time the connected user views a different base
@@ -12594,7 +12593,7 @@ class CONTROLAPI(resource.Resource):
 
     def kill_session(self, request, session, body = None):
         if not body: body = 'ok\n'
-        self.gameapi.log_out_async(session, 'forced_relog', lambda : SpinHTTP.complete_deferred_request(body, request))
+        self.gameapi.log_out_async(session, 'forced_relog').addBoth(lambda _, body=body, request=request: SpinHTTP.complete_deferred_request(body, request))
         return server.NOT_DONE_YET
 
     # function for receiving cross-server IPC broadcasts
@@ -21677,15 +21676,10 @@ class GAMEAPI(resource.Resource):
         if wait_for_session:
 
             # best to just stop the login attempt right here.
-            if gamedata['server'].get('stop_abnormal_logins',True):
-                if gamedata['server']['log_abnormal_logins'] >= 2:
-                    gamesite.exception_log.event(server_time, 'stopping login for user %d after %s' % (user_id, wait_reason))
-                retmsg.append(["ERROR", "CANNOT_LOG_IN_SIMULTANEOUS"])
-                return False
-
-            self.log_out_async(wait_for_session, wait_reason,
-                               functools.partial(self.handle_client_hello, request, client_ip, user_agent, arg, retmsg))
-            return True
+            if gamedata['server']['log_abnormal_logins'] >= 2:
+                gamesite.exception_log.event(server_time, 'stopping login for user %d after %s' % (user_id, wait_reason))
+            retmsg.append(["ERROR", "CANNOT_LOG_IN_SIMULTANEOUS"])
+            return False
 
         # ensure that only one login on a user_id runs to successful completion
         self.AsyncLogin.cancel_existing(user_id, client_session_id)
@@ -22559,26 +22553,29 @@ class GAMEAPI(resource.Resource):
         gamesite.pcache_client.player_cache_update(session.user.user_id, cache_props, reason = reason)
 
     # new asynchronous logout
-    def log_out_async(self, session, method, cb, force = False):
+    def log_out_async(self, session, method, force = False):
         ascdebug('log_out_async %d' % (session.user.user_id))
+        d = defer.Deferred()
 
         if session.logout_in_progress:
-            if session.logout_in_progress.cbs is None:
+            if session.logout_in_progress.defers is None:
                 # session has ALREADY finished logging out - this is a dangling reference!
-                # we must call the callback, but callers of this function assume it's async, so use callLater
-                reactor.callLater(0, cb)
+                # we must fire the deferred
+                reactor.callLater(0, lambda: d.callback(True))
             else:
                 if force:
                     # do not call complete_attack(), just kill the session
-                    self.log_out_async2(session, method, cb, force)
+                    self.log_out_async2(session, method, d, force)
                 else:
-                    session.logout_in_progress.cbs.append(cb)
+                    session.logout_in_progress.defers.append(d)
         else:
             # if an attack was going on, clean it up
             # then continue with log_out_async2
-            self.complete_attack(session, session.outgoing_messages, reason='log_out_async').addBoth(lambda _, self=self, session=session, method=method, cb=cb, force=force: self.log_out_async2(session, method, cb, force))
+            self.complete_attack(session, session.outgoing_messages, reason='log_out_async').addBoth(lambda _, self=self, session=session, method=method, d=d, force=force: self.log_out_async2(session, method, d, force))
 
-    def log_out_async2(self, session, method, cb, force):
+        return d
+
+    def log_out_async2(self, session, method, d, force):
         ascdebug('log_out_async2 %d' % (session.user.user_id))
 
         if not session.logout_in_progress:
@@ -22589,19 +22586,27 @@ class GAMEAPI(resource.Resource):
                 self.complete_longpoll(request, session)
 
             self.log_out_preflush(session, method)
-            session.logout_in_progress.cbs.append(functools.partial(self.log_out_postflush, session)) # mandatory unlock callback
-            session.logout_in_progress.cbs.append(cb) # add user-provided callback
+
+            # begin with the mandatory unlock callback
+            postflush_d = defer.Deferred()
+            postflush_d.addBoth(lambda _, self=self, session=session: self.log_out_postflush(session))
+            session.logout_in_progress.defers.append(postflush_d)
+
+            # chain the user-provided callback after postflush
+            postflush_d.addBoth(d.callback)
+
             player_table.store_async(session.player, session.logout_in_progress.player_cb, True, 'logout')
             user_table.store_async(session.user, session.logout_in_progress.user_cb, True, 'logout')
             return
 
         else: # logout is already in progress
-            session.logout_in_progress.cbs.append(cb) # add user-provided callback
+            # add the user-provided callback
+            session.logout_in_progress.defers.append(d)
 
             if force:
                 # it looks like the session is broken - we tried to shut it down, but the async stores failed
                 # -> force async completion
-                # (this assumes self.log_out_postflush is already in the AsyncLogout cblist, so that the locks will be released)
+                # (this assumes self.log_out_postflush is already in the AsyncLogout defer list, so that the locks will be released)
                 gamesite.exception_log.event(server_time, 'log_out_async2: force-dropping broken session for player %d - possible data loss!' % (session.user.user_id))
                 session.logout_in_progress.wrote_user = True
                 session.logout_in_progress.wrote_player = True
@@ -22810,7 +22815,8 @@ class GAMEAPI(resource.Resource):
             return True
 
         elif arg[0] == "LOGOUT":
-            self.log_out_async(session, 'onunload', functools.partial(self.complete_deferred_request, request, session, retmsg))
+            d = self.log_out_async(session, 'onunload')
+            d.addBoth(lambda _, self=self, request=request, session=session, retmsg=retmsg: self.complete_deferred_request(request, session, retmsg))
             return True
 
         elif arg[0] == "CLIENT_SYNC":
@@ -25872,7 +25878,9 @@ class GAMEAPI(resource.Resource):
         # records this to the exceptions log to pick up hacking/fuzzing attempts
         # then logs out the client
         retmsg.append(["ERROR", "SERVER_PROTOCOL"])
-        self.log_out_async(session, 'prococol_error', functools.partial(self.complete_deferred_request, request, session, retmsg))
+        d = self.log_out_async(session, 'protocol_error')
+        d.addBoth(lambda _, self=self, request=request, session=session, retmsg=retmsg: self.complete_deferred_request(request, session, retmsg))
+
         if gamedata['server']['log_protocol_errors']:
             gamesite.exception_log.event(server_time, ('user %d sent invalid message: ' % session.user.user_id) + repr(arg))
         return True
@@ -26206,7 +26214,7 @@ class GameSite(server.Site):
     # immediately kick all sessions, even if they are stuck on I/O
     def panic_kick(self):
         for session in session_table.values():
-            self.gameapi.log_out_async(session, 'panic', lambda: None, force = True)
+            self.gameapi.log_out_async(session, 'panic', force = True)
 
     # print Python stack frame to trace log upon receiving SIGUSR1
     def handle_SIGUSR1(self, signum, frm):
@@ -26248,28 +26256,18 @@ class GameSite(server.Site):
         # server is shutting down - forcefully log out all active sessions
 
         # need to wait for all async logouts to finish before proceeding
-        waiting_on = {}
-        semaphore = defer.Deferred()
-
-        def try_finish(waiting_on, id, semaphore):
-            del waiting_on[id]
-            if len(waiting_on) == 0:
-                semaphore.callback(1)
-                self.nosql_client.server_status_update(spin_server_name, None, reason='shutdown')
-
-        for id, session in session_table.items():
-            waiting_on[id] = session
-            self.gameapi.log_out_async(session_table[id], 'server_restart',
-                                       functools.partial(try_finish, waiting_on, id, semaphore))
+        waiting_on = []
+        for session in session_table.itervalues():
+            waiting_on.append(self.gameapi.log_out_async(session, 'server_shutdown'))
 
         print 'logging out %d active sessions' % len(waiting_on)
+        semaphore = defer.DeferredList(waiting_on, consumeErrors = True)
 
-        if len(waiting_on) == 0:
-            semaphore.callback(1)
-            self.nosql_client.server_status_update(spin_server_name, None, reason='shutdown')
-            return None
-        else:
-            return semaphore
+        # send a final server status update when we're finished
+        # note: if waiting_on is empty, this will fire synchronously
+        semaphore.addCallback(lambda _, self=self: self.nosql_client.server_status_update(spin_server_name, None, reason='shutdown'))
+
+        return semaphore
 
     def server_status_func(self):
         try:
@@ -26301,7 +26299,7 @@ class GameSite(server.Site):
             for session in session_table.values():
                 if session.logout_in_progress: continue
                 try:
-                    self.gameapi.log_out_async(session, 'maint_kick', lambda: None)
+                    self.gameapi.log_out_async(session, 'maint_kick')
                 except:
                     self.exception_log.event(server_time, ('bgfunc exception due to damaged session %d during server_restart kick (POSSIBLE DATA LOSS): ' % (session.user.user_id)) + \
                                              traceback.format_exc())
@@ -26373,7 +26371,7 @@ class GameSite(server.Site):
 
             if kick_reason:
                 try:
-                    self.gameapi.log_out_async(session, kick_reason, lambda: None)
+                    self.gameapi.log_out_async(session, kick_reason)
                 except:
                     self.exception_log.event(server_time, ('bgfunc exception due to damaged session %d during kick for %s (POSSIBLE DATA LOSS): ' % (session.user.user_id, kick_reason)) + \
                                              traceback.format_exc())
