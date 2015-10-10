@@ -16858,9 +16858,11 @@ class GAMEAPI(resource.Resource):
     def query_achievements(self, request, session, retmsg, arg):
         id = arg[1]; tag = arg[2]
 
-        def complete_query(self, session, retmsg, tag, result):
+        d = defer.Deferred()
+
+        def complete_query(self, d, session, retmsg, tag, result):
             retmsg.append(["QUERY_ACHIEVEMENTS_RESULT", tag, result])
-            self.complete_async_request(session)
+            d.callback(True)
 
         result = None
 
@@ -16871,7 +16873,7 @@ class GAMEAPI(resource.Resource):
             result = session.viewing_player.achievements
 
         if result is not None:
-            reactor.callLater(0, functools.partial(complete_query, self, session, retmsg, tag, result))
+            reactor.callLater(0, functools.partial(complete_query, self, d, session, retmsg, tag, result))
         else:
             # otherwise do an async load
             # XXX this could be vulnerable to DDOS
@@ -16879,10 +16881,10 @@ class GAMEAPI(resource.Resource):
                 result = player.achievements if (success and player) else None
                 continuation(result)
             player_table.lookup_async(session.player, id, False,
-                                      functools.partial(player_cb, functools.partial(complete_query, self, session, retmsg, tag)),
+                                      functools.partial(player_cb, functools.partial(complete_query, self, d, session, retmsg, tag)),
                                       'query_achievements')
 
-        return True # async
+        return d # async
 
     # simulate player cache query results by just reading from the in-memory player
     def get_player_cache_props(self, user, player, alliance_id):
@@ -17007,25 +17009,27 @@ class GAMEAPI(resource.Resource):
                 # try S3 download
                 bucket = AttackLog.storage_s3_bucket()
                 name = AttackLog.storage_s3_name(AttackLog.base_name(battle_time, attacker, defender, base_id))
-                def cb(self, request, session, retmsg, tag, success, buf):
+                d = defer.Deferred()
+                def cb(self, d, session, retmsg, tag, success, buf):
                     ret = None
                     if success and buf and (buf != 'NOTFOUND'):
                         start_time = time.time()
                         ret = map(SpinJSON.loads, gzip.GzipFile(fileobj=cStringIO.StringIO(buf)).readlines())
                         admin_stats.record_latency('GET_BATTLE_LOG3(s3 parse)', time.time()-start_time)
                     retmsg.append(["GET_BATTLE_LOG3_RESULT", tag, ret])
-                    self.complete_async_request(session)
+                    d.callback(True)
                 io_system.do_async_read((bucket,name),
-                                        functools.partial(cb, self, request, session, retmsg, tag, True),
-                                        functools.partial(cb, self, request, session, retmsg, tag, False),
+                                        functools.partial(cb, self, d, session, retmsg, tag, True),
+                                        functools.partial(cb, self, d, session, retmsg, tag, False),
                                         0)
-                return True # go async
+                return d # go async
         except:
             gamesite.exception_log.event(server_time, 'error reading battle log %s on behalf of player %d: %s' % \
                                          (filename, session.player.user_id, traceback.format_exc()))
             ret = None
 
         retmsg.append(["GET_BATTLE_LOG3_RESULT", tag, ret])
+        return None # not async
 
     def do_complete_quest(self, session, retmsg, questname):
         quest = session.player.get_abtest_quest(questname)
@@ -21330,10 +21334,11 @@ class GAMEAPI(resource.Resource):
                             session.last_action.append([latency_tag, server_time, session.last_active_time == server_time])
 
                         if go_async:
+                            assert isinstance(go_async, defer.Deferred)
                             # go asynchronous, breaking out of message processing here
-                            # eventually whichever callback (XXXXXX deferred) resolves the async status must call complete_async_request()
                             session.is_async = True
-                            return True
+                            go_async.addBoth(lambda _, self=self, session=session: self.complete_async_request(session))
+                            return
 
                     except Exception:
                         gamesite.exception_log.event(server_time, 'handle_message_guts exception %s msg %s: %s' % (session.dump_exception_state(), latency_tag, traceback.format_exc()))
@@ -21352,8 +21357,6 @@ class GAMEAPI(resource.Resource):
                 i = 0
             else:
                 i += 1
-
-        return False
 
     # we're about to send a response to the client. Run any pending batched actions.
     def run_deferred_actions(self, session, retmsg, reason = 'unknown'):
@@ -21713,7 +21716,7 @@ class GAMEAPI(resource.Resource):
             admin_stats.record_latency('complete_client_hello', end_time - start_time)
             if d is not None:
                 # note: if complete_client_hello2() fails, the session arg here will be None
-                d.addBoth(lambda session, request=request, retmsg=retmsg: self.complete_async_request(session) if session else self.complete_deferred_request(request, None, retmsg))
+                d.addBoth(lambda session, request=request, retmsg=retmsg: self.complete_async_request(session) if session else self.complete_deferred_request(request, None, retmsg)) # OK
 
         except:
             retmsg[:] = [["ERROR", "SERVER_EXCEPTION"]] # blow away old message, because session is not going to be set up
@@ -22808,14 +22811,10 @@ class GAMEAPI(resource.Resource):
                         return
 
             session.visit_base_in_progress = True
-            d = self.change_session(request, session, retmsg, dest_user_id = dest_id, dest_base_id = dest_base_id, force = True, new_ladder_state = ladder_state, delay = delay, client_props = client_props)
-            d.addBoth(lambda _, self=self, session=session: self.complete_async_request(session))
-            return True
+            return self.change_session(request, session, retmsg, dest_user_id = dest_id, dest_base_id = dest_base_id, force = True, new_ladder_state = ladder_state, delay = delay, client_props = client_props)
 
         elif arg[0] == "LOGOUT":
-            d = self.log_out_async(session, 'onunload')
-            d.addBoth(lambda _, self=self, session=session: self.complete_async_request(session))
-            return True
+            return self.log_out_async(session, 'onunload')
 
         elif arg[0] == "CLIENT_SYNC":
             retmsg.append(["SERVER_SYNC", arg[1]])
@@ -23268,9 +23267,7 @@ class GAMEAPI(resource.Resource):
 
             # go back home
             session.visit_base_in_progress = True
-            d = self.change_session(request, session, retmsg, dest_user_id = session.player.user_id, force = True)
-            d.addBoth(lambda _, self=self, session=session: self.complete_async_request(session))
-            return True
+            return self.change_session(request, session, retmsg, dest_user_id = session.player.user_id, force = True)
 
         elif arg[0] == "QUARRY_QUERY":
             tag = arg[1]
@@ -24049,9 +24046,10 @@ class GAMEAPI(resource.Resource):
                 bdict = batch.get_qs_dict()
                 rdict = {}
                 tag_list = sorted(bdict.keys())
+                master_d = defer.Deferred()
 
                 # launch next query in chain
-                def next_query(request, session, retmsg, retmsg_tag, result, user_ids, sql_query_i_addrs, batch, bdict, rdict, tag_list, i, last_result):
+                def next_query(master_d, session, retmsg, retmsg_tag, result, user_ids, sql_query_i_addrs, batch, bdict, rdict, tag_list, i, last_result):
                     if i > 0: # remember result from previous successful query
                         rdict[tag_list[i-1]] = last_result
 
@@ -24063,31 +24061,30 @@ class GAMEAPI(resource.Resource):
                                 result[u][sql_query_i_addrs[j][0]] = sql_result[u][j]
                         # complete async request
                         retmsg.append(["QUERY_PLAYER_SCORES_RESULT", user_ids, result, retmsg_tag, None])
-                        gamesite.gameapi.complete_async_request(session)
+                        if master_d: master_d.callback(True)
                         return
 
-                    def on_error(request, session, retmsg, retmsg_tag, result, user_ids, failure):
+                    def on_error(master_d, session, retmsg, retmsg_tag, result, user_ids, failure):
                         # complete async request, returning the incomplete results
                         #retmsg.append(["ERROR", "SCORES_OFFLINE"])
                         retmsg.append(["QUERY_PLAYER_SCORES_RESULT", user_ids, result, retmsg_tag, 'SCORES_OFFLINE'])
-                        gamesite.gameapi.complete_async_request(session)
-                        return
+                        if master_d: master_d.callback(True)
 
                     if not gamesite.sql_scores2_client:
-                        on_error(request, session, retmsg, retmsg_tag, result, user_ids, Exception('Scores2 SQL client is down'))
-                        return
+                        on_error(None, session, retmsg, retmsg_tag, result, user_ids, Exception('Scores2 SQL client is down'))
+                        return # not async
 
                     qs, qs_args = bdict[tag_list[i]]
                     d = gamesite.sql_scores2_client.sql_client.runQuery(qs, qs_args) # "SELECT pg_sleep(2); "+qs for latency testing
                     if d is None:
-                        on_error(request, session, retmsg, retmsg_tag, result, user_ids, Exception('Scores2 SQL server is down'))
-                        return
+                        on_error(None, session, retmsg, retmsg_tag, result, user_ids, Exception('Scores2 SQL server is down'))
+                        return # not async
 
-                    d.addCallbacks(functools.partial(next_query, request, session, retmsg, retmsg_tag, result, user_ids, sql_query_i_addrs, batch, bdict, rdict, tag_list, i+1),
-                                   functools.partial(on_error, request, session, retmsg, retmsg_tag, result, user_ids))
+                    d.addCallbacks(functools.partial(next_query, master_d, session, retmsg, retmsg_tag, result, user_ids, sql_query_i_addrs, batch, bdict, rdict, tag_list, i+1),
+                                   functools.partial(on_error, master_d, session, retmsg, retmsg_tag, result, user_ids))
 
-                reactor.callLater(0, functools.partial(next_query, request, session, retmsg, tag, result, user_ids, sql_query_i_addrs, batch, bdict, rdict, tag_list, -1, None))
-                return True # go async
+                reactor.callLater(0, functools.partial(next_query, master_d, session, retmsg, tag, result, user_ids, sql_query_i_addrs, batch, bdict, rdict, tag_list, -1, None))
+                return master_d # go async
 
             elif sql_query_i_addrs: # client asked for historical scores, but we cannot provide them
                 offline_msg = 'SCORES_OFFLINE'
@@ -25066,10 +25063,9 @@ class GAMEAPI(resource.Resource):
                         retmsg.append(["COOLDOWNS_UPDATE", session.player.cooldowns])
                         retmsg.append(["TECH_UPDATE", session.player.tech])
                         retmsg.append(["QUEST_STATE_UPDATE", session.player.completed_quests])
-                        self.complete_async_request(session)
 
                     d.addBoth(functools.partial(after_session_change, self, session, retmsg))
-                    return True
+                    return d # async
 
             elif spellname == "CHEAT_SPAWN_UNITS":
                 if not session.player.is_cheater:
@@ -25128,10 +25124,9 @@ class GAMEAPI(resource.Resource):
 
                         def after_session_change(self, session, retmsg, filename, change_session_result):
                             retmsg.append(["LOAD_AI_BASE_RESULT", True, None, filename])
-                            self.complete_async_request(session)
 
                         d.addBoth(functools.partial(after_session_change, self, session, retmsg, filename))
-                        return True
+                        return d # async
 
                     except:
                         error_msg = traceback.format_exc()
@@ -25252,17 +25247,18 @@ class GAMEAPI(resource.Resource):
                 # offline mutation.
 
                 rq = AsyncHTTP.AsyncHTTPRequester(-1, -1, 10, 0, lambda x: gamesite.exception_log.event(server_time, x))
-                def finish(self, request, session, retmsg, spellname, target_id, response_or_error):
+                d = defer.Deferred()
+                def finish(self, d, session, retmsg, spellname, target_id, response_or_error):
                     retmsg.append([spellname+"_RESULT", target_id, True])
-                    self.complete_async_request(session)
+                    d.callback(True)
                 host = SpinConfig.config['proxyserver'].get('external_host', gamesite.config.game_host)
                 port = SpinConfig.config['proxyserver']['external_http_port']
                 rq.queue_request(server_time, 'http://%s:%d/CONTROLAPI?' % (host,port) + urllib.urlencode({'method':spellname.lower(),
                                                                                                            'user_id':target_id,
                                                                                                            'secret':SpinConfig.config['proxy_api_secret']}),
-                                 functools.partial(finish, self, request, session, retmsg, spellname, target_id),
-                                 error_callback = functools.partial(finish, self, request, session, retmsg, spellname, target_id))
-                return True # go async
+                                 functools.partial(finish, self, d, session, retmsg, spellname, target_id),
+                                 error_callback = functools.partial(finish, self, d, session, retmsg, spellname, target_id))
+                return d # go async
 
             elif spellname == "ALLIANCE_CREATE" or spellname == "ALLIANCE_MODIFY":
                 props = spellargs[0]
@@ -25876,12 +25872,10 @@ class GAMEAPI(resource.Resource):
         # records this to the exceptions log to pick up hacking/fuzzing attempts
         # then logs out the client
         retmsg.append(["ERROR", "SERVER_PROTOCOL"])
-        d = self.log_out_async(session, 'protocol_error')
-        d.addBoth(lambda _, self=self, session=session: self.complete_async_request(session))
-
         if gamedata['server']['log_protocol_errors']:
             gamesite.exception_log.event(server_time, ('user %d sent invalid message: ' % session.user.user_id) + repr(arg))
-        return True
+
+        return self.log_out_async(session, 'protocol_error')
 
 # subclass of Twisted's built-in web server
 # this adds periodic function calls to perform background tasks for the game
