@@ -1826,7 +1826,7 @@ class User:
                     # note: send AFTER executing spell, so that player state is already updated
                     if 'tag' in payment_data: retmsg.append(["FBPAYMENT_ORDER_ACK", payment_data['tag']])
         if async_request:
-            gamesite.gameapi.complete_deferred_request(async_request, session, retmsg)
+            gamesite.gameapi.complete_async_request(session)
 
     def retrieve_facebook_credit_info_start(self):
         if self.credit_info_request_outstanding:
@@ -2961,6 +2961,9 @@ class Session(object):
         # flag indicating we have an async HTTP request in progress, and should wait before handling any new messages
         self.is_async = False
 
+        # park the current synchronous HTTP request here
+        self.sync_request = None
+
         # park the longpoll HTTP request here
         self.longpoll_request = None
         self.longpoll_request_time = -1 # note! if longpoll_request is not None, and this is <0, that means "reuse the same longpoll_request after flush" (for websockets)
@@ -3450,8 +3453,18 @@ class Session(object):
             gamesite.gameapi.add_deferred_session(self)
 
     def flush_outgoing_messages(self):
+        gamesite.gameapi.handle_message_buffer(None, self, self.outgoing_messages) # XXXXXX remove request arg
+        if self.is_async:
+            return
+        gamesite.gameapi.run_deferred_actions(self, self.outgoing_messages, reason = 'flush_outgoing_messages')
+
+        if self.sync_request:
+            req = self.sync_request
+            self.sync_request = None
+            gamesite.gameapi.complete_deferred_request(req, self, []) # OK - this is the "true" call
+            return
+
         if self.longpoll_request:
-            gamesite.gameapi.run_deferred_actions(self, self.outgoing_messages, reason = 'flush_outgoing_messages')
             if len(self.outgoing_messages) > 0 or self.logout_in_progress:
                 request = self.longpoll_request
                 if (not self.logout_in_progress) and self.longpoll_request_time < 0:
@@ -16847,7 +16860,7 @@ class GAMEAPI(resource.Resource):
 
         def complete_query(self, session, retmsg, tag, result):
             retmsg.append(["QUERY_ACHIEVEMENTS_RESULT", tag, result])
-            self.complete_deferred_request(request, session, retmsg)
+            self.complete_async_request(session)
 
         result = None
 
@@ -17001,7 +17014,7 @@ class GAMEAPI(resource.Resource):
                         ret = map(SpinJSON.loads, gzip.GzipFile(fileobj=cStringIO.StringIO(buf)).readlines())
                         admin_stats.record_latency('GET_BATTLE_LOG3(s3 parse)', time.time()-start_time)
                     retmsg.append(["GET_BATTLE_LOG3_RESULT", tag, ret])
-                    self.complete_deferred_request(request, session, retmsg)
+                    self.complete_async_request(session)
                 io_system.do_async_read((bucket,name),
                                         functools.partial(cb, self, request, session, retmsg, tag, True),
                                         functools.partial(cb, self, request, session, retmsg, tag, False),
@@ -21245,11 +21258,15 @@ class GAMEAPI(resource.Resource):
                 session.longpoll_request = http_request
                 session.longpoll_request_time = -1 # no need to force a keepalive, and reuse this request multiple times
 
-        is_async = self.handle_message_buffer(http_request, session, session.outgoing_messages)
-        if not is_async:
-            reactor.callLater(0, self.complete_deferred_request, http_request, session, [])
+        session.sync_request = http_request
+        reactor.callLater(0, session.flush_outgoing_messages)
         return server.NOT_DONE_YET
 
+    def complete_async_request(self, session):
+        if not session.sync_request or not session.is_async:
+            gamesite.exception_log.event(server_time, 'complete_async_request in unexpected state: sync_request %r is_async %r %s' % (session.sync_request, session.is_async, ''.join(traceback.format_stack())))
+        session.is_async = False
+        reactor.callLater(0, session.flush_outgoing_messages)
 
     # process as many bundles of AJAX messages on a session as possible
     # may terminate early if bundles are out of order, or may go asynchronous
@@ -21314,7 +21331,7 @@ class GAMEAPI(resource.Resource):
 
                         if go_async:
                             # go asynchronous, breaking out of message processing here
-                            # eventually the relevant async callback should call complete_deferred_request()
+                            # eventually whichever callback (XXXXXX deferred) resolves the async status must call complete_async_request()
                             session.is_async = True
                             return True
 
@@ -21398,24 +21415,7 @@ class GAMEAPI(resource.Resource):
             r = SpinJSON.dumps({'serial':-1, 'clock': server_time, 'msg': retmsg})
 
         else:
-
             # note: IGNORE retmsg here - all traffic is on session.outgoing_messages
-
-            session.is_async = False
-
-            # process any new pending messages
-            self.handle_message_buffer(request, session, session.outgoing_messages)
-            if session.is_async:
-                return
-
-            self.run_deferred_actions(session, session.outgoing_messages, reason = 'complete_deferred_request')
-
-            # sometimes this is called from a non-request context (e.g. bgtask calling complete_attack() on a timed-out session)
-            # if so, don't run the normal path. But flush deferred messages.
-            if request is None:
-                session.flush_outgoing_messages()
-                return
-
             if gamesite.raw_log:
                 client_str = 'sid %s' % pretty_print_session(session.session_id)
                 log.msg(('to   client (%s:%d): ' % (client_str, session.outgoing_serial))+repr(retmsg))
@@ -21556,7 +21556,7 @@ class GAMEAPI(resource.Resource):
                 if gamedata['server']['log_abnormal_logins'] >= 2:
                     gamesite.exception_log.event(server_time, 'ignoring user/player data for cancelled login %d: %s' % (self.user_id, self.cancel_reason))
                 self.retmsg.append(["ERROR", self.cancel_reason])
-                return self.api.complete_deferred_request(self.request, None, self.retmsg)
+                return self.api.complete_deferred_request(self.request, None, self.retmsg) # OK - do want to work with the raw request here
             assert self.has_lock
             del self.in_progress_by_user_id[self.user_id]
             del self.in_progress_by_session_id[self.session_id]
@@ -21713,7 +21713,7 @@ class GAMEAPI(resource.Resource):
             admin_stats.record_latency('complete_client_hello', end_time - start_time)
             if d is not None:
                 # note: if complete_client_hello2() fails, the session arg here will be None
-                d.addBoth(lambda session, request=request, retmsg=retmsg: self.complete_deferred_request(request, session, retmsg))
+                d.addBoth(lambda session, request=request, retmsg=retmsg: self.complete_async_request(session) if session else self.complete_deferred_request(request, None, retmsg))
 
         except:
             retmsg[:] = [["ERROR", "SERVER_EXCEPTION"]] # blow away old message, because session is not going to be set up
@@ -21721,7 +21721,7 @@ class GAMEAPI(resource.Resource):
 
         if d is None: # failure path
             gamesite.lock_client.player_lock_release(user_id, -1, Player.LockState.logged_in, expected_owner_id = user_id)
-            self.complete_deferred_request(request, None, retmsg)
+            self.complete_deferred_request(request, None, retmsg) # OK - failure path
 
     def do_complete_client_hello(self, request, retmsg, user_id, frame_platform, social_id, auth_token, lockgen, user, player, session_id,
                                  metrics_anon_id, user_demographics, client_browser_caps, client_session_data, query_string, client_permissions, client_login_country,
@@ -21932,6 +21932,8 @@ class GAMEAPI(resource.Resource):
 
         # upon success, retmsg will be ignored, and future client messages should go via session.outgoing_messages
         session.outgoing_messages = retmsg # !!!
+        session.sync_request = request
+        session.is_async = True
 
         # get rid of old combat debris
         player.update_inerts()
@@ -22807,12 +22809,12 @@ class GAMEAPI(resource.Resource):
 
             session.visit_base_in_progress = True
             d = self.change_session(request, session, retmsg, dest_user_id = dest_id, dest_base_id = dest_base_id, force = True, new_ladder_state = ladder_state, delay = delay, client_props = client_props)
-            d.addBoth(lambda _, self=self, request=request, session=session, retmsg=retmsg: self.complete_deferred_request(request, session, retmsg))
+            d.addBoth(lambda _, self=self, session=session: self.complete_async_request(session))
             return True
 
         elif arg[0] == "LOGOUT":
             d = self.log_out_async(session, 'onunload')
-            d.addBoth(lambda _, self=self, request=request, session=session, retmsg=retmsg: self.complete_deferred_request(request, session, retmsg))
+            d.addBoth(lambda _, self=self, session=session: self.complete_async_request(session))
             return True
 
         elif arg[0] == "CLIENT_SYNC":
@@ -23267,7 +23269,7 @@ class GAMEAPI(resource.Resource):
             # go back home
             session.visit_base_in_progress = True
             d = self.change_session(request, session, retmsg, dest_user_id = session.player.user_id, force = True)
-            d.addBoth(lambda _, self=self, request=request, session=session, retmsg=retmsg: self.complete_deferred_request(request, session, retmsg))
+            d.addBoth(lambda _, self=self, session=session: self.complete_async_request(session))
             return True
 
         elif arg[0] == "QUARRY_QUERY":
@@ -24061,14 +24063,14 @@ class GAMEAPI(resource.Resource):
                                 result[u][sql_query_i_addrs[j][0]] = sql_result[u][j]
                         # complete async request
                         retmsg.append(["QUERY_PLAYER_SCORES_RESULT", user_ids, result, retmsg_tag, None])
-                        gamesite.gameapi.complete_deferred_request(request, session, retmsg)
+                        gamesite.gameapi.complete_async_request(session)
                         return
 
                     def on_error(request, session, retmsg, retmsg_tag, result, user_ids, failure):
                         # complete async request, returning the incomplete results
                         #retmsg.append(["ERROR", "SCORES_OFFLINE"])
                         retmsg.append(["QUERY_PLAYER_SCORES_RESULT", user_ids, result, retmsg_tag, 'SCORES_OFFLINE'])
-                        gamesite.gameapi.complete_deferred_request(request, session, retmsg)
+                        gamesite.gameapi.complete_async_request(session)
                         return
 
                     if not gamesite.sql_scores2_client:
@@ -25064,7 +25066,7 @@ class GAMEAPI(resource.Resource):
                         retmsg.append(["COOLDOWNS_UPDATE", session.player.cooldowns])
                         retmsg.append(["TECH_UPDATE", session.player.tech])
                         retmsg.append(["QUEST_STATE_UPDATE", session.player.completed_quests])
-                        self.complete_deferred_request(request, session, retmsg)
+                        self.complete_async_request(session)
 
                     d.addBoth(functools.partial(after_session_change, self, session, retmsg))
                     return True
@@ -25126,7 +25128,7 @@ class GAMEAPI(resource.Resource):
 
                         def after_session_change(self, session, retmsg, filename, change_session_result):
                             retmsg.append(["LOAD_AI_BASE_RESULT", True, None, filename])
-                            self.complete_deferred_request(request, session, retmsg)
+                            self.complete_async_request(session)
 
                         d.addBoth(functools.partial(after_session_change, self, session, retmsg, filename))
                         return True
@@ -25252,7 +25254,7 @@ class GAMEAPI(resource.Resource):
                 rq = AsyncHTTP.AsyncHTTPRequester(-1, -1, 10, 0, lambda x: gamesite.exception_log.event(server_time, x))
                 def finish(self, request, session, retmsg, spellname, target_id, response_or_error):
                     retmsg.append([spellname+"_RESULT", target_id, True])
-                    self.complete_deferred_request(request, session, retmsg)
+                    self.complete_async_request(session)
                 host = SpinConfig.config['proxyserver'].get('external_host', gamesite.config.game_host)
                 port = SpinConfig.config['proxyserver']['external_http_port']
                 rq.queue_request(server_time, 'http://%s:%d/CONTROLAPI?' % (host,port) + urllib.urlencode({'method':spellname.lower(),
@@ -25875,7 +25877,7 @@ class GAMEAPI(resource.Resource):
         # then logs out the client
         retmsg.append(["ERROR", "SERVER_PROTOCOL"])
         d = self.log_out_async(session, 'protocol_error')
-        d.addBoth(lambda _, self=self, request=request, session=session, retmsg=retmsg: self.complete_deferred_request(request, session, retmsg))
+        d.addBoth(lambda _, self=self, session=session: self.complete_async_request(session))
 
         if gamedata['server']['log_protocol_errors']:
             gamesite.exception_log.event(server_time, ('user %d sent invalid message: ' % session.user.user_id) + repr(arg))
