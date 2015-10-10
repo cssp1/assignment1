@@ -216,9 +216,9 @@
 
     "idle_check": {
         "enforce": 1, // allow PolicyBot to take action
-        "enable_if": {"predicate": "TIME_IN_GAME", "seconds": 181440, "within_last": 604800}, // logged in at least 30% of the time for the last week
+        "enable_if": {"predicate": "TIME_IN_GAME", "seconds": 201600, "within_last": 604800}, // logged in at least 33% of the time for the last week
         "keep_history_for": 604800, // keep 1 week of success/fail history
-        "interval": 14400, // check every 4 hours
+        "interval": 28800, // check every 8 hours
         "max_tries": 3, // allow this many incorrect answers before failing
         "timeout": 120, // time limit for response
         "max_timeouts": 2 // allow this many timeouts before failing
