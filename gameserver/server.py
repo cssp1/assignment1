@@ -22226,8 +22226,7 @@ class GAMEAPI(resource.Resource):
             # check if player is due for various popups
             force_time = session.player.get_any_abtest_value('motd_refresh_time', gamedata['server']['message_of_the_day'].get('refresh_time',-1))
             if ((server_time - session.player.last_motd) > gamedata['client']['motd_interval']) or \
-               (session.player.last_motd < force_time) or \
-               'force_motd' in url_qs:
+               (session.player.last_motd < force_time):
                 session.player.last_motd = server_time
                 session.player.get_daily_tips(session, retmsg)
 
@@ -26423,7 +26422,10 @@ class GameSite(server.Site):
                     # (either the client's clock is way out of sync, or very lagged, or the player is trying to cheat by changing his clock to get more battle time)
                     gamesite.exception_log.event(server_time, 'user %d - forcing long attack at %d:%s to conclude (client inactive %d sec)' % (session.user.user_id, session.viewing_user.user_id, session.viewing_base.base_id, client_inactive_time))
                 session.attack_finish_time = -1
-                # change_session will unlock the victim's state for us
+
+                # note: change_session will unlock the victim's state for us
+
+                # XXXXXX do this by appending something to the message queue, not by calling inline
                 session.visit_base_in_progress = True
                 session.is_async = True
                 d = self.gameapi.change_session(None, session, session.outgoing_messages, dest_user_id = session.user.user_id, force = True)
