@@ -19542,18 +19542,11 @@ class GAMEAPI(resource.Resource):
         loc = spellargs[0]
         unit_id_list = spellargs[1]
 
-        if session.complete_attack_in_progress:
-            # This can happen due to race conditions, like the server
-            # forcing attack completion and then the client sending
-            # DEPLOY_UNITS before it becomes aware the battle is over.
-            # Just ignore the invalid request.
-            return False
-
         if session.home_base:
             retmsg.append(["ERROR", "SERVER_PROTOCOL"])
             return False
 
-        if session.complete_attack_in_progress or session.visit_base_in_progress or session.logout_in_progress or (not session.has_attacked and (session.viewing_base_lock is not None)):
+        if (not session.has_attacked and (session.viewing_base_lock is not None)):
             retmsg.append(["ERROR", "SERVER_PROTOCOL"])
             gamesite.exception_log.event(server_time, 'do_attack() with invalid session state: %s args [%r,%r]' % (session.dump_exception_state(), loc, unit_id_list))
             return False
