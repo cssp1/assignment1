@@ -3086,12 +3086,15 @@ class Session(object):
     # this should be called by any internal function that wants to prevent further message handling
     # on the session until the Deferred completes.
     def start_async_request(self, d):
+        if d in self.async_ds: return d # duplicate
+
 #        if self.async_ds:
 #            gamesite.exception_log.event(server_time, 'start_async_request overlap: async_ds %r %s' % (self.async_ds, ''.join(traceback.format_stack())))
 
         self.async_ds.append(d)
         # ensure we communicate back to the client as soon as async processing finishes
         d.addBoth(lambda _, self=self, d=d: self.complete_async_request(d))
+        return d # for syntactic convenience only
 
     def complete_async_request(self, d):
         # note: this is called BY an async_d firing, so don't fire it again!
@@ -3102,10 +3105,13 @@ class Session(object):
             self.async_ds.remove(d)
 
         if not self.async_ds: # totally drained - flush now
+
+            # XXX should we ignore these if the session got logged out?
             cb_list = self.after_async
             self.after_async = []
             for cb in cb_list:
                 reactor.callLater(0, cb)
+
             # and finally respond to the client. If one of the above cbs makes us async again, this will do nothing.
             reactor.callLater(0, self.flush_outgoing_messages)
 
@@ -3496,7 +3502,9 @@ class Session(object):
         if self.is_async():
             # we're in the middle of further async processing - don't respond yet
             return
-        gamesite.gameapi.run_deferred_actions(self, self.outgoing_messages, reason = 'flush_outgoing_messages')
+
+        if not self.logout_in_progress:
+            gamesite.gameapi.run_deferred_actions(self, self.outgoing_messages, reason = 'flush_outgoing_messages')
 
         # send outgoing messages with current sync request(s)
         if self.sync_requests:
@@ -12642,7 +12650,8 @@ class CONTROLAPI(resource.Resource):
 
     def kill_session(self, request, session, body = None):
         if not body: body = 'ok\n'
-        self.gameapi.log_out_async(session, 'forced_relog').addBoth(lambda _, body=body, request=request: SpinHTTP.complete_deferred_request(body, request))
+        session.after_async_request(lambda request=request, body=body: \
+                                    self.gameapi.log_out_async(session, 'forced_relog').addBoth(lambda _, body=body, request=request: SpinHTTP.complete_deferred_request(body, request)))
         return server.NOT_DONE_YET
 
     # function for receiving cross-server IPC broadcasts
@@ -12785,29 +12794,35 @@ class CONTROLAPI(resource.Resource):
 
             if session:
                 # ONLINE edit
-                # XXX really should delay until after_async_request() here
-                try:
-                    val = handler.exec_online(session, session.outgoing_messages)
-                except:
-                    gamesite.exception_log.event(server_time, 'CustomerSupport online exception player %d method %r args %r:\n%s' % (user_id, method_name, args, traceback.format_exc()))
-                    val = CustomerSupport.ReturnValue(error = traceback.format_exc())
 
-                if val.async:
-                    assert isinstance(val.async, defer.Deferred) # sanity check
-                    ret = server.NOT_DONE_YET
+                ret = server.NOT_DONE_YET
 
-                    def after_async(async_result, request, session):
-                        session.flush_outgoing_messages()
-                        SpinHTTP.complete_deferred_request(async_result.as_body(), request)
-                    val.async.addBoth(after_async, request, session)
+                def handle_online(request, session, handler, method_name, args):
+                    try:
+                        val = handler.exec_online(session, session.outgoing_messages)
+                    except:
+                        gamesite.exception_log.event(server_time, 'CustomerSupport online exception player %d method %r args %r:\n%s' % \
+                                                     (session.user.user_id, method_name, args, traceback.format_exc()))
+                        val = CustomerSupport.ReturnValue(error = traceback.format_exc())
 
-                else:
-                    if val.kill_session:
-                        ret = self.kill_session(request, session, body = val.as_body())
+                    if val.async:
+                        assert isinstance(val.async, defer.Deferred) # sanity check
+                        ret = server.NOT_DONE_YET
+
+                        def after_async(async_result, request, session):
+                            SpinHTTP.complete_deferred_request(async_result.as_body(), request)
+                        session.start_async_request(val.async)
+                        val.async.addBoth(after_async, request, session)
+
                     else:
-                        ret = val.as_body()
+                        if val.kill_session:
+                            ret = self.kill_session(request, session, body = val.as_body())
+                        else:
+                            ret = val.as_body()
+                        session.flush_outgoing_messages()
+                        SpinHTTP.complete_deferred_request(ret, request)
 
-                session.flush_outgoing_messages()
+                session.after_async_request(functools.partial(handle_online, request, session, handler, method_name, args))
 
             else:
                 # OFFLINE edit
@@ -12840,12 +12855,13 @@ class CONTROLAPI(resource.Resource):
                 return 'badmethod\n'
 
             handler_args = copy.deepcopy(args)
+            session = None
+
             # common code for methods that operate on a user
             # replace 'user_id' arg with 'session'
             if 'user_id' in handler_args:
                 user_id = int(args['user_id'])
                 del handler_args['user_id']
-                session = None
                 for s in session_table.itervalues():
                     if s.user.user_id == user_id:
                         session = s
@@ -12856,8 +12872,16 @@ class CONTROLAPI(resource.Resource):
                 else:
                     handler_args['session'] = session
 
+            if session:
+                ret = server.NOT_DONE_YET
+                def after_handle(request, session, handler_ret):
+                    session.flush_outgoing_messages()
+                    if handler_ret is server.NOT_DONE_YET: return # handler will complete the deferred request
+                    SpinHTTP.complete_deferred_request(handler_ret if handler_ret is not None else 'ok\n', request)
 
-            ret = handler(request, **handler_args)
+                session.after_async_request(lambda handler=handler, request=request, session=session, handler_args=handler_args: after_handle(request, session, handler(request, **handler_args)))
+            else:
+                ret = handler(request, **handler_args)
 
         # note: can go asynchronous
         return ret if (ret is not None) else 'ok\n'
