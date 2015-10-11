@@ -20588,12 +20588,6 @@ class GAMEAPI(resource.Resource):
         recalc_resources = False
         recalc_power = False
 
-        if session.visit_base_in_progress:
-            if gamedata['server'].get('log_combat_race_conditions', False):
-                gamesite.exception_log.event(server_time, 'object_combat_updates: player %d visit_base_in_progress' % \
-                                             (session.player.user_id))
-            return
-
         # for each affected object
         for a in arg:
             id, client_specname, newxy, newhp, neworders, killer_info, newpatrol = a
@@ -21410,8 +21404,7 @@ class GAMEAPI(resource.Resource):
     def run_deferred_actions(self, session, retmsg, reason = 'unknown'):
         if session.deferred_ping_squads:
             session.deferred_ping_squads = False
-            if not session.logout_in_progress:
-                session.player.ping_squads_and_send_update(session, retmsg, originator = session.player.user_id, reason='run_deferred_actions(%s)' % reason)
+            session.player.ping_squads_and_send_update(session, retmsg, originator = session.player.user_id, reason='run_deferred_actions(%s)' % reason)
 
         if session.deferred_ladder_point_decay_check:
             session.deferred_ladder_point_decay_check = False
@@ -22667,9 +22660,10 @@ class GAMEAPI(resource.Resource):
     def handle_message_guts(self, session, arg, retmsg):
 
         if arg[0] == "VISIT_BASE" or arg[0] == "VISIT_BASE2" or arg[0] == "VISIT_LADDER_RIVAL":
-            if session.visit_base_in_progress:
-                # do not allow overlapping client-initiated requests
-                return
+            # do not allow overlapping client-initiated requests
+            assert not session.visit_base_in_progress
+            assert not session.complete_attack_in_progress
+
             if session.incoming_attack_pending():
                 # don't allow the player to change sessions if an AI attack is about to occur
                 retmsg.append(["ERROR", "INCOMING_ATTACK_PENDING"])
@@ -26454,7 +26448,7 @@ class GameSite(server.Site):
                 need_flush = True
 
             # check for sessions where an attack has been going on for too long
-            elif (session.has_attacked) and (not session.visit_base_in_progress) and (not session.complete_attack_in_progress) and \
+            elif (session.has_attacked) and (not session.is_async()) and \
                  (session.attack_finish_time > 0) and (server_time >= session.attack_finish_time):
                 # force the attack to conclude
                 client_inactive_time = server_time - session.last_active_time
@@ -26467,7 +26461,7 @@ class GameSite(server.Site):
                 # note: change_session will unlock the victim's state for us
                 d = defer.Deferred()
                 def force_attack_end(self, session):
-                    if (session.has_attacked) and (not session.visit_base_in_progress) and (not session.complete_attack_in_progress) and (not session.logout_in_progress):
+                    if session.has_attacked:
                         self.gameapi.change_session(session, session.outgoing_messages, dest_user_id = session.user.user_id, force = True)
 
                 d.addCallback(lambda _, self=self, session=session: force_attack_end(self, session))
