@@ -18378,8 +18378,7 @@ function invoke_battle_end_dialog(battle_type, battle_base, battle_opponent_user
     var dialog = new SPUI.Dialog(dialog_data);
     dialog.user_data['dialog'] = 'battle_dialog';
 
-    change_selection_ui(dialog);
-    // install_child_dialog(dialog); // XXXXXX make sure this doesn't break the tutorial
+    install_child_dialog(dialog);
     dialog.auto_center();
     dialog.modal = true;
 
@@ -18463,8 +18462,8 @@ function invoke_battle_end_dialog(battle_type, battle_base, battle_opponent_user
         dialog.widgets['trophy_sunken'].tooltip.str = dialog.data['widgets']['trophy_sunken']['ui_tooltip'].replace('%s', gamedata['strings']['leaderboard']['categories']['trophies_'+trophy_type]['short_title']);
     }
 
-    dialog.widgets['ok_button'].onclick = (function (_outcome, _base) { return function() {
-        change_selection(null);
+    dialog.widgets['ok_button'].onclick = (function (_outcome, _base) { return function(w) {
+        close_parent_dialog(w);
         if(player.tutorial_state === 'battle_end_message') {
             advance_tutorial();
         }
@@ -18556,7 +18555,7 @@ function invoke_fancy_victory_dialog(battle_type, battle_base, battle_opponent_u
     dialog.user_data['dialog'] = 'fancy_victory_dialog';
     dialog.user_data['context'] = null;
     dialog.user_data['anim_start_time'] = client_time;
-    change_selection_ui(dialog);
+    install_child_dialog(dialog);
     dialog.auto_center();
     dialog.modal = true;
 
@@ -18850,8 +18849,8 @@ function invoke_fancy_victory_dialog(battle_type, battle_base, battle_opponent_u
             dialog.widgets['repair_not_necessary_button'].show = false;
 
     dialog.widgets['close_button'].onclick =
-        dialog.widgets['ok_button'].onclick = (function (_outcome, _base) { return function() {
-            change_selection(null);
+        dialog.widgets['ok_button'].onclick = (function (_outcome, _base) { return function(w) {
+            close_parent_dialog(w);
             if(player.tutorial_state === 'battle_end_message') {
                 advance_tutorial();
             }
