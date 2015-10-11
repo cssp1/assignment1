@@ -12948,7 +12948,8 @@ class CONTROLAPI(resource.Resource):
     def handle_shutdown(self, request, force = False):
         if (not force) and len(session_table) > 0:
             return SpinJSON.dumps({'error':'not shutting down - %d sessions still active\n' % len(session_table)})
-        reactor.callLater(5, reactor.stop) # ugly hack - make sure the response gets written
+        # make sure the response to this gets written before shutting everything down
+        request.notifyFinish().addBoth(lambda _: reactor.stop())
         return SpinJSON.dumps({'result':'ok'})
     def handle_terminate(self, request, session = None):
         if session:
