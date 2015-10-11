@@ -3094,6 +3094,13 @@ class Session(object):
         self.async_d = None
         reactor.callLater(0, self.flush_outgoing_messages)
 
+    # call this function after we come out of async wait (or immediately if not waiting)
+    def after_async_request(self, cb):
+        if self.async_d:
+            self.async_d.addBoth(lambda _, cb=cb: cb())
+        else:
+            reactor.callLater(0, cb)
+
     def record_activity_sample(self, force = False):
         interval = gamedata['server'].get('activity_classifier_interval',300)
         t = int(server_time/interval)*interval
@@ -26414,8 +26421,7 @@ class GameSite(server.Site):
                 need_flush = True
 
             # check for sessions where an attack has been going on for too long
-            elif (not session.async_d) and \
-                 (session.has_attacked) and (not session.visit_base_in_progress) and (not session.complete_attack_in_progress) and \
+            elif (session.has_attacked) and (not session.visit_base_in_progress) and (not session.complete_attack_in_progress) and \
                  (session.attack_finish_time > 0) and (server_time >= session.attack_finish_time):
                 # force the attack to conclude
                 client_inactive_time = server_time - session.last_active_time
@@ -26426,11 +26432,13 @@ class GameSite(server.Site):
                 session.attack_finish_time = -1
 
                 # note: change_session will unlock the victim's state for us
+                def force_attack_end(self, session):
+                    if (session.has_attacked) and (not session.visit_base_in_progress) and (not session.complete_attack_in_progress) and (not session.logout_in_progress):
+                        session.visit_base_in_progress = True
+                        d = self.gameapi.change_session(None, session, session.outgoing_messages, dest_user_id = session.user.user_id, force = True)
+                        session.start_async_request(d)
 
-                # XXXXXX do this by appending something to the message queue, not by calling inline
-                session.visit_base_in_progress = True
-                d = self.gameapi.change_session(None, session, session.outgoing_messages, dest_user_id = session.user.user_id, force = True)
-                session.start_async_request(d)
+                session.after_async_request(functools.partial(force_attack_end, self, session))
 
             if (not session.sprobe_in_progress):
                 sprobe_config = gamedata['server'].get('sprobe',None)
