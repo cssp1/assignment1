@@ -2954,15 +2954,15 @@ class Session(object):
         self.last_action = collections.deque([], gamedata['server']['ADMIN']['last_action_buf'])
 
         # list of incoming bundles of game messages ([serial, messsages])
-        # being held because earlier messages haven't been received yet
+        # being held because earlier messages haven't been received or completely handled yet
         self.message_buffer = [] # XXXXXX rename to incoming_messages
         self.lagged_out = False
 
         # flag indicating we have an async HTTP request in progress, and should wait before handling any new messages
         self.is_async = False
 
-        # park the current synchronous HTTP request here
-        self.sync_request = None
+        # park current synchronous HTTP requests here. They will be completed as soon as the session is no longer async.
+        self.sync_requests = []
 
         # park the longpoll HTTP request here
         self.longpoll_request = None
@@ -3458,12 +3458,15 @@ class Session(object):
             return
         gamesite.gameapi.run_deferred_actions(self, self.outgoing_messages, reason = 'flush_outgoing_messages')
 
-        if self.sync_request:
-            req = self.sync_request
-            self.sync_request = None
-            gamesite.gameapi.complete_deferred_request(req, self, []) # OK - this is the "true" call
+        # send outgoing messages with current sync request(s)
+        if self.sync_requests:
+            while self.sync_requests:
+                req = self.sync_requests[0]
+                del self.sync_requests[0]
+                gamesite.gameapi.complete_deferred_request(req, self, []) # OK - this is the "true" call
             return
 
+        # send outgoing messages via longpoll
         if self.longpoll_request:
             if len(self.outgoing_messages) > 0 or self.logout_in_progress:
                 request = self.longpoll_request
@@ -21262,13 +21265,13 @@ class GAMEAPI(resource.Resource):
                 session.longpoll_request = http_request
                 session.longpoll_request_time = -1 # no need to force a keepalive, and reuse this request multiple times
 
-        session.sync_request = http_request
+        session.sync_requests.append(http_request)
         reactor.callLater(0, session.flush_outgoing_messages)
         return server.NOT_DONE_YET
 
     def complete_async_request(self, session):
-        if not session.sync_request or not session.is_async:
-            gamesite.exception_log.event(server_time, 'complete_async_request in unexpected state: sync_request %r is_async %r %s' % (session.sync_request, session.is_async, ''.join(traceback.format_stack())))
+        if not session.sync_requests or not session.is_async:
+            gamesite.exception_log.event(server_time, 'complete_async_request in unexpected state: sync_request %r is_async %r %s' % (session.sync_requests, session.is_async, ''.join(traceback.format_stack())))
         session.is_async = False
         reactor.callLater(0, session.flush_outgoing_messages)
 
@@ -21935,7 +21938,8 @@ class GAMEAPI(resource.Resource):
 
         # upon success, retmsg will be ignored, and future client messages should go via session.outgoing_messages
         session.outgoing_messages = retmsg # !!!
-        session.sync_request = request
+        # kick-start HTTP request processing
+        session.sync_requests.append(request)
         session.is_async = True
 
         # get rid of old combat debris
