@@ -2962,7 +2962,7 @@ class Session(object):
 
         # Maintain a list of Deferreds we are waiting on during async message handling.
         self.async_ds = []
-        self.after_async = [] # list of callbacks to call once we finish async message handling.
+        self.after_async = [] # list of Deferreds to fire once we finish async message handling.
 
         # park current synchronous HTTP requests here. They will be completed as soon as the session is no longer async.
         self.sync_requests = []
@@ -3107,20 +3107,24 @@ class Session(object):
         if not self.async_ds: # totally drained - flush now
 
             # XXX should we ignore these if the session got logged out?
-            cb_list = self.after_async
+            d_list = self.after_async
             self.after_async = []
-            for cb in cb_list:
-                reactor.callLater(0, cb)
+            for d in d_list:
+                if self.logout_in_progress:
+                    # fail the call, since we've started logging out
+                    reactor.callLater(0, d.errback, Exception('player %d logged out' % self.user.user_id))
+                else:
+                    reactor.callLater(0, d.callback, True)
 
             # and finally respond to the client. If one of the above cbs makes us async again, this will do nothing.
             reactor.callLater(0, self.flush_outgoing_messages)
 
-    # call this function after we come out of async wait (or immediately if not waiting)
-    def after_async_request(self, cb):
+    # fire this deferred after we come out of async wait (or immediately if not waiting)
+    def after_async_request(self, d):
         if self.async_ds:
-            self.after_async.append(cb)
+            self.after_async.append(d)
         else:
-            reactor.callLater(0, cb)
+            reactor.callLater(0, d.callback, True)
 
     def is_async(self): return bool(self.async_ds)
 
@@ -12650,8 +12654,12 @@ class CONTROLAPI(resource.Resource):
 
     def kill_session(self, request, session, body = None):
         if not body: body = 'ok\n'
-        session.after_async_request(lambda request=request, body=body: \
-                                    self.gameapi.log_out_async(session, 'forced_relog').addBoth(lambda _, body=body, request=request: SpinHTTP.complete_deferred_request(body, request)))
+        d = defer.Deferred()
+        d.addCallback(lambda _, self=self, session=session, request=request, body=body: self.gameapi.log_out_async(session, 'forced_relog').addBoth(lambda _, body=body, request=request: SpinHTTP.complete_deferred_request(body, request)))
+        # player already logged out - just complete the request
+        d.addErrback(lambda _, request=request, body=body: SpinHTTP.complete_deferred_request(body, request))
+        session.after_async_request(d)
+
         return server.NOT_DONE_YET
 
     # function for receiving cross-server IPC broadcasts
@@ -12797,7 +12805,7 @@ class CONTROLAPI(resource.Resource):
 
                 ret = server.NOT_DONE_YET
 
-                def handle_online(request, session, handler, method_name, args):
+                def handle_online(request, session, handler, method_name, args, _):
                     try:
                         val = handler.exec_online(session, session.outgoing_messages)
                     except:
@@ -12822,7 +12830,11 @@ class CONTROLAPI(resource.Resource):
                         session.flush_outgoing_messages()
                         SpinHTTP.complete_deferred_request(ret, request)
 
-                session.after_async_request(functools.partial(handle_online, request, session, handler, method_name, args))
+                d = defer.Deferred()
+                d.addCallback(functools.partial(handle_online, request, session, handler, method_name, args))
+                # if player logged out, this is going to fail
+                d.addErrback(lambda _, request=request: SpinHTTP.complete_deferred_request(CustomerSupport.ReturnValue(error = 'Race condition: Player just logged out. Please try again.').as_body(), request))
+                session.after_async_request(d)
 
             else:
                 # OFFLINE edit
@@ -12874,12 +12886,21 @@ class CONTROLAPI(resource.Resource):
 
             if session:
                 ret = server.NOT_DONE_YET
+
                 def after_handle(request, session, handler_ret):
                     session.flush_outgoing_messages()
                     if handler_ret is server.NOT_DONE_YET: return # handler will complete the deferred request
                     SpinHTTP.complete_deferred_request(handler_ret if handler_ret is not None else 'ok\n', request)
 
-                session.after_async_request(lambda handler=handler, request=request, session=session, handler_args=handler_args: after_handle(request, session, handler(request, **handler_args)))
+                d = defer.Deferred()
+                d.addCallback(lambda _, handler=handler, request=request, session=session, handler_args=handler_args: after_handle(request, session, handler(request, **handler_args)))
+                if method_name in ('terminate','terminate_session'):
+                    # never fail
+                    d.addErrback(lambda _, request=request: SpinHTTP.complete_deferred_request('ok\n', request))
+                else:
+                    d.addErrback(lambda _, request=request: SpinHTTP.complete_deferred_request(CustomerSupport.ReturnValue(error = 'Race condition: Player just logged out. Please try again.').as_body(), request))
+                session.after_async_request(d)
+
             else:
                 ret = handler(request, **handler_args)
 
@@ -26462,12 +26483,14 @@ class GameSite(server.Site):
                 session.attack_finish_time = -1
 
                 # note: change_session will unlock the victim's state for us
+                d = defer.Deferred()
                 def force_attack_end(self, session):
                     if (session.has_attacked) and (not session.visit_base_in_progress) and (not session.complete_attack_in_progress) and (not session.logout_in_progress):
-                        d = self.gameapi.change_session(session, session.outgoing_messages, dest_user_id = session.user.user_id, force = True)
-                        session.start_async_request(d)
+                        self.gameapi.change_session(session, session.outgoing_messages, dest_user_id = session.user.user_id, force = True)
 
-                session.after_async_request(functools.partial(force_attack_end, self, session))
+                d.addCallback(lambda _, self=self, session=session: force_attack_end(self, session))
+                d.addErrback(lambda _: None) # ignore logout race
+                session.after_async_request(d)
 
             if (not session.sprobe_in_progress):
                 sprobe_config = gamedata['server'].get('sprobe',None)
