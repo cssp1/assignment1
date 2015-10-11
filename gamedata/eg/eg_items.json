@@ -36,6 +36,7 @@
     "ui_description": "Provides speed-ups, resources, and instant upgrades and unlocks. Click to immediately add more to your existing balance.",
     "icon": "gamebucks_inventory_icon", // A/B testable, see gamedata_main.json
     "rarity": 2,
+    "ui_precious": 1, // require confirmation to delete
     "fungible": 1, // allows infinite stacking, and special "take" behavior (adds directly to balance instead of going into inventory)
     "resource": "gamebucks" // if item is "fungible", MUST be one of "gamebucks", "iron", "water", or "lottery_ticket"
 },
@@ -46,6 +47,7 @@
     "ui_name_plural": "Ops Needs Points",
     "ui_description": "Use to acquire special items in the Store. Spend before expiration date — use them or lose them!",
     "ui_activate_button": "Go to Store",
+    "ui_precious": 1, // require confirmation to delete
     "icon": "inventory_ops_needs",
     "store_icon": "resource_icon_ops_needs",
     "max_stack": 999999,

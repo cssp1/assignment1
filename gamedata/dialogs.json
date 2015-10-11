@@ -448,6 +448,33 @@
         }
     },
 
+    "item_delete_confirm_dialog": {
+        "dimensions": [360,250],
+        "default_button": "ok_button",
+        "widgets": {
+            "bg": {"kind": "StaticImage", "xy":[0,0], "dimensions":[360,250], "asset": "dialog_resizable", "bg_image_resizable":1,
+                   "layout": {"resizable": 1} },
+            "sunken": {"kind": "StaticImage", "xy":[12,56], "dimensions":[335,180], "asset": "dialog_sunken_resizable", "bg_image_resizable":1,
+                       "layout": {"resizable":1} },
+
+            "title": { "kind": "TextField", "xy": [30,10], "dimensions": [221, 41], "text_size": 24, "text_style": "thick", "text_hjustify": "left",
+                       "ui_name": "Confirm Deletion" },
+            "description": { "kind": "RichTextField", "xy": [34,71], "dimensions": [290, 41], "text_size": 13, "text_style": "thick", "text_hjustify": "left", "text_vjustify": "top",
+                             "resize_to_fit_text": 1,
+                             "ui_name": "Are you SURE you want to delete these valuable items PERMANENTLY? There is no way to get them back!\n\n[b][color=#ff8000]%thing[/color][/b]\n\nTo confirm, type \"DELETE\" into the box below and then click \"Confirm\".", "layout": {"vresizable": 1} },
+
+            "input_bg": { "kind": "StaticImage", "xy": [30,147], "dimensions": [297,31], "asset": "dialog_sunken_white_resizable", "bg_image_resizable": 1, "layout": {"vjustify": "bottom"} },
+            "input": { "kind": "TextInput", "xy": [38,148], "dimensions": [287,30], "text_size": 15, "text_hjustify": "left",
+                       //"clip_to": [38,145,287,36], // doesn't work with resizing
+                       "max_chars": 6, "disallowed_chars": "\"'",
+                       "text_color": [0,0,0,1], "blank_on_enter": false, "require_string": "DELETE", "layout": {"vjustify": "bottom"} },
+            "ok_button": { "kind": "ActionButton", "xy": [195,195], "dimensions": [134, 28], "bg_image": "action_button_134px", "text_size": 13, "text_style": "bold",
+                           "state": "disabled", "ui_name": "Confirm", "layout": {"vjustify": "bottom"}},
+            "close_button": { "kind": "ActionButton", "xy": [30,195], "dimensions": [134,28],  "text_size": 13, "text_style": "bold",
+                              "bg_image": "menu_button_134px", "ui_name": "Cancel", "layout": {"vjustify": "bottom"} }
+        }
+    },
+
     "building_context_menu": {
         "dimensions": [152,48],
         "clip_children": 1,
