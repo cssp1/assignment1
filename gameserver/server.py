@@ -1725,7 +1725,7 @@ class User:
                         # XXX is tax_amount taken before or after the 30% cut?
                         usd_equivalent = 0.01*int(100*float(payment['payout_foreign_exchange_rate']) * (paid_amount * 0.7 - tax_amount) + 0.5)
                         price_description, detail_props = \
-                                           Store.execute_order(gamesite.gameapi, None, session, retmsg, 'fbpayments:'+paid_currency, user_facing_amount,
+                                           Store.execute_order(gamesite.gameapi, session, retmsg, 'fbpayments:'+paid_currency, user_facing_amount,
                                                                payment_data['unit_id'],
                                                                payment_data['spellname'],
                                                                payment_data['spellarg'],
@@ -3498,7 +3498,7 @@ class Session(object):
             gamesite.gameapi.add_deferred_session(self)
 
     def flush_outgoing_messages(self):
-        gamesite.gameapi.handle_message_buffer(None, self, self.outgoing_messages) # XXXXXX remove request arg
+        gamesite.gameapi.handle_message_buffer(self, self.outgoing_messages)
         if self.is_async():
             # we're in the middle of further async processing - don't respond yet
             return
@@ -13800,7 +13800,7 @@ class Store:
     # (new) FB Payments go through a different code path!
 
     @classmethod
-    def execute_credit_order(cls, order_id, gameapi, request, session, buyer, receiver, currency, credits_amount, my_data):
+    def execute_credit_order(cls, order_id, gameapi, session, buyer, receiver, currency, credits_amount, my_data):
         assert currency in ('fbcredits', 'kgcredits', 'gamebucks') or currency.startswith('xsolla:')
         # note that gamebucks here is only used for platform offers that pay out in gamebucks, NOT in-game purchases
 
@@ -13865,7 +13865,7 @@ class Store:
         if network_id != receiver:
             gamesite.exception_log.event(server_time, 'execute_order: strange, receiver is mismatched (%s %s)' % (network_id, receiver))
 
-        price_description, detail_props = Store.execute_order(gameapi, request, session, session.outgoing_messages,
+        price_description, detail_props = Store.execute_order(gameapi, session, session.outgoing_messages,
                                                               currency, credits_amount,
                                                               unit_id, spellname, spellarg,
                                                               server_time_according_to_client,
@@ -13931,10 +13931,10 @@ class Store:
         return session
 
     @classmethod
-    def execute_gamebucks_order(cls, gameapi, request, session, retmsg, amount_willing_to_pay,
+    def execute_gamebucks_order(cls, gameapi, session, retmsg, amount_willing_to_pay,
                                 unit_id, spellname, spellarg,
                                 server_time_according_to_client):
-        price_description, detail_props = Store.execute_order(gameapi, request, session, retmsg, 'gamebucks', amount_willing_to_pay,
+        price_description, detail_props = Store.execute_order(gameapi, session, retmsg, 'gamebucks', amount_willing_to_pay,
                                                               unit_id, spellname, spellarg,
                                                               server_time_according_to_client)
 
@@ -13979,21 +13979,21 @@ class Store:
         return descr
 
     @classmethod
-    def execute_item_order(cls, gameapi, request, session, retmsg, item_name, amount_willing_to_pay,
+    def execute_item_order(cls, gameapi, session, retmsg, item_name, amount_willing_to_pay,
                            unit_id, spellname, spellarg,
                            server_time_according_to_client):
-        return Store.execute_order(gameapi, request, session, retmsg, 'item:'+str(item_name), amount_willing_to_pay,
+        return Store.execute_order(gameapi, session, retmsg, 'item:'+str(item_name), amount_willing_to_pay,
                                    unit_id, spellname, spellarg,
                                    server_time_according_to_client)
     @classmethod
-    def execute_fungible_order(cls, gameapi, request, session, retmsg, resname, amount_willing_to_pay,
+    def execute_fungible_order(cls, gameapi, session, retmsg, resname, amount_willing_to_pay,
                                unit_id, spellname, spellarg,
                                server_time_according_to_client):
-        return Store.execute_order(gameapi, request, session, retmsg, resname, amount_willing_to_pay,
+        return Store.execute_order(gameapi, session, retmsg, resname, amount_willing_to_pay,
                                    unit_id, spellname, spellarg,
                                    server_time_according_to_client)
     @classmethod
-    def execute_order(cls, gameapi, request, session, retmsg, currency, amount_willing_to_pay,
+    def execute_order(cls, gameapi, session, retmsg, currency, amount_willing_to_pay,
                       unit_id, spellname, spellarg,
                       server_time_according_to_client,
                       usd_equivalent = None, gift_order = None, payment_id = None):
@@ -14640,7 +14640,7 @@ class CREDITAPI(resource.Resource):
 
                 if status == 'placed':
                     # okay to actually give the stuff here
-                    session = Store.execute_credit_order(order_id, self.gameapi, request, None, buyer, receiver, 'fbcredits', fb_credits_amount, SpinFacebook.order_data_decode(order_details['items'][0]['data']))
+                    session = Store.execute_credit_order(order_id, self.gameapi, None, buyer, receiver, 'fbcredits', fb_credits_amount, SpinFacebook.order_data_decode(order_details['items'][0]['data']))
 
                     if not session: raise Exception('execute_credit_order() returned no session')
 
@@ -14763,7 +14763,7 @@ class KGAPI(resource.Resource):
             retmsg['status'] = 'canceled' # first set this in case of failure
 
             # okay to actually give the stuff here
-            session = Store.execute_credit_order(order_id, self.gameapi, request, None,
+            session = Store.execute_credit_order(order_id, self.gameapi, None,
                                                  str(request_data['buyer_id']),
                                                  str(request_data['recipient_id']),
                                                  'kgcredits', order_info['client_price'], # must trust this?
@@ -14840,7 +14840,7 @@ class TRIALPAYAPI(resource.Resource):
 
         if gamebucks_amount > 0:
             # we (ab)use the credit order path here to share all of its metrics output
-            Store.execute_credit_order(request_args['oid'][0], self.gameapi, request, session, session.user.facebook_id, session.user.facebook_id,
+            Store.execute_credit_order(request_args['oid'][0], self.gameapi, session, session.user.facebook_id, session.user.facebook_id,
                                        'gamebucks', gamebucks_amount,
                                        # awkward syntax here
                                        {'spellname': 'FB_TRIALPAY_GAMEBUCKS',
@@ -14951,7 +14951,7 @@ class XSAPI(resource.Resource):
             if session.user.frame_platform == 'ag':
                 usd_receipts = round(usd_receipts*0.6, 2)
 
-            Store.execute_credit_order(request_data['transaction']['id'], self.gameapi, request, session,
+            Store.execute_credit_order(request_data['transaction']['id'], self.gameapi, session,
                                        request_data['user']['id'], request_data['user']['id'],
                                        real_currency,
                                        real_currency_amount,
@@ -21320,7 +21320,7 @@ class GAMEAPI(resource.Resource):
     # may terminate early if bundles are out of order, or may go asynchronous
     # returns True if going asynchronous, otherwise False.
 
-    def handle_message_buffer(self, request, session, retmsg):
+    def handle_message_buffer(self, session, retmsg):
         # look through the message buffer for a processable message bundle
         i = 0
         start_time = -1
@@ -21364,7 +21364,7 @@ class GAMEAPI(resource.Resource):
                     try:
                         if start_time < 0: start_time = time.time()
 
-                        go_async = self.handle_message_guts(request, session, msg, retmsg)
+                        go_async = self.handle_message_guts(session, msg, retmsg)
 
                         end_time = time.time()
 
@@ -22661,7 +22661,7 @@ class GAMEAPI(resource.Resource):
                 session.logout_in_progress.wrote_player = True
                 reactor.callLater(0, session.logout_in_progress.try_finish)
 
-    def handle_message_guts(self, request, session, arg, retmsg):
+    def handle_message_guts(self, session, arg, retmsg):
 
         if arg[0] == "VISIT_BASE" or arg[0] == "VISIT_BASE2" or arg[0] == "VISIT_LADDER_RIVAL":
             if session.visit_base_in_progress:
@@ -22944,7 +22944,7 @@ class GAMEAPI(resource.Resource):
                 print 'SIMULATED ORDER', item
                 try:
                     network_id = {'fbcredits':session.user.facebook_id, 'kgcredits':session.user.kg_id}[currency]
-                    Store.execute_credit_order('0', self, request, session, network_id, network_id, currency, item['price'],
+                    Store.execute_credit_order('0', self, session, network_id, network_id, currency, item['price'],
                                                order_info if currency == 'kgcredits' else item['data'])
                 except:
                     text = traceback.format_exc()
@@ -23007,7 +23007,8 @@ class GAMEAPI(resource.Resource):
             request_id = arg[1]
             signed_request = arg[2] # optional - speeds processing by avoiding the round-trip
             d = session.user.ping_fbpayment(session, retmsg, request_id, signed_request = signed_request)
-            session.start_async_request(d)
+            # this might or might not go async
+            if d: session.start_async_request(d)
             return d
         elif arg[0] == "FBPAYMENT_SIMULATE_PURCHASE":
             request_id = arg[1]
@@ -23080,7 +23081,7 @@ class GAMEAPI(resource.Resource):
             success = False
 
             try:
-                descr = Store.execute_gamebucks_order(self, request, session, retmsg, client_price,
+                descr = Store.execute_gamebucks_order(self, session, retmsg, client_price,
                                                       unit_id, spellname, spellarg,
                                                       server_time_according_to_client)
                 # at this point the order has changed player state, so go ahead and subtract gamebucks
@@ -23127,7 +23128,7 @@ class GAMEAPI(resource.Resource):
                 return
 
             try:
-                Store.execute_item_order(self, request, session, retmsg, item_name, client_price,
+                Store.execute_item_order(self, session, retmsg, item_name, client_price,
                                          unit_id, spellname, spellarg,
                                          server_time_according_to_client)
                 # at this point the order has changed player state, so go ahead and take the items
@@ -23161,7 +23162,7 @@ class GAMEAPI(resource.Resource):
                 if getattr(session.player.resources, resname) < client_price:
                     retmsg.append(["ERROR", "INSUFFICIENT_"+resname.upper(), client_price])
                 else:
-                    price_description, detail_props = Store.execute_fungible_order(self, request, session, retmsg, resname, client_price,
+                    price_description, detail_props = Store.execute_fungible_order(self, session, retmsg, resname, client_price,
                                                                                    unit_id, spellname, spellarg,
                                                                                    server_time_according_to_client)
                     # at this point the order has changed player state, so go ahead and take the resources
@@ -25857,10 +25858,10 @@ class GAMEAPI(resource.Resource):
                 retmsg.append(["DONATE_UNITS_RESULT", success, error_reason])
 
             else:
-                return self.handle_protocol_error(request, session, retmsg, arg)
+                return self.handle_protocol_error(session, retmsg, arg)
 
         else:
-            return self.handle_protocol_error(request, session, retmsg, arg)
+            return self.handle_protocol_error(session, retmsg, arg)
 
         return
 
@@ -25915,7 +25916,7 @@ class GAMEAPI(resource.Resource):
                                                          'server': spin_server_name },
                                                }, '', log = False)
 
-    def handle_protocol_error(self, request, session, retmsg, arg):
+    def handle_protocol_error(self, session, retmsg, arg):
         # called when there is a problem with the AJAX message the client sent
         # records this to the exceptions log to pick up hacking/fuzzing attempts
         # then logs out the client
