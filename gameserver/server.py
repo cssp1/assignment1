@@ -12768,6 +12768,7 @@ class CONTROLAPI(resource.Resource):
 
             if session:
                 # ONLINE edit
+                # XXX really should delay until after_async_request() here
                 try:
                     val = handler.exec_online(session, session.outgoing_messages)
                 except:
@@ -12779,7 +12780,6 @@ class CONTROLAPI(resource.Resource):
                     ret = server.NOT_DONE_YET
 
                     def after_async(async_result, request, session):
-                        # note: only handles one asynchronous step; if more are needed, this would have to recurse
                         session.flush_outgoing_messages()
                         SpinHTTP.complete_deferred_request(async_result.as_body(), request)
                     val.async.addBoth(after_async, request, session)
@@ -15980,6 +15980,13 @@ class GAMEAPI(resource.Resource):
         assert not (dest_user_id and dest_base_id)
 
         d = defer.Deferred()
+
+        session.visit_base_in_progress = True
+        def clear_progress_and_pass_result(session, result):
+            session.visit_base_in_progress = False
+            return result
+        d.addBoth(lambda result, session=session: clear_progress_and_pass_result(session, result))
+
         dest_feature = None
 
         if dest_user_id:
@@ -15988,8 +15995,7 @@ class GAMEAPI(resource.Resource):
 
             if (not force) and (session.viewing_user is not None) and (session.viewing_user.user_id == dest_user_id) and (session.viewing_base is session.viewing_player.my_home) and (not session.has_attacked):
                 # already viewing this base
-                session.visit_base_in_progress = False
-                reactor.callLater(0, functools.partial(d.callback, False))
+                reactor.callLater(0, d.callback, False)
                 return d
 
             deployable_feature = {'base_id': session.player.squad_base_id(SQUAD_IDS.BASE_DEFENDERS),
@@ -16004,8 +16010,7 @@ class GAMEAPI(resource.Resource):
             # new quarry path
             ascdebug('change_session (new) %d:%s -> %s' % (session.user.user_id, session.viewing_base.base_id, dest_base_id))
             if (not force) and (session.viewing_base.base_id == dest_base_id) and (not session.has_attacked):
-                session.visit_base_in_progress = False
-                reactor.callLater(0, functools.partial(d.callback, False))
+                reactor.callLater(0, d.callback, False)
                 return d
 
             if gamesite.nosql_client and session.player.home_region:
@@ -16023,8 +16028,7 @@ class GAMEAPI(resource.Resource):
                     else:
                         gamesite.exception_log.event(server_time, 'NoSQL spy error: player %d dest_base_id %s: result %s' % (session.player.user_id, dest_base_id, repr(dest_feature)))
                     retmsg.append(["ERROR", "CANNOT_SPY_BASE_NOT_FOUND", dest_base_id, 'change_session'])
-                    session.visit_base_in_progress = False
-                    reactor.callLater(0, functools.partial(d.callback, False))
+                    reactor.callLater(0, d.callback, False)
                     return d
 
                 # query for attacker's deployable squads
@@ -16056,8 +16060,7 @@ class GAMEAPI(resource.Resource):
                    hex_distance(dest_feature['base_map_loc'], session.player.my_home.base_map_loc) != 1:
                     # no squads in range, cannot spy on hostile base
                     retmsg.append(["ERROR", "CANNOT_SPY_NO_NEARBY_SQUADS"])
-                    session.visit_base_in_progress = False
-                    reactor.callLater(0, functools.partial(d.callback, False))
+                    reactor.callLater(0, d.callback, False)
                     return d
 
                 # check for defending squads
@@ -16084,8 +16087,7 @@ class GAMEAPI(resource.Resource):
                                 err = "CANNOT_ATTACK_THEIR_SQUAD_MOVED" # probably can't get here (due to the dest_feature check above), but just in case
                             retmsg.append(["ERROR", err, "VISIT_BASE2_pre_attack"])
                             # abort the spy attempt
-                            session.visit_base_in_progress = False
-                            reactor.callLater(0, functools.partial(d.callback, False))
+                            reactor.callLater(0, d.callback, False)
                             return d
 
                         # record the fact that we're now holding the lock
@@ -16728,8 +16730,6 @@ class GAMEAPI(resource.Resource):
         # tell client about res looter state
         session.res_looter.send_update(change_retmsg)
 
-        session.visit_base_in_progress = False
-
         # if visiting a quarry that you own, force repairs to start
         if session.viewing_base.base_landlord_id == session.player.user_id and \
            session.viewing_base is not session.player.my_home:
@@ -16764,7 +16764,6 @@ class GAMEAPI(resource.Resource):
 
                     if True: # dangerous - skips session change on client side
                         def go_home_and_flush_skip(self, session, complete_attack_result):
-                            session.visit_base_in_progress = True
                             # divert the messages
                             unused = []
                             d = self.change_session(session, unused, dest_user_id = session.player.user_id, force = True)
@@ -16784,7 +16783,6 @@ class GAMEAPI(resource.Resource):
                 # safer, but sends ineffective session change to client
                 # also necessary in case do_attack() fails
                 def go_home_and_flush(self, session):
-                    session.visit_base_in_progress = True
                     d = self.change_session(session, session.outgoing_messages, dest_user_id = session.player.user_id, force = True)
                     def flush(self, session, change_session_result):
                         session.flush_outgoing_messages()
@@ -22824,7 +22822,6 @@ class GAMEAPI(resource.Resource):
                         retmsg.append(["ERROR", "CANNOT_SPY_INVALID_AI", dest_id])
                         return
 
-            session.visit_base_in_progress = True
             return self.change_session(session, retmsg, dest_user_id = dest_id, dest_base_id = dest_base_id, force = True, new_ladder_state = ladder_state, delay = delay, client_props = client_props)
 
         elif arg[0] == "LOGOUT":
@@ -23280,7 +23277,6 @@ class GAMEAPI(resource.Resource):
                 return # no async
 
             # go back home
-            session.visit_base_in_progress = True
             return self.change_session(session, retmsg, dest_user_id = session.player.user_id, force = True)
 
         elif arg[0] == "QUARRY_QUERY":
@@ -26428,7 +26424,6 @@ class GameSite(server.Site):
                 # note: change_session will unlock the victim's state for us
                 def force_attack_end(self, session):
                     if (session.has_attacked) and (not session.visit_base_in_progress) and (not session.complete_attack_in_progress) and (not session.logout_in_progress):
-                        session.visit_base_in_progress = True
                         d = self.gameapi.change_session(session, session.outgoing_messages, dest_user_id = session.user.user_id, force = True)
                         session.start_async_request(d)
 
