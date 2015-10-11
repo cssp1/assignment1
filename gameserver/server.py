@@ -2960,8 +2960,8 @@ class Session(object):
         self.message_buffer = [] # XXXXXX rename to incoming_messages
         self.lagged_out = False
 
-        # flag indicating we have an async HTTP request in progress, and should wait before handling any new messages
-        self.is_async = False
+        # deferred that indicates we have async message handling in progress, and will be fired when it completes.
+        self.async_d = None
 
         # park current synchronous HTTP requests here. They will be completed as soon as the session is no longer async.
         self.sync_requests = []
@@ -3081,6 +3081,19 @@ class Session(object):
             gamesite.chat_mgr.join(self, 'DEVELOPER')
             self.do_chat_catchup('DEVELOPER', self.outgoing_messages)
 
+    # transition the session to async waiting on the given Deferred
+    def start_async_request(self, d):
+        assert not self.async_d
+        self.async_d = d
+        self.async_d.addBoth(lambda _, self=self: self.complete_async_request())
+
+    def complete_async_request(self):
+        if not self.sync_requests or not self.async_d:
+            gamesite.exception_log.event(server_time, 'complete_async_request in unexpected state: sync_request %r async_d %r %s' % (self.sync_requests, self.async_d, ''.join(traceback.format_stack())))
+        # note: this is called BY async_d firing, so don't fire it again
+        self.async_d = None
+        reactor.callLater(0, self.flush_outgoing_messages)
+
     def record_activity_sample(self, force = False):
         interval = gamedata['server'].get('activity_classifier_interval',300)
         t = int(server_time/interval)*interval
@@ -3129,8 +3142,8 @@ class Session(object):
 
     # just return a string describing the current session state, for exception logging only
     def dump_exception_state(self):
-        return 'player %d viewing %d at %s, is_async %r complete_attack_in_progress %r visit_base_in_progress %r logout_in_progress %r has_attacked %r viewing_base_lock %r' % \
-               (self.player.user_id, self.viewing_player.user_id, self.viewing_base.base_id, self.is_async, bool(self.complete_attack_in_progress), bool(self.visit_base_in_progress), bool(self.logout_in_progress), self.has_attacked, self.viewing_base_lock)
+        return 'player %d viewing %d at %s, async_d %r complete_attack_in_progress %r visit_base_in_progress %r logout_in_progress %r has_attacked %r viewing_base_lock %r' % \
+               (self.player.user_id, self.viewing_player.user_id, self.viewing_base.base_id, self.async_d, bool(self.complete_attack_in_progress), bool(self.visit_base_in_progress), bool(self.logout_in_progress), self.has_attacked, self.viewing_base_lock)
 
     # return current seconds of cumulative play time
     def cur_playtime(self):
@@ -3456,7 +3469,8 @@ class Session(object):
 
     def flush_outgoing_messages(self):
         gamesite.gameapi.handle_message_buffer(None, self, self.outgoing_messages) # XXXXXX remove request arg
-        if self.is_async:
+        if self.async_d:
+            # we're in the middle of further async processing - don't respond yet
             return
         gamesite.gameapi.run_deferred_actions(self, self.outgoing_messages, reason = 'flush_outgoing_messages')
 
@@ -21269,12 +21283,6 @@ class GAMEAPI(resource.Resource):
         reactor.callLater(0, session.flush_outgoing_messages)
         return server.NOT_DONE_YET
 
-    def complete_async_request(self, session):
-        if not session.sync_requests or not session.is_async:
-            gamesite.exception_log.event(server_time, 'complete_async_request in unexpected state: sync_request %r is_async %r %s' % (session.sync_requests, session.is_async, ''.join(traceback.format_stack())))
-        session.is_async = False
-        reactor.callLater(0, session.flush_outgoing_messages)
-
     # process as many bundles of AJAX messages on a session as possible
     # may terminate early if bundles are out of order, or may go asynchronous
     # returns True if going asynchronous, otherwise False.
@@ -21285,7 +21293,7 @@ class GAMEAPI(resource.Resource):
         start_time = -1
 
         while i < len(session.message_buffer):
-            if session.is_async:
+            if session.async_d:
                 # prevent re-entry of handle_message_buffer() on a subsequent client message while an async request is still happening
                 # the client will get its answer from complete_deferred_message after the async request completes
                 #gamesite.exception_log.event(server_time, 'user %d: skipping message processing while async in flight, in %d out %d buf %s' % (session.user.user_id, session.incoming_serial, session.outgoing_serial, repr(session.message_buffer)))
@@ -21339,8 +21347,7 @@ class GAMEAPI(resource.Resource):
                         if go_async:
                             assert isinstance(go_async, defer.Deferred)
                             # go asynchronous, breaking out of message processing here
-                            session.is_async = True
-                            go_async.addBoth(lambda _, self=self, session=session: self.complete_async_request(session))
+                            session.start_async_request(go_async)
                             return
 
                     except Exception:
@@ -21719,7 +21726,7 @@ class GAMEAPI(resource.Resource):
             admin_stats.record_latency('complete_client_hello', end_time - start_time)
             if d is not None:
                 # note: if complete_client_hello2() fails, the session arg here will be None
-                d.addBoth(lambda session, request=request, retmsg=retmsg: self.complete_async_request(session) if session else self.complete_deferred_request(request, None, retmsg)) # OK
+                d.addBoth(lambda session, request=request, retmsg=retmsg: session.complete_async_request() if session else self.complete_deferred_request(request, None, retmsg)) # OK
 
         except:
             retmsg[:] = [["ERROR", "SERVER_EXCEPTION"]] # blow away old message, because session is not going to be set up
@@ -21732,6 +21739,9 @@ class GAMEAPI(resource.Resource):
     def do_complete_client_hello(self, request, retmsg, user_id, frame_platform, social_id, auth_token, lockgen, user, player, session_id,
                                  metrics_anon_id, user_demographics, client_browser_caps, client_session_data, query_string, client_permissions, client_login_country,
                                  client_ip):
+
+        d = defer.Deferred() # we'll return this for the caller
+
         # parse query string
         url_qs = urlparse.parse_qs(query_string)
 
@@ -21940,7 +21950,7 @@ class GAMEAPI(resource.Resource):
         session.outgoing_messages = retmsg # !!!
         # kick-start HTTP request processing
         session.sync_requests.append(request)
-        session.is_async = True
+        session.async_d = d # caller will attach complete_async_request()
 
         # get rid of old combat debris
         player.update_inerts()
@@ -22137,7 +22147,6 @@ class GAMEAPI(resource.Resource):
         # note: sends both SQUADS_UPDATE and PLAYER_ARMY_UPDATE
         session.player.ping_squads_and_send_update(session, retmsg, originator=session.player.user_id, reason='SERVER_HELLO')
 
-        d = defer.Deferred() # we'll return this for the caller
         self.change_session(request, session, retmsg, dest_user_id = user.user_id, force = True).addBoth(lambda success, self=self, session=session, retmsg=retmsg, d=d: self.complete_client_hello2(d, session, retmsg))
         return d
 
@@ -26405,7 +26414,7 @@ class GameSite(server.Site):
                 need_flush = True
 
             # check for sessions where an attack has been going on for too long
-            elif (not session.is_async) and \
+            elif (not session.async_d) and \
                  (session.has_attacked) and (not session.visit_base_in_progress) and (not session.complete_attack_in_progress) and \
                  (session.attack_finish_time > 0) and (server_time >= session.attack_finish_time):
                 # force the attack to conclude
@@ -26420,12 +26429,8 @@ class GameSite(server.Site):
 
                 # XXXXXX do this by appending something to the message queue, not by calling inline
                 session.visit_base_in_progress = True
-                session.is_async = True
                 d = self.gameapi.change_session(None, session, session.outgoing_messages, dest_user_id = session.user.user_id, force = True)
-                def after_change_session(session, change_session_result):
-                    session.is_async = False
-                    session.flush_outgoing_messages()
-                d.addBoth(functools.partial(after_change_session, session))
+                session.start_async_request(d)
 
             if (not session.sprobe_in_progress):
                 sprobe_config = gamedata['server'].get('sprobe',None)
