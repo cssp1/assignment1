@@ -16821,36 +16821,28 @@ class GAMEAPI(resource.Resource):
             if pre_attack >= 2: # pre-auto-resolve
                 if attack_success:
                     self.auto_resolve(session, change_retmsg) # will be thrown away
-
-                    # the attack completion will go async to write the battle result, so we shouldn't call it in-line, since the async return isn't propagated out to the caller
-
                     if True: # dangerous - skips session change on client side
-                        def go_home_and_flush_skip(self, session, complete_attack_result):
-                            # divert the messages
-                            unused = []
-                            d = self.change_session(session, unused, dest_user_id = session.player.user_id, force = True)
+                        # first complete the attack manually so we get the battle-end messages
+                        compl_d = self.complete_attack(session, retmsg)
+                        # then go home, throwing away the session-change messages
+                        compl_d.addBoth(lambda _, self=self, session=session, change_retmsg=change_retmsg: \
+                                        self.change_session(session, change_retmsg, dest_user_id = session.player.user_id, force = True))
+                        # then let the client know we skipped the session change
+                        compl_d.addBoth(lambda _, session=session: session.outgoing_messages.append(["SESSION_CHANGE_SKIPPED"]))
+                        if d:
+                            compl_d.chainDeferred(d)
+                        return # don't fire d yet
 
-                            def flush_skip(self, session, change_session_result):
-                                session.outgoing_messages.append(["SESSION_CHANGE_SKIPPED"])
-                                session.flush_outgoing_messages()
-
-                            d.addBoth(functools.partial(flush_skip, self, session))
-
-                        self.complete_attack(session, session.outgoing_messages).addBoth(functools.partial(go_home_and_flush_skip, self, session))
-                        if d: d.callback(True) # success
-                        return
                 else:
                     retmsg += do_attack_retmsg # send error messages to client
 
                 # safer, but sends ineffective session change to client
                 # also necessary in case do_attack() fails
-                def go_home_and_flush(self, session):
-                    d = self.change_session(session, session.outgoing_messages, dest_user_id = session.player.user_id, force = True)
-                    def flush(self, session, change_session_result):
-                        session.flush_outgoing_messages()
-                    d.addBoth(functools.partial(flush, self, session))
+                temp_d = self.change_session(session, session.outgoing_messages, dest_user_id = session.player.user_id, force = True)
+                if d:
+                    temp_d.chainDeferred(d)
+                return # don't fire d yet
 
-                reactor.callLater(0, lambda: go_home_and_flush(self, session))
             else:
                 retmsg += do_attack_retmsg
 
@@ -20474,9 +20466,7 @@ class GAMEAPI(resource.Resource):
         retmsg.append(["PLAYER_STATE_UPDATE", session.player.resources.calc_snapshot().serialize()])
 
     def auto_resolve(self, session, retmsg):
-        if session.visit_base_in_progress or \
-           session.complete_attack_in_progress or \
-           not session.has_attacked or \
+        if not session.has_attacked or \
            ((not session.home_base) and session.player is session.viewing_player): # quarry reinforcement
             retmsg.append(["ERROR", "HARMLESS_RACE_CONDITION"])
             return
@@ -20936,14 +20926,6 @@ class GAMEAPI(resource.Resource):
         retmsg.append(["PLAYER_STATE_UPDATE", session.player.resources.calc_snapshot().serialize()])
 
     def destroy_object(self, session, retmsg, id, death_location, killer_info):
-
-        # possible race condition due to unserialized AJAX:
-        # client sends VISIT_BASE then destroys an object belonging to the old base
-        # not much we can do, preventing this is hard
-        if session.visit_base_in_progress:
-            if gamedata['server'].get('log_combat_race_conditions', False):
-                gamesite.exception_log.event(server_time, 'destroy_object: player %d visit_base_in_progress' % session.player.user_id)
-            return
 
         if (not session.has_object(id)):
             if gamedata['server'].get('log_combat_race_conditions', False):

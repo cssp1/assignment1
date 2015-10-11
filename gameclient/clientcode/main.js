@@ -18379,6 +18379,7 @@ function invoke_battle_end_dialog(battle_type, battle_base, battle_opponent_user
     dialog.user_data['dialog'] = 'battle_dialog';
 
     change_selection_ui(dialog);
+    // install_child_dialog(dialog); // XXXXXX make sure this doesn't break the tutorial
     dialog.auto_center();
     dialog.modal = true;
 
