@@ -1434,9 +1434,9 @@ class User:
     def ping_fbpayments(self, session, retmsg, request_ids):
         # batch this?
         for request_id in request_ids:
-            self.ping_fbpayment(None, session, retmsg, request_id)
+            self.ping_fbpayment(session, retmsg, request_id)
 
-    def ping_fbpayment(self, request, session, retmsg, request_id, signed_request = None):
+    def ping_fbpayment(self, session, retmsg, request_id, signed_request = None):
         # try to finalize the status of one inflight payment
         payment_data = session.player.fbpayments_inflight.get(request_id, None)
         if not payment_data: return
@@ -1480,8 +1480,9 @@ class User:
         if gamedata['server']['log_fbpayments'] >= 2:
             gamesite.exception_log.event(server_time, 'ping_fbpayment user %d request_id %s SEND %s' % (session.player.user_id, request_id, url))
 
-        gamesite.AsyncHTTP_Facebook.queue_request(server_time, url, functools.partial(self.ping_fbpayment_complete, request, session, retmsg, request_id), max_tries = 4)
-        return True # hold request async until the poll completes
+        d = defer.Deferred()
+        gamesite.AsyncHTTP_Facebook.queue_request(server_time, url, functools.partial(self.ping_fbpayment_complete, d, session, retmsg, request_id), max_tries = 4)
+        return d # hold request async until the poll completes
 
     # return the spellname, spellarg that corresponds to an FB payment on the Open Graph object "url" with quantity "item_quantity"
     def parse_fbpayment_product_url(self, url, item_quantity):
@@ -1670,7 +1671,7 @@ class User:
                                                                                       '%TIME': time.strftime('%H:%S', time_struct)}))
         if retmsg is not None: session.player.send_mailbox_update(retmsg)
 
-    def ping_fbpayment_complete(self, async_request, session, retmsg, request_id, result):
+    def ping_fbpayment_complete(self, d, session, retmsg, request_id, result):
         # note: payment may have been completed asynchronously, look up the request again here and exit if not found in in-flight
         payment_data = session.player.fbpayments_inflight.get(request_id, None)
         if payment_data:
@@ -1825,8 +1826,9 @@ class User:
 
                     # note: send AFTER executing spell, so that player state is already updated
                     if 'tag' in payment_data: retmsg.append(["FBPAYMENT_ORDER_ACK", payment_data['tag']])
-        if async_request:
-            gamesite.gameapi.complete_async_request(session)
+
+        # fire deferred completion
+        if d: d.callback(True)
 
     def retrieve_facebook_credit_info_start(self):
         if self.credit_info_request_outstanding:
@@ -19086,7 +19088,7 @@ class GAMEAPI(resource.Resource):
                                                                   generation=base.base_generation, do_hook=False, reason='do_start_repairs') \
                                                                   != Player.LockState.being_attacked: # generation=-1?
                 retmsg.append(["ERROR", "CANNOT_LOCK_QUARRY", base.base_ui_name])
-                return False
+                return
 
         try:
             for object in base.iter_objects():
@@ -19150,8 +19152,6 @@ class GAMEAPI(resource.Resource):
             session.player.unit_repair_integrity_check()
             session.player.unit_repair_send(retmsg)
             retmsg.append(["PLAYER_STATE_UPDATE", session.player.resources.calc_snapshot().serialize()])
-
-        return False
 
     def do_unit_repair_queue(self, session, id):
         if not session.home_base or session.has_attacked: return None
@@ -22963,7 +22963,7 @@ class GAMEAPI(resource.Resource):
         elif arg[0] == "FBPAYMENT_PING":
             request_id = arg[1]
             signed_request = arg[2] # optional - speeds processing by avoiding the round-trip
-            return session.user.ping_fbpayment(request, session, retmsg, request_id, signed_request = signed_request)
+            return session.user.ping_fbpayment(session, retmsg, request_id, signed_request = signed_request)
         elif arg[0] == "FBPAYMENT_SIMULATE_PURCHASE":
             request_id = arg[1]
             if spin_secure_mode:
@@ -23252,7 +23252,7 @@ class GAMEAPI(resource.Resource):
                 if gamesite.nosql_client.map_feature_lock_acquire(base.base_region, base.base_id, session.player.user_id,
                                                                   generation=base.base_generation, do_hook=False, reason='QUARRY_ABANDON') != Player.LockState.being_attacked: # generation=-1?
                     retmsg.append(["ERROR", "CANNOT_LOCK_QUARRY", base.base_ui_name])
-                    return False
+                    return # no async
 
             success = False
             try:
@@ -23267,7 +23267,7 @@ class GAMEAPI(resource.Resource):
                     gamesite.nosql_client.map_feature_lock_release(base.base_region, base.base_id, session.player.user_id, generation=base.base_generation, reason='QUARRY_ABANDON')
 
             if not success:
-                return
+                return # no async
 
             # go back home
             session.visit_base_in_progress = True
@@ -24745,7 +24745,7 @@ class GAMEAPI(resource.Resource):
                 self.do_speedup_for_free(session, retmsg, object)
 
             elif spellname == "REPAIR":
-                return self.do_start_repairs(session, retmsg, spellargs[0])
+                self.do_start_repairs(session, retmsg, spellargs[0])
 
             elif spellname == "UPGRADE_FOR_FREE":
                 self.do_upgrade(session, retmsg, object)
@@ -24820,7 +24820,7 @@ class GAMEAPI(resource.Resource):
                 self.do_cancel_make_droids(session, retmsg, object, spellargs)
 
             elif spellname == "BUILD":
-                return self.do_build(session, retmsg, spellargs, False)
+                self.do_build(session, retmsg, spellargs, False)
 
             elif spellname == "DEPLOY_UNITS":
                 self.do_attack(session, retmsg, spellargs)
@@ -24851,7 +24851,7 @@ class GAMEAPI(resource.Resource):
                 session.viewing_base.nosql_write_one(object, 'CONFIG_SET', fields = ['config'])
 
             elif spellname == "MOVE_BUILDING":
-                return self.do_move_building(session, retmsg, object, spellargs)
+                self.do_move_building(session, retmsg, object, spellargs)
 
             elif spellname == "LOTTERY_GET_SLATE":
                 session.player.reseed_lottery(session, force = False)
@@ -25039,8 +25039,7 @@ class GAMEAPI(resource.Resource):
                         session.player.abtests[name] = group
 
                 # really the user needs to be kicked and relogged
-                return self.handle_message_guts(request, session, ["LOGOUT"], retmsg)
-                #retmsg.append(["ABTEST_UPDATE", session.player.abtests])
+                return self.log_out_async(session, spellname)
 
             elif spellname == "CHEAT_RESET_GAME":
                 if spin_secure_mode:
