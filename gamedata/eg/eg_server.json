@@ -93,8 +93,6 @@
     "chat_alliance_logins": false, // whether to shout alliance member logins to chat
     "chat_alliance_membership": true, // whether to shout alliance leave/join messages to chat
 
-    "query_lock_state_on_spy": true, // ping dbserver upon Spying to get current lock state to show client
-
     "log_controlapi": false, // log CONTROLAPI IPC calls
 
     "log_gamebucks_init": false, // log giving of bonus gamebucks amount for new/veteran users
