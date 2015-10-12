@@ -16164,11 +16164,14 @@ class GAMEAPI(resource.Resource):
     # wrap change_session_complete so that exceptions cannot break a session that went async
     def change_session_complete(self, d, session, retmsg, *args, **kwargs):
         try:
-            self._change_session_complete(d, session, retmsg, *args, **kwargs)
+            return self._change_session_complete(d, session, retmsg, *args, **kwargs)
         except:
             gamesite.exception_log.event(server_time, 'change_session_complete exception on player %d: %s' % (session.user.user_id, traceback.format_exc()))
         finally:
             session.release_pre_locks()
+
+        # error path
+        if d: d.callback(False)
 
     def _change_session_complete(self, d, session, retmsg, dest_user_id, dest_user, dest_player, dest_base_id, dest_feature, dest_base, new_ladder_state, new_deployable_squads, new_defending_squads, pre_attack = None):
         if dest_base_id:
