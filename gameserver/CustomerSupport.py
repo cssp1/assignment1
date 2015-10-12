@@ -151,6 +151,20 @@ class HandleUnban(Handler):
     def do_exec_offline(self, user, player):
         player['banned_until'] = -1
         return ReturnValue(result = 'ok')
+
+class HandleApplyLockout(Handler):
+    def __init__(self, *args, **kwargs):
+        Handler.__init__(self, *args, **kwargs)
+        self.lockout_time = int(self.args['lockout_time'])
+        self.lockout_message = self.args.get('lockout_message', 'Account Under Maintenance')
+    def do_exec_online(self, session, retmsg):
+        session.player.lockout_until = self.time_now + self.lockout_time
+        session.player.lockout_message = self.lockout_message
+        return ReturnValue(result = 'ok', kill_session = True)
+    def do_exec_offline(self, user, player):
+        player['lockout_until'] = self.time_now + self.lockout_time
+        player['lockout_message'] = self.lockout_message
+        return ReturnValue(result = 'ok')
 class HandleClearLockout(Handler):
     def do_exec_online(self, session, retmsg):
         session.player.lockout_until = -1
@@ -821,6 +835,45 @@ class HandleResetIdleCheckState(Handler):
                     entry['seen'] = 1
         return ReturnValue(result = 'ok')
 
+online_only = Exception('offline execution not implemented')
+
+class HandleAIAttack(Handler):
+    def exec_offline(self, user, player): raise online_only
+    def do_exec_online(self, session, retmsg):
+        session.start_ai_attack(session.outgoing_messages, self.args['attack_type'], override_protection = True, verbose = True)
+        return ReturnValue(result = 'ok')
+
+class HandlePushGamedata(Handler): # no logging
+    def exec_offline(self, user, player): raise online_only
+    def exec_online(self, session, retmsg):
+        self.gamesite.gameapi.push_gamedata(session, session.outgoing_messages)
+        return ReturnValue(result = 'ok')
+
+class HandleForceReload(Handler): # no logging
+    def exec_offline(self, user, player): raise online_only
+    def exec_online(self, session, retmsg):
+        session.send([["FORCE_RELOAD"]], flush_now = True)
+        return ReturnValue(result = 'ok')
+
+class HandleClientEval(Handler): # no logging
+    def exec_offline(self, user, player): raise online_only
+    def exec_online(self, session, retmsg):
+        session.send([["CLIENT_EVAL", self.args['expr']]], flush_now = True)
+        return ReturnValue(result = 'ok')
+
+class HandleOfferPayerPromo(Handler): # no logging
+    def exec_offline(self, user, player): raise online_only
+    def exec_online(self, session, retmsg):
+        session.user.offer_payer_promo(session, session.outgoing_messages)
+        return ReturnValue(result = 'ok')
+
+class HandleInvokeFacebookAuth(Handler): # no logging
+    def exec_offline(self, user, player): raise online_only
+    def exec_online(self, session, retmsg):
+        scope = self.args.get('scope', 'email')
+        session.send([["INVOKE_FACEBOOK_AUTH", scope, "Test", "Test authorization"]], flush_now = True)
+        return ReturnValue(result = 'ok')
+
 methods = {
     'get_raw_player': HandleGetRawPlayer,
     'get_raw_user': HandleGetRawUser,
@@ -837,6 +890,7 @@ methods = {
     'chat_unblock': HandleChatUnblock,
     'chat_official': HandleChatOfficial,
     'chat_unofficial': HandleChatUnofficial,
+    'apply_lockout': HandleApplyLockout,
     'clear_lockout': HandleClearLockout,
     'clear_cooldown': HandleClearCooldown,
     'cooldown_togo': HandleCooldownTogo,
@@ -853,4 +907,11 @@ methods = {
     'demote_alliance_leader': HandleDemoteAllianceLeader,
     'kick_alliance_member': HandleKickAllianceMember,
     'reset_idle_check_state': HandleResetIdleCheckState,
+    'ai_attack': HandleAIAttack,
+    'push_gamedata': HandlePushGamedata,
+    'force_reload': HandleForceReload,
+    'client_eval': HandleClientEval,
+    'offer_payer_promo': HandleOfferPayerPromo,
+    'invoke_facebook_auth': HandleInvokeFacebookAuth,
+    # not implemented yet: join_abtest, clear_abtest
 }

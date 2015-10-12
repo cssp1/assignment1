@@ -12782,7 +12782,7 @@ class CONTROLAPI(resource.Resource):
         assert secret == str(SpinConfig.config['proxy_api_secret'])
 
         if (method_name in CustomerSupport.methods):
-            # new-style CustomerSupport handlers
+            # new-style CustomerSupport handlers that operate on a session or playerdb/userdb backing store
             user_id = None
             if 'user_id' in args:
                 user_id = int(args['user_id'])
@@ -12861,48 +12861,16 @@ class CONTROLAPI(resource.Resource):
                     ret = server.NOT_DONE_YET
 
         else:
-            # old-style custom handlers
+
+            # custom handlers that do not work with live sessions
+            # these are more for server-global operations, plus the terminate_session special case
+
             handler = getattr(self, 'handle_'+method_name, None)
             if handler is None:
+                request.setResponseCode(http.BAD_REQUEST)
                 return 'badmethod\n'
 
-            handler_args = copy.deepcopy(args)
-            session = None
-
-            # common code for methods that operate on a user
-            # replace 'user_id' arg with 'session'
-            if 'user_id' in handler_args:
-                user_id = int(args['user_id'])
-                del handler_args['user_id']
-                for s in session_table.itervalues():
-                    if s.user.user_id == user_id:
-                        session = s
-                        break
-                if (not session) and (method_name != 'terminate'):
-                    # always return OK for terminate, since it may fail due to innocent race conditions
-                    return 'notfound\n'
-                else:
-                    handler_args['session'] = session
-
-            if session:
-                ret = server.NOT_DONE_YET
-
-                def after_handle(request, session, handler_ret):
-                    session.flush_outgoing_messages()
-                    if handler_ret is server.NOT_DONE_YET: return # handler will complete the deferred request
-                    SpinHTTP.complete_deferred_request(handler_ret if handler_ret is not None else 'ok\n', request)
-
-                d = defer.Deferred()
-                d.addCallback(lambda _, handler=handler, request=request, session=session, handler_args=handler_args: after_handle(request, session, handler(request, **handler_args)))
-                if method_name in ('terminate','terminate_session'):
-                    # never fail
-                    d.addErrback(lambda _, request=request: SpinHTTP.complete_deferred_request('ok\n', request))
-                else:
-                    d.addErrback(lambda _, request=request: SpinHTTP.complete_deferred_request(CustomerSupport.ReturnValue(error = 'Race condition: Player just logged out. Please try again.').as_body(), request))
-                session.after_async_request(d)
-
-            else:
-                ret = handler(request, **handler_args)
+            ret = handler(request, **args)
 
         # note: can go asynchronous
         return ret if (ret is not None) else 'ok\n'
@@ -12951,11 +12919,6 @@ class CONTROLAPI(resource.Resource):
         # make sure the response to this gets written before shutting everything down
         request.notifyFinish().addBoth(lambda _: reactor.stop())
         return SpinJSON.dumps({'result':'ok'})
-    def handle_terminate(self, request, session = None):
-        if session:
-            return self.kill_session(request, session)
-        else:
-            return 'ok\n' # can get here due to race condition
     def handle_ping(self, request):
         pass
     def handle_sleep(self, request, duration = 5):
@@ -12971,47 +12934,6 @@ class CONTROLAPI(resource.Resource):
     def handle_server_eval(self, request, expr = None):
         result = eval(expr)
         gamesite.exception_log.event(server_time, 'eval %s -> %s' % (expr, repr(result)))
-    def handle_ban(self, request, session = None):
-        session.player.banned_until = server_time + gamedata['server']['default_ban_time']
-        return self.kill_session(request, session)
-    def handle_ai_attack(self, request, session = None, attack_type = None):
-        session.start_ai_attack(session.outgoing_messages, attack_type, override_protection = True, verbose = True)
-    def handle_lockout(self, request, session = None, lockout_time = None, lockout_message = None):
-        session.player.lockout_until = server_time + lockout_time
-        session.player.lockout_message = lockout_message
-        return self.kill_session(request, session)
-    def handle_push_gamedata(self, request, session = None):
-        self.gameapi.push_gamedata(session, session.outgoing_messages)
-        session.flush_outgoing_messages()
-    def handle_force_reload(self, request, session = None):
-        session.send([["FORCE_RELOAD"]], flush_now = True)
-    def handle_client_eval(self, request, session = None, expr = None):
-        session.send([["CLIENT_EVAL", expr]], flush_now = True)
-    def handle_offer_payer_promo(self, request, session = None):
-        session.user.offer_payer_promo(session, session.outgoing_messages)
-        session.flush_outgoing_messages()
-    def handle_invoke_facebook_auth(self, request, session = None, scope = None):
-        if not scope: scope = SpinConfig.config.get('facebook_auth_scope', 'email')
-        session.send([["INVOKE_FACEBOOK_AUTH", scope, "Test", "Test authorization"]], flush_now = True)
-    def handle_join_abtest(self, request, session = None, name = None, group = None):
-        assert group in gamedata['abtests'][name]['groups']
-        session.player.abtests[name] = group
-        # note: does NOT update object specs, will likely require a reload to work
-        session.outgoing_messages.append(["ABTEST_UPDATE", session.player.abtests])
-    def handle_clear_abtest(self, request, session = None, name = None):
-        if name in session.player.abtests: del session.player.abtests[name]
-        session.outgoing_messages.append(["ABTEST_UPDATE", session.player.abtests])
-    def handle_pvp_isolate(self, request, session = None):
-        session.player.isolate_pvp = True
-    def handle_pvp_unisolate(self, request, session = None):
-        session.player.isolate_pvp = False
-    def handle_add_battle_fatigue(self, request, session = None, stack = None, defender_id = None):
-        if stack is None: stack = gamedata['anti_bullying']['sandstorm_max_battle_fatigue']
-        session.player.cooldown_trigger('battle_fatigue:%d' % int(defender_id),
-                                        gamedata['anti_bullying']['battle_fatigue_duration'],
-                                        add_stack = stack)
-    def handle_remove_battle_fatigue(self, request, session = None, defender_id = None):
-        session.player.cooldown_reset('battle_fatigue:%d' % int(defender_id))
     def handle_system_announcement(self, request, body = None):
         for session in session_table.itervalues():
             if not session.logout_in_progress:
