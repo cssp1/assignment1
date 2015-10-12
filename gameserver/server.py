@@ -303,6 +303,34 @@ spin_server_name = None
 # table mapping sessions (big strings) to live Player objects
 session_table = {}
 
+def get_session_by_session_id(session_id, include_logout_in_progress = False):
+    s = session_table.get(session_id, None)
+    if s and s.logout_in_progress and not include_logout_in_progress: s = None
+    return s
+def get_session_by_user_id(user_id, include_logout_in_progress = False):
+    for s in session_table.itervalues():
+        if s.user.user_id == user_id:
+            if s.logout_in_progress and not include_logout_in_progress: return None
+            return s
+    return None
+def get_session_by_facebook_id(facebook_id, include_logout_in_progress = False):
+    for s in session_table.itervalues():
+        if s.user.facebook_id == facebook_id:
+            if s.logout_in_progress and not include_logout_in_progress: return None
+            return s
+    return None
+def get_session_by_xsolla_id(xs_id, include_logout_in_progress = False):
+    for s in session_table.itervalues():
+        if s.user.get_xsolla_id() == xs_id:
+            if s.logout_in_progress and not include_logout_in_progress: return None
+            return s
+    return None
+
+def iter_sessions(include_logout_in_progress = False):
+    for session in session_table.itervalues():
+        if session.logout_in_progress: continue
+        yield session
+
 invalid_sessions = {} # set of session IDs invalidated via CONTROLAPI (sid->count)
 invalid_sessions_by_time = collections.deque() # (time,sid) for session invalidations
 
@@ -12794,11 +12822,7 @@ class CONTROLAPI(resource.Resource):
             handler = CustomerSupport.methods[method_name](server_time, user_id, gamedata, gamesite, args)
 
             # see if the user is logged in
-            session = None
-            for s in session_table.itervalues():
-                if s.user.user_id == user_id:
-                    session = s
-                    break
+            session = get_session_by_user_id(user_id)
 
             if session:
                 # ONLINE edit
@@ -12889,7 +12913,7 @@ class CONTROLAPI(resource.Resource):
 
         self.gameapi.AsyncLogin.cancel_existing(None, session_id)
 
-        if session_id in session_table:
+        if session_id in session_table: # note: we DO want to see logout_in_progress sessions here, to wait until they finish logout before responding
             # note: this goes asynchronous
             return self.kill_session(request, session_table[session_id])
         else:
@@ -12935,10 +12959,9 @@ class CONTROLAPI(resource.Resource):
         result = eval(expr)
         gamesite.exception_log.event(server_time, 'eval %s -> %s' % (expr, repr(result)))
     def handle_system_announcement(self, request, body = None):
-        for session in session_table.itervalues():
-            if not session.logout_in_progress:
-                for channel in ('GLOBAL', 'ALLIANCE', 'REGION'):
-                    session.chat_recv(channel, {'chat_name':'System', 'type':'system', 'time': server_time, 'facebook_id':'-1', 'user_id':-1}, body)
+        for session in iter_sessions():
+            for channel in ('GLOBAL', 'ALLIANCE', 'REGION'):
+                session.chat_recv(channel, {'chat_name':'System', 'type':'system', 'time': server_time, 'facebook_id':'-1', 'user_id':-1}, body)
     def handle_broadcast_map_update(self, request, region_id = None, base_id = None, data = None, server = None, originator = None):
         assert region_id and base_id and server
         # note: ignore our own broadcasts
@@ -12950,10 +12973,9 @@ class CONTROLAPI(resource.Resource):
         if server != spin_server_name:
             self.gameapi.broadcast_map_attack(region_id, base_id, attacker_id, defender_id, summary, pcache_info, msg = msg, send_to_net = False)
     def handle_broadcast_turf_update(self, request, region_id = None, data = None):
-        for session in session_table.itervalues():
-            if not session.logout_in_progress:
-                if session.player.home_region == region_id:
-                    session.send([["REGION_TURF_UPDATE", session.player.home_region, data]])
+        for session in iter_sessions():
+            if session.player.home_region == region_id:
+                session.send([["REGION_TURF_UPDATE", session.player.home_region, data]])
 
 class Store:
 
@@ -13679,8 +13701,8 @@ class Store:
     def make_credit_order(cls, order_id, order_info, currency):
         assert currency in ('fbcredits', 'kgcredits')
         session_id = str(order_info['session_id'])
-        session = session_table[session_id]
-        assert (not session.logout_in_progress)
+        session = get_session_by_session_id(session_id)
+        assert session
         unit_id = order_info['unit_id']
         spellname = order_info['spellname']
         spellarg = order_info.get('spellarg', None)
@@ -13762,10 +13784,7 @@ class Store:
 
             # note: we have to find the session manually, because this request comes from Facebook without passing through the client!
             if session is None:
-                for s in session_table.itervalues():
-                    if s.user.facebook_id == buyer:
-                        session = s
-                        break
+                session = get_session_by_facebook_id(buyer)
             if session is None: raise Exception(('session not found for in-app currency order! (FB buyer %s)' % buyer)+repr(my_data))
             unit_id = GameObject.VIRTUAL_ID
             spellname = 'FB_PROMO_GAMEBUCKS'
@@ -13786,7 +13805,7 @@ class Store:
 
         else:
             if session is None:
-                session = session_table[my_data['session_id']]
+                session = get_session_by_session_id(my_data['session_id'])
             unit_id = my_data['unit_id']
             spellname = my_data['spellname']
             spellarg = my_data.get('spellarg', None)
@@ -14531,11 +14550,7 @@ class CREDITAPI(resource.Resource):
             assert 'currency' in spell
             assert spell['currency'].startswith('fbpayments:')
 
-            session = None
-            for s in session_table.itervalues():
-                if s.user.facebook_id == request_data['user_id']:
-                    session = s
-                    break
+            session = get_session_by_facebook_id(request_data['user_id'])
             if session is None:
                 gamesite.exception_log.event(server_time, 'payments_get_item_price on unknown session: %s' % repr(request_data))
 
@@ -14622,8 +14637,8 @@ class CREDITAPI(resource.Resource):
                     my_data = SpinFacebook.order_data_decode(order_details['items'][0]['data'])
 
                     session_id = my_data['session_id']
-                    session = session_table[session_id]
-                    assert (not session.logout_in_progress)
+                    session = get_session_by_session_id(session_id)
+                    assert session
                     unit_id = my_data['unit_id']
 
                     # XXX spell may be undefined here when the order is a Facebook payer promo, need to fix this.
@@ -14758,11 +14773,7 @@ class TRIALPAYAPI(resource.Resource):
         SpinHTTP.set_access_control_headers(request)
         # find session
         user_id = int(request.args['order_info'][0])
-        session = None
-        for s in session_table.itervalues():
-            if s.user.user_id == user_id:
-                session = s
-                break
+        session = get_session_by_user_id(user_id)
         if not session:
             raise Exception('session not found for TRIALPAYAPI order (user_id %d)' % user_id)
         return self.handle_payment(request, session,
@@ -14849,11 +14860,7 @@ class XSAPI(resource.Resource):
 
         # find session
         xs_id = request_data['user']['id']
-        session = None
-        for s in session_table.itervalues():
-            if s.user.get_xsolla_id() == xs_id and (not s.logout_in_progress):
-                session = s
-                break
+        session = get_session_by_xsolla_id(xs_id)
         if not session:
             gamesite.exception_log.event(server_time, 'session not found for XSAPI order (xs_id %s)' % xs_id)
             request.setResponseCode(http.BAD_REQUEST)
@@ -16446,18 +16453,7 @@ class GAMEAPI(resource.Resource):
 
                 # do this here so we send an up-to-date guess about lock state to the client upon Spying
                 session.viewing_player.bust_expired_locks()
-                if gamedata['server']['query_lock_state_on_spy']:
-                    spyee_lock_state = gamesite.lock_client.player_lock_get_state_batch([session.viewing_user.user_id], reason = 'spy')[0][0]
-                else:
-                    spyee_lock_state = session.viewing_player.lock_state
-                    if spyee_lock_state == Player.LockState.open:
-                        # search session table to see if they're logged in
-                        # this helps because viewing_player may have been updated from a disk file whereas the
-                        # actual player is logged in and has not been flushed yet
-                        for s in session_table.itervalues():
-                            if s.user.user_id == session.viewing_user.user_id:
-                                spyee_lock_state = Player.LockState.logged_in
-                                break
+                spyee_lock_state = gamesite.lock_client.player_lock_get_state_batch([session.viewing_user.user_id], reason = 'spy')[0][0]
 
             props['pvp_balance'] = (session.pvp_balance if session.pvp_balance else 'equal')
             if ((not session.using_squad_deployment()) or gamedata['server'].get('log_ladder_pvp_on_map',False)):
@@ -21129,8 +21125,9 @@ class GAMEAPI(resource.Resource):
             suser_id = 'unknown'
             if 'session' in args_dict:
                 session_id = args_dict['session']
-                if session_table.has_key(session_id):
-                    suser_id = str(session_table[session_id].user.user_id)
+                session = get_session_by_session_id(session_id, include_logout_in_progress = True)
+                if session:
+                    suser_id = str(session.user.user_id)
 
             gamesite.exception_log.event(server_time, 'GAMEAPI Exception (user '+suser_id+'): '+text)
 
@@ -21194,11 +21191,7 @@ class GAMEAPI(resource.Resource):
             return SpinJSON.dumps({'serial':-1, 'clock': server_time, 'msg': retmsg})
 
         else:
-            if session_id and session_table.has_key(session_id):
-                session = session_table[session_id]
-                if session.logout_in_progress:
-                    session = None
-
+            session = get_session_by_session_id(session_id)
             if not session:
                 return SpinJSON.dumps({'serial':-1, 'clock': server_time, 'msg': [["ERROR", "UNKNOWN_SESSION"]]})
 
@@ -21630,11 +21623,10 @@ class GAMEAPI(resource.Resource):
             wait_for_session = session_table[client_session_id]
             wait_reason = 'double_login'
         else:
-            for id, sess in session_table.iteritems():
-                if sess.user.user_id == user_id:
-                    wait_for_session = sess
-                    wait_reason = 'relog'
-                    break
+            sess = get_session_by_user_id(user_id, include_logout_in_progress = True)
+            if sess:
+                wait_for_session = sess
+                wait_reason = 'relog'
 
         if wait_for_session:
 
@@ -25798,7 +25790,7 @@ class GAMEAPI(resource.Resource):
         else:
             squad_owner_id = None
 
-        for session in session_table.itervalues():
+        for session in iter_sessions():
             if session.player.home_region == region_id:
                 # if the update concerns one of the player's squads, and it's from an external player,
                 # then have the owner ping squads to see what happened
@@ -25821,7 +25813,7 @@ class GAMEAPI(resource.Resource):
         if msg is None:
             msg = "REGION_MAP_ATTACK_COMPLETE" if summary else "REGION_MAP_ATTACK_START" # legacy compatibility
         upd = [msg, region_id, base_id, attacker_id, defender_id, summary, pcache_info]
-        for session in session_table.itervalues():
+        for session in iter_sessions():
             if session.player.user_id == defender_id and session.player.home_region == region_id and attacker_id != session.player.user_id:
                 session.send([upd], flush_now = True)
 
@@ -26163,7 +26155,7 @@ class GameSite(server.Site):
     # send logged-in players maintenance warnings, then kick all after 5 minutes
     # note: this does not prevent NEW log-ins, so make sure the proxyserver is not routing any new logins here
     def start_maint_kick(self):
-        for session in session_table.itervalues():
+        for session in iter_sessions():
             session.send([["SERVER_MAINTENANCE_WARNING"]], flush_now = True)
         self.maint_kick_time = server_time + gamedata['server']['maint_kick_time']
         self.server_state = 'maint_kick'
@@ -26174,7 +26166,7 @@ class GameSite(server.Site):
 
     # immediately kick all sessions, even if they are stuck on I/O
     def panic_kick(self):
-        for session in session_table.values():
+        for session in iter_sessions():
             self.gameapi.log_out_async(session, 'panic', force = True)
 
     # print Python stack frame to trace log upon receiving SIGUSR1
@@ -26218,7 +26210,7 @@ class GameSite(server.Site):
 
         # need to wait for all async logouts to finish before proceeding
         waiting_on = []
-        for session in session_table.itervalues():
+        for session in iter_sessions(include_logout_in_progress = True):
             waiting_on.append(self.gameapi.log_out_async(session, 'server_shutdown'))
 
         print 'logging out %d active sessions' % len(waiting_on)
@@ -26257,8 +26249,7 @@ class GameSite(server.Site):
         # if we're about to go down for maintenance, kick all logged-in players
         maint_kicks = 0
         if self.maint_kick_time > 0 and server_time >= self.maint_kick_time:
-            for session in session_table.values():
-                if session.logout_in_progress: continue
+            for session in iter_sessions():
                 try:
                     self.gameapi.log_out_async(session, 'maint_kick')
                 except:
@@ -26280,9 +26271,7 @@ class GameSite(server.Site):
         lock_keepalive_states = []
         region_lock_keepalives = {}
 
-        for id in session_table.keys():
-            session = session_table[id]
-            if session.logout_in_progress: continue
+        for session in iter_sessions():
 
             need_flush = False
             kick_reason = None
@@ -26336,7 +26325,7 @@ class GameSite(server.Site):
                 except:
                     self.exception_log.event(server_time, ('bgfunc exception due to damaged session %d during kick for %s (POSSIBLE DATA LOSS): ' % (session.user.user_id, kick_reason)) + \
                                              traceback.format_exc())
-                    del session_table[id]
+                    del session_table[session.session_id]
                 continue
 
             # conclude any longpolls that are idle for more than the wait interval
@@ -26598,7 +26587,7 @@ class AdminStats:
                 'load_unhalted': self.get_load(),
                 'machine_stats': MachineStats.get_stats(filesystems = machine_stats_filesystems),
                 'active_sessions': self.get_active_sessions(),
-                'paying_sessions': sum((1 for session in session_table.itervalues() if session.player.history.get('money_spent',0)>0),0)
+                'paying_sessions': sum((1 for session in iter_sessions() if session.player.history.get('money_spent',0)>0),0)
                 }
 
     def get_stats(self):
@@ -26840,7 +26829,7 @@ class AdminResource(resource.Resource):
             link = urllib.urlencode(props)
             return '<a href="?%s">%s</a>' % (link, text)
 
-        ret += '<tr><td>User</td><td>Name</td><td>'+make_sortlink('Level', request, 'level')+'</td><td>Country</td><td>Age</td><td>'+make_sortlink('IP', request, 'ip')+'</td><td>Campaign</td><td>'+make_sortlink('Acct Age', request, 'acct_age')+'</td><td>'+make_sortlink('Session Length', request, 'session_length')+'</td><td>Idle For</td><td>Last Actions (sec ago)</td><td>Tut</td><td>&#35;PvE</td><td>&#35;PvP</td><td>Protect</td><td>Where</td><td>Logins</td><td>Alloy Bal.</td><td>'+make_sortlink('Lifetime Receipts', request, 'default')+'</td></tr>'
+        ret += '<tr><td>User</td><td>Name</td><td>'+make_sortlink('Level', request, 'level')+'</td><td>Country</td><td>Age</td><td>'+make_sortlink('IP', request, 'ip')+'</td><td>Campaign</td><td>'+make_sortlink('Acct Age', request, 'acct_age')+'</td><td>'+make_sortlink('Session Length', request, 'session_length')+'</td><td>Async</td><td>Idle For</td><td>Last Actions (sec ago)</td><td>Tut</td><td>&#35;PvE</td><td>&#35;PvP</td><td>Protect</td><td>Where</td><td>Logins</td><td>Alloy Bal.</td><td>'+make_sortlink('Lifetime Receipts', request, 'default')+'</td></tr>'
 
         # sort by money spent, then player level
         sort_by = request.args['sort'][0] if ('sort' in request.args) else 'default'
@@ -26864,7 +26853,7 @@ class AdminResource(resource.Resource):
             user_link = '<a href="http://apps.facebook.com/'+SpinConfig.config['facebook_app_namespace']+'/?visit_base='+user+'">'+user+'</a>'
             name = session.user.get_ui_name(session.player)
             if session.user.facebook_id:
-                name = '<a href="http://www.facebook.com/'+session.user.facebook_id+'/">'+name+'</a>'
+                name = '<a href="https://www.facebook.com/'+session.user.facebook_id+'/">'+name+'</a>'
 
             country = session.user.country + (' (%d)' % SpinConfig.country_tier_map.get(session.user.country, 4))
 
@@ -26879,6 +26868,10 @@ class AdminResource(resource.Resource):
                 campaign = 'unknown'
             acct_age = 'unk' if (session.player.creation_time < 0) else '%0.1f' % ((server_time - session.player.creation_time)/86400.0)
             active = SpinConfig.pretty_print_time(session.last_active_time - session.login_time)
+            if len(session.async_ds) + len(session.after_async) > 0:
+                async = '%d,%d' % (len(session.async_ds), len(session.after_async))
+            else:
+                async = ''
             last_active = SpinConfig.pretty_print_time(server_time - session.last_active_time)
 
             action = []
@@ -26933,7 +26926,7 @@ class AdminResource(resource.Resource):
                 spend = '<b>$%.2f</b>' % spend
             else:
                 spend = '$%.2f' % spend
-            ret += '<tr><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%d</td><td>%d</td><td>%s</td><td>%s</td><td>%d</td><td>%d</td><td>%s</td></tr>' % (user_link,name,str(session.player.resources.player_level),country,years_old,ip_addr,campaign,acct_age,active,last_active,action,tutorial,pve,pvp,protect,battle,session.player.history.get('logged_in_times',0),session.player.resources.gamebucks,spend)
+            ret += '<tr><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%d</td><td>%d</td><td>%s</td><td>%s</td><td>%d</td><td>%d</td><td>%s</td></tr>' % (user_link,name,str(session.player.resources.player_level),country,years_old,ip_addr,campaign,acct_age,active,async,last_active,action,tutorial,pve,pvp,protect,battle,session.player.history.get('logged_in_times',0),session.player.resources.gamebucks,spend)
 
         ret += '</table><p>'
 
