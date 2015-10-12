@@ -16380,7 +16380,7 @@ class GAMEAPI(resource.Resource):
 
             session.pvp_balance = None
 
-            if gamedata['server']['query_lock_state_on_spy'] and gamesite.nosql_client:
+            if gamesite.nosql_client:
                 spyee_lock_state = gamesite.nosql_client.map_feature_lock_get_state_batch(session.player.home_region, [session.viewing_base.base_id], reason = 'spy_quarry')[0][0]
             else:
                 spyee_lock_state = Player.LockState.open
