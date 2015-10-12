@@ -316,24 +316,28 @@ SquadManageDialog.update_squad_manage = function(dialog) {
 
                     // find healthiest (or unhealthiest) non-pending reserve unit of this type
                     var obj = null, extreme_hp_ratio, no_space = false;
+                    var candidate_count = 0; // to determine whether this is the last unit of this type
                     if(button.get_button(SPUI.MouseButton.RIGHT)) {
                         extreme_hp_ratio = 1;
                     } else {
                         extreme_hp_ratio = -1;
                     }
                     goog.object.forEach(player.my_army, function(o) {
-                        if(o['squad_id'] === SQUAD_IDS.RESERVES && o['spec'] === _specname && !o['pending']) {
-                            var space = get_leveled_quantity(gamedata['units'][o['spec']]['consumes_space']||0, o['level']||1);
-                            if(_cur_squad_space+space <= _max_squad_space) {
-                                var curmax = army_unit_hp(o);
-                                var ratio = curmax[0]/Math.max(curmax[1],1);
-                                if((button.get_button(SPUI.MouseButton.RIGHT) && ratio <= extreme_hp_ratio) ||
-                                   (!button.get_button(SPUI.MouseButton.RIGHT) && ratio > extreme_hp_ratio)) {
-                                    extreme_hp_ratio = ratio;
-                                    obj = o;
+                        if(o['squad_id'] === SQUAD_IDS.RESERVES && o['spec'] === _specname) {
+                            candidate_count += 1;
+                            if(!o['pending']) {
+                                var space = get_leveled_quantity(gamedata['units'][o['spec']]['consumes_space']||0, o['level']||1);
+                                if(_cur_squad_space+space <= _max_squad_space) {
+                                    var curmax = army_unit_hp(o);
+                                    var ratio = curmax[0]/Math.max(curmax[1],1);
+                                    if((button.get_button(SPUI.MouseButton.RIGHT) && ratio <= extreme_hp_ratio) ||
+                                       (!button.get_button(SPUI.MouseButton.RIGHT) && ratio > extreme_hp_ratio)) {
+                                        extreme_hp_ratio = ratio;
+                                        obj = o;
+                                    }
+                                } else {
+                                    no_space = true;
                                 }
-                            } else {
-                                no_space = true;
                             }
                         }
                     });
@@ -360,7 +364,7 @@ SquadManageDialog.update_squad_manage = function(dialog) {
                             obj['squad_id'] = _squad_id;
                         }
                         obj['pending'] = 1;
-                        return false; // do not stop dripper
+                        return (candidate_count === 1); // stop dripper if this is the last unit in the stack
                     }
 
                     return true; // stop dripper
@@ -421,6 +425,7 @@ SquadManageDialog.update_squad_manage = function(dialog) {
                 if(_obj['pending']) { return true; } // stop dripper
 
                 var to_unassign = null;
+                var is_last; // whether this is the very last unit in the stack
 
                 if('stack_list' in _obj) {
                      // find healthiest (or unhealthiest) non-pending reserve unit of this type
@@ -441,8 +446,10 @@ SquadManageDialog.update_squad_manage = function(dialog) {
                             }
                         }
                     });
+                    is_last = (goog.object.getCount(_obj['stack_list']) === 1);
                 } else {
                     to_unassign = _obj;
+                    is_last = true;
                 }
 
                 if(to_unassign) {
@@ -462,7 +469,7 @@ SquadManageDialog.update_squad_manage = function(dialog) {
                     to_unassign['pending'] = 1;
 
                     unit_repair_sync_marker = synchronizer.request_sync();
-                    return false; // do not stop dripper
+                    return is_last; // stop dripper only on the last unit
                 } else {
                     return true; // stop dripper
                 }
