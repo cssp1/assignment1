@@ -1046,8 +1046,10 @@ var refresh_server_status = function() {
 
             var FIELDS = [{'name':'server_name','type':'server_name'},
                           {'name':'state','type':'state'},
-                          {'name':'active_sessions','type':'active_sessions'},
-                          {'name':'paying_sessions','type':'int'},
+                          {'name':'sessions','var':'active_sessions','type':'active_sessions'},
+                          {'name':'$_sessions','var':'paying_sessions','type':'int'},
+                          {'name':'clients','var':'active_protocol_clients','type':'int'},
+                          {'name':'requests','var':'active_protocol_requests','type':'int'},
                           {'name':'load_unhalted','type':'load'},
                           {'name':'machine_stats:machine_mem_free_mb','type':'memory_mb'},
                           {'name':'gameclient_build','type':'build'},
@@ -1080,7 +1082,7 @@ var refresh_server_status = function() {
                 var row = $('<tr>');
                 $.each(FIELDS, function(index, field) {
                     var val = null;
-                    var path = field['name'].split(':');
+                    var path = (field['var'] || field['name']).split(':');
                     for(var p = item, i = 0; i < path.length; i++) {
                         if(path[i] in p) {
                             if(i == path.length-1) {

@@ -66,7 +66,7 @@ class IOAPI(resource.Resource):
         assert request.args['secret'][0] == self.secret
 
         if ('shutdown' in request.args):
-            reactor.callLater(0, reactor.stop)
+            reactor.stop()
             return 'ok'
 
         if self.simulate_fault():
@@ -95,9 +95,39 @@ class IOAPI(resource.Resource):
             return 'error'
 
 class IoSite(server.Site):
+    class IoProtocol(http.HTTPChannel):
+        def connectionMade(self):
+            http.HTTPChannel.connectionMade(self)
+            self.site.gotClient(self)
+        def connectionLost(self, reason):
+            http.HTTPChannel.connectionLost(self, reason)
+            self.site.lostClient(self)
+
     displayTracebacks = False
+    protocol = IoProtocol
+
     def __init__(self, api):
         server.Site.__init__(self, api)
+        self.clients_stopped_deferred = None
+        self.active_clients = 0
+        reactor.addSystemEventTrigger('before', 'shutdown', self.stop_all_clients)
+
+    # client/request management boilerplate - see https://github.com/habnabit/polecat/blob/master/polecat.py
+    def gotClient(self, client):
+        self.active_clients += 1
+    def lostClient(self, client):
+        self.active_clients -= 1
+        if not self.active_clients and self.clients_stopped_deferred:
+            d = self.clients_stopped_deferred
+            self.clients_stopped_deferred = None
+            d.callback(None)
+    def stop_all_clients(self):
+        d = defer.Deferred()
+        if not self.active_clients:
+            reactor.callLater(0, d.callback, None)
+        else:
+            self.clients_stopped_deferred = d
+        return d
 
 def do_slave(port, secret):
     api = IOAPI(secret)

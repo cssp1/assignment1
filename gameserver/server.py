@@ -12955,9 +12955,12 @@ class CONTROLAPI(resource.Resource):
     def handle_shutdown(self, request, force = False):
         if (not force) and len(session_table) > 0:
             return SpinJSON.dumps({'error':'not shutting down - %d sessions still active\n' % len(session_table)})
-        # make sure the response to this gets written before shutting everything down
-        request.notifyFinish().addBoth(lambda _: reactor.stop())
+
+        request.setHeader('Connection', 'close')
+        reactor.stop()
+
         return SpinJSON.dumps({'result':'ok'})
+
     def handle_ping(self, request):
         pass
     def handle_sleep(self, request, duration = 5):
@@ -25862,7 +25865,16 @@ class GAMEAPI(resource.Resource):
 # subclass of Twisted's built-in web server
 # this adds periodic function calls to perform background tasks for the game
 class GameSite(server.Site):
+    class GameProtocol(http.HTTPChannel):
+        def connectionMade(self):
+            http.HTTPChannel.connectionMade(self)
+            self.site.gotClient(self)
+        def connectionLost(self, reason):
+            http.HTTPChannel.connectionLost(self, reason)
+            self.site.lostClient(self)
+
     displayTracebacks = False
+    protocol = GameProtocol
 
     def log_async_exception(self, exc):
         self.exception_log.event(server_time, exc)
@@ -26049,8 +26061,14 @@ class GameSite(server.Site):
         self.chat_mgr = ChatChannels.ChatChannelMgr(relay = self.chat_client)
         self.chat_mgr.join(controlapi, 'CONTROL')
 
+        # will be fired when last connection drops
+        self.clients_stopped_deferred = None
+        self.active_clients = 0
+        self.active_requests = set()
+
         # make sure players are logged out and flushed before server shuts down
         reactor.addSystemEventTrigger('before', 'shutdown', self.shutdown)
+        reactor.addSystemEventTrigger('before', 'shutdown', self.stop_all_clients)
 
         signal.signal(signal.SIGUSR1, self.handle_SIGUSR1)
         signal.signal(signal.SIGUSR2, self.handle_SIGUSR2)
@@ -26062,6 +26080,36 @@ class GameSite(server.Site):
         self.bg_task = task.LoopingCall(self.bgfunc)
         self.server_status_task = task.LoopingCall(self.server_status_func)
         self.reset_interval(True)
+
+    # client/request management boilerplate - see https://github.com/habnabit/polecat/blob/master/polecat.py
+    def gotClient(self, client):
+        self.active_clients += 1
+        #gamesite.exception_log.event(server_time, 'gotClient %r clients %d requests %d' % (client, self.active_clients, len(self.active_requests)))
+    def lostClient(self, client):
+        self.active_clients -= 1
+        #gamesite.exception_log.event(server_time, 'lostClient %r clients %d requests %d' % (client, self.active_clients, len(self.active_requests)))
+        if not self.active_clients and self.clients_stopped_deferred:
+            d = self.clients_stopped_deferred
+            self.clients_stopped_deferred = None
+            d.callback(None)
+    def getResourceFor(self, request):
+        self.active_requests.add(request)
+        request.notifyFinish().addBoth(lambda _, self=self, request=request: self.active_requests.discard(request))
+        return server.Site.getResourceFor(self, request)
+
+    def stop_all_clients(self):
+        "Returns a Deferred that fires when all clients have disconnected."
+        d = defer.Deferred()
+        if not self.active_clients:
+            reactor.callLater(0, d.callback, None)
+        else:
+            self.clients_stopped_deferred = d
+
+            # tell any keep-alive requests that we're closing down
+            for request in self.active_requests:
+                request.setHeader('Connection', 'close')
+
+        return d
 
     def sql_init(self):
         self.sql_scores2_client = None
@@ -26466,10 +26514,12 @@ class WS_GAMEAPI_Protocol(protocol.Protocol):
 
     def connectionMade(self):
         self.peer_ip = str(self.transport.getPeer().host)
-        #gamesite.exception_log.event(server_time, str(self.peer_ip))
         self.connected = True
+        gamesite.gotClient(self) # XXX not sure how to get a reference to the "site" here
+
     def connectionLost(self, reason):
         self.connected = False
+        gamesite.lostClient(self) # XXX not sure how to get a reference to the "site" here
 
     def dataReceived(self, data):
         update_server_time()
@@ -26502,7 +26552,20 @@ class WS_GAMEAPI(websockets.WebSocketsResource):
     def render(self, request):
         update_server_time()
         SpinHTTP.set_access_control_headers(request)
-        return websockets.WebSocketsResource.render(self, request)
+
+        # WebSocketsResource swaps WS_GAMEAPI_Protocol in place of GameProtocol, so we have
+        # to let the gamesite know it's gone to get the accounting right
+
+        # Secure connections wrap in TLSMemoryBIOProtocol too.
+        old_protocol = request.transport.protocol.wrappedProtocol if request.isSecure() else request.transport.protocol
+        assert isinstance(old_protocol, GameSite.GameProtocol)
+
+        ret = websockets.WebSocketsResource.render(self, request)
+        if ret is server.NOT_DONE_YET:
+            # success - drop the GameProtocol client since it's been swapped to WS_GAMEAPI_Protocol
+            old_protocol.site.lostClient(old_protocol)
+            old_protocol.site.active_requests.discard(request)
+        return ret
 
 # live server administration interface
 class AdminStats:
@@ -26603,7 +26666,9 @@ class AdminStats:
                 'load_unhalted': self.get_load(),
                 'machine_stats': MachineStats.get_stats(filesystems = machine_stats_filesystems),
                 'active_sessions': self.get_active_sessions(),
-                'paying_sessions': sum((1 for session in iter_sessions() if session.player.history.get('money_spent',0)>0),0)
+                'paying_sessions': sum((1 for session in iter_sessions() if session.player.history.get('money_spent',0)>0),0),
+                'active_protocol_clients': gamesite.active_clients,
+                'active_protocol_requests': len(gamesite.active_requests),
                 }
 
     def get_stats(self):
