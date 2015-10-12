@@ -15985,6 +15985,7 @@ class GAMEAPI(resource.Resource):
     def change_session(self, session, retmsg, dest_user_id = None, dest_base_id = None, force = False, new_ladder_state = None, delay = 0, client_props = None):
         assert dest_user_id or dest_base_id
         assert not (dest_user_id and dest_base_id)
+        pre_attack = client_props.get('pre_attack', None) if client_props else None
 
         d = defer.Deferred(); session.start_async_request(d)
 
@@ -16081,7 +16082,7 @@ class GAMEAPI(resource.Resource):
                                                                       'base_landlord_id': dest_feature['base_landlord_id'],
                                                                       'squad_id': int(dest_feature['base_id'].split('_')[1])}}
 
-                    if client_props and client_props.get('pre_attack',None) and (dest_feature['base_landlord_id'] != session.player.user_id):
+                    if pre_attack and (dest_feature['base_landlord_id'] != session.player.user_id):
                         # attempt to lock the destination squad immediately, to reduce the time window for the defender to manipulate it before the player can attack
                         state = gamesite.nosql_client.map_feature_lock_acquire(session.player.home_region, dest_base_id, session.player.user_id, reason='VISIT_BASE2_pre_attack')
                         if state != Player.LockState.being_attacked:
@@ -16142,26 +16143,23 @@ class GAMEAPI(resource.Resource):
             # do not do this from complete_attack, because that is called in the logout/relog path
 
         # first clean up any ongoing attack, then perform the actual session change
-        self.complete_attack(session, retmsg, client_props = client_props, reason='change_session').addBoth(
-            functools.partial(self.change_session2, d, session, retmsg, dest_user_id, dest_base_id, dest_feature, new_ladder_state, new_deployable_squads, new_defending_squads, delay,
-                              client_props.get('pre_attack', None) if client_props else None))
-        return d
+        complete_attack_d = self.complete_attack(session, retmsg, client_props = client_props, reason='change_session')
 
-    # ready to change sessions, begin the I/O
-    def change_session2(self, d, session, retmsg, dest_user_id, dest_base_id, dest_feature, new_ladder_state, new_deployable_squads, new_defending_squads, delay, pre_attack, complete_attack_result):
+        if dest_user_id == session.user.user_id:
+            # visiting self - complete synchronously
+            complete_attack_d.addBoth(lambda _, self=self, session=session, d=d, retmsg=retmsg, dest_user_id=dest_user_id, new_ladder_state=new_ladder_state, new_deployable_squads=new_deployable_squads, new_defending_squads=new_defending_squads:
+                                      self.change_session_complete(d, session, retmsg, dest_user_id, session.user, session.player, None, None, None, new_ladder_state, new_deployable_squads, new_defending_squads))
+            return d
+
         if dest_user_id:
             ascdebug('change_session2 (old) %d -> %d' % (session.user.user_id, dest_user_id))
-            if dest_user_id == session.user.user_id:
-                # visiting self - complete synchronously
-                self.change_session_complete(d, session, retmsg, dest_user_id, session.user, session.player, None, None, None, new_ladder_state, new_deployable_squads, new_defending_squads)
-                return
-
             change = SessionChangeOld(self, d, session, retmsg, dest_user_id, dest_base_id, dest_feature, is_ai_user_id_range(dest_user_id), new_ladder_state, new_deployable_squads, new_defending_squads, delay, pre_attack)
         else:
             ascdebug('change_session2 (new) %d:%s -> %s' % (session.user.user_id, session.viewing_base.base_id, dest_base_id))
             change = SessionChangeNew(self, d, session, retmsg, dest_user_id, dest_base_id, dest_feature, is_ai_user_id_range(dest_user_id), new_ladder_state, new_deployable_squads, new_defending_squads, delay, pre_attack)
 
-        change.begin()
+        complete_attack_d.addBoth(lambda _, change=change: change.begin())
+        return d
 
     # wrap change_session_complete so that exceptions cannot break a session that went async
     def change_session_complete(self, d, session, retmsg, *args, **kwargs):
