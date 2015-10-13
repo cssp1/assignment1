@@ -4542,14 +4542,13 @@ class Session(object):
             gamesite.gameapi.send_player_cache_update(self, 'change_title')
         return True
 
-# This holds the state of an ongoing asynchronous session change request
-# NOTE: session changes back to player's home base bypass this and just use
-# the session.user/session.player already in memory.
-
 class SessionChange(object):
-    def __init__(self, api, d, session, retmsg, dest_user_id, dest_base_id, dest_feature, is_ai, new_ladder_state, new_deployable_squads, new_defending_squads, delay, pre_attack):
-        self.api = api
-        self.d = d # deferred to fire upon completion
+    # This holds the state of an ongoing asynchronous session change request
+    # begin() returns a Deferred that will later fire with a list of arguments
+    # to pass to change_session_complete()
+
+    def __init__(self, session, retmsg, dest_user_id, dest_base_id, dest_feature, is_ai, new_ladder_state, new_deployable_squads, new_defending_squads, delay, pre_attack):
+        self.d = defer.Deferred() # deferred to fire upon completion
         self.session = session
         self.retmsg = retmsg
         self.dest_user_id = dest_user_id
@@ -4566,7 +4565,7 @@ class SessionChange(object):
         delay = self.delay
 
         cooldown = self.session.player.get_any_abtest_value('attack_spam_cooldown', gamedata['server']['attack_spam_cooldown'])
-        if (cooldown > 0) and (self.session.player.attack_cooldown_start > 0) and (server_time < (self.session.player.attack_cooldown_start + cooldown)):
+        if self.dest_user_id != self.session.user.user_id and (cooldown > 0) and (self.session.player.attack_cooldown_start > 0) and (server_time < (self.session.player.attack_cooldown_start + cooldown)):
             # delay the actual start until the cooldown passes
             spam_delay = gamedata['server']['attack_spam_delay']
             if spam_delay < 0:
@@ -4577,11 +4576,17 @@ class SessionChange(object):
                     gamesite.exception_log.event(server_time, 'user %d: attack spam, delaying visit_base (%s) by %d sec' % (self.session.user.user_id, descr, spam_delay))
             delay += spam_delay
 
-        if delay > 0:
-            reactor.callLater(delay, self.really_begin)
-        else:
-            self.really_begin()
+        reactor.callLater(max(delay, 0), self.really_begin)
+        return self.d
 
+class SessionChangeHome(SessionChange): # simple case for going back to your own home
+    def __init__(self, *args):
+        SessionChange.__init__(self, *args)
+        assert self.dest_user_id == self.session.user.user_id
+
+    def really_begin(self):
+        self.d.callback([self.session, self.retmsg, self.dest_user_id, self.session.user, self.session.player,
+                         None, None, self.new_ladder_state, self.new_deployable_squads, self.new_defending_squads, self.pre_attack])
 
 class SessionChangeOld(SessionChange): # legacy path
     def __init__(self, *args):
@@ -4639,7 +4644,8 @@ class SessionChangeOld(SessionChange): # legacy path
                 self.dest_player.country_tier = SpinConfig.country_tier_map.get(self.dest_user.country, 4)
                 self.dest_player.developer = self.dest_user.developer
             self.dest_player.migrate_proxy()
-        self.api.change_session_complete(self.d, self.session, self.retmsg, self.dest_user_id, self.dest_user, self.dest_player, None, None, None, self.new_ladder_state, self.new_deployable_squads, self.new_defending_squads, pre_attack = self.pre_attack)
+        self.d.callback([self.session, self.retmsg, self.dest_user_id, self.dest_user, self.dest_player,
+                         None, None, self.new_ladder_state, self.new_deployable_squads, self.new_defending_squads, self.pre_attack])
 
 class SessionChangeNew(SessionChange): # new basedb path
     def __init__(self, *args):
@@ -4743,7 +4749,7 @@ class SessionChangeNew(SessionChange): # new basedb path
         if (not self.got_base) or (not self.got_player) or (not self.got_user): return
 
         # note: this actually calls back into the "old" player.my_home path!
-        self.api.change_session_complete(self.d, self.session, self.retmsg, self.dest_user_id, self.dest_user, self.dest_player, None, None, None, self.new_ladder_state, self.new_deployable_squads, self.new_defending_squads, pre_attack = self.pre_attack)
+        self.d.callback([self.session, self.retmsg, self.dest_user_id, self.dest_user, self.dest_player, None, None, self.new_ladder_state, self.new_deployable_squads, self.new_defending_squads, self.pre_attack])
 
     def try_finish_remote(self):
         if (not self.got_base) or (not self.got_player) or (not self.got_user): return
@@ -4762,7 +4768,7 @@ class SessionChangeNew(SessionChange): # new basedb path
         if self.dest_base_pre and self.dest_player:
             # complete parsing of the base using the landlord Player
             self.dest_base = base_table.parse(self.session.player.home_region, self.dest_base_id, self.dest_base_pre, self.dest_player, self.session.player, reason='visit')
-        self.api.change_session_complete(self.d, self.session, self.retmsg, self.dest_user_id, self.dest_user, self.dest_player, self.dest_base_id, self.dest_feature, self.dest_base, self.new_ladder_state, self.new_deployable_squads, self.new_defending_squads, pre_attack = self.pre_attack)
+        self.d.callback([self.session, self.retmsg, self.dest_user_id, self.dest_user, self.dest_player, self.dest_base_id, self.dest_base, self.new_ladder_state, self.new_deployable_squads, self.new_defending_squads, self.pre_attack])
 
 # A collection of game objects indexed by ID
 class ObjectCollection:
@@ -15982,14 +15988,6 @@ class GAMEAPI(resource.Resource):
         assert not (dest_user_id and dest_base_id)
         pre_attack = client_props.get('pre_attack', None) if client_props else None
 
-        d = defer.Deferred(); session.start_async_request(d)
-
-        session.visit_base_in_progress = True
-        def clear_progress_and_pass_result(session, result):
-            session.visit_base_in_progress = False
-            return result
-        d.addBoth(lambda result, session=session: clear_progress_and_pass_result(session, result))
-
         dest_feature = None
 
         if dest_user_id:
@@ -15998,8 +15996,7 @@ class GAMEAPI(resource.Resource):
 
             if (not force) and (session.viewing_user is not None) and (session.viewing_user.user_id == dest_user_id) and (session.viewing_base is session.viewing_player.my_home) and (not session.has_attacked):
                 # already viewing this base
-                reactor.callLater(0, d.callback, False)
-                return d
+                return session.start_async_request(defer.succeed(False))
 
             deployable_feature = {'base_id': session.player.squad_base_id(SQUAD_IDS.BASE_DEFENDERS),
                                   'base_landlord_id': session.player.user_id,
@@ -16013,8 +16010,7 @@ class GAMEAPI(resource.Resource):
             # new quarry path
             ascdebug('change_session (new) %d:%s -> %s' % (session.user.user_id, session.viewing_base.base_id, dest_base_id))
             if (not force) and (session.viewing_base.base_id == dest_base_id) and (not session.has_attacked):
-                reactor.callLater(0, d.callback, False)
-                return d
+                return session.start_async_request(defer.succeed(False))
 
             if gamesite.nosql_client and session.player.home_region:
 
@@ -16031,8 +16027,7 @@ class GAMEAPI(resource.Resource):
                     else:
                         gamesite.exception_log.event(server_time, 'NoSQL spy error: player %d dest_base_id %s: result %s' % (session.player.user_id, dest_base_id, repr(dest_feature)))
                     retmsg.append(["ERROR", "CANNOT_SPY_BASE_NOT_FOUND", dest_base_id, 'change_session'])
-                    reactor.callLater(0, d.callback, False)
-                    return d
+                    return session.start_async_request(defer.succeed(False))
 
                 # query for attacker's deployable squads
                 new_deployable_squads = {}
@@ -16063,8 +16058,7 @@ class GAMEAPI(resource.Resource):
                    hex_distance(dest_feature['base_map_loc'], session.player.my_home.base_map_loc) != 1:
                     # no squads in range, cannot spy on hostile base
                     retmsg.append(["ERROR", "CANNOT_SPY_NO_NEARBY_SQUADS"])
-                    reactor.callLater(0, d.callback, False)
-                    return d
+                    return session.start_async_request(defer.succeed(False))
 
                 # check for defending squads
                 if dest_feature['base_type'] == 'home':
@@ -16090,8 +16084,7 @@ class GAMEAPI(resource.Resource):
                                 err = "CANNOT_ATTACK_THEIR_SQUAD_MOVED" # probably can't get here (due to the dest_feature check above), but just in case
                             retmsg.append(["ERROR", err, "VISIT_BASE2_pre_attack"])
                             # abort the spy attempt
-                            reactor.callLater(0, d.callback, False)
-                            return d
+                            return session.start_async_request(defer.succeed(False))
 
                         # record the fact that we're now holding the lock
                         # note that we MUST proceed with the attack after spying completes (or fails), or else this could open exploits where you hold a lock on a hostile squad forever
@@ -16137,38 +16130,51 @@ class GAMEAPI(resource.Resource):
             session.player.last_daily_attack = server_time
             # do not do this from complete_attack, because that is called in the logout/relog path
 
-        # first clean up any ongoing attack, then perform the actual session change
-        complete_attack_d = self.complete_attack(session, retmsg, client_props = client_props, reason='change_session')
 
         if dest_user_id == session.user.user_id:
-            # visiting self - complete synchronously
-            complete_attack_d.addBoth(lambda _, self=self, session=session, d=d, retmsg=retmsg, dest_user_id=dest_user_id, new_ladder_state=new_ladder_state, new_deployable_squads=new_deployable_squads, new_defending_squads=new_defending_squads:
-                                      self.change_session_complete(d, session, retmsg, dest_user_id, session.user, session.player, None, None, None, new_ladder_state, new_deployable_squads, new_defending_squads))
-            return d
-
-        if dest_user_id:
-            ascdebug('change_session2 (old) %d -> %d' % (session.user.user_id, dest_user_id))
-            change = SessionChangeOld(self, d, session, retmsg, dest_user_id, dest_base_id, dest_feature, is_ai_user_id_range(dest_user_id), new_ladder_state, new_deployable_squads, new_defending_squads, delay, pre_attack)
+            ascdebug('change_session (home) %d' % (session.user.user_id))
+            change = SessionChangeHome(session, retmsg, dest_user_id, dest_base_id, dest_feature, is_ai_user_id_range(dest_user_id), new_ladder_state, new_deployable_squads, new_defending_squads, delay, pre_attack)
+        elif dest_user_id:
+            ascdebug('change_session (old) %d -> %d' % (session.user.user_id, dest_user_id))
+            change = SessionChangeOld(session, retmsg, dest_user_id, dest_base_id, dest_feature, is_ai_user_id_range(dest_user_id), new_ladder_state, new_deployable_squads, new_defending_squads, delay, pre_attack)
         else:
-            ascdebug('change_session2 (new) %d:%s -> %s' % (session.user.user_id, session.viewing_base.base_id, dest_base_id))
-            change = SessionChangeNew(self, d, session, retmsg, dest_user_id, dest_base_id, dest_feature, is_ai_user_id_range(dest_user_id), new_ladder_state, new_deployable_squads, new_defending_squads, delay, pre_attack)
+            ascdebug('change_session (new) %d:%s -> %s' % (session.user.user_id, session.viewing_base.base_id, dest_base_id))
+            change = SessionChangeNew(session, retmsg, dest_user_id, dest_base_id, dest_feature, is_ai_user_id_range(dest_user_id), new_ladder_state, new_deployable_squads, new_defending_squads, delay, pre_attack)
 
-        complete_attack_d.addBoth(lambda _, change=change: change.begin())
-        return d
 
-    # wrap change_session_complete so that exceptions cannot break a session that went async
-    def change_session_complete(self, d, session, retmsg, *args, **kwargs):
-        try:
-            return self._change_session_complete(d, session, retmsg, *args, **kwargs)
-        except:
-            gamesite.exception_log.event(server_time, 'change_session_complete exception on player %d: %s' % (session.user.user_id, traceback.format_exc()))
-        finally:
-            session.release_pre_locks()
+        # it's cleaner to string everything together in one callback chain
+        master_d = defer.Deferred()
 
-        # error path
-        if d: d.callback(False)
+        def set_progress_and_pass_result(result, session, prog):
+            ascdebug('change_session set_progress_and_pass_result in_progress %r result %r' % (prog, result))
+            session.visit_base_in_progress = prog
+            return result
+        master_d.addBoth(set_progress_and_pass_result, session, True)
 
-    def _change_session_complete(self, d, session, retmsg, dest_user_id, dest_user, dest_player, dest_base_id, dest_feature, dest_base, new_ladder_state, new_deployable_squads, new_defending_squads, pre_attack = None):
+        master_d.addBoth(lambda _, self=self,session=session,retmsg=retmsg,client_props=client_props:
+                         self.complete_attack(session, retmsg, client_props = client_props, reason='change_session'))
+
+        # note: don't care whether complete_attack() succeeds or not
+
+        master_d.addBoth(lambda _, change=change: change.begin())
+        master_d.addCallback(lambda args, self=self: self.change_session_complete(*args)) # note: receives the list of arguments to pass from change.d's callback
+
+        # we DO care about exceptions inside change_session_complete(), since we need to release locks
+        master_d.addErrback(lambda err, session=session:
+                            gamesite.exception_log.event(server_time, 'change_session_complete exception on player %d: %s' % \
+                                                         (session.user.user_id, err.getTraceback())) and \
+                            session.release_pre_locks() and \
+                            None) # swallow the exception
+
+        master_d.addBoth(set_progress_and_pass_result, session, False)
+
+        reactor.callLater(0, master_d.callback, True)
+        return session.start_async_request(master_d)
+
+    def change_session_complete(self, session, retmsg, dest_user_id, dest_user, dest_player, dest_base_id,
+                                dest_base, new_ladder_state, new_deployable_squads, new_defending_squads,
+                                pre_attack):
+
         if dest_base_id:
             ascdebug('change_session_complete (new) %d:%s -> %s (%d,%d,%d)' % (session.user.user_id, session.viewing_base.base_id, dest_base_id, bool(dest_user), bool(dest_player), bool(dest_base)))
         else:
@@ -16759,19 +16765,14 @@ class GAMEAPI(resource.Resource):
                                         self.change_session(session, change_retmsg, dest_user_id = session.player.user_id, force = True))
                         # then let the client know we skipped the session change
                         compl_d.addBoth(lambda _, session=session: session.outgoing_messages.append(["SESSION_CHANGE_SKIPPED"]))
-                        if d:
-                            compl_d.chainDeferred(d)
-                        return # don't fire d yet
+                        return compl_d
 
                 else:
                     retmsg += do_attack_retmsg # send error messages to client
 
                 # safer, but sends ineffective session change to client
                 # also necessary in case do_attack() fails
-                temp_d = self.change_session(session, session.outgoing_messages, dest_user_id = session.player.user_id, force = True)
-                if d:
-                    temp_d.chainDeferred(d)
-                return # don't fire d yet
+                return self.change_session(session, session.outgoing_messages, dest_user_id = session.player.user_id, force = True)
 
             else:
                 retmsg += do_attack_retmsg
@@ -16779,7 +16780,7 @@ class GAMEAPI(resource.Resource):
         else:
             assert not session.pre_locks
 
-        if d: d.callback(not cannot_spy) # success
+        return defer.succeed(not cannot_spy) # success
 
     def query_battle_history(self, session, retmsg, arg):
         target = arg[1] # look up battles against this player (-1 for anyone)
