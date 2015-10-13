@@ -26065,10 +26065,6 @@ class GameSite(server.Site):
         self.active_clients = set()
         self.active_requests = set()
 
-        # make sure players are logged out and flushed before server shuts down
-        reactor.addSystemEventTrigger('before', 'shutdown', self.shutdown)
-        reactor.addSystemEventTrigger('before', 'shutdown', self.stop_all_clients)
-
         signal.signal(signal.SIGUSR1, self.handle_SIGUSR1)
         signal.signal(signal.SIGUSR2, self.handle_SIGUSR2)
         signal.signal(signal.SIGHUP, self.handle_SIGHUP)
@@ -26079,6 +26075,34 @@ class GameSite(server.Site):
         self.bg_task = task.LoopingCall(self.bgfunc)
         self.server_status_task = task.LoopingCall(self.server_status_func)
         self.reset_interval(True)
+
+        # these will be set up by start_listening()
+        self.listener_tcp = None
+        self.listener_ssl = None
+
+    def start_listening(self):
+        backlog = gamedata['server'].get('tcp_accept_backlog', 4000)
+        self.listener_tcp = reactor.listenTCP(self.config.game_http_port, self, interface=self.config.game_listen_host, backlog=backlog)
+        if self.config.game_ssl_port > 0:
+            self.listener_ssl = reactor.listenSSL(self.config.game_ssl_port, self,
+                                                  SpinSSL.ChainingOpenSSLContextFactory(SpinConfig.config['ssl_key_file'],
+                                                                                        SpinConfig.config['ssl_crt_file'],
+                                                                                        certificateChainFile=SpinConfig.config['ssl_chain_file']),
+                                                  interface=self.config.game_listen_host, backlog=backlog)
+
+        # make sure players are logged out and flushed before server shuts down
+        reactor.addSystemEventTrigger('before', 'shutdown', self.shutdown)
+
+    def shutdown(self):
+        # ordering here is important: close listening socket, then close sessions, then close HTTP/WS traffic
+        d = self.stop_listening()
+        d.addBoth(lambda _, self=self: self.stop_all_sessions())
+        d.addBoth(lambda _, self=self: self.stop_all_clients())
+        return d
+
+    def stop_listening(self):
+        return defer.DeferredList([defer.maybeDeferred(self.listener_tcp.stopListening)] + \
+                                  ([defer.maybeDeferred(self.listener_ssl.stopListening)] if self.listener_ssl else []))
 
     # client/request management boilerplate - see https://github.com/habnabit/polecat/blob/master/polecat.py
     def gotClient(self, client):
@@ -26098,10 +26122,10 @@ class GameSite(server.Site):
 
     def stop_all_clients(self):
         "Returns a Deferred that fires when all clients have disconnected."
-        d = defer.Deferred()
         if not self.active_clients:
-            reactor.callLater(0, d.callback, None)
+            return defer.succeed(None)
         else:
+            d = defer.Deferred()
             self.clients_stopped_deferred = d
 
             # tell any keep-alive requests that we're closing down
@@ -26110,8 +26134,7 @@ class GameSite(server.Site):
 
             for client in self.active_clients:
                 client.transport.loseConnection()
-
-        return d
+            return d
 
     def sql_init(self):
         self.sql_scores2_client = None
@@ -26276,7 +26299,7 @@ class GameSite(server.Site):
             # don't log every boring HTTP request
             pass
 
-    def shutdown(self):
+    def stop_all_sessions(self):
         # server is shutting down - forcefully log out all active sessions
 
         # need to wait for all async logouts to finish before proceeding
@@ -27139,16 +27162,7 @@ def do_main(pidfile, do_ai_setup, do_daemonize, cmdline_config):
         cherrypy.engine.start()
         reactor.addSystemEventTrigger('after', 'shutdown', cherrypy.engine.exit)
 
-    backlog = gamedata['server'].get('tcp_accept_backlog', 4000)
-
-    reactor.listenTCP(config.game_http_port, gamesite, interface=config.game_listen_host, backlog=backlog)
-
-    if config.game_ssl_port > 0:
-        reactor.listenSSL(config.game_ssl_port, gamesite,
-                          SpinSSL.ChainingOpenSSLContextFactory(SpinConfig.config['ssl_key_file'],
-                                                                SpinConfig.config['ssl_crt_file'],
-                                                                certificateChainFile=SpinConfig.config['ssl_chain_file']),
-                          interface=config.game_listen_host, backlog=backlog)
+    gamesite.start_listening()
 
     print 'Game server up and running on %s:%d (HTTP)%s%s%s' % (config.game_host, config.game_http_port,
                                                                 (' :%d (SSL)' % config.game_ssl_port) if config.game_ssl_port > 0 else '',
