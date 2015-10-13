@@ -218,7 +218,7 @@
         "keep_history_for": 604800, // keep 1 week of success/fail history
         "interval": 28800, // check every 8 hours
         "max_tries": 3, // allow this many incorrect answers before failing
-        "timeout": 120, // time limit for response
+        "timeout": 300, // time limit for response
         "max_timeouts": 2 // allow this many timeouts before failing
     },
 
