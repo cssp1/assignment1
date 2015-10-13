@@ -21310,11 +21310,12 @@ class GAMEAPI(resource.Resource):
 
                         if go_async:
                             assert isinstance(go_async, defer.Deferred)
-                            # go asynchronous, breaking out of message processing here
-                            if go_async not in session.async_ds:
-                                gamesite.exception_log.event(server_time, 'handle_message_guts did not install async_d: %s' % (latency_tag))
-                                session.start_async_request(go_async)
-                            return
+                            if not go_async.called:
+                                # go asynchronous, breaking out of message processing here
+                                if go_async not in session.async_ds:
+                                    gamesite.exception_log.event(server_time, 'handle_message_guts did not install async_d: %s' % (latency_tag))
+                                    session.start_async_request(go_async)
+                                return
 
                     except Exception:
                         gamesite.exception_log.event(server_time, 'handle_message_guts exception %s msg %s: %s' % (session.dump_exception_state(), latency_tag, traceback.format_exc()))
