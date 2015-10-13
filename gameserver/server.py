@@ -12696,9 +12696,9 @@ class CONTROLAPI(resource.Resource):
     def kill_session(self, request, session, body = None):
         if not body: body = 'ok\n'
         d = defer.Deferred()
-        d.addCallback(lambda _, self=self, session=session, request=request, body=body: self.gameapi.log_out_async(session, 'forced_relog').addBoth(lambda _, body=body, request=request: SpinHTTP.complete_deferred_request(body, request)))
-        # player already logged out - just complete the request
-        d.addErrback(lambda _, request=request, body=body: SpinHTTP.complete_deferred_request(body, request))
+        d.addCallbacks(lambda _, self=self, session=session, request=request, body=body: self.gameapi.log_out_async(session, 'forced_relog'),
+                       lambda _: None) # player already logged out - just complete the request
+        d.addBoth(lambda _, body=body, request=request: SpinHTTP.complete_deferred_request(body, request))
         session.after_async_request(d)
 
         return server.NOT_DONE_YET
@@ -12852,7 +12852,6 @@ class CONTROLAPI(resource.Resource):
 
                     if val.async:
                         assert isinstance(val.async, defer.Deferred) # sanity check
-                        ret = server.NOT_DONE_YET
 
                         def after_async(async_result, request, session):
                             SpinHTTP.complete_deferred_request(async_result.as_body(), request)
@@ -12868,9 +12867,9 @@ class CONTROLAPI(resource.Resource):
                         SpinHTTP.complete_deferred_request(ret, request)
 
                 d = defer.Deferred()
-                d.addCallback(functools.partial(handle_online, request, session, handler, method_name, args))
-                # if player logged out, this is going to fail
-                d.addErrback(lambda _, request=request: SpinHTTP.complete_deferred_request(CustomerSupport.ReturnValue(error = 'Race condition: Player just logged out. Please try again.').as_body(), request))
+                d.addCallbacks(functools.partial(handle_online, request, session, handler, method_name, args),
+                               # if player logged out, this is going to fail
+                               lambda _, request=request: SpinHTTP.complete_deferred_request(CustomerSupport.ReturnValue(error = 'Race condition: Player just logged out. Please try again.').as_body(), request))
                 session.after_async_request(d)
 
             else:
@@ -26484,10 +26483,10 @@ class GameSite(server.Site):
                 d = defer.Deferred()
                 def force_attack_end(self, session):
                     if session.has_attacked:
-                        self.gameapi.change_session(session, session.outgoing_messages, dest_user_id = session.user.user_id, force = True)
+                        return self.gameapi.change_session(session, session.outgoing_messages, dest_user_id = session.user.user_id, force = True)
 
-                d.addCallback(lambda _, self=self, session=session: force_attack_end(self, session))
-                d.addErrback(lambda _: None) # ignore logout race
+                d.addCallbacks(lambda _, self=self, session=session: force_attack_end(self, session),
+                               lambda _: None) # ignore logout race
                 session.after_async_request(d)
 
             if (not session.sprobe_in_progress):
