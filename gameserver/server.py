@@ -2948,7 +2948,7 @@ class Session(object):
     class AsyncLogout:
         def __init__(self, parent):
             self.parent = parent
-            self.defers = []
+            self.d = defer.Deferred()
             self.wrote_user = False
             self.wrote_player = False
         def user_cb(self):
@@ -2959,11 +2959,8 @@ class Session(object):
             self.try_finish()
         def try_finish(self):
             if (self.wrote_user) and (self.wrote_player):
-                d_list = self.defers
-                self.defers = []
-                if d_list:
-                    for d in d_list:
-                        d.callback(True)
+                d, self.d = self.d, None
+                d.callback(True)
 
     def __init__(self, session_id, user, player, login_time):
         assert user.active_session is None
@@ -22540,27 +22537,33 @@ class GAMEAPI(resource.Resource):
     # new asynchronous logout
     def log_out_async(self, session, method, force = False):
         ascdebug('log_out_async %d' % (session.user.user_id))
-        d = defer.Deferred(); session.start_async_request(d)
 
         if session.logout_in_progress:
-            if session.logout_in_progress.defers is None:
+            if session.logout_in_progress.d is None:
                 # session has ALREADY finished logging out - this is a dangling reference!
-                # we must fire the deferred
-                reactor.callLater(0, lambda: d.callback(True))
+                return defer.succeed(True)
             else:
                 if force:
                     # do not call complete_attack(), just kill the session
-                    self.log_out_async2(session, method, d, force)
+                    return self.log_out_async2(session, method, force)
                 else:
-                    session.logout_in_progress.defers.append(d)
-        else:
-            # if an attack was going on, clean it up
-            # then continue with log_out_async2
-            self.complete_attack(session, session.outgoing_messages, reason='log_out_async').addBoth(lambda _, self=self, session=session, method=method, d=d, force=force: self.log_out_async2(session, method, d, force))
+                    return session.logout_in_progress.d
 
-        return d
+        d = defer.Deferred()
 
-    def log_out_async2(self, session, method, d, force):
+        # if an attack was going on, clean it up
+        d.addBoth(lambda _, self=self,session=session:
+                  self.complete_attack(session, session.outgoing_messages, reason='log_out_async'))
+
+        # then continue with log_out_async2
+        d.addBoth(lambda _, self=self, session=session, method=method, force=force:
+                  self.log_out_async2(session, method, force))
+
+        reactor.callLater(0, d.callback, True)
+        return session.start_async_request(d)
+
+
+    def log_out_async2(self, session, method, force):
         ascdebug('log_out_async2 %d' % (session.user.user_id))
 
         if not session.logout_in_progress:
@@ -22575,22 +22578,13 @@ class GAMEAPI(resource.Resource):
 
             self.log_out_preflush(session, method)
 
-            # begin with the mandatory unlock callback
-            postflush_d = defer.Deferred()
-            postflush_d.addBoth(lambda _, self=self, session=session: self.log_out_postflush(session))
-            session.logout_in_progress.defers.append(postflush_d)
-
-            # chain the user-provided callback after postflush
-            postflush_d.addBoth(d.callback)
+            session.logout_in_progress.d.addBoth(lambda _, self=self, session=session: self.log_out_postflush(session))
 
             player_table.store_async(session.player, session.logout_in_progress.player_cb, True, 'logout')
             user_table.store_async(session.user, session.logout_in_progress.user_cb, True, 'logout')
-            return
+            return session.logout_in_progress.d
 
         else: # logout is already in progress
-            # add the user-provided callback
-            session.logout_in_progress.defers.append(d)
-
             if force:
                 # it looks like the session is broken - we tried to shut it down, but the async stores failed
                 # -> force async completion
@@ -22599,6 +22593,8 @@ class GAMEAPI(resource.Resource):
                 session.logout_in_progress.wrote_user = True
                 session.logout_in_progress.wrote_player = True
                 reactor.callLater(0, session.logout_in_progress.try_finish)
+
+            return session.logout_in_progress.d or defer.succeed(True)
 
     def handle_message_guts(self, session, arg, retmsg):
 
