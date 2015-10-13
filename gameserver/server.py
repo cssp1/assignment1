@@ -26265,6 +26265,8 @@ class GameSite(server.Site):
     def panic_kick(self):
         for session in iter_sessions():
             self.gameapi.log_out_async(session, 'panic', force = True)
+        for client in self.active_clients:
+            client.transport.abortConnection() # if loseConnection() isn't enough
 
     # print Python stack frame to trace log upon receiving SIGUSR1
     def handle_SIGUSR1(self, signum, frm):
