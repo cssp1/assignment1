@@ -3139,7 +3139,6 @@ class Session(object):
 
         if not self.async_ds: # totally drained - flush now
 
-            # XXX should we ignore these if the session got logged out?
             d_list = self.after_async
             self.after_async = []
             for d in d_list:
@@ -26063,7 +26062,7 @@ class GameSite(server.Site):
 
         # will be fired when last connection drops
         self.clients_stopped_deferred = None
-        self.active_clients = 0
+        self.active_clients = set()
         self.active_requests = set()
 
         # make sure players are logged out and flushed before server shuts down
@@ -26083,11 +26082,11 @@ class GameSite(server.Site):
 
     # client/request management boilerplate - see https://github.com/habnabit/polecat/blob/master/polecat.py
     def gotClient(self, client):
-        self.active_clients += 1
-        #gamesite.exception_log.event(server_time, 'gotClient %r clients %d requests %d' % (client, self.active_clients, len(self.active_requests)))
+        self.active_clients.add(client)
+        #gamesite.exception_log.event(server_time, 'gotClient %r clients %d requests %d' % (client, len(self.active_clients), len(self.active_requests)))
     def lostClient(self, client):
-        self.active_clients -= 1
-        #gamesite.exception_log.event(server_time, 'lostClient %r clients %d requests %d' % (client, self.active_clients, len(self.active_requests)))
+        self.active_clients.discard(client)
+        #gamesite.exception_log.event(server_time, 'lostClient %r clients %d requests %d' % (client, len(self.active_clients), len(self.active_requests)))
         if not self.active_clients and self.clients_stopped_deferred:
             d = self.clients_stopped_deferred
             self.clients_stopped_deferred = None
@@ -26108,6 +26107,9 @@ class GameSite(server.Site):
             # tell any keep-alive requests that we're closing down
             for request in self.active_requests:
                 request.setHeader('Connection', 'close')
+
+            for client in self.active_clients:
+                client.transport.loseConnection()
 
         return d
 
@@ -26667,7 +26669,7 @@ class AdminStats:
                 'machine_stats': MachineStats.get_stats(filesystems = machine_stats_filesystems),
                 'active_sessions': self.get_active_sessions(),
                 'paying_sessions': sum((1 for session in iter_sessions() if session.player.history.get('money_spent',0)>0),0),
-                'active_protocol_clients': gamesite.active_clients,
+                'active_protocol_clients': len(gamesite.active_clients),
                 'active_protocol_requests': len(gamesite.active_requests),
                 }
 
