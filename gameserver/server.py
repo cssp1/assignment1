@@ -26370,7 +26370,7 @@ class GameSite(server.Site):
         lock_keepalive_states = []
         region_lock_keepalives = {}
 
-        for session in iter_sessions():
+        for session in list(iter_sessions()): # make a copy since we might mutate the table
 
             kick_reason = None
 
