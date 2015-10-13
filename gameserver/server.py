@@ -3126,10 +3126,10 @@ class Session(object):
 
         self.async_ds.append(d)
         # ensure we communicate back to the client as soon as async processing finishes
-        d.addBoth(lambda _, self=self, d=d: self.complete_async_request(d))
+        d.addBoth(self.complete_async_request, d)
         return d # for syntactic convenience only
 
-    def complete_async_request(self, d):
+    def complete_async_request(self, result, d):
         # note: this is called BY an async_d firing, so don't fire it again!
 
         if d not in self.async_ds:
@@ -3150,6 +3150,8 @@ class Session(object):
 
             # and finally respond to the client. If one of the above cbs makes us async again, this will do nothing.
             self.queue_flush_outgoing_messages()
+
+        return result # pass along callback chain
 
     # fire this deferred after we come out of async wait (or immediately if not waiting)
     def after_async_request(self, d):
@@ -21695,7 +21697,7 @@ class GAMEAPI(resource.Resource):
             admin_stats.record_latency('complete_client_hello', end_time - start_time)
             if d is not None:
                 # note: if complete_client_hello2() fails, the session arg here will be None
-                d.addBoth(lambda session, d=d, request=request, retmsg=retmsg: session.complete_async_request(d) if session else self.complete_deferred_request(request, None, retmsg)) # OK
+                d.addBoth(lambda session, d=d, request=request, retmsg=retmsg: session.complete_async_request(None, d) if session else self.complete_deferred_request(request, None, retmsg)) # OK
 
         except:
             retmsg[:] = [["ERROR", "SERVER_EXCEPTION"]] # blow away old message, because session is not going to be set up
