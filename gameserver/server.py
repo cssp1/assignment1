@@ -3027,7 +3027,7 @@ class Session(object):
 
         # same for complete_attack
         self.complete_attack_in_progress = False
-        self.complete_attack_defers = None
+        self.complete_attack_d = None
 
         # prevents overlapping logouts and maintains deferred list
         self.logout_in_progress = None
@@ -15006,43 +15006,34 @@ class GAMEAPI(resource.Resource):
     # if execution gets aborted, the session will be left in a broken state
 
     def complete_attack(self, session, retmsg, client_props = None, reason='unknown'):
-        d = defer.Deferred(); session.start_async_request(d)
-
-        if session.complete_attack_in_progress:
-            if gamedata['server']['log_abnormal_logins'] >= 2:
-                gamesite.exception_log.event(server_time, 're-entered complete_attack() from %s: %d at %s' % (reason, session.user.user_id, session.viewing_base.base_id))
-            session.complete_attack_defers.append(d)
-            return d
-
-        run_cbs = False
 
         try:
-            self._complete_attack(session, retmsg, d, client_props=client_props, reason=reason)
+            return self._complete_attack(session, retmsg, client_props=client_props, reason=reason)
         except:
             gamesite.exception_log.event(server_time, 'complete_attack exception on player %d: %s' % (session.user.user_id, traceback.format_exc()))
-            run_cbs = True # hobble onwards after the exception
 
-        if run_cbs:
-            session.complete_attack_in_progress = False
-            d_list = session.complete_attack_defers
-            session.complete_attack_defers = None
-            if d_list:
-                for cb in d_list:
-                    reactor.callLater(0, cb.callback, None)
-
+        # error path
+        session.complete_attack_in_progress = False
+        d, session.complete_attack_d = session.complete_attack_d, None
+        if not d: d = defer.Deferred()
+        reactor.callLater(0, d.callback, False)
         return d
 
-    def _complete_attack(self, session, retmsg, d, client_props = None, reason='unknown'):
+    def _complete_attack(self, session, retmsg, client_props = None, reason='unknown'):
+        if session.complete_attack_in_progress:
+            assert session.complete_attack_d
+            if gamedata['server']['log_abnormal_logins'] >= 2:
+                gamesite.exception_log.event(server_time, 're-entered complete_attack() from %s: %d at %s' % (reason, session.user.user_id, session.viewing_base.base_id))
+            return session.complete_attack_d
+
         ascdebug('complete_attack %d' % session.user.user_id)
         start_time = time.time()
 
-        assert session.complete_attack_defers is None
+        assert session.complete_attack_d is None
         assert not session.complete_attack_in_progress
 
-        # note: these may be immediately set back to null if this particular call to complete_attack() can finish synchronously.
-        # we just prepare them so that if an exception is thrown, the wrapper above will still do the right thing.
+        session.complete_attack_d = session.start_async_request(defer.Deferred())
         session.complete_attack_in_progress = True
-        session.complete_attack_defers = [d]
 
         # record last bits of damage
         if session.damage_log:
@@ -15956,11 +15947,8 @@ class GAMEAPI(resource.Resource):
                 session.release_base()
 
             session.complete_attack_in_progress = False
-            d_list = session.complete_attack_defers
-            session.complete_attack_defers = None
-            if d_list:
-                for cb in d_list:
-                    cb.callback(None)
+            d, session.complete_attack_d = session.complete_attack_d, None
+            if d: d.callback(True)
 
         post_result = functools.partial(finish, session, io_type)
 
@@ -15981,6 +15969,8 @@ class GAMEAPI(resource.Resource):
             base_table.delete_async(session.viewing_base.base_region, session.viewing_base.base_id, post_result)
         else:
             raise Exception('unknown io_type '+io_type)
+
+        return session.complete_attack_d
 
     # the outer change_session() function just checks whether the player is eligible to change sessions right now
     def change_session(self, session, retmsg, dest_user_id = None, dest_base_id = None, force = False, new_ladder_state = None, delay = 0, client_props = None):
@@ -22266,6 +22256,8 @@ class GAMEAPI(resource.Resource):
 
     # wrap logout path in exception traps to avoid bad lock behavior
     def log_out_preflush(self, session, method):
+        ascdebug('log_out_preflush %d' % (session.user.user_id))
+
         try:
             self._log_out_preflush(session, method)
         except:
@@ -22427,6 +22419,8 @@ class GAMEAPI(resource.Resource):
 
     # wrap logout path in exception traps to avoid bad lock behavior
     def log_out_postflush(self, session):
+        ascdebug('log_out_postflush %d' % (session.user.user_id))
+
         try:
             self._log_out_postflush(session)
         except:
