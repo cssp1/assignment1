@@ -9717,7 +9717,7 @@ function flush_message_queue(force, my_timeout) {
         if(!the_websocket) {
             the_websocket = new SPWebsocket.SPWebsocket(gameapi_url(), ajax_config['message_timeout_hello'], ajax_config['message_timeout_gameplay']);
             var on_websocket_error = function(event) {
-                if(!the_websocket) { return; } // irrelevant
+                if(!the_websocket || SPINPUNCHGAME.shutdown_in_progress) { return; } // irrelevant
                 the_websocket.close();
                 the_websocket = null;
 
@@ -9768,10 +9768,19 @@ function flush_message_queue(force, my_timeout) {
                 }
 
             };
+            var on_websocket_shutdown = function(event) { // server-initiated shutdown
+                if(!the_websocket || SPINPUNCHGAME.shutdown_in_progress) { return; } // irrelevant
+                the_websocket = null;
+                session.connect_time = -1; // disconnect session
+                invoke_timeout_message('0600_client_idle_timeout', {}, {});
+                SPINPUNCHGAME.shutdown();
+            };
             var on_websocket_message = function(event) {
                 on_ajax(event.data, (the_websocket && the_websocket.url.indexOf('ws://') == 0 ? 'direct_ws' : 'direct_wss'));
             };
+
             goog.events.listen(the_websocket.target, 'error', on_websocket_error);
+            goog.events.listen(the_websocket.target, 'shutdown', on_websocket_shutdown);
             goog.events.listen(the_websocket.target, 'message', on_websocket_message);
 
             the_websocket.connect();
@@ -42100,6 +42109,8 @@ function toggle_unit_selection(u) {
 
 function on_ajax_goog(event) {
     if(!event.target.isSuccess()) {
+        if(SPINPUNCHGAME.shutdown_in_progress) { return; } // irrelevant (?)
+
         client_time = (new Date()).getTime()/1000;
         var code = event.target.getLastErrorCode();
         var msg = '';
