@@ -26281,9 +26281,12 @@ class GameSite(server.Site):
 
     # immediately kick all sessions, even if they are stuck on I/O
     def panic_kick(self):
-        for session in iter_sessions():
-            self.gameapi.log_out_async(session, 'panic', force = True)
-        for client in self.active_clients:
+        for session in list(iter_sessions()):
+            try:
+                self.gameapi.log_out_async(session, 'panic', force = True)
+            except:
+                pass
+        for client in list(self.active_clients):
             client.transport.abortConnection() # if loseConnection() isn't enough
 
     # print Python stack frame to trace log upon receiving SIGUSR1
@@ -26327,7 +26330,7 @@ class GameSite(server.Site):
 
         # need to wait for all async logouts to finish before proceeding
         waiting_on = []
-        for session in iter_sessions(include_logout_in_progress = True):
+        for session in list(iter_sessions(include_logout_in_progress = True)):
             waiting_on.append(self.gameapi.log_out_async(session, 'server_shutdown'))
 
         print 'logging out %d active sessions' % len(waiting_on)
@@ -26366,7 +26369,7 @@ class GameSite(server.Site):
         # if we're about to go down for maintenance, kick all logged-in players
         maint_kicks = 0
         if self.maint_kick_time > 0 and server_time >= self.maint_kick_time:
-            for session in iter_sessions():
+            for session in list(iter_sessions()):
                 try:
                     self.gameapi.log_out_async(session, 'maint_kick')
                 except:
