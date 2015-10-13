@@ -21237,7 +21237,7 @@ class GAMEAPI(resource.Resource):
         session.message_buffer.append([serial, arg])
         #if len(session.message_buffer) > 1: print 'client stream is lagging by %d AJAX requests' % len(session.message_buffer)
 
-        if http_request.__class__ is WSFakeRequest: # XXXXXX nasty hack
+        if isinstance(http_request, WSFakeRequest): # XXXXXX nasty hack
             # park this request as the longpoll request so we have something to write the client back on
             if session.longpoll_request is None:
                 session.longpoll_request = http_request
@@ -22566,6 +22566,9 @@ class GAMEAPI(resource.Resource):
                 request = session.longpoll_request
                 session.longpoll_request = None
                 self.complete_longpoll(request, session)
+                if isinstance(request, WSFakeRequest): # XXXXXX nasty hack
+                    # shut down the connection here so that it won't stick around until the full timeout
+                    request.close_connection()
 
             self.log_out_preflush(session, method)
 
@@ -26530,6 +26533,9 @@ class WSFakeRequest(object):
         if self.proto.connected:
             self.proto.transport.write(buf)
     def finish(self): pass
+    def close_connection(self):
+        if self.proto.connected:
+            self.proto.transport.loseConnection()
 
 class WS_GAMEAPI_Protocol(protocol.Protocol):
     def __init__(self, gameapi, addr):
