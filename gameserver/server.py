@@ -22568,7 +22568,7 @@ class GAMEAPI(resource.Resource):
                 self.complete_longpoll(request, session)
                 if isinstance(request, WSFakeRequest): # XXXXXX nasty hack
                     # shut down the connection here so that it won't stick around until the full timeout
-                    request.close_connection()
+                    request.close_connection_aggressively()
 
             self.log_out_preflush(session, method)
 
@@ -25864,16 +25864,33 @@ class GAMEAPI(resource.Resource):
 
         return self.log_out_async(session, 'protocol_error')
 
+
 # subclass of Twisted's built-in web server
 # this adds periodic function calls to perform background tasks for the game
 class GameSite(server.Site):
     class GameProtocol(http.HTTPChannel):
+        def __init__(self, *args, **kwargs):
+            http.HTTPChannel.__init__(self, *args, **kwargs)
+            self.close_connection_watchdog = None
         def connectionMade(self):
             http.HTTPChannel.connectionMade(self)
             self.site.gotClient(self)
         def connectionLost(self, reason):
             http.HTTPChannel.connectionLost(self, reason)
             self.site.lostClient(self)
+            if self.close_connection_watchdog:
+                self.close_connection_watchdog.cancel()
+                self.close_connection_watchdog = None
+        def close_connection_aggressively(self, force = False):
+            if force:
+                self.close_connection_watchdog = None
+                self.transport.abortConnection()
+            else:
+                self.transport.loseConnection()
+
+                if not self.close_connection_watchdog:
+                    # set watchdog timer to abort badly-behaved TCP connections
+                    self.close_connection_watchdog = reactor.callLater(10.0, self.close_connection_aggressively, True)
 
     displayTracebacks = False
     protocol = GameProtocol
@@ -26136,7 +26153,7 @@ class GameSite(server.Site):
                 request.setHeader('Connection', 'close')
 
             for client in self.active_clients:
-                client.transport.loseConnection()
+                client.close_connection_aggressively()
             return d
 
     def sql_init(self):
@@ -26535,7 +26552,7 @@ class WSFakeRequest(object):
         if self.proto.connected:
             self.proto.transport.write(buf)
     def finish(self): pass
-    def close_connection(self): return self.proto.close_connection()
+    def close_connection_aggressively(self): return self.proto.close_connection_aggressively()
 
 class WS_GAMEAPI_Protocol(protocol.Protocol):
     def __init__(self, gameapi, addr):
@@ -26556,7 +26573,7 @@ class WS_GAMEAPI_Protocol(protocol.Protocol):
             self.close_connection_watchdog = None
         gamesite.lostClient(self) # XXX not sure how to get a reference to the "site" here
 
-    def close_connection(self, force = False):
+    def close_connection_aggressively(self, force = False):
         if self.connected:
             if force:
                 self.close_connection_watchdog = None
@@ -26566,7 +26583,7 @@ class WS_GAMEAPI_Protocol(protocol.Protocol):
 
                 if not self.close_connection_watchdog:
                     # set watchdog timer to abort badly-behaved TCP connections
-                    self.close_connection_watchdog = reactor.callLater(10.0, self.close_connection, True)
+                    self.close_connection_watchdog = reactor.callLater(10.0, self.close_connection_aggressively, True)
 
     def dataReceived(self, data):
         update_server_time()
