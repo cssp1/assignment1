@@ -502,6 +502,9 @@ class IOSystem (object):
         max_time = gamedata['ai_base_persistence_time'][1]
         SpinUserDB.driver.collect_aistate_garbage(server_time - max_time)
 
+    def shutdown(self):
+        # override if necessary
+        return defer.succeed(True)
 
 class FileIOSystem (IOSystem):
     def __init__(self, config):
@@ -555,6 +558,8 @@ class IOSlaveIOSystem (IOSystem):
         self.clients[procnum].async_write(filename, buf, server_time, success_cb, self.async_write_error, fsync = True)
     def do_async_delete(self, filename, success_cb, procnum):
         self.clients[procnum].async_delete(filename, server_time, success_cb, self.async_write_error)
+    def shutdown(self):
+        return defer.DeferredList([client.defer_until_all_complete() for client in self.clients])
 
 class S3IOSystem (IOSystem):
     def __init__(self, config):
@@ -26110,6 +26115,7 @@ class GameSite(server.Site):
         d = self.stop_listening()
         d.addBoth(lambda _, self=self: self.stop_all_sessions())
         d.addBoth(lambda _, self=self: self.stop_all_clients())
+        d.addBoth(lambda _: io_system.shutdown())
         return d
 
     def stop_listening(self):

@@ -162,8 +162,6 @@ class IOClient (object):
                                                 log_exception_func,
                                                 error_on_404 = False)
 
-        # this trigger postpones reactor shutdown until all in-progress I/Os complete
-        reactor.addSystemEventTrigger('before', 'shutdown', self.defer_until_all_complete)
         self.shutdown_semaphore = None
 
     def __repr__(self):
@@ -234,6 +232,10 @@ TEST_SECRET = 'asbasdf'
 class TestClient (object):
     def __init__(self):
         self.master = IOClient(12222, TEST_SECRET)
+
+        # this trigger postpones reactor shutdown until all in-progress I/Os complete
+        reactor.addSystemEventTrigger('before', 'shutdown', self.master.defer_until_all_complete)
+
         self.success_count = 0
 
     def success_cb(self, result):
