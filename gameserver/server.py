@@ -26535,15 +26535,14 @@ class WSFakeRequest(object):
         if self.proto.connected:
             self.proto.transport.write(buf)
     def finish(self): pass
-    def close_connection(self):
-        if self.proto.connected:
-            self.proto.transport.loseConnection()
+    def close_connection(self): return self.proto.close_connection()
 
 class WS_GAMEAPI_Protocol(protocol.Protocol):
     def __init__(self, gameapi, addr):
         self.gameapi = gameapi
         self.peer_ip = None
         self.connected = False
+        self.close_connection_watchdog = None
 
     def connectionMade(self):
         self.peer_ip = str(self.transport.getPeer().host)
@@ -26552,7 +26551,22 @@ class WS_GAMEAPI_Protocol(protocol.Protocol):
 
     def connectionLost(self, reason):
         self.connected = False
+        if self.close_connection_watchdog:
+            self.close_connection_watchdog.cancel()
+            self.close_connection_watchdog = None
         gamesite.lostClient(self) # XXX not sure how to get a reference to the "site" here
+
+    def close_connection(self, force = False):
+        if self.connected:
+            if force:
+                self.close_connection_watchdog = None
+                self.transport.abortConnection()
+            else:
+                self.transport.loseConnection()
+
+                if not self.close_connection_watchdog:
+                    # set watchdog timer to abort badly-behaved TCP connections
+                    self.close_connection_watchdog = reactor.callLater(10.0, self.close_connection, True)
 
     def dataReceived(self, data):
         update_server_time()
