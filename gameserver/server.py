@@ -3134,9 +3134,6 @@ class Session(object):
     def start_async_request(self, d):
         if d in self.async_ds: return d # duplicate
 
-#        if self.async_ds:
-#            gamesite.exception_log.event(server_time, 'start_async_request overlap: async_ds %r %s' % (self.async_ds, ''.join(traceback.format_stack())))
-
         self.async_ds.append(d)
         # ensure we communicate back to the client as soon as async processing finishes
         d.addBoth(self.complete_async_request, d) # OK
@@ -15053,7 +15050,7 @@ class GAMEAPI(resource.Resource):
         assert session.complete_attack_d is None
         assert not session.complete_attack_in_progress
 
-        session.complete_attack_d = session.start_async_request(defer.Deferred())
+        session.complete_attack_d = defer.Deferred()
         session.complete_attack_in_progress = True
 
         # record last bits of damage
@@ -15991,7 +15988,7 @@ class GAMEAPI(resource.Resource):
         else:
             raise Exception('unknown io_type '+io_type)
 
-        return session.complete_attack_d
+        return session.start_async_request(session.complete_attack_d)
 
     # the outer change_session() function just checks whether the player is eligible to change sessions right now
     def change_session(self, session, retmsg, dest_user_id = None, dest_base_id = None, force = False, new_ladder_state = None, delay = 0, client_props = None):
@@ -16874,7 +16871,7 @@ class GAMEAPI(resource.Resource):
     def query_achievements(self, session, retmsg, arg):
         id = arg[1]; tag = arg[2]
 
-        d = defer.Deferred(); session.start_async_request(d)
+        d = defer.Deferred()
 
         def complete_query(self, d, session, retmsg, tag, result):
             retmsg.append(["QUERY_ACHIEVEMENTS_RESULT", tag, result])
@@ -16900,7 +16897,7 @@ class GAMEAPI(resource.Resource):
                                       functools.partial(player_cb, functools.partial(complete_query, self, d, session, retmsg, tag)),
                                       'query_achievements')
 
-        return d # async
+        return session.start_async_request(d) # async
 
     # simulate player cache query results by just reading from the in-memory player
     def get_player_cache_props(self, user, player, alliance_id):
@@ -17025,7 +17022,7 @@ class GAMEAPI(resource.Resource):
                 # try S3 download
                 bucket = AttackLog.storage_s3_bucket()
                 name = AttackLog.storage_s3_name(AttackLog.base_name(battle_time, attacker, defender, base_id))
-                d = defer.Deferred(); session.start_async_request(d)
+                d = defer.Deferred()
                 def cb(self, d, session, retmsg, tag, success, buf):
                     ret = None
                     if success and buf and (buf != 'NOTFOUND'):
@@ -17038,7 +17035,7 @@ class GAMEAPI(resource.Resource):
                                         functools.partial(cb, self, d, session, retmsg, tag, True),
                                         functools.partial(cb, self, d, session, retmsg, tag, False),
                                         0)
-                return d # go async
+                return session.start_async_request(d) # go async
         except:
             gamesite.exception_log.event(server_time, 'error reading battle log %s on behalf of player %d: %s' % \
                                          (filename, session.player.user_id, traceback.format_exc()))
@@ -22958,8 +22955,8 @@ class GAMEAPI(resource.Resource):
             signed_request = arg[2] # optional - speeds processing by avoiding the round-trip
             d = session.user.ping_fbpayment(session, retmsg, request_id, signed_request = signed_request)
             # this might or might not go async
-            if d: session.start_async_request(d)
-            return d
+            return session.start_async_request(d) if d else None
+
         elif arg[0] == "FBPAYMENT_SIMULATE_PURCHASE":
             request_id = arg[1]
             if spin_secure_mode:
@@ -24083,8 +24080,7 @@ class GAMEAPI(resource.Resource):
                                    functools.partial(on_error, master_d, session, retmsg, retmsg_tag, result, user_ids))
 
                 reactor.callLater(0, functools.partial(next_query, master_d, session, retmsg, tag, result, user_ids, sql_query_i_addrs, batch, bdict, rdict, tag_list, -1, None))
-                session.start_async_request(master_d)
-                return master_d # go async
+                return session.start_async_request(master_d) # go async
 
             elif sql_query_i_addrs: # client asked for historical scores, but we cannot provide them
                 offline_msg = 'SCORES_OFFLINE'
@@ -25246,7 +25242,7 @@ class GAMEAPI(resource.Resource):
                 # offline mutation.
 
                 rq = AsyncHTTP.AsyncHTTPRequester(-1, -1, 10, 0, lambda x: gamesite.exception_log.event(server_time, x))
-                d = defer.Deferred(); session.start_async_request(d)
+                d = defer.Deferred()
                 def finish(self, d, session, retmsg, spellname, target_id, response_or_error):
                     retmsg.append([spellname+"_RESULT", target_id, True])
                     d.callback(True)
@@ -25257,7 +25253,7 @@ class GAMEAPI(resource.Resource):
                                                                                                            'secret':SpinConfig.config['proxy_api_secret']}),
                                  functools.partial(finish, self, d, session, retmsg, spellname, target_id),
                                  error_callback = functools.partial(finish, self, d, session, retmsg, spellname, target_id))
-                return d # go async
+                return session.start_async_request(d) # go async
 
             elif spellname == "ALLIANCE_CREATE" or spellname == "ALLIANCE_MODIFY":
                 props = spellargs[0]
