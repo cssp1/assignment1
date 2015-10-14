@@ -2976,7 +2976,8 @@ class Session(object):
         def try_finish(self):
             if (self.wrote_user) and (self.wrote_player):
                 d, self.d = self.d, None
-                d.callback(True)
+                if d:
+                    d.callback(True)
 
     def __init__(self, session_id, user, player, login_time):
         assert user.active_session is None
@@ -3004,6 +3005,8 @@ class Session(object):
 
         # Maintain a list of Deferreds we are waiting on during async message handling.
         self.async_ds = []
+        self.async_ds_watchdog = None # IDelayedCall to detect async_ds getting "stuck"
+        self.async_ds_watchdog_fired = False
         self.after_async = [] # list of Deferreds to fire once we finish async message handling.
 
         # park current synchronous HTTP requests here. They will be completed as soon as the session is no longer async.
@@ -3137,7 +3140,30 @@ class Session(object):
         self.async_ds.append(d)
         # ensure we communicate back to the client as soon as async processing finishes
         d.addBoth(self.complete_async_request, d) # OK
+
+        timeout = gamedata['server'].get('async_d_watchdog_timeout',120.0)
+        if self.async_ds_watchdog:
+            if timeout > 0:
+                self.async_ds_watchdog.reset(timeout)
+            else:
+                self.async_ds_watchdog.cancel()
+                self.async_ds_watchdog = None
+        elif not self.logout_in_progress and not self.async_ds_watchdog_fired and timeout > 0:
+            self.async_ds_watchdog = reactor.callLater(timeout, self.async_ds_timeout)
+
         return d # for syntactic convenience only
+
+    def async_ds_timeout(self):
+        self.async_ds_watchdog = None
+        self.async_ds_watchdog_fired = True
+        gamesite.exception_log.event(server_time, 'player %d async_ds watchdog timeout at %f async_ds %r' % (self.user.user_id, time.time(), self.async_ds))
+
+        # not sure what to do here...
+
+        gamesite.gameapi.log_out_async(self, 'async_ds_timeout', force = True)
+#        d_list, self.async_ds = self.async_ds, []
+#        for d in d_list:
+#            d.errback(failure.Failure(Exception('async_ds watchdog timeout')))
 
     def complete_async_request(self, result_or_failure, d):
         # note: this is called BY an async_d firing, so don't fire it again!
@@ -3148,13 +3174,15 @@ class Session(object):
             self.async_ds.remove(d)
 
         if not self.async_ds: # totally drained - flush now
+            if self.async_ds_watchdog:
+                self.async_ds_watchdog.cancel()
+                self.async_ds_watchdog = None
 
-            d_list = self.after_async
-            self.after_async = []
+            d_list, self.after_async = self.after_async, []
             for d in d_list:
                 if self.logout_in_progress:
                     # fail the call, since we've started logging out
-                    reactor.callLater(0, d.errback, Exception('player %d logged out' % self.user.user_id))
+                    reactor.callLater(0, d.errback, failure.Failure(Exception('player %d logged out' % self.user.user_id)))
                 else:
                     reactor.callLater(0, d.callback, True)
 
@@ -3330,6 +3358,10 @@ class Session(object):
         assert self.viewing_base_lock is None
         assert self.viewing_squad_locks is None
         self.release_pre_locks()
+
+        if self.async_ds_watchdog:
+            self.async_ds_watchdog.cancel()
+            self.async_ds_watchdog = None
 
     def release_pre_locks(self):
         # give up any temporarily held locks
