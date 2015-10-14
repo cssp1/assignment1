@@ -11798,11 +11798,17 @@ class LivePlayer(Player):
 
         return True
 
+    def change_region(self, request_region, request_loc, session, retmsg, reason = ''):
+        start_time = time.time()
+        ret = self._change_region(request_region, request_loc, session, retmsg, reason = reason)
+        end_time = time.time()
+        admin_stats.record_latency('change_region(%s)' % reason, end_time - start_time)
+        return ret
 
     # main region-change function
     # pass None to get a random region
     # returns whether it succeeded or not
-    def change_region(self, request_region, request_loc, session, retmsg, reason = ''):
+    def _change_region(self, request_region, request_loc, session, retmsg, reason = ''):
         if (not gamesite.nosql_client):
             return False
 
@@ -17662,7 +17668,7 @@ class GAMEAPI(resource.Resource):
     def ping_object(self, session, retmsg, id, base):
         if id == GameObject.VIRTUAL_ID:
             # just ping player resources
-            retmsg.append(["PLAYER_STATE_UPDATE", session.player.resources.calc_snapshot().serialize()])
+            session.deferred_player_state_update = True
         else:
             # possible race condition due to unserialized AJAX
             if not session.has_object(id):
@@ -17673,6 +17679,7 @@ class GAMEAPI(resource.Resource):
             return self.do_ping_object(session, retmsg, object, base)
 
     def do_ping_object(self, session, retmsg, object, base, force_write = False):
+
             if not object.is_building():
                 # no need to ping objects that aren't buildings
                 return
@@ -17694,6 +17701,8 @@ class GAMEAPI(resource.Resource):
             xp = 0
             xp_why = []
 
+            start_time = time.time()
+
             if object.is_repairing():
                 if server_time >= object.repair_finish_time:
                     # object fully repaired
@@ -17703,6 +17712,8 @@ class GAMEAPI(resource.Resource):
                     object.repair_finish_time = -1
                     object.update_production(object.owner, base.base_type, base.base_region, compute_power_factor(base.get_power_state()))
                     object.update_all(undamaged_time)
+
+            end_time = time.time(); admin_stats.record_latency('do_ping_object(is_repairing)', end_time - start_time); start_time = end_time
 
             if object.is_under_construction() and (object.owner is session.player):
                 prog = object.build_done_time
@@ -17730,6 +17741,8 @@ class GAMEAPI(resource.Resource):
                             session.setmax_player_metric(object.spec.history_category+'_built', num_cat, bucket = bool(object.spec.worth_less_xp))
                         if object.spec.track_level_in_player_history:
                             session.setmax_player_metric(object.spec.name+'_level', object.level, bucket = bool(object.spec.worth_less_xp))
+
+            end_time = time.time(); admin_stats.record_latency('do_ping_object(is_under_construction)', end_time - start_time); start_time = end_time
 
             if object.is_upgrading() and (object.owner is session.player):
                 prog = object.upgrade_done_time
@@ -17762,6 +17775,8 @@ class GAMEAPI(resource.Resource):
                             session.setmax_player_metric(object.spec.name+'_level', object.level, bucket = bool(object.spec.worth_less_xp))
                     session.user.create_fb_open_graph_action_building_upgrade(object)
 
+            end_time = time.time(); admin_stats.record_latency('do_ping_object(is_upgrading)', end_time - start_time); start_time = end_time
+
             if object.is_researching() and (object.owner is session.player):
                 prog = object.research_done_time
                 if object.research_start_time >= 0:
@@ -17783,6 +17798,8 @@ class GAMEAPI(resource.Resource):
                     if spec.completion:
                         session.execute_consequent_safe(spec.get_leveled_quantity(spec.completion, current+1), session.player, retmsg, reason='tech:completion')
 
+            end_time = time.time(); admin_stats.record_latency('do_ping_object(is_researching)', end_time - start_time); start_time = end_time
+
             if object.is_crafting() and (object.owner is session.player):
                 if object.update_crafting(-1):
                     # crafting is complete
@@ -17790,8 +17807,12 @@ class GAMEAPI(resource.Resource):
                     if gamedata['crafting']['categories'][gamedata['crafting']['recipes'][object.crafting.queue[0].craft_state['recipe']]['crafting_category']].get('auto_collect',True):
                         self.do_collect_craft(session, retmsg, object)
 
+            end_time = time.time(); admin_stats.record_latency('do_ping_object(is_crafting)', end_time - start_time); start_time = end_time
+
             if object.is_manufacturing() and (object.owner is session.player):
                 did_a_manufacture |= self.do_ping_manufacturing(session, retmsg, base, object)
+
+            end_time = time.time(); admin_stats.record_latency('do_ping_object(is_manufacturing)', end_time - start_time); start_time = end_time
 
             if did_finish_construction or did_an_upgrade:
                 # handle any updates to stattab
@@ -17801,10 +17822,14 @@ class GAMEAPI(resource.Resource):
                     if object.owner is session.player:
                         object.owner.stattab.send_update(session, retmsg)
 
+            end_time = time.time(); admin_stats.record_latency('do_ping_object(stattab update)', end_time - start_time); start_time = end_time
+
             # if the action had any possible impact on power generation, then re-initialize harvesters
             if did_a_repair or did_finish_construction or did_an_upgrade:
                 session.power_changed(base, object, retmsg)
                 session.deferred_ladder_point_decay_check = True
+
+            end_time = time.time(); admin_stats.record_latency('do_ping_object(power changed)', end_time - start_time); start_time = end_time
 
             if did_finish_construction or did_an_upgrade:
                 if object.spec.provides_inventory:
@@ -17812,7 +17837,10 @@ class GAMEAPI(resource.Resource):
 
                 if object.spec.name in (gamedata['townhall'],gamedata['region_map_building']):
                     # these buildings can enable regional map features, place player on map if not already there
+                    start_time2 = time.time()
                     session.player.update_map_placement(session, retmsg)
+                    end_time2 = time.time()
+                    admin_stats.record_latency('do_ping_object(update_map_placement)', end_time2 - start_time2)
 
                 if object.spec.name in (gamedata['townhall'], gamedata['inventory_building']):
                     # check if this triggered the inventory intro mail
@@ -17840,6 +17868,8 @@ class GAMEAPI(resource.Resource):
                         xp += int(coeff*amount)
                     xp_why.append('building')
 
+            end_time = time.time(); admin_stats.record_latency('do_ping_object(construction/upgrade)', end_time - start_time); start_time = end_time
+
             if did_a_repair or did_finish_construction or did_an_upgrade or did_a_research or did_a_manufacture:
                 self.give_xp_to(session, object.owner, retmsg, xp, ','.join(xp_why), [object.x,object.y], obj_session_id = object.obj_id)
 
@@ -17849,6 +17879,8 @@ class GAMEAPI(resource.Resource):
                 base.nosql_write_one(object, 'do_ping_object')
 
             session.deferred_object_state_updates.add(object)
+
+            end_time = time.time(); admin_stats.record_latency('do_ping_object(nosql_write_one)', end_time - start_time); start_time = end_time
 
     def do_speedup_for_free(self, session, retmsg, object):
         assert object.is_building()
