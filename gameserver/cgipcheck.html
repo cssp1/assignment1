@@ -815,14 +815,16 @@ var refresh_credits = function() {
 };
 
 var send_server_control_cmd = function(server_name, cmd, args, cb) {
-    send_request('server', cmd, $.extend(args, {'server':server_name}), (function (_cmd, _cb) { return function(result) {
-        if(_cmd == 'shutdown') {
-            refresh_server_status(); // other commands return new status
+    send_request('server', cmd, $.extend(args, {'server':server_name}), (function (_server_name, _cmd, _cb) { return function(result) {
+        // all of these return a new status block
+        result['server_name'] = _server_name;
+        if(result['server_name'] in cur_server_status_rows) {
+            refresh_server_status_row(cur_server_status_rows[result['server_name']], result);
         }
         if(_cb) {
             _cb();
         }
-    }; })(cmd, cb), true);
+    }; })(server_name, cmd, cb), true);
 };
 
 var make_gamedata = function() {
@@ -1012,8 +1014,128 @@ var server_start = function() {
 };
 
 var cur_server_status = []; // updated from refresh_server_status
+var cur_server_status_rows = {};
+
+// build dates being used by proxyserver - used to determine which servers are "live"/exposed to players
+var cur_proxy_builds = {'gameclient_build':null, 'gamedata_build':null};
+
 var server_status_pending = false, server_latency_pending = false;
 var server_status_interval = 15;
+
+var server_status_fields = [{'name':'server_name','type':'server_name'},
+                            {'name':'state','type':'state'},
+                            {'name':'sessions','var':'active_sessions','type':'active_sessions'},
+                            {'name':'$_sessions','var':'paying_sessions','type':'int'},
+                            {'name':'clients','var':'active_protocol_clients','type':'int'},
+                            {'name':'requests','var':'active_protocol_requests','type':'int'},
+                            {'name':'load_unhalted','type':'load'},
+                            {'name':'machine_stats:machine_mem_free_mb','type':'memory_mb'},
+                            {'name':'gameclient_build','type':'build'},
+                            {'name':'gamedata_build','type':'build'}
+                           ];
+
+var refresh_server_status_row = function(row, item) {
+    row.empty();
+    $.each(server_status_fields, function(index, field) {
+        var val = null;
+        var path = (field['var'] || field['name']).split(':');
+        for(var p = item, i = 0; i < path.length; i++) {
+            if(path[i] in p) {
+                if(i == path.length-1) {
+                    val = p[path[i]];
+                    break;
+                } else {
+                    p = p[path[i]];
+                }
+            } else {
+                break;
+            }
+        }
+        var s = '';
+        if(val !== null) {
+            if(field['type'] == 'text') {
+                s = val;
+            } else if(field['type'] == 'int') {
+                s = val.toFixed(0);
+            } else if(field['type'] == 'pct') {
+                s = (100*val).toFixed(0)+'%';
+            } else if(field['type'] == 'load') {
+                if(val < 0) {
+                    s = '';
+                } else {
+                    s = (100*val).toFixed(0)+'%';
+                    if(val > 0.3) {
+                        s = '<font color="#ff0000">'+s+'</font>';
+                    }
+                }
+            } else if(field['type'] == 'state') {
+                s = val;
+                if(val != 'ok') {
+                    s = '<font color="#c00000">'+s+'</font>';
+                }
+            } else if(field['type'] == 'memory_mb') {
+                s = val.toFixed(0);
+                if(s < 2000) {
+                    s = '<font color="#ff0000">'+s+'</font>';
+                }
+            } else if(field['type'] == 'active_sessions') {
+                s = val.toFixed(0);
+                var has_regions = Object.keys(spin_regions).length > 0;
+                var warn_if_over = (has_regions ? 100 : 300);
+                if(('game_http_port' in item) && val >= warn_if_over) {
+                    s = '<font color="#ff0000">'+s+'</font>';
+                }
+            } else if(field['type'] == 'server_name') {
+                s = val;
+                var url = null;
+                if('game_ssl_port' in item && item['game_ssl_port'] > 0) {
+                    url = 'https://'+item['hostname']+':'+item['game_ssl_port'].toString()+'/ADMIN';
+                } else if('game_http_port' in item && item['game_http_port'] > 0) {
+                    url = 'http://'+item['hostname']+':'+item['game_http_port'].toString()+'/ADMIN';
+                }
+                if(url) { s = '<a href="'+url+'" target="_blank">'+s+'</a>'; }
+
+                if(cur_proxy_builds['gameclient_build']) {
+                    if(item['gameclient_build'] != cur_proxy_builds['gameclient_build'] || item['gamedata_build'] != cur_proxy_builds['gamedata_build']) {
+                        s += ' <font color="#c00000">(mismatch)</font>';
+                    }
+                }
+
+                var server_name = val;
+
+                if(spin_token_data['roles'].indexOf('ADMIN') != -1) {
+                    var btn_list = [{'name':'reconfig','ui_name':'HUP'},
+                                    {'name':'maint_kick','ui_name':'maint'},
+                                    {'name':'change_state','args':{'state':'ok'},'ui_name':'open'},
+                                    {'name':'change_state','args':{'state':'closed'},'ui_name':'close'},
+                                    {'name':'shutdown','ui_name':'stop'}];
+                    if(item['state'] == 'maint_kick') {
+                        btn_list.push({'name':'panic_kick','ui_name':'panic'});
+                    }
+                    $.each(btn_list,
+                           function(index, btn) {
+                               var btn_id = 'server_'+server_name+'_btn_'+index.toString()+btn['name'];
+                               var args = btn['args'] || {};
+                               var onclick = "$('#"+btn_id+"').attr('disabled','disabled'); send_server_control_cmd('"+val+"','"+btn['name']+"',"+JSON.stringify(args).replace(new RegExp('"','g'), "'")+", function() { $('#"+btn_id+"').removeAttr('disabled'); });";
+                               s += ' <button id="'+btn_id+'" onclick="'+onclick+'" class="spin_button_tiny">'+btn['ui_name']+'</button>';
+                           });
+                }
+
+            } else if(field['type'] == 'build') {
+                s = val;
+                if(cur_proxy_builds['gameclient_build']) {
+                    if(item['gameclient_build'] != cur_proxy_builds['gameclient_build'] || item['gamedata_build'] != cur_proxy_builds['gamedata_build']) {
+                        s = '<font color="#c00000">'+s+'</font>';
+                    } else {
+                        s = '<font color="#008000">'+s+'</font>';
+                    }
+                }
+            }
+        }
+        var cell = $('<td>', {html: s});
+        row.append(cell);
+    });
+};
 
 var continue_server_status = function() {
     if(!server_status_pending && !server_latency_pending && $('#mode_server').is(":visible")) {
@@ -1032,31 +1154,21 @@ var refresh_server_status = function() {
         send_request('server', 'get_status', {}, function(result) {
             server_status_pending = false;
             cur_server_status = result;
+            cur_server_status_rows = {};
 
             $('#server_status_loading')[0].innerHTML = 'Ready';
             $('#server_status_table').empty();
 
-            var proxy_builds = {'gameclient_build':null, 'gamedata_build':null};
+
             $.each(result, function(index, item) {
                 if(item['type'] == 'proxyserver' && item['state'] == 'ok') {
-                    proxy_builds['gameclient_build'] = item['gameclient_build'];
-                    proxy_builds['gamedata_build'] = item['gamedata_build'];
+                    cur_proxy_builds['gameclient_build'] = item['gameclient_build'];
+                    cur_proxy_builds['gamedata_build'] = item['gamedata_build'];
                 }
             });
 
-            var FIELDS = [{'name':'server_name','type':'server_name'},
-                          {'name':'state','type':'state'},
-                          {'name':'sessions','var':'active_sessions','type':'active_sessions'},
-                          {'name':'$_sessions','var':'paying_sessions','type':'int'},
-                          {'name':'clients','var':'active_protocol_clients','type':'int'},
-                          {'name':'requests','var':'active_protocol_requests','type':'int'},
-                          {'name':'load_unhalted','type':'load'},
-                          {'name':'machine_stats:machine_mem_free_mb','type':'memory_mb'},
-                          {'name':'gameclient_build','type':'build'},
-                          {'name':'gamedata_build','type':'build'}
-                         ];
             var header_row = $('<tr>');
-            $.each(FIELDS, function(index, field) {
+            $.each(server_status_fields, function(index, field) {
                 var ls = field['name'].split(':');
                 var s = ls[ls.length-1];
                 header_row.append($('<td>', {html:'<b>'+s+'</b>'}));
@@ -1080,101 +1192,8 @@ var refresh_server_status = function() {
 
             $.each(result, function(index, item) {
                 var row = $('<tr>');
-                $.each(FIELDS, function(index, field) {
-                    var val = null;
-                    var path = (field['var'] || field['name']).split(':');
-                    for(var p = item, i = 0; i < path.length; i++) {
-                        if(path[i] in p) {
-                            if(i == path.length-1) {
-                                val = p[path[i]];
-                                break;
-                            } else {
-                                p = p[path[i]];
-                            }
-                        } else {
-                            break;
-                        }
-                    }
-                    var s = '';
-                    if(val !== null) {
-                        if(field['type'] == 'text') {
-                            s = val;
-                        } else if(field['type'] == 'int') {
-                            s = val.toFixed(0);
-                        } else if(field['type'] == 'pct') {
-                            s = (100*val).toFixed(0)+'%';
-                        } else if(field['type'] == 'load') {
-                            s = (100*val).toFixed(0)+'%';
-                            if(val > 0.3) {
-                                s = '<font color="#ff0000">'+s+'</font>';
-                            }
-                        } else if(field['type'] == 'state') {
-                            s = val;
-                            if(val != 'ok') {
-                                s = '<font color="#c00000">'+s+'</font>';
-                            }
-                        } else if(field['type'] == 'memory_mb') {
-                            s = val.toFixed(0);
-                            if(s < 2000) {
-                                s = '<font color="#ff0000">'+s+'</font>';
-                            }
-                        } else if(field['type'] == 'active_sessions') {
-                            s = val.toFixed(0);
-                            var has_regions = Object.keys(spin_regions).length > 0;
-                            var warn_if_over = (has_regions ? 100 : 300);
-                            if(('game_http_port' in item) && val >= warn_if_over) {
-                                s = '<font color="#ff0000">'+s+'</font>';
-                            }
-                        } else if(field['type'] == 'server_name') {
-                            s = val;
-                            var url = null;
-                            if('game_ssl_port' in item && item['game_ssl_port'] > 0) {
-                                url = 'https://'+item['hostname']+':'+item['game_ssl_port'].toString()+'/ADMIN';
-                            } else if('game_http_port' in item && item['game_http_port'] > 0) {
-                                url = 'http://'+item['hostname']+':'+item['game_http_port'].toString()+'/ADMIN';
-                            }
-                            if(url) { s = '<a href="'+url+'" target="_blank">'+s+'</a>'; }
-
-                            if(proxy_builds['gameclient_build']) {
-                                if(item['gameclient_build'] != proxy_builds['gameclient_build'] || item['gamedata_build'] != proxy_builds['gamedata_build']) {
-                                    s += ' <font color="#c00000">(mismatch)</font>';
-                                }
-                            }
-
-                            var server_name = val;
-
-                            if(spin_token_data['roles'].indexOf('ADMIN') != -1) {
-                                var btn_list = [{'name':'reconfig','ui_name':'HUP'},
-                                                {'name':'maint_kick','ui_name':'maint'},
-                                                {'name':'change_state','args':{'state':'ok'},'ui_name':'open'},
-                                                {'name':'change_state','args':{'state':'closed'},'ui_name':'close'},
-                                                {'name':'shutdown','ui_name':'stop'}];
-                                if(item['state'] == 'maint_kick') {
-                                    btn_list.push({'name':'panic_kick','ui_name':'panic'});
-                                }
-                                $.each(btn_list,
-                                       function(index, btn) {
-                                           var btn_id = 'server_'+server_name+'_btn_'+index.toString()+btn['name'];
-                                           var args = btn['args'] || {};
-                                           var onclick = "$('#"+btn_id+"').attr('disabled','disabled'); send_server_control_cmd('"+val+"','"+btn['name']+"',"+JSON.stringify(args).replace(new RegExp('"','g'), "'")+", function() { $('#"+btn_id+"').removeAttr('disabled'); });";
-                                           s += ' <button id="'+btn_id+'" onclick="'+onclick+'" class="spin_button_tiny">'+btn['ui_name']+'</button>';
-                                       });
-                            }
-
-                        } else if(field['type'] == 'build') {
-                            s = val;
-                            if(proxy_builds['gameclient_build']) {
-                                if(item['gameclient_build'] != proxy_builds['gameclient_build'] || item['gamedata_build'] != proxy_builds['gamedata_build']) {
-                                    s = '<font color="#c00000">'+s+'</font>';
-                                } else {
-                                    s = '<font color="#008000">'+s+'</font>';
-                                }
-                            }
-                        }
-                    }
-                    var cell = $('<td>', {html: s});
-                    row.append(cell);
-                });
+                cur_server_status_rows[item['server_name']] = row;
+                refresh_server_status_row(row, item);
                 $('#server_status_table').append(row);
             });
             continue_server_status();

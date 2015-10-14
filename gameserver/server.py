@@ -12997,7 +12997,7 @@ class CONTROLAPI(resource.Resource):
     def handle_nosql_off(self, request):
         gamesite.nosql_shutdown()
     def handle_maint_kick(self, request):
-        return SpinJSON.dumps({'result': gamesite.start_maint_kick()})
+        return SpinJSON.dumps({'result': gamesite.start_maint_kick()}, newline=True)
     def handle_panic_kick(self, request):
         gamesite.panic_kick()
         return SpinJSON.dumps({'result': 'ok'})
@@ -13009,10 +13009,13 @@ class CONTROLAPI(resource.Resource):
         if (not force) and len(session_table) > 0:
             return SpinJSON.dumps({'error':'not shutting down - %d sessions still active\n' % len(session_table)})
 
+        # redundant with gamesite.shutdown(), but makes the status_json result show correct shutting_down state
+        status_json = gamesite.change_state('shutting_down')
+
         request.setHeader('Connection', 'close')
         reactor.stop()
 
-        return SpinJSON.dumps({'result':'ok'})
+        return SpinJSON.dumps({'result':status_json}, newline=True)
 
     def handle_ping(self, request):
         pass
@@ -26303,6 +26306,7 @@ class GameSite(server.Site):
 
     def change_state(self, state):
         assert state in ('ok','closed','shutting_down')
+        if self.server_state == state: return admin_stats.get_server_status_json()
         self.server_state = state
         if state == 'ok':
             self.maint_kick_time = -1
