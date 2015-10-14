@@ -23,7 +23,7 @@ if sys.platform == 'linux2':
     from twisted.internet import epollreactor
     epollreactor.install()
 
-from twisted.python import log
+from twisted.python import log, failure
 from twisted.internet import reactor, task, defer, protocol
 from twisted.web import server, resource, http
 import twisted.web.error
@@ -421,14 +421,14 @@ def update_server_time():
     return server_time_high
 
 # utilities for inserting into Deferred callback chains
-def _report_deferred_failure(failure, session):
+def _report_deferred_failure(fail, session):
     gamesite.exception_log.event(server_time, 'async exception on player %d: %s' % \
-                                 (session.user.user_id, failure.getTraceback()))
-def report_and_reraise_deferred_failure(failure, session):
-    _report_deferred_failure(failure, session)
-    return failure
-def report_and_absorb_deferred_failure(failure, session, retval = None):
-    _report_deferred_failure(failure, session)
+                                 (session.user.user_id, fail.getTraceback()))
+def report_and_reraise_deferred_failure(fail, session):
+    _report_deferred_failure(fail, session)
+    return fail
+def report_and_absorb_deferred_failure(fail, session, retval = None):
+    _report_deferred_failure(fail, session)
     return retval
 
 # userdb/playerdb/aistate file I/O backend
@@ -12872,10 +12872,10 @@ class CONTROLAPI(resource.Resource):
                     if val.async:
                         assert isinstance(val.async, defer.Deferred) # sanity check
 
-                        val.async.addErrback(lambda failure, session=session, method_name=method_name, args=args:
+                        val.async.addErrback(lambda fail, session=session, method_name=method_name, args=args:
                                              gamesite.exception_log.event(server_time, 'CustomerSupport online async exception player %d method %r args %r:\n%s' % \
-                                                                          (session.user.user_id, method_name, args, failure.getTraceback()))
-                                             or CustomerSupport.ReturnValue(error = failure.getTraceback())) # turn exception into a regular result
+                                                                          (session.user.user_id, method_name, args, fail.getTraceback()))
+                                             or CustomerSupport.ReturnValue(error = fail.getTraceback())) # turn exception into a regular result
                         session.start_async_request(val.async)
                         val.async.addCallback(lambda async_result, request=request: SpinHTTP.complete_deferred_request(async_result.as_body(), request))
 
@@ -24060,7 +24060,7 @@ class GAMEAPI(resource.Resource):
                         if master_d: master_d.callback(True)
                         return
 
-                    def on_error(master_d, session, retmsg, retmsg_tag, result, user_ids, failure):
+                    def on_error(master_d, session, retmsg, retmsg_tag, result, user_ids, fail):
                         # complete async request, returning the incomplete results
                         #retmsg.append(["ERROR", "SCORES_OFFLINE"])
                         retmsg.append(["QUERY_PLAYER_SCORES_RESULT", user_ids, result, retmsg_tag, 'SCORES_OFFLINE'])
