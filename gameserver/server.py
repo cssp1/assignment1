@@ -3161,7 +3161,7 @@ class Session(object):
         if not self.async_ds: return # it got cleared up asynchronously (? XXXXXX not sure why this happens - post-logout?)
 
         self.async_ds_watchdog_fired = True
-        gamesite.exception_log.event(server_time, 'player %d async_ds watchdog timeout at %f async_ds %r' % (self.user.user_id, time.time(), self.async_ds))
+        gamesite.exception_log.event(server_time, 'player %d async_ds watchdog timeout at %f async_ds %r after_async %r' % (self.user.user_id, time.time(), self.async_ds, self.after_async))
 
         # not sure what to do here...
 
@@ -12924,7 +12924,7 @@ class CONTROLAPI(resource.Resource):
                         session.queue_flush_outgoing_messages()
                         SpinHTTP.complete_deferred_request(ret, request)
 
-                d = make_deferred('CustomerSupport(online)')
+                d = make_deferred('CustomerSupport:'+method_name+'(online)')
                 d.addCallbacks(functools.partial(handle_online, request, session, handler, method_name, args),
                                # if player logged out, this is going to fail
                                lambda _, request=request: SpinHTTP.complete_deferred_request(CustomerSupport.ReturnValue(error = 'Race condition: Player just logged out. Please try again.').as_body(), request))
@@ -12933,7 +12933,7 @@ class CONTROLAPI(resource.Resource):
             else:
                 # OFFLINE edit
                 ret = None
-                d = make_deferred('CustomerSupport(offline)')
+                d = make_deferred('CustomerSupport:'+method_name+'(offline)')
 
                 if not handler.read_only:
                     # get lock

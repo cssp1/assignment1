@@ -71,11 +71,17 @@ from twisted.internet import defer
 class InstrumentedDeferred(defer.Deferred):
     def __init__(self, latency_tag):
         defer.Deferred.__init__(self)
-        self.latency_tag = '(d)'+latency_tag
+        self.latency_tag = latency_tag
     def _runCallbacks(self):
         start_time = time.time()
         ret = defer.Deferred._runCallbacks(self)
         end_time = time.time()
         if g_latency_func:
-            g_latency_func(self.latency_tag, end_time - start_time)
+            g_latency_func('(d)'+self.latency_tag, end_time - start_time)
         return ret
+    def __repr__(self):
+        r = defer.Deferred.__repr__(self)
+        # depends on the guts of Deferred.__repr__() :(
+        fields = r.split(' ')
+        fields[0] += '("'+self.latency_tag+'")'
+        return ' '.join(fields)
