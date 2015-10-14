@@ -6880,6 +6880,7 @@ def spawn_units(owner, base, units, temporary = False,
 
     new_objects = []
     ncells = base.ncells()
+    cur_space_usage = None
 
     for name, data in units.iteritems():
         if (name not in gamedata['units']): continue
@@ -6907,6 +6908,9 @@ def spawn_units(owner, base, units, temporary = False,
         space = GameObjectSpec.get_leveled_quantity(spec.consumes_space, level)
 
         for i in range(qty):
+            if cur_space_usage is None:
+                cur_space_usage = owner.get_army_space_usage_by_squad() # OK - expensive query
+
             newobj_x = x
             newobj_y = y
             if xyscatter:
@@ -6927,15 +6931,15 @@ def spawn_units(owner, base, units, temporary = False,
                             gamesite.exception_log.event(server_time, 'player %d not allowed to spawn unit of spec %s due to count limit' % (owner.user_id, spec.name))
                             break # skip adding the unit, and log message
 
-                cur = owner.get_army_space_usage_by_squad() # wow, this goes to the database for every unit...
-                if (cur['ALL'] + space > owner.stattab.total_space):
+
+                if (cur_space_usage['ALL'] + space > owner.stattab.total_space):
                     if limit_reduce_qty:
                         break # skip adding the unit
                     else:
                         gamesite.exception_log.event(server_time, 'player %d (CC%d) spawned unit into oversize army! (unit %s space %d limit %d army %s)' % \
-                                                     (owner.user_id, owner.get_townhall_level(), name, space, owner.stattab.total_space, repr(cur)))
+                                                     (owner.user_id, owner.get_townhall_level(), name, space, owner.stattab.total_space, repr(cur_space_usage)))
 
-                if (cur[str(SQUAD_IDS.BASE_DEFENDERS)] + space > owner.stattab.main_squad_space):
+                if (cur_space_usage[str(SQUAD_IDS.BASE_DEFENDERS)] + space > owner.stattab.main_squad_space):
                     if limit_reduce_qty:
                         break # skip adding the unit
                     else:
@@ -6943,7 +6947,7 @@ def spawn_units(owner, base, units, temporary = False,
                             destination_squad = SQUAD_IDS.RESERVES
                         else:
                             gamesite.exception_log.event(server_time, 'player %d (CC%d) spawned unit into oversize base defenders! (unit %s space %d limit %d army %s)' % \
-                                                         (owner.user_id, owner.get_townhall_level(), name, space, owner.stattab.main_squad_space, repr(cur)))
+                                                         (owner.user_id, owner.get_townhall_level(), name, space, owner.stattab.main_squad_space, repr(cur_space_usage)))
 
             newobj_id = gamesite.nosql_id_generator.generate()
             if temporary: newobj_id = 'TEMP-'+newobj_id # give temporary objects bogus obj_ids to deliberately cause errors if they are accidentally attempted to be written to NoSQL
@@ -6956,6 +6960,8 @@ def spawn_units(owner, base, units, temporary = False,
             if not temporary:
                 assert base is owner.my_home
                 base.adopt_object(newobj)
+                cur_space_usage['ALL'] += space
+                cur_space_usage[str(destination_squad)] += space
             new_objects.append(newobj)
     return new_objects
 
@@ -19073,6 +19079,9 @@ class GAMEAPI(resource.Resource):
             # keep track of added objects so we can send a UNIT_MANUFACTURED message to the client
             new_object_ids = []
 
+            # expensive query, so only do it once
+            space_usage = session.player.get_army_space_usage_by_squad()
+
             # grab items off the manufacturing queue in FIFO order
             while len(object.manuf_queue) > 0:
                 if object.manuf_queue[0]['total_time'] > prog:
@@ -19094,7 +19103,6 @@ class GAMEAPI(resource.Resource):
                         gamesite.exception_log.event(server_time, 'player %d not allowed to finish unit of spec %s due to count limit' % (session.player.user_id, spec.name))
                         continue # drop the unit
 
-                space_usage = session.player.get_army_space_usage_by_squad()
                 destination_squad = SQUAD_IDS.BASE_DEFENDERS
 
                 if (not session.player.is_cheater):
@@ -19122,6 +19130,8 @@ class GAMEAPI(resource.Resource):
                 newobj.squad_id = destination_squad
 
                 base.adopt_object(newobj)
+                space_usage['ALL'] += space
+                space_usage[str(destination_squad)] += space
                 session.player.send_army_update_one(newobj, retmsg)
 
                 new_object_ids.append(newobj.obj_id)
