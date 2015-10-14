@@ -8157,7 +8157,7 @@ class Player(AbstractPlayer):
         return ret
 
     # optionally supply map_object_data in case you just queried it
-    def get_army_space_usage_by_squad(self, map_object_data = None):
+    def get_army_space_usage_by_squad(self, map_object_data = None, exclude_manuf_queue = None):
         ret = dict([(k,0) for k in self.squads.iterkeys()] + [('ALL',0), (str(SQUAD_IDS.RESERVES),0)])
         for obj in self.home_base_iter():
             if (obj.owner is self) and obj.is_mobile():
@@ -8167,7 +8167,7 @@ class Player(AbstractPlayer):
                 ret['ALL'] += space
 
             # also add space occupied by units that are under construction
-            elif (obj.owner is self) and obj.is_building() and obj.is_manufacturer():
+            elif (obj.owner is self) and obj.is_building() and obj.is_manufacturer() and (obj is not exclude_manuf_queue):
                 for item in obj.manuf_queue:
                     spec = GameObjectSpec.lookup(item['spec_name'])
                     space = GameObjectSpec.get_leveled_quantity(spec.consumes_space, item.get('level',1))
@@ -19080,7 +19080,7 @@ class GAMEAPI(resource.Resource):
             new_object_ids = []
 
             # expensive query, so only do it once
-            space_usage = session.player.get_army_space_usage_by_squad()
+            space_usage = session.player.get_army_space_usage_by_squad(exclude_manuf_queue = object)
 
             # grab items off the manufacturing queue in FIFO order
             while len(object.manuf_queue) > 0:
