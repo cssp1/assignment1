@@ -556,26 +556,27 @@ SquadManageDialog.update_squad_manage = function(dialog) {
         });
 
         // sort by health and space
+        var hp_sign = button.get_button(SPUI.MouseButton.RIGHT) ? -1 : 1;
+
         to_assign_list.sort(function(a, b) {
             var a_curmax = army_unit_hp(a);
             var a_ratio = a_curmax[0]/Math.max(a_curmax[1],1);
             var b_curmax = army_unit_hp(b);
             var b_ratio = b_curmax[0]/Math.max(b_curmax[1],1);
 
-            var hp_sign = button.get_button(SPUI.MouseButton.RIGHT) ? -1 : 1;
-            if(a_ratio > b_ratio) {
+            if(a_ratio < b_ratio) {
                 return hp_sign;
-            } else if(a_ratio < b_ratio) {
+            } else if(a_ratio > b_ratio) {
                 return -hp_sign;
             }
 
             var a_space = get_leveled_quantity(gamedata['units'][a['spec']]['consumes_space']||0, a['level']||1);
             var b_space = get_leveled_quantity(gamedata['units'][b['spec']]['consumes_space']||0, b['level']||1);
-            if(a_space > b_space) {
+            if(a_space < b_space) {
                 return 1;
-            } else if(a_space < b_space) {
+            } else if(a_space > b_space) {
                 return -1;
-            } else if(a['obj_id'] > b['obj_id']) { // tie-break with obj_id for stable sort
+            } else if(a['obj_id'] < b['obj_id']) { // tie-break with obj_id for stable sort
                 return 1;
             } else {
                 return -1;
