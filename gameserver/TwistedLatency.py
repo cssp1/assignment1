@@ -53,3 +53,15 @@ def setup(reactor, latency_func):
             g_latency_func('ALL', end_time - start_time)
 
         epollreactor.EPollReactor.doIteration = mypoll
+
+        old_runUntilCurrent = epollreactor.EPollReactor.runUntilCurrent
+        def myRunUntilCurrent(self):
+            start_time = time.time()
+            ret = old_runUntilCurrent(self)
+            end_time = time.time()
+            g_latency_func('ALL', end_time - start_time)
+            return ret
+
+        epollreactor.EPollReactor.runUntilCurrent = myRunUntilCurrent
+
+
