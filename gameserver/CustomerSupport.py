@@ -571,18 +571,18 @@ class HandleChangeRegion(Handler):
     # the online handler has to first end any ongoing attack, which may go asynchronous, and then
     # a synchronous return to home base, and finally the region change
     def do_exec_online(self, session, retmsg):
-        self.d = defer.Deferred() # for the asynchronous callback from do_exec_online2
-        self.gamesite.gameapi.change_session(session, retmsg, dest_user_id = session.user.user_id, force = True).addBoth(functools.partial(self.do_exec_online2, session, retmsg))
+        self.d = self.gamesite.gameapi.change_session(session, retmsg, dest_user_id = session.user.user_id, force = True)
+        self.d.addCallback(self.do_exec_online2, session, retmsg)
         return ReturnValue(async = self.d)
 
     # then after complete_attack...
-    def do_exec_online2(self, session, retmsg, change_session_result):
+    def do_exec_online2(self, change_session_result, session, retmsg):
         success = session.player.change_region(self.new_region, None, session, retmsg, reason = 'CustomerSupport')
         if success:
             ret = ReturnValue(result = 'ok')
         else:
             ret = ReturnValue(error = 'change_region failed')
-        self.d.callback(ret)
+        return ret
 
     # the offline implementation is complex because it needs to do
     # everything Player.change_region() does, including careful trial

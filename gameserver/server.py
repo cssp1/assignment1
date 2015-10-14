@@ -420,6 +420,17 @@ def update_server_time():
     if gamesite.nosql_client: gamesite.nosql_client.set_time(server_time)
     return server_time_high
 
+# utilities for inserting into Deferred callback chains
+def _report_deferred_failure(failure, session):
+    gamesite.exception_log.event(server_time, 'async exception on player %d: %s' % \
+                                 (session.user.user_id, failure.getTraceback()))
+def report_and_reraise_deferred_failure(failure, session):
+    _report_deferred_failure(failure, session)
+    return failure
+def report_and_absorb_deferred_failure(failure, session, retval = None):
+    _report_deferred_failure(failure, session)
+    return retval
+
 # userdb/playerdb/aistate file I/O backend
 class IOSystem (object):
     def __init__(self, config):
@@ -3128,10 +3139,10 @@ class Session(object):
 
         self.async_ds.append(d)
         # ensure we communicate back to the client as soon as async processing finishes
-        d.addBoth(self.complete_async_request, d)
+        d.addBoth(self.complete_async_request, d) # OK
         return d # for syntactic convenience only
 
-    def complete_async_request(self, result, d):
+    def complete_async_request(self, result_or_failure, d):
         # note: this is called BY an async_d firing, so don't fire it again!
 
         if d not in self.async_ds:
@@ -3153,7 +3164,7 @@ class Session(object):
             # and finally respond to the client. If one of the above cbs makes us async again, this will do nothing.
             self.queue_flush_outgoing_messages()
 
-        return result # pass along callback chain
+        return result_or_failure # pass along callback chain
 
     # fire this deferred after we come out of async wait (or immediately if not waiting)
     def after_async_request(self, d):
@@ -12709,7 +12720,7 @@ class CONTROLAPI(resource.Resource):
         d = defer.Deferred()
         d.addCallbacks(lambda _, self=self, session=session, request=request, body=body: self.gameapi.log_out_async(session, 'forced_relog'),
                        lambda _: None) # player already logged out - just complete the request
-        d.addBoth(lambda _, body=body, request=request: SpinHTTP.complete_deferred_request(body, request))
+        d.addCallback(lambda _, body=body, request=request: SpinHTTP.complete_deferred_request(body, request))
         session.after_async_request(d)
 
         return server.NOT_DONE_YET
@@ -12864,14 +12875,16 @@ class CONTROLAPI(resource.Resource):
                     if val.async:
                         assert isinstance(val.async, defer.Deferred) # sanity check
 
-                        def after_async(async_result, request, session):
-                            SpinHTTP.complete_deferred_request(async_result.as_body(), request)
+                        val.async.addErrback(lambda failure, session=session, method_name=method_name, args=args:
+                                             gamesite.exception_log.event(server_time, 'CustomerSupport online async exception player %d method %r args %r:\n%s' % \
+                                                                          (session.user.user_id, method_name, args, failure.getTraceback()))
+                                             or CustomerSupport.ReturnValue(error = failure.getTraceback())) # turn exception into a regular result
                         session.start_async_request(val.async)
-                        val.async.addBoth(after_async, request, session)
+                        val.async.addCallback(lambda async_result, request=request: SpinHTTP.complete_deferred_request(async_result.as_body(), request))
 
                     else:
                         if val.kill_session:
-                            ret = self.kill_session(request, session, body = val.as_body())
+                            ret = self.kill_session(request, session, body = val.as_body()) # this adds complete_deferred_request() when necessary
                         else:
                             ret = val.as_body()
                         session.queue_flush_outgoing_messages()
@@ -12886,7 +12899,7 @@ class CONTROLAPI(resource.Resource):
             else:
                 # OFFLINE edit
                 ret = None
-                d = defer.Deferred() # OK - not online
+                d = defer.Deferred()
 
                 if not handler.read_only:
                     # get lock
@@ -12897,12 +12910,10 @@ class CONTROLAPI(resource.Resource):
                         def unlock(val, uid):
                             gamesite.lock_client.player_lock_release(uid, -1, Player.LockState.being_attacked, expected_owner_id = -1)
                             return val
-                        d.addBoth(unlock, user_id)
+                        d.addBoth(unlock, user_id) # OK
 
                 if ret is None: # no lock error
-                    def complete(val, request):
-                        SpinHTTP.complete_deferred_request(val.as_body(), request)
-                    d.addBoth(complete, request)
+                    d.addCallback(lambda val, request=request: SpinHTTP.complete_deferred_request(val.as_body(), request))
 
                     self.AsyncSupport(user_id, method_name, handler, d).start()
                     ret = server.NOT_DONE_YET
@@ -16149,24 +16160,24 @@ class GAMEAPI(resource.Resource):
             ascdebug('change_session set_progress_and_pass_result in_progress %r result %r' % (prog, result))
             session.visit_base_in_progress = prog
             return result
-        master_d.addBoth(set_progress_and_pass_result, session, True)
+        master_d.addBoth(set_progress_and_pass_result, session, True) # OK
 
-        master_d.addBoth(lambda _, self=self,session=session,retmsg=retmsg,client_props=client_props:
-                         self.complete_attack(session, retmsg, client_props = client_props, reason='change_session'))
+        master_d.addCallback(lambda _, self=self,session=session,retmsg=retmsg,client_props=client_props:
+                             self.complete_attack(session, retmsg, client_props = client_props, reason='change_session'))
 
-        # note: don't care whether complete_attack() succeeds or not
+        # note: continue even if complete_attack() fails
+        master_d.addErrback(report_and_absorb_deferred_failure, session)
 
-        master_d.addBoth(lambda _, change=change: change.begin())
+        master_d.addCallback(lambda _, change=change: change.begin())
         master_d.addCallback(lambda args, self=self: self.change_session_complete(*args)) # note: receives the list of arguments to pass from change.d's callback
 
         # we DO care about exceptions inside change_session_complete(), since we need to release locks
+        master_d.addErrback(report_and_reraise_deferred_failure, session)
         master_d.addErrback(lambda err, session=session:
-                            gamesite.exception_log.event(server_time, 'change_session_complete exception on player %d: %s' % \
-                                                         (session.user.user_id, err.getTraceback())) and \
                             session.release_pre_locks() and \
-                            None) # swallow the exception
+                            None) # now swallow the exception
 
-        master_d.addBoth(set_progress_and_pass_result, session, False)
+        master_d.addBoth(set_progress_and_pass_result, session, False) # OK
 
         reactor.callLater(0, master_d.callback, True)
         return session.start_async_request(master_d)
@@ -16760,11 +16771,13 @@ class GAMEAPI(resource.Resource):
                     if True: # dangerous - skips session change on client side
                         # first complete the attack manually so we get the battle-end messages
                         compl_d = self.complete_attack(session, retmsg)
+                        compl_d.addErrback(report_and_absorb_deferred_failure, session)
                         # then go home, throwing away the session-change messages
-                        compl_d.addBoth(lambda _, self=self, session=session, change_retmsg=change_retmsg: \
-                                        self.change_session(session, change_retmsg, dest_user_id = session.player.user_id, force = True))
+                        compl_d.addCallback(lambda _, self=self, session=session, change_retmsg=change_retmsg: \
+                                            self.change_session(session, change_retmsg, dest_user_id = session.player.user_id, force = True))
                         # then let the client know we skipped the session change
-                        compl_d.addBoth(lambda _, session=session: session.outgoing_messages.append(["SESSION_CHANGE_SKIPPED"]))
+                        compl_d.addErrback(report_and_absorb_deferred_failure, session)
+                        compl_d.addCallback(lambda _, session=session: session.outgoing_messages.append(["SESSION_CHANGE_SKIPPED"]))
                         return compl_d
 
                 else:
@@ -22110,7 +22123,7 @@ class GAMEAPI(resource.Resource):
         # note: sends both SQUADS_UPDATE and PLAYER_ARMY_UPDATE
         session.player.ping_squads_and_send_update(session, retmsg, originator=session.player.user_id, reason='SERVER_HELLO')
 
-        self.change_session(session, retmsg, dest_user_id = user.user_id, force = True).addBoth(lambda success, self=self, session=session, retmsg=retmsg, d=d: self.complete_client_hello2(d, session, retmsg))
+        self.change_session(session, retmsg, dest_user_id = user.user_id, force = True).addCallback(lambda success, self=self, session=session, retmsg=retmsg, d=d: self.complete_client_hello2(d, session, retmsg))
         return d
 
     def complete_client_hello2(self, d, session, retmsg):
@@ -22551,12 +22564,13 @@ class GAMEAPI(resource.Resource):
         d = defer.Deferred()
 
         # if an attack was going on, clean it up
-        d.addBoth(lambda _, self=self,session=session:
-                  self.complete_attack(session, session.outgoing_messages, reason='log_out_async'))
+        d.addCallback(lambda _, self=self,session=session:
+                      self.complete_attack(session, session.outgoing_messages, reason='log_out_async'))
+        d.addErrback(report_and_absorb_deferred_failure, session)
 
         # then continue with log_out_async2
-        d.addBoth(lambda _, self=self, session=session, method=method, force=force:
-                  self.log_out_async2(session, method, force))
+        d.addCallback(lambda _, self=self, session=session, method=method, force=force:
+                      self.log_out_async2(session, method, force))
 
         reactor.callLater(0, d.callback, True)
         return session.start_async_request(d)
@@ -22577,7 +22591,8 @@ class GAMEAPI(resource.Resource):
 
             self.log_out_preflush(session, method)
 
-            session.logout_in_progress.d.addBoth(lambda _, self=self, session=session: self.log_out_postflush(session))
+            session.logout_in_progress.d.addErrback(report_and_absorb_deferred_failure, session)
+            session.logout_in_progress.d.addCallback(lambda _, self=self, session=session: self.log_out_postflush(session))
 
             player_table.store_async(session.player, session.logout_in_progress.player_cb, True, 'logout')
             user_table.store_async(session.user, session.logout_in_progress.user_cb, True, 'logout')
@@ -22985,8 +23000,8 @@ class GAMEAPI(resource.Resource):
             d = gamesite.xsapi.get_token(session, retmsg, spellname, spellarg)
             if d:
                 # let's try doing this asynchronously to the other session traffic...
-                d.addBoth(lambda result, _session = session, _tag = tag: \
-                          _session.send([["XSOLLA_GET_TOKEN_RESULT", _tag, result]], flush_now = True))
+                d.addCallback(lambda result, _session = session, _tag = tag: \
+                              _session.send([["XSOLLA_GET_TOKEN_RESULT", _tag, result]], flush_now = True))
             return # do not go async
 
         # pay with gamebucks
@@ -25048,7 +25063,7 @@ class GAMEAPI(resource.Resource):
                         retmsg.append(["TECH_UPDATE", session.player.tech])
                         retmsg.append(["QUEST_STATE_UPDATE", session.player.completed_quests])
 
-                    d.addBoth(functools.partial(after_session_change, self, session, retmsg))
+                    d.addCallback(functools.partial(after_session_change, self, session, retmsg))
                     return d # async
 
             elif spellname == "CHEAT_SPAWN_UNITS":
@@ -25109,7 +25124,7 @@ class GAMEAPI(resource.Resource):
                         def after_session_change(self, session, retmsg, filename, change_session_result):
                             retmsg.append(["LOAD_AI_BASE_RESULT", True, None, filename])
 
-                        d.addBoth(functools.partial(after_session_change, self, session, retmsg, filename))
+                        d.addCallback(functools.partial(after_session_change, self, session, retmsg, filename))
                         return d # async
 
                     except:
@@ -26114,9 +26129,12 @@ class GameSite(server.Site):
     def shutdown(self):
         # ordering here is important: close listening socket, then close sessions, then close HTTP/WS traffic
         d = self.stop_listening()
-        d.addBoth(lambda _, self=self: self.stop_all_sessions())
-        d.addBoth(lambda _, self=self: self.stop_all_clients())
-        d.addBoth(lambda _: io_system.shutdown())
+        d.addCallback(lambda _, self=self: self.stop_all_sessions())
+        d.addErrback(lambda err, self=self: self.exception_log.event(server_time, 'stop_all_sessions() exception: %s' % err.getTraceback()) and None)
+        d.addCallback(lambda _, self=self: self.stop_all_clients())
+        d.addErrback(lambda err, self=self: self.exception_log.event(server_time, 'stop_all_clients() exception: %s' % err.getTraceback()) and None)
+        d.addCallback(lambda _: io_system.shutdown())
+        d.addErrback(lambda err, self=self: self.exception_log.event(server_time, 'io_system.shutdown() exception: %s' % err.getTraceback()) and None)
         return d
 
     def stop_listening(self):
@@ -26136,7 +26154,7 @@ class GameSite(server.Site):
             d.callback(None)
     def getResourceFor(self, request):
         self.active_requests.add(request)
-        request.notifyFinish().addBoth(lambda _, self=self, request=request: self.active_requests.discard(request))
+        request.notifyFinish().addBoth(lambda _, self=self, request=request: self.active_requests.discard(request)) # OK
         return server.Site.getResourceFor(self, request)
 
     def stop_all_clients(self):
