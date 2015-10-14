@@ -6908,7 +6908,7 @@ def spawn_units(owner, base, units, temporary = False,
         space = GameObjectSpec.get_leveled_quantity(spec.consumes_space, level)
 
         for i in range(qty):
-            if cur_space_usage is None:
+            if (not temporary) and cur_space_usage is None:
                 cur_space_usage = owner.get_army_space_usage_by_squad() # OK - expensive query
 
             newobj_x = x
