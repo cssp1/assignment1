@@ -8,19 +8,19 @@
 # implementation to install a latency monitor to track all "non-waiting"
 # CPU time taken by a server process
 
+import sys, time
+
 g_latency_func = None
 
 def setup(reactor, latency_func):
-    import sys
+    global g_latency_func
+    g_latency_func = latency_func
 
-    if sys.platform != 'linux2': return
+    if sys.platform != 'linux2': return # not supported
 
     from twisted.internet import epollreactor
     from twisted.python import log
-    import errno, time
-
-    global g_latency_func
-    g_latency_func = latency_func
+    import errno
 
     assert isinstance(reactor, epollreactor.EPollReactor)
     if 1:
@@ -65,3 +65,17 @@ def setup(reactor, latency_func):
         epollreactor.EPollReactor.runUntilCurrent = myRunUntilCurrent
 
 
+# subclass of Deferred that reports callback latency
+
+from twisted.internet import defer
+class InstrumentedDeferred(defer.Deferred):
+    def __init__(self, latency_tag):
+        defer.Deferred.__init__(self)
+        self.latency_tag = '(d)'+latency_tag
+    def _runCallbacks(self):
+        start_time = time.time()
+        ret = defer.Deferred._runCallbacks(self)
+        end_time = time.time()
+        if g_latency_func:
+            g_latency_func(self.latency_tag, end_time - start_time)
+        return ret

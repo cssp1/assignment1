@@ -95,6 +95,8 @@ def soft_assert(x):
     if not x:
         gamesite.exception_log.event(server_time, 'soft assert fail: '+string.join(traceback.format_stack(), ''))
 
+def make_deferred(latency_tag): return TwistedLatency.InstrumentedDeferred(latency_tag)
+
 # increment value of d[key], assuming that the current amount is zero
 # if d[key] doesn't exist
 def dict_increment(d, key, amount):
@@ -1524,7 +1526,7 @@ class User:
         if gamedata['server']['log_fbpayments'] >= 2:
             gamesite.exception_log.event(server_time, 'ping_fbpayment user %d request_id %s SEND %s' % (session.player.user_id, request_id, url))
 
-        d = defer.Deferred() # OK - installed into session by caller
+        d = make_deferred('ping_fbpayment_complete') # OK - installed into session by caller
         gamesite.AsyncHTTP_Facebook.queue_request(server_time, url, functools.partial(self.ping_fbpayment_complete, d, session, retmsg, request_id), max_tries = 4)
         return d # hold request async until the poll completes
 
@@ -2964,7 +2966,7 @@ class Session(object):
     class AsyncLogout:
         def __init__(self, parent):
             self.parent = parent
-            self.d = defer.Deferred()
+            self.d = make_deferred('AsyncLogout')
             self.wrote_user = False
             self.wrote_player = False
         def user_cb(self):
@@ -4591,7 +4593,7 @@ class SessionChange(object):
     # to pass to change_session_complete()
 
     def __init__(self, session, retmsg, dest_user_id, dest_base_id, dest_feature, is_ai, new_ladder_state, new_deployable_squads, new_defending_squads, delay, pre_attack):
-        self.d = defer.Deferred() # deferred to fire upon completion
+        self.d = make_deferred('SessionChange') # deferred to fire upon completion
         self.session = session
         self.retmsg = retmsg
         self.dest_user_id = dest_user_id
@@ -12749,7 +12751,7 @@ class CONTROLAPI(resource.Resource):
 
     def kill_session(self, request, session, body = None):
         if not body: body = 'ok\n'
-        d = defer.Deferred()
+        d = make_deferred('kill_session')
         d.addCallbacks(lambda _, self=self, session=session, request=request, body=body: self.gameapi.log_out_async(session, 'forced_relog'),
                        lambda _: None) # player already logged out - just complete the request
         d.addCallback(lambda _, body=body, request=request: SpinHTTP.complete_deferred_request(body, request))
@@ -12922,7 +12924,7 @@ class CONTROLAPI(resource.Resource):
                         session.queue_flush_outgoing_messages()
                         SpinHTTP.complete_deferred_request(ret, request)
 
-                d = defer.Deferred()
+                d = make_deferred('CustomerSupport(online)')
                 d.addCallbacks(functools.partial(handle_online, request, session, handler, method_name, args),
                                # if player logged out, this is going to fail
                                lambda _, request=request: SpinHTTP.complete_deferred_request(CustomerSupport.ReturnValue(error = 'Race condition: Player just logged out. Please try again.').as_body(), request))
@@ -12931,7 +12933,7 @@ class CONTROLAPI(resource.Resource):
             else:
                 # OFFLINE edit
                 ret = None
-                d = defer.Deferred()
+                d = make_deferred('CustomerSupport(offline)')
 
                 if not handler.read_only:
                     # get lock
@@ -15016,7 +15018,7 @@ class XSAPI(resource.Resource):
                                                                    session.player.level(), session.user.account_creation_time)
         if gamedata['server'].get('log_xsolla', False):
             gamesite.xsolla_log.event(server_time, SpinJSON.dumps({'url':url, 'method':method, 'headers':headers, 'body':body}))
-        d = defer.Deferred() # OK - doesn't block message processing
+        d = make_deferred('SpinXsolla:get_token') # OK - doesn't block message processing
         gamesite.AsyncHTTP_Xsolla.queue_request(server_time, url,
                                                 lambda result, _d=d: _d.callback(SpinJSON.loads(result)['token']),
                                                 method=method, headers=headers, postdata=body)
@@ -15068,7 +15070,7 @@ class GAMEAPI(resource.Resource):
         # error path
         session.complete_attack_in_progress = False
         d, session.complete_attack_d = session.complete_attack_d, None
-        if not d: d = defer.Deferred()
+        if not d: d = make_deferred('complete_attack(fail)')
         reactor.callLater(0, d.callback, False)
         return d
 
@@ -15085,7 +15087,7 @@ class GAMEAPI(resource.Resource):
         assert session.complete_attack_d is None
         assert not session.complete_attack_in_progress
 
-        session.complete_attack_d = defer.Deferred()
+        session.complete_attack_d = make_deferred('_complete_attack')
         session.complete_attack_in_progress = True
 
         # record last bits of damage
@@ -16186,7 +16188,7 @@ class GAMEAPI(resource.Resource):
 
 
         # it's cleaner to string everything together in one callback chain
-        master_d = defer.Deferred()
+        master_d = make_deferred('change_session')
 
         def set_progress_and_pass_result(result, session, prog):
             ascdebug('change_session set_progress_and_pass_result in_progress %r result %r' % (prog, result))
@@ -16906,7 +16908,7 @@ class GAMEAPI(resource.Resource):
     def query_achievements(self, session, retmsg, arg):
         id = arg[1]; tag = arg[2]
 
-        d = defer.Deferred()
+        d = make_deferred('query_achievements')
 
         def complete_query(self, d, session, retmsg, tag, result):
             retmsg.append(["QUERY_ACHIEVEMENTS_RESULT", tag, result])
@@ -17057,7 +17059,7 @@ class GAMEAPI(resource.Resource):
                 # try S3 download
                 bucket = AttackLog.storage_s3_bucket()
                 name = AttackLog.storage_s3_name(AttackLog.base_name(battle_time, attacker, defender, base_id))
-                d = defer.Deferred()
+                d = make_deferred('get_battle_log3(S3)')
                 def cb(self, d, session, retmsg, tag, success, buf):
                     ret = None
                     if success and buf and (buf != 'NOTFOUND'):
@@ -21748,7 +21750,7 @@ class GAMEAPI(resource.Resource):
                                  metrics_anon_id, user_demographics, client_browser_caps, client_session_data, query_string, client_permissions, client_login_country,
                                  client_ip):
 
-        d = defer.Deferred() # OK - login path is special - we'll return this for the caller
+        d = make_deferred('do_complete_client_hello') # OK - login path is special - we'll return this for the caller
 
         # parse query string
         url_qs = urlparse.parse_qs(query_string)
@@ -22593,7 +22595,7 @@ class GAMEAPI(resource.Resource):
                 else:
                     return session.logout_in_progress.d
 
-        d = defer.Deferred()
+        d = make_deferred('log_out_async')
 
         # if an attack was going on, clean it up
         d.addCallback(lambda _, self=self,session=session:
@@ -24077,7 +24079,7 @@ class GAMEAPI(resource.Resource):
                 bdict = batch.get_qs_dict()
                 rdict = {}
                 tag_list = sorted(bdict.keys())
-                master_d = defer.Deferred() # OK - see below
+                master_d = make_deferred('QUERY_PLAYER_SCORES')
 
                 # launch next query in chain
                 def next_query(master_d, session, retmsg, retmsg_tag, result, user_ids, sql_query_i_addrs, batch, bdict, rdict, tag_list, i, last_result):
@@ -25277,7 +25279,7 @@ class GAMEAPI(resource.Resource):
                 # offline mutation.
 
                 rq = AsyncHTTP.AsyncHTTPRequester(-1, -1, 10, 0, lambda x: gamesite.exception_log.event(server_time, x))
-                d = defer.Deferred()
+                d = make_deferred(spellname)
                 def finish(self, d, session, retmsg, spellname, target_id, response_or_error):
                     retmsg.append([spellname+"_RESULT", target_id, True])
                     d.callback(True)
@@ -26193,7 +26195,7 @@ class GameSite(server.Site):
         if not self.active_clients:
             return defer.succeed(None)
         else:
-            d = defer.Deferred()
+            d = make_deferred('stop_all_clients')
             self.clients_stopped_deferred = d
 
             # tell any keep-alive requests that we're closing down
@@ -26536,7 +26538,7 @@ class GameSite(server.Site):
                 session.attack_finish_time = -1
 
                 # note: change_session will unlock the victim's state for us
-                d = defer.Deferred()
+                d = make_deferred('force_attack_end')
                 def force_attack_end(self, session):
                     if session.has_attacked:
                         return self.gameapi.change_session(session, session.outgoing_messages, dest_user_id = session.user.user_id, force = True)
