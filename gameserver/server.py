@@ -26161,6 +26161,10 @@ class GameSite(server.Site):
 
     def shutdown(self):
         # ordering here is important: close listening socket, then close sessions, then close HTTP/WS traffic
+
+        self.change_state('shutting_down') # send status update to tell latency probe to ignore us
+        # (there's a small race condition here - could fix by inserting a deley here, but probably not a problem)
+
         d = self.stop_listening()
         d.addCallback(lambda _, self=self: self.stop_all_sessions())
         d.addErrback(lambda err, self=self: self.exception_log.event(server_time, 'stop_all_sessions() exception: %s' % err.getTraceback()) and None)
@@ -26168,6 +26172,8 @@ class GameSite(server.Site):
         d.addErrback(lambda err, self=self: self.exception_log.event(server_time, 'stop_all_clients() exception: %s' % err.getTraceback()) and None)
         d.addCallback(lambda _: io_system.shutdown())
         d.addErrback(lambda err, self=self: self.exception_log.event(server_time, 'io_system.shutdown() exception: %s' % err.getTraceback()) and None)
+        # send a final server status update when we're finished
+        d.addCallback(lambda _, self=self: self.nosql_client.server_status_update(spin_server_name, None, reason='shutdown'))
         return d
 
     def stop_listening(self):
@@ -26296,7 +26302,7 @@ class GameSite(server.Site):
             self.server_status_task.start(self.server_status_interval, now = run_now)
 
     def change_state(self, state):
-        assert state in ('ok','closed')
+        assert state in ('ok','closed','shutting_down')
         self.server_state = state
         if state == 'ok':
             self.maint_kick_time = -1
@@ -26382,14 +26388,7 @@ class GameSite(server.Site):
         for session in list(iter_sessions(include_logout_in_progress = True)):
             waiting_on.append(self.gameapi.log_out_async(session, 'server_shutdown'))
 
-        print 'logging out %d active sessions' % len(waiting_on)
-        semaphore = defer.DeferredList(waiting_on, consumeErrors = True)
-
-        # send a final server status update when we're finished
-        # note: if waiting_on is empty, this will fire synchronously
-        semaphore.addCallback(lambda _, self=self: self.nosql_client.server_status_update(spin_server_name, None, reason='shutdown'))
-
-        return semaphore
+        return defer.DeferredList(waiting_on, consumeErrors = True)
 
     def server_status_func(self):
         try:

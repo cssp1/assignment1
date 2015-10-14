@@ -63,7 +63,7 @@ def bgtask_func():
     nosql_client.set_time(int(time_now))
 
     servers = []
-    rows = nosql_client.server_status_query({}, fields = {'_id':1, 'type':1, 'hostname':1, 'game_http_port':1, 'external_http_port':1, 'server_time':1})
+    rows = nosql_client.server_status_query({'state':{'$ne':'shutting_down'}}, fields = {'_id':1, 'type':1, 'hostname':1, 'game_http_port':1, 'external_http_port':1, 'server_time':1})
     for row in rows:
         key = row['server_name']
         if row['type'] == 'proxyserver':
