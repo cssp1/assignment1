@@ -21413,6 +21413,8 @@ class GAMEAPI(resource.Resource):
 
     # we're about to send a response to the client. Run any pending batched actions.
     def run_deferred_actions(self, session, retmsg, reason = 'unknown'):
+        start_time = time.time()
+
         if session.deferred_ping_squads:
             session.deferred_ping_squads = False
             session.player.ping_squads_and_send_update(session, retmsg, originator = session.player.user_id, reason='run_deferred_actions(%s)' % reason)
@@ -21463,6 +21465,9 @@ class GAMEAPI(resource.Resource):
             retmsg.append(["PLAYER_ALIAS_UPDATE", session.player.alias])
             retmsg.append(["PLAYER_TITLES_UPDATE", session.player.title])
             retmsg.append(["PLAYER_CACHE_UPDATE", [self.get_player_cache_props(session.user, session.player, session.alliance_id_cache)]])
+
+        end_time = time.time()
+        admin_stats.record_latency('run_deferred_actions', end_time - start_time)
 
     def complete_deferred_request(self, request, session, retmsg):
         # note: retmsg is ONLY used to convey error messages that happen prior to session set-up
