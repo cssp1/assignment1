@@ -9846,6 +9846,7 @@ function flush_message_queue(force, my_timeout) {
 var longpoll_error_count = 0;
 var longpoll_in_progress = false;
 function longpoll_send() {
+    if(SPINPUNCHGAME.shutdown_in_progress || client_state === client_states.TIMED_OUT) { return; }
     if(longpoll_in_progress) { return; }
     if(!gamedata['client']['enable_ajax_longpoll']) { return; }
     if(spin_game_use_websocket) { return; }
@@ -9858,7 +9859,6 @@ function longpoll_send() {
     longpoll_in_progress = true;
     goog.net.XhrIo.send(gameapi_url(), function(event) {
         longpoll_in_progress = false;
-        var repeat = (client_state != client_states.TIMED_OUT);
         if(!event.target.isSuccess()) {
             var code = event.target.getLastErrorCode();
             console.log('LONGPOLL error code '+code);
@@ -9878,9 +9878,7 @@ function longpoll_send() {
                 repeat = false; // longpoll_error_count += 1;
             }
         }
-        if(repeat) {
-            longpoll_send(); // send again
-        }
+        longpoll_send(); // send again
     }, 'POST', msg, {}, 1000*gamedata['client']['ajax_longpoll_timeout'], true);
 }
 
