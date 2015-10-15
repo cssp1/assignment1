@@ -26707,6 +26707,7 @@ class WS_GAMEAPI_Protocol(protocol.Protocol):
         except Exception:
             gamesite.exception_log.event(server_time, 'WS_GAMEAPI Exception: '+traceback.format_exc())
             self.transport.write(SpinJSON.dumps({'serial':-1, 'clock': server_time, 'msg': [["ERROR", "SERVER_EXCEPTION"]]}))
+            self.transport.loseConnection()
 
 class WS_GAMEAPI_Factory(protocol.Factory):
     def __init__(self, gameapi):
