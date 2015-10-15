@@ -16297,7 +16297,7 @@ class GAMEAPI(resource.Resource):
         # check for map violations
 
         if (not cannot_spy) and \
-           (not dest_base_id) and dest_player and dest_user and and (dest_player is not session.player) and (not dest_player.is_ai()) and \
+           (not dest_base_id) and dest_player and dest_user and (dest_player is not session.player) and (not dest_player.is_ai()) and \
            ((not new_ladder_state) and (not session.player.can_take_ladder_revenge(dest_player))):
             if session.player.is_legacy_pvp_player() and (not dest_player.is_legacy_pvp_player()):
                 if (not session.player.can_spy_despite_map_violation(session.user, dest_player.user_id, dest_user.social_id)):
