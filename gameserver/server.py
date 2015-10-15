@@ -13044,6 +13044,7 @@ class CONTROLAPI(resource.Resource):
     def handle_server_eval(self, request, expr = None):
         result = eval(expr)
         gamesite.exception_log.event(server_time, 'eval %s -> %s' % (expr, repr(result)))
+        return SpinJSON.dumps({'result': repr(result)}, newline=True)
     def handle_system_announcement(self, request, body = None):
         for session in iter_sessions():
             for channel in ('GLOBAL', 'ALLIANCE', 'REGION'):
@@ -25968,6 +25969,8 @@ class GameSite(server.Site):
         def __init__(self, *args, **kwargs):
             http.HTTPChannel.__init__(self, *args, **kwargs)
             self.close_connection_watchdog = None
+            self.last_request = None # for debugging only
+            self.last_request_time = -1
         def connectionMade(self):
             http.HTTPChannel.connectionMade(self)
             self.site.gotClient(self)
@@ -25977,6 +25980,7 @@ class GameSite(server.Site):
             if self.close_connection_watchdog:
                 self.close_connection_watchdog.cancel()
                 self.close_connection_watchdog = None
+            self.last_request = None # break circular reference
         def close_connection_aggressively(self, force = False):
             if force:
                 self.close_connection_watchdog = None
@@ -25987,6 +25991,18 @@ class GameSite(server.Site):
                 if not self.close_connection_watchdog:
                     # set watchdog timer to abort badly-behaved TCP connections
                     self.close_connection_watchdog = reactor.callLater(10.0, self.close_connection_aggressively, True)
+
+        def allContentReceived(self): # remember last request for debugging
+            self.last_request_time = int(time.time())
+            self.last_request = self.requests[-1] # save reference here, but have to wait until it parses request to repr()
+            return http.HTTPChannel.allContentReceived(self)
+
+        def __repr__(self):
+            if self.last_request_time > 0:
+                ago = server_time - self.last_request_time
+            else:
+                ago = -1
+            return 'GameProtocol (last request %ds ago: %r)' % (ago, self.last_request)
 
     displayTracebacks = False
     protocol = GameProtocol
@@ -26663,6 +26679,8 @@ class WS_GAMEAPI_Protocol(protocol.Protocol):
         self.peer_ip = None
         self.connected = False
         self.close_connection_watchdog = None
+        self.last_request_repr = '' # for debugging only
+        self.last_request_time = -1
 
     def connectionMade(self):
         self.peer_ip = str(self.transport.getPeer().host)
@@ -26675,6 +26693,7 @@ class WS_GAMEAPI_Protocol(protocol.Protocol):
             self.close_connection_watchdog.cancel()
             self.close_connection_watchdog = None
         gamesite.lostClient(self) # XXX not sure how to get a reference to the "site" here
+        self.last_request_repr = 'connectionLost'
 
     def close_connection_aggressively(self, force = False):
         if self.connected:
@@ -26692,6 +26711,8 @@ class WS_GAMEAPI_Protocol(protocol.Protocol):
         update_server_time()
         try:
             args_dict = SpinJSON.loads(data)
+            self.last_request_repr = repr(args_dict)[0:100] # for debugging only - text representation
+            self.last_request_time = server_time
             response = gamesite.gameapi.render_request(WSFakeRequest(self), args_dict, self.peer_ip, 'WS_GAMEAPI_Protocol')
             if response == twisted.web.server.NOT_DONE_YET:
                 pass
@@ -26708,6 +26729,13 @@ class WS_GAMEAPI_Protocol(protocol.Protocol):
             gamesite.exception_log.event(server_time, 'WS_GAMEAPI Exception: '+traceback.format_exc())
             self.transport.write(SpinJSON.dumps({'serial':-1, 'clock': server_time, 'msg': [["ERROR", "SERVER_EXCEPTION"]]}))
             self.transport.loseConnection()
+
+    def __repr__(self):
+        if self.last_request_time > 0:
+            ago = server_time - self.last_request_time
+        else:
+            ago = -1
+        return 'WS_GAMEAPI_Protocol (last request %ds ago: %s...)' % (ago, self.last_request_repr)
 
 class WS_GAMEAPI_Factory(protocol.Factory):
     def __init__(self, gameapi):
