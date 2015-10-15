@@ -16345,6 +16345,8 @@ class GAMEAPI(resource.Resource):
                                  'base_landlord_id': dest_user_id,
                                  'squad_id': SQUAD_IDS.BASE_DEFENDERS}
             new_defending_squads = {defending_feature['base_id']: defending_feature}
+            new_ladder_state = None
+            pre_attack = None
             session.release_pre_locks()
 
         session.clear_objects()
