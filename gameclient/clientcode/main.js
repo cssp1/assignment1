@@ -9717,7 +9717,7 @@ function flush_message_queue(force, my_timeout) {
         if(!the_websocket) {
             the_websocket = new SPWebsocket.SPWebsocket(gameapi_url(), ajax_config['message_timeout_hello'], ajax_config['message_timeout_gameplay']);
             var on_websocket_error = function(event) {
-                if(!the_websocket || SPINPUNCHGAME.shutdown_in_progress) { return; } // irrelevant
+                if(!the_websocket || SPINPUNCHGAME.shutdown_in_progress || client_state === client_states.TIMED_OUT) { return; } // irrelevant
                 the_websocket.close();
                 the_websocket = null;
 
@@ -42107,7 +42107,7 @@ function toggle_unit_selection(u) {
 
 function on_ajax_goog(event) {
     if(!event.target.isSuccess()) {
-        if(SPINPUNCHGAME.shutdown_in_progress) { return; } // irrelevant (?)
+        if(SPINPUNCHGAME.shutdown_in_progress || client_state === client_states.TIMED_OUT) { return; } // irrelevant (?)
 
         client_time = (new Date()).getTime()/1000;
         var code = event.target.getLastErrorCode();
