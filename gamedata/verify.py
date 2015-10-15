@@ -1967,7 +1967,7 @@ if 0: # test code
 
 def check_hives(hives):
     error = 0
-    max_region_pop = max(hives['region_pop'].values() + [1,])
+    max_region_pop = max(hives.get('region_pop',{}).values() + [1,])
     spawn_pop = spawn_pop_init()
 
     for spawn_name, spawn in [x for x in hives.iteritems() if x[0].startswith('spawn')]:
