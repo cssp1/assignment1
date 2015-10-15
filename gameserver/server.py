@@ -4592,17 +4592,13 @@ class SessionChange(object):
     # begin() returns a Deferred that will later fire with a list of arguments
     # to pass to change_session_complete()
 
-    def __init__(self, session, retmsg, dest_user_id, dest_base_id, dest_feature, is_ai, new_ladder_state, new_deployable_squads, new_defending_squads, delay, pre_attack):
+    def __init__(self, session, retmsg, dest_user_id, dest_base_id, new_ladder_state, delay, pre_attack):
         self.d = make_deferred('SessionChange') # deferred to fire upon completion
         self.session = session
         self.retmsg = retmsg
         self.dest_user_id = dest_user_id
         self.dest_base_id = dest_base_id
-        self.dest_feature = dest_feature
-        self.is_ai = is_ai
         self.new_ladder_state = new_ladder_state
-        self.new_deployable_squads = new_deployable_squads
-        self.new_defending_squads = new_defending_squads
         self.delay = delay
         self.pre_attack = pre_attack
 
@@ -4624,6 +4620,23 @@ class SessionChange(object):
         reactor.callLater(max(delay, 0), self.really_begin)
         return self.d
 
+    # note: these queries may be called before instantiation to check for existence
+    # before we start the full async session change
+
+    @classmethod
+    def default_deployable_squads(cls, player):
+        deployable_feature = {'base_id': player.squad_base_id(SQUAD_IDS.BASE_DEFENDERS),
+                              'base_landlord_id': player.user_id,
+                              'squad_id': SQUAD_IDS.BASE_DEFENDERS}
+        return {deployable_feature['base_id']: deployable_feature}
+
+    @classmethod
+    def default_defending_squads(cls, dest_user_id):
+        defending_feature = {'base_id': 's%d_%d' % (dest_user_id, SQUAD_IDS.BASE_DEFENDERS),
+                             'base_landlord_id': dest_user_id,
+                             'squad_id': SQUAD_IDS.BASE_DEFENDERS}
+        return {defending_feature['base_id']: defending_feature}
+
 class SessionChangeHome(SessionChange): # simple case for going back to your own home
     def __init__(self, *args):
         SessionChange.__init__(self, *args)
@@ -4631,9 +4644,12 @@ class SessionChangeHome(SessionChange): # simple case for going back to your own
 
     def really_begin(self):
         self.d.callback([self.session, self.retmsg, self.dest_user_id, self.session.user, self.session.player,
-                         None, None, self.new_ladder_state, self.new_deployable_squads, self.new_defending_squads, self.pre_attack])
+                         None, None, self.new_ladder_state,
+                         self.default_deployable_squads(self.session.player),
+                         self.default_defending_squads(self.dest_user_id),
+                         self.pre_attack])
 
-class SessionChangeOld(SessionChange): # legacy path
+class SessionChangeOld(SessionChange): # non-map path
     def __init__(self, *args):
         SessionChange.__init__(self, *args)
         assert self.dest_user_id
@@ -4642,7 +4658,7 @@ class SessionChangeOld(SessionChange): # legacy path
         self.dest_user = None
         self.got_player = False
         self.got_user = False
-
+        self.is_ai = is_ai_user_id_range(self.dest_user_id)
     def really_begin(self):
         if self.is_ai:
             # check for AI instances first, then fall back to regular player_table
@@ -4690,13 +4706,15 @@ class SessionChangeOld(SessionChange): # legacy path
                 self.dest_player.developer = self.dest_user.developer
             self.dest_player.migrate_proxy()
         self.d.callback([self.session, self.retmsg, self.dest_user_id, self.dest_user, self.dest_player,
-                         None, None, self.new_ladder_state, self.new_deployable_squads, self.new_defending_squads, self.pre_attack])
+                         None, None, self.new_ladder_state,
+                         self.default_deployable_squads(self.session.player),
+                         self.default_defending_squads(self.dest_user_id),
+                         self.pre_attack])
 
 class SessionChangeNew(SessionChange): # new basedb path
     def __init__(self, *args):
         SessionChange.__init__(self, *args)
         assert not self.dest_user_id
-        assert not self.is_ai
         assert self.dest_base_id
         self.dest_base_pre = None
         self.dest_base = None
@@ -4705,7 +4723,135 @@ class SessionChangeNew(SessionChange): # new basedb path
         self.got_base = False
         self.got_player = False
         self.got_user = False
+        self.new_defending_squads = None
+        self.new_deployable_squads = None
+
+    @classmethod
+    def query_dest_feature(cls, player, dest_base_id):
+        assert gamesite.nosql_client and player.home_region # map path
+        dest_feature = gamesite.nosql_client.get_map_feature_by_base_id(player.home_region, dest_base_id, reason='change_session(query_dest_feature)')
+        if (not dest_feature) or \
+           (('base_map_path' in dest_feature) and (dest_feature['base_map_path'][-1]['eta']>server_time)) or \
+           (dest_feature['base_type'] not in ('hive', 'quarry', 'home', 'squad')) or \
+           (dest_feature['base_type'] == 'squad' and not player.squad_combat_enabled()) or \
+           (dest_feature['base_type'] == 'home' and not player.map_home_combat_enabled()):
+            return None
+        return dest_feature
+
+    @classmethod
+    def query_deployable_squads(cls, player, dest_feature):
+        assert gamesite.nosql_client and player.home_region and dest_feature # map path
+        new_deployable_squads = {}
+
+        if dest_feature['base_landlord_id'] != player.user_id:
+            squad_features = list(gamesite.nosql_client.get_map_features_by_landlord_and_type(player.home_region, player.user_id, 'squad', reason='change_session(query_deployable_squads)'))
+
+            for squad_feature in squad_features:
+                if ('base_map_path' in squad_feature) and (squad_feature['base_map_path'][-1]['eta'] > server_time): continue # squad not arrived yet
+                if squad_feature.get('LOCK_STATE',0) > 0 and \
+                   squad_feature.get('LOCK_OWNER',-1) != player.user_id:
+#                           ((not session.viewing_squad_locks) or (SpinDB.base_lock_id(player.home_region, player.squad_base_id(squad_id)) not in session.viewing_squad_locks)):
+                    continue # squad is already locked
+                if hex_distance(squad_feature['base_map_loc'], dest_feature['base_map_loc']) == 1: # note: don't take squads on top of the target
+                    squad_id = squad_feature['squad_id'] = int(squad_feature['base_id'].split('_')[1])
+                    if str(squad_id) in player.squads:
+                        new_deployable_squads[squad_feature['base_id']] = squad_feature
+
+            if hex_distance(dest_feature['base_map_loc'], player.my_home.base_map_loc) == 1:
+                # battle is taking place next to home base - allow deployment of squads that are at home
+                for squad_data in player.squads.itervalues():
+                    if ((SQUAD_IDS.is_mobile_squad_id(squad_data['id']) or gamedata['territory']['base_defenders_can_attack_neighbors']) and \
+                        (not player.squad_is_deployed(squad_data['id']))):
+                        squad_feature = {'base_id': player.squad_base_id(squad_data['id']),
+                                         'base_landlord_id': player.user_id, 'squad_id': squad_data['id']}
+                        new_deployable_squads[squad_feature['base_id']] = squad_feature
+
+        return new_deployable_squads
+
+    @classmethod
+    def query_defending_squads(cls, player, dest_feature, dest_user_id):
+        assert gamesite.nosql_client and player.home_region and dest_feature # map path
+
+        if dest_feature['base_type'] == 'home':
+            defending_feature = {'base_id': 's%d_%d' % (dest_feature['base_landlord_id'], SQUAD_IDS.BASE_DEFENDERS),
+                                 'base_landlord_id': dest_feature['base_landlord_id'],
+                                 'squad_id': SQUAD_IDS.BASE_DEFENDERS}
+            new_defending_squads = {defending_feature['base_id']: defending_feature}
+        elif dest_feature['base_type'] == 'squad':
+            new_defending_squads = {dest_feature['base_id']: {'base_id': dest_feature['base_id'],
+                                                              'base_landlord_id': dest_feature['base_landlord_id'],
+                                                              'squad_id': int(dest_feature['base_id'].split('_')[1])}}
+        elif dest_feature['base_type'] == 'quarry':
+            # find guard squad(s)
+            new_defending_squads = {}
+            defense_features = [x for x in gamesite.nosql_client.get_map_features_by_loc(player.home_region, dest_feature['base_map_loc'], reason='change_session(guards)') if x.get('base_type',None)=='squad']
+
+            for squad_feature in defense_features:
+                if ('base_map_path' in squad_feature) and (squad_feature['base_map_path'][-1]['eta'] > server_time):
+                    continue # squad has not arrived at its destination yet
+                if squad_feature['base_landlord_id'] != dest_feature['base_landlord_id']:
+                    # "defending" squad, but it's owned by someone other than the quarry owner
+                    # this can happen via race condition where the old quarry owner had a squad on the way to the quarry (or left over due to undeployable units hanging around),
+                    # but then it got attacked and taken over before it arrives
+                    gamesite.exception_log.event(server_time, 'quarry %s (owner %d) has foreign squad %s (owner %d) at same location - recalling it back to base' % \
+                                                 (dest_feature['base_id'], dest_feature['base_landlord_id'], squad_feature['base_id'], squad_feature['base_landlord_id']))
+                    gamesite.nosql_client.drop_map_feature(player.home_region, squad_feature['base_id'], originator = player.user_id, reason='visit_quarry_guard_race_cleanup')
+                    continue
+                squad_id = int(squad_feature['base_id'].split('_')[1])
+                squad_feature['squad_id'] = squad_id
+                new_defending_squads[squad_feature['base_id']] = squad_feature
+        else:
+            new_defending_squads = {} # hive
+
+        return new_defending_squads
+
     def really_begin(self):
+
+        # query for target feature (to verify type and location)
+        dest_feature = self.query_dest_feature(self.session.player, self.dest_base_id)
+        if not dest_feature:
+            if gamedata['server'].get('log_nosql',0) < 2 and self.dest_base_id[0]=='s':
+                pass # do not bother logging failed attempts to spy on squads that have moved
+            else:
+                gamesite.exception_log.event(server_time, 'NoSQL spy error: player %d dest_base_id %s: result %s' % (self.session.player.user_id, self.dest_base_id, repr(dest_feature)))
+            self.retmsg.append(["ERROR", "CANNOT_SPY_BASE_NOT_FOUND", self.dest_base_id, 'change_session'])
+            self.d.callback(None) # fail now
+            return
+
+
+        # query for attacker's deployable squads
+        self.new_deployable_squads = self.query_deployable_squads(self.session.player, dest_feature)
+        if dest_feature and len(self.new_deployable_squads) < 1 and dest_feature['base_landlord_id'] != self.session.player.user_id and \
+           hex_distance(dest_feature['base_map_loc'], self.session.player.my_home.base_map_loc) != 1:
+            # no squads in range, cannot spy on hostile base
+            self.retmsg.append(["ERROR", "CANNOT_SPY_NO_NEARBY_SQUADS"])
+            self.d.callback(None) # fail now
+            return
+
+        # check for defending squads
+        self.new_defending_squads = self.query_defending_squads(self.session.player, dest_feature, self.dest_user_id)
+
+        if self.pre_attack and dest_feature and dest_feature['base_type'] == 'squad' and \
+           (dest_feature['base_landlord_id'] != self.session.player.user_id):
+            # attempt to lock the destination squad immediately,
+            # to reduce the time window for the defender to manipulate it before the player can attack
+            state = gamesite.nosql_client.map_feature_lock_acquire(self.session.player.home_region, self.dest_base_id, self.session.player.user_id, reason='VISIT_BASE2_pre_attack')
+            if state != Player.LockState.being_attacked:
+                # try to figure out more specifically why we didn't get the lock
+                if dest_feature.get('LOCK_OWNER',-1) == dest_feature['base_landlord_id']:
+                    err = "CANNOT_ATTACK_THEIR_SQUAD_OFFENSE"
+                elif dest_feature.get('LOCK_OWNER',-1) > 0:
+                    err = "CANNOT_ATTACK_THEIR_SQUAD_DEFENSE"
+                else:
+                    err = "CANNOT_ATTACK_THEIR_SQUAD_MOVED" # probably can't get here (due to the dest_feature check above), but just in case
+                self.retmsg.append(["ERROR", err, "VISIT_BASE2_pre_attack"])
+                self.d.callback(None) # abort the spy attempt
+                return
+
+            # record the fact that we're now holding the lock
+            # note that we MUST proceed with the attack after spying completes (or fails), or else this could open exploits where you hold a lock on a hostile squad forever
+            self.session.pre_locks.add(SpinDB.base_lock_id(self.session.player.home_region, self.dest_base_id))
+
         if self.dest_base_id[0] == 'h':
             # handle home bases specially, using an ordinary playerdb lookup
             self.dest_user_id = int(self.dest_base_id[1:])
@@ -4719,12 +4865,12 @@ class SessionChangeNew(SessionChange): # new basedb path
             # in this case, there IS no destination base, need to create a virtual one on the fly to hold the defending squad
             self.got_base = True
             self.dest_base = Base(self.session.player.home_region, self.dest_base_id, self.dest_user_id, 'squad')
-            if self.dest_feature:
-                if 'base_map_loc' in self.dest_feature:
-                    self.dest_base.base_map_loc = self.dest_feature['base_map_loc']
+            if dest_feature:
+                if 'base_map_loc' in dest_feature:
+                    self.dest_base.base_map_loc = dest_feature['base_map_loc']
                     self.dest_base.base_climate = Region(gamedata, self.session.player.home_region).read_climate_name(self.dest_base.base_map_loc)
                 # apply correct generation count to the virtual base
-                self.dest_base.base_generation = self.dest_feature.get('LOCK_GENERATION',-1)
+                self.dest_base.base_generation = dest_feature.get('LOCK_GENERATION',-1)
 
             self.dest_base.spawn_scenery(self.session.player, self.session.player.user_id + self.dest_squad_id)
 
@@ -4739,7 +4885,7 @@ class SessionChangeNew(SessionChange): # new basedb path
                 user_table.lookup_async(self.dest_user_id, self.user_cb, 'change_session')
 
         else:
-            base_table.lookup_async(self.session.player.home_region, self.dest_base_id, None, # do NOT send self.dest_feature, it's obsoleted by complete_attack!
+            base_table.lookup_async(self.session.player.home_region, self.dest_base_id, None, # do NOT send dest_feature, it's obsoleted by complete_attack!
                                     self.base_cb, 'change_session')
     def base_cb(self, success, base, landlord_id):
         self.got_base = True
@@ -16048,158 +16194,30 @@ class GAMEAPI(resource.Resource):
         assert not (dest_user_id and dest_base_id)
         pre_attack = client_props.get('pre_attack', None) if client_props else None
 
-        dest_feature = None
-
         if dest_user_id:
             # old inline path
-            ascdebug('change_session (old) %d -> %d' % (session.user.user_id, dest_user_id))
-
             if (not force) and (session.viewing_user is not None) and (session.viewing_user.user_id == dest_user_id) and (session.viewing_base is session.viewing_player.my_home) and (not session.has_attacked):
-                # already viewing this base
-                return session.start_async_request(defer.succeed(False))
-
-            deployable_feature = {'base_id': session.player.squad_base_id(SQUAD_IDS.BASE_DEFENDERS),
-                                  'base_landlord_id': session.player.user_id,
-                                  'squad_id': SQUAD_IDS.BASE_DEFENDERS}
-            new_deployable_squads = {deployable_feature['base_id']: deployable_feature}
-            defending_feature = {'base_id': 's%d_%d' % (dest_user_id, SQUAD_IDS.BASE_DEFENDERS),
-                                 'base_landlord_id': dest_user_id,
-                                 'squad_id': SQUAD_IDS.BASE_DEFENDERS}
-            new_defending_squads = {defending_feature['base_id']: defending_feature}
+                return session.start_async_request(defer.succeed(False)) # already viewing this base
         else:
             # new quarry path
-            ascdebug('change_session (new) %d:%s -> %s' % (session.user.user_id, session.viewing_base.base_id, dest_base_id))
+            assert gamesite.nosql_client and session.player.home_region
             if (not force) and (session.viewing_base.base_id == dest_base_id) and (not session.has_attacked):
-                return session.start_async_request(defer.succeed(False))
-
-            if gamesite.nosql_client and session.player.home_region:
-
-                # query for target feature (to verify type and location)
-                dest_feature = gamesite.nosql_client.get_map_feature_by_base_id(session.player.home_region, dest_base_id, reason='change_session(dest)')
-
-                if (not dest_feature) or \
-                   (('base_map_path' in dest_feature) and (dest_feature['base_map_path'][-1]['eta']>server_time)) or \
-                   (dest_feature['base_type'] not in ('hive', 'quarry', 'home', 'squad')) or \
-                   (dest_feature['base_type'] == 'squad' and not session.player.squad_combat_enabled()) or \
-                   (dest_feature['base_type'] == 'home' and not session.player.map_home_combat_enabled()):
-                    if gamedata['server'].get('log_nosql',0) < 2 and dest_base_id[0]=='s':
-                        pass # do not bother logging failed attempts to spy on squads that have moved
-                    else:
-                        gamesite.exception_log.event(server_time, 'NoSQL spy error: player %d dest_base_id %s: result %s' % (session.player.user_id, dest_base_id, repr(dest_feature)))
-                    retmsg.append(["ERROR", "CANNOT_SPY_BASE_NOT_FOUND", dest_base_id, 'change_session'])
-                    return session.start_async_request(defer.succeed(False))
-
-                # query for attacker's deployable squads
-                new_deployable_squads = {}
-                if dest_feature['base_landlord_id'] != session.player.user_id:
-                    squad_features = list(gamesite.nosql_client.get_map_features_by_landlord_and_type(session.player.home_region, session.player.user_id, 'squad', reason='change_session(deployable_squads)'))
-
-                    for squad_feature in squad_features:
-                        if ('base_map_path' in squad_feature) and (squad_feature['base_map_path'][-1]['eta'] > server_time): continue # squad not arrived yet
-                        if squad_feature.get('LOCK_STATE',0) > 0 and \
-                           squad_feature.get('LOCK_OWNER',-1) != session.player.user_id:
-#                           ((not session.viewing_squad_locks) or (SpinDB.base_lock_id(self.home_region, self.squad_base_id(squad_id)) not in session.viewing_squad_locks)):
-                            continue # squad is already locked
-                        if hex_distance(squad_feature['base_map_loc'], dest_feature['base_map_loc']) == 1: # note: don't take squads on top of the target
-                            squad_id = squad_feature['squad_id'] = int(squad_feature['base_id'].split('_')[1])
-                            if str(squad_id) in session.player.squads:
-                                new_deployable_squads[squad_feature['base_id']] = squad_feature
-
-                if hex_distance(dest_feature['base_map_loc'], session.player.my_home.base_map_loc) == 1:
-                    # battle is taking place next to home base - allow deployment of squads that are at home
-                    for squad_data in session.player.squads.itervalues():
-                        if ((SQUAD_IDS.is_mobile_squad_id(squad_data['id']) or gamedata['territory']['base_defenders_can_attack_neighbors']) and \
-                            (not session.player.squad_is_deployed(squad_data['id']))):
-                            squad_feature = {'base_id': session.player.squad_base_id(squad_data['id']),
-                                             'base_landlord_id': session.player.user_id, 'squad_id': squad_data['id']}
-                            new_deployable_squads[squad_feature['base_id']] = squad_feature
-
-                if len(new_deployable_squads) < 1 and dest_feature['base_landlord_id'] != session.player.user_id and \
-                   hex_distance(dest_feature['base_map_loc'], session.player.my_home.base_map_loc) != 1:
-                    # no squads in range, cannot spy on hostile base
-                    retmsg.append(["ERROR", "CANNOT_SPY_NO_NEARBY_SQUADS"])
-                    return session.start_async_request(defer.succeed(False))
-
-                # check for defending squads
-                if dest_feature['base_type'] == 'home':
-                    defending_feature = {'base_id': 's%d_%d' % (dest_feature['base_landlord_id'], SQUAD_IDS.BASE_DEFENDERS),
-                                         'base_landlord_id': dest_feature['base_landlord_id'],
-                                         'squad_id': SQUAD_IDS.BASE_DEFENDERS}
-                    new_defending_squads = {defending_feature['base_id']: defending_feature}
-                elif dest_feature['base_type'] == 'squad':
-                    new_defending_squads = {dest_feature['base_id']: {'base_id': dest_feature['base_id'],
-                                                                      'base_landlord_id': dest_feature['base_landlord_id'],
-                                                                      'squad_id': int(dest_feature['base_id'].split('_')[1])}}
-
-                    if pre_attack and (dest_feature['base_landlord_id'] != session.player.user_id):
-                        # attempt to lock the destination squad immediately, to reduce the time window for the defender to manipulate it before the player can attack
-                        state = gamesite.nosql_client.map_feature_lock_acquire(session.player.home_region, dest_base_id, session.player.user_id, reason='VISIT_BASE2_pre_attack')
-                        if state != Player.LockState.being_attacked:
-                            # try to figure out more specifically why we didn't get the lock
-                            if dest_feature.get('LOCK_OWNER',-1) == dest_feature['base_landlord_id']:
-                                err = "CANNOT_ATTACK_THEIR_SQUAD_OFFENSE"
-                            elif dest_feature.get('LOCK_OWNER',-1) > 0:
-                                err = "CANNOT_ATTACK_THEIR_SQUAD_DEFENSE"
-                            else:
-                                err = "CANNOT_ATTACK_THEIR_SQUAD_MOVED" # probably can't get here (due to the dest_feature check above), but just in case
-                            retmsg.append(["ERROR", err, "VISIT_BASE2_pre_attack"])
-                            # abort the spy attempt
-                            return session.start_async_request(defer.succeed(False))
-
-                        # record the fact that we're now holding the lock
-                        # note that we MUST proceed with the attack after spying completes (or fails), or else this could open exploits where you hold a lock on a hostile squad forever
-                        session.pre_locks.add(SpinDB.base_lock_id(session.player.home_region, dest_base_id))
-
-                elif dest_feature['base_type'] == 'quarry':
-                    # find guard squad(s)
-                    new_defending_squads = {}
-                    defense_features = [x for x in gamesite.nosql_client.get_map_features_by_loc(session.player.home_region, dest_feature['base_map_loc'], reason='change_session(guards)') if x.get('base_type',None)=='squad']
-
-                    for squad_feature in defense_features:
-                        if ('base_map_path' in squad_feature) and (squad_feature['base_map_path'][-1]['eta'] > server_time):
-                            continue # squad has not arrived at its destination yet
-                        if squad_feature['base_landlord_id'] != dest_feature['base_landlord_id']:
-                            # "defending" squad, but it's owned by someone other than the quarry owner
-                            # this can happen via race condition where the old quarry owner had a squad on the way to the quarry (or left over due to undeployable units hanging around),
-                            # but then it got attacked and taken over before it arrives
-                            gamesite.exception_log.event(server_time, 'quarry %s (owner %d) has foreign squad %s (owner %d) at same location - recalling it back to base' % \
-                                                         (dest_feature['base_id'], dest_feature['base_landlord_id'], squad_feature['base_id'], squad_feature['base_landlord_id']))
-                            gamesite.nosql_client.drop_map_feature(session.player.home_region, squad_feature['base_id'], originator = session.player.user_id, reason='visit_quarry_guard_race_cleanup')
-                            continue
-                        squad_id = int(squad_feature['base_id'].split('_')[1])
-                        squad_feature['squad_id'] = squad_id
-                        new_defending_squads[squad_feature['base_id']] = squad_feature
-                else:
-                    new_defending_squads = {} # hive
-
-                # XXXXXXXXXXX MUST move query for defending/deployable squads AFTER complete_attack to avoid ordering bugs
-                # a better way to do this is to have the client send base_map_loc and verify in change_session_complete
-                # XXX may become invalid after complete_attack()!
-                # dest_feature = None
-
-            else:
-                # legacy path
-                deployable_feature = {'base_id': session.player.squad_base_id(SQUAD_IDS.BASE_DEFENDERS),
-                                      'base_landlord_id': session.player.user_id,
-                                      'squad_id': SQUAD_IDS.BASE_DEFENDERS}
-                new_deployable_squads = {deployable_feature['base_id']: deployable_feature}
-                new_defending_squads = {}
+                return session.start_async_request(defer.succeed(False)) # already viewing this base
 
         if session.home_base and session.has_attacked:
             # reset daily attack timer
             session.player.last_daily_attack = server_time
             # do not do this from complete_attack, because that is called in the logout/relog path
 
-
         if dest_user_id == session.user.user_id:
             ascdebug('change_session (home) %d' % (session.user.user_id))
-            change = SessionChangeHome(session, retmsg, dest_user_id, dest_base_id, dest_feature, is_ai_user_id_range(dest_user_id), new_ladder_state, new_deployable_squads, new_defending_squads, delay, pre_attack)
+            change = SessionChangeHome(session, retmsg, dest_user_id, dest_base_id, new_ladder_state, delay, pre_attack)
         elif dest_user_id:
             ascdebug('change_session (old) %d -> %d' % (session.user.user_id, dest_user_id))
-            change = SessionChangeOld(session, retmsg, dest_user_id, dest_base_id, dest_feature, is_ai_user_id_range(dest_user_id), new_ladder_state, new_deployable_squads, new_defending_squads, delay, pre_attack)
+            change = SessionChangeOld(session, retmsg, dest_user_id, dest_base_id, new_ladder_state, delay, pre_attack)
         else:
             ascdebug('change_session (new) %d:%s -> %s' % (session.user.user_id, session.viewing_base.base_id, dest_base_id))
-            change = SessionChangeNew(session, retmsg, dest_user_id, dest_base_id, dest_feature, is_ai_user_id_range(dest_user_id), new_ladder_state, new_deployable_squads, new_defending_squads, delay, pre_attack)
+            change = SessionChangeNew(session, retmsg, dest_user_id, dest_base_id, new_ladder_state, delay, pre_attack)
 
 
         # it's cleaner to string everything together in one callback chain
@@ -16218,7 +16236,10 @@ class GAMEAPI(resource.Resource):
         master_d.addErrback(report_and_absorb_deferred_failure, session)
 
         master_d.addCallback(lambda _, change=change: change.begin())
-        master_d.addCallback(lambda args, self=self: self.change_session_complete(*args)) # note: receives the list of arguments to pass from change.d's callback
+        master_d.addCallback(lambda args, self=self:
+                             # note: receives the list of arguments to pass from change.d's callback
+                             # if args is None, that means the change attempt failed
+                             self.change_session_complete(*args) if args else (session.release_pre_locks() and None))
 
         # we DO care about exceptions inside change_session_complete(), since we need to release locks
         master_d.addErrback(report_and_reraise_deferred_failure, session)
