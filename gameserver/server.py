@@ -96,6 +96,8 @@ def soft_assert(x):
         gamesite.exception_log.event(server_time, 'soft assert fail: '+string.join(traceback.format_stack(), ''))
 
 def make_deferred(latency_tag): return TwistedLatency.InstrumentedDeferred(latency_tag)
+def deferred_is_finished(d):
+    return d.called and hasattr(d, 'result') and not isinstance(d.result, defer.Deferred)
 
 # increment value of d[key], assuming that the current amount is zero
 # if d[key] doesn't exist
@@ -21440,7 +21442,7 @@ class GAMEAPI(resource.Resource):
 
                         if go_async:
                             assert isinstance(go_async, defer.Deferred)
-                            if not go_async.called:
+                            if not deferred_is_finished(go_async):
                                 # go asynchronous, breaking out of message processing here
                                 if (not session.logout_in_progress) and (go_async not in session.async_ds):
                                     gamesite.exception_log.event(server_time, 'handle_message_guts did not install async_d: %s' % (latency_tag))
@@ -22403,12 +22405,12 @@ class GAMEAPI(resource.Resource):
     # new asynchronous logout
     # it should be safe to call this function from any context
     def log_out_async(self, session, method, force = False):
-        ascdebug('log_out_async %d' % (session.user.user_id))
 
         if session.logout_in_progress:
-            if session.logout_d.called:
+            if deferred_is_finished(session.logout_d):
+                ascdebug('log_out_async (already finished) %d' % (session.user.user_id))
                 # session has ALREADY finished logging out - this is a dangling reference!
-                return defer.succeed(True)
+                return defer.succeed(True) # probably OK to return session.logout_d, but that might have exceptions on it
             elif force:
                 # do not wait for complete_attack(), just kill the session
                 gamesite.exception_log.event(server_time, 'log_out_async: force-dropping broken session for player %d - possible data loss!' % (session.user.user_id))
@@ -22417,7 +22419,10 @@ class GAMEAPI(resource.Resource):
                 reactor.callLater(0, session.logout_in_progress.try_finish)
                 return defer.succeed(True)
             else:
+                ascdebug('log_out_async (waiting) %d' % (session.user.user_id))
                 return session.logout_d
+
+        ascdebug('log_out_async %d' % (session.user.user_id))
 
         session.logout_in_progress = Session.AsyncLogout(session)
         session.logout_d = make_deferred('log_out_async')
