@@ -13086,10 +13086,14 @@ class CONTROLAPI(resource.Resource):
                     if val.async:
                         assert isinstance(val.async, defer.Deferred) # sanity check
 
-                        val.async.addErrback(lambda fail, session=session, method_name=method_name, args=args:
-                                             gamesite.exception_log.event(server_time, 'CustomerSupport online async exception player %d method %r args %r:\n%s' % \
-                                                                          (session.user.user_id, method_name, args, fail.getTraceback()))
-                                             or CustomerSupport.ReturnValue(error = fail.getTraceback())) # turn exception into a regular result
+                        def online_error(fail, session, method_name, args):
+                            gamesite.exception_log.event(server_time, 'CustomerSupport online async exception player %d method %r args %r:\n%s' % \
+                                                         (session.user.user_id, method_name, args, fail.getTraceback()))
+                            # turn exception into a regular result
+                            return CustomerSupport.ReturnValue(error = fail.getTraceback())
+
+                        val.async.addErrback(online_error, session, method_name, args)
+
                         session.start_async_request(val.async)
                         val.async.addCallback(lambda async_result, request=request: SpinHTTP.complete_deferred_request(async_result.as_body(), request))
 
@@ -13102,11 +13106,15 @@ class CONTROLAPI(resource.Resource):
                         SpinHTTP.complete_deferred_request(ret, request)
 
                 d = make_deferred('CustomerSupport:'+method_name+'(online)')
+
+                # if player logged out, this is going to fail
+                def handle_online_race(request, fail):
+                    fail.trap(Session.AlreadyLoggedOut)
+                    SpinHTTP.complete_deferred_request(CustomerSupport.ReturnValue(error = 'Race condition: Player just logged out. Please try again.').as_body(), request)
+
                 d.addCallbacks(functools.partial(handle_online, request, session, handler, method_name, args),
-                               # if player logged out, this is going to fail
-                               lambda fail, request=request:
-                               fail.trap(Session.AlreadyLoggedOut) and \
-                               SpinHTTP.complete_deferred_request(CustomerSupport.ReturnValue(error = 'Race condition: Player just logged out. Please try again.').as_body(), request))
+                               functools.partial(handle_online_race, request))
+
                 session.after_async_request(d)
 
             else:
@@ -16261,13 +16269,11 @@ class GAMEAPI(resource.Resource):
         master_d.addCallback(lambda args, self=self:
                              # note: receives the list of arguments to pass from change.d's callback
                              # if args is None, that means the change attempt failed
-                             self.change_session_complete(*args) if args else (session.release_pre_locks() and None))
+                             self.change_session_complete(*args) if args else session.release_pre_locks())
 
         # we DO care about exceptions inside change_session_complete(), since we need to release locks
         master_d.addErrback(report_and_reraise_deferred_failure, session)
-        master_d.addErrback(lambda err, session=session:
-                            session.release_pre_locks() and \
-                            None) # now swallow the exception
+        master_d.addErrback(lambda err, session=session: session.release_pre_locks()) # now swallow the exception
 
         master_d.addBoth(set_progress_and_pass_result, session, False) # OK
 
@@ -22428,7 +22434,10 @@ class GAMEAPI(resource.Resource):
         session.logout_d = make_deferred('log_out_async')
 
         # we're going to get this exception from complete_async_request if after_async_request() waits, so absorb it
-        session.logout_d.addErrback(lambda fail: fail.trap(Session.AlreadyLoggedOut) and None)
+        def absorb_logout_exception(fail):
+            fail.trap(Session.AlreadyLoggedOut)
+            return None
+        session.logout_d.addErrback(absorb_logout_exception)
 
         # if an attack was going on, clean it up
         session.logout_d.addCallback(lambda _, self=self,session=session:
@@ -26200,11 +26209,11 @@ class GameSite(server.Site):
 
         d = self.stop_listening()
         d.addCallback(lambda _, self=self: self.stop_all_sessions())
-        d.addErrback(lambda err, self=self: self.exception_log.event(server_time, 'stop_all_sessions() exception: %s' % err.getTraceback()) and None)
+        d.addErrback(lambda err, self=self: self.exception_log.event(server_time, 'stop_all_sessions() exception: %s' % err.getTraceback()))
         d.addCallback(lambda _, self=self: self.stop_all_clients())
-        d.addErrback(lambda err, self=self: self.exception_log.event(server_time, 'stop_all_clients() exception: %s' % err.getTraceback()) and None)
+        d.addErrback(lambda err, self=self: self.exception_log.event(server_time, 'stop_all_clients() exception: %s' % err.getTraceback()))
         d.addCallback(lambda _: io_system.shutdown())
-        d.addErrback(lambda err, self=self: self.exception_log.event(server_time, 'io_system.shutdown() exception: %s' % err.getTraceback()) and None)
+        d.addErrback(lambda err, self=self: self.exception_log.event(server_time, 'io_system.shutdown() exception: %s' % err.getTraceback()))
         # send a final server status update when we're finished
         d.addCallback(lambda _, self=self: self.nosql_client.server_status_update(spin_server_name, None, reason='shutdown'))
         return d
@@ -26575,9 +26584,11 @@ class GameSite(server.Site):
                 def force_attack_end(self, session):
                     if session.has_attacked:
                         return self.gameapi.change_session(session, session.outgoing_messages, dest_user_id = session.user.user_id, force = True)
-
+                def ignore_logout_race(fail):
+                    fail.trap(Session.AlreadyLoggedOut)
+                    return None
                 d.addCallbacks(lambda _, self=self, session=session: force_attack_end(self, session),
-                               lambda fail: fail.trap(Session.AlreadyLoggedOut) and None) # ignore logout race
+                               ignore_logout_race)
                 session.after_async_request(d)
 
             if (not session.sprobe_in_progress):
