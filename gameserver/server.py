@@ -21291,6 +21291,7 @@ class GAMEAPI(resource.Resource):
             gamesite.exception_log.event(server_time, 'GAMEAPI Exception (user '+suser_id+'): '+text)
 
             # return a formatted error for the client
+            http_request.setHeader('Connection', 'close') # stop keepalive
             error_response = SpinJSON.dumps({'serial':-1, 'clock': server_time, 'msg': [["ERROR", "SERVER_EXCEPTION"]]})
 
         return error_response or response
@@ -21318,6 +21319,7 @@ class GAMEAPI(resource.Resource):
                     gamesite.exception_log.event(server_time, 'bad client message! ' + repr(http_request) + ' args ' + repr(args_dict) + ' from '+repr(client_ip) + ' User-Agent "'+ user_agent +'" Exception:\n' + traceback.format_exc())
 
         if arg is None:
+            http_request.setHeader('Connection', 'close') # stop keepalive
             return SpinJSON.dumps({'serial':-1, 'clock': server_time, 'msg': [["ERROR","UNKNOWN_SESSION"]]})
 
         session_id = args_dict["session"]
@@ -21347,11 +21349,13 @@ class GAMEAPI(resource.Resource):
                 return server.NOT_DONE_YET
 
             # some kind of error happened
+            http_request.setHeader('Connection', 'close') # stop keepalive
             return SpinJSON.dumps({'serial':-1, 'clock': server_time, 'msg': retmsg})
 
         else:
             session = get_session_by_session_id(session_id)
             if not session:
+                http_request.setHeader('Connection', 'close') # stop keepalive
                 return SpinJSON.dumps({'serial':-1, 'clock': server_time, 'msg': [["ERROR", "UNKNOWN_SESSION"]]})
 
             # after this point, session is guaranteed to be valid
@@ -21365,6 +21369,7 @@ class GAMEAPI(resource.Resource):
 
             # compare serial number of incoming message vs. the next expected serial number
             if (serial < session.incoming_serial):
+                http_request.setHeader('Connection', 'close') # stop keepalive
                 return SpinJSON.dumps({'serial':-1, 'clock': server_time, 'msg': [["ERROR", "SERVER_PROTOCOL"]]})
 
             if len(session.message_buffer) >= gamedata['server']['session_message_buffer']:
@@ -21373,6 +21378,7 @@ class GAMEAPI(resource.Resource):
                     session.lagged_out = True
                     metric_event_coded(session.user.user_id, '0955_lagged_out', {'method':str(len(session.message_buffer)),
                                                                                  'country': session.user.country })
+                http_request.setHeader('Connection', 'close') # stop keepalive
                 return SpinJSON.dumps({'serial':-1, 'clock': server_time, 'msg': [["ERROR", "TOO_LAGGED"]]})
 
         session.message_buffer.append([serial, arg])
@@ -21542,6 +21548,7 @@ class GAMEAPI(resource.Resource):
             assert request
             # DO pay attention to retmsg here
             r = SpinJSON.dumps({'serial':-1, 'clock': server_time, 'msg': retmsg})
+            request.setHeader('Connection', 'close') # stop keepalive
 
         else:
             # note: IGNORE retmsg here - all traffic is on session.outgoing_messages
@@ -26681,10 +26688,17 @@ class GameSite(server.Site):
 class WSFakeRequest(object):
     def __init__(self, proto):
         self.proto = proto
+        self.want_close = False
+    def setHeader(self, key, val):
+        # detect removal of keepalive header to signal that we should close after next write
+        if key == 'Connection' and val == 'close':
+            self.want_close = True
     def write(self, buf):
         if self.proto.connected:
             self.proto.transport.write(buf)
-    def finish(self): pass
+    def finish(self):
+        if self.want_close:
+            self.proto.close_connection_aggressively()
     def close_connection_aggressively(self): return self.proto.close_connection_aggressively()
 
 class WS_GAMEAPI_Protocol(protocol.Protocol):

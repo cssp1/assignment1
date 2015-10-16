@@ -1827,6 +1827,7 @@ class GameProxy(proxy.ReverseProxyResource):
             session = self.session_emulate(db_client.session_get_by_session_id(session_id, reason=self.path))
             if not session:
                 if verbose(): print 'GAMEAPI proxy error: session not recognized', session_id
+                request.setHeader('Connection', 'close')
                 return SpinJSON.dumps({'serial':-1, 'clock': proxy_time, 'msg': [["ERROR", "UNKNOWN_SESSION"]]})
 
             if 'proxy_logout' in request.args:
