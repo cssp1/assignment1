@@ -23062,7 +23062,7 @@ class GAMEAPI(resource.Resource):
             if d:
                 # let's try doing this asynchronously to the other session traffic...
                 d.addCallback(lambda result, _session = session, _tag = tag: \
-                              _session.send([["XSOLLA_GET_TOKEN_RESULT", _tag, result]], flush_now = True))
+                              _session.send([["XSOLLA_GET_TOKEN_RESULT", _tag, result]], flush_now = True) if (not _session.logout_in_progress) else None)
             return # do not go async
 
         # pay with gamebucks
@@ -24110,6 +24110,11 @@ class GAMEAPI(resource.Resource):
 
                 # launch next query in chain
                 def next_query(master_d, session, retmsg, retmsg_tag, result, user_ids, sql_query_i_addrs, batch, bdict, rdict, tag_list, i, last_result):
+                    if session.logout_in_progress:
+                        # session went away, abort
+                        master_d.callback(True)
+                        return
+
                     if i > 0: # remember result from previous successful query
                         rdict[tag_list[i-1]] = last_result
 
@@ -24120,31 +24125,31 @@ class GAMEAPI(resource.Resource):
                             for j in xrange(len(sql_query_i_addrs)):
                                 result[u][sql_query_i_addrs[j][0]] = sql_result[u][j]
                         # complete async request
-                        retmsg.append(["QUERY_PLAYER_SCORES_RESULT", user_ids, result, retmsg_tag, None])
-                        if master_d: master_d.callback(True)
+                        session.send([["QUERY_PLAYER_SCORES_RESULT", user_ids, result, retmsg_tag, None]], flush_now = True)
+                        master_d.callback(True)
                         return
 
                     def on_error(master_d, session, retmsg, retmsg_tag, result, user_ids, fail):
                         # complete async request, returning the incomplete results
-                        #retmsg.append(["ERROR", "SCORES_OFFLINE"])
-                        retmsg.append(["QUERY_PLAYER_SCORES_RESULT", user_ids, result, retmsg_tag, 'SCORES_OFFLINE'])
-                        if master_d: master_d.callback(True)
+                        if not session.logout_in_progress:
+                            session.send([["QUERY_PLAYER_SCORES_RESULT", user_ids, result, retmsg_tag, 'SCORES_OFFLINE']], flush_now = True)
+                        master_d.callback(True)
 
                     if not gamesite.sql_scores2_client:
-                        on_error(None, session, retmsg, retmsg_tag, result, user_ids, Exception('Scores2 SQL client is down'))
+                        on_error(master_d, session, retmsg, retmsg_tag, result, user_ids, Exception('Scores2 SQL client is down'))
                         return # not async
 
                     qs, qs_args = bdict[tag_list[i]]
                     d = gamesite.sql_scores2_client.sql_client.runQuery(qs, qs_args) # "SELECT pg_sleep(2); "+qs for latency testing
                     if d is None:
-                        on_error(None, session, retmsg, retmsg_tag, result, user_ids, Exception('Scores2 SQL server is down'))
+                        on_error(master_d, session, retmsg, retmsg_tag, result, user_ids, Exception('Scores2 SQL server is down'))
                         return # not async
 
                     d.addCallbacks(functools.partial(next_query, master_d, session, retmsg, retmsg_tag, result, user_ids, sql_query_i_addrs, batch, bdict, rdict, tag_list, i+1),
                                    functools.partial(on_error, master_d, session, retmsg, retmsg_tag, result, user_ids))
 
                 reactor.callLater(0, functools.partial(next_query, master_d, session, retmsg, tag, result, user_ids, sql_query_i_addrs, batch, bdict, rdict, tag_list, -1, None))
-                return session.start_async_request(master_d) # go async
+                return None # note: asynchronous with other session traffic! - not session.start_async_request(master_d)
 
             elif sql_query_i_addrs: # client asked for historical scores, but we cannot provide them
                 offline_msg = 'SCORES_OFFLINE'
