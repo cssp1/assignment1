@@ -15,9 +15,9 @@
     },
 
     "manufacture_categories": {
-        "rovers": { "singular": "Infantry", "plural": "Infantry" },
-        "transports": { "singular": "Armor", "plural": "Armor" },
-        "starcraft": { "singular": "Aircraft", "plural": "Aircraft" }
+        "rovers": { "singular": "Infantry", "plural": "Infantry", "ui_color": [1,1,0] },
+        "transports": { "singular": "Armor", "plural": "Armor", "ui_color": [1,0.5,0] },
+        "starcraft": { "singular": "Aircraft", "plural": "Aircraft", "ui_color": [0,0.5,1] }
     },
 
     // this helps drive the GUI research dialogs

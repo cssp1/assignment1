@@ -1865,6 +1865,50 @@ RegionMap.RegionMap.prototype.draw_hovercell = function() {
     SPUI.ctx.stroke();
 };
 
+RegionMap.RegionMap.prototype.draw_feature_strength = function(feature, wxy) {
+    // query stats
+    var unit_strength_by_manuf_category = null;
+    if(feature['base_landlord_id'] === session.user_id && feature['base_type'] === 'squad') {
+        // horrible temporary deep query
+        unit_strength_by_manuf_category = {};
+        var squad_id = parseInt(feature['base_id'].split('_')[1], 10);
+        goog.object.forEach(player.my_army, function(obj, obj_id) {
+            if(obj['squad_id'] === squad_id) {
+                var spec = gamedata['units'][obj['spec']];
+                var catname = spec['manufacture_category'];
+                var cur_max = army_unit_hp(obj);
+                var space = army_unit_space(obj);
+                var contribution = space * (cur_max[0]/cur_max[1]); // scale contribution by unit health
+                unit_strength_by_manuf_category[catname] = (unit_strength_by_manuf_category[catname]||0) + contribution;
+            }
+        });
+    }
+    if(!unit_strength_by_manuf_category) { return; }
+    var n_categories = goog.object.getCount(gamedata['strings']['manufacture_categories']);
+    // max contribution = full squad of largest possible space
+    var provides_squad_space = gamedata['buildings'][gamedata['squad_building']]['provides_squad_space'];
+    var max_contribution = provides_squad_space[provides_squad_space.length-1];
+    var total_width = 40;
+    var spacing = 2;
+    var bar_width = Math.floor(total_width/n_categories) - spacing;
+    var max_height = 60;
+    var i = 0;
+    goog.object.forEach(gamedata['strings']['manufacture_categories'], function(catdata, catname) {
+        var height = (unit_strength_by_manuf_category[catname]||0)/max_contribution * max_height;
+        if(height > 0) {
+            var xy = [wxy[0] + i * (bar_width+spacing), wxy[1] - height];
+            var wh = [bar_width, height];
+            if(SPFX.detail >= 2) { // drop shadow
+                SPFX.ctx.fillStyle = 'rgba(0,0,0,1)';
+                SPUI.ctx.fillRect(xy[0]+1/this.zoom, xy[1]+1/this.zoom, wh[0], wh[1]);
+            }
+            SPUI.ctx.fillStyle = SPUI.make_colorv(catdata['ui_color']).str();
+            SPUI.ctx.fillRect(xy[0], xy[1], wh[0], wh[1]);
+        }
+        i += 1;
+    }, this);
+};
+
 RegionMap.RegionMap.prototype.draw_feature_label = function(wxy, str, color_str, size) {
     var has_state = false;
     if(size != 1) {
@@ -2026,6 +2070,7 @@ RegionMap.RegionMap.prototype.draw_feature = function(feature) {
     if(1) {
         var base_xy = this.cell_to_field(loc);
         var moving = this.region.feature_is_moving(feature);
+        var moving_xy = null; // only valid if moving is true
         var selected = (this.selection_feature === feature); // (this.selection_loc && this.selection_loc[0] === loc[0] && this.selection_loc[1] === loc[1]);
 
         if(gamedata['territory']['clip_features']) { // clip for speed
@@ -2133,7 +2178,7 @@ RegionMap.RegionMap.prototype.draw_feature = function(feature) {
                     var last_xy = this.cell_to_field(last_next_progress[0]);
                     var next_xy = this.cell_to_field(last_next_progress[1]);
                     var delta = vec_sub(next_xy, last_xy);
-                    var moving_xy = vec_add(last_xy, vec_scale(last_next_progress[2], delta));
+                    moving_xy = vec_add(last_xy, vec_scale(last_next_progress[2], delta));
 
                     if(owned) {
                         // draw movement path
@@ -2219,7 +2264,7 @@ RegionMap.RegionMap.prototype.draw_feature = function(feature) {
                 GameArt.assets['region_tiles'].states[icon_type].draw_topleft([base_xy[0]-cover[0], base_xy[1]-cover[1]-2], 0, 0);
             }
 
-            var show_bubble = false, show_padlock = false, show_token_icon = false;
+            var show_bubble = false, show_padlock = false, show_token_icon = false, show_strength = false;
             var show_trophy = this.winnable_ladder_points(feature);
 
             if(feature['LOCK_STATE'] && feature['LOCK_OWNER'] == feature['base_landlord_id'] && (feature['base_landlord_id'] != session.user_id ||
@@ -2250,6 +2295,10 @@ RegionMap.RegionMap.prototype.draw_feature = function(feature) {
                    !read_predicate(gamedata['hives_client']['templates'][feature['base_template']]['activation']).is_satisfied(player,null)) {
                     show_padlock = true; // hive that player cannot attack
                 }
+            }
+
+            if(gamedata['territory']['show_feature_strength']) {
+                show_strength = true;
             }
 
             if(show_token_icon && this.token_icon) {
@@ -2314,6 +2363,11 @@ RegionMap.RegionMap.prototype.draw_feature = function(feature) {
             if(busy_asset) {
                 var offset = (busy_asset == 'map_flame' ? [0.5,0.15] : [0.5,0.4]);
                 GameArt.assets[busy_asset].states['normal'].draw(vec_add(base_xy, vec_mul(offset,gamedata['territory']['cell_size'])), 0, client_time);
+            }
+
+            if(show_strength) {
+                var offset = [0.70,0.66];
+                this.draw_feature_strength(feature, vec_add(moving_xy || base_xy, vec_mul(offset, gamedata['territory']['cell_size'])));
             }
         }
 
