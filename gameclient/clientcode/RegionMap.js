@@ -9,6 +9,7 @@ goog.provide('RegionMap');
 */
 
 goog.require('SPUI');
+goog.require('SPFX');
 goog.require('GameArt');
 goog.require('SquadControlDialog');
 goog.require('PlayerInfoDialog');
@@ -1872,8 +1873,10 @@ RegionMap.RegionMap.prototype.draw_feature_label = function(wxy, str, color_str,
     }
 
     // adds drop shadow
-    SPUI.ctx.fillStyle = 'rgba(0,0,0,1)';
-    this.do_draw_feature_label([wxy[0]+1/this.zoom,wxy[1]+1/this.zoom], str, size);
+    if(SPFX.detail >= 2) {
+        SPUI.ctx.fillStyle = 'rgba(0,0,0,1)';
+        this.do_draw_feature_label([wxy[0]+1/this.zoom,wxy[1]+1/this.zoom], str, size);
+    }
 
     SPUI.ctx.fillStyle = (SPUI.low_fonts && color_str != gamedata['territory']['label_colors']['owned'] ? 'rgba(255,255,255,1)' : color_str);
     var ret = this.do_draw_feature_label(wxy, str, size);
