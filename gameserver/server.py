@@ -22270,6 +22270,18 @@ class GAMEAPI(resource.Resource):
         return d
 
     def complete_client_hello2(self, d, session, retmsg):
+        # there's a race window where terminate_session() is called between change_session() and here,
+        # and the invalidation doesn't work since we past CLIENT_HELLO but not in the session table yet.
+        # XXX band-aid fix for now - need to untangle the login path later...
+        if session.session_id in invalid_sessions:
+            if gamedata['server']['log_abnormal_logins'] >= 2:
+                gamesite.exception_log.event(server_time, 'user %d almost logged in with invalidated session %s' % (session.user.user_id, session.session_id))
+            retmsg.append(["ERROR", "CANNOT_LOG_IN_SIMULTANEOUS"])
+            ascdebug('UNLOCKED player %d (complete_client_hello2 invalidated)' % session.user.user_id)
+            gamesite.lock_client.player_lock_release(session.user.user_id, -1, Player.LockState.logged_in, expected_owner_id = session.user.user_id)
+            d.callback(session) # return session so that complete_async_request gets called
+            return
+
         try:
             start_time = time.time()
             self.do_complete_client_hello2(d, session, retmsg)
