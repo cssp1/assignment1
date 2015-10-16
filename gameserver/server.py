@@ -22445,10 +22445,12 @@ class GAMEAPI(resource.Resource):
         session.logout_d.addErrback(report_and_absorb_deferred_failure, session)
 
         # then the flush happens...
-        session.logout_d.addCallback(lambda _, session=session:
-                                     player_table.store_async(session.player, session.logout_in_progress.player_cb, True, 'logout') and \
-                                     user_table.store_async(session.user, session.logout_in_progress.user_cb, True, 'logout') and \
-                                     (session.logout_in_progress.d or True))
+        def flushit(session):
+            user_table.store_async(session.user, session.logout_in_progress.user_cb, True, 'logout')
+            player_table.store_async(session.player, session.logout_in_progress.player_cb, True, 'logout')
+            return session.logout_in_progress.d or True
+
+        session.logout_d.addCallback(lambda _, session=session: flushit(session))
         session.logout_d.addErrback(report_and_absorb_deferred_failure, session)
 
         # then postflush cleanup
