@@ -311,8 +311,8 @@
                              "text_vjustify": "top", "text_style": "normal",
                              "ui_name": "Buy \"%thing\" for %price?" },
 
-//            "price_display": { "kind": "ActionButton", "xy": [190,128], "dimensions": [120,32], "text_offset": [8,1], "text_size": 13, "text_style": "thick",
-//                               "bg_image": "price_display", "ui_name": "%d", "ui_tooltip": "", "tooltip_delay": 0 }, // PRICE
+            //            "price_display": { "kind": "ActionButton", "xy": [190,128], "dimensions": [120,32], "text_offset": [8,1], "text_size": 13, "text_style": "thick",
+            //                               "bg_image": "price_display", "ui_name": "%d", "ui_tooltip": "", "tooltip_delay": 0 }, // PRICE
             "cancel_button": { "kind": "ActionButton", "xy": [165,130], "dimensions": [134,28],
                                "bg_image": "menu_button_134px", "text_size": 13, "text_style": "bold", "ui_name": "Cancel" },
             "ok_button": { "kind": "ActionButton", "xy": [308,130], "dimensions": [134,28], "text_offset": [0,1],
