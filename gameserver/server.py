@@ -622,7 +622,7 @@ ASYNC_DEBUG = True
 def ascdebug(msg):
     if gamedata['server'].get('log_async_io',False):
         print msg
-        gamesite.exception_log.event(server_time, 'ASC: '+msg)
+        gamesite.exception_log.event(server_time, 'ASC: '+spin_server_name+' '+msg)
 
 # mapping of SpinPunch user IDs to User objects
 class UserTable:
@@ -12932,6 +12932,7 @@ class CONTROLAPI(resource.Resource):
     def kill_session(self, request, session, body = None):
         if not body: body = 'ok\n'
         d = self.gameapi.log_out_async(session, 'forced_relog')
+        d.addCallback(lambda _, session=session: ascdebug('kill_session %d %s async end' % (session.user.user_id, session.session_id)))
         d.addCallback(lambda _, body=body, request=request: SpinHTTP.complete_deferred_request(body, request))
 
         return server.NOT_DONE_YET
@@ -13170,9 +13171,11 @@ class CONTROLAPI(resource.Resource):
 
         if session_id in session_table: # note: we DO want to see logout_in_progress sessions here, to wait until they finish logout before responding
             # note: this goes asynchronous
+            ascdebug('terminate_session %s async start' % (session_id))
             return self.kill_session(request, session_table[session_id])
         else:
             # still return 'ok' even if session was not found, since it may have timed out
+            ascdebug('terminate_session %s ok' % (session_id))
             return 'ok\n'
 
     def handle_sql_on(self, request):
@@ -16254,7 +16257,7 @@ class GAMEAPI(resource.Resource):
         master_d = make_deferred('change_session')
 
         def set_progress_and_pass_result(result, session, prog):
-            ascdebug('change_session set_progress_and_pass_result in_progress %r result %r' % (prog, result))
+            #ascdebug('change_session set_progress_and_pass_result in_progress %r result %r' % (prog, result))
             session.visit_base_in_progress = prog
             return result
         master_d.addBoth(set_progress_and_pass_result, session, True) # OK
@@ -21667,6 +21670,7 @@ class GAMEAPI(resource.Resource):
         def cancel(self, cancel_reason):
             self.cancel_reason = cancel_reason
             if self.has_lock:
+                ascdebug('UNLOCKED player %d (cancel)' % self.user_id)
                 gamesite.lock_client.player_lock_release(self.user_id, -1, Player.LockState.logged_in, expected_owner_id = self.user_id)
                 self.has_lock = False
             if self.user_id in self.in_progress_by_user_id:
@@ -21813,6 +21817,8 @@ class GAMEAPI(resource.Resource):
             retmsg.append(["ERROR", "CANNOT_LOG_IN_WHILE_UNDER_ATTACK"])
             return False
 
+        ascdebug('LOCKED player %d in session %s' % (user_id, client_session_id))
+
         # open a new session, using the ID passed in by the client
         aslogin = self.AsyncLogin(self, request, retmsg, client_session_id, frame_platform, client_social_id, client_auth_token,
                                   user_id, lockgen, metrics_anon_id, user_demographics, client_browser_caps,
@@ -21845,6 +21851,7 @@ class GAMEAPI(resource.Resource):
             gamesite.exception_log.event(server_time, ('complete_client_hello Exception (player %d): ' % user_id) + traceback.format_exc())
 
         if d is None: # failure path
+            ascdebug('UNLOCKED player %d (client_hello failure)' % user_id)
             gamesite.lock_client.player_lock_release(user_id, -1, Player.LockState.logged_in, expected_owner_id = user_id)
             self.complete_deferred_request(request, None, retmsg) # OK - failure path
 
@@ -22274,6 +22281,7 @@ class GAMEAPI(resource.Resource):
             gamesite.exception_log.event(server_time, ('complete_client_hello2 Exception (player %d): ' % session.user.user_id) + traceback.format_exc())
 
         # failure path
+        ascdebug('UNLOCKED player %d (complete_client_hello2 failure)' % session.user.user_id)
         gamesite.lock_client.player_lock_release(session.user.user_id, -1, Player.LockState.logged_in, expected_owner_id = session.user.user_id)
         d.callback(None) # return error instead of session
 
@@ -22588,6 +22596,7 @@ class GAMEAPI(resource.Resource):
                                                            extra_props = {'protection_end_time': session.player.resources.protection_end_time}, reason = 'log_out')
             session.player_base_lock = None
 
+        ascdebug('UNLOCKED player %d (normal logout)' % session.user.user_id)
         gamesite.lock_client.player_lock_release(session.user.user_id, session.player.generation, Player.LockState.logged_in, expected_owner_id=session.user.user_id)
 
         if gamesite.nosql_client:
