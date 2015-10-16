@@ -9859,6 +9859,7 @@ function longpoll_send() {
     longpoll_in_progress = true;
     goog.net.XhrIo.send(gameapi_url(), function(event) {
         longpoll_in_progress = false;
+        var repeat = true;
         if(!event.target.isSuccess()) {
             var code = event.target.getLastErrorCode();
             console.log('LONGPOLL error code '+code);
@@ -9878,7 +9879,9 @@ function longpoll_send() {
                 repeat = false; // longpoll_error_count += 1;
             }
         }
-        longpoll_send(); // send again
+        if(repeat) {
+            longpoll_send(); // send again
+        }
     }, 'POST', msg, {}, 1000*gamedata['client']['ajax_longpoll_timeout'], true);
 }
 
