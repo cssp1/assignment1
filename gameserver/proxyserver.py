@@ -196,10 +196,10 @@ def uniqid(prefix='', more_entropy=False):
 
 unique_session_counter = 0
 
-def generate_session_id():
+def generate_session_id(user_id):
     global unique_session_counter
     unique_session_counter += 1
-    return hashlib.sha256('SP!NP0NCH' + str(time.time()) + str(unique_session_counter)).hexdigest()[32:64]
+    return str(user_id)+'_'+hashlib.sha256(SpinConfig.config.get('session_id_salt','SP!NP0NCH') + str(time.time()) + str(unique_session_counter)).hexdigest()[32:64]
 
 
 def parse_host_port(hostport, is_ssl):
@@ -1517,7 +1517,7 @@ class GameProxy(proxy.ReverseProxyResource):
 
         # note: we're remembering the gameserver's HTTP port no matter what protocol the client is using,
         # since this is for proxy forwarding
-        session = ProxySession(generate_session_id(), user_id, visitor.social_id, visitor.demographics['ip'],
+        session = ProxySession(generate_session_id(user_id), user_id, visitor.social_id, visitor.demographics['ip'],
                                server.name, server.host, server.port)
         session.last_active_time = proxy_time
 
