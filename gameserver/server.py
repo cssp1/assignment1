@@ -25971,13 +25971,16 @@ class GameSite(server.Site):
         def __init__(self, *args, **kwargs):
             http.HTTPChannel.__init__(self, *args, **kwargs)
             self.close_connection_watchdog = None
+            self.connect_time = -1
             self.last_request = None # for debugging only
             self.last_request_time = -1
         def connectionMade(self):
             http.HTTPChannel.connectionMade(self)
+            self.connect_time = int(time.time())
             self.site.gotClient(self)
         def connectionLost(self, reason):
             http.HTTPChannel.connectionLost(self, reason)
+            self.connect_time = -1
             self.site.lostClient(self)
             if self.close_connection_watchdog:
                 self.close_connection_watchdog.cancel()
@@ -26662,6 +26665,13 @@ class GameSite(server.Site):
                                              traceback.format_exc())
 
 
+        # close TCP connections that have been idling too long
+        for client in list(self.active_clients):
+            assert isinstance(client, self.GameProtocol) or isinstance(client, WS_GAMEAPI_Protocol) # duck typed :P
+            last_activity = max(client.connect_time, client.last_request_time)
+            if server_time - last_activity > gamedata['server']['http_connection_timeout']:
+                client.close_connection_aggressively()
+
         end_time = time.time()
         admin_stats.record_latency('bgtask', end_time-start_time)
 
@@ -26683,16 +26693,19 @@ class WS_GAMEAPI_Protocol(protocol.Protocol):
         self.peer_ip = None
         self.connected = False
         self.close_connection_watchdog = None
+        self.connect_time = -1
         self.last_request_repr = '' # for debugging only
         self.last_request_time = -1
 
     def connectionMade(self):
         self.peer_ip = str(self.transport.getPeer().host)
         self.connected = True
+        self.connect_time = int(time.time())
         gamesite.gotClient(self) # XXX not sure how to get a reference to the "site" here
 
     def connectionLost(self, reason):
         self.connected = False
+        self.connect_time = -1
         if self.close_connection_watchdog:
             self.close_connection_watchdog.cancel()
             self.close_connection_watchdog = None
