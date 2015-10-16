@@ -56,7 +56,7 @@ for CONT in $GAME_TOURNAMENT_CONTINENTS; do
     NOTIFICATION_MESSAGE_FULL="${NOTIFICATION_MESSAGE_BRIEF}${NEWLINE}`cat ${LOGFILE}`"
 
     # send SNS notification
-    /usr/bin/aws sns publish --topic-arn `./SpinConfig.py --getvar tournament_winners_sns_topic` --subject "${NOTIFICATION_SUBJECT}" --message "${NOTIFICATION_MESSAGE_FULL}" > /dev/null
+    /usr/bin/aws sns publish --topic-arn "`./SpinConfig.py --getvar tournament_winners_sns_topic --getvar-format raw`" --subject "${NOTIFICATION_SUBJECT}" --message "${NOTIFICATION_MESSAGE_FULL}" > /dev/null
 
     # send SpinReminder notification
     ./SpinReminders.py --from "tournament-winners.sh" --subject "${NOTIFICATION_SUBJECT}" --body "${NOTIFICATION_MESSAGE_BRIEF}" \
