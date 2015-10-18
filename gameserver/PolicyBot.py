@@ -175,9 +175,6 @@ class AntiRefreshPolicy(Policy):
 
         elif repeat_offender_level >= 2:
             # full punishment - removal from region and banishment
-            clear_repeat_stacks = True
-            message_body = 'Our systems have again detected that you may be using a browser plugin or script to stay logged in to the game for long periods of time, and therefore relocated your base to %s and locked you out of the main map regions due to repeated violations of our Terms of Service. If you would like to appeal your case, please contact support and our team will be able to assist you.' % (new_region['ui_name'])
-            do_banish = True
 
             cur_region = gamedata['regions'][cur_region_name]
             cur_continent_id = cur_region.get('continent_id',None)
@@ -198,6 +195,9 @@ class AntiRefreshPolicy(Policy):
             if not self.test:
                 assert new_region['id'] != cur_region_name
 
+            clear_repeat_stacks = True
+            message_body = 'Our systems have again detected that you may be using a browser plugin or script to stay logged in to the game for long periods of time, and therefore relocated your base to %s and locked you out of the main map regions due to repeated violations of our Terms of Service. If you would like to appeal your case, please contact support and our team will be able to assist you.' % (new_region['ui_name'])
+            do_banish = True
             event_name = '7301_policy_bot_punished'
 
         elif repeat_offender_level >= 1:
