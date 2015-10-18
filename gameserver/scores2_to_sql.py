@@ -192,7 +192,7 @@ if __name__ == '__main__':
                         batch.append(keyvals)
                         n_updated += 1
 
-                    if not dry_run:
+                    if (not dry_run) and batch:
                         cur.executemany("SELECT upsert_"+kind+"_score("+','.join(["%s"]*10)+")", [[v for k,v in keyvals2] for keyvals2 in batch])
                         con.commit() # new scores become permanent in SQL
 
@@ -201,8 +201,12 @@ if __name__ == '__main__':
                             print kind, freq, loc, 'updated', n_updated, 'rows', 'mongo_count', mongo_count
 
                     if do_mongo_drop:
-                        # remove historical data (earlier than N-1) from Mongo
-                        if loc < now_time_coords[freq]-1: # maybe change to earlier than N?
+                        # remove historical data (earlier than this time period minus keep_history) from Mongo
+                        keep_history = {Scores2.FREQ_ALL: 0,
+                                        Scores2.FREQ_SEASON: 1, # keep last season
+                                        Scores2.FREQ_WEEK: 2 # keep last TWO weeks
+                                        }[freq]
+                        if loc < now_time_coords[freq] - keep_history:
 
                             # THIS DOES NOT FIX THE RACE CONDITION, but it's close enough that I wouldn't worry about it.
                             if mongo_scores._scores2_get_stats_for_time(kind, freq, loc, mtime_gte = sql_last_mtime).count() != mongo_count:
