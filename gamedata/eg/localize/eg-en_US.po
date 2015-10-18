@@ -15700,3 +15700,6 @@ msgstr "Show Clans with Facebook likes similar to mine"
 
 msgid "(This Alliance was disbanded)"
 msgstr "(This Clan was disbanded)"
+
+msgid "Note: Alliancemates can only receive gifts\nif they have played within the last 5 days."
+msgstr "Note: Clanmates can only receive gifts\nif they have played within the last 5 days."

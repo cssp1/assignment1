@@ -8591,6 +8591,10 @@
             "sunken": {"kind": "StaticImage", "xy":[36,63], "dimensions":[540,320], "asset": "dialog_sunken_resizable", "bg_image_resizable":1 },
             "title": { "kind": "TextField", "xy": [37,14], "dimensions": [221, 41], "text_size": 30, "text_style": "thick", "text_hjustify": "left",
                        "ui_name_invite": "Invite Friends", "ui_name_gift": "Send Gifts" },
+
+            "recent_alliance_logins_only": { "show": 0, "kind": "TextField", "xy": [324,16], "dimensions": [221, 41], "text_size": 13, "text_style": "normal",
+                                             "text_hjustify": "left", "text_vjustify": "top", "text_color": [0.8,0.8,0.8,1],
+                                             "ui_name": "Note: Alliancemates can only receive gifts\nif they have played within the last 5 days." },
             "close_button": { "kind": "ActionButton", "xy": [582,1], "dimensions": [19,22], "bg_image": "close_button_small", "push_bg_image": 1 },
 
             "scroll_left": {"show": 1, "kind": "ActionButton", "xy": [10,170], "dimensions": [22,100], "bg_image": "dialog_scroll_arrow_left" },
