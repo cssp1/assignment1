@@ -47,17 +47,19 @@ if __name__ == '__main__':
     game_id = SpinConfig.game()
     commit_interval = 1000
     verbose = True
+    optimize = False
     force = False
     do_reset = False
     do_mongo_drop = False
     dry_run = 0
 
-    opts, args = getopt.gnu_getopt(sys.argv[1:], 'g:c:q', ['reset','mongo-drop','dry-run','force'])
+    opts, args = getopt.gnu_getopt(sys.argv[1:], 'g:c:q', ['reset','mongo-drop','optimize','dry-run','force'])
 
     for key, val in opts:
         if key == '-g': game_id = val
         elif key == '-c': commit_interval = int(val)
         elif key == '-q': verbose = False
+        elif key == '--optimize': optimize = True
         elif key == '--mongo-drop': do_mongo_drop = True
         elif key == '--reset': do_reset = True
         elif key == '--dry-run': dry_run = 1
@@ -209,7 +211,7 @@ if __name__ == '__main__':
                             else:
                                 if verbose: print kind, freq, loc, 'dropping from MongoDB'
                                 if not dry_run: mongo_scores._scores2_drop_stats_for_time(kind, freq, loc)
-            if not dry_run:
+            if not dry_run and optimize:
                 old = con.isolation_level
                 con.set_isolation_level(0)
                 try:
