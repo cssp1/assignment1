@@ -214,7 +214,7 @@ class AntiRefreshPolicy(Policy):
                                                                        'message_body': message_body,
                                                                        'do_banish': do_banish,
                                                                        'event_name': event_name,
-                                                                       'new_region': new_region,
+                                                                       'new_region': new_region['id'],
                                                                        'clear_repeat_stacks': clear_repeat_stacks,
                                                                        'add_repeat_stack': add_repeat_stack})
 
