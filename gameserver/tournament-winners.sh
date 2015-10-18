@@ -4,8 +4,8 @@
 
 . /etc/spinpunch
 
-if [ $# -ne 4 ]; then
-    echo "Usage: tournament-winners.sh END_TIME SEASON# WEEK# STAT"
+if [ $# -ne 5 ]; then
+    echo "Usage: tournament-winners.sh END_TIME SEASON# WEEK# STAT TIME_SCOPE"
     exit 1
 fi
 
@@ -13,6 +13,7 @@ END_TIME=$1
 SEASON=$2
 WEEK=$3
 TOURNAMENT_STAT=$4
+TIME_SCOPE=$5
 
 DROPBOX_ACCESS_TOKEN=`cat ${HOME}/.ssh/dropbox-access-token`
 GAME_ID_UPPER=`echo ${GAME_ID} | tr a-z A-Z`
@@ -30,7 +31,10 @@ for CONT in $GAME_TOURNAMENT_CONTINENTS; do
     UI_PLATFORM="${PLATFORM_UI_NAMES[$CONT]}"
 
     # get winner list and award prizes
-    ./SpinNoSQL.py --winners --season ${SEASON} --week ${WEEK} --tournament-stat ${TOURNAMENT_STAT} --score-scope continent --score-loc $CONT --send-prizes > $LOGFILE
+    ./SpinNoSQL.py --winners --season ${SEASON} --week ${WEEK} --tournament-stat ${TOURNAMENT_STAT} \
+		   --score-time-scope ${TIME_SCOPE}
+		   --score-space-scope continent --score-space-loc $CONT \
+		   --send-prizes > $LOGFILE
 
     # upload to dropbox
     DROPBOX_FILENAME="${NUMERIC_DATE}-${GAME_ID_UPPER}-winners-week${WEEK}-${UI_PLATFORM}.txt"

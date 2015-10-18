@@ -2148,7 +2148,7 @@ if __name__ == '__main__':
 
     opts, args = getopt.gnu_getopt(sys.argv[1:], 'g:', ['reset', 'init', 'console', 'maint', 'region-maint=', 'clear-locks',
                                                         'winners', 'send-prizes', 'leaders', 'tournament-stat=', 'week=', 'season=', 'game-id=',
-                                                        'score-scope=', 'score-loc=', 'spend-week=',
+                                                        'score-space-scope=', 'score-space-loc=', 'score-time-scope=', 'spend-week=',
                                                         'recache-alliance-scores', 'test'])
     game_instance = SpinConfig.config['game_id']
     mode = None
@@ -2158,6 +2158,7 @@ if __name__ == '__main__':
     tournament_stat = None
     score_space_scope = None
     score_space_loc = None
+    score_time_scope = None
     spend_week = None
     time_now = int(time.time())
     maint_region = None
@@ -2176,17 +2177,30 @@ if __name__ == '__main__':
         elif key == '--season': season = int(val)
         elif key == '--tournament-stat':
             tournament_stat = val
-        elif key == '--score-scope':
+        elif key == '--score-space-scope':
             import Scores2
             if val == 'ALL':
                 score_space_scope = Scores2.SPACE_ALL
                 score_space_loc = Scores2.SPACE_ALL_LOC
-            else:
+            elif val == 'continent':
                 score_space_scope = Scores2.SPACE_CONTINENT
-        elif key == '--score-loc':
+            else:
+                raise Exception('unknown score-space-scope %s' % val)
+        elif key == '--score-space-loc':
             import Scores2
             assert score_space_scope == Scores2.SPACE_CONTINENT
             score_space_loc = val
+        elif key == '--score-time-scope':
+            import Scores2
+            if val == 'ALL':
+                score_time_scope = Scores2.FREQ_ALL
+            elif val == 'season':
+                score_time_scope = Scores2.FREQ_SEASON
+            elif val == 'week':
+                score_time_scope = Scores2.FREQ_WEEK
+            else:
+                raise Exception('unknown score-time-scope %s' % val)
+
         elif key == '--spend-week': spend_week = int(val)
         elif key == '--recache-alliance-scores': mode = 'recache-alliance-scores'
         elif key == '--test': mode = 'test'
@@ -2275,13 +2289,10 @@ if __name__ == '__main__':
                 return raw + gamedata['trophy_display_offset'].get(tournament_stat.split('_')[1], 0)
             return raw
 
-        freq = 'season' if season >= 0 else 'week'
-        freq_name = 'SEASON'  if season >= 0 else 'WEEK'
-        period = season if season >= 0 else week
+        assert season >= 0 and week >= 0
+        score_time_loc = {Scores2.FREQ_ALL: 0, Scores2.FREQ_SEASON: season, Scores2.FREQ_WEEK: week}[score_time_scope]
 
-        addr = (tournament_stat, freq, period)
-        time_scope = {'season':Scores2.FREQ_SEASON, 'week':Scores2.FREQ_WEEK}[freq]
-        stat_axes = (tournament_stat, Scores2.make_point(time_scope, period, score_space_scope, score_space_loc))
+        stat_axes = (tournament_stat, Scores2.make_point(score_time_scope, score_time_loc, score_space_scope, score_space_loc))
 
         if mode == 'leaders':
             # for STAT in conquests damage_inflicted resources_looted xp havoc_caused quarry_resources tokens_looted trophies_pvp hive_kill_points strongpoint_resources; do ./SpinNoSQL.py --leaders --season 3 --tournament-stat $STAT --score-scope continent --score-loc fb >> /tmp/`date +%Y%m%d`-tr-stat-leaders.txt; done
@@ -2310,8 +2321,12 @@ if __name__ == '__main__':
 
             top_alliances = s2.alliance_scores2_get_leaders([stat_axes], 5)[0]
 
-            print '[color="#FFFF00"]TOP %s ALLIANCES FOR %sWEEK %d%s[/color]' % \
-                  (tournament_stat, 'SEASON %d ' % (season+gamedata['matchmaking']['season_ui_offset']) if season >= 0 else '', week,
+            ui_score_time_scope = {Scores2.FREQ_ALL: 'ALL-TIME',
+                                   Scores2.FREQ_SEASON: 'SEASONAL',
+                                   Scores2.FREQ_WEEK: 'WEEKLY'}[score_time_scope]
+
+            print '[color="#FFFF00"]TOP %s %s ALLIANCES FOR %sWEEK %d%s[/color]' % \
+                  (ui_score_time_scope, tournament_stat, 'SEASON %d ' % (season+gamedata['matchmaking']['season_ui_offset']) if season >= 0 else '', week,
                    (' IN '+gamedata['continents'][score_space_loc]['ui_name']) if score_space_scope == Scores2.SPACE_CONTINENT else '')
 
             data = client.get_alliance_info([x['alliance_id'] for x in top_alliances])
