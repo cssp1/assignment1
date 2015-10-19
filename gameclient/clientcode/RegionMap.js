@@ -1898,7 +1898,7 @@ RegionMap.RegionMap.prototype.draw_feature_strength = function(feature, wxy) {
         if(height > 0) {
             var xy = [wxy[0] + i * (bar_width+spacing), wxy[1] - height];
             var wh = [bar_width, height];
-            if(SPFX.detail >= 2) { // drop shadow
+            if(true /* SPFX.detail >= 2*/) { // drop shadow
                 SPFX.ctx.fillStyle = 'rgba(0,0,0,1)';
                 SPUI.ctx.fillRect(xy[0]+1/this.zoom, xy[1]+1/this.zoom, wh[0], wh[1]);
             }
