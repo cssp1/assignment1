@@ -149,7 +149,7 @@ done
 # send SMS update
 echo "sending SMS message..."
 $GAME_DIR/gameserver/SpinReminders.py --body-from "$SMSFILE" --from "$UI_MAIL_SENDER" --subject "${GAME_ID_UPPER} Heartbeat" \
-				      --recipients "`${GAME_DIR}/gameserver/SpinConfig.py --getvar heartbeat_recipients`"
+                      --recipients "`${GAME_DIR}/gameserver/SpinConfig.py --getvar heartbeat_recipients`"
 rm -f "$SMSFILE"
 
 exit $ERROR
