@@ -46,6 +46,8 @@ fi
 touch $HOME/.awsrc
 
 GAME_NAME=`basename $GAME_DIR`
+GAME_ID=`$GAME_DIR/SpinConfig.py --getvar game_id --getvar-format raw`
+GAME_ID_UPPER=`echo ${GAME_ID} | tr [a-z] [A-Z]`
 
 TODAY=`date +%Y%m%d`
 # process both yesterday and today's logs, to ensure nothing is missed
@@ -146,7 +148,8 @@ done
 
 # send SMS update
 echo "sending SMS message..."
-$GAME_DIR/gameserver/SpinReminders.py --body-from "$SMSFILE" --from "$UI_MAIL_SENDER" --recipients "`${GAME_DIR}/gameserver/SpinConfig.py --getvar heartbeat_recipients`"
+$GAME_DIR/gameserver/SpinReminders.py --body-from "$SMSFILE" --from "$UI_MAIL_SENDER" --subject "${GAME_ID_UPPER} Heartbeat" \
+				      --recipients "`${GAME_DIR}/gameserver/SpinConfig.py --getvar heartbeat_recipients`"
 rm -f "$SMSFILE"
 
 exit $ERROR
