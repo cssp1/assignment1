@@ -2,6 +2,10 @@
 
 # script that runs on the cloud node
 
+# IAM key for this host, passed by setup-here-*.sh
+AWSCRED_KEYID=$1
+AWSCRED_SECRET=$2
+
 # stop SSH brute-force attacks
 echo "SETUP(remote): Setting up fail2ban..."
 sudo yum install fail2ban
@@ -49,3 +53,20 @@ baseurl=http://downloads-distro.mongodb.org/repo/redhat/os/x86_64/
 gpgcheck=0
 enabled=1
 EOF
+
+# set up ~/.aws/credentials with host's IAM key and ~/.aws/config with proper default region
+CUR_REGION=`curl -s http://169.254.169.254/latest/dynamic/instance-identity/document | grep region | awk -F\" '{print $4}'`
+for homedir in /root /home/ec2-user; do
+    sudo mkdir -p "${homedir}/.aws"
+    sudo sh -c "/bin/cat > ${homedir}/.aws/credentials" <<EOF
+[default]
+aws_access_key_id = ${AWSCRED_KEYID}
+aws_secret_access_key = ${AWSCRED_SECRET}
+EOF
+    sudo sh -c "/bin/cat > ${homedir}/.aws/config" <<EOF
+[default]
+region = ${CUR_REGION}
+EOF
+    sudo sh -c "chmod 0700 ${homedir}/.aws"
+    sudo sh -c "chmod 0600 ${homedir}/.aws/{config,credentials}"
+done

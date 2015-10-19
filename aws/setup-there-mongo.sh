@@ -2,8 +2,6 @@
 
 SYSTEM=$1
 
-. ./setup-there-common.sh
-
 YUMPACKAGES="git xfsprogs telnet subversion nscd munin-node strace sendmail-cf patch screen"
 
 echo "SETUP(remote): Installing additional packages..."

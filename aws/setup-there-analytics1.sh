@@ -1,7 +1,5 @@
 #!/bin/sh
 
-. ./setup-there-common.sh
-
 YUMPACKAGES="git munin-node nscd patch pinentry screen sendmail-cf strace subversion xfsprogs"
 YUMPACKAGES+=" libffi libffi-devel libxml2 libxml2-devel"
 YUMPACKAGES+=" gcc autoconf automake libtool"

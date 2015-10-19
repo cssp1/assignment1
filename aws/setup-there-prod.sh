@@ -3,8 +3,6 @@
 GAME_ID=$1
 GAME_ID_LONG=$2
 
-. ./setup-there-common.sh
-
 YUMPACKAGES="git munin-node nscd patch pinentry screen sendmail-cf strace subversion xfsprogs"
 YUMPACKAGES+=" libffi libffi-devel libxml2 libxml2-devel"
 YUMPACKAGES+=" gcc autoconf automake libtool"

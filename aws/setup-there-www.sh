@@ -1,7 +1,5 @@
 #!/bin/sh
 
-. ./setup-there-common.sh
-
 YUMPACKAGES="s3cmd xfsprogs httpd mod_ssl telnet mysql-server php php-mysql subversion MySQL-python php-mbstring php-mcrypt php-pecl-apc"
 YUMPACKAGES+=" python-twisted python-simplejson emacs strace"
 YUMPACKAGES+=" python-imaging python-imaging-devel numpy"

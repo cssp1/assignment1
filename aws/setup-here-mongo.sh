@@ -3,6 +3,8 @@
 AWSHOST="dvprod-mongo.spinpunch.com"
 AWSKEY="$HOME/.ssh/dvprod.pem"
 SYSTEM="mongo"
+AWSCRED_KEYID="host's-IAM-key-id"
+AWSCRED_SECRET="host's-IAM-key-secret"
 
 # run on mothership machine
 
@@ -28,6 +30,6 @@ echo "Copying files to cloud host..."
 scp $SSHARGS $FILESTOGO $SSHDEST:/home/ec2-user
 
 echo "Running setup script on cloud host..."
-ssh $SSHARGS -t $SSHDEST /home/ec2-user/setup-there-${SYSTEM}.sh $SYSTEM
+ssh $SSHARGS -t $SSHDEST "/home/ec2-user/setup-there-common.sh ${AWSCRED_KEYID} ${AWSCRED_SECRET} && /home/ec2-user/setup-there-${SYSTEM}.sh $SYSTEM"
 
 rm -f /tmp/overlay-${SYSTEM}.cpio.gz

@@ -4,6 +4,8 @@ AWSHOST="dvprod.spinpunch.com"
 GAME_ID="dv"
 GAME_ID_LONG="daysofvalor"
 AWSKEY="$HOME/.ssh/${GAME_ID}prod.pem"
+AWSCRED_KEYID="host's-IAM-key-id"
+AWSCRED_SECRET="host's-IAM-key-secret"
 
 # run on mothership machine
 
@@ -29,6 +31,6 @@ echo "Copying files to cloud host..."
 scp $SSHARGS $FILESTOGO $SSHDEST:/home/ec2-user
 
 echo "Running setup script on cloud host..."
-ssh $SSHARGS -t $SSHDEST /home/ec2-user/setup-there-prod.sh $GAME_ID $GAME_ID_LONG
+ssh $SSHARGS -t $SSHDEST "/home/ec2-user/setup-there-common.sh ${AWSCRED_KEYID} ${AWSCRED_SECRET} && /home/ec2-user/setup-there-prod.sh ${GAME_ID} ${GAME_ID_LONG}"
 
 rm -f /tmp/overlay-prod.cpio.gz
