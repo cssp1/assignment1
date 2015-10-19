@@ -1917,7 +1917,7 @@ RegionMap.RegionMap.prototype.draw_feature_label = function(wxy, str, color_str,
     }
 
     // adds drop shadow
-    if(SPFX.detail >= 2) {
+    if(true /* SPFX.detail >= 2 */) {
         SPUI.ctx.fillStyle = 'rgba(0,0,0,1)';
         this.do_draw_feature_label([wxy[0]+1/this.zoom,wxy[1]+1/this.zoom], str, size);
     }
