@@ -3060,6 +3060,7 @@ class Session(object):
         # these are reset each time the connected user views a different base
         self.home_base = True
         self.has_attacked = False
+        self.has_attacked_reason = 'init'
 
         self.defender_cc_standing = False # true if the defender's CC was not destroyed at start of battle
         self.defender_protection_expired_at = -1 # set on initial base visit
@@ -3264,8 +3265,8 @@ class Session(object):
 
     # just return a string describing the current session state, for exception logging only
     def dump_exception_state(self):
-        return 'player %d viewing %d at %s, is_async %r complete_attack_in_progress %r visit_base_in_progress %r logout_in_progress %r has_attacked %r viewing_base_lock %r' % \
-               (self.player.user_id, self.viewing_player.user_id, self.viewing_base.base_id, self.is_async(), bool(self.complete_attack_in_progress), bool(self.visit_base_in_progress), bool(self.logout_in_progress), self.has_attacked, self.viewing_base_lock)
+        return 'player %d viewing %d at %s, is_async %r complete_attack_in_progress %r visit_base_in_progress %r logout_in_progress %r has_attacked %r (%r) viewing_base_lock %r' % \
+               (self.player.user_id, self.viewing_player.user_id, self.viewing_base.base_id, self.is_async(), bool(self.complete_attack_in_progress), bool(self.visit_base_in_progress), bool(self.logout_in_progress), self.has_attacked, self.has_attacked_reason, self.viewing_base_lock)
 
     # return current seconds of cumulative play time
     def cur_playtime(self):
@@ -4443,7 +4444,12 @@ class Session(object):
             gamesite.exception_log.event(server_time, 'AI attack on player %d: %s' % \
                                          (self.player.user_id, str(self.incoming_attack_type)))
 
+        if not self.res_looter:
+            gamesite.exception_log.event(server_time, 'deploy_ai_attack with no res_looter %s' % (session.dump_exception_state(),))
+            self.res_looter = ResLoot.ResLoot(gamedata, self, self.viewing_player, self.viewing_base)
+
         self.has_attacked = True
+        self.has_attacked_reason = 'deploy_ai_attack %d' % self.debug_session_change_count
 
         # add "weak zombie" debuff to player units
         if self.player.get_any_abtest_value('enable_zombie_debuff', gamedata['enable_zombie_debuff']):
@@ -16147,6 +16153,8 @@ class GAMEAPI(resource.Resource):
             # END has_attacked
 
         session.has_attacked = False
+        session.has_attacked_reason = '_complete_attack %d' % session.debug_session_change_count
+
         session.defender_cc_standing = False
         session.reset_attack_log()
         session.attack_finish_time = -1
@@ -16364,6 +16372,7 @@ class GAMEAPI(resource.Resource):
                 cannot_spy = True
             else:
                 session.has_attacked = True
+                session.has_attacked_reason = 'reinforce %d' % session.debug_session_change_count
                 session.attack_finish_time = server_time + gamedata['reinforce_time']
 
         if cannot_spy:
@@ -19818,6 +19827,8 @@ class GAMEAPI(resource.Resource):
                                                                 'ladder':session.is_ladder_battle()})
 
             session.has_attacked = True
+            session.has_attacked_reason = 'do_attack %d' % session.debug_session_change_count
+
             session.viewing_base.base_last_attack_time = server_time
             session.viewing_base.base_times_attacked += 1
             session.player.attack_cooldown_start = server_time
@@ -21453,7 +21464,7 @@ class GAMEAPI(resource.Resource):
                         if True or latency_tag not in ('PING_PLAYER', 'PLAYER_STATE_QUERY',
                                                        'UNIT_REPAIR_TICK', 'OBJECT_COMBAT_UPDATES',
                                                        'REPORT_METRIC'):
-                            session.last_action.append([latency_tag, server_time, session.last_active_time == server_time])
+                            session.last_action.append({'tag':latency_tag, 'time':server_time, 'keepalive':session.last_active_time == server_time})
 
                         if go_async:
                             assert isinstance(go_async, defer.Deferred)
@@ -27184,8 +27195,8 @@ class AdminResource(resource.Resource):
 
             action = []
             for act in reversed(session.last_action):
-                s = '%s (%ds)' % (act[0], server_time-act[1])
-                if not act[2]:
+                s = '%s (%ds)' % (act['tag'], server_time-act['time'])
+                if not act['keepalive']:
                     s = '<font color="#a0a0a0">'+s+'</font>'
                 action.append(s)
             action = '<font size="-2">'+string.join(action, '<br>')+'</font>'
