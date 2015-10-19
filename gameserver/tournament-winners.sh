@@ -32,9 +32,9 @@ for CONT in $GAME_TOURNAMENT_CONTINENTS; do
 
     # get winner list and award prizes
     ./SpinNoSQL.py --winners --season ${SEASON} --week ${WEEK} --tournament-stat ${TOURNAMENT_STAT} \
-		   --score-time-scope ${TIME_SCOPE}
-		   --score-space-scope continent --score-space-loc $CONT \
-		   --send-prizes > $LOGFILE
+           --score-time-scope ${TIME_SCOPE}
+           --score-space-scope continent --score-space-loc $CONT \
+           --send-prizes > $LOGFILE
 
     # upload to dropbox
     DROPBOX_FILENAME="${NUMERIC_DATE}-${GAME_ID_UPPER}-winners-week${WEEK}-${UI_PLATFORM}.txt"
