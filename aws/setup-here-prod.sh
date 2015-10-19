@@ -6,6 +6,7 @@ GAME_ID_LONG="daysofvalor"
 AWSKEY="$HOME/.ssh/${GAME_ID}prod.pem"
 AWSCRED_KEYID="host's-IAM-key-id"
 AWSCRED_SECRET="host's-IAM-key-secret"
+AWS_CRON_SNS_TOPIC="your-cron-SNS-topic"
 
 # run on mothership machine
 
@@ -22,7 +23,7 @@ FILESTOGO="$HOME/.bashrc \
            $HOME/.dir_colors"
 
 # remote setup scripts
-FILESTOGO+=" setup-there-common.sh setup-there-prod.sh fix-ec2-mail.py ec2-send-memory-metrics.py"
+FILESTOGO+=" setup-there-common.sh setup-there-prod.sh fix-ec2-mail.py ec2-send-memory-metrics.py cron-mail-to-sns.py"
 
 # overlay
 FILESTOGO+=" /tmp/overlay-prod.cpio.gz"
@@ -31,6 +32,6 @@ echo "Copying files to cloud host..."
 scp $SSHARGS $FILESTOGO $SSHDEST:/home/ec2-user
 
 echo "Running setup script on cloud host..."
-ssh $SSHARGS -t $SSHDEST "/home/ec2-user/setup-there-common.sh ${AWSCRED_KEYID} ${AWSCRED_SECRET} && /home/ec2-user/setup-there-prod.sh ${GAME_ID} ${GAME_ID_LONG}"
+ssh $SSHARGS -t $SSHDEST "/home/ec2-user/setup-there-common.sh ${AWSCRED_KEYID} ${AWSCRED_SECRET} ${AWS_CRON_SNS_TOPIC} && /home/ec2-user/setup-there-prod.sh ${GAME_ID} ${GAME_ID_LONG}"
 
 rm -f /tmp/overlay-prod.cpio.gz

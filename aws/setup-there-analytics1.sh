@@ -42,9 +42,6 @@ sudo newaliases
 echo "SETUP(remote): Mounting all volumes..."
 sudo mount -a
 
-echo "SETUP(remote): Setting up ec2-send-memory-metrics.py..."
-sudo install ./ec2-send-memory-metrics.py /usr/local/bin/ec2-send-memory-metrics.py
-
 echo "SETUP(remote): analytics1 setup done!"
 
 echo "/etc/fstab"
@@ -69,7 +66,6 @@ echo "MISSING: GIT: git config --global user.name " # 'SpinPunch Deploy'
 echo "MISSING: GIT: git config --global user.email " # 'awstech@spinpunch.com'
 echo "MISSING: /home/ec2-user/.ssh/slack.token (with incoming webhook for analytics channel) for automated messages"
 echo "MISSING: /home/ec2-user/.ssh/host-awssecret"
-echo "MISSING: /home/ec2-user/.aws/credentials, and config file with host awssecret for CloudWatch metrics"
 echo "MISSING: set up scratch space in /media/aux/tmp for backup script"
 echo "MISSING: set up swap space"
 echo "MISSING: mysql config for analytics (or RDS - if local, use /usr/bin/mysql_secure_installation to set root password)"

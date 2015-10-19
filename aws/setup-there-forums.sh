@@ -1,7 +1,7 @@
 #!/bin/sh
 
 YUMPACKAGES="xfsprogs httpd mod_ssl telnet mysql-server php php-mysql subversion MySQL-python php-mbstring php-mcrypt"
-YUMPACKAGES+=" python-twisted python-simplejson emacs strace"
+YUMPACKAGES+=" python-boto python-twisted python-simplejson emacs strace"
 YUMPACKAGES+=" python-imaging python-imaging-devel numpy"
 YUMPACKAGES+=" libxml2 libxml2-devel"
 YUMPACKAGES+=" sendmail-cf patch screen"

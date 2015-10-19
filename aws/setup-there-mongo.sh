@@ -2,7 +2,7 @@
 
 SYSTEM=$1
 
-YUMPACKAGES="git xfsprogs telnet subversion nscd munin-node strace sendmail-cf patch screen"
+YUMPACKAGES="git xfsprogs telnet subversion nscd munin-node strace sendmail-cf patch screen python-boto"
 
 echo "SETUP(remote): Installing additional packages..."
 sudo yum -y -q install $YUMPACKAGES
@@ -48,9 +48,6 @@ sudo /etc/init.d/munin-node restart
 echo "SETUP(remote): Fixing mail configuration..."
 sudo ./fix-ec2-mail.py
 
-echo "SETUP(remote): Setting up ec2-send-memory-metrics.py..."
-sudo install ./ec2-send-memory-metrics.py /usr/local/bin/ec2-send-memory-metrics.py
-
 echo "SETUP(remote): ${SYSTEM} setup done!"
 
 echo "MISSING:"
@@ -71,6 +68,5 @@ echo "check fstab"
 echo "keys: /home/ec2-user/.ssh"
 echo "                     xxprod-mongo-awssecret (backups)"
 echo "                     xxprod-mongo-root-password (backups)"
-echo "/home/ec2-user/.aws/credentials, and config file with host awssecret for CloudWatch metrics"
 echo "configure /etc/cron.spinpunch.daily/mongo-backup.py backup script (check that SCRATCH_DIR exists!)"
 echo "MISSING: /etc/aliases: add 'root: awstech@example.com' mail alias"

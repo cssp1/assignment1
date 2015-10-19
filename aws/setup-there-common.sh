@@ -5,6 +5,7 @@
 # IAM key for this host, passed by setup-here-*.sh
 AWSCRED_KEYID=$1
 AWSCRED_SECRET=$2
+AWS_CRON_SNS_TOPIC=$3
 
 # stop SSH brute-force attacks
 echo "SETUP(remote): Setting up fail2ban..."
@@ -54,7 +55,7 @@ gpgcheck=0
 enabled=1
 EOF
 
-# set up ~/.aws/credentials with host's IAM key and ~/.aws/config with proper default region
+# set up ~/.aws/credentials with host's IAM key proper default region
 CUR_REGION=`curl -s http://169.254.169.254/latest/dynamic/instance-identity/document | grep region | awk -F\" '{print $4}'`
 for homedir in /root /home/ec2-user; do
     sudo mkdir -p "${homedir}/.aws"
@@ -62,12 +63,22 @@ for homedir in /root /home/ec2-user; do
 [default]
 aws_access_key_id = ${AWSCRED_KEYID}
 aws_secret_access_key = ${AWSCRED_SECRET}
-EOF
-    sudo sh -c "/bin/cat > ${homedir}/.aws/config" <<EOF
-[default]
 region = ${CUR_REGION}
 EOF
     sudo sh -c "chmod 0700 ${homedir}/.aws"
-    sudo sh -c "chmod 0600 ${homedir}/.aws/{config,credentials}"
+    sudo sh -c "chmod 0600 ${homedir}/.aws/credentials"
 done
 sudo chown -R ec2-user:ec2-user /home/ec2-user/.aws
+
+# set up cron-to-sns gateway
+sudo yum install python-boto
+sudo install ./cron-mail-to-sns.py /usr/local/bin/cron-mail-to-sns.py
+sudo sh -c "/bin/cat > /etc/sysconfig/crond" <<EOF
+# SpinPunch - send cron errors via SNS instead of system mail
+CRONDARGS=" -m '/usr/local/bin/cron-mail-to-sns.py ${AWS_CRON_SNS_TOPIC}'"
+EOF
+
+# install memory-metrics reporting script (may not be enabled, see cron setup)
+sudo install ./ec2-send-memory-metrics.py /usr/local/bin/ec2-send-memory-metrics.py
+
+
