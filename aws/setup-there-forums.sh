@@ -55,6 +55,7 @@ sudo ./fix-ec2-mail.py
 #sudo setcap 'cap_net_bind_service=+ep' /usr/bin/python2.6
 
 echo "SETUP(remote): forums setup done!"
+echo "MISSING: /etc/sysconfig/network hostname and sudo hostname <HOSTNAME>"
 echo "MISSING: SSL certs, from s3://spinpunch-config/ssl-spinpunch.com.tar.gz.gpg."
 echo "MISSING: /home/ec2-user/.ssh/forums-mysql-root-password for backups."
 echo "MISSING: /home/ec2-user/.ssh/forums-awssecret for backups."

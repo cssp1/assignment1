@@ -61,7 +61,7 @@ echo "SETUP(remote): Fixing mail configuration..."
 sudo ./fix-ec2-mail.py
 
 echo "SETUP(remote): www setup done!"
-
+echo "MISSING: /etc/sysconfig/network hostname and sudo hostname <HOSTNAME>"
 echo "MISSING: /home/ec2-user/.ssh/www-mysql-root-password for backups."
 echo "MISSING: /home/ec2-user/.ssh/www-awssecret for backups."
 echo "MISSING: SSL certs, from s3://spinpunch-config/ssl-spinpunch.com.tar.gz.gpg."
