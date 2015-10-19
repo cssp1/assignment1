@@ -70,3 +70,4 @@ EOF
     sudo sh -c "chmod 0700 ${homedir}/.aws"
     sudo sh -c "chmod 0600 ${homedir}/.aws/{config,credentials}"
 done
+sudo chown -R ec2-user:ec2-user /home/ec2-user/.aws
