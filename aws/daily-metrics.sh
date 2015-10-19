@@ -46,7 +46,7 @@ fi
 touch $HOME/.awsrc
 
 GAME_NAME=`basename $GAME_DIR`
-GAME_ID=`$GAME_DIR/SpinConfig.py --getvar game_id --getvar-format raw`
+GAME_ID=`$GAME_DIR/gameserver/SpinConfig.py --getvar game_id --getvar-format raw`
 GAME_ID_UPPER=`echo ${GAME_ID} | tr [a-z] [A-Z]`
 
 TODAY=`date +%Y%m%d`
