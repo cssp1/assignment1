@@ -3265,8 +3265,8 @@ class Session(object):
 
     # just return a string describing the current session state, for exception logging only
     def dump_exception_state(self):
-        return 'player %d viewing %d at %s, is_async %r complete_attack_in_progress %r visit_base_in_progress %r logout_in_progress %r has_attacked %r (%r) viewing_base_lock %r' % \
-               (self.player.user_id, self.viewing_player.user_id, self.viewing_base.base_id, self.is_async(), bool(self.complete_attack_in_progress), bool(self.visit_base_in_progress), bool(self.logout_in_progress), self.has_attacked, self.has_attacked_reason, self.viewing_base_lock)
+        return 'player %d viewing %d at %s (session change count %d), is_async %r complete_attack_in_progress %r visit_base_in_progress %r logout_in_progress %r has_attacked %r (%r) viewing_base_lock %r' % \
+               (self.player.user_id, self.viewing_player.user_id, self.viewing_base.base_id, self.debug_session_change_count, self.is_async(), bool(self.complete_attack_in_progress), bool(self.visit_base_in_progress), bool(self.logout_in_progress), self.has_attacked, self.has_attacked_reason, self.viewing_base_lock)
 
     # return current seconds of cumulative play time
     def cur_playtime(self):
@@ -4445,7 +4445,7 @@ class Session(object):
                                          (self.player.user_id, str(self.incoming_attack_type)))
 
         if not self.res_looter:
-            gamesite.exception_log.event(server_time, 'deploy_ai_attack with no res_looter %s' % (session.dump_exception_state(),))
+            gamesite.exception_log.event(server_time, 'deploy_ai_attack with no res_looter %s' % (self.dump_exception_state(),))
             self.res_looter = ResLoot.ResLoot(gamedata, self, self.viewing_player, self.viewing_base)
 
         self.has_attacked = True
