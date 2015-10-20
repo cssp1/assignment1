@@ -46,7 +46,7 @@ fi
 touch $HOME/.awsrc
 
 GAME_NAME=`basename $GAME_DIR`
-GAME_ID=`$GAME_DIR/gameserver/SpinConfig.py --getvar game_id --getvar-format raw`
+GAME_ID=`(cd $GAME_DIR/gameserver && ./SpinConfig.py --getvar game_id --getvar-format raw)`
 GAME_ID_UPPER=`echo ${GAME_ID} | tr [a-z] [A-Z]`
 
 TODAY=`date +%Y%m%d`
@@ -151,7 +151,7 @@ echo "sending SMS message..."
 (cd $GAME_DIR/gameserver && \
     ./SpinReminders.py \
         --body-from "$SMSFILE" --from "$UI_MAIL_SENDER" --subject "${GAME_ID_UPPER} Heartbeat" \
-        --recipients "`${GAME_DIR}/gameserver/SpinConfig.py --getvar heartbeat_recipients`")
+        --recipients "`(cd ${GAME_DIR}/gameserver && ./SpinConfig.py --getvar heartbeat_recipients)`")
 rm -f "$SMSFILE"
 
 exit $ERROR
