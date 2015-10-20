@@ -13,8 +13,6 @@
 
 import SpinJSON
 import random
-import functools
-from twisted.internet import defer
 from Region import Region
 
 # encapsulate the return value from CONTROLAPI support calls, to be interpreted by cgipcheck.html JavaScript
