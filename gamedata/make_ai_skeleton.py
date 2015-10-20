@@ -187,6 +187,14 @@ def dump_json_toplevel(blob, depth=0, fd = sys.stdout):
         else:
             print >>fd, '\n', '    '*(depth), '}',
 
+# create the "ui_progress" block that goes into an AI base/attack
+# "cur"/"max" are within this difficulty and the "overall" versions are across all difficulties put together
+def format_ui_progress(cur, max, overall_cur, overall_max):
+    if overall_cur == cur and overall_max == max:
+        return {"cur": cur, "max": max}
+    else:
+        return {"cur": cur, "max": max, "overall_cur": overall_cur, "overall_max": overall_max}
+
 def completion_valentina_message(picture = None, text = None, extra = ''):
     assert picture is not None and type(picture) is str
     assert text is not None and type(text) is str
@@ -1020,10 +1028,7 @@ if __name__ == '__main__':
                 (data['event_ui_name'], (' (%s difficulty)' % diff if len(data['difficulties'])>1 else ''),
                  "\nAI Enemy: %s" % data['villain_ui_name'] if data['villain_ui_name'] != data['event_ui_name'] else '', unskipped_count+1, num_unskipped_bases,
                  data['final_reward_info'][diff], ('\n'+data['extra_ui_info']) if 'extra_ui_info' in data else '')),
-                ("ui_progress", { # within difficulty
-                                  "cur": unskipped_count, "max": num_unskipped_bases,
-                                  # across all difficulties
-                                  "overall_cur": overall_unskipped_count, "overall_max": overall_num_unskipped_bases }),
+                ("ui_progress", format_ui_progress(unskipped_count, num_unskipped_bases, overall_unskipped_count, overall_num_unskipped_bases)),
                 ("ui_difficulty", diff),
                 ("ui_priority", ui_priority),
                 ("portrait", data['villain_portrait'][diff]),
@@ -1598,10 +1603,7 @@ if __name__ == '__main__':
         # 1. Player has already completed the event this week, and needs to wait for next week.
         # 2. While still logged in, a week boundary passes. The engine currently doesn't update the
         # available AI list in this case, so the player will still see last week's dummy base. XXX needs fix.
-        json += [("ui_progress", { # within this difficulty
-                                   "cur": unskipped_count, "max": num_unskipped_bases,
-                                   # across all difficulties
-                                   "overall_cur": overall_unskipped_count, "overall_max": overall_num_unskipped_bases }),
+        json += [("ui_progress", format_ui_progress(unskipped_count, num_unskipped_bases, overall_unskipped_count, overall_num_unskipped_bases)),
                  ("ui_difficulty", diff),
                  ("ui_spy_button","Defeated"),
                  ("ui_instance_cooldown",instance_cdname),
