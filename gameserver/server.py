@@ -3047,6 +3047,8 @@ class Session(object):
 
         # for debugging, keep track of how many SESSION_CHANGE messages we've sent the client this login
         self.debug_session_change_count = 0
+        # for debugging, keep track of last time a long attack was forced to conclude
+        self.debug_last_long_attack = -1
 
         # same for complete_attack
         self.complete_attack_in_progress = False
@@ -3265,8 +3267,8 @@ class Session(object):
 
     # just return a string describing the current session state, for exception logging only
     def dump_exception_state(self):
-        return 'player %d viewing %d at %s (session change count %d), is_async %r complete_attack_in_progress %r visit_base_in_progress %r logout_in_progress %r has_attacked %r (%r) viewing_base_lock %r' % \
-               (self.player.user_id, self.viewing_player.user_id, self.viewing_base.base_id, self.debug_session_change_count, self.is_async(), bool(self.complete_attack_in_progress), bool(self.visit_base_in_progress), bool(self.logout_in_progress), self.has_attacked, self.has_attacked_reason, self.viewing_base_lock)
+        return 'player %d viewing %d at %s (session change count %d), is_async %r complete_attack_in_progress %r visit_base_in_progress %r logout_in_progress %r has_attacked %r (%r) viewing_base_lock %r last_long_attack %d' % \
+               (self.player.user_id, self.viewing_player.user_id, self.viewing_base.base_id, self.debug_session_change_count, self.is_async(), bool(self.complete_attack_in_progress), bool(self.visit_base_in_progress), bool(self.logout_in_progress), self.has_attacked, self.has_attacked_reason, self.viewing_base_lock, self.debug_last_long_attack)
 
     # return current seconds of cumulative play time
     def cur_playtime(self):
@@ -21476,7 +21478,7 @@ class GAMEAPI(resource.Resource):
                                 return
 
                     except Exception:
-                        gamesite.exception_log.event(server_time, 'handle_message_guts exception %s msg %s: %s' % (session.dump_exception_state(), latency_tag, traceback.format_exc()))
+                        gamesite.exception_log.event(server_time, 'handle_message_guts exception %s msg %s:\n%s' % (session.dump_exception_state(), latency_tag, traceback.format_exc()))
                         retmsg.append(["ERROR", "SERVER_EXCEPTION"])
                         break
 
@@ -26636,6 +26638,7 @@ class GameSite(server.Site):
                     return None
                 d.addCallbacks(lambda _, self=self, session=session: force_attack_end(self, session),
                                ignore_logout_race)
+                session.debug_last_long_attack = server_time
                 session.after_async_request(d)
 
             if (not session.sprobe_in_progress):
