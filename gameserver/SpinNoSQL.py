@@ -136,14 +136,14 @@ class NoSQLClient (object):
 
     # must match dbserver.py and server.py definitions of these lock states
     LOCK_OPEN = 0
-    LOCK_LOGGED_IN = 1 # not used anymore
+    LOCK_LOGGED_IN = 1
     LOCK_BEING_ATTACKED = 2
 
     LOCK_TIMEOUT = 600 # seconds after which a lock is considered stale and may be busted
 
     # how long to keep old lock generation counters around - this should be longer than
-    # the longest period of time a server could reasonably have stale (spied but not locked) player/base data
-    LOCK_GEN_TIME = 6*3600
+    # the longest period of time a server could hold stale (spied but not locked) player/base data
+    LOCK_GEN_TIME = 12*3600
 
     ROLE_DEFAULT = 0
     ROLE_LEADER = 4
@@ -308,6 +308,8 @@ class NoSQLClient (object):
 
     def do_maint(self, time_now, cur_season, cur_week):
         print 'Busting stale player locks...'
+        LOCK_IS_OPEN = {'$or':[{'LOCK_STATE':{'$exists':False}},
+                               {'LOCK_STATE':{'$lte':0}}]}
         LOCK_IS_TAKEN = {'$and':[{'LOCK_STATE':{'$exists':True}},
                                  {'LOCK_STATE':{'$gt':0}}]}
         LOCK_IS_STALE = {'LOCK_TIME':{'$lte':self.time - self.LOCK_TIMEOUT}}
@@ -315,6 +317,18 @@ class NoSQLClient (object):
                                             {'$unset':{'LOCK_STATE':1,'LOCK_OWNER':1,'LOCK_TIME':1,'LOCK_GENERATION':1,'LOCK_HOLDER':1}}).matched_count
         if n > 0:
             print '  Busted', n, 'stale player locks'
+
+        # strictly speaking we don't need to get rid of old LOCK_GENERATION counters,
+        # but we do this to avoid permanent lock-outs when the playerdb backing store doesn't get
+        # an update to match the last lock generation in the player cache. Can happen due to S3 bugs etc.
+        print 'Deleting old player lock generation counters...'
+        n = self.player_cache().update_many({'$and':[LOCK_IS_OPEN,
+                                                     {'LOCK_GENERATION': {'$exists':True}},
+                                                     {'last_mtime': {'$lt': time_now - self.LOCK_GEN_TIME}}
+                                                     ]},
+                                            {'$unset':{'LOCK_GENERATION':1}}).matched_count
+        if n > 0:
+            print '  Deleted', n, 'old player lock generation counters'
 
         print 'Checking for expired player messages...'
         prune_msg_qs = {'$or': [{'expire_time': {'$gt': 0, '$lt': time_now}}]}
