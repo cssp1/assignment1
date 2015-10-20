@@ -8821,10 +8821,12 @@ class Player(AbstractPlayer):
             cur_time = server_time
         return cur_time
 
-    def get_event(self, event_kind, event_name, ref_time, ignore_activation = False):
+    # Return the event_schedule entry for an event in progress
+    def get_event_schedule(self, event_kind, event_name, ref_time, ignore_activation):
         assert event_kind in ('current_event', 'current_event_store', 'facebook_sale',
                               'current_trophy_pve_challenge', 'current_trophy_pvp_challenge',
                               'current_stat_tournament')
+        assert ref_time is not None
 
         # PvP-isolated players may not get trophies
         if self.isolate_pvp and ('trophy' in event_kind): return None
@@ -8862,9 +8864,16 @@ class Player(AbstractPlayer):
 
         return None
 
+    def get_event_data(self, event_kind, event_name = None, ref_time = None, ignore_activation = False):
+        if ref_time is None: ref_time = self.get_absolute_time()
+        sched = self.get_event_schedule(event_kind, event_name, ref_time, ignore_activation)
+        if sched:
+            return gamedata['events'][sched['name']]
+        return None
+
     def get_event_time(self, event_kind, event_name, method, ignore_activation = False, t_offset = 0):
         ref_time = self.get_absolute_time() + t_offset
-        entry = self.get_event(event_kind, event_name, ref_time, ignore_activation = ignore_activation)
+        entry = self.get_event_schedule(event_kind, event_name, ref_time, ignore_activation)
         if not entry: return None
 
         if method == 'start': # time since start of current run
@@ -9926,11 +9935,11 @@ class Player(AbstractPlayer):
                                                SpinConfig.get_pvp_day(gamedata['matchmaking']['week_origin'], self.get_absolute_time()))
 
         # look for an ongoing stat tournament
-        event_stat_name = None
-        event = self.get_event('current_stat_tournament', None, self.get_absolute_time())
-        if event:
-            event_data = gamedata['events'][event['name']]
+        event_data = self.get_event_data('current_stat_tournament')
+        if event_data:
             event_stat_name = event_data['stat']['name']
+        else:
+            event_stat_name = None
 
         for name, value in stats.iteritems():
 
@@ -9971,11 +9980,11 @@ class Player(AbstractPlayer):
         do_all = self.history.get('scores2_publish_refresh',-1) < gamedata['server'].get('scores2_publish_refresh',-1)
         if do_all:
             it = self.scores2.all_iter()
-            event_stat_name = None
-            event = self.get_event('current_stat_tournament', None, self.get_absolute_time())
-            if event:
-                event_data = gamedata['events'][event['name']]
+            event_data = self.get_event_data('current_stat_tournament')
+            if event_data:
                 event_stat_name = event_data['stat']['name']
+            else:
+                event_stat_name = None
             it_a = filter(lambda x: x['stat'].startswith('trophies_') or x['stat'] == event_stat_name, it)
         else:
             it = self.scores2.dirty_iter()
@@ -10010,11 +10019,11 @@ class Player(AbstractPlayer):
 
         if it_a is None:
             # look for an ongoing stat tournament
-            event_stat_name = None
-            event = self.get_event('current_stat_tournament', None, self.get_absolute_time())
-            if event:
-                event_data = gamedata['events'][event['name']]
+            event_data = self.get_event_data('current_stat_tournament')
+            if event_data:
                 event_stat_name = event_data['stat']['name']
+            else:
+                event_stat_name = None
             it_a = filter(lambda item: item['stat'].startswith('trophies_') or (event_stat_name and (item['stat'] == event_stat_name)), self.scores2.all_iter())
 
         # do not cache alliance scores regionally

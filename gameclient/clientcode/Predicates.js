@@ -1108,16 +1108,12 @@ EventTimePredicate.prototype.is_satisfied = function(player, qdata) {
     }
 };
 EventTimePredicate.prototype.ui_expire_time = function(player) {
+    var neg_time_left = player.get_event_time(this.kind, this.name, 'end', this.ignore_activation, this.t_offset);
+    if(neg_time_left === null) {
+        throw Error('event '+this.name+' is not active');
+    }
     var ref_time = player.get_absolute_time() + this.t_offset;
-    var event_data = player.get_event(this.kind, this.name, ref_time, this.ignore_activation);
-    if(!event_data) {
-        throw Error('event '+this.name+' is not active');
-    }
-    var time_left = -player.get_event_time(this.kind, this.name, 'end', this.ignore_activation, this.t_offset);
-    if(time_left === null) {
-        throw Error('event '+this.name+' is not active');
-    }
-    return ref_time + time_left;
+    return ref_time - neg_time_left;
 };
 
 /** @constructor

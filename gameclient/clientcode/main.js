@@ -12408,8 +12408,9 @@ function get_event_evil_valentina() {
 
     // is any global event currently going on?
     if(read_predicate({'predicate':'LIBRARY', 'name': 'hide_event_info_until'}).is_satisfied(player, null)) {
-        if(player.get_event_time('current_event', null, 'inprogress')) {
-            props = get_event_evil_valentina_props(gamedata['events'][player.get_event('current_event', null, player.get_absolute_time())['name']]);
+        var event_data = player.get_event_data('current_event');
+        if(event_data) {
+            props = get_event_evil_valentina_props(event_data);
         }
     }
     // global events take priority over tutorial event
@@ -13067,8 +13068,8 @@ function update_desktop_dialogs() {
         if(player.tutorial_state == "COMPLETE" &&
            read_predicate({'predicate':'LIBRARY', 'name': 'hide_event_info_until'}).is_satisfied(player, null) &&
            !(global_chat_frame && global_chat_frame.user_data['size'] === 'big')) {
-            var quarry_event = player.get_event('current_event', 'event_quarry_contest', player.get_absolute_time());
-            if(quarry_event && player.get_event_time('current_event', 'event_quarry_contest', 'inprogress')) {
+            var quarry_event = player.get_event_data('current_event', 'event_quarry_contest');
+            if(quarry_event) {
                 show_regional_event_info = true;
                 dialog.widgets['regional_title'].str = quarry_event['ui_title'];
                 dialog.widgets['regional_descr'].str = quarry_event['ui_description'];
@@ -20646,12 +20647,9 @@ function invoke_region_map(target_loc) {
     }
 
     // check for token event
-    var sched = player.get_event('current_event', null, player.get_absolute_time(), true);
-    if(sched) {
-        var event = gamedata['events'][sched['name']];
-        if('token_item' in event) {
-            dialog.widgets['map'].token_icon = gamedata['items'][event['token_item']]['store_icon'];
-        }
+    var event = player.get_event_data('current_event', null, null, true);
+    if(event && ('token_item' in event)) {
+        dialog.widgets['map'].token_icon = gamedata['items'][event['token_item']]['store_icon'];
     }
 
     if(player.get_any_abtest_value('region_map_scroll_help', gamedata['territory']['scroll_help']) &&
@@ -25776,9 +25774,9 @@ function invoke_leaderboard(force_period, force_mode, force_chapter) {
     dialog.widgets['close_button'].onclick = function() { change_selection_ui(null); };
 
     // see if a token-based event is going on
-    if(player.get_event_time('current_event', null, 'inprogress')) {
-        var props = gamedata['events'][player.get_event('current_event', null, player.get_absolute_time())['name']];
-        dialog.user_data['enable_tokens'] = !!props['enable_token_leaderboard'];
+    var event_data = player.get_event_data('current_event');
+    if(event_data) {
+        dialog.user_data['enable_tokens'] = !!event_data['enable_token_leaderboard'];
     }
 
     dialog.user_data['periods'] = ['week', 'season', 'ALL'];
@@ -25831,8 +25829,8 @@ function invoke_leaderboard(force_period, force_mode, force_chapter) {
         }
     }
 
-    var quarry_event = player.get_event('current_event', 'event_quarry_contest', player.get_absolute_time());
-    if(quarry_event && player.get_event_time('current_event', 'event_quarry_contest', 'inprogress')) {
+    var quarry_event = player.get_event_data('current_event', 'event_quarry_contest');
+    if(quarry_event) {
         dialog.widgets['footer_bg'].show =
             dialog.widgets['footer_message'].show = true;
         dialog.widgets['footer_message'].set_text_with_linebreaking(quarry_event['ui_leaderboard_footer_message'].replace('%d', pretty_print_time_brief(-player.get_event_time('current_event', 'event_quarry_contest','end'))));
@@ -34644,11 +34642,12 @@ player.event_list_cache = null;
     @type {?Object.<string, Array.<Object>>} */
 player.event_list_cache_index = null;
 
-/** @param {string} event_kind
+/** Return the event_schedule entry for an event in progress
+    @param {string} event_kind
     @param {string|null} event_name
     @param {number} ref_time
-    @param {boolean=} ignore_activation */
-player.get_event = function(event_kind, event_name, ref_time, ignore_activation) {
+    @param {boolean} ignore_activation */
+player.get_event_schedule = function(event_kind, event_name, ref_time, ignore_activation) {
     if(!goog.array.contains(['current_event','current_event_store','facebook_sale',
                              'current_stat_tournament',
                              'current_trophy_pve_challenge','current_trophy_pvp_challenge'], event_kind)) {
@@ -34703,6 +34702,21 @@ player.get_event = function(event_kind, event_name, ref_time, ignore_activation)
     return null;
 };
 
+/** Returns the event_schedule entry for an event in progress
+    @param {string} event_kind
+    @param {string|null=} event_name
+    @param {number|null=} ref_time
+    @param {boolean=} ignore_activation */
+player.get_event_data = function(event_kind, event_name, ref_time, ignore_activation) {
+    if(typeof ref_time === 'undefined' || ref_time === null) { ref_time = player.get_absolute_time(); }
+    if(!event_name) { event_name = null; }
+    var sched = player.get_event_schedule(event_kind, event_name, ref_time, !!ignore_activation);
+    if(sched) {
+        return gamedata['events'][sched['name']];
+    }
+    return null;
+};
+
 /** @param {string} event_kind
     @param {string|null} event_name
     @param {string} method
@@ -34711,7 +34725,7 @@ player.get_event = function(event_kind, event_name, ref_time, ignore_activation)
 player.get_event_time = function(event_kind, event_name, method, ignore_activation, t_offset) {
     if(typeof t_offset == 'undefined') { t_offset = 0; }
     var ref_time = player.get_absolute_time() + t_offset;
-    var entry = player.get_event(event_kind, event_name, ref_time, ignore_activation);
+    var entry = player.get_event_schedule(event_kind, event_name, ref_time, !!ignore_activation);
     if(!entry) { return null; }
 
     if(method === 'start') { // time since start of current run
@@ -34744,17 +34758,12 @@ player.get_event_time = function(event_kind, event_name, method, ignore_activati
 
 // returns the events entry
 player.current_stat_tournament_event = function() {
-    var sched = player.get_event('current_stat_tournament', null, player.get_absolute_time(), false);
-    if(sched) {
-        return gamedata['events'][sched['name']];
-    } else {
-        return null;
-    }
+    return player.get_event_data('current_stat_tournament');
 };
 
 // returns absolute end time of current cycle of this stat tournament
 player.current_stat_tournament_end_time = function() {
-    var cur_time_minus_end_time = player.get_event_time('current_stat_tournament', null, 'end', false, 0);
+    var cur_time_minus_end_time = player.get_event_time('current_stat_tournament', null, 'end');
     return player.get_absolute_time() - cur_time_minus_end_time;
 };
 
@@ -34788,7 +34797,7 @@ function display_trophy_count(raw, trophy_type) {
 }
 
 player.get_current_trophy_challenge_name = function(kind) {
-    var entry = player.get_event(kind, null, player.get_absolute_time());
+    var entry = player.get_event_data(kind);
     if(entry) { return entry['name']; }
     return null;
 };
