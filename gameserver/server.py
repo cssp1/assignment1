@@ -8836,8 +8836,17 @@ class Player(AbstractPlayer):
             data = gamedata['events'].get(entry['name'], None)
             if not data: continue
             if ('kind' not in data) or (data['kind'] != event_kind): continue
-            if entry['end_time'] <= ref_time: continue # event is in the past
+
+            # first run of event starts at start_time and ends at end_time
+            # if repeat_interval is specified, event re-runs at start_time + repeat_interval
             if entry['start_time'] > ref_time: continue # event is in the future
+            if 'repeat_interval' in entry:
+                delta = (ref_time - entry['start_time']) % entry['repeat_interval']
+                if delta >= (entry['end_time'] - entry['start_time']): continue # we are between runs
+            else:
+                if entry['end_time'] <= ref_time: continue # event is in the past
+
+
             if (event_name and (entry['name'] != event_name)): continue
             if not ignore_activation:
                 if ('activation' in entry) and (not Predicates.read_predicate(entry['activation']).is_satisfied(self, None)): continue
@@ -8854,19 +8863,38 @@ class Player(AbstractPlayer):
         return None
 
     def get_event_time(self, event_kind, event_name, method, ignore_activation = False, t_offset = 0):
-        cur_time = self.get_absolute_time() + t_offset
-        event_data = self.get_event(event_kind, event_name, cur_time, ignore_activation = ignore_activation)
-        if not event_data: return None
+        ref_time = self.get_absolute_time() + t_offset
+        entry = self.get_event(event_kind, event_name, ref_time, ignore_activation = ignore_activation)
+        if not entry: return None
 
-        if method == 'start':
-            return cur_time - event_data['start_time']
-        elif method == 'end':
-            return cur_time - event_data['end_time']
-        elif method == 'inprogress':
-            return (cur_time >= event_data['start_time'] and cur_time < event_data['end_time'])
-        elif method == 'progress':
-            if cur_time < event_data['start_time'] or cur_time >= event_data['end_time']: return 0
-            return (cur_time - event_data['start_time'])/float(event_data['end_time']-event_data['start_time'])
+        if method == 'start': # time since start of current run
+            if 'repeat_interval' in entry:
+                return (ref_time - entry['start_time']) % entry['repeat_interval']
+            else:
+                return ref_time - entry['start_time']
+        elif method == 'end': # negative time until end of current run
+            if 'repeat_interval' in entry:
+                delta = (ref_time - entry['start_time']) % entry['repeat_interval']
+                return delta - (entry['end_time'] - entry['start_time'])
+            else:
+                return ref_time - entry['end_time']
+        elif method == 'inprogress': # true if event is in progress, false if not
+            if 'repeat_interval' in entry:
+                if ref_time < entry['start_time']: return False
+                delta = (ref_time - entry['start_time']) % entry['repeat_interval']
+                return (delta < (entry['end_time'] - entry['start_time']))
+            else:
+                return (ref_time >= entry['start_time'] and ref_time < entry['end_time'])
+        elif method == 'progress': # 0.0-1.0 progress during current run of event
+            if 'repeat_interval' in entry:
+                if ref_time < entry['start_time']: return 0
+                delta = (ref_time - entry['start_time']) % entry['repeat_interval']
+                if delta >= (entry['end_time'] - entry['start_time']): return 0
+                return delta / float(entry['end_time']-entry['start_time'])
+            else:
+                if ref_time < entry['start_time']: return 0
+                if ref_time >= entry['end_time']: return 0
+                return (ref_time - entry['start_time'])/float(entry['end_time']-entry['start_time'])
         elif method == 'enabled':
             return True
         else:

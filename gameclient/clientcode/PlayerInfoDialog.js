@@ -905,7 +905,7 @@ PlayerInfoDialog.update_scores = function(dialog) {
         point_time_scope = event['stat']['time_scope'];
         point_icon = event['icon'];
         point_icon_state = 'icon_30x30';
-        dialog.user_data['tournament_end_time'] = player.current_stat_tournament()['end_time'];
+        dialog.user_data['tournament_end_time'] = player.current_stat_tournament_end_time();
     } else if(trophy_type) { // show pvp points on primary display
         point_ui_name = gamedata['events'][trophy_challenge_name]['ui_name'];
         point_stat = 'trophies_'+trophy_type;

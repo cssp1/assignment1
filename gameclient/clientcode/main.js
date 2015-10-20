@@ -26726,7 +26726,7 @@ function alliance_list_change_tab(dialog, newtab, info_id) {
             var challenge, togo;
             if(event) { // stat tournament
                 challenge = d.user_data['event'] = event;
-                togo = player.current_alliance_stat_tournament()['end_time'] - player.get_absolute_time();
+                togo = player.current_alliance_stat_tournament_end_time() - player.get_absolute_time();
                 d.user_data['point_stat'] = event['stat'];
                 d.user_data['point_icon_asset'] = event['icon'];
                 d.user_data['point_icon_state'] = 'icon_30x30';
@@ -26948,7 +26948,7 @@ function alliance_list_change_tab(dialog, newtab, info_id) {
             d.user_data['point_stat'] = null;
             if(event) {
                 d.user_data['event'] = event;
-                d.user_data['event_end_time'] = player.current_alliance_stat_tournament()['end_time'];
+                d.user_data['event_end_time'] = player.current_alliance_stat_tournament_end_time();
                 d.user_data['point_stat'] = event['stat'];
                 d.user_data['point_icon_30x30_asset'] = dialog.user_data['point_icon_15x15_asset'] = event['icon'];
                 d.user_data['point_icon_30x30_state'] = 'icon_30x30';
@@ -27491,7 +27491,7 @@ function init_alliance_info_tab(dialog, alliance_id) {
     var event = player.current_alliance_stat_tournament_event();
     if(event) {
         dialog.user_data['event'] = event;
-        dialog.user_data['event_end_time'] = player.current_alliance_stat_tournament()['end_time'];
+        dialog.user_data['event_end_time'] = player.current_alliance_stat_tournament_end_time();
         dialog.user_data['point_stat'] = event['stat'];
         dialog.user_data['point_icon_30x30_asset'] = dialog.user_data['point_icon_15x15_asset'] = event['icon'];
         dialog.user_data['point_icon_30x30_state'] = 'icon_30x30';
@@ -34681,8 +34681,17 @@ player.get_event = function(event_kind, event_name, ref_time, ignore_activation)
         var data = gamedata['events'][entry['name']] || null;
         if(!data) { continue; }
         if(!('kind' in data) || (data['kind'] != event_kind)) { continue; }
-        if(entry['end_time'] <= ref_time) { continue; }
+
+        // first run of event starts at start_time and ends at end_time
+        // if repeat_interval is specified, event re-runs at start_time + repeat_interval
         if(entry['start_time'] > ref_time) { continue; }
+        if('repeat_interval' in entry) {
+            var delta = (ref_time - entry['start_time']) % entry['repeat_interval'];
+            if(delta >= (entry['end_time'] - entry['start_time'])) { continue; }
+        } else {
+            if(entry['end_time'] <= ref_time) { continue; }
+        }
+
         if(event_name && (entry['name'] != event_name)) { continue; }
         if(!ignore_activation) {
             if(('activation' in entry) && !read_predicate(entry['activation']).is_satisfied(player, null)) { continue; }
@@ -34701,16 +34710,31 @@ player.get_event = function(event_kind, event_name, ref_time, ignore_activation)
     @param {number=} t_offset */
 player.get_event_time = function(event_kind, event_name, method, ignore_activation, t_offset) {
     if(typeof t_offset == 'undefined') { t_offset = 0; }
-    var cur_time = player.get_absolute_time() + t_offset;
-    var event_data = player.get_event(event_kind, event_name, cur_time, ignore_activation);
-    if(!event_data) { return null; }
+    var ref_time = player.get_absolute_time() + t_offset;
+    var entry = player.get_event(event_kind, event_name, ref_time, ignore_activation);
+    if(!entry) { return null; }
 
-    if(method === 'start') {
-        return cur_time - event_data['start_time'];
-    } else if(method === 'end') {
-        return cur_time - event_data['end_time'];
-    } else if(method === 'inprogress') {
-        return (cur_time >= event_data['start_time'] && cur_time < event_data['end_time']);
+    if(method === 'start') { // time since start of current run
+        if('repeat_interval' in entry) {
+            return (ref_time - entry['start_time']) % entry['repeat_interval'];
+        } else {
+            return ref_time - entry['start_time'];
+        }
+    } else if(method === 'end') { // negative time until end of current run
+        if('repeat_interval' in entry) {
+            var delta = (ref_time - entry['start_time']) % entry['repeat_interval'];
+            return delta - (entry['end_time'] - entry['start_time']);
+        } else {
+            return ref_time - entry['end_time'];
+        }
+    } else if(method === 'inprogress') { // true if event is in progress, false if not
+        if('repeat_interval' in entry) {
+            if(ref_time < entry['start_time']) { return false; }
+            var delta = (ref_time - entry['start_time']) % entry['repeat_interval'];
+            return (delta < (entry['end_time'] - entry['start_time']));
+        } else {
+            return (ref_time >= entry['start_time'] && ref_time < entry['end_time']);
+        }
     } else if(method === 'enabled') {
         return true;
     } else {
@@ -34718,19 +34742,20 @@ player.get_event_time = function(event_kind, event_name, method, ignore_activati
     }
 };
 
-// returns the event_schedule entry
-player.current_stat_tournament = function() {
-    return player.get_event('current_stat_tournament', null, player.get_absolute_time(), false);
-};
-
 // returns the events entry
 player.current_stat_tournament_event = function() {
-    var sched = player.current_stat_tournament();
+    var sched = player.get_event('current_stat_tournament', null, player.get_absolute_time(), false);
     if(sched) {
         return gamedata['events'][sched['name']];
     } else {
         return null;
     }
+};
+
+// returns absolute end time of current cycle of this stat tournament
+player.current_stat_tournament_end_time = function() {
+    var cur_time_minus_end_time = player.get_event_time('current_stat_tournament', null, 'end', false, 0);
+    return player.get_absolute_time() - cur_time_minus_end_time;
 };
 
 // returns the events entry
@@ -34744,10 +34769,9 @@ player.current_alliance_stat_tournament_event = function() {
     return null;
 };
 
-// returns the event_schedule entry
-player.current_alliance_stat_tournament = function() {
+player.current_alliance_stat_tournament_end_time = function() {
     if(player.current_alliance_stat_tournament_event()) {
-        return player.current_stat_tournament();
+        return player.current_stat_tournament_end_time();
     }
     return null;
 };

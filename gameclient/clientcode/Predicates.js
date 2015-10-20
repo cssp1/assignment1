@@ -1113,7 +1113,11 @@ EventTimePredicate.prototype.ui_expire_time = function(player) {
     if(!event_data) {
         throw Error('event '+this.name+' is not active');
     }
-    return event_data['end_time'];
+    var time_left = -player.get_event_time(this.kind, this.name, 'end', this.ignore_activation, this.t_offset);
+    if(time_left === null) {
+        throw Error('event '+this.name+' is not active');
+    }
+    return ref_time + time_left;
 };
 
 /** @constructor
