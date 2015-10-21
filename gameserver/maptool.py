@@ -996,7 +996,10 @@ def spawn_all_hives(db, lock_manager, region_id, force_rotation = False, dry_run
         else:
             spawn_times = [[spawn_data.get('start_time',-1), spawn_data.get('end_time',-1)]]
 
+        repeat_interval = spawn_data.get('repeat_interval',None)
+
         do_spawn = False
+        ref_time = event_time_override or time_now
         for start_time, end_time in spawn_times:
             # restrict time range by any start/end times provided within the template itself
             if template.get('start_time',-1) > 0:
@@ -1004,10 +1007,15 @@ def spawn_all_hives(db, lock_manager, region_id, force_rotation = False, dry_run
             if template.get('end_time',-1) > 0:
                 end_time = min(end_time, template['end_time']) if (end_time > 0) else template['end_time'] # this defaults to [[start_time,end_time]] or [[-1,-1]] if none is specified
 
-            if ((start_time < 0) or ((event_time_override or time_now) >= start_time)) and \
-               ((end_time < 0) or ((event_time_override or time_now) < end_time)):
-                do_spawn = True # found a valid spawn time
-                break
+            if ((start_time > 0) and (ref_time < start_time)): continue # in the future
+            if repeat_interval:
+                delta = (ref_time - start_time) % repeat_interval
+                if ((end_time > 0) and (delta >= (end_time - start_time))): continue # outside a run
+            else:
+                if ((end_time > 0) and (ref_time >= end_time)): continue # in the past
+
+            do_spawn = True # found a valid spawn time
+            break
 
         if not do_spawn:
             #if verbose: print 'not spawning hive template', spawn_data['template'], 'because current time is outside its start/end_time range(s)'
@@ -1035,7 +1043,7 @@ def spawn_all_hives(db, lock_manager, region_id, force_rotation = False, dry_run
 
         for i in xrange(qty):
             if spawn_hive(hives, map_cache, db, lock_manager, region_id, (spawn_data['id_start']+i), name_idx, spawn_data['template'], template,
-                          start_time = start_time, end_time = end_time, region_player_pop = player_pop if region_data.get('hive_num_scale_by_player_pop',False) else None,
+                          start_time = start_time, end_time = end_time, repeat_interval = repeat_interval, region_player_pop = player_pop if region_data.get('hive_num_scale_by_player_pop',False) else None,
                           force_rotation = force_rotation, dry_run = dry_run):
                 num_spawned_by_type[spawn_data['template']] = num_spawned_by_type.get(spawn_data['template'],0) + 1
                 do_throttle()
@@ -1049,7 +1057,7 @@ def spawn_all_hives(db, lock_manager, region_id, force_rotation = False, dry_run
 
 
 def spawn_hive(hives, map_cache, db, lock_manager, region_id, id_num, name_idx, template_name, template,
-               start_time = -1, end_time = -1, force_rotation = False, region_player_pop = None,
+               start_time = -1, end_time = -1, repeat_interval = None, force_rotation = False, region_player_pop = None,
                dry_run = True):
 
     owner_id = template['owner_id']
@@ -1079,8 +1087,15 @@ def spawn_hive(hives, map_cache, db, lock_manager, region_id, id_num, name_idx, 
     duration = int(hives['duration'] * (1.0 - hives['randomize_duration'] * random.random()))
 
     # clamp duration to end time
-    if (end_time > 0) and ((event_time_override or time_now) + duration >= end_time):
-        duration = min(duration, end_time - (event_time_override or time_now))
+    ref_time = (event_time_override or time_now)
+    if (end_time > 0):
+        if repeat_interval:
+            delta = (ref_time - start_time) % repeat_interval
+            run_end_time = ref_time + (end_time - start_time - delta)
+        else:
+            run_end_time = end_time
+        if (ref_time + duration >= run_end_time):
+            duration = min(duration, run_end_time - ref_time)
 
     assign_climate = template.get('base_climate', None)
 
