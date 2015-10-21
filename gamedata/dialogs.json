@@ -6414,7 +6414,7 @@
             "picture_sunken": {"kind": "StaticImage", "xy":[16,50], "dimensions":[430,170], "asset": "dialog_sunken_gray_resizable", "bg_image_resizable": 1 },
             "picture_bg": { "kind": "SolidRect", "xy": [23,58], "dimensions": [416,154], "color": [0,0,0,1] },
             "picture": { "kind": "StaticImage", "xy": [24,59], "dimensions": [414,152] },
-
+            "picture_click_catcher": { "show": 0, "kind": "ActionButton", "xy": [23,58], "dimensions": [416,154] },
             "description_sunken": {"kind": "StaticImage", "xy":[16,230], "dimensions":[430,181], "asset": "dialog_sunken_resizable", "bg_image_resizable": 1 },
             "description": { "kind": "ScrollingTextField", "xy": [32,238], "dimensions": [400,561], // [398,161]
                              "text_size": 13,

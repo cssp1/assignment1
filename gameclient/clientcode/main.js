@@ -34323,7 +34323,8 @@ function update_daily_tip_pageable(dialog) {
         }
 
         if(url || cons || helper) {
-            dialog.widgets['link_button'].show = true;
+            dialog.widgets['link_button'].show =
+                dialog.widgets['picture_click_catcher'].show = true;
             if('link_button_bg_image' in tip) {
                 dialog.widgets['link_button'].bg_image = tip['link_button_bg_image'];
             } else {
@@ -34336,13 +34337,14 @@ function update_daily_tip_pageable(dialog) {
             }
             dialog.widgets['link_button'].state = (cons || url) ? 'normal' : 'disabled_clickable';
             dialog.widgets['link_button'].tooltip.str = helper_tooltip;
-            dialog.widgets['link_button'].onclick = (function (_url, _cons, _helper) { return function() {
-                if(_url) {
-                    url_open_in_new_tab(_url);
-                }
-                if(_cons) { change_selection_ui(null); read_consequent(_cons).execute(); }
-                if(_helper) { _helper(); }
-            }; })(url, cons, helper);
+            dialog.widgets['picture_click_catcher'].onclick =
+                dialog.widgets['link_button'].onclick = (function (_url, _cons, _helper) { return function() {
+                    if(_url) {
+                        url_open_in_new_tab(_url);
+                    }
+                    if(_cons) { change_selection_ui(null); read_consequent(_cons).execute(); }
+                    if(_helper) { _helper(); }
+                }; })(url, cons, helper);
         }
     }
 }
