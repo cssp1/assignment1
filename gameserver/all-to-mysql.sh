@@ -22,7 +22,7 @@ echo `date` "${GAME_ID} === ${FREQ} ETL run ${RUN_ID} start ===" >> ${LOG}
 
 # run a command, writing the time it took to the log as well as the command name
 function run_it {
-    TIME_TEMPFILE="/tmp/etl-${GAME_ID}-${RUN_ID}-time.txt"
+    TIME_TEMPFILE="/var/tmp/etl-${GAME_ID}-${RUN_ID}-time.txt"
     TIME_FMT="%Uuser %Ssystem %Eelapsed %PCPU %Mk max"
     UI_CMD=`basename $1`
     echo `date` "${GAME_ID} run ${RUN_ID} ${UI_CMD} START" >> ${LOG}
