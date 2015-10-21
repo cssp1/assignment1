@@ -17,7 +17,7 @@ Screenshot.Codec = {
 /** Once we get an exception, blacklist further screenshot attempts */
 Screenshot.blacklisted = false;
 /** @return {boolean} */
-Screenshot.supported = function() { return !Screenshot.blacklisted; };
+Screenshot.supported = function() { return !Screenshot.blacklisted && (typeof Blob !== 'undefined'); };
 
 /** @constructor
     @struct
