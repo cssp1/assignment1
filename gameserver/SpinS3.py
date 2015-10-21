@@ -453,8 +453,6 @@ class S3 (object):
         url, headers = self.put_request_from_buf(buf, bucket, filename, **kwargs)
         if self.verbose: print 'PUT', len(buf.buffer()), 'bytes to', url
 
-        wrote_data = None
-
         if HTTPLIB == 'requests':
             attempt = 0
             err_msg = None
@@ -462,8 +460,7 @@ class S3 (object):
                 try:
                     response = self.requests_session.put(url, headers = headers, data = buf.buffer(), timeout = S3_REQUEST_TIMEOUT)
                     response.raise_for_status()
-                    wrote_data = response.content
-                    break # GOOD!
+                    return response.content
                 except requests.exceptions.HTTPError as e:
                     err_msg = 'S3 exists (requests) HTTPError: %s' % repr(e)
                     if e.response.status_code == 500:
@@ -472,15 +469,14 @@ class S3 (object):
                         raise S3Exception(err_msg) # abort immediately
                 attempt += 1
                 time.sleep(RETRY_DELAY)
-                if wrote_data is None:
-                    raise S3Exception('S3 put_putbuf(%s,%s) giving up after %d HTTP errors, last one was: %s' % (bucket, filename, attempt, err_msg))
+
+            raise S3Exception('S3 put_putbuf(%s,%s) giving up after %d HTTP errors, last one was: %s' % (bucket, filename, attempt, err_msg))
+
         else:
             request = urllib2.Request(url, data = buf.buffer())
             [request.add_header(key, val) for key, val in headers.iteritems()]
             request.get_method = lambda: 'PUT'
-            wrote_data = self.urlopen(request).read()
-
-        return wrote_data
+            return self.urlopen(request).read()
 
     # synchronous PUT from disk file
     def put_file(self, bucket, filename, source_filename, streaming = True, timeout = S3_REQUEST_TIMEOUT, **kwargs):
