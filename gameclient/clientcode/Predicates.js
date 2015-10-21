@@ -1123,6 +1123,7 @@ function AbsoluteTimePredicate(data) {
     this.range = data['range'];
     this.mod = ('mod' in data ? data['mod'] : -1);
     this.shift = data['shift'] || 0;
+    this.repeat_interval = data['repeat_interval'] || null;
 }
 goog.inherits(AbsoluteTimePredicate, Predicate);
 AbsoluteTimePredicate.prototype.is_satisfied = function(player, qdata) {
@@ -1132,8 +1133,17 @@ AbsoluteTimePredicate.prototype.is_satisfied = function(player, qdata) {
     if(this.mod > 0) {
         et = et % this.mod;
     }
+    // before range start?
     if(this.range[0] >= 0 && et < this.range[0]) { return false; }
-    if(this.range[1] >= 0 && et >= this.range[1]) { return false; }
+    // after range end?
+    if(this.range[1] >= 0) {
+        if(this.repeat_interval) {
+            var delta = (et - this.range[0]) % this.repeat_interval;
+            if(delta >= (this.range[1] - this.range[0])) { return false; }
+        } else {
+            if(et >= this.range[1]) { return false; }
+        }
+    }
     return true;
 };
 AbsoluteTimePredicate.prototype.do_ui_describe = function(player) {

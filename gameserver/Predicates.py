@@ -663,14 +663,24 @@ class AbsoluteTimePredicate(Predicate):
         self.range = data['range']
         self.mod = data.get('mod', -1)
         self.shift = data.get('shift', 0)
+        self.repeat_interval = data.get('repeat_interval', None)
     def is_satisfied(self, player, qdata):
         et = player.get_absolute_time()
         if et is None: return False
         et = et + self.shift
         if self.mod > 0:
             et = et % self.mod
+
+        # before range start?
         if self.range[0] >= 0 and et < self.range[0]: return False
-        if self.range[1] >= 0 and et >= self.range[1]: return False
+
+        # after range end?
+        if self.range[1] >= 0:
+            if self.repeat_interval:
+                delta = (et - self.range[0]) % self.repeat_interval
+                if delta >= (self.range[1] - self.range[0]): return False
+            else:
+                if et >= self.range[1]: return False
         return True
 
 class TimeOfDayPredicate(Predicate):
