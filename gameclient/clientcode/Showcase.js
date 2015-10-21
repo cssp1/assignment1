@@ -81,7 +81,7 @@ Showcase.apply_showcase_hacks = function(dialog, hack) {
         ItemDisplay.set_inventory_item_asset(dialog.widgets['corner_token'], token_item_spec);
 
         // create a fake token item for use by the tooltip
-        var force_expire_by = (eval_cond_or_literal(token_item_spec['force_expire_by'] || -1, player, null) || -1);
+        var force_expire_by = session.get_item_spec_forced_expiration(token_item_spec);
         var token_item = {'spec': hack['token_item'], 'expire_time': force_expire_by};
         ItemDisplay.attach_inventory_item_tooltip(dialog.widgets['corner_token'], token_item);
 

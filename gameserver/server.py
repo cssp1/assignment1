@@ -3978,6 +3978,27 @@ class Session(object):
         else:
             gamesite.exception_log.event(server_time, 'tech completion for non-session.player! %d' % player.user_id)
 
+    # check for forced expirations of an inventory item by spec
+    def get_item_spec_forced_expiration(self, spec, prev_expire_time = -1, ref_time = None):
+        expire_time = prev_expire_time
+        if ref_time is None: ref_time = self.player.get_absolute_time()
+        if 'force_duration' in spec:
+            force_duration = Predicates.eval_cond_or_literal(spec['force_duration'], self, self.player)
+            if force_duration > 0: expire_time = min(force_duration+ref_time, expire_time) if (expire_time > 0) else force_duration+ref_time
+        if 'force_expire_by' in spec:
+            expire_by_data = Predicates.eval_cond_or_literal(spec['force_expire_by'], self, self.player)
+            if isinstance(expire_by_data, dict): # event-driven
+                neg_time_to_end = self.player.get_event_time(expire_by_data.get('event_kind','current_event'), expire_by_data.get('event_name',None), 'end', ignore_activation = True, t_offset = ref_time - self.player.get_absolute_time())
+                if neg_time_to_end is None: # event not active!
+                    expire_by = -1
+                else:
+                    expire_by = ref_time + (-neg_time_to_end)
+            else: # literal int
+                assert isinstance(expire_by_data, int)
+                expire_by = expire_by_data
+            if expire_by > 0: expire_time = min(expire_by, expire_time) if (expire_time > 0) else expire_by
+        return expire_time
+
     def get_loot_items(self, player, loot_table, item_duration, item_expire_at, rand_func = random.random, duration_ref_time = None):
         assert player is self.player
 
@@ -4015,12 +4036,7 @@ class Session(object):
                 del item['item_duration']
 
             # allow items.json entry to force expiration
-            if 'force_duration' in spec:
-                force_duration = Predicates.eval_cond_or_literal(spec['force_duration'], self, player)
-                if force_duration > 0: item_expire_time = min(force_duration+duration_ref_time, item_expire_time) if (item_expire_time > 0) else force_duration+duration_ref_time
-            if 'force_expire_by' in spec:
-                expire_by = Predicates.eval_cond_or_literal(spec['force_expire_by'], self, player)
-                if expire_by > 0: item_expire_time = min(item_expire_time, expire_by) if (item_expire_time > 0) else expire_by
+            item_expire_time = self.get_item_spec_forced_expiration(spec, prev_expire_time = item_expire_time, ref_time = duration_ref_time)
 
             if item_expire_time > 0:
                 if item_expire_time < absolute_time: # item already expired
@@ -7779,7 +7795,6 @@ class Player(AbstractPlayer):
                                             return True
         return False
 
-
     def prune_inventory(self, session):
         to_remove = []
         for item in self.inventory:
@@ -7787,13 +7802,9 @@ class Player(AbstractPlayer):
 
             # check for forced expirations
             if spec and (item.get('expire_time',-1) < 0):
-                item_expire_time = -1
-                if 'force_duration' in spec:
-                    force_duration = Predicates.eval_cond_or_literal(spec['force_duration'], session, self)
-                    if force_duration > 0: item['expire_time'] = min(force_duration+server_time, item_expire_time) if (item_expire_time > 0) else force_duration+server_time
-                if 'force_expire_by' in spec:
-                    expire_by = Predicates.eval_cond_or_literal(spec['force_expire_by'], session, self)
-                    if expire_by > 0: item['expire_time'] = min(item_expire_time, expire_by) if (item_expire_time > 0) else expire_by
+                expire_time = session.get_item_spec_forced_expiration(spec)
+                if expire_time > 0:
+                    item['expire_time'] = expire_time
 
             if (item.get('expire_time',-1) > 0) and (server_time > item['expire_time']):
                 to_remove.append(item)

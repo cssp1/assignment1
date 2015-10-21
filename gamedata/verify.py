@@ -1269,8 +1269,13 @@ def check_item(itemname, spec):
                 expect_absolute_time_end = {'origin': gamedata['matchmaking']['week_origin'], 'offset': 2*86400, 'interval': 7*86400}
                 if COND_CHAIN == 'force_expire_by':
                     for pred, val in spec[COND_CHAIN]:
-                        if ((val - expect_absolute_time_end['origin']) % expect_absolute_time_end['interval']) != expect_absolute_time_end['offset']:
-                            error |= 1; print '%s: incorrect force_expire_by time %d, must agree with %r' % (itemname, val, expect_absolute_time_end)
+                        if isinstance(val, int):
+                            if val > 1 and ((val - expect_absolute_time_end['origin']) % expect_absolute_time_end['interval']) != expect_absolute_time_end['offset']:
+                                error |= 1; print '%s: incorrect force_expire_by time %d, must agree with %r' % (itemname, val, expect_absolute_time_end)
+                        else:
+                            assert isinstance(val, dict)
+                            if not (('event_name' in val) or ('event_kind' in val)):
+                                error |= 1; print '%s: incorrect force_expire_by entry %r, missing event_name or event_kind' % (itemname, val)
 
             error |= check_cond_chain(spec[COND_CHAIN], reason = 'item %s: %s' % (itemname, COND_CHAIN), expect_absolute_time_end = expect_absolute_time_end)
 

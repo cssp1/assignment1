@@ -5435,6 +5435,42 @@ session.set_battle_outcome_dirty = function() {
     session.battle_outcome_dirty = true;
 };
 
+/** check for earliest forced expiration time of an inventory item by spec
+ @param {!Object} spec
+ @param {number=} prev_expire_time
+ @param {number=} ref_time
+ @return {number} */
+session.get_item_spec_forced_expiration = function(spec, prev_expire_time, ref_time) {
+    var expire_time = (prev_expire_time > 0 ? prev_expire_time : -1);
+    if(!ref_time || ref_time <= 0) { ref_time = player.get_absolute_time(); }
+    if('force_duration' in spec) {
+        var force_duration = eval_cond_or_literal(spec['force_duration'], player, null);
+        if(force_duration > 0) {
+            expire_time = (expire_time > 0) ? Math.min(force_duration+ref_time, expire_time) : (force_duration+ref_time);
+        }
+    }
+    if('force_expire_by' in spec) {
+        var expire_by_data = eval_cond_or_literal(spec['force_expire_by'], player, null);
+        var expire_by;
+        if(typeof expire_by_data === 'object') { // event-driven
+            var neg_time_to_end = player.get_event_time(expire_by_data['event_kind'] || 'current_event',
+                                                        expire_by_data['event_name'] || null, 'end',
+                                                        true, ref_time - player.get_absolute_time());
+            if(neg_time_to_end === null) { // event not active
+                expire_by = -1;
+            } else {
+                expire_by = ref_time + (-neg_time_to_end);
+            }
+        } else { // literal int
+            expire_by = expire_by_data;
+        }
+        if(expire_by > 0) {
+            expire_time = (expire_time > 0) ? Math.min(expire_by, expire_time) : expire_by;
+        }
+    }
+    return expire_time;
+};
+
 // player state
 var player = {};
 
