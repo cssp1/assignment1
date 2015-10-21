@@ -41,6 +41,8 @@ def ai_analytics_tag_assignments_schema(sql_util):
                        ('user_id', 'INT4'), # -1 when base_type != 'home' (cannot use NULL because we want to parameterize matches)
                        ('start_time', 'INT8'),
                        ('end_time', 'INT8'),
+                       ('reset_interval', 'INT8'),
+                       ('repeat_interval', 'INT8'),
                        ('analytics_tag', 'VARCHAR(32)'),
                        ('difficulty', 'VARCHAR(16)'), # "Normal"/"Heroic"/"Epic"
                        ('difficulty_step', 'INT2'), # counts starts from 1 within each Normal/Heroic/Epic progression
@@ -57,8 +59,34 @@ def ai_analytics_tag_info_schema(sql_util):
                        ('num_hives', 'INT4'),
                        ('start_time', 'INT8'),
                        ('end_time', 'INT8'),
-                       ('repeat_interval', 'INT4')
+                       ('reset_interval', 'INT8'),
+                       ('repeat_interval', 'INT8'),
                        ], 'indices': {}}
+
+def new_analytics_tag_info(tag, event_klass):
+    return {'analytics_tag': tag,
+            'event_type': event_klass,
+            'difficulties': [],
+            'base_ids': [],
+            'hives': [],
+            'start_end_times': None, # array of all applicable [start,end] times
+            'start_time': None, # earliest of all applicable start_times
+            'end_time': None, # latest of all applicable end_times
+            'reset_interval': None,
+            'repeat_interval': None}
+
+# incorporate timing info from one AI base or hive into the info for the entire event tag
+def apply_timing_info(info, start_end_times):
+    # overwrite existing contents
+    info['start_end_times'] = []
+    for start_time, end_time, reset_interval, repeat_interval in start_end_times:
+        if (start_time,end_time,reset_interval, repeat_interval) not in info['start_end_times']: info['start_end_times'].append((start_time,end_time,reset_interval,repeat_interval))
+        # set min/max ranges
+        if start_time is not None: info['start_time'] = start_time if (info['start_time'] is None or start_time < 0) else min(info['start_time'], start_time)
+        if end_time is not None: info['end_time'] = end_time if (info['end_time'] is None or end_time < 0) else max(info['end_time'], end_time)
+        if reset_interval is not None: info['reset_interval'] = reset_interval
+        if repeat_interval is not None: info['repeat_interval'] = repeat_interval
+
 
 if __name__ == '__main__':
     game_id = SpinConfig.game()
@@ -125,15 +153,7 @@ if __name__ == '__main__':
                            'pve_tutorial_progression': 'tutorial'}.get(klass, None)
             if tag and event_klass:
                 if tag not in analytics_tag_info:
-                    analytics_tag_info[tag] = {'analytics_tag': tag,
-                                               'event_type': event_klass,
-                                               'difficulties': [],
-                                               'base_ids': [],
-                                               'hives': [],
-                                               'start_end_times': None, # array of all applicable [start,end] times
-                                               'start_time': None, # earliest of all applicable start_times
-                                               'end_time': None, # latest of all applicable end_times
-                                               'repeat_interval': None}
+                    analytics_tag_info[tag] = new_analytics_tag_info(tag, event_klass)
                 info = analytics_tag_info[tag]
                 info['base_ids'].append(int(sid))
 
@@ -143,12 +163,7 @@ if __name__ == '__main__':
                 # add timing info to existing entry
                 start_end_times = SpinUpcache.ai_base_timings(gamedata, data)
                 if start_end_times:
-                    info['start_end_times'] = []
-                    for start_time, end_time, repeat_interval in start_end_times:
-                        if (start_time,end_time) not in info['start_end_times']: info['start_end_times'].append((start_time, end_time))
-                        if start_time is not None: info['start_time'] = start_time if (info['start_time'] is None or start_time < 0) else min(info['start_time'], start_time)
-                        if end_time is not None: info['end_time'] = end_time if (info['end_time'] is None or end_time < 0) else max(info['end_time'], end_time)
-                        if repeat_interval is not None: info['repeat_interval'] = repeat_interval
+                    apply_timing_info(info, start_end_times)
 
         for kind, dir in (('quarry', 'quarries'), ('hive', 'hives')):
             for name, data in gamedata[dir]['templates'].iteritems():
@@ -167,25 +182,12 @@ if __name__ == '__main__':
 
                 if tag and event_klass:
                     if tag not in analytics_tag_info:
-                        analytics_tag_info[tag] = {'analytics_tag': tag,
-                                                   'event_type': event_klass,
-                                                   'difficulties': [],
-                                                   'base_ids': [],
-                                                   'hives': [],
-                                                   'start_end_times': None, # array of all applicable [start,end] times
-                                                   'start_time': None, # earliest of all applicable start_times
-                                                   'end_time': None, # latest of all applicable end_times
-                                                   'repeat_interval': None}
+                        analytics_tag_info[tag] = new_analytics_tag_info(tag, event_klass)
                     info = analytics_tag_info[tag]
                     info['hives'].append(name)
                     start_end_times = SpinUpcache.hive_timings(gamedata, name)
                     if start_end_times:
-                        info['start_end_times'] = []
-                        for start_time, end_time in start_end_times:
-                            if (start_time,end_time) not in info['start_end_times']: info['start_end_times'].append((start_time, end_time))
-                            if start_time is not None: info['start_time'] = start_time if (info['start_time'] is None or start_time < 0) else min(info['start_time'], start_time)
-                            if end_time is not None: info['end_time'] = end_time if (info['end_time'] is None or end_time < 0) else max(info['end_time'], end_time)
-
+                        apply_timing_info(info, start_end_times)
 
         # fix up repeat_interval to be NULL instead of the end-start time for once-only events
     #    for entry in analytics_tag_info.itervalues():
@@ -207,6 +209,7 @@ if __name__ == '__main__':
                                                                          ('num_hives', len(entry['hives'])),
                                                                          ('start_time', entry['start_time']),
                                                                          ('end_time', entry['end_time']),
+                                                                         ('reset_interval', entry['reset_interval']),
                                                                          ('repeat_interval', entry['repeat_interval']))
                                                                         for entry in analytics_tag_info.itervalues()])
             # upsert into ai_analytics_tag_assignments
@@ -216,7 +219,7 @@ if __name__ == '__main__':
                 if entry['start_end_times']:
                     start_end_times = entry['start_end_times']
                 else:
-                    start_end_times = [[-1,-1]]
+                    start_end_times = [[-1,-1,None,None]]
 
                 for base_id in entry['base_ids']:
                     base = gamedata['ai_bases']['bases'][str(base_id)]
@@ -230,26 +233,30 @@ if __name__ == '__main__':
                         difficulty_step = None
                         progression_step = None
 
-                    for start_time, end_time in start_end_times:
+                    for start_time, end_time, reset_interval, repeat_interval in start_end_times:
                         assignments_keys.append(('home', 'home', base_id, start_time))
                         assignments_rows.append((('base_type', 'home'),
                                                  ('base_template', 'home'),
                                                  ('user_id', base_id),
                                                  ('start_time', start_time),
                                                  ('end_time', end_time),
+                                                 ('reset_interval', reset_interval),
+                                                 ('repeat_interval', repeat_interval),
                                                  ('analytics_tag', entry['analytics_tag']),
                                                  ('difficulty', base.get('ui_difficulty', 'Normal')),
                                                  ('difficulty_step', difficulty_step),
                                                  ('progression_step', progression_step),
                                                  ))
                 for hive in entry['hives']:
-                    for start_time, end_time in start_end_times:
+                    for start_time, end_time, reset_interval, repeat_interval in start_end_times:
                         assignments_keys.append(('hive', hive, -1, start_time))
                         assignments_rows.append((('base_type', 'hive'),
                                                  ('base_template', hive),
                                                  ('user_id', -1),
                                                  ('start_time', start_time),
                                                  ('end_time', end_time),
+                                                 ('reset_interval', reset_interval),
+                                                 ('repeat_interval', repeat_interval),
                                                  ('analytics_tag', entry['analytics_tag']),
                                                  ('difficulty', None),
                                                  ('difficulty_step', None),

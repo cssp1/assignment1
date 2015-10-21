@@ -575,7 +575,7 @@ def cons_cooldown(gamedata, cons): # return cooldown trigger interval if present
         return cons['period']
     return None
 
-def ai_base_timings(gamedata, base): # return list of [start_time, end_time, repeat_interval] for this base
+def ai_base_timings(gamedata, base): # return list of [start_time, end_time, reset_interval, repeat_interval] for this base
     start_end_times = None
     if 'activation' in base:
         start_end_times = pred_start_end_times(gamedata, base['activation'])
@@ -585,18 +585,19 @@ def ai_base_timings(gamedata, base): # return list of [start_time, end_time, rep
     if start_end_times is None: # unrestricted
         start_end_times = [[-1,-1]]
 
-    # append the repeat intervals to each start_end_times entry
+    # append the reset/repeat intervals to each start_end_times entry
     if 'completion' in base:
-        repeat_interval = cons_cooldown(gamedata, base['completion'])
+        reset_interval = cons_cooldown(gamedata, base['completion'])
     else:
-        repeat_interval = None
-
+        reset_interval = None
+    repeat_interval = None
     for entry in start_end_times:
+        entry.append(reset_interval)
         entry.append(repeat_interval)
 
     return start_end_times
 
-# utility function to parse AI hive JSON to obtain list of start/end times
+# utility function to parse AI hive JSON to obtain list of [start_time, end_time, reset_interval, repeat_interval] for this template
 def hive_timings(gamedata, template):
     start_end_times = []
     max_duration = gamedata['hives']['duration'] # extend hive end_time by the max duration, since spawned hives can last that long
@@ -604,11 +605,11 @@ def hive_timings(gamedata, template):
         if entry['template'] == template:
             if not entry.get('active',True): continue
             if 'spawn_times' in entry:
-                start_end_times += [[x[0],x[1]+max_duration] for x in entry['spawn_times']]
+                start_end_times += [[x[0],x[1]+max_duration,None,None] for x in entry['spawn_times']]
             elif 'start_time' in entry:
-                start_end_times.append([entry['start_time'], entry['end_time']+max_duration])
+                start_end_times.append([entry['start_time'], entry['end_time']+max_duration, None, entry.get('repeat_interval',None)])
             else:
-                start_end_times.append([-1,-1]) # unrestricted
+                start_end_times.append([-1,-1,None,None]) # unrestricted
     return start_end_times
 
 # utility functions to classify the type of an AI base, hive, or quarry for analytics purposes
