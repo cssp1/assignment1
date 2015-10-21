@@ -3047,8 +3047,9 @@ class Session(object):
 
         # for debugging, keep track of how many SESSION_CHANGE messages we've sent the client this login
         self.debug_session_change_count = 0
-        # for debugging, keep track of last time a long attack was forced to conclude
-        self.debug_last_long_attack = -1
+
+        # keep track of last few actions applied to this session for debugging
+        self.debug_action_log = collections.deque([], 20)
 
         # same for complete_attack
         self.complete_attack_in_progress = False
@@ -3062,7 +3063,6 @@ class Session(object):
         # these are reset each time the connected user views a different base
         self.home_base = True
         self.has_attacked = False
-        self.has_attacked_reason = 'init'
 
         self.defender_cc_standing = False # true if the defender's CC was not destroyed at start of battle
         self.defender_protection_expired_at = -1 # set on initial base visit
@@ -3265,10 +3265,15 @@ class Session(object):
                     return
         metric_event_coded(player.user_id, event_name, val)
 
+    def debug_log_action(self, reason):
+        self.debug_action_log.append({'time':server_time, 'reason': reason, 'session': self.debug_session_change_count})
+
     # just return a string describing the current session state, for exception logging only
     def dump_exception_state(self):
-        return 'player %d viewing %d at %s (session change count %d), is_async %r complete_attack_in_progress %r visit_base_in_progress %r logout_in_progress %r has_attacked %r (%r) viewing_base_lock %r last_long_attack %d' % \
-               (self.player.user_id, self.viewing_player.user_id, self.viewing_base.base_id, self.debug_session_change_count, self.is_async(), bool(self.complete_attack_in_progress), bool(self.visit_base_in_progress), bool(self.logout_in_progress), self.has_attacked, self.has_attacked_reason, self.viewing_base_lock, self.debug_last_long_attack)
+        ui_action_log = '\n'.join('%d %d %s' % (x['time'], x['session'], x['reason']) for x in self.debug_action_log)
+        ui_action_log += '\n%d %d %s' % (server_time, self.debug_session_change_count, 'NOW')
+        return 'player %d viewing %d at %s (session change count %d), is_async %r complete_attack_in_progress %r visit_base_in_progress %r logout_in_progress %r has_attacked %r viewing_base_lock %r action_log %s' % \
+               (self.player.user_id, self.viewing_player.user_id, self.viewing_base.base_id, self.debug_session_change_count, self.is_async(), bool(self.complete_attack_in_progress), bool(self.visit_base_in_progress), bool(self.logout_in_progress), self.has_attacked, self.viewing_base_lock, ui_action_log)
 
     # return current seconds of cumulative play time
     def cur_playtime(self):
@@ -4451,7 +4456,7 @@ class Session(object):
             self.res_looter = ResLoot.ResLoot(gamedata, self, self.viewing_player, self.viewing_base)
 
         self.has_attacked = True
-        self.has_attacked_reason = 'deploy_ai_attack %d' % self.debug_session_change_count
+        self.debug_log_action('deploy_ai_attack')
 
         # add "weak zombie" debuff to player units
         if self.player.get_any_abtest_value('enable_zombie_debuff', gamedata['enable_zombie_debuff']):
@@ -13266,7 +13271,8 @@ class CONTROLAPI(resource.Resource):
         return server.NOT_DONE_YET
     def handle_server_eval(self, request, expr = None):
         result = eval(expr)
-        gamesite.exception_log.event(server_time, 'eval %s -> %s' % (expr, repr(result)))
+        ui_result = ('\n'+result) if isinstance(result, basestring) else (' '+repr(result))
+        gamesite.exception_log.event(server_time, 'eval %s ->%s' % (expr, ui_result))
         return SpinJSON.dumps({'result': repr(result)}, newline=True)
     def handle_system_announcement(self, request, body = None):
         for session in iter_sessions():
@@ -16192,7 +16198,7 @@ class GAMEAPI(resource.Resource):
             # END has_attacked
 
         session.has_attacked = False
-        session.has_attacked_reason = '_complete_attack %d' % session.debug_session_change_count
+        session.debug_log_action('_complete_attack')
 
         session.defender_cc_standing = False
         session.reset_attack_log()
@@ -16290,15 +16296,17 @@ class GAMEAPI(resource.Resource):
             # do not do this from complete_attack, because that is called in the logout/relog path
 
         if dest_user_id == session.user.user_id:
-            ascdebug('change_session (home) %d' % (session.user.user_id))
+            reason = 'change_session (home) %d' % (session.user.user_id)
             change = SessionChangeHome(session, retmsg, dest_user_id, dest_base_id, new_ladder_state, delay, pre_attack)
         elif dest_user_id:
-            ascdebug('change_session (old) %d -> %d' % (session.user.user_id, dest_user_id))
+            reason = 'change_session (old) %d -> %d' % (session.user.user_id, dest_user_id)
             change = SessionChangeOld(session, retmsg, dest_user_id, dest_base_id, new_ladder_state, delay, pre_attack)
         else:
-            ascdebug('change_session (new) %d:%s -> %s' % (session.user.user_id, session.viewing_base.base_id, dest_base_id))
+            reason = 'change_session (new) %d:%s -> %s' % (session.user.user_id, session.viewing_base.base_id, dest_base_id)
             change = SessionChangeNew(session, retmsg, dest_user_id, dest_base_id, new_ladder_state, delay, pre_attack)
 
+        ascdebug(reason)
+        session.debug_log_action(reason)
 
         # it's cleaner to string everything together in one callback chain
         master_d = make_deferred('change_session')
@@ -16335,9 +16343,12 @@ class GAMEAPI(resource.Resource):
                                 pre_attack):
 
         if dest_base_id:
-            ascdebug('change_session_complete (new) %d:%s -> %s (%d,%d,%d)' % (session.user.user_id, session.viewing_base.base_id, dest_base_id, bool(dest_user), bool(dest_player), bool(dest_base)))
+            reason = 'change_session_complete (new) %d:%s -> %s (%d,%d,%d)' % (session.user.user_id, session.viewing_base.base_id, dest_base_id, bool(dest_user), bool(dest_player), bool(dest_base))
         else:
-            ascdebug('change_session_complete (old) %d -> %d (%d,%d)' % (session.user.user_id, dest_user_id, bool(dest_user), bool(dest_player)))
+            reason = 'change_session_complete (old) %d -> %d (%d,%d)' % (session.user.user_id, dest_user_id, bool(dest_user), bool(dest_player))
+
+        ascdebug(reason)
+        session.debug_log_action(reason)
 
         cannot_spy = False
 
@@ -16411,7 +16422,7 @@ class GAMEAPI(resource.Resource):
                 cannot_spy = True
             else:
                 session.has_attacked = True
-                session.has_attacked_reason = 'reinforce %d' % session.debug_session_change_count
+                session.debug_log_action('reinforce')
                 session.attack_finish_time = server_time + gamedata['reinforce_time']
 
         if cannot_spy:
@@ -19866,7 +19877,7 @@ class GAMEAPI(resource.Resource):
                                                                 'ladder':session.is_ladder_battle()})
 
             session.has_attacked = True
-            session.has_attacked_reason = 'do_attack %d' % session.debug_session_change_count
+            session.debug_log_action('do_attack')
 
             session.viewing_base.base_last_attack_time = server_time
             session.viewing_base.base_times_attacked += 1
@@ -21489,6 +21500,8 @@ class GAMEAPI(resource.Resource):
                     else:
                         latency_tag = msg[0]
 
+                    session.debug_log_action(latency_tag)
+
                     try:
                         if start_time < 0: start_time = time.time()
 
@@ -22506,6 +22519,7 @@ class GAMEAPI(resource.Resource):
                 return session.logout_d
 
         ascdebug('log_out_async %d' % (session.user.user_id))
+        session.debug_log_action('log_out_async (%s)' % method)
 
         session.logout_in_progress = Session.AsyncLogout(session)
         session.logout_d = make_deferred('log_out_async')
@@ -22651,6 +22665,7 @@ class GAMEAPI(resource.Resource):
 
     def log_out_postflush(self, session):
         ascdebug('log_out_postflush %d' % (session.user.user_id))
+        session.debug_log_action('log_out_postflush')
 
         # remove the session from the global session table
         if session_table.get(session.session_id, None) is session:
@@ -26675,7 +26690,7 @@ class GameSite(server.Site):
                     return None
                 d.addCallbacks(lambda _, self=self, session=session: force_attack_end(self, session),
                                ignore_logout_race)
-                session.debug_last_long_attack = server_time
+                session.debug_log_action('force_attack_end')
                 session.after_async_request(d)
 
             if (not session.sprobe_in_progress):
