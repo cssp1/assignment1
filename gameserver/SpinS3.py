@@ -255,6 +255,9 @@ class S3 (object):
                         pass # retry
                     else:
                         raise S3Exception(err_msg) # abort immediately
+                except socket.timeout as e:
+                    err_msg = 'socket.timeout'
+                    pass # retry
                 attempt += 1
                 time.sleep(RETRY_DELAY)
 
@@ -282,6 +285,9 @@ class S3 (object):
                     pass # retry
                 else:
                     raise e # break immediately
+            except socket.timeout as e:
+                err_msg = 'socket.timeout'
+                pass # retry
             except urllib2_HTTPError as e:
                 if e.code == 500:
                     err_msg = 'urllib2.HTTPError code %d' % e.code
@@ -336,6 +342,9 @@ class S3 (object):
                             pass # retry
                         else:
                             raise S3Exception(err_msg) # abort immediately
+                    except socket.timeout as e:
+                        err_msg = 'socket.timeout'
+                        pass # retry
                     attempt += 1
                     time.sleep(RETRY_DELAY)
 
@@ -394,6 +403,9 @@ class S3 (object):
                             pass # retry
                         else:
                             raise S3Exception(err_msg) # abort immediately
+                    except socket.timeout as e:
+                        err_msg = 'socket.timeout'
+                        pass # retry
                 else:
                     try:
                         con = self._invoke_urllib2(bucket, filename, query = query)
