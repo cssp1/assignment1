@@ -16313,7 +16313,7 @@ class GAMEAPI(resource.Resource):
             reason = 'change_session (old) %d -> %d' % (session.user.user_id, dest_user_id)
             change = SessionChangeOld(session, retmsg, dest_user_id, dest_base_id, new_ladder_state, delay, pre_attack)
         else:
-            reason = 'change_session (new) %d:%s -> %s' % (session.user.user_id, session.viewing_base.base_id, dest_base_id)
+            reason = 'change_session (new) %d:%s -> %s pre_attack %r' % (session.user.user_id, session.viewing_base.base_id, dest_base_id, pre_attack)
             change = SessionChangeNew(session, retmsg, dest_user_id, dest_base_id, new_ladder_state, delay, pre_attack)
 
         ascdebug(reason)
@@ -16335,10 +16335,22 @@ class GAMEAPI(resource.Resource):
         master_d.addErrback(report_and_absorb_deferred_failure, session)
 
         master_d.addCallback(lambda _, change=change: change.begin())
-        master_d.addCallback(lambda args, self=self:
+
+        # if the main session change fails after begin(), we need to insert a forced change back to base
+        # (since we already ran complete_attack(), which irreversibly mutates state like res_looter)
+        def handle_failed_change(self, session, retmsg):
+            session.release_pre_locks()
+            # go back home
+            new_change = SessionChangeHome(session, retmsg, session.user.user_id, None, None, 0, None)
+            reason = 'change_session (home) %d because of failure' % (session.user.user_id)
+            ascdebug(reason)
+            session.debug_log_action(reason)
+            return new_change.begin().addCallback(lambda args, self=self: self.change_session_complete(*args))
+
+        master_d.addCallback(lambda args, self=self, session=session, retmsg=retmsg:
                              # note: receives the list of arguments to pass from change.d's callback
                              # if args is None, that means the change attempt failed
-                             self.change_session_complete(*args) if args else session.release_pre_locks())
+                             self.change_session_complete(*args) if args else handle_failed_change(self, session, retmsg))
 
         # we DO care about exceptions inside change_session_complete(), since we need to release locks
         master_d.addErrback(report_and_reraise_deferred_failure, session)
@@ -16354,9 +16366,9 @@ class GAMEAPI(resource.Resource):
                                 pre_attack):
 
         if dest_base_id:
-            reason = 'change_session_complete (new) %d:%s -> %s (%d,%d,%d)' % (session.user.user_id, session.viewing_base.base_id, dest_base_id, bool(dest_user), bool(dest_player), bool(dest_base))
+            reason = 'change_session_complete (new) %d:%s -> %s (%d,%d,%d) pre_attack %r' % (session.user.user_id, session.viewing_base.base_id, dest_base_id, bool(dest_user), bool(dest_player), bool(dest_base), pre_attack)
         else:
-            reason = 'change_session_complete (old) %d -> %d (%d,%d)' % (session.user.user_id, dest_user_id, bool(dest_user), bool(dest_player))
+            reason = 'change_session_complete (old) %d -> %d (%d,%d) pre_attack %r' % (session.user.user_id, dest_user_id, bool(dest_user), bool(dest_player), pre_attack)
 
         ascdebug(reason)
         session.debug_log_action(reason)
