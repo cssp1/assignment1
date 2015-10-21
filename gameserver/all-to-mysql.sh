@@ -41,6 +41,7 @@ if [[ "$FREQ" == "daily" ]]; then
   # credits - done hourly
   # gamebucks - done hourly
 
+  run_it ./ai_bases_to_mysql.py -q
   run_it ./battles_to_mysql.py -q --prune
   run_it ./battle_risk_reward_to_sql.py -q # requires battles, store (gamebucks), stats
 
