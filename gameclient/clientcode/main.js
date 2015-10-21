@@ -15939,24 +15939,14 @@ function invoke_post_screenshot_dialog(data, filename, reason, caption_prefix) {
     img.src = data;
     dialog.widgets['image'].raw_image = img;
 
-    // set scaling on the image to fit
-    var img_scale = 1/canvas_oversample;
-    if(img_scale * img.width > dialog.data['widgets']['image']['dimensions'][0]) {
-        img_scale *= dialog.data['widgets']['image']['dimensions'][0] / (img_scale*img.width);
-    }
-    if(img_scale * img.height > dialog.data['widgets']['image']['dimensions'][1]) {
-        img_scale *= dialog.data['widgets']['image']['dimensions'][1] / (img_scale*img.height);
-    }
-    var img_dims = vec_floor(vec_scale(img_scale, [img.width, img.height]));
 
-    dialog.widgets['image'].xy = vec_floor(vec_add(dialog.data['widgets']['image']['xy'],
-                                                   vec_scale(0.5, vec_sub(dialog.data['widgets']['image']['dimensions'], img_dims))));
-    dialog.widgets['image'].wh = [img.width, img.height];
-    dialog.widgets['image'].transform = [img_scale,0,0,img_scale,0,0];
-    dialog.widgets['image_bg'].xy = vec_add(dialog.widgets['image'].xy, vec_sub(dialog.data['widgets']['image_bg']['xy'],
-                                                                                dialog.data['widgets']['image']['xy']));
-    dialog.widgets['image_bg'].wh = vec_add(img_dims, vec_scale(2, vec_sub(dialog.data['widgets']['image']['xy'],
-                                                                           dialog.data['widgets']['image_bg']['xy'])));
+    // set scaling on the image to fit
+    post_screenshot_dialog_update_image_dimensions(dialog)
+
+    // note: some browsers (Chrome) parse the image asynchronously, so we have to wait for it to complete
+    if(img.width === 0 || img.height === 0) {
+        img.addEventListener('load', goog.partial(post_screenshot_dialog_update_image_dimensions, dialog), false);
+    }
 
     dialog.widgets['close_button'].onclick = dialog.widgets['cancel_button'].onclick = close_parent_dialog;
     dialog.widgets['caption_prefix'].str = caption_prefix; // dialog.user_data['caption_prefix'];
@@ -16002,6 +15992,32 @@ function invoke_post_screenshot_dialog(data, filename, reason, caption_prefix) {
 
     post_screenshot_dialog_update_privacy(dialog, dialog.user_data['privacy']);
     SPUI.set_keyboard_focus(dialog.widgets['caption_input']);
+}
+
+/** Show the preview/caption GUI
+    @param {!SPUI.Dialog} dialog
+*/
+function post_screenshot_dialog_update_image_dimensions(dialog) {
+    if(!dialog.is_visible()) { return; }
+    var img = dialog.widgets['image'].raw_image;
+
+    var img_scale = 1/canvas_oversample;
+    if(img_scale * img.width > dialog.data['widgets']['image']['dimensions'][0]) {
+        img_scale *= dialog.data['widgets']['image']['dimensions'][0] / (img_scale*img.width);
+    }
+    if(img_scale * img.height > dialog.data['widgets']['image']['dimensions'][1]) {
+        img_scale *= dialog.data['widgets']['image']['dimensions'][1] / (img_scale*img.height);
+    }
+    var img_dims = vec_floor(vec_scale(img_scale, [img.width, img.height]));
+
+    dialog.widgets['image'].xy = vec_floor(vec_add(dialog.data['widgets']['image']['xy'],
+                                                   vec_scale(0.5, vec_sub(dialog.data['widgets']['image']['dimensions'], img_dims))));
+    dialog.widgets['image'].wh = [img.width, img.height];
+    dialog.widgets['image'].transform = [img_scale,0,0,img_scale,0,0];
+    dialog.widgets['image_bg'].xy = vec_add(dialog.widgets['image'].xy, vec_sub(dialog.data['widgets']['image_bg']['xy'],
+                                                                                dialog.data['widgets']['image']['xy']));
+    dialog.widgets['image_bg'].wh = vec_add(img_dims, vec_scale(2, vec_sub(dialog.data['widgets']['image']['xy'],
+                                                                           dialog.data['widgets']['image_bg']['xy'])));
 }
 
 function post_screenshot_dialog_update_privacy(dialog, new_setting) {
