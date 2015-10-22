@@ -548,7 +548,7 @@ def ai_base_has_tokens(gamedata, base):
 
 # utility functions to parse AI base JSON to obtain start/end time and repeat interval
 
-def pred_start_end_times(gamedata, pred): # return array of (start_time, end_time) if present in the predicate, else None
+def pred_start_end_times(gamedata, pred): # return array of (start_time, end_time, repeat_interval) if present in the predicate, else None
     if pred['predicate'] == 'OR':
         # return the union of all the times
         time_list = []
@@ -563,7 +563,7 @@ def pred_start_end_times(gamedata, pred): # return array of (start_time, end_tim
             if temp is not None:
                 return temp
     elif pred['predicate'] == 'ABSOLUTE_TIME':
-        return [[pred['range'][0], pred['range'][1]]]
+        return [[pred['range'][0], pred['range'][1], pred.get('repeat_interval',None)]]
     return None
 
 def cons_cooldown(gamedata, cons): # return cooldown trigger interval if present in the consequent, else None
@@ -576,26 +576,22 @@ def cons_cooldown(gamedata, cons): # return cooldown trigger interval if present
     return None
 
 def ai_base_timings(gamedata, base): # return list of [start_time, end_time, reset_interval, repeat_interval] for this base
-    start_end_times = None
+    start_end_repeat = None
     if 'activation' in base:
-        start_end_times = pred_start_end_times(gamedata, base['activation'])
-    if (start_end_times is None) and ('show_if' in base):
-        start_end_times = pred_start_end_times(gamedata, base['show_if'])
+        start_end_repeat = pred_start_end_times(gamedata, base['activation'])
+    if (start_end_repeat is None) and ('show_if' in base):
+        start_end_repeat = pred_start_end_times(gamedata, base['show_if'])
 
-    if start_end_times is None: # unrestricted
-        start_end_times = [[-1,-1]]
+    if start_end_repeat is None: # unrestricted
+        start_end_repeat = [[-1,-1,None]]
 
-    # append the reset/repeat intervals to each start_end_times entry
+    # detect the reset interval
     if 'completion' in base:
         reset_interval = cons_cooldown(gamedata, base['completion'])
     else:
         reset_interval = None
-    repeat_interval = None
-    for entry in start_end_times:
-        entry.append(reset_interval)
-        entry.append(repeat_interval)
 
-    return start_end_times
+    return [[start, end, reset_interval, repeat] for start, end, repeat in start_end_repeat]
 
 # utility function to parse AI hive JSON to obtain list of [start_time, end_time, reset_interval, repeat_interval] for this template
 def hive_timings(gamedata, template):

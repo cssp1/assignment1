@@ -406,19 +406,19 @@ def _generate_showcase_consequent(game_id, event_dirname, data, atom):
             # we need a special case to handle this as make_per_run_cond_chain will just assume the single list is a set of
             # items that drop across multiple runs
             if len(final_loot_item_list) > 0 and isinstance(final_loot_item_list[0], list):
-                showcase['final_reward_items'] = make_per_run_cond_chain(data, lambda i, start_time, end_time: final_loot_item_list[i])
+                showcase['final_reward_items'] = make_per_run_cond_chain(data, lambda i, start_time, end_time, repeat_interval: final_loot_item_list[i])
             else:
                 showcase['final_reward_items'] = final_loot_item_list
 
             final_reward_items_title = data['showcase'].get('final_reward_items_title', None)
             if isinstance(final_reward_items_title, list):
-                showcase['ui_final_reward_title_bbcode'] = make_per_run_cond_chain(data, lambda i, start_time, end_time: get_for_difficulty(final_reward_items_title[i], diff))
+                showcase['ui_final_reward_title_bbcode'] = make_per_run_cond_chain(data, lambda i, start_time, end_time, repeat_interval: get_for_difficulty(final_reward_items_title[i], diff))
             else:
                 showcase['ui_final_reward_title_bbcode'] = get_for_difficulty(final_reward_items_title, diff)
 
             final_reward_items_subtitle = data['showcase'].get('final_reward_items_subtitle', None)
             if isinstance(final_reward_items_subtitle, list):
-                showcase['ui_final_reward_subtitle_bbcode'] = make_per_run_cond_chain(data, lambda i, start_time, end_time: get_for_difficulty(final_reward_items_subtitle[i], diff))
+                showcase['ui_final_reward_subtitle_bbcode'] = make_per_run_cond_chain(data, lambda i, start_time, end_time, repeat_interval: get_for_difficulty(final_reward_items_subtitle[i], diff))
             else:
                 showcase['ui_final_reward_subtitle_bbcode'] = get_for_difficulty(final_reward_items_subtitle, diff)
         elif final_loot_item_set:
@@ -530,8 +530,8 @@ def _generate_showcase_consequent(game_id, event_dirname, data, atom):
             login_showcase['corner_token_mode'] = 'token_login'
         else:
             login_showcase['corner_ai_asset'] = data['villain_attack_portrait'].replace('attack_portrait', 'console')
-        def make_login_header_text(i, start_time, end_time):
-            if start_time > 0:
+        def make_login_header_text(i, start_time, end_time, repeat_interval):
+            if start_time > 0 and (not repeat_interval): # punt in case where this is a repeating event
                 return '[color=#ffff00]NEW:[/color] [absolute_time=%s]' % start_time
             else:
                 return None
@@ -811,18 +811,25 @@ def get_progression_reward_items(loot, include_resource_boosts, include_random_l
 
     return ret
 
+def make_show_time_pred(start, end, repeat_interval):
+    ret = {"predicate": "ABSOLUTE_TIME", "range": [start,end]}
+    if repeat_interval: ret['repeat_interval'] = repeat_interval
+    return ret
+
 # make a cond chain with a value customized to each rergun segment of a multi-segment event.
-# make_value is a function that is given the (index, start_time, end_time) for the segment and returns the customized value
+# make_value is a function that is given the (index, start_time, end_time, repeat_interval) for the segment and returns the customized value
 def make_per_run_cond_chain(data, make_value):
     if 'show_times' in data:
         show_times = data['show_times']
     else:
         show_times = [[data.get('reveal_time', -1), data.get('hide_time', -1)]]
 
+    repeat_interval = data.get('repeat_interval',None)
+
     if len(show_times) == 1:
-        return make_value(0, show_times[0][0], show_times[0][1])
+        return make_value(0, show_times[0][0], show_times[0][1], repeat_interval)
     else:
-        return [[{"predicate": "ABSOLUTE_TIME", "range": [t[0], t[1]]}, make_value(i, t[0], t[1])] for i, t in enumerate(show_times)]
+        return [[make_show_time_pred(t[0], t[1], repeat_interval), make_value(i, t[0], t[1], repeat_interval)] for i, t in enumerate(show_times)]
 
 if __name__ == '__main__':
     print_auto_gen_warning()
@@ -944,9 +951,17 @@ if __name__ == '__main__':
 
     # predicate for time-based showing/hiding of the AI
     if 'show_times' in data:
-        time_pred = { "predicate": "OR", "subpredicates": [ {"predicate": "ABSOLUTE_TIME", "range": [t[0],t[1]]} for t in data['show_times'] ] }
+        show_times = data['show_times']
     elif ('reveal_time' in data) or ('hide_time' in data):
-        time_pred = { "predicate": "ABSOLUTE_TIME", "range": [data.get('reveal_time',-1),data.get('hide_time',-1)] }
+        show_times = [[data.get('reveal_time',-1),data.get('hide_time',-1)]]
+    else:
+        show_times = None
+
+    if show_times:
+        if len(show_times) == 1:
+            time_pred = make_show_time_pred(show_times[0][0], show_times[0][1], data.get('repeat_interval',None))
+        else:
+            time_pred = {"predicate": "OR", "subpredicates": [make_show_time_pred(t[0], t[1], data.get('repeat_interval',None)) for t in show_times]}
     else:
         time_pred = None
 
@@ -974,13 +989,14 @@ if __name__ == '__main__':
         else:
             speedrun_aura = None
 
-        def make_ui_priority_for_time(i, start_time, end_time):
+        def make_ui_priority_for_time(i, start_time, end_time, repeat_interval):
             priority = data['map_ui_priority'][diff]
             default_priority = {'mf':300}.get(game_id,100)
             if priority != default_priority:
                 raise Exception('event %s should have map_ui_priority = %d' % (data['event_name'], default_priority))
 
             if start_time > 0: # append the starting week number as a fractional part to the ui_priority so the "freshest" event wins ties.
+                # does this work with repeat_interval? not sure...
                 priority += 0.001 * SpinConfig.get_pvp_week(gamedata['matchmaking']['week_origin'], start_time)
 
             if len(data['difficulties']) > 1:
