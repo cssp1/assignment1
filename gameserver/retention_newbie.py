@@ -6,7 +6,7 @@
 
 # load some standard Python libraries
 import sys, time, urllib, urllib2, getopt, traceback, random, re, functools
-import SpinConfig, SpinUserDB, SpinJSON, SpinParallel, SpinLog
+import SpinConfig, SpinUserDB, SpinS3, SpinJSON, SpinParallel, SpinLog
 import SpinNoSQL, SpinNoSQLLog, SpinETL
 import SpinFacebook
 import SpinSingletonProcess
@@ -323,8 +323,14 @@ class Sender(object):
         text = ui_name.replace('%s', replace_s)
         print >> self.msg_fd, 'eligible for: "%s"...' % (text)
 
-        # necessary to find country for demographics dimensions
-        user = SpinJSON.loads(SpinUserDB.driver.sync_download_user(user_id))
+        # userdb entry is necessary to find country for demographics dimensions
+        # but ignore failures
+        try:
+            user = SpinJSON.loads(SpinUserDB.driver.sync_download_user(user_id))
+
+        # October 2015 server bug caused some players to get written out without userdb entry. Ignore this.
+        except SpinS3.S3404Exception:
+            user = {}
 
         generation = player.get('generation',0)
         if not self.dry_run:

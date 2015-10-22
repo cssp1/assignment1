@@ -10,6 +10,7 @@ import SpinUserDB
 import SpinNoSQL
 import SpinConfig
 import SpinJSON
+import SpinS3
 
 # load some standard Python libraries
 import sys, time, getopt, string
@@ -332,7 +333,11 @@ if __name__ == '__main__':
             if use_controlapi:
                 user = SpinJSON.loads(do_CONTROLAPI({'method': 'get_raw_user', 'stringify': '1', 'user_id': user_id}))
             else:
-                user = SpinJSON.loads(driver.sync_download_user(user_id))
+                try:
+                    user = SpinJSON.loads(driver.sync_download_user(user_id))
+                # October 2015 server bug caused some players to get written out without userdb entry. Ignore this.
+                except SpinS3.S3404Exception:
+                    user = {}
 
         if do_get:
             SpinJSON.dump(player, sys.stdout if use_stdio else open(player_filename,'w'), pretty=True)
