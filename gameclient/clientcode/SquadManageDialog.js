@@ -203,7 +203,7 @@ SquadManageDialog.update_squad_manage = function(dialog) {
     dialog.widgets['includes_manufacturing'].show = (dialog.user_data['squad_id'] === SQUAD_IDS.BASE_DEFENDERS) && (!player.squads_enabled() || !gamedata['produce_to_reserves']);
 
     var reserve_types_to_show = goog.object.getKeys(reserve_units_by_type);
-    reserve_types_to_show.sort(army_unit_compare_specnames);
+    reserve_types_to_show.sort(compare_specnames);
     squad_units.sort(army_unit_compare);
 
     // show manufacture-queued units in base defenders, after all other units

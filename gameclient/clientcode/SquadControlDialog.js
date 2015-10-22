@@ -469,7 +469,7 @@ SquadControlDialog.update_squad_tile = function(dialog) {
     dialog.widgets['name'].text_color = SPUI.make_colorv(dialog.data['widgets']['name'][('text_color_'+my_status in dialog.data['widgets']['name'] ? 'text_color_'+my_status : 'text_color')]);
 
     var types_to_show = goog.object.getKeys(units_by_type);
-    types_to_show.sort(army_unit_compare_specnames);
+    types_to_show.sort(compare_specnames);
 
     dialog.user_data['icon_unit_specname'] = (types_to_show.length >= 1 ? types_to_show[0] : null);
 

@@ -28406,22 +28406,22 @@ function army_unit_repair_state(obj) {
     return 0;
 }
 
-// used for sorting units in squad displays
-function army_unit_compare_specnames(a,b) {
+// compare units/buildings by "coolnesss" - used for sorting units in squad displays
+function compare_specnames(a,b) {
     // sort by max health then space consumption
-    var aspec = gamedata['units'][a], bspec = gamedata['units'][b];
-    var amax = get_leveled_quantity(aspec['max_hp'],1);
-    var bmax = get_leveled_quantity(bspec['max_hp'],1);
+    var aspec = (gamedata['units'][a] || gamedata['buildings'][a]), bspec = (gamedata['units'][b] || gamedata['buildings'][b]);
+    var amax = get_leveled_quantity(aspec['max_hp'] || 0,1);
+    var bmax = get_leveled_quantity(bspec['max_hp'] || 0,1);
     if(amax < bmax) { return 1; }
     if(amax > bmax) { return -1; }
-    var aspace = get_leveled_quantity(aspec['consumes_space'],1);
-    var bspace = get_leveled_quantity(bspec['consumes_space'],1);
+    var aspace = get_leveled_quantity(aspec['consumes_space'] || 0,1);
+    var bspace = get_leveled_quantity(bspec['consumes_space'] || 0,1);
     if(aspace < bspace) { return 1; }
     if(aspace > bspace) { return -1; }
     return 0;
 }
 function army_unit_compare(a,b) {
-    var cmp = army_unit_compare_specnames(a['spec'], b['spec']);
+    var cmp = compare_specnames(a['spec'], b['spec']);
     if(cmp != 0) { return cmp; }
     // use current health ratio to break ties
     var acurmax = army_unit_hp(a), aratio = acurmax[0]/Math.max(acurmax[1],1);

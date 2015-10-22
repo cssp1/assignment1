@@ -12,6 +12,7 @@ goog.provide('BattleLog');
 // converts array of raw metrics to SPText
 
 goog.require('goog.array');
+goog.require('goog.object');
 goog.require('SPUI'); // for SPUI.Color
 goog.require('SPText');
 goog.require('ItemDisplay');
@@ -64,15 +65,22 @@ BattleLog.one_unit = function(kind, level, is_mine, props) {
 BattleLog.unit = function(met, is_mine) {
     if('multi_units' in met) {
         var ret = [];
-        for(var key in met['multi_units']) {
+        // sort unit specnames with most "impressive" ones first
+        var key_list = goog.object.getKeys(met['multi_units']);
+        key_list.sort(function(a,b) {
+            var a_specname = a.split('|')[0];
+            var b_specname = b.split('|')[0];
+            return compare_specnames(a_specname,b_specname);
+        });
+        goog.array.forEach(key_list, function(key) {
             var count = met['multi_units'][key];
             var kind_level_props = key.split('|');
             var kind = kind_level_props[0];
-            var level = parseInt(kind_level_props[1],10);
+            var level = (kind_level_props.length >= 2 ? parseInt(kind_level_props[1],10) : -1);
             var props = (kind_level_props.length >= 3 ? JSON.parse(kind_level_props[2]) : null);
             var tx = BattleLog.one_unit(kind, level, is_mine, props);
             ret.push(count.toString()+'x '+tx);
-        }
+        });
         return ret.join(', ');
     } else {
         var props = {};
@@ -249,7 +257,36 @@ BattleLog.parse = function(my_id, summary, metlist) {
                          hi: {color:color_bad_hi} } };
 
     var ret = [];
-    var start = -1;
+    var start = -1; // battle start time
+
+    // show unit casualties
+    if('loot' in summary) {
+        var casualties_shown = false;
+        goog.array.forEach([{loot_key: 'units_killed', role: 'defender'}, {loot_key: 'units_lost', role: 'attacker'}], function(entry) {
+            if(entry.loot_key in summary['loot']) {
+
+                // create units-only version of the killed/lost dictionaries (that include buildings)
+                var units_only = goog.object.filter(summary['loot'][entry.loot_key], function(count, key) {
+                    return (key in gamedata['units']);
+                });
+                if(goog.object.getCount(units_only) < 1) { return; }
+
+                // casualties are bad for you and good for other
+                var pr = (myrole === entry.role) ? props.bad : props.good;
+                var line = [];
+                line.push(new SPText.ABlock(poss[entry.role]+' unit casualties: ', pr.normal));
+                line.push(new SPText.ABlock(BattleLog.unit({'multi_units':units_only}, myrole === entry.role), pr.hi));
+                line.push(new SPText.ABlock('.', pr.normal));
+                ret.push([line]);
+                casualties_shown = true;
+            }
+        });
+        if(casualties_shown) { // add divider bar
+            var divider_text = ''; // '---------------------------------------------------------------------------'
+            ret.push([[new SPText.ABlock(divider_text, props.neutral.normal)]]);
+        }
+    }
+
     for(var i = 0; i < metlist.length; i++) {
         var met = metlist[i];
         var line = [];
