@@ -24,7 +24,12 @@ PLATFORM_UI_NAMES[fb]=Facebook
 PLATFORM_UI_NAMES[ag]=ArmorGames
 PLATFORM_UI_NAMES[kg]=Kongregate
 
-sleep `python -c "import time; print int(${END_TIME}-time.time());"`
+# wait for end time to come
+WAIT_SECONDS=`python -c "import time; print int(${END_TIME}-time.time());"`
+if [[ $WAIT_SECONDS -gt 0 ]]; then
+    sleep $WAIT_SECONDS
+fi
+
 for CONT in $GAME_TOURNAMENT_CONTINENTS; do
     NUMERIC_DATE=`date +%Y%m%d`
     LOGFILE="/var/tmp/`date +%s`-winners-s${SEASON}-wk${WEEK}-${CONT}.txt"
@@ -32,26 +37,40 @@ for CONT in $GAME_TOURNAMENT_CONTINENTS; do
 
     # get winner list and award prizes
     ./SpinNoSQL.py --winners --season ${SEASON} --week ${WEEK} --tournament-stat ${TOURNAMENT_STAT} \
-           --score-time-scope ${TIME_SCOPE}
+           --score-time-scope ${TIME_SCOPE} \
            --score-space-scope continent --score-space-loc $CONT \
            --send-prizes > $LOGFILE
 
     # upload to dropbox
     DROPBOX_FILENAME="${NUMERIC_DATE}-${GAME_ID_UPPER}-winners-week${WEEK}-${UI_PLATFORM}.txt"
     DROPBOX_PATH="/tournament_winners/${DROPBOX_FILENAME}"
+    echo "DROPBOX_PATH=${DROPBOX_PATH}" >> $LOGFILE
 
-    curl -s -X POST https://content.dropboxapi.com/2-beta-2/files/upload \
+    UPLOAD_RESULT=`curl -s -X POST https://content.dropboxapi.com/2/files/upload \
      --header "Authorization: Bearer ${DROPBOX_ACCESS_TOKEN}" \
      --header "Content-Type: application/octet-stream" \
      --header "Dropbox-API-Arg: {\"path\": \"${DROPBOX_PATH}\",\"mode\": \"overwrite\",\"autorename\": false,\"mute\": false}" \
-     --data-binary "@${LOGFILE}" > /dev/null
+     --data-binary "@${LOGFILE}"`
+    echo "UPLOAD_RESULT=${UPLOAD_RESULT}" >> $LOGFILE
 
-    # get dropbox shared link
-    SHARED_LINK_RESULT=`curl -s -X POST https://api.dropboxapi.com/2-beta-2/sharing/create_shared_link \
-     --header "Authorization: Bearer ${DROPBOX_ACCESS_TOKEN}" \
-     --header "Content-Type: application/json" \
-     --data "{\"path\": \"${DROPBOX_PATH}\",\"short_url\": false}"`
-    SHARED_LINK_URL=`echo $SHARED_LINK_RESULT | python -c 'import json, sys; print json.load(sys.stdin)["url"];'`
+    # check for validity by parsing returned JSON
+    UPLOAD_PATH=`echo $UPLOAD_RESULT | python -c 'import json, sys; ret = json.load(sys.stdin); "name" in ret or sys.exit(1); print ret["name"];'`
+    if [[ $? -ne 0 ]]; then
+        # Dropbox upload seems to have failed
+        SHARED_LINK_URL='(Dropbox upload failed! - Follow up with dev)'
+    else
+        # get dropbox shared link
+        SHARED_LINK_RESULT=`curl -s -X POST https://api.dropboxapi.com/2/sharing/create_shared_link \
+         --header "Authorization: Bearer ${DROPBOX_ACCESS_TOKEN}" \
+         --header "Content-Type: application/json" \
+         --data "{\"path\": \"${DROPBOX_PATH}\",\"short_url\": false,\"pending_upload\":\"file\"}"`
+        echo "SHARED_LINK_RESULT=${SHARED_LINK_RESULT}" >> $LOGFILE
+        SHARED_LINK_URL=`echo $SHARED_LINK_RESULT | python -c 'import json, sys; ret = json.load(sys.stdin); "url" in ret or sys.exit(1); print ret["url"];'`
+        if [[ $? -ne 0 ]]; then
+            SHARED_LINK_URL='(Dropbox upload succeeded, but shared link creation failed! - Follow up with dev)'
+        fi
+    fi
+    echo "SHARED_LINK_URL=${SHARED_LINK_URL}" >> $LOGFILE
 
     # compile notification
     NOTIFICATION_SUBJECT="${NUMERIC_DATE} ${GAME_ID_UPPER} Tournament Winners in ${UI_PLATFORM}"
