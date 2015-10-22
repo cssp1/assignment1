@@ -31,6 +31,7 @@
 
     "enable_store_jewel": 1,
     "activate_store_jewel": { "predicate": "LIBRARY", "name": "extended_tutorial_complete" },
+    "purchase_confirm": 1,
 
     "enable_upgrade_all_barriers": 0,
 
