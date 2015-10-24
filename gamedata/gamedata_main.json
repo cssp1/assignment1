@@ -434,6 +434,8 @@
         "vfx":
 #include "$GAME_ID/$GAME_ID_client_vfx.json"
         ,
+        "camera_shake_scale": 0.5, // global scale on camera_shake SPFX effects
+
         "inert_warn_count": 100, // warn developers if more than this many inert objects are used
 
         // controls overall intensity of weapon projectile glow effect (only in high_gfx mode)

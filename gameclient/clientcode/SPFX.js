@@ -297,7 +297,7 @@ SPFX.get_camera_shake = function() {
     @param {number} amplitude
     @param {number} falloff */
 SPFX.shake_camera = function(when, amplitude, falloff) {
-    SPFX.shake_impulses.push({when:when, amplitude:amplitude, falloff:falloff, started_at: -1});
+    SPFX.shake_impulses.push({when:when, amplitude: gamedata['client']['camera_shake_scale']*amplitude, falloff:falloff, started_at: -1});
 };
 
 /** @constructor
