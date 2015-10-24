@@ -44870,7 +44870,8 @@ function handle_server_message(data) {
                 } else if(session.last_map_dialog_state) {
                     // make sure region map is up and pointing to last location
                     var state = session.last_map_dialog_state;
-                    session.last_map_dialog_state = null;
+                    // don't clear state, since this might be followed immediately by a session change
+                    //session.last_map_dialog_state = null;
                     var dialog = invoke_region_map();
                     if(dialog) { dialog.widgets['map'].set_state(state); }
                 }
