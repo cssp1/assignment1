@@ -21,9 +21,9 @@ do
 done
 
 TARFILE=`date +%Y%m%d`-${DBNAME}.mysql.gz
-S3_KEYFILE=${HOME}/.ssh/`echo $HOSTNAME | cut -d. -f1`-awssecret
-export AWS_ACCESS_KEY_ID=`head -n1 ${S3_KEYFILE}`
-export AWS_SECRET_ACCESS_KEY=`head -n2 ${S3_KEYFILE} | tail -n1`
+# S3_KEYFILE=${HOME}/.ssh/`echo $HOSTNAME | cut -d. -f1`-awssecret
+# export AWS_ACCESS_KEY_ID=`head -n1 ${S3_KEYFILE}`
+# export AWS_SECRET_ACCESS_KEY=`head -n2 ${S3_KEYFILE} | tail -n1`
 
 tempfiles=( )
 cleanup() {
