@@ -24,9 +24,19 @@ TARFILE=`date +%Y%m%d`-${DBNAME}.mysql.gz
 S3_KEYFILE=${HOME}/.ssh/`echo $HOSTNAME | cut -d. -f1`-awssecret
 export AWS_ACCESS_KEY_ID=`head -n1 ${S3_KEYFILE}`
 export AWS_SECRET_ACCESS_KEY=`head -n2 ${S3_KEYFILE} | tail -n1`
-ERROR=0
 
-./mysql.py ${DBNAME} --dump "${SAVE_DIR}/${TARFILE}"
+tempfiles=( )
+cleanup() {
+    rm -f "${tempfiles[@]}"
+}
+trap cleanup 0
+
+PIDFILE="/tmp/spin-singleton-backup-mysql-${DBNAME}.pid"
+tempfiles+=( "${PIDFILE}" )
+echo $$ > "${PIDFILE}"
+
+tempfiles+=( "${SAVE_DIR}/${TARFILE}" )
+./mysql.py "${DBNAME}" --dump "${SAVE_DIR}/${TARFILE}"
 if [[ $? != 0 ]]; then
     echo "SQL dump error"
     exit $?
@@ -35,9 +45,5 @@ fi
 /usr/bin/env aws s3 cp --quiet "${SAVE_DIR}/${TARFILE}" "s3://${S3_PATH}/${TARFILE}"
 if [[ $? != 0 ]]; then
     echo "S3 upload error!"
-    ERROR=1
+    exit $?
 fi
-
-rm -f "${SAVE_DIR}/${TARFILE}"
-
-exit $ERROR

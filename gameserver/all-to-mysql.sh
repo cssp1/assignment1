@@ -16,6 +16,12 @@ do
   esac
 done
 
+if [[ "$FREQ" == "hourly" ]] && [ -e /tmp/spin-singleton-backup-mysql-${GAME_ID}*.pid ]; then
+    echo `date` "${GAME_ID} === ${FREQ} ETL run ${RUN_ID} skipped because MySQL backup is in progress ===" >> ${LOG}
+    echo "MySQL backup in progress - skipping hourly ETL run"
+    exit 0
+fi
+
 RUN_START_TS=`date +%s`
 
 echo `date` "${GAME_ID} === ${FREQ} ETL run ${RUN_ID} start ===" >> ${LOG}
