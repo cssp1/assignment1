@@ -3049,7 +3049,7 @@ class Session(object):
         self.debug_session_change_count = 0
 
         # keep track of last few actions applied to this session for debugging
-        self.debug_action_log = collections.deque([], 20)
+        self.debug_action_log = collections.deque([], 16)
 
         # same for complete_attack
         self.complete_attack_in_progress = False
@@ -3272,7 +3272,7 @@ class Session(object):
     def dump_exception_state(self):
         ui_action_log = '\n'.join('%d %d %s' % (x['time'], x['session'], x['reason']) for x in self.debug_action_log)
         ui_action_log += '\n%d %d %s' % (server_time, self.debug_session_change_count, 'NOW')
-        return 'player %d viewing %d at %s (session change count %d), is_async %r complete_attack_in_progress %r visit_base_in_progress %r logout_in_progress %r has_attacked %r viewing_base_lock %r action_log %s' % \
+        return 'player %d viewing %d at %s (session change count %d), is_async %r complete_attack_in_progress %r visit_base_in_progress %r logout_in_progress %r has_attacked %r viewing_base_lock %r action_log\n%s' % \
                (self.player.user_id, self.viewing_player.user_id, self.viewing_base.base_id, self.debug_session_change_count, self.is_async(), bool(self.complete_attack_in_progress), bool(self.visit_base_in_progress), bool(self.logout_in_progress), self.has_attacked, self.viewing_base_lock, ui_action_log)
 
     # return current seconds of cumulative play time
