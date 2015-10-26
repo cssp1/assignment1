@@ -202,11 +202,11 @@ if __name__ == '__main__':
 
             keyvals += summary
 
-            if row['event_name'] in ('1400_gamebucks_spent', '1401_fungible_spent'):
+            if row['event_name'] in ('1400_gamebucks_spent', '1401_fungible_spent', '1402_score_spent'):
                 if row['event_name'] == '1400_gamebucks_spent':
                     keyvals.append(('price',row['gamebucks_price']))
                     keyvals.append(('currency','gamebucks'))
-                elif row['event_name'] == '1401_fungible_spent':
+                elif row['event_name'] in ('1401_fungible_spent', '1402_score_spent'):
                     keyvals.append(('price',row['price']))
                     keyvals.append(('currency',row['price_currency']))
 

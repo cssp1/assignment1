@@ -13383,7 +13383,7 @@ class Store:
             return p
 
         # only check for currency match when price > 0
-        if (not (sale_currency.startswith('item:') or (sale_currency in gamedata['resources']))):
+        if (not (sale_currency.startswith('item:') or sale_currency.startswith('score:') or (sale_currency in gamedata['resources']))):
             spell_currency = spell.get('currency', session.player.get_any_abtest_value('currency', gamedata['currency']) if session else gamedata['currency'])
             # wildcard matches for unknown real currencies
             if spell_currency == 'fbpayments:*' and sale_currency.startswith('fbpayments:') or \
@@ -14289,20 +14289,6 @@ class Store:
         return descr
 
     @classmethod
-    def execute_item_order(cls, gameapi, session, retmsg, item_name, amount_willing_to_pay,
-                           unit_id, spellname, spellarg,
-                           server_time_according_to_client):
-        return Store.execute_order(gameapi, session, retmsg, 'item:'+str(item_name), amount_willing_to_pay,
-                                   unit_id, spellname, spellarg,
-                                   server_time_according_to_client)
-    @classmethod
-    def execute_fungible_order(cls, gameapi, session, retmsg, resname, amount_willing_to_pay,
-                               unit_id, spellname, spellarg,
-                               server_time_according_to_client):
-        return Store.execute_order(gameapi, session, retmsg, resname, amount_willing_to_pay,
-                                   unit_id, spellname, spellarg,
-                                   server_time_according_to_client)
-    @classmethod
     def execute_order(cls, gameapi, session, retmsg, currency, amount_willing_to_pay,
                       unit_id, spellname, spellarg,
                       server_time_according_to_client,
@@ -14383,7 +14369,7 @@ class Store:
             record_spend_type = 'gamebucks'
             record_price_type = 'gamebucks_price'
             record_amount = amount_willing_to_pay
-        elif currency.startswith('item:'):
+        elif currency.startswith('item:') or currency.startswith('score:'):
             item_name = currency.split(':')[1]
             record_spend_type = item_name
             record_price_type = item_name+'_price'
@@ -23283,9 +23269,9 @@ class GAMEAPI(resource.Resource):
                 return
 
             try:
-                Store.execute_item_order(self, session, retmsg, item_name, client_price,
-                                         unit_id, spellname, spellarg,
-                                         server_time_according_to_client)
+                Store.execute_order(self, session, retmsg, 'item:'+str(item_name), client_price,
+                                    unit_id, spellname, spellarg,
+                                    server_time_according_to_client)
                 # at this point the order has changed player state, so go ahead and take the items
                 session.player.inventory_remove_by_type(item_name, client_price, '5130_item_activated', reason='purchase')
                 success = True
@@ -23317,9 +23303,9 @@ class GAMEAPI(resource.Resource):
                 if getattr(session.player.resources, resname) < client_price:
                     retmsg.append(["ERROR", "INSUFFICIENT_"+resname.upper(), client_price])
                 else:
-                    price_description, detail_props = Store.execute_fungible_order(self, session, retmsg, resname, client_price,
-                                                                                   unit_id, spellname, spellarg,
-                                                                                   server_time_according_to_client)
+                    price_description, detail_props = Store.execute_order(self, session, retmsg, resname, client_price,
+                                                                          unit_id, spellname, spellarg,
+                                                                          server_time_according_to_client)
                     # at this point the order has changed player state, so go ahead and take the resources
                     success = True
                     negative_cost = {resname: -client_price}
@@ -23344,7 +23330,55 @@ class GAMEAPI(resource.Resource):
                 retmsg.append(["ERROR", "ORDER_PROCESSING"])
 
             retmsg.append(["FUNGIBLE_ORDER_ACK", tag, success])
-            retmsg.append(["PLAYER_STATE_UPDATE", session.player.resources.calc_snapshot().serialize()])
+            session.deferred_player_state_update = True
+
+        elif arg[0] == "SCORE_ORDER":
+            tag = arg[1]
+            stat_name = arg[2]
+            currency = 'score:'+stat_name
+            client_price = int(arg[3])
+            unit_id = arg[4]
+            spellname = arg[5]
+            spellarg = arg[6]
+            server_time_according_to_client = arg[7]
+            success = False
+
+            # note: client_price is UNTRUSTED input, but if it's too low, then execute_order() will throw an exception
+            assert client_price >= 0
+
+            try:
+                # check for insufficient resources
+                if session.player.get_master_score(stat_name) < client_price:
+                    retmsg.append(["ERROR", "INSUFFICIENT_"+stat_name.upper(), client_price])
+                else:
+                    price_description, detail_props = Store.execute_order(self, session, retmsg, currency, client_price,
+                                                                          unit_id, spellname, spellarg,
+                                                                          server_time_according_to_client)
+                    # at this point the order has changed player state, so go ahead and take the resources
+                    success = True
+                    negative_cost = {stat_name: -client_price}
+                    session.player.modify_scores(negative_cost, method = '+=', reason = 'score_order')
+                    session.deferred_player_trophies_update = True
+
+                    if spellname != 'BUY_ITEM': # awkward overlap with 5120_buy_item logging
+                        descr = Store.get_description(session, unit_id, spellname, spellarg, price_description)
+                        props = {'user_id': session.user.user_id,
+                                 'summary': session.player.get_denormalized_summary_props('brief'),
+                                 'event_name': '1402_score_spent',
+                                 'code': 1401,
+                                 'price': client_price,
+                                 'price_currency': currency,
+                                 'Billing Description': descr}
+                        props.update(detail_props)
+                        gamesite.gamebucks_log.event(server_time, props)
+
+            except Exception:
+                text = traceback.format_exc()
+                gamesite.exception_log.event(server_time, 'SCORE_ORDER Exception: '+text)
+                retmsg.append(["ERROR", "ORDER_PROCESSING"])
+
+            retmsg.append(["SCORE_ORDER_ACK", tag, success])
+            session.deferred_player_state_update = True
 
         elif arg[0] == "DSTROY_OBJECT":
             id = arg[1]

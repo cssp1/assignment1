@@ -3061,7 +3061,17 @@ def check_store_sku(sku_name, sku):
                 if 'store_icon' not in item:
                     error |= 1
                     print 'store sku %s currency item "%s" needs a store_icon' % (sku_name, item_name)
-
+            elif sku['price_currency'].startswith('score:'):
+                stat_name = sku['price_currency'].split(':')[1]
+                if stat_name not in ('trophies_pvp', 'trophies_pvv'):
+                    error |= 1
+                    print 'store sku %s invalid currency stat "%s"' % (sku_name, stat_name)
+                if 'INSUFFICIENT_'+stat_name.upper() not in gamedata['errors']:
+                    error |= 1
+                    print 'store sku %s calls for INSUFFICIENT_'+stat_name.upper()+' which needs to be in errors_gamespecific.json' % (sku_name)
+                if ('score' not in gamedata['strings']['requirements_help']) or (stat_name not in gamedata['strings']['requirements_help']['score']):
+                    error |= 1
+                    print 'store sku %s calls for strings.json: requirements_help.score.%s' % (sku_name, stat_name)
     if 'jewel' in sku:
         if type(sku['jewel']) is list and (len(sku['jewel']) == 0 or type(sku['jewel'][0]) is dict):
             error |= 1; print 'store sku %s "jewel" must be single predicate' % (sku_name)
