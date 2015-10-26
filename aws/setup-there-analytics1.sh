@@ -21,7 +21,7 @@ sudo /etc/init.d/nscd start
 sudo chkconfig mysqld off # moved to RDS
 
 echo "SETUP(remote): Unpacking filesystem overlay..."
-(cd / && gunzip -c /home/ec2-user/overlay-analytics1.cpio.gz | sudo cpio -iuvd -R root:root)
+(cd / && sudo tar zxvf /home/ec2-user/overlay-analytics1.tar.gz)
 
 # fix permissions
 sudo chown -R root:root /etc

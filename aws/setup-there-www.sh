@@ -14,14 +14,9 @@ sudo chkconfig httpd on
 
 echo "SETUP(remote): Adjusting users, groups, and permissions..."
 
-sudo groupadd -g 1013 -f iantien
-sudo useradd -g 1013 -u 1013 iantien
-echo ianISawesome | sudo passwd --stdin iantien
-
 # WEB
 sudo groupadd -g 1502 -f httpwrite
 sudo usermod -a -G httpwrite ec2-user
-sudo usermod -a -G httpwrite iantien
 sudo chmod 775 /var/www /var/www/html
 sudo chgrp -R httpwrite /var/www/html
 sudo chmod +s /var/www/html

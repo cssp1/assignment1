@@ -1,7 +1,5 @@
 #!/bin/sh
 
-SYSTEM=$1
-
 YUMPACKAGES="git xfsprogs telnet subversion nscd munin-node strace sendmail-cf patch screen python-boto"
 
 echo "SETUP(remote): Installing additional packages..."
@@ -12,7 +10,7 @@ sudo chkconfig --add nscd
 sudo chkconfig nscd on
 
 echo "SETUP(remote): Unpacking filesystem overlay..."
-(cd / && gunzip -c /home/ec2-user/overlay-${SYSTEM}.cpio.gz | sudo cpio -iuvd -R root:root)
+(cd / && sudo tar zxvf /home/ec2-user/overlay-mongo.tar.gz)
 
 echo "SETUP(remote): Installing mongodb from mongodb.org repo..."
 sudo yum -y -q install mongodb-org mongodb-org-server mongodb-org-shell mongodb-org-tools
@@ -48,7 +46,7 @@ sudo /etc/init.d/munin-node restart
 echo "SETUP(remote): Fixing mail configuration..."
 sudo ./fix-ec2-mail.py
 
-echo "SETUP(remote): ${SYSTEM} setup done!"
+echo "SETUP(remote): mongo setup done!"
 
 echo "MISSING:"
 echo "/etc/sysconfig/network hostname."

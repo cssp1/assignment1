@@ -39,7 +39,7 @@ echo "SETUP(remote): Adjusting users, groups, and permissions..."
 #sudo chown mysql:mysql /media/ephemeral0/mysql
 
 echo "SETUP(remote): Unpacking filesystem overlay..."
-(cd / && gunzip -c /home/ec2-user/overlay-prod.cpio.gz | sudo cpio -iuvd -R root:root)
+(cd / && sudo tar zxvf /home/ec2-user/overlay-prod.tar.gz)
 
 # fix permissions
 sudo chown -R root:root /etc
