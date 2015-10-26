@@ -25591,6 +25591,7 @@ class GAMEAPI(resource.Resource):
                 ui_name = spellargs[0][:64].strip()
                 success = True
 
+                # subtract 1 for Base Defenders which doesn't count against the squad limit
                 if len(session.player.squads)-1 >= session.player.stattab.max_squads:
                     retmsg.append(["ERROR", "CANNOT_CREATE_SQUAD_LIMIT_REACHED"])
                     success = False
