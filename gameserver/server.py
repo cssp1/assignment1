@@ -3038,6 +3038,7 @@ class Session(object):
         self.deferred_donated_units_update = False
         self.deferred_object_state_updates = set()
         self.deferred_player_name_update = False
+        self.deferred_player_trophies_update = False
 
         # prevent overlapping SPROBE_RUN requests
         self.sprobe_in_progress = False
@@ -9882,11 +9883,6 @@ class Player(AbstractPlayer):
                     # no more powerplants to upgrade
                     break
 
-    # increment score counters, where "stats" is like {"xp": 35, "trophies_pvp": -2, ...}
-    def modify_scores(self, *args, **kwargs):
-        # scores1 API is obsolete now
-        self.modify_scores2(*args, **kwargs)
-
     # new score system
 
     # which continent are we in (or which one would we be in, if we aren't on the map for some reason)
@@ -9944,7 +9940,8 @@ class Player(AbstractPlayer):
             space_scope, space_loc = self.scores2_wide_space()
         return (client_name, Scores2.make_point(time_scope, time_loc, space_scope, space_loc))
 
-    def modify_scores2(self, stats, reason='', method = '+=', trophy_decay_k = 0, trophy_decay_elapsed = 0):
+    # increment score counters, where "stats" is like {"xp": 35, "trophies_pvp": -2, ...}
+    def modify_scores(self, stats, reason='', method = '+=', trophy_decay_k = 0, trophy_decay_elapsed = 0):
         time_coords = Scores2.make_time_coords(self.get_absolute_time(),
                                                SpinConfig.get_pvp_season(gamedata['matchmaking']['season_starts'], self.get_absolute_time()),
                                                SpinConfig.get_pvp_week(gamedata['matchmaking']['week_origin'], self.get_absolute_time()),
@@ -9956,6 +9953,8 @@ class Player(AbstractPlayer):
             event_stat_name = event_data['stat']['name']
         else:
             event_stat_name = None
+
+        any_changed = False
 
         for name, value in stats.iteritems():
 
@@ -9985,11 +9984,12 @@ class Player(AbstractPlayer):
                 space_coords = Scores2.make_space_coords(self.home_continent(), self.home_region)
                 stat_method = method
 
-            self.scores2.set(name, value, time_coords, space_coords, method = stat_method, floor = floor, affects_alliance = affects_alliance)
+            any_changed |= self.scores2.set(name, value, time_coords, space_coords, method = stat_method, floor = floor, affects_alliance = affects_alliance)
 
-        self.publish_scores2(reason = 'modify_scores2')
+        self.publish_scores(reason = 'modify_scores')
+        return any_changed
 
-    def publish_scores2(self, alliance_id = None, reason=''):
+    def publish_scores(self, alliance_id = None, reason=''):
         if self.history.get('scores2_migration',0) < SCORES2_MIGRATION_VERSION: return
 
         # force publish of all scores?
@@ -10006,7 +10006,7 @@ class Player(AbstractPlayer):
             it = self.scores2.dirty_iter()
             it_a = self.scores2.dirty_alliance_iter()
 
-        reason = 'publish_scores2(%s,%s)' % ('full' if do_all else 'incr', reason)
+        reason = 'publish_scores(%s,%s)' % ('full' if do_all else 'incr', reason)
 
         if it:
             gamesite.mongo_scores2_client.player_scores2_write(self.user_id, it)
@@ -11842,7 +11842,7 @@ class LivePlayer(Player):
             self.history['achievement_points_published'] = 1
 
         # publish any modified scores
-        self.publish_scores2(reason = 'migrate')
+        self.publish_scores(reason = 'migrate')
 
     def recalculate_xp(self):
         new_player_xp = gamedata['player_xp']
@@ -21591,6 +21591,7 @@ class GAMEAPI(resource.Resource):
     # we're about to send a response to the client. Run any pending batched actions.
     def run_deferred_actions(self, session, retmsg, reason = 'unknown'):
         start_time = time.time()
+        do_player_cache_update = False
 
         if session.deferred_ping_squads:
             session.deferred_ping_squads = False
@@ -21641,6 +21642,13 @@ class GAMEAPI(resource.Resource):
             retmsg.append(["PLAYER_UI_NAME_UPDATE", session.user.get_ui_name(session.player)])
             retmsg.append(["PLAYER_ALIAS_UPDATE", session.player.alias])
             retmsg.append(["PLAYER_TITLES_UPDATE", session.player.title])
+            do_player_cache_update = True
+
+        if session.deferred_player_trophies_update:
+            session.deferred_player_trophies_update = False
+            do_player_cache_update = True
+
+        if do_player_cache_update:
             retmsg.append(["PLAYER_CACHE_UPDATE", [self.get_player_cache_props(session.user, session.player, session.alliance_id_cache)]])
 
         end_time = time.time()
@@ -25117,7 +25125,15 @@ class GAMEAPI(resource.Resource):
                     for res in gamedata['resources']:
                         setattr(session.player.resources, res, 0)
                     session.player.resources.gamebucks = 0
-                    retmsg.append(["PLAYER_STATE_UPDATE", session.player.resources.calc_snapshot().serialize()])
+                    session.deferred_player_state_update = True
+                    scores_to_modify = {}
+                    if session.player.ladder_points() != 0:
+                        scores_to_modify['trophies_pvp'] = 0
+                    if session.player.trophies_pvv() != 0:
+                        scores_to_modify['trophies_pvv'] = 0
+                    if scores_to_modify:
+                        if session.player.modify_scores(scores_to_modify, method = '=', reason = spellname):
+                            session.deferred_player_trophies_update = True
             elif spellname == "CHEAT_GET_DONATED_UNITS":
                 if not session.player.is_cheater:
                     retmsg.append(["ERROR", "DISALLOWED_IN_SECURE_MODE"])
@@ -25272,6 +25288,14 @@ class GAMEAPI(resource.Resource):
                     retmsg.append(["ERROR", "DISALLOWED_IN_SECURE_MODE"])
                 else:
                     self.execute_spell(session, retmsg, "GIVE_UNITS_LIMIT_BREAK", spellargs[0])
+
+            elif spellname == "CHEAT_MODIFY_SCORE":
+                if not session.player.is_cheater:
+                    retmsg.append(["ERROR", "DISALLOWED_IN_SECURE_MODE"])
+                else:
+                    stat_name, stat_method, stat_delta = spellargs[0:3]
+                    if session.player.modify_scores({stat_name: stat_delta}, method = stat_method, reason = spellname):
+                        session.deferred_player_trophies_update = True
 
             elif spellname == "LOAD_AI_BASE":
                 if spin_secure_mode or not session.home_base:

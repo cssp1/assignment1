@@ -14479,6 +14479,8 @@ function invoke_cheat_menu(parent_widget) {
             send_to_server.func(["CAST_SPELL", GameObject.VIRTUAL_ID, "CHEAT_CLEAR_PLAYER_AURAS"]); }}));
         buttons.push(new ContextMenuButton({ui_name: "Get Donated Units", asset: 'menu_button_resizable', onclick: function() {
             send_to_server.func(["CAST_SPELL", GameObject.VIRTUAL_ID, "CHEAT_GET_DONATED_UNITS"]); }}));
+        buttons.push(new ContextMenuButton({ui_name: "Get PvP Points", asset: 'menu_button_resizable', onclick: function() {
+            send_to_server.func(["CAST_SPELL", GameObject.VIRTUAL_ID, "CHEAT_MODIFY_SCORE", "trophies_pvp", "+=", 10000]); }}));
     }
 
     //buttons.push(new ContextMenuButton({ui_name: "Simulate Chargeback", onclick: function() { change_selection_ui(null); send_to_server.func(["FBPAYMENT_SIMULATE_REFUND"]); }}));

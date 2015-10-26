@@ -120,12 +120,15 @@ class CurScores(object):
         return None
 
     def set(self, stat, val, time_coords, space_coords, extra_axes = None, **kwargs):
+        any_changed = False
         for time_scope, time_loc in time_coords.iteritems():
             assert time_scope in FREQ_VALUES and time_loc >= 0
             for space_scope, space_loc in space_coords.iteritems():
                 assert space_scope in SPACE_VALUES
                 axes = make_point(time_scope, time_loc, space_scope, space_loc, extra_axes)
-                self.set_point(stat, val, axes, **kwargs)
+                if self.set_point(stat, val, axes, **kwargs) is not None:
+                    any_changed = True
+        return any_changed
 
     def set_point(self, stat, val, axes, method = '+=', floor = None, decay_kt = 0, affects_alliance = False):
         k = self._key(stat, axes)
