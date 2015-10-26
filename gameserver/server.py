@@ -10968,7 +10968,18 @@ class LivePlayer(Player):
         msg['received_time'] = server_time
         self.mailbox.append(msg)
 
+    # return unique player history key for a daily tip or message
+    @staticmethod
+    def get_daily_tip_key(kind, data, ref_time):
+        assert kind in ('daily_tip', 'daily_msg')
+        ret = kind+':'+data['name']
+        if ('repeat_interval' in data) and ('start_time' in data):
+            run_num = (ref_time - data['start_time'])//data['repeat_interval']
+            ret += ':run%d' % run_num
+        return ret
+
     def get_daily_tips(self, session, retmsg):
+        ref_time = self.get_absolute_time()
         popup_tip = None # only one popup tip is allowed
         pageable_tips = [] # any number of pageable tips are allowed (oldest->newest)
         all_pageable_tips_seen = True
@@ -10976,7 +10987,7 @@ class LivePlayer(Player):
         for tip in gamedata['daily_tips']:
             if ('show_if' in tip) and (not Predicates.read_predicate(tip['show_if']).is_satisfied(self, None)): continue
 
-            key = 'daily_tip:'+tip['name']
+            key = self.get_daily_tip_key('daily_tip', tip, ref_time)
             already_understood = (self.history.get(key, 0) >= 2)
 
             kind = tip.get('kind', 'popup')
@@ -10992,7 +11003,7 @@ class LivePlayer(Player):
                 popup_tip = tip
 
         if popup_tip:
-            key = 'daily_tip:'+popup_tip['name']
+            key = self.get_daily_tip_key('daily_tip', popup_tip, ref_time)
             if ('action' in popup_tip) and (self.history.get(key, 0) < 1):
                 session.execute_consequent_safe(popup_tip['action'], self, retmsg, reason='get_daily_tips')
                 session.setmax_player_metric(key, 1)
@@ -11004,17 +11015,26 @@ class LivePlayer(Player):
 
     def get_daily_messages(self, session, retmsg):
         got_any = False
+        ref_time = self.get_absolute_time()
+
         for tip in gamedata['daily_messages']:
-            key = 'daily_msg:'+tip['name']
+            key = self.get_daily_tip_key('daily_msg', tip, ref_time)
             if self.history.get(key, 0) and (not tip.get('recurring',False)): continue
 
             if 'expire_at' in tip:
                 expire_time = tip['expire_at']
+            elif 'end_time' in tip:
+                if ('repeat_interval' in tip) and ('start_time' in tip):
+                    # time remaining in this run
+                    delta = (ref_time - tip['start_time']) % tip['repeat_interval']
+                    expire_time = ref_time + (tip['end_time'] - tip['start_time'] - delta)
+                else:
+                    expire_time = tip['end_time']
             elif 'expire_in' in tip:
-                expire_time = server_time + tip['expire_in']
+                expire_time = ref_time + tip['expire_in']
             else:
                 expire_time = -1
-            if expire_time > 0 and server_time >= expire_time: continue
+            if expire_time > 0 and ref_time >= expire_time: continue
 
             if 'show_if' in tip and (not Predicates.read_predicate(tip['show_if']).is_satisfied(self, None)): continue
             msg = {'type': 'mail',

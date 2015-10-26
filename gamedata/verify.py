@@ -2743,6 +2743,9 @@ def check_achievement_name(name, context):
 
 def check_daily_tip(tip):
     error = 0
+    if ('repeat_interval' in tip) and (('start_time' not in tip) or ('end_time' not in tip)):
+        error |= 1
+        print 'daily tip/message %s needs start_time and end_time since it is using repeat_interval' % (tip['name'])
     if 'show_if' in tip:
         if check_predicate(tip['show_if'], reason='%s:show_if' % tip['name']):
             error |= 1
@@ -2760,6 +2763,13 @@ def check_daily_tip(tip):
 def check_daily_message(msg):
     error = 0
     error |= check_misspellings(msg, set(['show_if','attachments']), 'daily_message:%s' % msg['name'])
+    if ('repeat_interval' in msg):
+        if (('start_time' not in msg) or ('end_time' not in msg)):
+            error |= 1
+            print 'daily tip/message %s needs start_time and end_time since it is using repeat_interval' % (msg['name'])
+        if ('expire_at' in msg):
+            error |= 1
+            print 'daily tip/message %s is using repeat_interval, so change "expire_at" to "end_time"' % (msg['name'])
     if 'show_if' in msg:
         if check_predicate(msg['show_if'], reason='%s:show_if' % msg['name']):
             error |= 1
