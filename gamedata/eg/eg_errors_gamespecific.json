@@ -7,6 +7,7 @@
 "INSUFFICIENT_WATER": { "ui_name": "Need %d Fuel to do this" },
 "INSUFFICIENT_GAMEBUCKS": { "ui_name": "Need %d Gold to do this" },
 "INSUFFICIENT_ITEMS": { "ui_title": "Insufficient Items", "ui_name": "Need %dx %s. Earn them by fighting selected Single Player opponents on the Attack menu, or by conquering epic event bases on the Multiplayer regional map." },
+"INSUFFICIENT_TROPHIES_PVP": { "ui_title": "Insufficient PvP Points", "ui_name": "Need %d more PvP points. Earn them by fighting selected opponents on the Multiplayer map." },
 
 "UNIT_SPACE_LIMIT": { "ui_name": "Not enough unit space - upgrade Tactical Ops Center or disband old units" },
 "POWER_LIMIT": { "ui_name": "Not enough power - repair, build, or upgrade Generator" },

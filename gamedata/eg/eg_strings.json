@@ -1053,6 +1053,11 @@
                       "ui_description": "Gain Hardware by attacking special event enemies on the Attack -> Multiplayer Map." } // or conquering Hardware Quarries
         },
 
+        "score": {
+            "trophies_pvp": { "ui_title": "%s more PvP points needed",
+                              "ui_description": "Gain points by attacking selected opponents on the Map -> Multiplayer menu."}
+        },
+
         "insufficient_resources_to_repair_units": {
             "iron": { "ui_title": "Need %s more supplies",
                       "ui_description": "We cannot repair all damaged units.\n\nObtain more supplies, then attempt repairs again.\n\nGain supplies by attacking bases, collecting from Supply Yards, or claiming mission rewards. You can also buy supplies from the Store.",
