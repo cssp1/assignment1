@@ -26133,10 +26133,10 @@ class GAMEAPI(resource.Resource):
         if msg is None:
             msg = "REGION_MAP_ATTACK_COMPLETE" if summary else "REGION_MAP_ATTACK_START" # legacy compatibility
         upd = [msg, region_id, feature, attacker_id, defender_id, summary, pcache_info]
-        for id in (attacker_id, defender_id):
-            session = get_session_by_user_id(id)
-            if session and session.player.home_region == region_id:
-                session.send([upd], flush_now = True)
+        for session in iter_sessions():
+            if session.player.home_region == region_id:
+                if gamedata['server'].get('broadcast_thirdparty_map_attack', True) or (session.user.user_id in (attacker_id, defender_id)):
+                    session.send([upd], flush_now = (session.user.user_id in (attacker_id, defender_id)))
 
         if send_to_net:
             gamesite.chat_mgr.send('CONTROL', {'secret':SpinConfig.config['proxy_api_secret'],
