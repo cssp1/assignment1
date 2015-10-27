@@ -44512,7 +44512,8 @@ function handle_server_message(data) {
             if(feature && ('base_map_loc' in feature)) { // note: exclude features where all we know is the lock state (regional map isn't loaded)
                 PlayerCache.update_batch(pcache_data);
 
-                if(defender_id == session.user_id) {
+                var myrole = (session.user_id == defender_id ? 'defender' : (session.user_id == attacker_id ? 'attacker' : null));
+                if(myrole) {
                     var what_happened;
                     if(msg == "REGION_MAP_ATTACK_DIVERT") {
                         what_happened = 'was_diverted';
@@ -44523,26 +44524,51 @@ function handle_server_message(data) {
                     }
 
                     var x = feature['base_map_loc'][0].toString(), y = feature['base_map_loc'][1].toString();
-                    //var attacker_info = PlayerCache.query_sync(attacker_id); // can return null if an in-flight query already set 'pending' on the entry
-                    var attacker_info = goog.array.find(pcache_data, function(entry) { return entry['user_id'] == attacker_id; });
-                    if(!attacker_info) { throw Error('no attacker_info with '+msg+', attacker_id '+attacker_id.toString()+' pcache_data '+JSON.stringify(pcache_data)); }
-                    var attacker_str = PlayerCache.get_ui_name(attacker_info) + ' (L'+ attacker_info['player_level'].toString()+')';
-                    var str = null, name = null;
 
-                    if(feature['base_type'] == 'squad') {
-                        var squad_id = parseInt(base_id.split('_')[1],10);
-                        if(squad_id.toString() in player.squads) {
-                            name = player.squads[squad_id.toString()]['ui_name'];
-                            str = gamedata['strings']['regional_map']['your_squad_'+what_happened];
+                    var ui_names = { 'attacker': null, 'defender': null };
+                    var ui_names_pos = { 'attacker': null, 'defender': null };
+                    goog.array.forEach([['attacker', attacker_id], ['defender', defender_id]], function (key_id) {
+                        var key = key_id[0], id = key_id[1];
+                        if(id == session.user_id) {
+                            ui_names[key] = gamedata['strings']['regional_map']['msg_you'];
+                            ui_names_pos[key] = gamedata['strings']['regional_map']['msg_you_pos'];
+                        } else {
+                            //var info = PlayerCache.query_sync(id); // can return null if an in-flight query already set 'pending' on the entry
+                            var info = goog.array.find(pcache_data, function(entry) { return entry['user_id'] == id; });
+                            if(!info) { throw Error('no info with '+msg+', id '+id.toString()+' pcache_data '+JSON.stringify(pcache_data)); }
+                            ui_names[key] = PlayerCache.get_ui_name(info) + ' (L'+ info['player_level'].toString()+')';
+                            ui_names_pos[key] = gamedata['strings']['regional_map']['msg_make_possessive'].replace('%s', ui_names[key]);
                         }
-                    } else if(feature['base_type'] == 'quarry') {
-                        name = feature['base_ui_name'] || gamedata['strings']['regional_map']['unknown_name'];
-                        str = gamedata['strings']['regional_map']['your_quarry_'+what_happened];
-                    }
+                    });
+
+                    var str_key = 'msg_'+feature['base_type']+'_'+what_happened;
+                    console.log(str_key);
+                    var str = gamedata['strings']['regional_map'][str_key];
 
                     if(str) {
-                        str = str.replace('%x',x).replace('%y',y).replace('%basename',name).replace('%attacker',attacker_str);
-                        user_log.msg(str, new SPUI.Color(1,1,0,1));
+                        var base_ui_name;
+
+                        if(feature['base_type'] == 'squad') {
+                            var squad_id = parseInt(base_id.split('_')[1],10);
+                            if(session.user_id == defender_id && squad_id.toString() in player.squads) {
+                                base_ui_name = player.squads[squad_id.toString()]['ui_name'];
+                            } else {
+                                base_ui_name = '#'+squad_id.toString();
+                            }
+                        } else if(feature['base_type'] == 'quarry') {
+                            base_ui_name = feature['base_ui_name'] || gamedata['strings']['regional_map']['unknown_name'];
+                        }
+
+                        str = str.replace('%x',x).replace('%y',y).replace('%basename',base_ui_name).replace('%attacker_pos',ui_names_pos['attacker']).replace('%attacker',ui_names['attacker']).replace('%defender_pos',ui_names_pos['defender']).replace('%defender',ui_names['defender']);
+                        // capitalize first letter
+                        str = str[0].toUpperCase() + str.substr(1);
+
+                        console.log(str);
+                        // show message if you aren't looking at the base
+                        if(session.viewing_base.base_id != feature['base_id']) {
+                            user_log.msg(str, new SPUI.Color(1,1,0,1));
+                        }
+
                         // update repeater on the map
                         if(selection.ui && selection.ui.user_data && selection.ui.user_data['dialog'] == 'region_map_dialog') {
                             var dialog = selection.ui;

@@ -16199,19 +16199,19 @@ class GAMEAPI(resource.Resource):
                 if gamedata['server'].get('nosql_battle_record',True) and summary.get('attack_type',None) != 'tutorial' and summary['defender_id'] != LION_STONE_ID:
                     gamesite.nosql_client.battle_record(summary, reason=summary['battle_type'])
 
-                if summary['battle_type'] == 'attack' and not summary['defender_is_ai']:
-                    # PvP offense attack
-                    # mail the victim a "you've been attacked" message and battle summary
-                    gamesite.msg_client.msg_send([{'from': session.player.user_id,
-                                                   'to': [summary['defender_id']],
-                                                   'type': 'i_attacked_you',
-                                                   'expire_time': server_time + gamedata['server']['message_expire_time']['i_attacked_you'],
-                                                   'from_fbid': str(summary['attacker_facebook_id']),
-                                                   'from_name': unicode(session.user.get_ui_name(session.player)),
-                                                   'summary': summary}])
+                if summary['battle_type'] == 'attack': # offensive attack
+                    if not summary['defender_is_ai']: # PvP
+                        # mail the victim a "you've been attacked" message and battle summary
+                        gamesite.msg_client.msg_send([{'from': session.player.user_id,
+                                                       'to': [summary['defender_id']],
+                                                       'type': 'i_attacked_you',
+                                                       'expire_time': server_time + gamedata['server']['message_expire_time']['i_attacked_you'],
+                                                       'from_fbid': str(summary['attacker_facebook_id']),
+                                                       'from_name': unicode(session.user.get_ui_name(session.player)),
+                                                       'summary': summary}])
 
                     if summary['base_type'] != 'home' and 'base_region' in summary:
-                        # PvP offense attack against quarry or squad
+                        # offense attack against quarry or squad
                         # broadcast map attack to victim
                         self.broadcast_map_attack(summary['base_region'], summary['base_id'],
                                                   summary['attacker_id'], summary['defender_id'],
@@ -26128,8 +26128,8 @@ class GAMEAPI(resource.Resource):
         if msg is None:
             msg = "REGION_MAP_ATTACK_COMPLETE" if summary else "REGION_MAP_ATTACK_START" # legacy compatibility
         upd = [msg, region_id, base_id, attacker_id, defender_id, summary, pcache_info]
-        if attacker_id != defender_id:
-            session = get_session_by_user_id(defender_id)
+        for id in (attacker_id, defender_id):
+            session = get_session_by_user_id(id)
             if session and session.player.home_region == region_id:
                 session.send([upd], flush_now = True)
 
