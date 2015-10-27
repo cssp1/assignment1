@@ -1973,23 +1973,28 @@ if 0: # test code
 def check_hives(hives):
     error = 0
     max_region_pop = max(hives.get('region_pop',{}).values() + [1,])
-    spawn_pop = spawn_pop_init()
 
-    for spawn_name, spawn in [x for x in hives.iteritems() if x[0].startswith('spawn')]:
-        for item in spawn:
+    for spawn_array_name, spawn_array in filter(lambda k_v: k_v[0] == 'spawn' or k_v[0].startswith('spawn_for'), hives.iteritems()):
+        spawn_pop = spawn_pop_init()
+        if spawn_array_name == 'spawn':
+            region_id = 'ALL'
+        else:
+            region_id = spawn_array_name.split('_for_')[1]
+
+        for item in spawn_array:
             if item['template'] not in hives['templates']:
                 error |= 1
-                print 'hive %s: invalid template "%s"' % (spawn_name, item['template'])
+                print 'hive %s: invalid template "%s"' % (spawn_array_name, item['template'])
             # stupid N^2 algorithm to look for overlap
             id_start = item['id_start']
             id_end = id_start + int(max_region_pop * item['num'])
-            for other in spawn:
+            for other in spawn_array:
                 if other is item: continue
                 other_start = other['id_start']
                 other_end = other_start + int(max_region_pop * other['num'])
                 if range_overlap(id_start, id_end, other_start, other_end):
                     error |= 1
-                    print 'hive %s: these two templates have overlapping ID ranges (note: num can be multiplied by %.2f for max_region_pop)!\n%s\n%s' % (spawn_name, max_region_pop, repr(item), repr(other))
+                    print 'hive %s: these two templates have overlapping ID ranges (note: num can be multiplied by %.2f for max_region_pop)!\n%s\n%s' % (spawn_array_name, max_region_pop, repr(item), repr(other))
             if item.get('active', 1):
                 if 'spawn_times' in item:
                     for start_time, end_time in item['spawn_times']:
@@ -1999,7 +2004,7 @@ def check_hives(hives):
 
                     if ('start_time' in item) or ('end_time' in item):
                         error |= 1
-                        print 'hive %s: this template has both spawn_times and start_time/end_time specified\n%s' % (spawn_name, repr(item))
+                        print 'hive %s: this template has both spawn_times and start_time/end_time specified\n%s' % (spawn_array_name, repr(item))
                 else:
                     start_time = item.get('start_time',-1)
                     end_time = item.get('end_time',-1)
@@ -2007,23 +2012,23 @@ def check_hives(hives):
                     if end_time > 0:
                         spawn_pop_update(spawn_pop, end_time, -item['num']) # hives disappear
 
-    # check future spawn population for abnormally low or high intervals
-    if len(spawn_pop) > 1 and gamedata['game_id'] != 'mf': # ignore MF
-        i = 0
-        while spawn_pop[i+1][0] < time_now: # ignore intervals before curren ttime
-            i += 1
-        for j in xrange(i, len(spawn_pop)):
-            entry = spawn_pop[j]
-            warn = None
-            if entry[1] < 10:
-                warn  = 'LOW (%d)' % entry[1]
-            elif entry[1] >= 1000:
-                warn = 'HIGH (%d)' % entry[1]
-            if warn:
-                interval = [entry[0], spawn_pop[j+1][0] if j+1 < len(spawn_pop) else -1]
-                ui_interval = map(lambda x: time.strftime('%Y %b %d', time.gmtime(x)) if x > 0 else 'infinity', interval)
-                print 'warning:', warn, 'number of hives set to spawn in the interval %d,%d (%s -> %s)' % (interval[0], interval[1], ui_interval[0], ui_interval[1])
-        #print spawn_pop[i:]
+        # check future spawn population for abnormally low or high intervals
+        if len(spawn_pop) > 1 and gamedata['game_id'] != 'mf': # ignore MF
+            i = 0
+            while spawn_pop[i+1][0] < time_now: # ignore intervals before current time
+                i += 1
+            for j in xrange(i, len(spawn_pop)):
+                entry = spawn_pop[j]
+                warn = None
+                if entry[1] < 10:
+                    warn  = 'LOW (%d)' % entry[1]
+                elif entry[1] >= 1000:
+                    warn = 'HIGH (%d)' % entry[1]
+                if warn:
+                    interval = [entry[0], spawn_pop[j+1][0] if j+1 < len(spawn_pop) else -1]
+                    ui_interval = map(lambda x: time.strftime('%Y %b %d', time.gmtime(x)) if x > 0 else 'infinity', interval)
+                    print 'warning:', warn, 'number of hives set to spawn in region %s in the interval %d,%d (%s -> %s)' % (region_id, interval[0], interval[1], ui_interval[0], ui_interval[1])
+            #print spawn_pop[i:]
 
     for strid, data in hives['templates'].iteritems():
         error |= check_hive('hive:'+strid, data)
