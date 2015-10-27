@@ -13327,11 +13327,11 @@ class CONTROLAPI(resource.Resource):
         # note: ignore our own broadcasts
         if server != spin_server_name:
             self.gameapi.broadcast_map_update(region_id, base_id, data, originator, send_to_net = False)
-    def handle_broadcast_map_attack(self, request, msg = None, region_id = None, base_id = None,
+    def handle_broadcast_map_attack(self, request, msg = None, region_id = None, feature = None,
                                     attacker_id = None, defender_id = None, summary = None, pcache_info = None, server = None):
         # note: ignore our own broadcasts
         if server != spin_server_name:
-            self.gameapi.broadcast_map_attack(region_id, base_id, attacker_id, defender_id, summary, pcache_info, msg = msg, send_to_net = False)
+            self.gameapi.broadcast_map_attack(region_id, feature, attacker_id, defender_id, summary, pcache_info, msg = msg, send_to_net = False)
     def handle_broadcast_turf_update(self, request, region_id = None, data = None):
         for session in iter_sessions():
             if session.player.home_region == region_id:
@@ -15813,7 +15813,7 @@ class GAMEAPI(resource.Resource):
                                 # this finds any squads that were not in the original defending_squads query, like ones that were on the way but not arrived yet
                                 defense_features = [x for x in gamesite.nosql_client.get_map_features_by_loc(session.player.home_region, session.viewing_base.base_map_loc, reason='complete_attack(victory/defending_squads)') if x.get('base_type',None)=='squad']
                                 for feature in defense_features:
-                                    self.broadcast_map_attack(session.player.home_region, feature['base_id'], session.player.user_id, session.viewing_player.user_id,
+                                    self.broadcast_map_attack(session.player.home_region, feature, session.player.user_id, session.viewing_player.user_id,
                                                               None,
                                                               [self.get_player_cache_props(u,p,aid) for u,p,aid in ((session.user,session.player,session.alliance_id_cache),(session.viewing_user,session.viewing_player,session.viewing_alliance_id_cache))],
                                                               msg = "REGION_MAP_ATTACK_DIVERT")
@@ -16213,7 +16213,7 @@ class GAMEAPI(resource.Resource):
                     if summary['base_type'] != 'home' and 'base_region' in summary:
                         # offense attack against quarry or squad
                         # broadcast map attack to victim
-                        self.broadcast_map_attack(summary['base_region'], summary['base_id'],
+                        self.broadcast_map_attack(summary['base_region'], session.viewing_base.get_cache_props(),
                                                   summary['attacker_id'], summary['defender_id'],
                                                   summary,
                                                   [self.get_player_cache_props(u,p,aid) for u,p,aid in ((session.user,session.player,session.alliance_id_cache),(session.viewing_user,session.viewing_player,session.viewing_alliance_id_cache))],
@@ -19821,7 +19821,7 @@ class GAMEAPI(resource.Resource):
                     return False
 
                 if session.viewing_player is not session.player:
-                    self.broadcast_map_attack(session.viewing_base.base_region, session.viewing_base.base_id,
+                    self.broadcast_map_attack(session.viewing_base.base_region, session.viewing_base.get_cache_props(),
                                               session.player.user_id, session.viewing_player.user_id, None, # no summary -> attack start
                                               [self.get_player_cache_props(u,p,aid) for u,p,aid in ((session.user,session.player,session.alliance_id_cache),(session.viewing_user,session.viewing_player,session.viewing_alliance_id_cache))],
                                               msg = "REGION_MAP_ATTACK_START")
@@ -26124,10 +26124,10 @@ class GAMEAPI(resource.Resource):
                                                          'server': spin_server_name, 'originator': originator },
                                                }, '', log = False)
 
-    def broadcast_map_attack(self, region_id, base_id, attacker_id, defender_id, summary, pcache_info, send_to_net = True, msg = None):
+    def broadcast_map_attack(self, region_id, feature, attacker_id, defender_id, summary, pcache_info, send_to_net = True, msg = None):
         if msg is None:
             msg = "REGION_MAP_ATTACK_COMPLETE" if summary else "REGION_MAP_ATTACK_START" # legacy compatibility
-        upd = [msg, region_id, base_id, attacker_id, defender_id, summary, pcache_info]
+        upd = [msg, region_id, feature, attacker_id, defender_id, summary, pcache_info]
         for id in (attacker_id, defender_id):
             session = get_session_by_user_id(id)
             if session and session.player.home_region == region_id:
@@ -26138,7 +26138,7 @@ class GAMEAPI(resource.Resource):
                                                'server':spin_server_name,
                                                'method':'broadcast_map_attack',
                                                'args': { 'msg': msg,
-                                                         'region_id': region_id, 'base_id': base_id,
+                                                         'region_id': region_id, 'feature': feature,
                                                          'attacker_id': attacker_id, 'defender_id': defender_id,
                                                          'summary': summary, 'pcache_info': pcache_info,
                                                          'server': spin_server_name },

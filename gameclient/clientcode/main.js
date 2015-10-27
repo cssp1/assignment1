@@ -44506,9 +44506,11 @@ function handle_server_message(data) {
             console.log('ignoring spurious REGION_MAP_UPDATES'); console.log(data[1]);
         }
     } else if(msg == "REGION_MAP_ATTACK_START" || msg == "REGION_MAP_ATTACK_COMPLETE" || msg == "REGION_MAP_ATTACK_DIVERT") {
-        var region_id = data[1], base_id = data[2], attacker_id = data[3], defender_id = data[4], summary = data[5], pcache_data = data[6];
+        var region_id = data[1], feature = data[2], attacker_id = data[3], defender_id = data[4], summary = data[5], pcache_data = data[6];
+
+        if(typeof feature === 'string') { return; } // XXXXXX legacy compatibility - this parameter used to be base_id
+
         if(session.region.data && session.region.data['id'] == region_id) {
-            var feature = session.region.find_feature_by_id(base_id);
             if(feature && ('base_map_loc' in feature)) { // note: exclude features where all we know is the lock state (regional map isn't loaded)
                 PlayerCache.update_batch(pcache_data);
 
@@ -44542,14 +44544,13 @@ function handle_server_message(data) {
                     });
 
                     var str_key = 'msg_'+feature['base_type']+'_'+what_happened;
-                    console.log(str_key);
                     var str = gamedata['strings']['regional_map'][str_key];
 
                     if(str) {
                         var base_ui_name;
 
                         if(feature['base_type'] == 'squad') {
-                            var squad_id = parseInt(base_id.split('_')[1],10);
+                            var squad_id = parseInt(feature['base_id'].split('_')[1],10);
                             if(session.user_id == defender_id && squad_id.toString() in player.squads) {
                                 base_ui_name = player.squads[squad_id.toString()]['ui_name'];
                             } else {
@@ -44563,7 +44564,6 @@ function handle_server_message(data) {
                         // capitalize first letter
                         str = str[0].toUpperCase() + str.substr(1);
 
-                        console.log(str);
                         // show message if you aren't looking at the base
                         if(session.viewing_base.base_id != feature['base_id']) {
                             user_log.msg(str, new SPUI.Color(1,1,0,1));
