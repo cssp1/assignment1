@@ -9376,6 +9376,8 @@ class Player(AbstractPlayer):
     def ladder_point_decay_check(self, session, retmsg, base_damage = None, base_repair_time = None):
         if base_damage is not None: assert base_repair_time is not None # must be given together
 
+        mode = gamedata['matchmaking'].get('ladder_point_decay_mode', 'damage')
+        assert mode in ('damage', 'protection')
         pred = gamedata['matchmaking'].get('ladder_point_decay_if', None)
         pred_ok = (pred and Predicates.read_predicate(pred).is_satisfied(self, None))
 
@@ -9384,11 +9386,15 @@ class Player(AbstractPlayer):
             for aura in self.player_auras:
                 if aura['spec'] == 'trophy_pvp_decay':
                     elapsed = server_time - aura['start_time']
-                    if ('data' in aura):
-                        if aura['data'].get('base_repair_time',-1) >= aura['start_time']:
-                            elapsed = min(elapsed, aura['data']['base_repair_time'] - aura['start_time'])
-                    else:
-                        elapsed = 0 # legacy compatibility
+                    # note: aura['end_time'] may be -1 or missing for damaged-and-not-yet-repairing bases
+
+                    # legacy compatibility
+                    if ('data' in aura) and aura['data'].get('base_repair_time',-1) >= aura['start_time']:
+                        elapsed = min(elapsed, aura['data']['base_repair_time'] - aura['start_time'])
+
+                    # limit by end_time
+                    elif aura.get('end_time',-1) >= server_time and aura['end_time'] >= aura['start_time']:
+                        elapsed = min(elapsed, aura['end_time'] - aura['start_time'])
 
                     if elapsed > 0:
                         # exponential decay constant
@@ -9398,14 +9404,21 @@ class Player(AbstractPlayer):
 
         # check if decay aura should be applied
         decay = False
+        end_time = -1
+
         if pred_ok:
-            if base_damage is None:
-                base_damage, base_repair_time = self.my_home.calc_base_damage_and_repair_time()
-            if base_damage >= gamedata['matchmaking']['ladder_win_damage']:
-                decay = True
+            if mode == 'damage':
+                if base_damage is None:
+                    base_damage, base_repair_time = self.my_home.calc_base_damage_and_repair_time()
+                if base_damage >= gamedata['matchmaking']['ladder_win_damage']:
+                    decay = True
+                    end_time = base_repair_time
+            elif mode == 'protection':
+                decay = (self.resources.protection_end_time >= server_time)
+                end_time = self.resources.protection_end_time
 
         if decay:
-            if self.apply_aura('trophy_pvp_decay', data = {'base_repair_time':base_repair_time}, ignore_limit = True) and (retmsg is not None):
+            if self.apply_aura('trophy_pvp_decay', duration = (end_time - server_time) if (end_time > 0) else -1, ignore_limit = True) and (retmsg is not None):
                 retmsg.append(["PLAYER_AURAS_UPDATE" if self is session.player else "ENEMY_AURAS_UPDATE", self.player_auras])
         else:
             self.remove_aura(session, retmsg, 'trophy_pvp_decay', force = True)
@@ -15611,8 +15624,6 @@ class GAMEAPI(resource.Resource):
                     protection_based_on = session.viewing_player.get_any_abtest_value('protection_based_on', gamedata['server']['protection_based_on'])
                     ladder_prot_time = session.viewing_base.calc_ladder_protection(base_damage)
 
-                    session.viewing_player.ladder_point_decay_check(session, None, base_damage = base_damage, base_repair_time = -1) # PvP attack victim
-
                     # update victim's protection timer
                     if session.is_ladder_battle() and session.viewing_player.resources.protection_end_time > 0:
                         protection_based_on = 'ladder_battle'
@@ -15707,6 +15718,8 @@ class GAMEAPI(resource.Resource):
                                                       precurve_storage_damage,
                                                       storage_damage,
                                                       prot_time))
+
+                    session.viewing_player.ladder_point_decay_check(session, None, base_damage = base_damage, base_repair_time = -1) # PvP attack victim
 
                     # send real-time Facebook notification to the victim
                     # XXX not working for quarries or squads because we have no way to write viewing_player.last_fb_notification_time as global state
@@ -16236,7 +16249,7 @@ class GAMEAPI(resource.Resource):
         # note: not sending updates to retmsg, so we assume a session change will come right after this
         if session.home_base:
             self.do_start_repairs(session, None, session.player.my_home.base_id, repair_units = False)
-            session.player.ladder_point_decay_check(session, None) # after attack - player
+            session.player.ladder_point_decay_check(session, retmsg) # after attack - player
 
         if summary:
             retmsg.append(["BATTLE_ENDED",
@@ -17618,7 +17631,8 @@ class GAMEAPI(resource.Resource):
                                                     'spellname': spellname,
                                                     'reason': reason})
             session.player.resources.protection_end_time = max(session.player.resources.protection_end_time, server_time) + spell['duration']
-            retmsg.append(["PLAYER_STATE_UPDATE", session.player.resources.calc_snapshot().serialize()])
+            session.deferred_ladder_point_decay_check = True
+            session.deferred_player_state_update = True
 
         elif spellname.startswith("FREE_RANDOM_") or spellname.startswith("BUY_RANDOM_"):
             items = session.get_loot_items(session.player, gamedata['loot_tables'][spell['loot_table']]['loot'], -1, -1)
@@ -19969,6 +19983,8 @@ class GAMEAPI(resource.Resource):
                                                                 'new_end_time': 0,
                                                                 'defender_id':session.viewing_player.user_id})
                     session.player.resources.protection_end_time = 0
+                    session.deferred_ladder_point_decay_check = True
+
                     session.player.protection_attack_count = 0
                     session.setmax_player_metric('last_pvp_aggression_time', server_time, time_series = False)
 
@@ -24452,6 +24468,7 @@ class GAMEAPI(resource.Resource):
                                                             'new_end_time': 0})
                     session.player.resources.protection_end_time = 0
                     session.player.protection_attack_count = 0
+                    session.deferred_ladder_point_decay_check = True
                     session.deferred_player_state_update = True
                     # XXXXXX all things that affect protection_end_time should probably cause a map and/or player_cache update!
             else:
