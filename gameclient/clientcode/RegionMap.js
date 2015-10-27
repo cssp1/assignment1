@@ -491,9 +491,17 @@ RegionMap.RegionMap = function(data) {
     this.font = SPUI.make_font(14, 17, 'thick');
     this.cursor = null;
 
+    this.spfx_list = [];
+
     this.zoom_to_default();
 };
 goog.inherits(RegionMap.RegionMap, SPUI.DialogWidget);
+
+/** @override */
+RegionMap.RegionMap.prototype.destroy = function() {
+    // kill any ongoing SPFX instances
+    goog.array.forEach(this.spfx_list, function(fx) { SPFX.remove(fx); } );
+};
 
 // save/restore state, for reloading the map after session changes
 RegionMap.RegionMap.prototype.get_state = function() {
@@ -1899,7 +1907,7 @@ RegionMap.RegionMap.prototype.draw_feature_strength = function(feature, wxy) {
             var xy = [wxy[0] + i * (bar_width+spacing), wxy[1] - height];
             var wh = [bar_width, height];
             if(true /* SPFX.detail >= 2*/) { // drop shadow
-                SPFX.ctx.fillStyle = 'rgba(0,0,0,1)';
+                SPUI.ctx.fillStyle = 'rgba(0,0,0,1)';
                 SPUI.ctx.fillRect(xy[0]+1/this.zoom, xy[1]+1/this.zoom, wh[0], wh[1]);
             }
             SPUI.ctx.fillStyle = SPUI.make_colorv(catdata['ui_color']).str();
@@ -2548,6 +2556,17 @@ RegionMap.RegionMap.prototype.classify_feature = function(feature) {
         color = 'default';
     }
     return color;
+};
+
+RegionMap.RegionMap.prototype.trigger_spfx_at = function(vfx_data, loc) {
+    var wxy = this.cell_to_widget(vec_add(loc, [0.5,0.5]));
+    // clip
+    if(wxy[0] < 0 || wxy[0] >= this.wh[0] || wxy[1] < 0 || wxy[1] >= this.wh[1]) {
+        return;
+    }
+    var absolute_xy = vec_add(wxy, this.get_absolute_xy());
+    // XXX leaks - find a way to delete when obsolete
+    this.spfx_list.push(SPFX.add_visual_effect_at_time(absolute_xy, 0, [0,1,0], client_time, vfx_data, false /* no sound */, {'is_ui': true, 'sprite_scale': [this.zoom,this.zoom]}));
 };
 
 RegionMap.RegionMap.prototype.draw = function(offset) {

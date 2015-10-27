@@ -44577,6 +44577,9 @@ function handle_server_message(data) {
                                 _dialog.widgets['map'].zoom_all_the_way_in();
                             }; })(dialog, feature);
                             region_map_display_notification(dialog, '[color=#ff0000]'+str+'[/color]', {onclick: onclick});
+                            if(msg == "REGION_MAP_ATTACK_COMPLETE") {
+                                dialog.widgets['map'].trigger_spfx_at(gamedata['client']['vfx']['region_map_battle_complete'], feature['base_map_loc']);
+                            }
                         }
                     }
                 }

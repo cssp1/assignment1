@@ -1208,7 +1208,7 @@ SPFX.Explosion = function(where, height, assetname, when, enable_audio, data, in
     this.opacity = ((data && ('opacity' in data)) ? /** @type {number} */ (data['opacity']) : 1);
     this.composite_mode = ((data && ('composite_mode' in data)) ? /** @type {string} */ (data['composite_mode']) : 'source-over');
 
-    this.sprite_scale = ((data && 'sprite_scale' in data) ? SPFX.get_vec_parameter(data['sprite_scale']) : [1,1]);
+    this.sprite_scale = (instance_data && 'sprite_scale' in instance_data ? SPFX.get_vec_parameter(instance_data['sprite_scale']) : ((data && 'sprite_scale' in data) ? SPFX.get_vec_parameter(data['sprite_scale']) : [1,1]));
 
     this.rotation = (instance_data && 'rotation' in instance_data ? /** @type {number} */ (instance_data['rotation']) : (data && ('rotation' in data) ? /** @type {number} */ (data['rotation']) : 0));
     this.rotate_speed = (instance_data && 'rotate_speed' in instance_data ? /** @type {number} */ (instance_data['rotate_speed']) : (data && ('rotate_speed' in data) ? /** @type {number} */ (data['rotate_speed']) : 0));

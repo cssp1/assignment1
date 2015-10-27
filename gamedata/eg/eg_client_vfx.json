@@ -44,6 +44,10 @@
         { "type": "sound", "assets": ["fx/zg02"] }
     ] },
 
+    "region_map_battle_complete": { "type": "combine", "effects": [
+        { "layer": "ui", "type": "explosion", "sprite": "fx/zg02", "composite_mode": "lighter" }
+    ] },
+
     // bursts of iron/water that explode out of buildings when you loot them
     "iron_burst": { "require_detail": 2,
                     "type": "particles", "charge": "iron",
