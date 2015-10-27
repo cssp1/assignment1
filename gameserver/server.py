@@ -13036,8 +13036,13 @@ class CONTROLAPI(resource.Resource):
         assert channel == 'CONTROL'
         if gamedata['server']['log_controlapi']:
             gamesite.exception_log.event(server_time, 'CONTROLAPI(CHAT): %s got %s %s' % (spin_server_name, repr(sender_info), text))
+        ret = None
         start_time = time.time()
-        ret = self.handle(None, sender_info['secret'], sender_info['method'], sender_info['args'])
+        try:
+            ret = self.handle(None, sender_info['secret'], sender_info['method'], sender_info['args'])
+        except:
+            gamesite.exception_log.event(server_time, 'CONTROL chat_recv exception method %r args %r:\n%s' % (sender_info['method'], sender_info['args'], traceback.format_exc()))
+            pass
         end_time = time.time()
         admin_stats.record_latency('CONTROLAPI(CHAT:%s)' % sender_info['method'], end_time-start_time)
         return ret
