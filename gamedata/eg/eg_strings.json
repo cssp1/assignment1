@@ -432,14 +432,17 @@
         "you_control": "You Control",
         "you_control_quarries": "You Control (%cur/%max Quarries)",
 
-        "your_quarry_is_under_attack": "Your Quarry %basename is under attack by %attacker!",
-        "your_quarry_was_attacked_victory": "Your Quarry %basename repelled the attack by %attacker!",
-        "your_quarry_was_attacked_defeat": "Your Quarry %basename was taken by %attacker!",
+        "msg_you": "you", "msg_you_pos": "your",
+        "msg_make_possessive": "%s's",
 
-        "your_squad_is_under_attack": "Your Battalion %basename is under attack by %attacker!",
-        "your_squad_was_attacked_victory": "Your Battalion %basename repelled the attack by %attacker!",
-        "your_squad_was_attacked_defeat": "Your Battalion %basename was destroyed by %attacker!",
-        "your_squad_was_diverted": "Your Battalion %basename was diverted to home base because its destination was conquered by %attacker"
+        "msg_quarry_is_under_attack": "%defender_pos Quarry %basename is under attack by %attacker!",
+        "msg_quarry_was_attacked_victory": "%defender_pos Quarry %basename repelled the attack by %attacker!",
+        "msg_quarry_was_attacked_defeat": "%defender_pos Quarry %basename was taken by %attacker!",
+
+        "msg_squad_is_under_attack": "%defender_pos Battalion %basename is under attack by %attacker!",
+        "msg_squad_was_attacked_victory": "%defender_pos Battalion %basename repelled the attack by %attacker!",
+        "msg_squad_was_attacked_defeat": "%defender_pos Battalion %basename was destroyed by %attacker!",
+        "msg_squad_was_diverted": "%defender_pos Battalion %basename was diverted to home base because its destination was conquered by %attacker"
     },
 
     "inventory": {
