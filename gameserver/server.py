@@ -16220,7 +16220,9 @@ class GAMEAPI(resource.Resource):
                         # broadcast map attack to victim
                         self.broadcast_map_attack(summary['base_region'], session.viewing_base.get_cache_props(),
                                                   summary['attacker_id'], summary['defender_id'],
-                                                  summary,
+                                                  # The only part of the summary actually used by the client is the defender_outcome.
+                                                  # Trim it down to hide sensitive info like analytics summary data. (XXX simplify args)
+                                                  {'defender_outcome': summary['defender_outcome']},
                                                   [self.get_player_cache_props(u,p,aid) for u,p,aid in ((session.user,session.player,session.alliance_id_cache),(session.viewing_user,session.viewing_player,session.viewing_alliance_id_cache))],
                                                   msg = "REGION_MAP_ATTACK_COMPLETE")
 
