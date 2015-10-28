@@ -37,12 +37,14 @@ if HTTPLIB == 'requests':
     requests_exceptions_HTTPError = requests.exceptions.HTTPError
     requests_exceptions_ConnectionError = requests.exceptions.ConnectionError
     urllib2_HTTPError = S3DummyException
+    urllib3_TimeoutError = requests.packages.urllib3.exceptions.TimeoutError
 else:
     import urllib2
     # stub out foreign exceptions
     requests_exceptions_HTTPError = S3DummyException
     requests_exceptions_ConnectionError = S3DummyException
     urllib2_HTTPError = urllib2.HTTPError
+    urllib3_TimeoutError = S3DummyException
 
 # hack - patch HTTPResponse to support usage as a standard Python file object
 import httplib
@@ -274,11 +276,16 @@ class S3 (object):
             try:
                 fd = self.get_open(bucket, filename)
                 d = open(dest, 'w')
+
                 while True:
-                    data = fd.read(bufsize)
-                    if not data:
-                        return # DONE!
-                    d.write(data)
+                    try:
+                        data = fd.read(bufsize)
+                        if not data:
+                            return # DONE!
+                        d.write(data)
+                    except urllib3_TimeoutError as e:
+                        break # retry
+
             except socket.error as e:
                 if e.errno == errno.ECONNRESET:
                     err_msg = 'socket.error %s' % errno.errorcode[e.errno]
@@ -308,6 +315,7 @@ class S3 (object):
             attempt += 1
             time.sleep(RETRY_DELAY)
 
+        # XXX delete file on error?
         raise S3Exception('S3 get_file(%s,%s,%s) giving up after %d HTTP errors, last one was: %s' % (bucket, filename, dest, attempt, err_msg))
 
     # synchronous check if an object exists in S3
