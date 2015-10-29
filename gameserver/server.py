@@ -12912,7 +12912,7 @@ class OGPAPI(resource.Resource):
 
     def render_GET(self, request):
         SpinHTTP.set_access_control_headers(request)
-        ret = catch_all('OGPAPI request %r args %r' % (request, request.args))(self.handle_request)(self, request)
+        ret = catch_all('OGPAPI request %r args %r' % (request, request.args))(self.handle_request)(request)
         if ret is None:
             request.setResponseCode(http.BAD_REQUEST)
             ret = 'spinpunch error'
@@ -13153,7 +13153,7 @@ class CONTROLAPI(resource.Resource):
             args = dict([(k, str(v[0])) for k, v in request.args.iteritems() if k not in ('secret','method')])
 
             with admin_stats.latency_measurer('CONTROLAPI(HTTP:%s)' % method):
-                ret = catch_all('CONTROLAPI (method %r args %r)' % (method, args))(self.handle)(self, request, secret, method, args)
+                ret = catch_all('CONTROLAPI (method %r args %r)' % (method, args))(self.handle)(request, secret, method, args)
 
         if ret is None:
             request.setResponseCode(http.BAD_REQUEST)
@@ -14982,7 +14982,7 @@ class CREDITAPI(resource.Resource):
         return self.render_POST(request)
     def render_POST(self, request):
         SpinHTTP.set_access_control_headers(request)
-        ret = catch_all('CREDITAPI')(self.handle_request)(self, request)
+        ret = catch_all('CREDITAPI')(self.handle_request)(request)
         if ret is None:
             request.setResponseCode(http.BAD_REQUEST)
             ret = 'spinpunch error'
@@ -15174,7 +15174,7 @@ class KGAPI(resource.Resource):
         return self.render_POST(request)
     def render_POST(self, request):
         SpinHTTP.set_access_control_headers(request)
-        ret = catch_all('KGAPI')(self.handle_request)(self, request)
+        ret = catch_all('KGAPI')(self.handle_request)(request)
         if ret is None:
             request.setResponseCode(http.BAD_REQUEST)
             ret = 'spinpunch error'
@@ -15238,7 +15238,7 @@ class TRIALPAYAPI(resource.Resource):
         return self.render_POST(request)
     def render_POST(self, request):
         SpinHTTP.set_access_control_headers(request)
-        ret = catch_all('TRIALPAYAPI')(self.handle_request)(self, request)
+        ret = catch_all('TRIALPAYAPI')(self.handle_request)(request)
         if ret is None:
             request.setResponseCode(http.BAD_REQUEST)
             ret = 'spinpunch error'
@@ -15309,7 +15309,7 @@ class XSAPI(resource.Resource):
         return self.render_POST(request)
     def render_POST(self, request):
         SpinHTTP.set_access_control_headers(request)
-        ret = catch_all('XSAPI')(self.handle_request)(self, request)
+        ret = catch_all('XSAPI')(self.handle_request)(request)
         if ret is None:
             request.setResponseCode(http.BAD_REQUEST)
             ret = SpinJSON.dumps({'error': {'code':'FATAL_ERROR', 'message': text}})
@@ -27008,7 +27008,7 @@ class AdminResource(resource.Resource):
     isLeaf = True
     def render(self, request):
         # do not return a revealing error message on exceptions
-        ret = catch_all('ADMIN')(resource.Resource.render)(self, request)
+        ret = catch_all('ADMIN')(resource.Resource.render)(request)
         if ret is None:
             request.setResponseCode(http.BAD_REQUEST)
             ret = 'spinpunch error'
