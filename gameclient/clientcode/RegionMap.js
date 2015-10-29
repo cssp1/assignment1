@@ -961,7 +961,7 @@ RegionMap.RegionMap.prototype.make_nosql_spy_buttons = function(feature) {
                 ret.push([gamedata['strings']['regional_map']['attack'], wrapped_attack_cb, 'attack']);
 
                 // pre-attack-and-resolve button
-                if(gamedata['client']['enable_pre_resolve'] && player.auto_resolve_enabled()) {
+                if(gamedata['territory']['enable_pre_resolve'] && player.auto_resolve_enabled()) {
                     var resolve_cb = make_cb(this, feature, 2); // pass pre_attack = 2 for auto-attack-and-resolve
                     var wrapped_resolve_cb = (will_lose_protection ? (function(_resolve_cb) { return function() { invoke_attack_through_protection_message(_resolve_cb); }; })(resolve_cb) : resolve_cb);
                     ret.push([gamedata['strings']['regional_map']['auto_resolve'], wrapped_resolve_cb, 'attack']);
