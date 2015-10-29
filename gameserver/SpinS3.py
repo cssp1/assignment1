@@ -10,26 +10,80 @@ import base64, time, calendar, hmac, hashlib
 import socket, os, errno, fcntl
 from urllib import urlencode
 import requests
+import AtomicFileWrite
 
-# wrap urlopen to loop on error since S3 sometimes throws occasional errors
+class S3Exception(Exception):
+    def __init__(self, wrapped, ui_msg, op, bucket, filename, attempt_num):
+        self.wrapped = wrapped
+        self.ui_msg = ui_msg
+        self.op = op
+        self.bucket = bucket
+        self.filename = filename
+        self.attempt_num = attempt_num
+    def __repr__(self):
+        ret = '%s %s(%s,%s): %s' % (self.__class__.__name__, self.op, self.bucket, self.filename, self.ui_msg)
+        if self.attempt_num > 0:
+            ret += ' (after %d retries)' % self.attempt_num
+        return ret
+
+class S3404Exception(S3Exception): pass
+
+# need retry logic since S3 sometimes throws errors
 MAX_RETRIES = 10
 RETRY_DELAY = 2.0 # number of seconds between retry attempts
 S3_REQUEST_TIMEOUT = 60 # timeout (seconds) on any one individual S3 request
 
-class S3Exception(Exception): pass
-class S3DummyException(S3Exception): pass # for stubbing out missing module exceptions
-class S3TransportException(S3Exception):
-    def __init__(self, e):
-        self.e = e
-    def __repr__(self):
-        return 'S3TransportException(%s %s)' % (repr(type(self.e)), repr(self.e))
+class Policy404(object):
+    # what to do when server returns 404
+    RAISE = 0
+    IGNORE = 1
 
-class S3404Exception(S3Exception):
-    def __init__(self, bucket, filename):
-        self.bucket = bucket
-        self.filename = filename
-    def __repr__(self):
-        return 'S3404Exception("%s","%s")' % (self.bucket, self.filename)
+# note: assumes "func" returns a requests response object, or None if you don't care about HTTP errors
+def retry_logic(func_name, bucket, filename, policy_404, func, *args, **kwargs):
+    attempt = 0
+    last_err = None
+
+    while attempt < MAX_RETRIES:
+        try:
+            response = func(*args, **kwargs)
+            if response is None: # quiet success
+                return None
+            if response.status_code == 404:
+                if policy_404 == Policy404.RAISE:
+                    raise S3404Exception(None, '404 Not Found', func_name, bucket, filename, attempt)
+                elif policy_404 == Policy404.IGNORE:
+                    pass
+            else:
+                response.raise_for_status()
+            return response
+
+        except requests.exceptions.HTTPError as e:
+            last_err = S3Exception(e, 'requests.exceptions.HTTPError: %r' % e, func_name, bucket, filename, attempt)
+            if e.response.status_code == 500:
+                pass # retry on 500 Internal Server Error
+            else:
+                raise last_err # abort immediately
+
+        except requests.exceptions.RequestException as e:
+            last_err = S3Exception(e, 'requests.exceptions.RequestException: %r' % e, func_name, bucket, filename, attempt)
+            pass # retry
+        except requests.exceptions.ConnectionError as e:
+            last_err = S3Exception(e, 'requests.exceptions.ConnectionError: %r' % e, func_name, bucket, filename, attempt)
+            pass # retry
+        except socket.timeout as e:
+            last_err = S3Exception(e, 'socket.timeout', func_name, bucket, filename, attempt)
+            pass # retry
+        except socket.error as e:
+            last_err = S3Exception(e, 'socket.error: %s' % errno.errorcode[e.errno], func_name, bucket, filename, attempt)
+            if e.errno == errno.ECONNRESET:
+                pass # retry
+            else:
+                raise last_err # abort immediately
+
+        attempt += 1
+        time.sleep(RETRY_DELAY)
+
+    raise last_err
 
 # hack - patch HTTPResponse to support usage as a standard Python file object
 import httplib
@@ -153,87 +207,43 @@ class S3 (object):
         url, headers = self.get_request(bucket, filename)
         if not allow_keepalive:
             headers['Connection'] = 'close'
-        attempt = 0
-        err_msg = None
-        while attempt < MAX_RETRIES:
-            try:
-                response = self.requests_session.get(url, headers = headers, stream = True, timeout = S3_REQUEST_TIMEOUT)
-                if response.status_code == 404:
-                    raise S3404Exception(bucket, filename)
-                response.raise_for_status()
 
-                if not allow_keepalive:
-                    # remove nonblocking mode on the file descriptor
-                    fdno = response.raw.fileno()
-                    flags = fcntl.fcntl(fdno, fcntl.F_GETFL)
-                    if flags & os.O_NONBLOCK:
-                        flags = flags & ~os.O_NONBLOCK
-                        fcntl.fcntl(fdno, fcntl.F_SETFL, flags)
+        response = retry_logic('get_open', bucket, filename, Policy404.RAISE,
+                               self.requests_session.get, url, headers = headers, stream = True, timeout = S3_REQUEST_TIMEOUT)
 
-                return response.raw
-            except requests.exceptions.RequestException as e:
-                err_msg = 'S3 get_open (requests) RequestException: %s' % repr(e)
-                pass # retry
-            except requests.exceptions.ConnectionError as e:
-                err_msg = 'S3 get_open (requests) ConnectionError %s' % repr(e)
-                pass # retry
-            except requests.exceptions.HTTPError as e:
-                err_msg = 'S3 get_open (requests) HTTPError: %s' % repr(e)
-                if e.response.status_code == 500:
-                    pass # retry
-                else:
-                    raise S3Exception(err_msg) # abort immediately
-            except socket.timeout as e:
-                err_msg = 'socket.timeout'
-                pass # retry
-            attempt += 1
-            time.sleep(RETRY_DELAY)
+        if not allow_keepalive:
+            # remove nonblocking mode on the file descriptor
+            fdno = response.raw.fileno()
+            flags = fcntl.fcntl(fdno, fcntl.F_GETFL)
+            if flags & os.O_NONBLOCK:
+                flags = flags & ~os.O_NONBLOCK
+                fcntl.fcntl(fdno, fcntl.F_SETFL, flags)
 
-        raise S3Exception('S3 get_open(%s,%s) giving up after %d HTTP errors, last one was: %s' % (bucket, filename, attempt, err_msg))
+        return response.raw
 
     # perform synchronous GET to disk file
     def get_file(self, bucket, filename, dest, bufsize=64*1024):
-        attempt = 0
-        err_msg = None
-        while attempt < MAX_RETRIES:
-            try:
-                fd = self.get_open(bucket, filename)
-                d = open(dest, 'w')
+        retry_logic('get_file', bucket, filename, Policy404.RAISE,
+                    self.do_get_file, bucket, filename, dest, bufsize)
+    def do_get_file(self, bucket, filename, dest, bufsize):
+        fd = self.get_open(bucket, filename)
+        atom = AtomicFileWrite.AtomicFileWrite(dest, 'w')
 
-                while True:
-                    try:
-                        data = fd.read(bufsize)
-                        if not data:
-                            return # DONE!
-                        d.write(data)
-                    except requests.packages.urllib3.exceptions.TimeoutError as e:
-                        break # retry
+        try:
+            while True:
+                try:
+                    data = fd.read(bufsize)
+                    if data:
+                        atom.fd.write(data)
+                    else: # DONE!
+                        atom.complete()
+                        return
 
-            except socket.error as e:
-                if e.errno == errno.ECONNRESET:
-                    err_msg = 'socket.error %s' % errno.errorcode[e.errno]
-                    pass # retry
-                else:
-                    raise e # break immediately
-            except socket.timeout as e:
-                err_msg = 'socket.timeout'
-                pass # retry
-            except requests.exceptions.HTTPError as e:
-                if e.response.status_code == 500:
-                    err_msg = 'requests.exceptions.HTTPError status_code %d' % e.response.status_code
-                    pass # retry
-                else:
-                    raise e # break immediately
-            except requests.exceptions.ConnectionError as e:
-                err_msg = 'requests.exceptions.ConnectionError %s' % repr(e)
-                pass # retry
-            # break immediately on any other exception
-
-            attempt += 1
-            time.sleep(RETRY_DELAY)
-
-        # XXX delete file on error?
-        raise S3Exception('S3 get_file(%s,%s,%s) giving up after %d HTTP errors, last one was: %s' % (bucket, filename, dest, attempt, err_msg))
+                except requests.packages.urllib3.exceptions.TimeoutError:
+                    break # retry forever here
+        except:
+            # delete file on error
+            atom.abort()
 
     # synchronous check if an object exists in S3
     # if it exists, return the mtime as a UNIX timestamp, otherwise return False
@@ -243,38 +253,12 @@ class S3 (object):
 
             # use HEAD method on object
             url, headers = self.get_request(bucket, filename, method = 'HEAD')
-            attempt = 0
-            err_msg = None
-            while attempt < MAX_RETRIES:
-                try:
-                    response = self.requests_session.head(url, headers = headers, timeout = S3_REQUEST_TIMEOUT)
-                    if response.status_code == 404:
-                        return False
-                    response.raise_for_status()
-                    mtime_str = response.headers['Last-Modified']
-                    break # GOOD!
 
-                except requests.exceptions.RequestException as e:
-                    err_msg = 'S3 exists (requests) RequestException: %s' % repr(e)
-                    pass # retry
-                except requests.exceptions.ConnectionError as e:
-                    err_msg = 'S3 exists (requests) ConnectionError %s' % repr(e)
-                    pass # retry
-                except requests.exceptions.HTTPError as e:
-                    err_msg = 'S3 exists (requests) HTTPError: %s' % repr(e)
-                    if e.response.status_code == 500:
-                        pass # retry
-                    else:
-                        raise S3Exception(err_msg) # abort immediately
-                except socket.timeout as e:
-                    err_msg = 'socket.timeout'
-                    pass # retry
-                attempt += 1
-                time.sleep(RETRY_DELAY)
-
-            if mtime_str is None:
-                raise S3Exception('S3 exists(%s,%s) giving up after %d HTTP errors, last one was: %s' % (bucket, filename, attempt, err_msg))
-
+            response = retry_logic('exists', bucket, filename, Policy404.IGNORE,
+                                   self.requests_session.head, url, headers = headers, timeout = S3_REQUEST_TIMEOUT)
+            if response.status_code == 404:
+                return False
+            mtime_str = response.headers['Last-Modified']
             mtime = calendar.timegm(time.strptime(mtime_str, "%a, %d %b %Y %H:%M:%S GMT"))
             return mtime
 
@@ -286,59 +270,22 @@ class S3 (object):
             else:
                 return False
 
+    # get entire contents of an S3 object
     def get_slurp(self, bucket, filename, query = None):
-        # get entire contents of an S3 object, retrying and looping upon error
-        attempt = 0
-        err_msg = None
-
-        while attempt < MAX_RETRIES:
-
-            old_timeout = socket.getdefaulttimeout()
-            try:
-                socket.setdefaulttimeout(S3_REQUEST_TIMEOUT)
-                try:
-                    url, headers = self.get_request(bucket, filename, query = query)
-                    response = self.requests_session.get(url, headers = headers, timeout = S3_REQUEST_TIMEOUT)
-                    if response.status_code == 404:
-                        raise S3404Exception(bucket, filename) # abort immediately, do not retry
-                    buf = response.content
-                    response.raise_for_status()
-                    if 'Content-Length' in response.headers:
-                        assert len(buf) == int(response.headers['Content-Length'])
-                    return buf
-                except requests.exceptions.RequestException as e:
-                    err_msg = 'S3 get_slurp (requests) RequestException: %s' % repr(e)
-                    pass # retry
-                except requests.exceptions.ConnectionError as e:
-                    err_msg = 'S3 get_slurp (requests) ConnectionError %s' % repr(e)
-                    pass # retry
-                except requests.exceptions.HTTPError as e:
-                    err_msg = 'S3 get_slurp (requests) HTTPError: %s' % repr(e)
-                    if e.response.status_code == 500:
-                        pass # retry
-                    else:
-                        raise S3Exception(err_msg) # abort immediately
-                except socket.timeout as e:
-                    err_msg = 'socket.timeout'
-                    pass # retry
-
-            finally:
-                socket.setdefaulttimeout(old_timeout)
-
-            attempt += 1
-            time.sleep(RETRY_DELAY)
-
-        raise S3Exception('S3 get_slurp giving up after %d HTTP errors, last one was: %s' % (attempt, err_msg))
+        url, headers = self.get_request(bucket, filename, query = query)
+        response = retry_logic('get_slurp', bucket, filename, Policy404.RAISE,
+                               self.requests_session.get, url, headers = headers, timeout = S3_REQUEST_TIMEOUT)
+        buf = response.content
+        if 'Content-Length' in response.headers:
+            assert len(buf) == int(response.headers['Content-Length'])
+        return buf
 
     # synchronous DELETE
     def do_delete(self, bucket, filename):
         url, headers = self.delete_request(bucket, filename)
         if self.verbose: print 'DELETE', url
-        response = self.requests_session.delete(url, headers = headers, timeout = S3_REQUEST_TIMEOUT)
-        if response.status_code == 404:
-            pass # ignore
-        else:
-            response.raise_for_status()
+        response = retry_logic('do_delete', bucket, filename, Policy404.IGNORE,
+                               self.requests_session.delete, url, headers = headers, timeout = S3_REQUEST_TIMEOUT)
         return response.content
 
     # synchronous PUT from memory buffer
@@ -349,26 +296,12 @@ class S3 (object):
         url, headers = self.put_request_from_buf(buf, bucket, filename, **kwargs)
         if self.verbose: print 'PUT', len(buf.buffer()), 'bytes to', url
 
-        attempt = 0
-        err_msg = None
-        while attempt < MAX_RETRIES:
-            try:
-                response = self.requests_session.put(url, headers = headers, data = buf.buffer(), timeout = S3_REQUEST_TIMEOUT)
-                response.raise_for_status()
-                return response.content
-            except requests.exceptions.HTTPError as e:
-                err_msg = 'S3 exists (requests) HTTPError: %s' % repr(e)
-                if e.response.status_code == 500:
-                    pass # retry
-                else:
-                    raise S3Exception(err_msg) # abort immediately
-            attempt += 1
-            time.sleep(RETRY_DELAY)
-
-        raise S3Exception('S3 put_putbuf(%s,%s) giving up after %d HTTP errors, last one was: %s' % (bucket, filename, attempt, err_msg))
-
+        response = retry_logic('put_putbuf', bucket, filename, Policy404.RAISE,
+                               self.requests_session.put, url, headers = headers, data = buf.buffer(), timeout = S3_REQUEST_TIMEOUT)
+        return response.content
 
     # synchronous PUT from disk file
+    # optionally override timeout for slow/big streaming uploads
     def put_file(self, bucket, filename, source_filename, streaming = True, timeout = S3_REQUEST_TIMEOUT, **kwargs):
         fd = open(source_filename)
         if not streaming:
@@ -381,34 +314,13 @@ class S3 (object):
         else:
             size = os.fstat(fd.fileno()).st_size
             url, headers = self.put_request(bucket, filename, size, **kwargs)
-            attempt = 0
-            while True:
-                ret = -1
-                err_msg = None
+            retry_logic('put_file', bucket, filename, Policy404.RAISE,
+                        self.do_put_file_streaming, url, headers, fd, timeout)
+            return size
 
-                old_timeout = socket.getdefaulttimeout()
-                try:
-                    socket.setdefaulttimeout(timeout)
-
-                    response = self.requests_session.put(url, data=fd, headers=headers, timeout = S3_REQUEST_TIMEOUT)
-                    response.raise_for_status()
-
-                    ret = size # good! done!
-
-                except Exception as e:
-                    err_msg = '%s %s' % (repr(e), repr(type(e)))
-                finally:
-                    socket.setdefaulttimeout(old_timeout)
-
-                if ret >= 0:
-                    return ret
-
-                attempt += 1
-                if attempt > MAX_RETRIES:
-                    raise S3Exception('S3 put_file giving up after %d HTTP errors, last one was: %s' % (attempt,err_msg))
-                time.sleep(RETRY_DELAY) # give S3 time to unscrew itself
-                fd.seek(0)
-
+    def do_put_file_streaming(self, url, headers, fd, timeout):
+        fd.seek(0)
+        return self.requests_session.put(url, data=fd, headers=headers, timeout = timeout)
 
     # synchronous bucket listing
     def list_bucket(self, bucket, prefix='', max_keys = 1000):
@@ -441,6 +353,10 @@ if __name__ == '__main__':
     read_data = con.get_slurp(TEST_BUCKET, 'hello.txt')
     assert read_data == 'Hello!\n'
     print 'READ (slurp) OK', len(read_data), 'bytes'
+
+    con.get_file(TEST_BUCKET, 'hello.txt', '/tmp/hello.txt')
+    assert open('/tmp/hello.txt').read() == 'Hello!\n'
+    print 'READ (file) OK'
 
     try:
         read_fd = con.get_open(TEST_BUCKET, 'hello.txt-badfile')
