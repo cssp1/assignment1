@@ -440,8 +440,12 @@ class UserIDPredicate(Predicate):
     def __init__(self, data):
         Predicate.__init__(self, data)
         self.allow = data['allow']
+        self.mod = data.get('mod', None)
     def is_satisfied(self, player, qdata):
-        return player.user_id in self.allow
+        test_id = player.user_id
+        if self.mod is not None:
+            test_id = test_id % self.mod
+        return test_id in self.allow
 
 class FacebookIDPredicate(Predicate):
     def __init__(self, data):

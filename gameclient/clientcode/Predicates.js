@@ -1041,15 +1041,15 @@ AIBaseShownPredicate.prototype.do_ui_describe = function(player) {
 function UserIDPredicate(data) {
     goog.base(this, data);
     this.allow = data['allow'];
+    this.mod = ('mod' in data ? data['mod'] : 0);
 }
 goog.inherits(UserIDPredicate, Predicate);
 UserIDPredicate.prototype.is_satisfied = function(player, qdata) {
-    for(var i = 0; i < this.allow.length; i++) {
-        if(session.user_id === this.allow[i]) {
-            return true;
-        }
+    var test_id = session.user_id;
+    if(this.mod > 0) {
+        test_id = test_id % this.mod;
     }
-    return false;
+    return goog.array.contains(this.allow, test_id);
 };
 
 
