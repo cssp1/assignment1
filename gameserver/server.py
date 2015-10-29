@@ -304,6 +304,17 @@ def pretty_print_session(id):
 gamesite = None
 spin_server_name = None
 
+# decorator to trap all exceptions underneath a main entry point
+def catch_all(name):
+    def _apply_catch_decorator(func):
+        def _catch_decorator(*args, **kwargs):
+            try:
+                return func(*args, **kwargs)
+            except:
+                gamesite.exception_log.event(server_time, '%s Exception: %s' % (name, traceback.format_exc().strip())) # OK
+        return functools.wraps(func)(_catch_decorator)
+    return _apply_catch_decorator
+
 # table mapping sessions (big strings) to live Player objects
 session_table = {}
 
@@ -398,7 +409,7 @@ def reload_gamedata():
 
     except:
         writefunc = (lambda x: gamesite.exception_log.event(server_time, x)) if gamesite else (lambda x: sys.stderr.write(x+'\n'))
-        writefunc('error (re)loading gamedata: '+traceback.format_exc())
+        writefunc('error (re)loading gamedata: '+traceback.format_exc().strip()) # OK
         pass
 
 reload_gamedata()
@@ -434,6 +445,259 @@ def report_and_reraise_deferred_failure(fail, session):
 def report_and_absorb_deferred_failure(fail, session, retval = None):
     _report_deferred_failure(fail, session)
     return retval
+
+
+# live server administration interface
+class AdminStats:
+    def __init__(self):
+        self.reset()
+    def reset(self):
+        self.start_time = server_time
+        self.developer_revenue = 0.0
+        self.revenue = 0.0
+        self.users_seen = set()
+        self.paying_users_seen = set()
+        self.new_users_seen = set()
+        self.last_payments = collections.deque([], 10)
+        self.last_gamebucks = collections.deque([], 10)
+        self.campaigns = {}
+        self.econ = {}
+        self.latency = {}
+        self.quarry_cache_misses = 0
+        self.quarry_cache_hits = 0
+
+    def econ_flow_res(self, player, category, reason, res, spec = None, level = None):
+        # eventually need to separate third resource out
+        total = sum(res.itervalues(),0)
+        if total == 0: return # we assume that entries are either all positive or all negative
+        if category not in self.econ:
+            self.econ[category] = {}
+        self.econ[category][reason] = self.econ[category].get(reason,0) + total
+
+        if gamedata['server'].get('log_econ_res', False) and gamesite.nosql_client:
+            props = {'user_id':player.user_id, 'res':res, 'cat':category, 'sub': reason}
+            if spec is not None:
+                props['spec'] = spec
+            if level is not None:
+                props['level'] = level
+            props.update(player.get_denormalized_summary_props('brief'))
+            gamesite.nosql_client.log_record('econ_res', server_time, props, log_ident = False, reason = 'econ_flow_res')
+
+    def record_latency(self, name, elapsed):
+        if name not in self.latency:
+            self.latency[name] = {'N':0.0, 'total':0.0, 'max': 0.0}
+        self.latency[name]['N'] += 1
+        self.latency[name]['total'] += elapsed
+        self.latency[name]['max'] = max(self.latency[name]['max'], elapsed)
+
+    # decorator for timing a function
+    def measure_latency(self, name):
+        def _apply_latency_decorator(func):
+            def _latency_decorator(*args, **kwargs):
+                start_time = time.time()
+                ret = func(*args, **kwargs)
+                end_time = time.time()
+                self.record_latency(name, end_time - start_time)
+                return ret
+            return functools.wraps(func)(_latency_decorator)
+        return _apply_latency_decorator
+
+    # context object for timing a block
+    class MeasureLatency(object):
+        def __init__(self, parent, name):
+            self.parent = parent
+            self.name = name
+        def __enter__(self):
+            self.start_time = time.time()
+        def __exit__(self, type, value, traceback):
+            end_time = time.time()
+            self.parent.record_latency(self.name, end_time - self.start_time)
+    def latency_measurer(self, name): return self.MeasureLatency(self, name)
+
+    def add_visit(self, user_id, is_new, is_paying):
+        self.users_seen.add(user_id)
+        if is_paying:
+            self.paying_users_seen.add(user_id)
+        if is_new:
+            self.new_users_seen.add(user_id)
+
+    def add_revenue(self, user_id, dollar_amount, descr):
+        self.revenue += dollar_amount
+        # add here in case this is the user's first payment
+        self.paying_users_seen.add(user_id)
+        self.last_payments.append({'user_id':user_id,
+                                   'time':server_time,
+                                   'dollar_amount':dollar_amount,
+                                   'description':descr})
+
+    def add_gamebucks_spend(self, user_id, bucks, descr):
+        self.last_gamebucks.append({'user_id':user_id,
+                                    'time':server_time,
+                                    'gamebucks_amount':bucks,
+                                    'description':descr})
+
+    def add_logout(self, user_id, campaign, length):
+        # only track FIRST visits
+        if user_id not in self.new_users_seen:
+            return
+
+        if campaign not in self.campaigns:
+            self.campaigns[campaign] = {'lengths': collections.deque([], 5), 'num': 0}
+        self.campaigns[campaign]['lengths'].append(length)
+        self.campaigns[campaign]['num'] += 1
+
+    def get_active_sessions(self):
+        # also count valid in-flight asynchronous logins here
+        return len(session_table) + sum((1 for async in gamesite.gameapi.AsyncLogin.in_progress_by_user_id.itervalues() if (not async.cancel_reason)),0)
+
+    def get_server_status_json(self):
+        return {'server_time': server_time,
+                'launch_time': spin_server_launch_time,
+                'type': SpinConfig.game(),
+                'state': gamesite.server_state,
+                'hostname': gamesite.config.game_host,
+                'pid': os.getpid(),
+                'game_listen_host': gamesite.config.game_listen_host,
+                'game_http_port': gamesite.config.game_http_port,
+                'game_ssl_port': gamesite.config.game_ssl_port,
+                'game_ws_port': gamesite.config.game_ws_port,
+                'game_wss_port': gamesite.config.game_wss_port,
+                'affinities': gamesite.config.affinities,
+                'scm_version': SERVER_VERSION,
+                'gamedata_build': gamedata['gamedata_build_info']['date'],
+                'gameclient_build': gameclient_build_date,
+                'uptime': server_time - self.start_time,
+                'load_unhalted': self.get_load(),
+                'machine_stats': MachineStats.get_stats(filesystems = machine_stats_filesystems),
+                'active_sessions': self.get_active_sessions(),
+                'paying_sessions': sum((1 for session in iter_sessions() if session.player.history.get('money_spent',0)>0),0),
+                'active_protocol_clients': len(gamesite.active_clients),
+                'active_protocol_requests': len(gamesite.active_requests),
+                }
+
+    def get_stats(self):
+        props = {}
+        up_hours = float(server_time - self.start_time)/3600.0
+        up_days = up_hours/24.0
+        props['uptime hours'] = up_hours
+        props['revenue'] = self.revenue
+        props['revenue/day (projected)'] = self.revenue / up_days
+        props['revenue (developers)'] = self.developer_revenue
+        props['unique users'] = len(self.users_seen)
+        props['unique paying users'] = len(self.paying_users_seen)
+        props['unique new users'] = len(self.new_users_seen)
+        DAU = len(self.users_seen) / up_days
+        PDAU = len(self.paying_users_seen) / up_days
+        props['DAU (projected)'] = DAU
+        props['PDAU (projected)'] = PDAU
+        props['ARPDAU (projected)'] = self.revenue / (DAU+0.0001)
+        props['ARPPDAU (paying, projected)'] = self.revenue / (PDAU+0.0001)
+        return props
+
+    def get_campaigns(self):
+        ret = ''
+        ret += '<table border="1" cellspacing="1">'
+        ret += '<tr><td>Name</td><td>Last Session Lengths (new users only)</td><td>Average</td><td># Acquisitions</td></tr>'
+        for name in sorted(self.campaigns.iterkeys()):
+            data = self.campaigns[name]
+            lengths = data['lengths']
+            num = data['num']
+            if len(lengths) > 0:
+                str_average = SpinConfig.pretty_print_time(sum(lengths)/len(lengths))
+            else:
+                str_average = '-'
+            str_lengths = string.join(map(SpinConfig.pretty_print_time, lengths), ', ')
+            ret += '<tr><td>%s</td><td>%s</td><td>%s</td><td>%d</td></tr>' % (name, str_lengths, str_average, num)
+        ret += '</table>'
+        return ret
+
+    def get_payments(self):
+        ret = '<table border="1" cellspacing="1">'
+        ret += '<tr><td>Time ago</td><td>User ID</td><td>Amount</td><td>Description</td></tr>'
+        for props in reversed(self.last_payments):
+            elapsed = server_time - props['time']
+            ret += '<tr><td>%s</td><td>%d</td><td>$%0.2f</td><td>%s</td></tr>' % (SpinConfig.pretty_print_time(elapsed),
+                                                                       props['user_id'],
+                                                                       props['dollar_amount'],
+                                                                       props['description'])
+        ret += '</table>'
+        return ret
+
+    def get_gamebucks(self):
+        ret = '<table border="1" cellspacing="1">'
+        ret += '<tr><td>Time ago</td><td>User ID</td><td>Amount</td><td>Description</td></tr>'
+        for props in reversed(self.last_gamebucks):
+            elapsed = server_time - props['time']
+            ret += '<tr><td>%s</td><td>%d</td><td>%d</td><td>%s</td></tr>' % (SpinConfig.pretty_print_time(elapsed),
+                                                                       props['user_id'],
+                                                                       props['gamebucks_amount'],
+                                                                       props['description'])
+        ret += '</table>'
+        return ret
+
+    def get_load(self):
+        if 'ALL' in self.latency:
+            return self.latency['ALL']['total'] / max(1, float(server_time - self.start_time))
+        else:
+            return -1
+
+    def get_latency(self):
+        ret = ''
+
+        if 'ALL' in self.latency:
+            ret += 'Approximate unhalted load: <b>%.1f%%</b><br>' % (100.0*self.get_load())
+            ret += 'Average request latency: <b>%.1f ms</b><p>' % ((1000.0*self.latency['ALL']['total'])/self.latency['ALL']['N'])
+
+        def sort_by_max(kv): return -kv[1]['max']
+        def sort_by_average(kv): return -kv[1]['total']/kv[1]['N']
+        def sort_by_total(kv): return -kv[1]['total']
+
+        grand_total = sum([data['total'] for name, data in self.latency.iteritems() if name != 'ALL'])
+
+        for sort_name, sort_func in {'Max': sort_by_max, 'Avg': sort_by_average, 'Total': sort_by_total}.iteritems():
+            ret += '<p>Sort by %s<br>' % sort_name
+            ret += '<table border="1" cellspacing="1">'
+            ret += '<tr><td>Request</td><td>Average</td><td>Max</td><td>Total</td><td>Total %</td><td>#Calls</td></tr>'
+            ls = self.latency.items()
+            ls.sort(key = sort_func)
+            for name, data in ls[0:25]:
+                ret += '<tr><td>%s</td><td>%.1f ms</td><td>%.1f ms</td><td>%.1f s</td><td>%.1f%%</td><td>%d</td></tr>' % \
+                       (name, 1000.0*data['total']/data['N'],
+                        1000.0*data['max'],
+                        data['total'],
+                        (100.0*data['total']/grand_total) if grand_total != 0 else 0,
+                        int(data['N'])
+                        )
+            ret += '</table>'
+
+        quarry_total = self.quarry_cache_misses + self.quarry_cache_hits
+        if quarry_total > 0:
+            ret += '<p>Quarry cache hit rate: <b>%.1f%%</b><br>' % (100*self.quarry_cache_hits/float(quarry_total))
+        return ret
+
+    def get_econ(self):
+        ret = '<table border="1" cellspacing="1">'
+        ret += '<tr><td>Category</td><td>Reason</td><td>Amount</td><td>%</td></tr>'
+        cat_totals = {}
+        cat_totals = dict([(category, sum(self.econ[category].itervalues())) for category in self.econ.iterkeys()])
+        grand_total = sum(cat_totals.itervalues())
+        abs_total = sum([abs(x) for x in cat_totals.itervalues()])
+
+        def big_number(x):
+            return '%.3fM' % (x/1000000.0)
+
+        for cat, data in sorted(self.econ.items()):
+            cat_ratio = cat_totals[cat]/float(abs_total) if (abs_total != 0) else 0
+            ret += '<tr><td><b>%s</b></td><td>%s</td><td><b>%s</b></td><td><b>%.1f%%</b></td></tr>' % (cat, '', big_number(cat_totals[cat]), 100.0*cat_ratio)
+            for reason, amount in sorted(data.items()):
+                ratio = amount/float(cat_totals[cat]) if (cat_totals[cat] != 0) else 0
+                ret += '<tr><td></td><td>%s</td><td>%s</td><td>%.1f%%</td></tr>' % (reason, big_number(amount), 100.0*ratio)
+
+        ret += '<tr><td><b>TOTAL</b></td><td></td><td>%s</td><td>-</td></tr>' % big_number(grand_total)
+        ret += '</table>'
+        return ret
+
+admin_stats = AdminStats()
 
 # userdb/playerdb/aistate file I/O backend
 class IOSystem (object):
@@ -481,7 +745,6 @@ class IOSystem (object):
 
         if reason:
             start_time = time.time()
-        #admin_stats.record_latency('ASYNC TIME', start_time-request_time)
         ret = cb(*args)
         if reason:
             end_time = time.time()
@@ -717,58 +980,49 @@ class UserTable:
         return jsonobj
 
     def unparse(self, user):
-        start_time = time.time()
-        jsonobj = self.jsonize(user)
-        end_time = time.time()
-        admin_stats.record_latency('user_table:jsonize', end_time-start_time)
-        start_time = end_time
+        with admin_stats.latency_measurer('user_table:jsonize'):
+            jsonobj = self.jsonize(user)
 
-        ret = SpinJSON.dumps(jsonobj, pretty = True, newline = True, size_hint = 65536, double_precision = 5)
-
-        end_time = time.time()
-        admin_stats.record_latency('user_table:serialize', end_time-start_time)
+        with admin_stats.latency_measurer('user_table:serialize'):
+            ret = SpinJSON.dumps(jsonobj, pretty = True, newline = True, size_hint = 65536, double_precision = 5)
         return ret
 
     def parse(self, buf, user_id):
         jsonobj = None
 
         try:
-            start_time = time.time()
-            jsonobj = SpinJSON.loads(buf)
-            end_time = time.time()
-            admin_stats.record_latency('user_table:deserialize', end_time-start_time)
+            with admin_stats.latency_measurer('user_table:deserialize'):
+                jsonobj = SpinJSON.loads(buf)
         except:
             pass
 
         if not jsonobj:
             return None
 
-        start_time = end_time
+        with admin_stats.latency_measurer('user_table:parse'):
 
-        ret = User(user_id)
+            ret = User(user_id)
 
-        if jsonobj.has_key('user_id') and jsonobj['user_id'] != user_id:
-                print 'warning: UserTable lookup for id %d has data from id %d' % (user_id, jsonobj['user_id'])
+            if jsonobj.has_key('user_id') and jsonobj['user_id'] != user_id:
+                    print 'warning: UserTable lookup for id %d has data from id %d' % (user_id, jsonobj['user_id'])
 
-        for name, coerce in self.WRITE_ONLY_FIELDS:
-            if jsonobj.has_key(name):
-                del jsonobj[name]
+            for name, coerce in self.WRITE_ONLY_FIELDS:
+                if jsonobj.has_key(name):
+                    del jsonobj[name]
 
-        # parse recognized fields
-        for name, coerce in self.FIELDS:
-            if jsonobj.has_key(name):
-                val = jsonobj[name]
-                if coerce:
-                    val = coerce(val)
-                setattr(ret, name, val)
-                del jsonobj[name]
+            # parse recognized fields
+            for name, coerce in self.FIELDS:
+                if jsonobj.has_key(name):
+                    val = jsonobj[name]
+                    if coerce:
+                        val = coerce(val)
+                    setattr(ret, name, val)
+                    del jsonobj[name]
 
-        # store unrecognized fields
-        for name, val in jsonobj.iteritems():
-            print 'unrecogized User data', name, ':', val
-            ret.foreign_data[name] = val
-        end_time = time.time()
-        admin_stats.record_latency('user_table:parse', end_time-start_time)
+            # store unrecognized fields
+            for name, val in jsonobj.iteritems():
+                print 'unrecogized User data', name, ':', val
+                ret.foreign_data[name] = val
 
         return ret
 
@@ -1683,7 +1937,7 @@ class User:
                                               paid_amount, tax_amount, paid_currency, refund_amount, refund_currency, repr(gift_order)))
 
             except:
-                gamesite.exception_log.event(server_time, ('ping_fbpayment_post_complete player %d payment_id %s error:\n' % (session.user.user_id, str(payment_id)))+traceback.format_exc())
+                gamesite.exception_log.event(server_time, ('ping_fbpayment_post_complete player %d payment_id %s error: ' % (session.user.user_id, str(payment_id)))+traceback.format_exc().strip()) # OK
                 pass
         return new_mail
 
@@ -1860,8 +2114,8 @@ class User:
                         session.player.send_history_update(retmsg)
 
 
-                    except Exception:
-                        gamesite.exception_log.event(server_time, 'FBPAYMENT_ORDER Exception:\n'+''.join(traceback.format_stack()[-5:-1])+traceback.format_exc())
+                    except:
+                        gamesite.exception_log.event(server_time, 'FBPAYMENT_ORDER Exception:\n'+''.join(traceback.format_stack()[-5:-1])+traceback.format_exc().strip()) # OK
                         retmsg.append(["ERROR", "ORDER_PROCESSING"])
 
                         # write the bad fbpayment data to a file for debugging
@@ -1901,17 +2155,15 @@ class User:
         self.credit_info_request_outstanding = True
 
         def on_success(result):
-            start_time = time.time()
             self.credit_info_request_outstanding = False
             self.retrieve_facebook_credit_info_complete(result)
-            end_time = time.time()
-            admin_stats.record_latency('AsyncHTTP(facebook_credit_info)', end_time-start_time)
 
         def on_error(reason):
             self.credit_info_request_outstanding = False
 
         gamesite.AsyncHTTP_Facebook.queue_request(server_time, request_url, on_success, error_callback = on_error)
 
+    @admin_stats.measure_latency('retrieve_facebook_credit_info_complete')
     def retrieve_facebook_credit_info_complete(self, result):
         dom = xml.dom.minidom.parseString(result)
         try:
@@ -1951,8 +2203,8 @@ class User:
         request_url = 'https://api.facebook.com/method/fql.query?'+query_tok
         gamesite.AsyncHTTP_Facebook.queue_request(server_time, request_url, lambda result: self.retrieve_facebook_requests_complete_v1(result))
 
+    @admin_stats.measure_latency('AsyncHTTP(facebook_apprequests_v1)')
     def retrieve_facebook_requests_complete_v1(self, result):
-        start_time = time.time()
 
         dom = xml.dom.minidom.parseString(result)
 
@@ -1997,10 +2249,6 @@ class User:
             # tell Facebook to delete the request (even if processing it caused an error)
             delete_url = SpinFacebook.versioned_graph_endpoint('apprequest', str(request_id))+'?'+urllib.urlencode(dict(access_token=self.fb_oauth_token, method='delete')) # SpinConfig.config['facebook_app_access_token']?
             gamesite.AsyncHTTP_Facebook.queue_request(server_time, delete_url, lambda x: None)
-
-        end_time = time.time()
-        admin_stats.record_latency('AsyncHTTP(facebook_apprequests_v1)', end_time-start_time)
-
 
     def retrieve_facebook_requests_start_v2(self):
         request_url = SpinFacebook.versioned_graph_endpoint('apprequests', 'me/apprequests') + \
@@ -2148,8 +2396,8 @@ class User:
             self.retrieve_facebook_info_receive(dest, None, result = buffer)
 
     # this callback is called for each URL downloaded asynchronously
+    @admin_stats.measure_latency('AsyncHTTP(facebook_profile/friends/likes)')
     def retrieve_facebook_info_receive(self, dest, raw_result, result = None):
-        start_time = time.time()
 
         if result is not None:
             pass # caller supplied pre-parsed result
@@ -2172,8 +2420,6 @@ class User:
         if (self.facebook_profile != None) and (self.facebook_friends != None) and (self.facebook_likes != None):
             self.retrieve_facebook_info_complete(None)
 
-        end_time = time.time()
-        admin_stats.record_latency('AsyncHTTP(facebook_profile/friends/likes)', end_time-start_time)
 
     def facebook_permissions_ok(self, wanted):
         if self.active_session.player.facebook_permissions is None: return False
@@ -2470,7 +2716,7 @@ class PlayerTable:
                 try:
                     ret = self.parent.parse(buf, self.observer, self.user_id, self.live)
                 except:
-                    gamesite.exception_log.event(server_time, 'Error reading playerdb for user %d:\n' % self.user_id + traceback.format_exc())
+                    gamesite.exception_log.event(server_time, 'Error reading playerdb for user %d: %s' % (self.user_id, traceback.format_exc().strip())) # OK
                     ret = None
                     success = False
             for cb in self.cblist: cb(success, ret)
@@ -2498,71 +2744,61 @@ class PlayerTable:
         return jsonobj
 
     def unparse(self, player):
-        start_time = time.time()
-        jsonobj = self.jsonize(player)
-        end_time = time.time()
-        admin_stats.record_latency('player_table:jsonize', end_time-start_time)
-        start_time = end_time
+        with admin_stats.latency_measurer('player_table:jsonize'):
+            jsonobj = self.jsonize(player)
 
-        ret = SpinJSON.dumps(jsonobj, pretty = True, newline = True, size_hint = 1024*1024, double_precision = 5)
-
-        end_time = time.time()
-        admin_stats.record_latency('player_table:serialize', end_time-start_time)
+        with admin_stats.latency_measurer('player_table:serialize'):
+            ret = SpinJSON.dumps(jsonobj, pretty = True, newline = True, size_hint = 1024*1024, double_precision = 5)
         return ret
 
     def parse(self, buf, observer, user_id, live):
         jsonobj = None
         try:
-            start_time = time.time()
-            jsonobj = SpinJSON.loads(buf)
-            end_time = time.time()
-            admin_stats.record_latency('player_table:deserialize', end_time-start_time)
+            with admin_stats.latency_measurer('player_table:deserialize'):
+                jsonobj = SpinJSON.loads(buf)
         except:
             pass
 
         if not jsonobj:
             return None
 
-        start_time = end_time
+        with admin_stats.latency_measurer('player_table:parse'):
 
-        if live:
-            player = LivePlayer(user_id)
-        else:
-            player = ProxyPlayer(user_id)
+            if live:
+                player = LivePlayer(user_id)
+            else:
+                player = ProxyPlayer(user_id)
 
-        if observer is None: observer = player
+            if observer is None: observer = player
 
-        if jsonobj.has_key('user_id') and jsonobj['user_id'] != user_id:
-            gamesite.exception_log.event(server_time, 'warning: PlayerTable lookup for id %d has data from id %d' % (user_id, jsonobj['user_id']))
+            if jsonobj.has_key('user_id') and jsonobj['user_id'] != user_id:
+                gamesite.exception_log.event(server_time, 'warning: PlayerTable lookup for id %d has data from id %d' % (user_id, jsonobj['user_id']))
 
-        for field in self.PLAYER_RW_FIELDS:
-            read_json_field(jsonobj, player, field, player = player, observer = observer)
-        for field in self.BASE_RW_FIELDS:
-            read_json_field(jsonobj, player.my_home, field, player = player, observer = observer)
+            for field in self.PLAYER_RW_FIELDS:
+                read_json_field(jsonobj, player, field, player = player, observer = observer)
+            for field in self.BASE_RW_FIELDS:
+                read_json_field(jsonobj, player.my_home, field, player = player, observer = observer)
 
-#            if field[0] == 'my_base':
-#                old_base = player.my_home.my_base
-#                new_base = player.my_home.nosql_read(observer, player, 'PlayerTable:parse')
-#                if new_base is not None:
-#                    # verify that contents are identical
-#                    if len(old_base) != len(new_base):
-#                        gamesite.exception_log.event(server_time, 'PlayerTable: nosql_read for user %d returned %d objects but my_base had %d' % \
-#                                                     (user_id, len(new_base), len(old_base)))
-#                    #player.my_home.my_base = new_base
+    #            if field[0] == 'my_base':
+    #                old_base = player.my_home.my_base
+    #                new_base = player.my_home.nosql_read(observer, player, 'PlayerTable:parse')
+    #                if new_base is not None:
+    #                    # verify that contents are identical
+    #                    if len(old_base) != len(new_base):
+    #                        gamesite.exception_log.event(server_time, 'PlayerTable: nosql_read for user %d returned %d objects but my_base had %d' % \
+    #                                                     (user_id, len(new_base), len(old_base)))
+    #                    #player.my_home.my_base = new_base
 
 
-        # save all unrecognized data as foreign_data
-        for name, coerce_write, coerce_read in self.PLAYER_WRONLY_FIELDS:
-            if jsonobj.has_key(name): del jsonobj[name]
+            # save all unrecognized data as foreign_data
+            for name, coerce_write, coerce_read in self.PLAYER_WRONLY_FIELDS:
+                if jsonobj.has_key(name): del jsonobj[name]
 
-        for name, val in jsonobj.iteritems():
-            if name in self.PLAYER_DELETE_FIELDS: continue
-            if gamedata['server'].get('log_foreign_data', False):
-                gamesite.exception_log.event(server_time, 'unrecognized playerdb data ' + name + ': ' + repr(val))
-            player.foreign_data[name] = val
-
-        end_time = time.time()
-        admin_stats.record_latency('player_table:parse', end_time-start_time)
+            for name, val in jsonobj.iteritems():
+                if name in self.PLAYER_DELETE_FIELDS: continue
+                if gamedata['server'].get('log_foreign_data', False):
+                    gamesite.exception_log.event(server_time, 'unrecognized playerdb data ' + name + ': ' + repr(val))
+                player.foreign_data[name] = val
 
         # init stattab AGAIN so that stuff that depends on home base contents (e.g. repair speed) gets updated properly
         player.recalc_stattab(observer)
@@ -2585,13 +2821,12 @@ class AIInstanceTable:
     def delete_async(self, user_id, ai_id, cb):
         io_system.async_delete_aistate(user_id, game_id, ai_id, cb)
 
+    @admin_stats.measure_latency('ai_instance_table:parse')
     def parse(self, buf, observer, ai_id):
         jsonobj = None
+
         try:
-            start_time = time.time()
             jsonobj = SpinJSON.loads(buf)
-            end_time = time.time()
-            admin_stats.record_latency('ai_instance_table:deserialize', end_time-start_time)
         except:
             pass
 
@@ -2601,8 +2836,6 @@ class AIInstanceTable:
         # has it expired?
         if server_time >= jsonobj['expiration_time']:
             return None, True
-
-        start_time = end_time
 
         player = ProxyPlayer(ai_id)
         player.expiration_time = jsonobj['expiration_time']
@@ -2629,8 +2862,6 @@ class AIInstanceTable:
         player.read_only = True # never write into the "real" PlayerTable
         player.my_home.init_production(player)
 
-        end_time = time.time()
-        admin_stats.record_latency('ai_instance_table:parse', end_time-start_time)
         return player, False
 
     class AsyncRead:
@@ -2665,7 +2896,6 @@ class AIInstanceTable:
         io_system.async_write_aistate(user_id, game_id, ai_id, buf, cb, fsync)
 
     def unparse(self, ai_id, player):
-        start_time = time.time()
         player.ai_generation += 1
         jsonobj = { 'expiration_time': player.expiration_time,
                     'ai_generation': player.ai_generation,
@@ -2682,12 +2912,10 @@ class AIInstanceTable:
                     'base_times_attacked': player.my_home.base_times_attacked,
                     'user_id': ai_id }
         if player.my_home.base_resource_loot: jsonobj['base_resource_loot'] = player.my_home.base_resource_loot
-        end_time = time.time()
-        admin_stats.record_latency('ai_instance_table:unparse', end_time-start_time)
-        start_time = end_time
-        ret = SpinJSON.dumps(jsonobj, pretty = True, newline = True, size_hint = 65536, double_precision = 5)
-        end_time = time.time()
-        admin_stats.record_latency('ai_instance_table:serialize', end_time-start_time)
+
+        with admin_stats.latency_measurer('ai_instance_table:serialize'):
+            ret = SpinJSON.dumps(jsonobj, pretty = True, newline = True, size_hint = 65536, double_precision = 5)
+
         return ret
 
     def collect_garbage(self):
@@ -2727,10 +2955,8 @@ class BaseTable:
     def preparse(self, buf, region_id, base_id):
         jsonobj = None
         try:
-            start_time = time.time()
-            jsonobj = SpinJSON.loads(buf)
-            end_time = time.time()
-            admin_stats.record_latency('base_table:deserialize', end_time-start_time)
+            with admin_stats.latency_measurer('base_table:deserialize'):
+                jsonobj = SpinJSON.loads(buf)
         except:
             pass
 
@@ -2748,6 +2974,7 @@ class BaseTable:
 
         return jsonobj, False, jsonobj['base_landlord_id']
 
+    @admin_stats.measure_latency('base_table:parse')
     def parse(self, region_id, base_id, jsonobj, landlord, observer, reason=''):
         # NOTE! SUBTLE!
         # in the NoSQL case, jsonobj is just the 'feature' from MapCache
@@ -2756,7 +2983,6 @@ class BaseTable:
         assert jsonobj['base_landlord_id'] == landlord.user_id
 
         base = Base(region_id, base_id, landlord.user_id, jsonobj.get('base_type','hive'))
-        start_time = time.time()
 
         # NOTE! read_json_field magically works because the MapCache 'feature' has the same format as BaseTable entries
         for field in PlayerTable.BASE_RW_FIELDS:
@@ -2772,8 +2998,7 @@ class BaseTable:
             base.base_richness = gamedata['hives']['templates'][base.base_template].get('base_richness', base.base_richness)
 
         base.init_production(landlord)
-        end_time = time.time()
-        admin_stats.record_latency('base_table:parse', end_time-start_time)
+
         return base
 
     def lookup_async(self, region_id, base_id, feature, cb, reason):
@@ -2802,20 +3027,15 @@ class BaseTable:
         if cb: reactor.callLater(0, cb)
 
     def unparse(self, base):
-        start_time = time.time()
         jsonobj = {}
 
-        for field in PlayerTable.BASE_RW_FIELDS:
-            write_json_field(base, jsonobj, field)
+        with admin_stats.latency_measurer('base_table:unparse'):
+            for field in PlayerTable.BASE_RW_FIELDS:
+                write_json_field(base, jsonobj, field)
 
-        end_time = time.time()
-        admin_stats.record_latency('base_table:unparse', end_time-start_time)
-        start_time = end_time
+        with admin_stats.latency_measurer('base_table:serialize'):
+            ret = SpinJSON.dumps(jsonobj, pretty = True, newline = True, size_hint = 65536, double_precision = 5)
 
-        ret = SpinJSON.dumps(jsonobj, pretty = True, newline = True, size_hint = 65536, double_precision = 5)
-
-        end_time = time.time()
-        admin_stats.record_latency('base_table:serialize', end_time-start_time)
         return ret
 
 base_table = BaseTable()
@@ -4370,7 +4590,7 @@ class Session(object):
         try:
             Consequents.read_consequent(cons).execute(self, player, retmsg, context=context)
         except Exception:
-            gamesite.exception_log.event(server_time, 'Consequent exception player %d from %s:\n%s\n%s' % (player.user_id, reason, repr(cons), traceback.format_exc()))
+            gamesite.exception_log.event(server_time, 'Consequent exception player %d from %s:\n%s\n%s' % (player.user_id, reason, repr(cons), traceback.format_exc().strip())) # OK
             if rethrow:
                 raise
 
@@ -6977,12 +7197,7 @@ class Base(object):
         ret = []
         for state in list(gamesite.nosql_client.get_fixed_objects_by_base(self.base_region, self.base_id, reason=reason)) + \
             list(gamesite.nosql_client.get_mobile_objects_by_base(self.base_region, self.base_id, reason=reason)):
-            try:
-                obj = reconstitute_object(observer, player, state, context = 'Base %s (landlord %d observer %d):nosql_read' % (self.base_id, self.base_landlord_id, observer.user_id))
-            except:
-                gamesite.exception_log.event(server_time, 'nosql_read %s reason %s exception:\n%s' % (self.base_id, reason, traceback.format_exc()))
-                obj = None
-
+            obj = reconstitute_object(observer, player, state, context = 'Base %s (landlord %d observer %d):nosql_read' % (self.base_id, self.base_landlord_id, observer.user_id))
             if obj:
                 # for now, just return what the new my_base array would be, instead of actually replacing it
                 #self.adopt_object(obj)
@@ -8055,9 +8270,8 @@ class Player(AbstractPlayer):
             else:
                 self.unit_repair_queue.pop()
 
-
+    @admin_stats.measure_latency('ping_squads')
     def ping_squads(self, session, return_army = False, originator = None, reason=''):
-        start_time = time.time()
         if gamesite.nosql_client and self.home_region:
             map_squad_data = list(gamesite.nosql_client.get_map_features_by_landlord_and_type(self.home_region, self.user_id, 'squad', reason='ping_squads(%s)'%reason))
             map_object_data = list(gamesite.nosql_client.get_mobile_objects_by_owner(self.my_home.base_region, self.user_id, reason='ping_squads(%s)'%reason))
@@ -8186,9 +8400,6 @@ class Player(AbstractPlayer):
         else:
             ret_army = None
 
-
-        end_time = time.time()
-        admin_stats.record_latency('ping_squads(%s)' % ('nosql' if (gamesite.nosql_client and self.home_region) else 'local'), end_time-start_time)
         return ret_army, ret_features, mailbox_update
 
     # check for oversized armies
@@ -9178,8 +9389,8 @@ class Player(AbstractPlayer):
         id = candidate_list[0] if candidate_list else None
         return id
 
+    @admin_stats.measure_latency('find_suitable_ladder_match')
     def find_suitable_ladder_match(self, exclude_user_ids = [], exclude_alliance_ids = []):
-        start_time = time.time()
         id = None
         min_trophies = None
         if 'ladder_match_min_trophies' in gamedata['matchmaking']:
@@ -9198,18 +9409,10 @@ class Player(AbstractPlayer):
                 if id: break
         else:
             raise Exception('unknown ladder_match_by method '+gamedata['matchmaking']['ladder_match_by'])
-        end_time = time.time()
-        admin_stats.record_latency('find_suitable_ladder_match', end_time-start_time)
         return id
 
+    @admin_stats.measure_latency('is_suitable_ladder_match')
     def is_suitable_ladder_match(self, other_id):
-        start_time = time.time()
-        ret = self._is_suitable_ladder_match(other_id)
-        end_time = time.time()
-        admin_stats.record_latency('is_suitable_ladder_match', end_time-start_time)
-        return ret
-
-    def _is_suitable_ladder_match(self, other_id):
         if gamedata['anti_bullying']['enable_ladder_fatigue'] and self.cooldown_active('ladder_fatigue:%d' % other_id): return False
         if is_ai_user_id_range(other_id): return True
 
@@ -11680,7 +11883,7 @@ class LivePlayer(Player):
                 self.history['unit_equip_migration_done'] = 1
 
             except:
-                gamesite.exception_log.event(server_time, 'unit_equip_migration: %d EXCEPTION:\n%s' % (user_id, traceback.format_exc()))
+                gamesite.exception_log.event(server_time, 'unit_equip_migration (player %d) Exception: %s' % (user_id, traceback.format_exc().strip())) # OK
                 pass
 
         # remove invalid objects from donated units
@@ -12067,11 +12270,8 @@ class LivePlayer(Player):
         return True
 
     def change_region(self, request_region, request_loc, session, retmsg, reason = ''):
-        start_time = time.time()
-        ret = self._change_region(request_region, request_loc, session, retmsg, reason = reason)
-        end_time = time.time()
-        admin_stats.record_latency('change_region(%s)' % reason, end_time - start_time)
-        return ret
+        with admin_stats.latency_measurer('change_region(%s)' % reason):
+            return self._change_region(request_region, request_loc, session, retmsg, reason = reason)
 
     # main region-change function
     # pass None to get a random region
@@ -12689,61 +12889,6 @@ def parse_canvas_oversample(v):
         else: v = int(v)
     return v
 
-# raw 35-byte representation of a 1x1 transparent GIF, used as the "return value" from metrics requests
-TINY_GIF = 'GIF89a\x01\x00\x01\x00\x80\xff\x00\xff\xff\xff\x00\x00\x00,\x00\x00\x00\x00\x01\x00\x01\x00\x00\x02\x02D\x01\x00;'
-
-# DEPRECATED - METRICSAPI is now handled entirely inside of proxyserver!
-class METRICSAPI(resource.Resource):
-    isLeaf = True
-    def __init__(self, gameapi):
-        resource.Resource.__init__(self)
-        self.gameapi = gameapi
-    def record_metric(self, anon_id, event_name, props):
-
-        props['anon_id'] = anon_id
-        props['event_name'] = event_name
-
-        gamesite.metrics_log.event(server_time, props)
-
-    def render_GET(self, request):
-        update_server_time()
-        SpinHTTP.set_access_control_headers(request)
-
-        # wrap this block so the server does not return a revealing error message in case of exceptions
-        try:
-            anon_id = request.args['id'][0]
-            event_name = request.args['event'][0]
-            props_raw = request.args['props'][0]
-
-            # some browsers append '/' to the URL and cause failure in JSON parsing, fix it here
-            if props_raw[-1] == '/':
-                props_raw = props_raw[:-1]
-
-            props = SpinJSON.loads(props_raw)
-            self.record_metric(anon_id, event_name, props)
-        except Exception:
-            gamesite.exception_log.event(server_time, 'METRICSAPI Exception: '+traceback.format_exc()+'while handling request '+repr(request)+' args '+repr(request.args))
-
-        request.setHeader('Content-Type', 'image/gif')
-        request.setHeader('Pragma','no-cache, no-store')
-        request.setHeader('Cache-Control','no-cache, no-store')
-        return TINY_GIF
-
-    def render_POST(self, request):
-        update_server_time()
-        SpinHTTP.set_access_control_headers(request)
-
-        try:
-            msg = SpinJSON.loads(request.args['myarg'][0])
-            anon_id = msg[0]
-            event_name = msg[1]
-            props = msg[2]
-            self.record_metric(anon_id, event_name, props)
-        except Exception:
-            gamesite.exception_log.event(server_time, 'METRICSAPI Exception: '+traceback.format_exc()+'while handling request '+repr(request)+' args '+repr(request.args))
-
-        return 'ok'
-
 # Facebook Open Graph object endpoint
 class OGPAPI(resource.Resource):
     isLeaf = True
@@ -12766,223 +12911,227 @@ class OGPAPI(resource.Resource):
         return ("http://%s%s/OGPAPI?" % (host, port_str)) + qs
 
     def render_GET(self, request):
+        SpinHTTP.set_access_control_headers(request)
+        ret = catch_all('OGPAPI request %r args %r' % (request, request.args))(self.handle_request)(self, request)
+        if ret is None:
+            request.setResponseCode(http.BAD_REQUEST)
+            ret = 'spinpunch error'
+        return ret
+
+    @admin_stats.measure_latency('OGPAPI')
+    def handle_request(self, request):
         if gamedata['server']['log_fb_open_graph']:
             gamesite.exception_log.event(server_time, 'OGPAPI HIT: '+repr(request)+' args '+repr(request.args))
-        SpinHTTP.set_access_control_headers(request)
+
         if 'type' not in request.args:
             # bad hit, like from a web crawler
             request.setResponseCode(http.BAD_REQUEST)
             return 'spinpunch error'
-        try:
-            ret = '<!DOCTYPE html>\n<html>\n'
-            type = request.args['type'][0]
-            # order of precedence:
-            # image_url > art_asset_file > art_asset_s3
-            image_url = None
-            art_asset_file = None
-            art_asset_s3 = None
-            my_extra_prefix = ''
-            my_og_type = None
-            my_url = None
-            my_spin_ref = None
-            my_spin_ref_user_id = None
-            my_spin_link_qs = None
-            my_ui_name = None
-            my_ui_description = None
-            my_ui_determiner = None
-            extra_props = {}
-            extra_raw_props = []
 
-            if type in (OGPAPI.object_type('gamebucks'), OGPAPI.object_type('alloy')):
-                my_url = self.get_object_endpoint({'type':type})
-                my_extra_prefix = ' product: http://ogp.me/ns/product#' # ' fbpayment:http://ogp.me/ns/fb/fbpayment#'
-                my_og_type = 'og:product' # 'fbpayment:currency'
-                my_ui_name = gamedata['strings']['game_name'] +' ' + gamedata['store']['gamebucks_ui_name']
-                my_ui_description = "Can be spent in game on speed-ups, resources, and special items"
-                my_ui_determiner = 'the'
-                art_asset_s3 = gamedata['store']['fb_open_graph_gamebucks_icon']
-                #extra_raw_props.append(('fbpayment:rate', gamedata['store']['gamebucks_per_fbcredit']))
-                for currency, amount in gamedata['store']['gamebucks_open_graph_prices']:
+        ret = '<!DOCTYPE html>\n<html>\n'
+        type = request.args['type'][0]
+        # order of precedence:
+        # image_url > art_asset_file > art_asset_s3
+        image_url = None
+        art_asset_file = None
+        art_asset_s3 = None
+        my_extra_prefix = ''
+        my_og_type = None
+        my_url = None
+        my_spin_ref = None
+        my_spin_ref_user_id = None
+        my_spin_link_qs = None
+        my_ui_name = None
+        my_ui_description = None
+        my_ui_determiner = None
+        extra_props = {}
+        extra_raw_props = []
+
+        if type in (OGPAPI.object_type('gamebucks'), OGPAPI.object_type('alloy')):
+            my_url = self.get_object_endpoint({'type':type})
+            my_extra_prefix = ' product: http://ogp.me/ns/product#' # ' fbpayment:http://ogp.me/ns/fb/fbpayment#'
+            my_og_type = 'og:product' # 'fbpayment:currency'
+            my_ui_name = gamedata['strings']['game_name'] +' ' + gamedata['store']['gamebucks_ui_name']
+            my_ui_description = "Can be spent in game on speed-ups, resources, and special items"
+            my_ui_determiner = 'the'
+            art_asset_s3 = gamedata['store']['fb_open_graph_gamebucks_icon']
+            #extra_raw_props.append(('fbpayment:rate', gamedata['store']['gamebucks_per_fbcredit']))
+            for currency, amount in gamedata['store']['gamebucks_open_graph_prices']:
+                extra_raw_props.append(('product:price:amount', amount))
+                extra_raw_props.append(('product:price:currency', currency))
+
+        elif type == OGPAPI.object_type('sku'):
+            spellname = request.args['spellname'][0]
+            if spellname not in gamedata['spells']:
+                request.setResponseCode(http.NOT_FOUND)
+                return 'invalid spellname'
+            spell = gamedata['spells'][spellname]
+            assert spell['price_formula'] == 'constant' # price must be only a function of the URL!
+            my_url = self.get_object_endpoint({'type':type, 'spellname': spellname})
+            my_extra_prefix = ' product: http://ogp.me/ns/product#'
+            my_og_type = 'og:product'
+            # note: for localized languages, we'll have to have individual SKUs here
+            my_ui_name = Store.format_ui_string(None, spellname, (request.args['quantity'][0] if 'quantity' in request.args else None), spell, spell['ui_name'])
+            my_ui_description = Store.format_ui_string(None, spellname, (request.args['quantity'][0] if 'quantity' in request.args else None), spell, spell['ui_description'])
+
+            art_asset_s3 = spell.get('fb_open_graph_s3_image', gamedata['store']['fb_open_graph_gamebucks_icon'])
+            if 'open_graph_prices' in spell:
+                for i in xrange(len(spell['open_graph_prices'])):
+                    # for details see https://developers.facebook.com/docs/payments/ads_virtual_goods
+                    if 'open_graph_original_prices' in spell:
+                        currency, amount = spell['open_graph_original_prices'][i]
+                        extra_raw_props.append(('product:original_price:amount', amount))
+                        extra_raw_props.append(('product:original_price:currency', currency))
+                    currency, amount = spell['open_graph_prices'][i]
                     extra_raw_props.append(('product:price:amount', amount))
                     extra_raw_props.append(('product:price:currency', currency))
+            if 'open_graph_purchase_limit' in spell:
+                extra_raw_props.append(('product:purchase_limit', spell['open_graph_purchase_limit']))
 
-            elif type == OGPAPI.object_type('sku'):
-                spellname = request.args['spellname'][0]
-                if spellname not in gamedata['spells']:
-                    request.setResponseCode(http.NOT_FOUND)
-                    return 'invalid spellname'
-                spell = gamedata['spells'][spellname]
-                assert spell['price_formula'] == 'constant' # price must be only a function of the URL!
-                my_url = self.get_object_endpoint({'type':type, 'spellname': spellname})
-                my_extra_prefix = ' product: http://ogp.me/ns/product#'
-                my_og_type = 'og:product'
-                # note: for localized languages, we'll have to have individual SKUs here
-                my_ui_name = Store.format_ui_string(None, spellname, (request.args['quantity'][0] if 'quantity' in request.args else None), spell, spell['ui_name'])
-                my_ui_description = Store.format_ui_string(None, spellname, (request.args['quantity'][0] if 'quantity' in request.args else None), spell, spell['ui_description'])
+        elif type == OGPAPI.object_type('achievement'):
+            name = request.args['name'][0]
+            data = gamedata['achievements'][name]
+            my_url = self.get_object_endpoint({'type':type, 'name':name})
+            my_og_type = data['fb_open_graph'].get('fb_type', 'game.achievement').replace('$APP_NAMESPACE', SpinConfig.config['facebook_app_namespace'])
+            my_ui_name = data['fb_open_graph'].get('fb_name', data['ui_name'])
+            my_ui_description = data['fb_open_graph'].get('fb_description', data['ui_description'])
+            art_asset_s3 = data['fb_open_graph']['s3_image']
+            if my_og_type == 'game.achievement':
+                extra_raw_props.append(('game:points', data['fb_open_graph']['points']))
 
-                art_asset_s3 = spell.get('fb_open_graph_s3_image', gamedata['store']['fb_open_graph_gamebucks_icon'])
-                if 'open_graph_prices' in spell:
-                    for i in xrange(len(spell['open_graph_prices'])):
-                        # for details see https://developers.facebook.com/docs/payments/ads_virtual_goods
-                        if 'open_graph_original_prices' in spell:
-                            currency, amount = spell['open_graph_original_prices'][i]
-                            extra_raw_props.append(('product:original_price:amount', amount))
-                            extra_raw_props.append(('product:original_price:currency', currency))
-                        currency, amount = spell['open_graph_prices'][i]
-                        extra_raw_props.append(('product:price:amount', amount))
-                        extra_raw_props.append(('product:price:currency', currency))
-                if 'open_graph_purchase_limit' in spell:
-                    extra_raw_props.append(('product:purchase_limit', spell['open_graph_purchase_limit']))
+        elif type == OGPAPI.object_type('base'):
+            user_id = int(request.args['user_id'][0])
+            base = gamedata['ai_bases']['bases'][str(user_id)]
+            #art_asset_file =gamedata['art'][base['portrait']]['states']['normal']['images'][0]
+            my_url = self.get_object_endpoint({'type':type,'user_id':user_id})
+            if 'fb_open_graph' in base:
+                my_ui_name = base['fb_open_graph'].get('name', base['ui_name'])
+                my_ui_description = base['fb_open_graph']['description']
+                art_asset_s3 = base['fb_open_graph']['s3_image']
+            else:
+                my_ui_name = "%s Level %d" % (base['ui_name'], base['resources']['player_level'])
+                my_ui_description = "A vicious computer opponent" # ui_name
 
-            elif type == OGPAPI.object_type('achievement'):
-                name = request.args['name'][0]
-                data = gamedata['achievements'][name]
-                my_url = self.get_object_endpoint({'type':type, 'name':name})
-                my_og_type = data['fb_open_graph'].get('fb_type', 'game.achievement').replace('$APP_NAMESPACE', SpinConfig.config['facebook_app_namespace'])
-                my_ui_name = data['fb_open_graph'].get('fb_name', data['ui_name'])
-                my_ui_description = data['fb_open_graph'].get('fb_description', data['ui_description'])
-                art_asset_s3 = data['fb_open_graph']['s3_image']
-                if my_og_type == 'game.achievement':
-                    extra_raw_props.append(('game:points', data['fb_open_graph']['points']))
+            extra_props['level'] = base['resources']['player_level']
+            extra_props['owner'] = base['ui_name']
+            extra_props['user_id'] = user_id
 
-            elif type == OGPAPI.object_type('base'):
-                user_id = int(request.args['user_id'][0])
-                base = gamedata['ai_bases']['bases'][str(user_id)]
-                #art_asset_file =gamedata['art'][base['portrait']]['states']['normal']['images'][0]
-                my_url = self.get_object_endpoint({'type':type,'user_id':user_id})
-                if 'fb_open_graph' in base:
-                    my_ui_name = base['fb_open_graph'].get('name', base['ui_name'])
-                    my_ui_description = base['fb_open_graph']['description']
-                    art_asset_s3 = base['fb_open_graph']['s3_image']
-                else:
-                    my_ui_name = "%s Level %d" % (base['ui_name'], base['resources']['player_level'])
-                    my_ui_description = "A vicious computer opponent" # ui_name
+        elif type == OGPAPI.object_type('player_level'):
+            level = int(request.args['level'][0])
+            my_url = self.get_object_endpoint({'type':type, 'level': level})
+            my_ui_name = "Level %d" % level
+            extra_props['level'] = level
 
-                extra_props['level'] = base['resources']['player_level']
-                extra_props['owner'] = base['ui_name']
-                extra_props['user_id'] = user_id
+        elif type in [OGPAPI.object_type(x) for x in ('spec_building','spec_unit','spec_mobile','spec_inert','spec_tech','spec_aura')]:
+            spec_name = request.args['spec'][0]
+            level = int(request.args['level'][0]) if ('level' in request.args) else -1
 
-            elif type == OGPAPI.object_type('player_level'):
-                level = int(request.args['level'][0])
-                my_url = self.get_object_endpoint({'type':type, 'level': level})
-                my_ui_name = "Level %d" % level
+            spec = GameObjectSpec.lookup(spec_name)
+            # need to get the raw gamedata spec for UI strings
+            raw_spec = gamedata[Spec.KEY_MAP[spec.kind]][spec_name]
+            my_ui_name = "%s" % raw_spec['ui_name']
+            my_ui_description = "%s" % raw_spec['ui_description']
+
+            if 'external_art_asset' in raw_spec:
+                art_asset_s3 = raw_spec['external_art_asset']
+
+            url_params = {'type':type,'spec':spec_name}
+            if level > 0:
+                url_params['level'] = str(level)
+                my_ui_name += " Level %d" % level
                 extra_props['level'] = level
 
-            elif type in [OGPAPI.object_type(x) for x in ('spec_building','spec_unit','spec_mobile','spec_inert','spec_tech','spec_aura')]:
-                spec_name = request.args['spec'][0]
-                level = int(request.args['level'][0]) if ('level' in request.args) else -1
+            my_url = self.get_object_endpoint(url_params)
 
-                spec = GameObjectSpec.lookup(spec_name)
-                # need to get the raw gamedata spec for UI strings
-                raw_spec = gamedata[Spec.KEY_MAP[spec.kind]][spec_name]
-                my_ui_name = "%s" % raw_spec['ui_name']
-                my_ui_description = "%s" % raw_spec['ui_description']
+        elif type == OGPAPI.object_type('ranking'):
+            #value = int(request.args['value'][0])
+            #percentile = str(request.args['percentile'][0])
+            #category = str(request.args['category'][0])
+            #extra_props['value'] = value
+            #extra_props['percentile'] = percentile
 
-                if 'external_art_asset' in raw_spec:
-                    art_asset_s3 = raw_spec['external_art_asset']
+            my_ui_name = 'Leaderboard Ranking'
+            if 'category' in request.args:
+                category = str(request.args['category'][0])
+                extra_props['category'] = category
+                my_ui_name += ': '+category
 
-                url_params = {'type':type,'spec':spec_name}
-                if level > 0:
-                    url_params['level'] = str(level)
-                    my_ui_name += " Level %d" % level
-                    extra_props['level'] = level
+            my_url = self.get_object_endpoint(dict([(key, val[0]) for key, val in request.args.iteritems()]))
+            #my_ui_description = 'For '+category
 
-                my_url = self.get_object_endpoint(url_params)
+        elif type == OGPAPI.object_type('literal'):
+            for MANDATORY_ARG in ('spin_ref', 'ui_name'):
+                if MANDATORY_ARG not in request.args:
+                    request.setResponseCode(http.BAD_REQUEST)
+                    return 'missing %s' % MANDATORY_ARG
 
-            elif type == OGPAPI.object_type('ranking'):
-                #value = int(request.args['value'][0])
-                #percentile = str(request.args['percentile'][0])
-                #category = str(request.args['category'][0])
-                #extra_props['value'] = value
-                #extra_props['percentile'] = percentile
-
-                my_ui_name = 'Leaderboard Ranking'
-                if 'category' in request.args:
-                    category = str(request.args['category'][0])
-                    extra_props['category'] = category
-                    my_ui_name += ': '+category
-
-                my_url = self.get_object_endpoint(dict([(key, val[0]) for key, val in request.args.iteritems()]))
-                #my_ui_description = 'For '+category
-
-            elif type == OGPAPI.object_type('literal'):
-                for MANDATORY_ARG in ('spin_ref', 'ui_name'):
-                    if MANDATORY_ARG not in request.args:
-                        request.setResponseCode(http.BAD_REQUEST)
-                        return 'missing %s' % MANDATORY_ARG
-
-                my_ui_name = request.args['ui_name'][0].decode('utf-8')
-                if ('ui_description' in request.args):
-                    my_ui_description = request.args['ui_description'][0].decode('utf-8')
-                else:
-                    my_ui_description = SpinConfig.config['proxyserver'].get('fbexternalhit_description', '')
-                my_spin_ref = str(request.args['spin_ref'][0])
-                if ('spin_ref_user_id' in request.args):
-                    my_spin_ref_user_id = str(request.args['spin_ref_user_id'][0])
-                if ('spin_link_qs' in request.args):
-                    my_spin_link_qs = SpinJSON.loads(request.args['spin_link_qs'][0])
-                    assert my_spin_link_qs.__class__ is dict
-                my_url = self.get_object_endpoint(dict([(key, val[0]) for key, val in request.args.iteritems()]))
-
+            my_ui_name = request.args['ui_name'][0].decode('utf-8')
+            if ('ui_description' in request.args):
+                my_ui_description = request.args['ui_description'][0].decode('utf-8')
             else:
-                raise Exception('unknown type "%s"' % type)
+                my_ui_description = SpinConfig.config['proxyserver'].get('fbexternalhit_description', '')
+            my_spin_ref = str(request.args['spin_ref'][0])
+            if ('spin_ref_user_id' in request.args):
+                my_spin_ref_user_id = str(request.args['spin_ref_user_id'][0])
+            if ('spin_link_qs' in request.args):
+                my_spin_link_qs = SpinJSON.loads(request.args['spin_link_qs'][0])
+                assert my_spin_link_qs.__class__ is dict
+            my_url = self.get_object_endpoint(dict([(key, val[0]) for key, val in request.args.iteritems()]))
 
-            ns = SpinConfig.config['facebook_app_namespace']
-            ret += '<head prefix="og: http://ogp.me/ns# fb: http://ogp.me/ns/fb# %s: http://ogp.me/ns/fb/%s#%s">\n' % (ns, ns, my_extra_prefix)
-            ret += '<meta property="fb:app_id" content="%s" />\n' % SpinConfig.config['facebook_app_id']
-            ret += '<meta property="og:type"   content="%s" />\n' % (my_og_type if my_og_type else '%s:%s' % (ns, type))
-            #ret += '<meta property="og:url"    content="http://apps.facebook.com/%s?spin_campaign=open_graph" />\n' % (SpinConfig.config['facebook_app_namespace'])
-            ret += '<meta property="og:url"    content="%s" />\n' % my_url
-            ret += u'<meta property="og:title"  content="'+cgi_escape(my_ui_name,True)+u'" />\n'
+        else:
+            raise Exception('unknown type "%s"' % type)
 
-            if my_ui_description:
-                ret += u'<meta property="og:description"  content="'+cgi_escape(my_ui_description,True)+u'" />\n'
-            if my_ui_determiner is not None:
-                ret += u'<meta property="og:determiner"  content="'+cgi_escape(my_ui_determiner,True)+u'" />\n'
+        ns = SpinConfig.config['facebook_app_namespace']
+        ret += '<head prefix="og: http://ogp.me/ns# fb: http://ogp.me/ns/fb# %s: http://ogp.me/ns/fb/%s#%s">\n' % (ns, ns, my_extra_prefix)
+        ret += '<meta property="fb:app_id" content="%s" />\n' % SpinConfig.config['facebook_app_id']
+        ret += '<meta property="og:type"   content="%s" />\n' % (my_og_type if my_og_type else '%s:%s' % (ns, type))
+        #ret += '<meta property="og:url"    content="http://apps.facebook.com/%s?spin_campaign=open_graph" />\n' % (SpinConfig.config['facebook_app_namespace'])
+        ret += '<meta property="og:url"    content="%s" />\n' % my_url
+        ret += u'<meta property="og:title"  content="'+cgi_escape(my_ui_name,True)+u'" />\n'
 
-            if not image_url:
-                # add image file, either from in-game art asset (200x200px minimum!),
-                # or use a generic default Mars Frontier image if none is specified
+        if my_ui_description:
+            ret += u'<meta property="og:description"  content="'+cgi_escape(my_ui_description,True)+u'" />\n'
+        if my_ui_determiner is not None:
+            ret += u'<meta property="og:determiner"  content="'+cgi_escape(my_ui_determiner,True)+u'" />\n'
 
-                if ('image_url' in request.args): # allow client-provided fallback
-                    image_url = str(request.args['image_url'][0])
-                elif art_asset_file:
-                    if 'art_cdn_path' in SpinConfig.config['proxyserver']:
-                        art_server = SpinConfig.config['proxyserver']['art_cdn_path']
-                    else:
-                        # URL to art asset assumes proxyserver is running on same host if no CDN is in use!
-                        art_server = '%s:%d/' %  (SpinConfig.config['proxyserver'].get('external_host', gamesite.config.game_host),
-                                                  SpinConfig.config['proxyserver']['external_http_port'])
-                    image_url = 'http://%s%s' % (art_server, art_asset_file)
-                elif art_asset_s3:
-                    image_url = 'http://s3.amazonaws.com/'+gamedata['public_s3_bucket']+'/facebook_assets/%s' % art_asset_s3
+        if not image_url:
+            # add image file, either from in-game art asset (200x200px minimum!),
+            # or use a generic default Mars Frontier image if none is specified
+
+            if ('image_url' in request.args): # allow client-provided fallback
+                image_url = str(request.args['image_url'][0])
+            elif art_asset_file:
+                if 'art_cdn_path' in SpinConfig.config['proxyserver']:
+                    art_server = SpinConfig.config['proxyserver']['art_cdn_path']
                 else:
-                    image_url = SpinConfig.config['proxyserver'].get('fbexternalhit_image', '')
+                    # URL to art asset assumes proxyserver is running on same host if no CDN is in use!
+                    art_server = '%s:%d/' %  (SpinConfig.config['proxyserver'].get('external_host', gamesite.config.game_host),
+                                              SpinConfig.config['proxyserver']['external_http_port'])
+                image_url = 'http://%s%s' % (art_server, art_asset_file)
+            elif art_asset_s3:
+                image_url = 'http://s3.amazonaws.com/'+gamedata['public_s3_bucket']+'/facebook_assets/%s' % art_asset_s3
+            else:
+                image_url = SpinConfig.config['proxyserver'].get('fbexternalhit_image', '')
 
-            ret += '<meta property="og:image"  content="%s" />\n' % image_url
+        ret += '<meta property="og:image"  content="%s" />\n' % image_url
 
-            for key, val in extra_props.iteritems():
-                ret += '<meta property="%s:%s"  content="%s" />\n' % (ns, key, cgi_escape(str(val),True))
-            for key, val in extra_raw_props:
-                ret += '<meta property="%s"  content="%s" />\n' % (key, cgi_escape(str(val),True))
+        for key, val in extra_props.iteritems():
+            ret += '<meta property="%s:%s"  content="%s" />\n' % (ns, key, cgi_escape(str(val),True))
+        for key, val in extra_raw_props:
+            ret += '<meta property="%s"  content="%s" />\n' % (key, cgi_escape(str(val),True))
 
-            if not my_spin_ref:
-                my_spin_ref = 'open_graph_'+type
+        if not my_spin_ref:
+            my_spin_ref = 'open_graph_'+type
 
-            # add JavaScript code to redirect end-user browser hits (not Facebook back-end Open Graph hits) to the game
-            game_qs = 'spin_ref='+my_spin_ref
-            if my_spin_ref_user_id:
-                game_qs += '&spin_ref_user_id='+my_spin_ref_user_id
-            if my_spin_link_qs:
-                game_qs += '&'+urllib.urlencode(my_spin_link_qs)
-            ret += '</head>\n<body onload="top.location.href = \'//apps.facebook.com/%s/?%s\';"></body>\n</html>' % \
-                   (SpinConfig.config['facebook_app_namespace'], game_qs)
-            return ret.encode('utf-8')
-
-        except Exception:
-            gamesite.exception_log.event(server_time, 'OGPAPI Exception: '+traceback.format_exc()+'while handling request '+repr(request)+' args '+repr(request.args))
-        request.setResponseCode(http.BAD_REQUEST)
-        return 'spinpunch error'
+        # add JavaScript code to redirect end-user browser hits (not Facebook back-end Open Graph hits) to the game
+        game_qs = 'spin_ref='+my_spin_ref
+        if my_spin_ref_user_id:
+            game_qs += '&spin_ref_user_id='+my_spin_ref_user_id
+        if my_spin_link_qs:
+            game_qs += '&'+urllib.urlencode(my_spin_link_qs)
+        ret += '</head>\n<body onload="top.location.href = \'//apps.facebook.com/%s/?%s\';"></body>\n</html>' % \
+               (SpinConfig.config['facebook_app_namespace'], game_qs)
+        return ret.encode('utf-8')
 
 OGPAPI_instance = OGPAPI()
 
@@ -12994,34 +13143,22 @@ class CONTROLAPI(resource.Resource):
         self.gameapi = gameapi
 
     def render_POST(self, request): return self.render_GET(request)
-
     def render_GET(self, request):
-        start_time = time.time()
-        ret = self.do_render_GET(request)
-        end_time = time.time()
-        if 'method' in request.args:
-            reason = request.args['method'][0]
-        else:
-            reason = 'unknown'
-        admin_stats.record_latency('CONTROLAPI(HTTP:%s)' % reason, end_time-start_time)
-        return ret
-
-    def do_render_GET(self, request):
         update_server_time()
+        ret = None
 
         if ('secret' in request.args and 'method' in request.args):
             secret = str(request.args['secret'][0])
             method = str(request.args['method'][0])
             args = dict([(k, str(v[0])) for k, v in request.args.iteritems() if k not in ('secret','method')])
 
-            # wrap this block so the server does not return a revealing error message in case of exceptions
-            try:
-                return self.handle(request, secret, method, args)
-            except Exception:
-                gamesite.exception_log.event(server_time, 'CONTROLAPI Exception (method %r args %r):\n%s' % (method, args, traceback.format_exc()))
+            with admin_stats.latency_measurer('CONTROLAPI(HTTP:%s)' % method):
+                ret = catch_all('CONTROLAPI (method %r args %r)' % (method, args))(self.handle)(self, request, secret, method, args)
 
-        request.setResponseCode(http.BAD_REQUEST)
-        return 'error\n'
+        if ret is None:
+            request.setResponseCode(http.BAD_REQUEST)
+            ret = 'error\n'
+        return ret
 
     def kill_session(self, request, session, body = None):
         if not body: body = 'ok\n'
@@ -13037,14 +13174,13 @@ class CONTROLAPI(resource.Resource):
         if gamedata['server']['log_controlapi']:
             gamesite.exception_log.event(server_time, 'CONTROLAPI(CHAT): %s got %s %s' % (spin_server_name, repr(sender_info), text))
         ret = None
-        start_time = time.time()
+
         try:
-            ret = self.handle(None, sender_info['secret'], sender_info['method'], sender_info['args'])
+            with admin_stats.latency_measurer('CONTROLAPI(CHAT:%s)' % sender_info['method']):
+                ret = self.handle(None, sender_info['secret'], sender_info['method'], sender_info['args'])
         except:
-            gamesite.exception_log.event(server_time, 'CONTROL chat_recv exception method %r args %r:\n%s' % (sender_info['method'], sender_info['args'], traceback.format_exc()))
-            pass
-        end_time = time.time()
-        admin_stats.record_latency('CONTROLAPI(CHAT:%s)' % sender_info['method'], end_time-start_time)
+            gamesite.exception_log.event(server_time, 'CONTROL chat_recv exception method %r args %r: %s' % (sender_info['method'], sender_info['args'], traceback.format_exc().strip())) # OK
+
         return ret
 
     # encapsulate state needed to load, mutate, then store player and user JSON structs
@@ -13118,8 +13254,8 @@ class CONTROLAPI(resource.Resource):
                         user_json = None
                     self.val = self.handler.exec_offline(user_json, player_json)
             except:
-                gamesite.exception_log.event(server_time, 'CustomerSupport offline exception player %d method %r args %r:\n%s' % (self.user_id, self.method_name, self.handler.args, traceback.format_exc()))
-                self.d.callback(CustomerSupport.ReturnValue(error = traceback.format_exc()))
+                gamesite.exception_log.event(server_time, 'CustomerSupport offline exception player %d method %r args %r: %s' % (self.user_id, self.method_name, self.handler.args, traceback.format_exc().strip())) # OK
+                self.d.callback(CustomerSupport.ReturnValue(error = traceback.format_exc().strip())) # OK
                 return
 
             assert self.val
@@ -13179,18 +13315,18 @@ class CONTROLAPI(resource.Resource):
                     try:
                         val = handler.exec_online(session, session.outgoing_messages)
                     except:
-                        gamesite.exception_log.event(server_time, 'CustomerSupport online exception player %d method %r args %r:\n%s' % \
-                                                     (session.user.user_id, method_name, args, traceback.format_exc()))
-                        val = CustomerSupport.ReturnValue(error = traceback.format_exc())
+                        gamesite.exception_log.event(server_time, 'CustomerSupport online exception player %d method %r args %r: %s' % \
+                                                     (session.user.user_id, method_name, args, traceback.format_exc().strip())) # OK
+                        val = CustomerSupport.ReturnValue(error = traceback.format_exc().strip()) # OK
 
                     if val.async:
                         assert isinstance(val.async, defer.Deferred) # sanity check
 
                         def online_error(fail, session, method_name, args):
-                            gamesite.exception_log.event(server_time, 'CustomerSupport online async exception player %d method %r args %r:\n%s' % \
-                                                         (session.user.user_id, method_name, args, fail.getTraceback()))
+                            gamesite.exception_log.event(server_time, 'CustomerSupport online async exception player %d method %r args %r: %s' % \
+                                                         (session.user.user_id, method_name, args, fail.getTraceback().strip())) # OK
                             # turn exception into a regular result
-                            return CustomerSupport.ReturnValue(error = fail.getTraceback())
+                            return CustomerSupport.ReturnValue(error = fail.getTraceback().strip()) # OK
 
                         val.async.addErrback(online_error, session, method_name, args)
 
@@ -14845,18 +14981,14 @@ class CREDITAPI(resource.Resource):
     def render_GET(self, request):
         return self.render_POST(request)
     def render_POST(self, request):
-        try:
-            start_time = time.time()
-            ret = self.handle_request(request)
-            end_time = time.time()
+        SpinHTTP.set_access_control_headers(request)
+        ret = catch_all('CREDITAPI')(self.handle_request)(self, request)
+        if ret is None:
+            request.setResponseCode(http.BAD_REQUEST)
+            ret = 'spinpunch error'
+        return ret
 
-            admin_stats.record_latency('CREDITAPI', end_time-start_time)
-            return ret
-        except Exception:
-            text = traceback.format_exc()
-            gamesite.exception_log.event(server_time, 'CREDITAPI Exception: '+text)
-        return 'spinpunch error'
-
+    @admin_stats.measure_latency('CREDITAPI')
     def handle_request(self, request):
         SpinHTTP.set_access_control_headers(request)
 
@@ -15041,17 +15173,14 @@ class KGAPI(resource.Resource):
     def render_GET(self, request):
         return self.render_POST(request)
     def render_POST(self, request):
-        try:
-            start_time = time.time()
-            ret = self.handle_request(request)
-            end_time = time.time()
-            admin_stats.record_latency('KGAPI', end_time-start_time)
-            return ret
-        except Exception:
-            text = traceback.format_exc()
-            gamesite.exception_log.event(server_time, 'KGAPI Exception: '+text)
-        return 'spinpunch error'
+        SpinHTTP.set_access_control_headers(request)
+        ret = catch_all('KGAPI')(self.handle_request)(self, request)
+        if ret is None:
+            request.setResponseCode(http.BAD_REQUEST)
+            ret = 'spinpunch error'
+        return ret
 
+    @admin_stats.measure_latency('KGAPI')
     def handle_request(self, request):
         SpinHTTP.set_access_control_headers(request)
 
@@ -15108,18 +15237,14 @@ class TRIALPAYAPI(resource.Resource):
     def render_GET(self, request):
         return self.render_POST(request)
     def render_POST(self, request):
-        try:
-            start_time = time.time()
-            ret = self.handle_request(request)
-            end_time = time.time()
-            admin_stats.record_latency('TRIALPAYAPI', end_time-start_time)
-            return ret
-        except Exception:
-            text = traceback.format_exc()
-            gamesite.exception_log.event(server_time, 'TRIALPAYAPI Exception: '+text)
-        request.setResponseCode(http.BAD_REQUEST)
-        return 'spinpunch error'
+        SpinHTTP.set_access_control_headers(request)
+        ret = catch_all('TRIALPAYAPI')(self.handle_request)(self, request)
+        if ret is None:
+            request.setResponseCode(http.BAD_REQUEST)
+            ret = 'spinpunch error'
+        return ret
 
+    @admin_stats.measure_latency('TRIALPAYAPI')
     def handle_request(self, request):
         SpinHTTP.set_access_control_headers(request)
         # find session
@@ -15184,18 +15309,13 @@ class XSAPI(resource.Resource):
         return self.render_POST(request)
     def render_POST(self, request):
         SpinHTTP.set_access_control_headers(request)
-        try:
-            start_time = time.time()
-            ret = self.handle_request(request)
-            end_time = time.time()
-            admin_stats.record_latency('XSAPI', end_time-start_time)
-            return ret
-        except Exception:
-            text = traceback.format_exc()
-            gamesite.exception_log.event(server_time, 'XSAPI Exception: '+text)
-        request.setResponseCode(http.BAD_REQUEST)
-        return SpinJSON.dumps({'error': {'code':'FATAL_ERROR', 'message': text}})
+        ret = catch_all('XSAPI')(self.handle_request)(self, request)
+        if ret is None:
+            request.setResponseCode(http.BAD_REQUEST)
+            ret = SpinJSON.dumps({'error': {'code':'FATAL_ERROR', 'message': text}})
+        return ret
 
+    @admin_stats.measure_latency('XSAPI')
     def handle_request(self, request):
         request_body = request.content.read()
 
@@ -15345,7 +15465,7 @@ class GAMEAPI(resource.Resource):
         try:
             return self._complete_attack(session, retmsg, client_props=client_props, reason=reason)
         except:
-            gamesite.exception_log.event(server_time, 'complete_attack exception on player %d: %s' % (session.user.user_id, traceback.format_exc()))
+            gamesite.exception_log.event(server_time, 'complete_attack exception on player %d: %s' % (session.user.user_id, traceback.format_exc().strip())) # OK?
 
         # error path
         session.complete_attack_in_progress = False
@@ -15354,6 +15474,7 @@ class GAMEAPI(resource.Resource):
         reactor.callLater(0, d.callback, False)
         return d
 
+    @admin_stats.measure_latency('_complete_attack')
     def _complete_attack(self, session, retmsg, client_props = None, reason='unknown'):
         if session.complete_attack_in_progress:
             assert session.complete_attack_d
@@ -15362,7 +15483,6 @@ class GAMEAPI(resource.Resource):
             return session.complete_attack_d
 
         ascdebug('complete_attack %d' % session.user.user_id)
-        start_time = time.time()
 
         assert session.complete_attack_d is None
         assert not session.complete_attack_in_progress
@@ -16265,9 +16385,6 @@ class GAMEAPI(resource.Resource):
                            session.viewing_base.get_cache_props(), # extra_props = {'deployment_buffer': session.viewing_base.deployment_buffer} ?
                            session.ladder_state])
 
-        end_time = time.time()
-        admin_stats.record_latency('complete_attack', end_time - start_time)
-
         # queue the callback (and any future complete_attack()s called before the I/O completes), and call them after I/O completes
 
         def finish(session, io_type):
@@ -16762,13 +16879,9 @@ class GAMEAPI(resource.Resource):
 
         if session.viewing_player is not session.player and (not session.viewing_player.is_ai()) and \
            gamesite.sql_client and session.player.get_any_abtest_value('enable_alliances', gamedata['client']['enable_alliances']):
-            try:
-                session.viewing_alliance_id_cache = gamesite.sql_client.get_users_alliance(session.viewing_user.user_id, reason = 'VISIT_BASE')
-                if session.viewing_alliance_id_cache > 0:
-                    session.viewing_alliance_info_cache = gamesite.sql_client.get_alliance_info(session.viewing_alliance_id_cache, reason = 'VISIT_BASE')
-            except:
-                gamesite.exception_log.event(server_time, 'Error setting up alliance state for player %d for spy on behalf of %d:\n%s' % \
-                                             (session.viewing_user.user_id, session.user.user_id, traceback.format_exc()))
+            session.viewing_alliance_id_cache = gamesite.sql_client.get_users_alliance(session.viewing_user.user_id, reason = 'VISIT_BASE')
+            if session.viewing_alliance_id_cache > 0:
+                session.viewing_alliance_info_cache = gamesite.sql_client.get_alliance_info(session.viewing_alliance_id_cache, reason = 'VISIT_BASE')
 
         # sanity check
         if session.ladder_state:
@@ -17188,24 +17301,26 @@ class GAMEAPI(resource.Resource):
         reason += ',incr' if updated_since > 0 else ',full'
 
         db_time = 1
-        start_time = time.time()
-        result = list(gamesite.nosql_client.get_map_features(region, updated_since = updated_since, reason = 'do_quarry_query_uncached('+reason+')'))
-        admin_stats.record_latency('do_quarry_query_uncached('+reason+':get_map_features)', time.time()-start_time)
+
+        with admin_stats.latency_measurer('do_quarry_query_uncached('+reason+':get_map_features)'):
+            result = list(gamesite.nosql_client.get_map_features(region, updated_since = updated_since, reason = 'do_quarry_query_uncached('+reason+')'))
 
         for x in result:
             db_time = max(db_time, x.get('last_mtime',-1))
 
         if gamedata['server']['enable_map_compression'] and updated_since < 0:
-            start_time = time.time()
 
             if has_lz4 and gamedata['server']['map_compression_codec'] == 'lz4':
                 codec = 'lz4'
-                z_result = base64.b64encode(bytes(lz4.compress(SpinJSON.dumps(result))))
             else:
                 codec = 'lzjb'
-                z_result = base64.b64encode(bytes(SpinLZJB.compress(SpinLZJB.string_to_bytes(SpinJSON.dumps(result)))))
 
-            admin_stats.record_latency('do_quarry_query_uncached('+reason+':'+codec+'encode)', time.time()-start_time)
+            with admin_stats.latency_measurer('do_quarry_query_uncached('+reason+':'+codec+'encode)'):
+                if codec == 'lz4':
+                    z_result = base64.b64encode(bytes(lz4.compress(SpinJSON.dumps(result))))
+                elif codec == 'lzjb':
+                    z_result = base64.b64encode(bytes(SpinLZJB.compress(SpinLZJB.string_to_bytes(SpinJSON.dumps(result)))))
+
             #SpinJSON.dump(result, open('/tmp/zzz.txt','w'), pretty=True)
 
         else:
@@ -17241,9 +17356,8 @@ class GAMEAPI(resource.Resource):
                 def cb(self, d, session, retmsg, tag, success, buf):
                     ret = None
                     if success and buf and (buf != 'NOTFOUND'):
-                        start_time = time.time()
-                        ret = map(SpinJSON.loads, gzip.GzipFile(fileobj=cStringIO.StringIO(buf)).readlines())
-                        admin_stats.record_latency('GET_BATTLE_LOG3(s3 parse)', time.time()-start_time)
+                        with admin_stats.latency_measurer('GET_BATTLE_LOG3(s3 parse)'):
+                            ret = map(SpinJSON.loads, gzip.GzipFile(fileobj=cStringIO.StringIO(buf)).readlines())
                     retmsg.append(["GET_BATTLE_LOG3_RESULT", tag, ret])
                     d.callback(True)
                 io_system.do_async_read((bucket,name),
@@ -17253,7 +17367,7 @@ class GAMEAPI(resource.Resource):
                 return session.start_async_request(d) # go async
         except:
             gamesite.exception_log.event(server_time, 'error reading battle log %s on behalf of player %d: %s' % \
-                                         (filename, session.player.user_id, traceback.format_exc()))
+                                         (filename, session.player.user_id, traceback.format_exc().strip())) # OK
             ret = None
 
         retmsg.append(["GET_BATTLE_LOG3_RESULT", tag, ret])
@@ -17777,7 +17891,7 @@ class GAMEAPI(resource.Resource):
                         retmsg.append(["OBJECT_CREATED2", object.serialize_state(fake_xy = death_location)])
                         session.player.send_army_update_one(object, retmsg)
                     except:
-                        gamesite.exception_log.event(server_time, 'player %d: error healing %s:\n%s' % (session.player.user_id, object.spec.name, traceback.format_exc()))
+                        gamesite.exception_log.event(server_time, 'player %d: error healing %s: %s' % (session.player.user_id, object.spec.name, traceback.format_exc().strip())) # OK
 
                 for entry in to_remove:
                     session.resurrectable_objects.remove(entry)
@@ -17848,6 +17962,7 @@ class GAMEAPI(resource.Resource):
             object = session.get_object(id)
             return self.do_ping_object(session, retmsg, object, base)
 
+    @admin_stats.measure_latency('do_ping_object')
     def do_ping_object(self, session, retmsg, object, base, force_write = False):
 
             if not object.is_building():
@@ -17871,8 +17986,6 @@ class GAMEAPI(resource.Resource):
             xp = 0
             xp_why = []
 
-            start_time = time.time()
-
             if object.is_repairing():
                 if server_time >= object.repair_finish_time:
                     # object fully repaired
@@ -17882,8 +17995,6 @@ class GAMEAPI(resource.Resource):
                     object.repair_finish_time = -1
                     object.update_production(object.owner, base.base_type, base.base_region, compute_power_factor(base.get_power_state()))
                     object.update_all(undamaged_time)
-
-            end_time = time.time(); admin_stats.record_latency('do_ping_object(is_repairing)', end_time - start_time); start_time = end_time
 
             if object.is_under_construction() and (object.owner is session.player):
                 prog = object.build_done_time
@@ -17911,8 +18022,6 @@ class GAMEAPI(resource.Resource):
                             session.setmax_player_metric(object.spec.history_category+'_built', num_cat, bucket = bool(object.spec.worth_less_xp))
                         if object.spec.track_level_in_player_history:
                             session.setmax_player_metric(object.spec.name+'_level', object.level, bucket = bool(object.spec.worth_less_xp))
-
-            end_time = time.time(); admin_stats.record_latency('do_ping_object(is_under_construction)', end_time - start_time); start_time = end_time
 
             if object.is_upgrading() and (object.owner is session.player):
                 prog = object.upgrade_done_time
@@ -17945,8 +18054,6 @@ class GAMEAPI(resource.Resource):
                             session.setmax_player_metric(object.spec.name+'_level', object.level, bucket = bool(object.spec.worth_less_xp))
                     session.user.create_fb_open_graph_action_building_upgrade(object)
 
-            end_time = time.time(); admin_stats.record_latency('do_ping_object(is_upgrading)', end_time - start_time); start_time = end_time
-
             if object.is_researching() and (object.owner is session.player):
                 prog = object.research_done_time
                 if object.research_start_time >= 0:
@@ -17968,8 +18075,6 @@ class GAMEAPI(resource.Resource):
                     if spec.completion:
                         session.execute_consequent_safe(spec.get_leveled_quantity(spec.completion, current+1), session.player, retmsg, reason='tech:completion')
 
-            end_time = time.time(); admin_stats.record_latency('do_ping_object(is_researching)', end_time - start_time); start_time = end_time
-
             if object.is_crafting() and (object.owner is session.player):
                 if object.update_crafting(-1):
                     # crafting is complete
@@ -17977,12 +18082,8 @@ class GAMEAPI(resource.Resource):
                     if gamedata['crafting']['categories'][gamedata['crafting']['recipes'][object.crafting.queue[0].craft_state['recipe']]['crafting_category']].get('auto_collect',True):
                         self.do_collect_craft(session, retmsg, object)
 
-            end_time = time.time(); admin_stats.record_latency('do_ping_object(is_crafting)', end_time - start_time); start_time = end_time
-
             if object.is_manufacturing() and (object.owner is session.player):
                 did_a_manufacture |= self.do_ping_manufacturing(session, retmsg, base, object)
-
-            end_time = time.time(); admin_stats.record_latency('do_ping_object(is_manufacturing)', end_time - start_time); start_time = end_time
 
             if did_finish_construction or did_an_upgrade:
                 # handle any updates to stattab
@@ -17992,14 +18093,10 @@ class GAMEAPI(resource.Resource):
                     if object.owner is session.player:
                         object.owner.stattab.send_update(session, retmsg)
 
-            end_time = time.time(); admin_stats.record_latency('do_ping_object(stattab update)', end_time - start_time); start_time = end_time
-
             # if the action had any possible impact on power generation, then re-initialize harvesters
             if did_a_repair or did_finish_construction or did_an_upgrade:
                 session.power_changed(base, object, retmsg)
                 session.deferred_ladder_point_decay_check = True
-
-            end_time = time.time(); admin_stats.record_latency('do_ping_object(power changed)', end_time - start_time); start_time = end_time
 
             if did_finish_construction or did_an_upgrade:
                 if object.spec.provides_inventory:
@@ -18007,10 +18104,7 @@ class GAMEAPI(resource.Resource):
 
                 if object.spec.name in (gamedata['townhall'],gamedata['region_map_building']):
                     # these buildings can enable regional map features, place player on map if not already there
-                    start_time2 = time.time()
                     session.player.update_map_placement(session, retmsg)
-                    end_time2 = time.time()
-                    admin_stats.record_latency('do_ping_object(update_map_placement)', end_time2 - start_time2)
 
                 if object.spec.name in (gamedata['townhall'], gamedata['inventory_building']):
                     # check if this triggered the inventory intro mail
@@ -18038,8 +18132,6 @@ class GAMEAPI(resource.Resource):
                         xp += int(coeff*amount)
                     xp_why.append('building')
 
-            end_time = time.time(); admin_stats.record_latency('do_ping_object(construction/upgrade)', end_time - start_time); start_time = end_time
-
             if did_a_repair or did_finish_construction or did_an_upgrade or did_a_research or did_a_manufacture:
                 self.give_xp_to(session, object.owner, retmsg, xp, ','.join(xp_why), [object.x,object.y], obj_session_id = object.obj_id)
 
@@ -18049,8 +18141,6 @@ class GAMEAPI(resource.Resource):
                 base.nosql_write_one(object, 'do_ping_object')
 
             session.deferred_object_state_updates.add(object)
-
-            end_time = time.time(); admin_stats.record_latency('do_ping_object(nosql_write_one)', end_time - start_time); start_time = end_time
 
     def do_speedup_for_free(self, session, retmsg, object):
         assert object.is_building()
@@ -18797,8 +18887,8 @@ class GAMEAPI(resource.Resource):
                     looted += loot
                     session.player.inventory_log_event('5125_item_obtained', item['spec'], item.get('stack',1), item.get('expire_time',-1), level = item.get('level',None), reason='crafted')
                 except:
-                    gamesite.exception_log.event(server_time, 'player %d crafting delivery %s target not found, discarding.\n%s' % \
-                                                 (object.owner.user_id, repr(bus.craft_state), traceback.format_exc()))
+                    gamesite.exception_log.event(server_time, 'player %d crafting delivery %s target not found, discarding. %s' % \
+                                                 (object.owner.user_id, repr(bus.craft_state), traceback.format_exc().strip())) # OK
             else:
 
                 # returned "looted" list does include fungible items
@@ -20295,6 +20385,7 @@ class GAMEAPI(resource.Resource):
             metric_event_coded(session.user.user_id, '4120_send_gift_completed', props)
             session.deferred_history_update = True
 
+    @catch_all('do_receive_mail')
     def do_receive_mail(self, session, retmsg, is_login = False, type_filter = None):
         ret = {
             'was_attacked': False, # True if battle history should be shown upon login
@@ -20511,7 +20602,7 @@ class GAMEAPI(resource.Resource):
                     try:
                         gamesite.trialpayapi.handle_payment(None, session, msg['their_hash'], msg['request_args'], msg['request_body'])
                     except:
-                        gamesite.exception_log.event(server_time, 'TRIALPAYAPI_payment API fail on user %d payment %r:' % (session.user.user_id, msg.get('request_args')) + traceback.format_exc())
+                        gamesite.exception_log.event(server_time, 'TRIALPAYAPI_payment API fail on user %d payment %r: ' % (session.user.user_id, msg.get('request_args')) + traceback.format_exc().strip()) # OK
                         pass
                     to_ack.append(msg['msg_id'])
 
@@ -20584,10 +20675,10 @@ class GAMEAPI(resource.Resource):
                                 session.user.ping_fbpayment_complete(None, session, retmsg, request_id, {'data':[response]})
 
                         if (status not in ('INFLIGHT','COMPLETED','FAILED','SYNTHESIZED')) or gamedata['server']['log_fbpayments'] >= 2:
-                            gamesite.exception_log.event(server_time, 'FBRTAPI_payment API call on user %d payment %s request_id %s: items %s actions %s status %s' % (session.user.user_id, payment_id, request_id, str(response['items']), str(response['actions']), status))
+                            gamesite.exception_log.event(server_time, 'FBRTAPI_payment API call on user %d payment %s request_id %s: items %s actions %s status %s' % (session.user.user_id, payment_id, request_id, str(response['items']), str(response['actions']), status)) # OK
 
                     except:
-                        gamesite.exception_log.event(server_time, 'FBRTAPI_payment API fail on user %d payment %s:' % (session.user.user_id, msg['payment_id']) + traceback.format_exc())
+                        gamesite.exception_log.event(server_time, 'FBRTAPI_payment API fail on user %d payment %s: ' % (session.user.user_id, msg['payment_id']) + traceback.format_exc().strip()) # OK
                         pass
                     to_ack.append(msg['msg_id'])
 
@@ -20606,7 +20697,7 @@ class GAMEAPI(resource.Resource):
                             gamesite.xsapi.handle_payment(None, session, request_data)
                             gamesite.exception_log.event(server_time, 'XSAPI_payment API success on user %d payment %s' % (session.user.user_id, payment_id))
                     except:
-                        gamesite.exception_log.event(server_time, 'XSAPI_payment API fail on user %d payment %s:' % (session.user.user_id, payment_id) + traceback.format_exc())
+                        gamesite.exception_log.event(server_time, 'XSAPI_payment API fail on user %d payment %s: ' % (session.user.user_id, payment_id) + traceback.format_exc().strip()) # OK
                         pass
                     to_ack.append(msg['msg_id'])
 
@@ -20845,7 +20936,6 @@ class GAMEAPI(resource.Resource):
 
             # handle battle damage
             if newhp != obj.hp:
-                #start_time = time.time()
 
                 max_hp = obj.max_hp
                 if newhp > obj.hp:
@@ -21031,9 +21121,6 @@ class GAMEAPI(resource.Resource):
 
                 update_viewing_player = True
 
-                #end_time = time.time()
-                #admin_stats.record_latency('OBJECT_COMBAT_UPDATES_hp'+obj.spec.kind+('_loot' if obj.hp == 0 else ''), end_time-start_time)
-
             # END handle damage
 
             # write object state to NoSQL, if it's stored there
@@ -21071,14 +21158,11 @@ class GAMEAPI(resource.Resource):
             session.power_changed(session.viewing_base, None, retmsg)
 
         if recalc_resources:
-            start_time = time.time()
-            if update_player:
-                retmsg.append(["PLAYER_STATE_UPDATE", session.player.resources.calc_snapshot().serialize()])
-            if update_viewing_player and session.has_attacked:
-                retmsg.append(["ENEMY_STATE_UPDATE", session.viewing_player.resources.calc_snapshot().serialize(enemy = True)])
-
-            end_time = time.time()
-            admin_stats.record_latency('OBJECT_COMBAT_UPDATES_state', end_time - start_time)
+            with admin_stats.latency_measurer('OBJECT_COMBAT_UPDATES_state'):
+                if update_player:
+                    retmsg.append(["PLAYER_STATE_UPDATE", session.player.resources.calc_snapshot().serialize()])
+                if update_viewing_player and session.has_attacked:
+                    retmsg.append(["ENEMY_STATE_UPDATE", session.viewing_player.resources.calc_snapshot().serialize(enemy = True)])
 
     def recycle_unit(self, session, retmsg, id):
         obj = session.player.get_object_by_obj_id(id, fail_missing = False)
@@ -21390,9 +21474,7 @@ class GAMEAPI(resource.Resource):
         try:
             response = self.do_render_request(http_request, args_dict, client_ip, user_agent)
 
-        except Exception:
-            text = traceback.format_exc()
-
+        except:
             # try to determine user id
             suser_id = 'unknown'
             if 'session' in args_dict:
@@ -21401,7 +21483,7 @@ class GAMEAPI(resource.Resource):
                 if session:
                     suser_id = str(session.user.user_id)
 
-            gamesite.exception_log.event(server_time, 'GAMEAPI Exception (user '+suser_id+'): '+text)
+            gamesite.exception_log.event(server_time, 'GAMEAPI Exception (user '+suser_id+'): '+traceback.format_exc().strip()) # OK
 
             # return a formatted error for the client
             http_request.setHeader('Connection', 'close') # stop keepalive
@@ -21429,7 +21511,7 @@ class GAMEAPI(resource.Resource):
                 arg = None
                 # only log exception if it's not an empty request
                 if True or len(args_dict) > 1:
-                    gamesite.exception_log.event(server_time, 'bad client message! ' + repr(http_request) + ' args ' + repr(args_dict) + ' from '+repr(client_ip) + ' User-Agent "'+ user_agent +'" Exception:\n' + traceback.format_exc())
+                    gamesite.exception_log.event(server_time, 'bad client message! ' + repr(http_request) + ' args ' + repr(args_dict) + ' from '+repr(client_ip) + ' User-Agent "'+ user_agent +'" Exception: ' + traceback.format_exc().strip()) # OK
 
         if arg is None:
             http_request.setHeader('Connection', 'close') # stop keepalive
@@ -21528,10 +21610,6 @@ class GAMEAPI(resource.Resource):
 
             if session.message_buffer[i][0] == session.incoming_serial:
 
-                # for debugging only, helps print message below when things get screwed up
-                # by bad asynchronous code
-                temp_message_buffer = None # copy.deepcopy(session.message_buffer[i])
-
                 # ok, we got the next expected message bundle
                 serial_arg = session.message_buffer[i]
 
@@ -21580,17 +21658,13 @@ class GAMEAPI(resource.Resource):
                                 return
 
                     except Exception:
-                        gamesite.exception_log.event(server_time, 'handle_message_guts exception %s msg %s:\n%s' % (session.dump_exception_state(), latency_tag, traceback.format_exc()))
+                        gamesite.exception_log.event(server_time, 'handle_message_guts exception %s msg %s: %s' % (session.dump_exception_state(), latency_tag, traceback.format_exc().strip())) # OK
                         retmsg.append(["ERROR", "SERVER_EXCEPTION"])
                         break
 
                 if len(serial_arg[1]) == 0:
                     # processed one complete bundle. Advance to next.
-                    try:
-                        session.message_buffer.pop(i)
-                    except:
-                        gamesite.exception_log.event(server_time, 'player %d hit the message_buffer error at i=%d: %s WAS:\n%s' % (session.player.user_id, i, traceback.format_exc(), repr(temp_message_buffer)))
-                        raise
+                    session.message_buffer.pop(i)
                     session.incoming_serial += 1
 
                 i = 0
@@ -21598,8 +21672,8 @@ class GAMEAPI(resource.Resource):
                 i += 1
 
     # we're about to send a response to the client. Run any pending batched actions.
+    @admin_stats.measure_latency('run_deferred_actions')
     def run_deferred_actions(self, session, retmsg, reason = 'unknown'):
-        start_time = time.time()
         do_player_cache_update = False
 
         if session.deferred_ping_squads:
@@ -21659,9 +21733,6 @@ class GAMEAPI(resource.Resource):
 
         if do_player_cache_update:
             retmsg.append(["PLAYER_CACHE_UPDATE", [self.get_player_cache_props(session.user, session.player, session.alliance_id_cache)]])
-
-        end_time = time.time()
-        admin_stats.record_latency('run_deferred_actions', end_time - start_time)
 
     def complete_deferred_request(self, request, session, retmsg):
         # note: retmsg is ONLY used to convey error messages that happen prior to session set-up
@@ -21823,17 +21894,9 @@ class GAMEAPI(resource.Resource):
             return self.api.complete_client_hello(self.request, self.retmsg, self.user_id, self.frame_platform, self.social_id, self.auth_token, self.lockgen, self.user, self.player, self.session_id, self.metrics_anon_id, self.user_demographics, self.client_browser_caps, self.client_session_data, self.query_string, self.client_permissions, self.client_login_country, self.client_ip)
 
     # handle initial handshake message from client
-    # if login is successful, return the new Session, otherwise None
-
-    def handle_client_hello(self, *args):
-        start_time = time.time()
-        ret = self.do_handle_client_hello(*args)
-        end_time = time.time()
-        admin_stats.record_latency('handle_client_hello', end_time - start_time)
-        return ret
-
     # returns whether or not to go async
-    def do_handle_client_hello(self, request, client_ip, user_agent, arg, retmsg):
+    @admin_stats.measure_latency('handle_client_hello')
+    def handle_client_hello(self, request, client_ip, user_agent, arg, retmsg):
         # check IP bans
         if client_ip and str(client_ip) in gamedata['server']['banned_ips']:
             gamesite.exception_log.event(server_time, 'prevented banned IP %s from logging in' % client_ip)
@@ -21964,21 +22027,19 @@ class GAMEAPI(resource.Resource):
 
         return True
 
+    @admin_stats.measure_latency('complete_client_hello')
     def complete_client_hello(self, request, retmsg, user_id, *args):
         d = None # deferred for completion
 
         try:
-            start_time = time.time()
             d = self.do_complete_client_hello(request, retmsg, user_id, *args)
-            end_time = time.time()
-            admin_stats.record_latency('complete_client_hello', end_time - start_time)
             if d is not None:
                 # note: if complete_client_hello2() fails, the session arg here will be None
                 d.addBoth(lambda session, d=d, request=request, retmsg=retmsg: session.complete_async_request(None, d) if session else self.complete_deferred_request(request, None, retmsg)) # OK
 
         except:
             retmsg[:] = [["ERROR", "SERVER_EXCEPTION"]] # blow away old message, because session is not going to be set up
-            gamesite.exception_log.event(server_time, ('complete_client_hello Exception (player %d): ' % user_id) + traceback.format_exc())
+            gamesite.exception_log.event(server_time, ('complete_client_hello Exception (player %d): ' % user_id) + traceback.format_exc().strip()) # OK
 
         if d is None: # failure path
             ascdebug('UNLOCKED player %d (client_hello failure)' % user_id)
@@ -22000,7 +22061,7 @@ class GAMEAPI(resource.Resource):
             try:
                 acq_data = get_acquisition_data_from_url('/?'+query_string, user_id)
             except:
-                gamesite.exception_log.event(server_time, ('error in get_acquisition_data_from_url user %d "%s":\n' % (user_id, query_string)) + traceback.format_exc())
+                gamesite.exception_log.event(server_time, ('error in get_acquisition_data_from_url user %d "%s": ' % (user_id, query_string)) + traceback.format_exc().strip()) # OK
                 pass
 
         # prep user ###############################
@@ -22292,11 +22353,7 @@ class GAMEAPI(resource.Resource):
                                         })
 
             # check status of any unhandled inflight payments
-            try:
-                # somewhat likely to have exceptions here - don't break login path
-                user.ping_fbpayments(session, retmsg, [data['request_id'] for key, data in player.fbpayments_inflight.items()])
-            except Exception:
-                gamesite.exception_log.event(server_time, ('ping_fbpayments Exception on login for player %d: ' % user.user_id) + traceback.format_exc())
+            user.ping_fbpayments(session, retmsg, [data['request_id'] for key, data in player.fbpayments_inflight.items()])
         elif session.user.frame_platform == 'kg':
             user.retrieve_kg_info(session, retmsg)
         elif session.user.frame_platform == 'ag':
@@ -22399,6 +22456,7 @@ class GAMEAPI(resource.Resource):
         self.change_session(session, retmsg, dest_user_id = user.user_id, force = True).addCallback(lambda success, self=self, session=session, retmsg=retmsg, d=d: self.complete_client_hello2(d, session, retmsg))
         return d
 
+    @admin_stats.measure_latency('complete_client_hello2')
     def complete_client_hello2(self, d, session, retmsg):
         # there's a race window where terminate_session() is called between change_session() and here,
         # and the invalidation doesn't work since we past CLIENT_HELLO but not in the session table yet.
@@ -22413,14 +22471,11 @@ class GAMEAPI(resource.Resource):
             return
 
         try:
-            start_time = time.time()
             self.do_complete_client_hello2(d, session, retmsg)
-            end_time = time.time()
-            admin_stats.record_latency('complete_client_hello2', end_time - start_time)
             return
         except:
             retmsg[:] = [["ERROR", "SERVER_EXCEPTION"]] # blow away old message, because session is not going to be set up
-            gamesite.exception_log.event(server_time, ('complete_client_hello2 Exception (player %d): ' % session.user.user_id) + traceback.format_exc())
+            gamesite.exception_log.event(server_time, ('complete_client_hello2 Exception (player %d): ' % session.user.user_id) + traceback.format_exc().strip()) # OK
 
         # failure path
         ascdebug('UNLOCKED player %d (complete_client_hello2 failure)' % session.user.user_id)
@@ -22446,30 +22501,27 @@ class GAMEAPI(resource.Resource):
 
         retmsg.append(["PLAYER_TRAVEL_UPDATE", session.player.travel_state])
 
-        # set up alliance state, but catch errors so the login doesn't bug out
+        # set up alliance state
         alliance_info = None
         alliance_membership = None
         alliance_chat_catchup_messages = []
         alliance_join_requests = None
-        try:
-            alliance_info, alliance_membership = session.init_alliance(alliance_chat_catchup_messages, reason = 'SERVER_HELLO')
 
-            # fix missing alliances_joined count in player_history, for quest purposes
-            if alliance_info and ('alliances_joined' not in session.player.history): session.player.history['alliances_joined'] = 1
+        alliance_info, alliance_membership = session.init_alliance(alliance_chat_catchup_messages, reason = 'SERVER_HELLO')
 
-            # for leaders, get pending join requests
-            if alliance_info and (alliance_info.get('leader_id', -1) == session.player.user_id):
-                alliance_join_requests = gamesite.sql_client.poll_join_requests(session.player.user_id, alliance_info['id'], server_time, reason='SERVER_HELLO')
+        # fix missing alliances_joined count in player_history, for quest purposes
+        if alliance_info and ('alliances_joined' not in session.player.history): session.player.history['alliances_joined'] = 1
 
-            if session.alliance_chat_channel and gamedata['server']['chat_alliance_logins']:
-                session.do_chat_send(session.alliance_chat_channel, 'I logged in!', bypass_gag = True, props = {'type':'logged_in'})
-        except:
-            gamesite.exception_log.event(server_time, 'Error setting up alliance state for player %d for SERVER_HELLO:\n%s' % \
-                                         (user.user_id, traceback.format_exc()))
+        # for leaders, get pending join requests
+        if alliance_info and (alliance_info.get('leader_id', -1) == session.player.user_id):
+            alliance_join_requests = gamesite.sql_client.poll_join_requests(session.player.user_id, alliance_info['id'], server_time, reason='SERVER_HELLO')
+
+        if session.alliance_chat_channel and gamedata['server']['chat_alliance_logins']:
+            session.do_chat_send(session.alliance_chat_channel, 'I logged in!', bypass_gag = True, props = {'type':'logged_in'})
 
         # accept any queued messages the user has received
         mail_stat = self.do_receive_mail(session, retmsg, is_login = True)
-        show_battle_history = mail_stat.get('was_attacked', False)
+        show_battle_history = mail_stat and mail_stat.get('was_attacked', False)
 
         # send alliance state
         retmsg.append(["ALLIANCE_UPDATE", alliance_info['id'] if alliance_info else -1, (not mail_stat.get('new_alliance', False)), alliance_info, alliance_membership, mail_stat.get('new_alliance_role', False)])
@@ -23111,10 +23163,8 @@ class GAMEAPI(resource.Resource):
                     Store.execute_credit_order('0', self, session, network_id, network_id, currency, item['price'],
                                                order_info if currency == 'kgcredits' else item['data'])
                 except:
-                    text = traceback.format_exc()
-                    gamesite.exception_log.event(server_time, 'DEV_SIMULATE_ORDER Exception: '+text)
+                    gamesite.exception_log.event(server_time, 'DEV_SIMULATE_ORDER Exception (player %d): %s' % (arg[0], session.user.user_id, traceback.format_exc().strip())) # OK
                     retmsg.append(["ERROR", "ORDER_PROCESSING"])
-                    return
 
         elif arg[0] == "FBPAYMENT_CREATE":
             # client has started the order flow - register the payment as inflight
@@ -23253,11 +23303,10 @@ class GAMEAPI(resource.Resource):
                 success = True
                 retmsg.append(["PLAYER_STATE_UPDATE", session.player.resources.calc_snapshot().serialize()])
 
-            except Exception:
-                text = traceback.format_exc()
+            except:
                 my_filter = gamedata['server'].get('bad_internet_exception_log_filter', None)
                 if (not my_filter) or (Predicates.read_predicate(my_filter).is_satisfied(session.player, None)):
-                    gamesite.exception_log.event(server_time, 'GAMEBUCKS_ORDER Exception (player %d):\n%s' % (session.player.user_id,text))
+                    gamesite.exception_log.event(server_time, '%s Exception (player %d): %s' % (arg[0],session.user.user_id,traceback.format_exc().strip())) # OK
                 retmsg.append(["ERROR", "ORDER_PROCESSING"])
                 # update object state, in case the client is out of sync
                 if session.has_object(unit_id):
@@ -23299,9 +23348,8 @@ class GAMEAPI(resource.Resource):
                 session.player.inventory_remove_by_type(item_name, client_price, '5130_item_activated', reason='purchase')
                 success = True
 
-            except Exception:
-                text = traceback.format_exc()
-                gamesite.exception_log.event(server_time, 'ITEM_ORDER Exception: '+text)
+            except:
+                gamesite.exception_log.event(server_time, '%s Exception (player %d): %s' % (arg[0],session.user.user_id,traceback.format_exc().strip())) # OK
                 retmsg.append(["ERROR", "ORDER_PROCESSING"])
 
             finally:
@@ -23347,9 +23395,8 @@ class GAMEAPI(resource.Resource):
                         props.update(detail_props)
                         gamesite.gamebucks_log.event(server_time, props)
 
-            except Exception:
-                text = traceback.format_exc()
-                gamesite.exception_log.event(server_time, 'FUNGIBLE_ORDER Exception: '+text)
+            except:
+                gamesite.exception_log.event(server_time, '%s Exception (player %d): %s' % (arg[0],session.user.user_id,traceback.format_exc().strip())) # OK
                 retmsg.append(["ERROR", "ORDER_PROCESSING"])
 
             retmsg.append(["FUNGIBLE_ORDER_ACK", tag, success])
@@ -23395,9 +23442,8 @@ class GAMEAPI(resource.Resource):
                         props.update(detail_props)
                         gamesite.gamebucks_log.event(server_time, props)
 
-            except Exception:
-                text = traceback.format_exc()
-                gamesite.exception_log.event(server_time, 'SCORE_ORDER Exception: '+text)
+            except:
+                gamesite.exception_log.event(server_time, '%s Exception (player %d): %s' % (arg[0],session.user.user_id,traceback.format_exc().strip())) # OK
                 retmsg.append(["ERROR", "ORDER_PROCESSING"])
 
             retmsg.append(["SCORE_ORDER_ACK", tag, success])
@@ -25218,7 +25264,8 @@ class GAMEAPI(resource.Resource):
                                                        'expire_time': server_time + gamedata['server']['message_expire_time']['resource_gift'],
                                                        'from_pcache': self.get_player_cache_props(session.user, session.player, session.alliance_id_cache),
                                                        'unique_per_sender': 'resource_gift'}])
-                    if self.do_receive_mail(session, retmsg)['new_mail']:
+                    mail_stat = self.do_receive_mail(session, retmsg)
+                    if mail_stat and mail_stat['new_mail']:
                         session.player.send_mailbox_update(retmsg)
 
             elif spellname == "CHEAT_GIVE_ITEMS":
@@ -25411,7 +25458,7 @@ class GAMEAPI(resource.Resource):
                         return d # async
 
                     except:
-                        error_msg = traceback.format_exc()
+                        error_msg = traceback.format_exc().strip() # OK
                         success = False
 
                     retmsg.append(["LOAD_AI_BASE_RESULT", success, "LOAD_AI_BASE_ERROR" if (not success) else None, error_msg if (not success) else filename])
@@ -25462,7 +25509,7 @@ class GAMEAPI(resource.Resource):
                         atom.fd.write(SpinJSON.dumps(out, pretty = True)[1:-1]+'\n') # note: get rid of surrounding {}
                         atom.complete()
                     except:
-                        error_msg = traceback.format_exc()
+                        error_msg = traceback.format_exc().strip() # OK
                         success = False
 
                     retmsg.append(["SAVE_AI_BASE_RESULT", success, "SAVE_AI_BASE_ERROR" if (not success) else None, error_msg if (not success) else filename])
@@ -25500,7 +25547,7 @@ class GAMEAPI(resource.Resource):
                             setup_next_ai_base([str(idnum),])
 
                     except:
-                        error_msg = traceback.format_exc()
+                        error_msg = traceback.format_exc().strip() # OK
                         success = False
 
                     retmsg.append(["PUBLISH_AI_BASE_RESULT", success, "PUBLISH_AI_BASE_ERROR" if (not success) else None, error_msg if (not success) else str(idnum)])
@@ -26616,7 +26663,7 @@ class GameSite(server.Site):
 
     # print Python stack frame to trace log upon receiving SIGUSR1
     def handle_SIGUSR1(self, signum, frm):
-        self.trace_log.event(server_time, string.join(traceback.format_stack(frm), ''))
+        self.trace_log.event(server_time, ''.join(traceback.format_stack(frm)))
 
     # reload config.json and gamedatadata upon receiving SIGHUP
     def handle_SIGHUP(self, signum, frm):
@@ -26660,24 +26707,18 @@ class GameSite(server.Site):
 
         return defer.DeferredList(waiting_on, consumeErrors = True)
 
+    @catch_all('server_status_func')
     def server_status_func(self):
-        try:
-            # report server stats
-            if self.nosql_client:
-                self.nosql_client.server_status_update(spin_server_name, admin_stats.get_server_status_json(), reason='server_status_func')
-        except:
-            self.exception_log.event(server_time, 'server_status_func Exception: ' + traceback.format_exc())
+        # report server stats
+        if self.nosql_client:
+            self.nosql_client.server_status_update(spin_server_name, admin_stats.get_server_status_json(), reason='server_status_func')
 
+    @catch_all('bgfunc')
+    @admin_stats.measure_latency('bgfunc')
     def bgfunc(self):
-        try:
-            self.do_bgfunc()
-        except:
-            self.exception_log.event(server_time, 'bgfunc Exception: ' + traceback.format_exc())
-
-    def do_bgfunc(self):
         # run housekeeping functions
 
-        start_time = update_server_time()
+        update_server_time()
 
         # garbage-collect old AI instances
         if (server_time - self.last_ai_base_gc_time) >= gamedata['server'].get('ai_base_gc_interval', 1800):
@@ -26688,13 +26729,7 @@ class GameSite(server.Site):
         maint_kicks = 0
         if self.maint_kick_time > 0 and server_time >= self.maint_kick_time:
             for session in list(iter_sessions()):
-                try:
-                    self.gameapi.log_out_async(session, 'maint_kick')
-                except:
-                    self.exception_log.event(server_time, ('bgfunc exception due to damaged session %d during server_restart kick (POSSIBLE DATA LOSS): ' % (session.user.user_id)) + \
-                                             traceback.format_exc())
-                    del session_table[session.session_id]
-
+                self.gameapi.log_out_async(session, 'maint_kick')
                 maint_kicks += 1
                 if maint_kicks >= gamedata['server']['maint_kicks_at_once']:
                     break
@@ -26755,12 +26790,7 @@ class GameSite(server.Site):
                     session.send(abuse_warning_msg)
 
             if kick_reason:
-                try:
-                    self.gameapi.log_out_async(session, kick_reason)
-                except:
-                    self.exception_log.event(server_time, ('bgfunc exception due to damaged session %d during kick for %s (POSSIBLE DATA LOSS): ' % (session.user.user_id, kick_reason)) + \
-                                             traceback.format_exc())
-                    del session_table[session.session_id]
+                self.gameapi.log_out_async(session, kick_reason)
                 continue
 
             # conclude any longpolls that are idle for more than the wait interval
@@ -26853,16 +26883,11 @@ class GameSite(server.Site):
             if messages_pending[i]:
                 session = lock_keepalive_sessions[i]
                 if session.has_attacked: continue
-                try:
-                    stat = self.gameapi.do_receive_mail(session, session.outgoing_messages)
-                    if stat['new_mail']:
-                        session.deferred_mailbox_update = True
-                        session.deferred_history_update = True
-                        session.queue_flush_outgoing_messages()
-                except:
-                    self.exception_log.event(server_time, ('bgfunc exception while processing mail for player %d: ' % session.user.user_id) + \
-                                             traceback.format_exc())
-
+                stat = self.gameapi.do_receive_mail(session, session.outgoing_messages)
+                if stat and stat['new_mail']:
+                    session.deferred_mailbox_update = True
+                    session.deferred_history_update = True
+                    session.queue_flush_outgoing_messages()
 
         # close TCP connections that have been idling too long
         for client in list(self.active_clients):
@@ -26870,9 +26895,6 @@ class GameSite(server.Site):
             last_activity = max(client.connect_time, client.last_request_time)
             if server_time - last_activity > gamedata['server']['http_connection_timeout']:
                 client.close_connection_aggressively()
-
-        end_time = time.time()
-        admin_stats.record_latency('bgtask', end_time-start_time)
 
 # glue code that links GAMEAPI to WebSocket
 
@@ -26932,26 +26954,22 @@ class WS_GAMEAPI_Protocol(protocol.Protocol):
 
     def dataReceived(self, data):
         update_server_time()
-        try:
-            args_dict = SpinJSON.loads(data)
-            self.last_request_repr = repr(args_dict)[0:100] # for debugging only - text representation
-            self.last_request_time = server_time
-            response = gamesite.gameapi.render_request(WSFakeRequest(self), args_dict, self.peer_ip, 'WS_GAMEAPI_Protocol')
-            if response == twisted.web.server.NOT_DONE_YET:
-                pass
-            else:
-                self.transport.write(response)
-
-            # old test code
-#            if 'ping_only' in args_dict: # respond to latency probe
-#                self.transport.write("ok\n")
-#            else:
-#                raise Exception('unhandled message')
-
-        except Exception:
-            gamesite.exception_log.event(server_time, 'WS_GAMEAPI Exception: '+traceback.format_exc())
+        ret = self.do_dataReceived(data)
+        if ret is None: # error
             self.transport.write(SpinJSON.dumps({'serial':-1, 'clock': server_time, 'msg': [["ERROR", "SERVER_EXCEPTION"]]}))
             self.transport.loseConnection()
+
+    @catch_all('WS_GAMEAPI')
+    def do_dataReceived(self, data):
+        args_dict = SpinJSON.loads(data)
+        self.last_request_repr = repr(args_dict)[0:100] # for debugging only - text representation
+        self.last_request_time = server_time
+        response = gamesite.gameapi.render_request(WSFakeRequest(self), args_dict, self.peer_ip, 'WS_GAMEAPI_Protocol')
+        if response == twisted.web.server.NOT_DONE_YET:
+            pass
+        else:
+            self.transport.write(response)
+        return True # signal wrapper that we're OK
 
     def __repr__(self):
         if self.last_request_time > 0:
@@ -26986,244 +27004,16 @@ class WS_GAMEAPI(websockets.WebSocketsResource):
             old_protocol.site.active_requests.discard(request)
         return ret
 
-# live server administration interface
-class AdminStats:
-    def __init__(self):
-        self.reset()
-    def reset(self):
-        self.start_time = server_time
-        self.developer_revenue = 0.0
-        self.revenue = 0.0
-        self.users_seen = set()
-        self.paying_users_seen = set()
-        self.new_users_seen = set()
-        self.last_payments = collections.deque([], 10)
-        self.last_gamebucks = collections.deque([], 10)
-        self.campaigns = {}
-        self.econ = {}
-        self.latency = {}
-        self.quarry_cache_misses = 0
-        self.quarry_cache_hits = 0
-
-    def econ_flow_res(self, player, category, reason, res, spec = None, level = None):
-        # eventually need to separate third resource out
-        total = sum(res.itervalues(),0)
-        if total == 0: return # we assume that entries are either all positive or all negative
-        if category not in self.econ:
-            self.econ[category] = {}
-        self.econ[category][reason] = self.econ[category].get(reason,0) + total
-
-        if gamedata['server'].get('log_econ_res', False) and gamesite.nosql_client:
-            props = {'user_id':player.user_id, 'res':res, 'cat':category, 'sub': reason}
-            if spec is not None:
-                props['spec'] = spec
-            if level is not None:
-                props['level'] = level
-            props.update(player.get_denormalized_summary_props('brief'))
-            gamesite.nosql_client.log_record('econ_res', server_time, props, log_ident = False, reason = 'econ_flow_res')
-
-    def record_latency(self, name, elapsed):
-        if name not in self.latency:
-            self.latency[name] = {'N':0.0, 'total':0.0, 'max': 0.0}
-        self.latency[name]['N'] += 1
-        self.latency[name]['total'] += elapsed
-        self.latency[name]['max'] = max(self.latency[name]['max'], elapsed)
-
-    def add_visit(self, user_id, is_new, is_paying):
-        self.users_seen.add(user_id)
-        if is_paying:
-            self.paying_users_seen.add(user_id)
-        if is_new:
-            self.new_users_seen.add(user_id)
-
-    def add_revenue(self, user_id, dollar_amount, descr):
-        self.revenue += dollar_amount
-        # add here in case this is the user's first payment
-        self.paying_users_seen.add(user_id)
-        self.last_payments.append({'user_id':user_id,
-                                   'time':server_time,
-                                   'dollar_amount':dollar_amount,
-                                   'description':descr})
-
-    def add_gamebucks_spend(self, user_id, bucks, descr):
-        self.last_gamebucks.append({'user_id':user_id,
-                                    'time':server_time,
-                                    'gamebucks_amount':bucks,
-                                    'description':descr})
-
-    def add_logout(self, user_id, campaign, length):
-        # only track FIRST visits
-        if user_id not in self.new_users_seen:
-            return
-
-        if campaign not in self.campaigns:
-            self.campaigns[campaign] = {'lengths': collections.deque([], 5), 'num': 0}
-        self.campaigns[campaign]['lengths'].append(length)
-        self.campaigns[campaign]['num'] += 1
-
-    def get_active_sessions(self):
-        # also count valid in-flight asynchronous logins here
-        return len(session_table) + sum((1 for async in gamesite.gameapi.AsyncLogin.in_progress_by_user_id.itervalues() if (not async.cancel_reason)),0)
-
-    def get_server_status_json(self):
-        return {'server_time': server_time,
-                'launch_time': spin_server_launch_time,
-                'type': SpinConfig.game(),
-                'state': gamesite.server_state,
-                'hostname': gamesite.config.game_host,
-                'pid': os.getpid(),
-                'game_listen_host': gamesite.config.game_listen_host,
-                'game_http_port': gamesite.config.game_http_port,
-                'game_ssl_port': gamesite.config.game_ssl_port,
-                'game_ws_port': gamesite.config.game_ws_port,
-                'game_wss_port': gamesite.config.game_wss_port,
-                'affinities': gamesite.config.affinities,
-                'scm_version': SERVER_VERSION,
-                'gamedata_build': gamedata['gamedata_build_info']['date'],
-                'gameclient_build': gameclient_build_date,
-                'uptime': server_time - self.start_time,
-                'load_unhalted': self.get_load(),
-                'machine_stats': MachineStats.get_stats(filesystems = machine_stats_filesystems),
-                'active_sessions': self.get_active_sessions(),
-                'paying_sessions': sum((1 for session in iter_sessions() if session.player.history.get('money_spent',0)>0),0),
-                'active_protocol_clients': len(gamesite.active_clients),
-                'active_protocol_requests': len(gamesite.active_requests),
-                }
-
-    def get_stats(self):
-        props = {}
-        up_hours = float(server_time - self.start_time)/3600.0
-        up_days = up_hours/24.0
-        props['uptime hours'] = up_hours
-        props['revenue'] = self.revenue
-        props['revenue/day (projected)'] = self.revenue / up_days
-        props['revenue (developers)'] = self.developer_revenue
-        props['unique users'] = len(self.users_seen)
-        props['unique paying users'] = len(self.paying_users_seen)
-        props['unique new users'] = len(self.new_users_seen)
-        DAU = len(self.users_seen) / up_days
-        PDAU = len(self.paying_users_seen) / up_days
-        props['DAU (projected)'] = DAU
-        props['PDAU (projected)'] = PDAU
-        props['ARPDAU (projected)'] = self.revenue / (DAU+0.0001)
-        props['ARPPDAU (paying, projected)'] = self.revenue / (PDAU+0.0001)
-        return props
-
-    def get_campaigns(self):
-        ret = ''
-        ret += '<table border="1" cellspacing="1">'
-        ret += '<tr><td>Name</td><td>Last Session Lengths (new users only)</td><td>Average</td><td># Acquisitions</td></tr>'
-        for name in sorted(self.campaigns.iterkeys()):
-            data = self.campaigns[name]
-            lengths = data['lengths']
-            num = data['num']
-            if len(lengths) > 0:
-                str_average = SpinConfig.pretty_print_time(sum(lengths)/len(lengths))
-            else:
-                str_average = '-'
-            str_lengths = string.join(map(SpinConfig.pretty_print_time, lengths), ', ')
-            ret += '<tr><td>%s</td><td>%s</td><td>%s</td><td>%d</td></tr>' % (name, str_lengths, str_average, num)
-        ret += '</table>'
-        return ret
-
-    def get_payments(self):
-        ret = '<table border="1" cellspacing="1">'
-        ret += '<tr><td>Time ago</td><td>User ID</td><td>Amount</td><td>Description</td></tr>'
-        for props in reversed(self.last_payments):
-            elapsed = server_time - props['time']
-            ret += '<tr><td>%s</td><td>%d</td><td>$%0.2f</td><td>%s</td></tr>' % (SpinConfig.pretty_print_time(elapsed),
-                                                                       props['user_id'],
-                                                                       props['dollar_amount'],
-                                                                       props['description'])
-        ret += '</table>'
-        return ret
-
-    def get_gamebucks(self):
-        ret = '<table border="1" cellspacing="1">'
-        ret += '<tr><td>Time ago</td><td>User ID</td><td>Amount</td><td>Description</td></tr>'
-        for props in reversed(self.last_gamebucks):
-            elapsed = server_time - props['time']
-            ret += '<tr><td>%s</td><td>%d</td><td>%d</td><td>%s</td></tr>' % (SpinConfig.pretty_print_time(elapsed),
-                                                                       props['user_id'],
-                                                                       props['gamebucks_amount'],
-                                                                       props['description'])
-        ret += '</table>'
-        return ret
-
-    def get_load(self):
-        if 'ALL' in self.latency:
-            return self.latency['ALL']['total'] / max(1, float(server_time - self.start_time))
-        else:
-            return -1
-
-    def get_latency(self):
-        ret = ''
-
-        if 'ALL' in self.latency:
-            ret += 'Approximate unhalted load: <b>%.1f%%</b><br>' % (100.0*self.get_load())
-            ret += 'Average request latency: <b>%.1f ms</b><p>' % ((1000.0*self.latency['ALL']['total'])/self.latency['ALL']['N'])
-
-        def sort_by_max(kv): return -kv[1]['max']
-        def sort_by_average(kv): return -kv[1]['total']/kv[1]['N']
-        def sort_by_total(kv): return -kv[1]['total']
-
-        grand_total = sum([data['total'] for name, data in self.latency.iteritems() if name != 'ALL'])
-
-        for sort_name, sort_func in {'Max': sort_by_max, 'Avg': sort_by_average, 'Total': sort_by_total}.iteritems():
-            ret += '<p>Sort by %s<br>' % sort_name
-            ret += '<table border="1" cellspacing="1">'
-            ret += '<tr><td>Request</td><td>Average</td><td>Max</td><td>Total</td><td>Total %</td><td>#Calls</td></tr>'
-            ls = self.latency.items()
-            ls.sort(key = sort_func)
-            for name, data in ls[0:25]:
-                ret += '<tr><td>%s</td><td>%.1f ms</td><td>%.1f ms</td><td>%.1f s</td><td>%.1f%%</td><td>%d</td></tr>' % \
-                       (name, 1000.0*data['total']/data['N'],
-                        1000.0*data['max'],
-                        data['total'],
-                        (100.0*data['total']/grand_total) if grand_total != 0 else 0,
-                        int(data['N'])
-                        )
-            ret += '</table>'
-
-        quarry_total = self.quarry_cache_misses + self.quarry_cache_hits
-        if quarry_total > 0:
-            ret += '<p>Quarry cache hit rate: <b>%.1f%%</b><br>' % (100*self.quarry_cache_hits/float(quarry_total))
-        return ret
-
-    def get_econ(self):
-        ret = '<table border="1" cellspacing="1">'
-        ret += '<tr><td>Category</td><td>Reason</td><td>Amount</td><td>%</td></tr>'
-        cat_totals = {}
-        cat_totals = dict([(category, sum(self.econ[category].itervalues())) for category in self.econ.iterkeys()])
-        grand_total = sum(cat_totals.itervalues())
-        abs_total = sum([abs(x) for x in cat_totals.itervalues()])
-
-        def big_number(x):
-            return '%.3fM' % (x/1000000.0)
-
-        for cat, data in sorted(self.econ.items()):
-            cat_ratio = cat_totals[cat]/float(abs_total) if (abs_total != 0) else 0
-            ret += '<tr><td><b>%s</b></td><td>%s</td><td><b>%s</b></td><td><b>%.1f%%</b></td></tr>' % (cat, '', big_number(cat_totals[cat]), 100.0*cat_ratio)
-            for reason, amount in sorted(data.items()):
-                ratio = amount/float(cat_totals[cat]) if (cat_totals[cat] != 0) else 0
-                ret += '<tr><td></td><td>%s</td><td>%s</td><td>%.1f%%</td></tr>' % (reason, big_number(amount), 100.0*ratio)
-
-        ret += '<tr><td><b>TOTAL</b></td><td></td><td>%s</td><td>-</td></tr>' % big_number(grand_total)
-        ret += '</table>'
-        return ret
-
-admin_stats = AdminStats()
-
-
 class AdminResource(resource.Resource):
     isLeaf = True
     def render(self, request):
         # do not return a revealing error message on exceptions
-        try:
-            return resource.Resource.render(self, request)
-        except:
-            gamesite.exception_log.event(server_time, 'ADMIN Exception: ' + traceback.format_exc())
-        return 'spinpunch error'
+        ret = catch_all('ADMIN')(resource.Resource.render)(self, request)
+        if ret is None:
+            request.setResponseCode(http.BAD_REQUEST)
+            ret = 'spinpunch error'
+        return ret
+
     def revenue_image(self):
         rev = admin_stats.revenue
         src = 'http://s3.amazonaws.com/'+SpinConfig.config['public_s3_bucket']+'/'
@@ -27243,14 +27033,8 @@ class AdminResource(resource.Resource):
             src += 'revenue0.jpg'
         return '<div style="position:absolute; top:50px;right:30px;"><img src="%s" border="0"></div>' % src
 
+    @admin_stats.measure_latency('ADMIN')
     def render_GET(self, request):
-        start_time = time.time()
-        ret = self.do_render_GET(request)
-        end_time = time.time()
-        admin_stats.record_latency('ADMIN', end_time-start_time)
-        return ret
-
-    def do_render_GET(self, request):
         update_server_time()
 
         # protect with auth
@@ -27533,7 +27317,6 @@ def do_main(pidfile, do_ai_setup, do_daemonize, cmdline_config):
     root.putChild("TRIALPAYAPI",trialpayapi)
     root.putChild("XSAPI",xsapi)
     root.putChild("KGAPI",KGAPI(gameapi))
-    root.putChild("METRICSAPI",METRICSAPI(gameapi))
     root.putChild("CONTROLAPI",controlapi)
     root.putChild("OGPAPI",OGPAPI_instance)
     root.putChild("ADMIN",ADMINAPI_instance)
