@@ -13,6 +13,7 @@ import SpinConfig
 import SpinJSON
 import SpinNoSQLId
 import SpinSingletonProcess
+import AIBaseRandomizer
 from Region import Region
 import Sobol
 import sys, getopt, time, random, copy, math
@@ -1141,6 +1142,8 @@ def spawn_hive(hives, map_cache, db, lock_manager, region_id, id_num, name_idx, 
     nosql_id_generator.set_time(int(time.time()))
 
     base_data['my_base'] = auto_level_hive_objects(template['buildings'] + template['units'], owner_level, owner_tech, xform)
+    if template.get('randomize_defenses',False):
+        AIBaseRandomizer.randomize_defenses(gamedata, base_data['my_base'], random_seed = 1000*time.time(), ui_name = template_name)
 
     for p in template.get('scenery',[]):
         obj = {'obj_id': nosql_id_generator.generate(),
