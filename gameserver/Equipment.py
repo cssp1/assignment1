@@ -14,12 +14,20 @@ class Equipment (object):
         if equipment:
             assert type(equipment) is dict
             for slot_type in equipment:
-                for x in equipment[slot_type]:
-                    if x:
-                        if type(x) is dict:
-                            yield x
-                        else:
-                            yield {'spec': x}
+                for x in Equipment.slot_type_iter(equipment[slot_type]):
+                    yield x
+
+    # iterate through slots of one slot type
+    @staticmethod
+    def slot_type_iter(equipment_slot_type):
+        for x in equipment_slot_type:
+            if x:
+                if isinstance(x, dict):
+                    yield x
+                else:
+                    assert isinstance(x, basestring)
+                    yield {'spec': x}
+
     # return a serialized representation of each equipped item, for sending to the client
     @staticmethod
     def equip_serialize(equipment):
