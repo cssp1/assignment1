@@ -8429,7 +8429,7 @@ class Player(AbstractPlayer):
             # check overall army being too large
             space_usage = self.get_army_space_usage_by_squad(map_object_data = map_object_data)
             if space_usage['ALL'] > self.stattab.total_space:
-                candidates = sorted(filter(lambda obj: obj.is_mobile() and obj.owner is self, self.home_base_iter()), key = lambda obj: obj.get_leveled_quantity(obj.spec.consumes_space))
+                candidates = sorted(filter(lambda obj: obj.is_mobile() and (obj.owner is self) and (not obj.is_temporary()), self.home_base_iter()), key = lambda obj: obj.get_leveled_quantity(obj.spec.consumes_space))
                 for obj in candidates:
                     item_spec = 'packaged_'+obj.spec.name
                     if item_spec not in gamedata['items']:
@@ -8453,7 +8453,7 @@ class Player(AbstractPlayer):
                 spec = self.get_abtest_spec(GameObjectSpec, name)
                 if spec.limit >= 0 and qty > spec.limit:
                     # pull units out of home base. Note, squad units are not affected!
-                    candidates = filter(lambda obj: obj.spec is spec and obj.owner is self, self.home_base_iter())
+                    candidates = filter(lambda obj: obj.spec is spec and (obj.owner is self) and (not obj.is_temporary()), self.home_base_iter())
                     for obj in candidates:
                         item_spec = 'packaged_'+obj.spec.name
                         if item_spec not in gamedata['items']:
@@ -8509,7 +8509,7 @@ class Player(AbstractPlayer):
                                                              (self.user_id, squad_id, space_usage[sid], limit))
                             continue
                         else:
-                            candidates = sorted(filter(lambda obj: obj.is_mobile() and obj.owner is self and obj.squad_id == squad_id, self.home_base_iter()),
+                            candidates = sorted(filter(lambda obj: obj.is_mobile() and (obj.owner is self) and (not obj.is_temporary()) and obj.squad_id == squad_id, self.home_base_iter()),
                                                 key = lambda obj: obj.get_leveled_quantity(obj.spec.consumes_space))
 
                             for obj in candidates:
