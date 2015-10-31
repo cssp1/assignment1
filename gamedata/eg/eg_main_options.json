@@ -108,6 +108,8 @@
 "unit_repair_refund_on_cancel": false, // whether or not to refund iron/water when a unit repair is cancelled
 "unit_repair_refund_on_paid_repair": true, // whether or not to refund iron/water on queued repairs when a paid repair is made
 
+"persist_temporary_units": true, // persist security team units until repairs start
+
 // default AI state for units when you put them on patrol
 // AI_ATTACK_MOVE = don't go outside of weapon range to pursue targets, AI_ATTACK_MOVE_AGGRO = do go outside weapon range
 "default_patrol_ai_state": "AI_ATTACK_MOVE_AGGRO",

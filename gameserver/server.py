@@ -4384,7 +4384,7 @@ class Session(object):
                     gamesite.nosql_client.heal_mobile_object_by_id(self.player.home_region, state['obj_id'], reason='heal_all_units')
                     if 'hp_ratio' in state: del state['hp_ratio']
                     if 'hp' in state: del state['hp']
-            retmsg.append(["PLAYER_ARMY_UPDATE", [self.player.strip_fields_for_army_update(state) for state in states]])
+            retmsg.append(["PLAYER_ARMY_UPDATE", filter(lambda x: x is not None, [self.player.strip_fields_for_army_update(state) for state in states])])
 
             self.player.unit_repair_send(retmsg)
 
@@ -5594,7 +5594,7 @@ for name, data in gamedata["inert"].iteritems():
 for name, data in gamedata["tech"].iteritems():
     TechSpec(name, data)
 
-def instantiate_object_for_player(observer, owner, specname, x=-1, y=-1, level=1, build_finish_time = -1, metadata = None, obj_id = None):
+def instantiate_object_for_player(observer, owner, specname, x=-1, y=-1, level=1, build_finish_time = -1, metadata = None, obj_id = None, temporary = None):
     if observer:
         # create a fresh GameObject for this player, taking into account A/B tests and tech auras
         # subtle distinction: "observer" is the person playing the game, "owner" is the player/AI who owns it
@@ -5615,7 +5615,7 @@ def instantiate_object_for_player(observer, owner, specname, x=-1, y=-1, level=1
     if spec.kind == 'building':
         obj = Building(obj_id, spec, owner, x, y, -1, level, build_finish_time, auras)
     elif spec.kind == 'mobile':
-        obj = Mobile(obj_id, spec, owner, x, y, -1, level, build_finish_time, auras)
+        obj = Mobile(obj_id, spec, owner, x, y, -1, level, build_finish_time, auras, temporary = temporary)
     elif spec.kind == 'inert':
         obj = Inert(obj_id, spec, owner, x, y, -1, level, build_finish_time, auras, metadata = metadata)
     return obj
@@ -5893,13 +5893,14 @@ class GameObject:
         return self.cost_to_repair(player)['time']
 
 class Mobile(GameObject):
-    def __init__(self, obj_id, spec, owner, x, y, hp, level, build_finish_time, auras):
+    def __init__(self, obj_id, spec, owner, x, y, hp, level, build_finish_time, auras, temporary = None):
         GameObject.__init__(self, obj_id, spec, owner, x, y, hp, level, build_finish_time, auras)
         self.squad_id = None
         self.orders = None
         self.patrol = None
+        self.temporary = temporary # indicates a "temporary" unit like a security team
     def serialize_state(self, fake_xy = None, update_hp = True):
-        return GameObject.serialize_state(self, fake_xy = fake_xy, update_hp = update_hp) + [self.squad_id,self.orders, self.patrol]
+        return GameObject.serialize_state(self, fake_xy = fake_xy, update_hp = update_hp) + [self.squad_id,self.orders, self.patrol, self.temporary]
     def persist_state(self, **args):
         ret = GameObject.persist_state(self, **args)
         if self.squad_id is not None:
@@ -5908,6 +5909,8 @@ class Mobile(GameObject):
             ret['orders'] = self.orders
         if self.patrol:
             ret['patrol'] = self.patrol
+        if self.temporary:
+            ret['temporary'] = self.temporary
         return ret
     def unpersist_state(self, state):
         GameObject.unpersist_state(self, state)
@@ -5919,6 +5922,9 @@ class Mobile(GameObject):
                 gamesite.exception_log.event(server_time, 'Mobile orders that are not a list: %s' % repr(orders))
         self.patrol = int(not (not state.get('patrol', None)))
         self.squad_id = state.get('squad_id', None)
+        self.temporary = state.get('temporary', None)
+
+    def is_temporary(self): return bool(self.temporary)
 
     # reposition in middle of map, used for deploying squad units that don't have positions yet
     def ensure_mobile_position(self, base_ncells):
@@ -7363,8 +7369,7 @@ def spawn_units(owner, base, units, temporary = False,
                                                          (owner.user_id, owner.get_townhall_level(), name, space, owner.stattab.main_squad_space, repr(cur_space_usage)))
 
             newobj_id = gamesite.nosql_id_generator.generate()
-            if temporary: newobj_id = 'TEMP-'+newobj_id # give temporary objects bogus obj_ids to deliberately cause errors if they are accidentally attempted to be written to NoSQL
-            newobj = instantiate_object_for_player(observer, owner, name, x=newobj_x, y=newobj_y, level=level, obj_id = newobj_id)
+            newobj = instantiate_object_for_player(observer, owner, name, x=newobj_x, y=newobj_y, level=level, obj_id = newobj_id, temporary = temporary)
             newobj.squad_id = destination_squad
             if temporary:
                 # put object into aggressive state
@@ -7372,10 +7377,15 @@ def spawn_units(owner, base, units, temporary = False,
 
             if not temporary:
                 assert base is owner.my_home
-                base.adopt_object(newobj)
                 cur_space_usage['ALL'] += space
                 cur_space_usage[str(destination_squad)] += space
+
+            if (not temporary) or \
+               (gamedata.get('persist_temporary_units', False) and \
+                base.base_landlord_id == owner.user_id): # don't adopt security teams into foreign bases!
+                base.adopt_object(newobj)
             new_objects.append(newobj)
+
     return new_objects
 
 
@@ -8176,6 +8186,10 @@ class Player(AbstractPlayer):
             if (not obj):
                 gamesite.exception_log.event(server_time, 'unit_repair_integrity_check() player %d tossing item with bad obj_id %s\n%s' % (self.user_id, repr(item), ''.join(traceback.format_stack())))
                 to_remove.append(item)
+                continue
+            if obj.is_temporary():
+                gamesite.exception_log.event(server_time, 'unit_repair_integrity_check() player %d tossing temporary object %s\n%s' % (self.user_id, repr(item), ''.join(traceback.format_stack())))
+                to_cancel.append(obj)
                 continue
             squad_id = obj.squad_id or 0
             if (not (SQUAD_IDS.is_mobile_squad_id(squad_id) or squad_id == SQUAD_IDS.BASE_DEFENDERS)):
@@ -10948,6 +10962,7 @@ class LivePlayer(Player):
 
     def strip_fields_for_army_update(self, state):
         assert 'obj_id' in state
+        if state.get('temporary', None): return None # don't persist temporary objects
         for field in state.keys():
             if field not in ('obj_id','spec','level','owner_id','squad_id','hp','max_hp','hp_ratio'):
                 del state[field]
@@ -10956,13 +10971,17 @@ class LivePlayer(Player):
     def send_army_update_one(self, object, retmsg):
         assert object.owner is self
         assert object.is_mobile()
-        retmsg.append(["PLAYER_ARMY_UPDATE", [self.strip_fields_for_army_update(object.persist_state(nosql = True))]])
+        if object.is_temporary(): return
+        fields = self.strip_fields_for_army_update(object.persist_state(nosql = True))
+        if fields is not None:
+            retmsg.append(["PLAYER_ARMY_UPDATE", [fields]])
     def send_army_update_destroyed(self, object, retmsg):
-        retmsg.append(["PLAYER_ARMY_UPDATE_DESTROYED", object.obj_id])
+        if not object.is_temporary():
+            retmsg.append(["PLAYER_ARMY_UPDATE_DESTROYED", object.obj_id])
     def ping_squads_and_send_update(self, session, retmsg, originator=None, reason=''):
         army, map_features, mailbox_update = self.ping_squads(session, return_army = True, originator=originator, reason=reason)
         retmsg.append(["SQUADS_UPDATE", self.squads])
-        retmsg.append(["PLAYER_ARMY_UPDATE_FULL", map(self.strip_fields_for_army_update, army)])
+        retmsg.append(["PLAYER_ARMY_UPDATE_FULL", filter(lambda x: x is not None, map(self.strip_fields_for_army_update, army))])
         if self.home_region and map_features: retmsg.append(["REGION_MAP_UPDATES", self.home_region, map_features])
         if mailbox_update: self.send_mailbox_update(retmsg)
 
@@ -12745,6 +12764,7 @@ def setup_ai_base(strid, cb):
 
             if 'orders' in p: obj.orders = p['orders']
             if 'patrol' in p: obj.patrol = p['patrol']
+            if 'temporary' in p: obj.temporary = p['temporary']
             player.home_base_add(obj)
 
         player.my_home.init_production(player)
@@ -14669,15 +14689,23 @@ class Store:
                 assert gamesite.nosql_client.map_feature_lock_acquire(base.base_region, base.base_id, session.player.user_id,
                                                                       generation=base.base_generation, do_hook=False, reason=spellname) \
                                                                       == Player.LockState.being_attacked # generation=-1?
+            to_remove = []
             try:
                 for object in base.iter_objects():
+                    if object.is_mobile() and object.is_temporary(): # get rid of temporary units
+                        to_remove.append(object)
+                        continue
                     if object.is_building() and object.is_damaged():
                         object.repair_finish_time = server_time - 1
                         if session.has_object(object.obj_id):
                             gameapi.ping_object(session, retmsg, object.obj_id, base)
                         if write_base:
                             base.nosql_write_one(object, spellname)
-
+                for object in to_remove:
+                    base.drop_object(object)
+                    if session.has_object(object.obj_id):
+                        retmsg.append(["OBJECT_REMOVED2", object.obj_id])
+                        session.rem_object(object.obj_id)
             finally:
                 if write_base and session.viewing_base_lock != base.lock_id():
                     gamesite.nosql_client.map_feature_lock_release(base.base_region, base.base_id, session.player.user_id, generation=base.base_generation, reason=spellname)
@@ -19425,6 +19453,7 @@ class GAMEAPI(resource.Resource):
         squad_to_repair = session.player.which_squad_is_under_repair() or SQUAD_IDS.BASE_DEFENDERS
         units_to_repair = [] # list units separately so we can sort them by time
         unit_repair_cost = dict([(res,0) for res in gamedata['resources']])
+        units_to_remove = []
 
         if write_base and session.viewing_base_lock != base.lock_id():
             # not going to hold it for an extended period of time, so no need to broadcast
@@ -19452,14 +19481,22 @@ class GAMEAPI(resource.Resource):
                                 self.do_ping_object(session, retmsg, object, base)
                                 if write_base:
                                     base.nosql_write_one(object, 'do_start_repairs')
-                if do_units and object.is_mobile():
-                    if object.is_damaged() and session.player.can_repair_unit(object) and \
+                if object.is_mobile():
+                    if object.is_temporary(): # get rid of temporary units
+                        units_to_remove.append(object)
+                    elif do_units and object.is_damaged() and session.player.can_repair_unit(object) and \
                        ((object.squad_id or 0) == squad_to_repair) and \
                        (not session.player.unit_repair_queued(object)):
                         units_to_repair.append(object)
                         my_cost = object.cost_to_repair(session.player)
                         for res in gamedata['resources']:
                             unit_repair_cost[res] += my_cost.get(res,0)
+
+            for object in units_to_remove:
+                base.drop_object(object)
+                if session.has_object(object.obj_id):
+                    if retmsg is not None: retmsg.append(["OBJECT_REMOVED2", object.obj_id])
+                    session.rem_object(object.obj_id)
         finally:
             if write_base and session.viewing_base_lock != base.lock_id():
                 gamesite.nosql_client.map_feature_lock_release(base.base_region, base.base_id, session.player.user_id, generation=base.base_generation, reason='do_start_repairs')
@@ -19504,6 +19541,7 @@ class GAMEAPI(resource.Resource):
         assert obj.owner is session.player
         assert obj.is_mobile()
         if not obj.is_damaged(): return None
+        if obj.is_temporary(): return None
 
         # see if it's already under repair
         for item in session.player.unit_repair_queue:
@@ -25443,6 +25481,7 @@ class GAMEAPI(resource.Resource):
                             if 'force_level' in data: obj.force_ai_level = data['force_level']
                             if 'orders' in data: obj.orders = data['orders']
                             if 'patrol' in data: obj.patrol = data['patrol']
+                            if 'temporary' in data: obj.temporary = data['temporary']
                             session.player.home_base_add(obj)
                         for data in base.get('scenery',[]):
                             obj = instantiate_object_for_player(session.player, EnvironmentOwner, data['spec'], x=data['xy'][0], y=data['xy'][1])
@@ -25496,6 +25535,7 @@ class GAMEAPI(resource.Resource):
                                 if obj.equipment: props['equipment'] = obj.equipment
                                 out['buildings'].append(props)
                             elif obj.is_mobile():
+                                if obj.is_temporary(): continue # don't save these
                                 props = {'spec': obj.spec.name, 'xy': [obj.x, obj.y] }
                                 if obj.orders: props['orders'] = obj.orders
                                 if obj.patrol: props['patrol'] = obj.patrol

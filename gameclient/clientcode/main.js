@@ -5196,8 +5196,8 @@ session.incoming_attack_wave_pending = false; // whether we sent next_ai_attack_
 session.incoming_attack_units = []; // list of waves, where each wave is a map (specname->quantity) of AI units that will spawn
 session.incoming_attack_direction = null; // key in gamedata/ai_attacks/directions
 session.incoming_attacker_name = ''; // user-visible name of the attacking AI
-session.incoming_attack_units_total = 0; // number of AI units involved in current attack
-session.incoming_attack_units_destroyed = 0; // number of AI units destroyed during current attack (not counting secteams)
+session.incoming_attack_units_total = 0; // number of AI units involved in current attack (including secteam units spawned during battle)
+session.incoming_attack_units_destroyed = 0; // number of AI units destroyed during current attack (including secteam units spawned during battle)
 session.battle_outcome_sync_marker = Synchronizer.INIT; // synchronizer to make sure server is up to date before client tries to end battle
 session.battle_outcome_dirty = false; // whether we need to check for win/loss - always update sync_marker when setting true
 session.deployed_unit_space = 0; // how much "space" worth of units has been deployed into battle
@@ -8179,6 +8179,7 @@ function Mobile() {
     this.squad_id = null;
     this.orders = [];
     this.patrol = null;
+    this.temporary = null;
 
     // client side reference only, the authoritive source is player.unit_repair_queue
     this.under_repair_finish = -1;
@@ -8226,6 +8227,7 @@ function Mobile() {
 
 goog.inherits(Mobile, GameObject);
 
+Mobile.prototype.is_temporary = function() { return !!this.temporary; };
 Mobile.prototype.is_flying = function() { return this.spec['flying'] || false; };
 Mobile.prototype.passes_through_walls = function() { return this.spec['flying'] || this.spec['noclip']; };
 Mobile.prototype.is_under_repair = function() { return this.under_repair_finish > 0; };
@@ -8353,6 +8355,7 @@ Mobile.prototype.receive_state = function(data, init, is_deploying) {
     this.squad_id = data.shift();
     var orders = data.shift();
     var patrol = data.shift();
+    this.temporary = data.shift();
 
     if(patrol !== null) { this.patrol = !!patrol; }
 
@@ -8948,7 +8951,7 @@ function create_object(data, is_deploying) {
     }
 
     // when spawning new temporary units (e.g. security teams) during an AI attack, add those to the count of attackers so the bookkeeping works out accurately
-    if(session.home_base && session.attack_finish_time > server_time && obj.team == 'enemy' && (obj.id.indexOf('TEMP')===0)) {
+    if(session.home_base && session.attack_finish_time > server_time && obj.team == 'enemy' && obj.is_mobile() && obj.is_temporary()) {
         session.incoming_attack_units_total += 1;
     }
 
@@ -9027,7 +9030,7 @@ function destroy_object(obj) {
                     delete player.my_army[obj.id];
                 }
             }
-        } else if(session.home_base /*&& session.attack_finish_time > server_time*/ && obj.team == 'enemy' && obj.id !== GameObject.DEAD_ID /*&& (obj.id.indexOf('TEMP')!=0)*/ ) {
+        } else if(session.home_base /*&& session.attack_finish_time > server_time*/ && obj.team == 'enemy' && obj.id !== GameObject.DEAD_ID) {
             session.incoming_attack_units_destroyed += 1;
         }
     }
