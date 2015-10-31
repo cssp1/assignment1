@@ -701,27 +701,27 @@ def get_loot_sample(loot_table, randgen, extra_test = None):
 
     return LootTable.get_loot(gamedata['loot_tables'], [loot_table], rand_func = randgen.random, cond_resolver = lambda pred, _extra = extra_test: loot_pred_resolver(pred, _extra))
 
+
+def is_token_event(data):
+    if 'loot' in data:
+        randgen = random.Random(1234) # mock random number generator
+        for difficulty in data['difficulties']:
+            if diff in data['loot']:
+                for item in get_loot_sample(data['loot'][diff][-1], randgen):
+                    if item['spec'] == 'token':
+                        return True
+    return False
+
 # report token events that use different loot/richness for reruns and immortals that have the same richness for reruns
 def check_one_time_loot(event_name, data):
-    randgen = random.Random(1234)
-
-    if 'loot' in data:
-        def is_token_event(data):
-            for difficulty in data['difficulties']:
-                if diff in data['loot']:
-                    for item in get_loot_sample(data['loot'][diff][-1], randgen):
-                        if item['spec'] == 'token':
-                            return True
-            return False
-
-        if is_token_event(data):
-            if 'loot_once_only' in data:
-                print >> sys.stderr, 'warning: token event %s drops reduced loot on repeated playthroughs. Remove loot_only_once and fold into regular loot.' % event_name
-            if data.get('base_richness_on_replay', 1) != 1:
-                print >> sys.stderr, 'warning: token event %s drops reduced resources on repeated playthroughs. Remove base_richness_on_replay.' % event_name
-        else:
-            if data.get('base_richness_on_replay', 1) != 1:
-                print >> sys.stderr, 'warning: immortal event %s drops reduced resources on repeated playthroughs. Remove base_richness_on_replay.' % event_name
+    if is_token_event(data):
+        if 'loot_once_only' in data:
+            print >> sys.stderr, 'warning: token event %s drops reduced loot on repeated playthroughs. Remove loot_only_once and fold into regular loot.' % event_name
+        if data.get('base_richness_on_replay', 1) != 1:
+            print >> sys.stderr, 'warning: token event %s drops reduced resources on repeated playthroughs. Remove base_richness_on_replay.' % event_name
+    else:
+        if data.get('base_richness_on_replay', 1) != 1:
+            print >> sys.stderr, 'warning: immortal event %s drops reduced resources on repeated playthroughs. Remove base_richness_on_replay.' % event_name
 
 # given the array of loot tables for an event difficulty (one per level),
 # return a list of the special progression reward items, suitable for including in showcase['progression_reward_items']
@@ -1653,7 +1653,8 @@ if __name__ == '__main__':
                 print >> out_fd, '},'
             base_id += 1
 
-            # print warnings about the skeleton
-            check_one_time_loot(data['event_name'], data)
+            # print warnings about the skeleton (in non-legacy games)
+            if game_id not in ('mf2','bfm'):
+                check_one_time_loot(data['event_name'], data)
 
         out_atom.complete()
