@@ -207,19 +207,14 @@ def completion_valentina_message(picture = None, text = None, extra = ''):
              "description_xy": [221, 218], "description_dimensions": [500,150],
              "ui_description": text + extra}
 
-def print_auto_gen_warning(fd = sys.stdout):
+def print_auto_gen_warning(fd):
     print >>fd, "// AUTO-GENERATED FILE - DO NOT EDIT!"
     print >>fd, "// Make changes using make_ai_skeleton.py or the event .skel file."
     print >>fd, "// Skeleton JSON created by:"
     print >>fd, "// PYTHONPATH=../gameserver ./make_ai_skeleton.py " + " ".join(sys.argv[1:])
     print >>fd
 
-def generate_showcase_consequent(game_id, event_dirname, data):
-    with AtomicFileWrite.AtomicFileWrite('%s/%s_consequent_library_%s.json' % (game_id, game_id, event_dirname), 'w') as atom:
-        _generate_showcase_consequent(game_id, event_dirname, data, atom)
-        atom.complete()
-
-def _generate_showcase_consequent(game_id, event_dirname, data, atom):
+def generate_showcase_consequent(data, fd):
     WRAP_IN_ABTEST = False # temporary - wrap in A/B test
 
     randgen = random.Random(1234) # fix random number seed for loot-table sampling
@@ -227,7 +222,7 @@ def _generate_showcase_consequent(game_id, event_dirname, data, atom):
     has_multiple_difficulties = len(data['difficulties']) > 1
     highest_difficulty = data['difficulties'][-1]
 
-    print_auto_gen_warning(fd = atom.fd)
+    print_auto_gen_warning(fd)
     for diff in data['difficulties']:
         suffix = data['key_suffix'][diff]
         extra_suffix = data.get('extra_key_suffix',{}).get(diff,None)
@@ -450,16 +445,16 @@ def _generate_showcase_consequent(game_id, event_dirname, data, atom):
                                                     "reset_origin_time": data['reset_origin_time'],
                                                     "reset_interval": data['reset_interval'] },
                           "showcase_hack": showcase }
-        atom.fd.write('"ai_%s%s_showcase": ' % (data['event_name'], data['key_suffix'][diff]))
+        fd.write('"ai_%s%s_showcase": ' % (data['event_name'], data['key_suffix'][diff]))
         if WRAP_IN_ABTEST:
             showcase_cons = { "consequent": "IF", "if": {"predicate": "ANY_ABTEST", "key": "enable_showcase", "value": 1},
                               "then": showcase_cons }
-        dump_json_toplevel(showcase_cons, fd = atom.fd)
-        atom.fd.write(',\n\n')
+        dump_json_toplevel(showcase_cons, fd = fd)
+        fd.write(',\n\n')
 
         # MILESTONE_SHOWCASE
         # make the "milestone" version of the showcase (shown after completing a difficulty tier) - delete random items, add VICTORY text, big progress bar, and optional progression instructions
-        atom.fd.write('"ai_%s%s_milestone_showcase": ' % (data['event_name'], data['key_suffix'][diff]))
+        fd.write('"ai_%s%s_milestone_showcase": ' % (data['event_name'], data['key_suffix'][diff]))
         milestone_showcase = copy.deepcopy(showcase)
         for FIELD in ('corner_token_mode','feature_random_items','feature_random_item_count','final_reward_unit','final_reward_items',
                       'ui_final_reward_label','ui_final_reward_subtitle_bbcode','ui_final_reward_title_bbcode','ui_random_rewards_text'):
@@ -489,12 +484,12 @@ def _generate_showcase_consequent(game_id, event_dirname, data, atom):
         if WRAP_IN_ABTEST:
             milestone_showcase_cons = { "consequent": "IF", "if": {"predicate": "ANY_ABTEST", "key": "enable_showcase", "value": 1},
                                         "then": milestone_showcase_cons }
-        dump_json_toplevel(milestone_showcase_cons, fd = atom.fd)
-        atom.fd.write(',\n\n')
+        dump_json_toplevel(milestone_showcase_cons, fd = fd)
+        fd.write(',\n\n')
 
         # VICTORY_SHOWCASE
         # make "victory" version - delete random items, add VICTORY text
-        atom.fd.write('"ai_%s%s_victory_showcase": ' % (data['event_name'], data['key_suffix'][diff]))
+        fd.write('"ai_%s%s_victory_showcase": ' % (data['event_name'], data['key_suffix'][diff]))
         victory_showcase = copy.deepcopy(showcase)
         for FIELD in ('ui_random_rewards_text','feature_random_items','feature_random_item_count','corner_token_mode'):
             if FIELD in victory_showcase: del victory_showcase[FIELD]
@@ -511,14 +506,14 @@ def _generate_showcase_consequent(game_id, event_dirname, data, atom):
         if WRAP_IN_ABTEST:
             victory_showcase_cons = { "consequent": "IF", "if": {"predicate": "ANY_ABTEST", "key": "enable_showcase", "value": 1},
                                       "then": victory_showcase_cons }
-        dump_json_toplevel(victory_showcase_cons, fd = atom.fd)
-        atom.fd.write(',\n\n')
+        dump_json_toplevel(victory_showcase_cons, fd = fd)
+        fd.write(',\n\n')
 
         # LOGIN_SHOWCASE
         # make "login" version - delete random items, add NEW THIS WEEK text
         # note: this adds the extra_key_suffix to the consequent name since the tip name should be changed for each event release
         tip_name = 'ai_%s%s%s_login_showcase' % (data['event_name'], data['key_suffix'][diff], data['extra_key_suffix'][diff])
-        atom.fd.write('"%s": ' % tip_name)
+        fd.write('"%s": ' % tip_name)
         login_showcase = copy.deepcopy(showcase)
         for FIELD in ('ui_random_rewards_text','feature_random_items','feature_random_item_count','corner_token_mode'):
             if FIELD in login_showcase: del login_showcase[FIELD]
@@ -569,19 +564,19 @@ def _generate_showcase_consequent(game_id, event_dirname, data, atom):
         if WRAP_IN_ABTEST:
             login_showcase_cons = { "consequent": "IF", "if": {"predicate": "ANY_ABTEST", "key": "enable_showcase", "value": 1},
                                     "then": login_showcase_cons }
-        dump_json_toplevel(login_showcase_cons, fd = atom.fd)
+        dump_json_toplevel(login_showcase_cons, fd = fd)
 
         # build progression loot variants
         if data['showcase'].get('progression_reward_items',False):
 
-            atom.fd.write(',\n\n')
+            fd.write(',\n\n')
             progression_reward_items = get_progression_reward_items(data['loot'][diff],
                                                                     data['showcase'].get('include_resource_boosts_in_progression', False),
                                                                     data['showcase'].get('include_random_loot_in_progression', False))
 
             # PROGRESSION_INTRO_SHOWCASE
             # shows progression reward items PLUS final reward items and corner_token instruction (shown at the first level)
-            atom.fd.write('"ai_%s%s_progression_intro_showcase": ' % (data['event_name'], data['key_suffix'][diff]))
+            fd.write('"ai_%s%s_progression_intro_showcase": ' % (data['event_name'], data['key_suffix'][diff]))
             intro_showcase = copy.deepcopy(showcase)
             for FIELD in ('show_progress_bar', 'feature_random_item_count', 'feature_random_items'):
                 if FIELD in intro_showcase: del intro_showcase[FIELD]
@@ -602,12 +597,12 @@ def _generate_showcase_consequent(game_id, event_dirname, data, atom):
             if WRAP_IN_ABTEST:
                 intro_showcase_cons = { "consequent": "IF", "if": {"predicate": "ANY_ABTEST", "key": "enable_showcase", "value": 1},
                                           "then": intro_showcase_cons }
-            dump_json_toplevel(intro_showcase_cons, fd = atom.fd)
-            atom.fd.write(',\n\n')
+            dump_json_toplevel(intro_showcase_cons, fd = fd)
+            fd.write(',\n\n')
 
             # PROGRESSION_SHOWCASE
             # shows progression reward items WITHOUT final reward items PLUS big progress bar and progression instructions
-            atom.fd.write('"ai_%s%s_progression_showcase": ' % (data['event_name'], data['key_suffix'][diff]))
+            fd.write('"ai_%s%s_progression_showcase": ' % (data['event_name'], data['key_suffix'][diff]))
             progression_showcase = copy.deepcopy(showcase)
             for FIELD in ('corner_token_mode','feature_random_items','feature_random_item_count','final_reward_unit','final_reward_items',
                           'ui_final_reward_label','ui_final_reward_subtitle_bbcode','ui_final_reward_title_bbcode'):
@@ -628,11 +623,11 @@ def _generate_showcase_consequent(game_id, event_dirname, data, atom):
             if WRAP_IN_ABTEST:
                 progression_showcase_cons = { "consequent": "IF", "if": {"predicate": "ANY_ABTEST", "key": "enable_showcase", "value": 1},
                                           "then": progression_showcase_cons }
-            dump_json_toplevel(progression_showcase_cons, fd = atom.fd)
+            dump_json_toplevel(progression_showcase_cons, fd = fd)
 
         if diff != data['difficulties'][-1]:
-            atom.fd.write(',')
-        atom.fd.write('\n')
+            fd.write(',')
+        fd.write('\n')
 
 # returns a list of player history keys for an event that will be used for the achievement counter in the showcase dialog
 def generate_achievement_keys(data, has_tokens):
@@ -833,13 +828,15 @@ if __name__ == '__main__':
     base_file_dir = None
     include_prefix = ''
     output_filename = '-'
+    consequent_output_filename = None
     game_id = SpinConfig.game()
 
-    opts, args = getopt.gnu_getopt(sys.argv, 'g:o:', ['separate-files','base-filename-convention=','include-prefix='])
+    opts, args = getopt.gnu_getopt(sys.argv, 'g:o:c:', ['separate-files','base-filename-convention=','include-prefix='])
 
     for key, val in opts:
         if key == '-g': game_id = val
         elif key == '-o': output_filename = val
+        elif key == '-c': consequent_output_filename = val
         elif key == '--separate-files': separate_files = True
         elif key == '--base-filename-convention': base_filename_convention = val
         elif key == '--include-prefix': include_prefix = val
@@ -878,12 +875,16 @@ if __name__ == '__main__':
     with out_atom:
         out_fd = out_atom.fd
 
-        print_auto_gen_warning(fd = out_fd)
+        print_auto_gen_warning(out_fd)
         auto_cutscenes = None
 
         # create loot showcase
         if 'showcase' in data:
-            generate_showcase_consequent(game_id, event_dirname, data)
+            if consequent_output_filename is None:
+                consequent_output_filename = '%s/%s_consequent_library_%s.json' % (game_id, game_id, event_dirname)
+            with AtomicFileWrite.AtomicFileWrite(consequent_output_filename, 'w') as showcase_atom:
+                generate_showcase_consequent(data, showcase_atom.fd)
+                showcase_atom.complete()
 
             # automatically add showcase cutscenes, if necessary
             if data['showcase'].get('automatic_showcase_cutscenes', False):
