@@ -44223,7 +44223,7 @@ function handle_server_message(data) {
                     return function(w, mloc) {
                         if(!_suser_id) { return; }
                         var _user_id = parseInt(_suser_id,10);
-                        if(!_user_id || is_ai_user_id_range(_user_id)) { return; }
+                        if(!_user_id || is_ai_user_id_range(_user_id) || _user_id < 0) { return; }
                         change_selection_ui(null);
                         PlayerInfoDialog.invoke(_user_id);
                     }; } },
