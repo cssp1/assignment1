@@ -230,9 +230,6 @@ if __name__ == '__main__':
         nosql_client = SpinNoSQL.NoSQLClient(SpinConfig.get_mongodb_config(game_id))
         cur = con.cursor(MySQLdb.cursors.DictCursor)
 
-        # prepare for big GROUP_CONCAT()s below (MySQL-specific)
-        cur.execute("SET @@session.group_concat_max_len = @@global.max_allowed_packet")
-
         for table, schema in ((battles_table, battles_schema(sql_util)),
                               (battles_summary_table, battles_summary_schema(sql_util)),
                               (battle_units_table, battle_units_schema(sql_util)),

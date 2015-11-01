@@ -157,6 +157,9 @@ if __name__ == '__main__':
 
         cur = con.cursor(MySQLdb.cursors.DictCursor)
 
+        # prepare for big GROUP_CONCAT() percentile queries (MySQL-specific)
+        cur.execute("SET @@session.group_concat_max_len = @@global.max_allowed_packet")
+
         for table, schema in ((battles_risk_reward_table, battles_risk_reward_schema(sql_util)),
                               (battles_risk_reward_hourly_summary_table, battles_risk_reward_summary_schema(sql_util, 'hour')),
                               (battles_risk_reward_daily_summary_table, battles_risk_reward_summary_schema(sql_util, 'day')),
