@@ -30,6 +30,7 @@ TABLES = {
               'table_name': 'chat_buffer',
               'compression': 'zip',
               'retain_for': 30*86400 },
+    'chat_reports': { 's3_name': None, 'table_name': 'chat_reports', 'retain_for': 30*86400 },
 
     # credits log
     'credits': { 's3_name': 'credits', 'table_name': 'log_credits', 'compression': 'zip', 'retain_for': -1 },

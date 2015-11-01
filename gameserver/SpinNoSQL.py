@@ -7,7 +7,7 @@
 # MongoDB adaptor API
 
 import time, sys, re, random
-import datetime
+import datetime, calendar
 import pymongo, bson # 3.0+ OK
 import SpinConfig
 import SpinNoSQLId
@@ -165,6 +165,7 @@ class NoSQLClient (object):
         self.seen_sessions = False
         self.seen_client_perf = False
         self.seen_chat = False
+        self.seen_chat_reports = False
         self.seen_logs = {}
         self.seen_battles = False
         self.seen_dau = {}
@@ -756,6 +757,44 @@ class NoSQLClient (object):
             ret.append(row)
         ret.reverse() # oldest messages first
         return ret
+
+    ###### CHAT REPORTS ######
+
+    def chat_reports_table(self):
+        coll = self._table('chat_reports')
+        if not self.seen_chat_reports:
+            coll.create_index('millitime', expireAfterSeconds=7*86400) # automatically clear after one week
+            self.seen_chat_reports = True
+        return coll
+    def chat_report(self, channel, reporter_id, target_id, context, reason=''):
+        return self.instrument('chat_report(%s)'%reason, self._chat_report, (channel, reporter_id, target_id, context))
+    def _chat_report(self, channel, reporter_id, target_id, context):
+        props = {'millitime':datetime.datetime.utcfromtimestamp(float(self.time)),
+                 'channel': channel, 'reporter_id': reporter_id, 'target_id': target_id,
+                 'resolved': False}
+        if context is not None:
+            assert isinstance(context, basestring)
+            context = unicode(context)
+            props['context'] = context
+        self.chat_reports_table().with_options(write_concern = pymongo.write_concern.WriteConcern(w=0)).insert_one(props)
+
+    def chat_reports_get(self, start_time, end_time, reason=''):
+        return self.instrument('chat_reports_get(%s)'%reason, self._chat_reports_get, (start_time, end_time))
+    def decode_chat_report(self, row):
+        row['id'] = self.decode_object_id(row['_id']); del row['_id'] # convert native ObjectID to string
+        if 'millitime' in row: # convert datetime.datetime to UNIX timestamp
+            row['time'] = calendar.timegm(row['millitime'].timetuple())
+            del row['millitime']
+        return row
+    def _chat_reports_get(self, start_time, end_time):
+        return [self.decode_chat_report(x) for x in \
+                self.chat_reports_table().find({'millitime':{'$gte':datetime.datetime.utcfromtimestamp(start_time), '$lt': datetime.datetime.utcfromtimestamp(end_time)},
+                                                'resolved': False})]
+    def chat_report_resolve(self, id, reason=''):
+        return self.instrument('chat_report_resolve(%s)'%reason, self._chat_report_resolve, (id,))
+    def _chat_report_resolve(self, id):
+        return self.chat_reports_table().update_one({'_id': self.encode_object_id(id)}, {'$set': {'resolved': True}}).matched_count > 0
+
 
     ###### PLAYER ALIAS UNIQUE RESERVATIONS ######
 
@@ -2740,6 +2779,16 @@ if __name__ == '__main__':
 
         # test maintenance
         #client.do_maint(time_now, cur_season, cur_week)
+
+        # test chat reports
+        client.chat_reports_table().drop(); client.seen_chat_reports = False
+        client.chat_report('global_en', 1112, 1113, 'you are a poopyhead')
+        rep_list = client.chat_reports_get(time_now - 60, time_now + 60)
+        assert len(rep_list) == 1
+        rep = rep_list[0]
+        print rep
+        client.chat_report_resolve(rep['id'])
+        assert len(client.chat_reports_get(time_now - 60, time_now + 60)) == 0
 
         # test player aliases
         client.player_alias_table().drop(); client.seen_player_aliases = False
