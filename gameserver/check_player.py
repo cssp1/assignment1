@@ -62,6 +62,18 @@ def pretty_print_time(sec, limit = 99, spell_units = False):
     ret = ret[0:limit]
     return (', ' if spell_units else ' ').join(ret)
 
+# display end time for auras/cooldowns
+def ui_end_time(end_time, time_now, negate = False):
+    if end_time > 0:
+        if end_time > time_now:
+            ui_dur =  '%.1f hrs' % ((end_time - time_now)/3600.0)
+            if negate:
+                return 'in '+ui_dur
+            else:
+                return 'for '+ui_dur
+        else: return None # expired
+    else:
+        return 'Never' if negate else 'Permanently'
 
 def check_bloat(input, min_size = 1024, print_max = 20):
     sizes = []
@@ -102,7 +114,7 @@ if __name__ == '__main__':
                                                        ])
 
 
-    fmt = '%-20s %-50s'
+    fmt = '%-22s %-50s'
     game_id = SpinConfig.config['game_id']
     user_id = None
     facebook_id = None
@@ -490,17 +502,24 @@ if __name__ == '__main__':
             print fmt % ('GAGGED - player cannot talk in chat (permanently - user.chat_gagged)', '')
 
         for aura in player.get('player_auras',[]):
-            if aura.get('end_time',-1) > 0:
-                if aura['end_time'] > time_now:
-                    ui_duration = 'For %.1f hrs' % ((aura['end_time'] - time_now)/3600.0)
-                else: continue # aura expired
-            else:
-                ui_duration = 'Permanently'
+            ui_duration = ui_end_time(aura.get('end_time',-1), time_now)
+            if not ui_duration: continue
 
             if aura['spec'] == 'chat_gagged':
                 print fmt % ('GAGGED (by chat_gagged aura) - player cannot talk in chat:', ui_duration)
             elif aura['spec'] == 'region_banished' and ('tag' in aura.get('data',{})):
                 print fmt % ('Banished from regions with "%s" tag:' % aura['data']['tag'], ui_duration)
+
+        for cdname, cooldown in player.get('cooldowns', {}).iteritems():
+            ui_duration = ui_end_time(cooldown.get('end',-1), time_now, negate = True)
+            if not ui_duration: continue
+            stack = cooldown.get('stack',1)
+            if cdname == 'idle_check_violation':
+                print fmt % ('Anti-refresh offender:', ('%d violation(s), expires %s' % (stack, ui_duration)))
+            elif cdname == 'alt_account_violation':
+                print fmt % ('Alt-account offender:', ('%d violation(s), expires %s' % (stack, ui_duration)))
+            elif cdname == 'chat_abuse_violation':
+                print fmt % ('Chat abuse offender:', ('%d violation(s), expires %s' % (stack, ui_duration)))
 
         if user.get('chat_mod',0):
             print fmt % ('Player is a chat moderator', '')
