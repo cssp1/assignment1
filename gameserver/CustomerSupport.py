@@ -482,6 +482,9 @@ class HandleChatGag(Handler):
             # old-style gag
             session.user.chat_gagged = True
             self.gamesite.pcache_client.player_cache_update(self.user_id, {'chat_gagged': session.user.chat_gagged})
+            # when applying a permanent chat gag, remove any existing temporary gag auras
+            for aura_name in HandleChatUngag.AURAS:
+                session.player.remove_aura(session, session.outgoing_messages, aura_name, force = True)
         return ReturnValue(result = 'ok')
     def do_exec_offline(self, user, player):
         if 'duration' in self.args:
@@ -496,6 +499,8 @@ class HandleChatGag(Handler):
             # old-style gag
             user['chat_gagged'] = True
             self.gamesite.pcache_client.player_cache_update(self.user_id, {'chat_gagged': user['chat_gagged']})
+            # when applying a permanent gag, remove any temporary gag auras
+            player['player_auras'] = filter(lambda x: x['spec'] not in HandleChatUngag.AURAS, player.get('player_auras',[]))
         return ReturnValue(result = 'ok')
 class HandleChatUngag(Handler):
     AURAS = ('chat_gagged', 'chat_warned')
