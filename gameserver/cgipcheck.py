@@ -136,6 +136,79 @@ def run_shell_command(argv, ignore_stderr = False):
          raise Exception(err or out)
      return out
 
+def chat_abuse_clear(control_args):
+    clear_cd_args = control_args.copy()
+    clear_cd_args.update({'method':'clear_cooldown', 'name': 'chat_abuse_violation'})
+    assert do_CONTROLAPI_checked(clear_cd_args) == 'ok'
+    ungag_args = control_args.copy()
+    ungag_args.update({'method': 'chat_ungag'})
+    assert do_CONTROLAPI_checked(ungag_args) == 'ok'
+    return "Player was unmuted and chat abuse record was cleared."
+
+def chat_abuse_violate(control_args):
+    check_stacks_args = control_args.copy()
+    check_stacks_args.update({'method': 'cooldown_active', 'name': 'chat_abuse_violation'})
+    active_stacks = max(do_CONTROLAPI_checked(check_stacks_args), 0)
+    # for policy see https://sites.google.com/a/spinpunch.com/support/about-zendesk/chat-moderation-process
+    # active_stacks 0 -> message and 24h mute
+    # active_stacks 1 -> message and 48h mute
+    # active_stacks 2 -> message and 72h mute
+    # active_stacks 3 -> no message, permanent mute, also mute alts.
+    ui_actions = []
+    message_body = None
+    alt_message_body = None
+    add_stack = False
+    temporary_mute_duration = -1
+    permanent_mute = False
+    permanent_mute_alts = False
+
+    if active_stacks == 0:
+        message_body = "Hello! You were recently reported for violating our in-game chat rules of conduct. This message is to serve as a warning, and a notification that you are receiving a temporary mute from in-game chat. Any future offenses may result in a longer temporary or permanent mute from chat. Thanks in advance for your understanding."
+        add_stack = True
+        temporary_mute_duration = 24*3600
+    elif active_stacks == 1:
+        message_body = "You were recently reported again for violating our in-game chat rules of conduct. This message is to serve as a 2nd warning, and a notification that you are receiving a temporary mute from in-game chat. Any future offenses may result in a longer temporary or permanent mute from chat. Thanks in advance for your understanding."
+        add_stack = True
+        temporary_mute_duration = 48*3600
+    elif active_stacks == 2:
+        message_body = "Hello! You were recently reported again for violating our in-game chat rules of conduct. This message is to serve as a 3rd warning, and a notification that you are receiving a temporary mute from in-game chat. Any future offenses will result in a permanent chat mute without further warning. Thanks in advance for your understanding."
+        add_stack = True
+        temporary_mute_duration = 72*3600
+    elif active_stacks >= 3:
+        if active_stacks == 3:
+            alt_message_body = "Hello! This message is to inform you that your account has been muted from in-game chat due to there having been confirmed offensive chat violations on a related game account (ID: %d). If you feel this ban may have been made in error, please submit a ticket to our Customer Support team. Thanks in advance for your understanding." % int(control_args['user_id'])
+        add_stack = (active_stacks < 4)
+        permanent_mute = True
+        permanent_mute_alts = True
+
+    OFFENSE_MEMORY_DURATION = 365*86400
+
+    if add_stack:
+        add_stack_args = control_args.copy()
+        add_stack_args.update({'method': 'trigger_cooldown', 'name': 'chat_abuse_violation', 'add_stack': 1, 'duration': OFFENSE_MEMORY_DURATION})
+        assert do_CONTROLAPI_checked(add_stack_args) == 'ok'
+        ui_actions.append("Offense count increased to %d" % (active_stacks + 1))
+    if message_body:
+        send_message_args = control_args.copy()
+        send_message_args.update({'method': 'send_message', 'message_subject': 'Chat Warning', 'message_body': message_body})
+        assert do_CONTROLAPI_checked(send_message_args) == 'ok'
+        ui_actions.append("Sent warning message")
+    if temporary_mute_duration > 0:
+        temporary_mute_args = control_args.copy()
+        temporary_mute_args.update({'method': 'chat_gag', 'duration': temporary_mute_duration})
+        assert do_CONTROLAPI_checked(temporary_mute_args) == 'ok'
+        ui_actions.append("Muted player for %d hours" % (temporary_mute_duration / 3600))
+    if permanent_mute:
+        permanent_mute_args = control_args.copy()
+        permanent_mute_args.update({'method': 'chat_gag'})
+        assert do_CONTROLAPI_checked(permanent_mute_args) == 'ok'
+        ui_actions.append("Muted player permanently")
+
+    if permanent_mute_alts or alt_message_body:
+        pass # XXXXXX no handling for alts yet
+
+    return "Player had %d offense(s) before this. Took actions:\n\n- %s" % (active_stacks, "\n- ".join(ui_actions))
+
 def do_action(path, method, args, spin_token_data, nosql_client):
     try:
         do_log = False
@@ -147,7 +220,7 @@ def do_action(path, method, args, spin_token_data, nosql_client):
                 do_log = True # log all write activity
 
             # require special role for writes, except for chat, aura, and alt actions
-            if (method not in ('lookup','get_raw_player','chat_gag','chat_ungag','chat_block','chat_unblock','apply_aura','remove_aura','ignore_alt','unignore_alt')):
+            if (method not in ('lookup','get_raw_player','chat_gag','chat_ungag','chat_block','chat_unblock','chat_abuse_violate','chat_abuse_clear','apply_aura','remove_aura','ignore_alt','unignore_alt')):
                 check_role(spin_token_data, 'PCHECK-WRITE')
                 if method in ('ban','unban'):
                     check_role(spin_token_data, 'PCHECK-BAN')
@@ -159,6 +232,11 @@ def do_action(path, method, args, spin_token_data, nosql_client):
 
             if method == 'lookup':
                 result = {'result':do_lookup(control_args)}
+            # chat abuse handling doesn't map 1-to-1 with CONTROLAPI calls, so handle them specially
+            elif method == 'chat_abuse_violate':
+                result = {'result':chat_abuse_violate(control_args)}
+            elif method == 'chat_abuse_clear':
+                result = {'result':chat_abuse_clear(control_args)}
             elif method in ('give_item','send_message','chat_gag','chat_ungag','chat_block','chat_unblock','apply_aura','remove_aura','get_raw_player','ban','unban',
                             'make_developer','unmake_developer','clear_alias','chat_official','chat_unofficial','clear_lockout','clear_cooldown','check_idle','change_region','ignore_alt','unignore_alt','demote_alliance_leader','kick_alliance_member'):
                 result = do_CONTROLAPI(control_args)
@@ -561,6 +639,14 @@ def do_CONTROLAPI(args, host = None, port = None):
     args['secret'] = SpinConfig.config['proxy_api_secret']
     response = urllib2.urlopen(url+'?'+urllib.urlencode(args)).read().strip()
     return SpinJSON.loads(response)
+
+# this version assumes the CustomerSupport return value conventions
+def do_CONTROLAPI_checked(args):
+    ret = do_CONTROLAPI(args)
+    if 'error' in ret:
+        raise Exception('CONTROLAPI method failed: '+ret['error'])
+    else:
+        return ret['result']
 
 def do_lookup(args):
     cmd_args = ['--live']

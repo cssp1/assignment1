@@ -331,6 +331,20 @@ var method_chat_ungag = function() {
         send_request('player', 'chat_ungag', $.extend(ident, {'ui_reason':ui_reason}), function(result) { alert("Success!"); });
     }
 };
+var method_chat_abuse_clear = function() {
+    var ident = get_ident();
+    var ui_reason = check_ui_reason($("#chat_abuse_reason")[0].value);
+    if(ident && ui_reason) {
+        send_request('player', 'chat_abuse_clear', $.extend(ident, {'ui_reason':ui_reason}), function(result) { alert("Success!\n"+result.toString()); });
+    }
+};
+var method_chat_abuse_violate = function() {
+    var ident = get_ident();
+    var ui_reason = check_ui_reason($("#chat_abuse_reason")[0].value);
+    if(ident && ui_reason) {
+        send_request('player', 'chat_abuse_violate', $.extend(ident, {'ui_reason':ui_reason}), function(result) { alert("Success!\n"+result.toString()); });
+    }
+};
 var method_ban = function() {
     var ident = get_ident();
     var ui_reason = check_ui_reason($("#ban_reason")[0].value);
@@ -1467,6 +1481,7 @@ $(function() {
     <li><a href="#player_tools_give_item" id="player_tools_give_item_header">Give Item</a></li>
     <li><a href="#player_tools_give_gamebucks" id="player_tools_give_gamebucks_header">Give $GAMEBUCKS_NAME$</a></li>
     <li><a href="#player_tools_chat_gag" id="player_tools_chat_gag_header">Chat Tools</a></li>
+    <li><a href="#player_tools_chat_abuse" id="player_tools_chat_abuse_header">Chat Abuse</a></li>
     <li><a href="#player_tools_send_message" id="player_tools_send_message_header">Send Message</a></li>
     <li><a href="#player_tools_clear_cooldown" id="player_tools_clear_cooldown_header">Cooldowns</a></li>
     <li><a href="#player_tools_alts" id="player_tools_alts_header">Alts</a></li>
@@ -1500,6 +1515,16 @@ $(function() {
       Reason for this action:
       <br>
       <input type="text" id="chat_reason" style="width:500px;">
+    </div>
+    <div id="player_tools_chat_abuse">
+      <button onclick="method_chat_get()" class="spin_button" style="width:250px;">Get Recent Messages</button>
+      <p>
+      <button onclick="method_chat_abuse_violate()" class="spin_button" style="width:250px;">Add Offense</button>
+      <button onclick="method_chat_abuse_clear()" class="spin_button" style="width:250px;">Unmute and Clear Offenses</button>
+      <p>
+      Reason for this action:
+      <br>
+      <input type="text" id="chat_abuse_reason" style="width:500px;">
     </div>
     <div id="player_tools_give_item">
       Pick an item from the list:
