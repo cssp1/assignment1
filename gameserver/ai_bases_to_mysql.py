@@ -52,7 +52,7 @@ def ai_analytics_tag_assignments_schema(sql_util):
             }
 
 def ai_analytics_tag_info_schema(sql_util):
-    return {'fields': [('analytics_tag', 'VARCHAR(32) NOT NULL PRIMARY KEY'),
+    return {'fields': [('analytics_tag', 'VARCHAR(32) NOT NULL'),
                        ('event_type', 'VARCHAR(32)'),
                        ('num_difficulties', 'INT1'), # number of difficulty progressions (3 for Normal/Heroic/Epic, 1 for Normal only, NULL for non-linear-progression events)
                        ('num_progression', 'INT4'),
@@ -61,7 +61,8 @@ def ai_analytics_tag_info_schema(sql_util):
                        ('end_time', 'INT8'),
                        ('reset_interval', 'INT8'),
                        ('repeat_interval', 'INT8'),
-                       ], 'indices': {}}
+                       ], 'indices': {'master':{'unique': True, 'keys':[('analytics_tag','ASC'),('start_time','ASC')]}}
+            }
 
 def new_analytics_tag_info(tag, event_klass):
     return {'analytics_tag': tag,
@@ -200,8 +201,9 @@ if __name__ == '__main__':
 
         # note: upsert into ai_analytics_tag_info
         if len(analytics_tag_info) > 0:
-            cur.execute("DELETE FROM "+sql_util.sym(ai_analytics_tag_info_table)+" WHERE analytics_tag IN (" + \
-                        (','.join(["%s",] * len(analytics_tag_info)))+")", analytics_tag_info.keys())
+            cur.executemany("DELETE FROM "+sql_util.sym(ai_analytics_tag_info_table)+" WHERE analytics_tag = %s AND start_time >= %s",
+                            [(k, info['start_time']) for k, info in analytics_tag_info.iteritems()])
+            if verbose: print 'minimum start_time of modified data:', min(info['start_time'] for info in analytics_tag_info.itervalues() if info['start_time'] > 0)
             sql_util.do_insert_batch(cur, ai_analytics_tag_info_table, [(('analytics_tag',entry['analytics_tag']),
                                                                          ('event_type',entry['event_type']),
                                                                          ('num_difficulties', len(entry['difficulties']) if entry['difficulties'] else None),
