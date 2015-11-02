@@ -520,7 +520,7 @@
 
     "generic_context_menu": {
         "dimensions": [152,10],
-        "clip_children": 1,
+        "clip_children": 0,
         "widgets": {
             // virtual widget that catches clicks outside the area, acts like close button
             "bg_close_button": { "kind": "ActionButton", "xy": [-1000,-1000], "dimensions": [2000,2000] },
