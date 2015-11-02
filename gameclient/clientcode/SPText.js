@@ -167,6 +167,7 @@ SPText.cstring_to_ablocks_bbcode = function(str, props, plugins) {
     var code = null;
     var prop_stack = [];
     var code_stack = [];
+    var code_text_stack = []; // just the literal text inside a [code]...[/code] block
     var word_props = goog.object.clone(props);
 
     for(var i = 0; i < str.length; i++) {
@@ -204,6 +205,7 @@ SPText.cstring_to_ablocks_bbcode = function(str, props, plugins) {
 
                 prop_stack.push(word_props);
                 code_stack.push(root);
+                code_text_stack.push('');
                 word_props = goog.object.clone(word_props);
 
                 if(root == 'color') {
@@ -216,20 +218,34 @@ SPText.cstring_to_ablocks_bbcode = function(str, props, plugins) {
                     // do not descend since there is no closing code for this
                     prop_stack.pop();
                     code_stack.pop();
+                    code_text_stack.pop();
                     insert_string = pretty_print_date(parseInt(arg,10)); // XXX imported from main.js
                 } else if(plugins && (root in plugins)) {
-                    if('onclick' in plugins[root]) { word_props.onclick = plugins[root]['onclick'](arg); }
+                    // note: don't call the handler yet, because we need to wait until text is accumulated to the close of the block
+                    // also note we need to add a *reference* to a state object, not a literal, since inner blocks are going to clone this.
+                    if('onclick' in plugins[root]) {
+                        word_props.onclick_state = {root:root, handler: plugins[root]['onclick'], arg:arg, callback:null};
+                   }
                 } else {
                     console.log("parse error: unknown BBCode "+code);
                     break;
                 }
 
             } else if(state == SPText.BBCODE_STATES.CODE_CLOSE) {
-                var last_code = code_stack.pop();
-                if(code != last_code) {
+                var last_root = code_stack.pop();
+                code_text_stack.pop(); // we want the one before this
+
+                if(code != last_root) {
                     console.log("parse error: mismatched code blocks");
                     break;
                 }
+                var cur_code_text = code_text_stack[code_text_stack.length-1];
+
+                if(word_props.onclick_state) {
+                    var onc = word_props.onclick_state;
+                    onc.callback = onc.handler(onc.arg, cur_code_text);
+                }
+
                 word_props = prop_stack.pop();
             } else {
                 console.log("parse error: ] without [");
@@ -246,10 +262,10 @@ SPText.cstring_to_ablocks_bbcode = function(str, props, plugins) {
                 code = c;
             } else if(state == SPText.BBCODE_STATES.CODE_OPEN || state == SPText.BBCODE_STATES.CODE_CLOSE) {
                 code += c;
-            } else if(state == SPText.BBCODE_STATES.LITERAL) {
+            } else if(state == SPText.BBCODE_STATES.LITERAL || state == SPText.BBCODE_STATES.ESCAPED) {
                 word.str += c;
-            } else if(state == SPText.BBCODE_STATES.ESCAPED) {
-                word.str += c;
+                // also update all nested code text in the stack
+                for(var tx = 0; tx < code_text_stack.length; tx++) { code_text_stack[tx] += c; }
                 state = SPText.BBCODE_STATES.LITERAL;
             }
         }
