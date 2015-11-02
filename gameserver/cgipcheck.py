@@ -136,14 +136,29 @@ def run_shell_command(argv, ignore_stderr = False):
          raise Exception(err or out)
      return out
 
+CHAT_ABUSE_MEMORY_DURATION = 365*86400
+
 def chat_abuse_clear(control_args):
-    clear_cd_args = control_args.copy()
-    clear_cd_args.update({'method':'clear_cooldown', 'name': 'chat_abuse_violation'})
-    assert do_CONTROLAPI_checked(clear_cd_args) == 'ok'
+    check_stacks_args = control_args.copy()
+    check_stacks_args.update({'method': 'cooldown_active', 'name': 'chat_abuse_violation'})
+    active_stacks = max(do_CONTROLAPI_checked(check_stacks_args), 0)
+
+    if active_stacks > 0:
+        new_stacks = max(0, active_stacks - 1)
+        clear_cd_args = control_args.copy()
+        clear_cd_args.update({'method':'clear_cooldown', 'name': 'chat_abuse_violation'})
+        assert do_CONTROLAPI_checked(clear_cd_args) == 'ok'
+        if new_stacks > 0:
+            add_stack_args = control_args.copy()
+            add_stack_args.update({'method': 'trigger_cooldown', 'name': 'chat_abuse_violation', 'add_stack': new_stacks, 'duration': CHAT_ABUSE_MEMORY_DURATION})
+            assert do_CONTROLAPI_checked(add_stack_args) == 'ok'
+    else:
+        new_stacks = 0
+
     ungag_args = control_args.copy()
     ungag_args.update({'method': 'chat_ungag'})
     assert do_CONTROLAPI_checked(ungag_args) == 'ok'
-    return "Player was unmuted and chat abuse record was cleared."
+    return "Player was unmuted and reduced to %d chat offense(s)." % new_stacks
 
 def chat_abuse_violate(control_args):
     check_stacks_args = control_args.copy()
@@ -181,11 +196,9 @@ def chat_abuse_violate(control_args):
         permanent_mute = True
         permanent_mute_alts = True
 
-    OFFENSE_MEMORY_DURATION = 365*86400
-
     if add_stack:
         add_stack_args = control_args.copy()
-        add_stack_args.update({'method': 'trigger_cooldown', 'name': 'chat_abuse_violation', 'add_stack': 1, 'duration': OFFENSE_MEMORY_DURATION})
+        add_stack_args.update({'method': 'trigger_cooldown', 'name': 'chat_abuse_violation', 'add_stack': 1, 'duration': CHAT_ABUSE_MEMORY_DURATION})
         assert do_CONTROLAPI_checked(add_stack_args) == 'ok'
         ui_actions.append("Offense count increased to %d" % (active_stacks + 1))
     if message_body:
