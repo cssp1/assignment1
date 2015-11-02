@@ -19912,7 +19912,6 @@ function invoke_generic_context_menu(xy, buttons, dialog_name, special_buttons) 
     // that the first button is directly underneath the cursor
     var default_button = ('default_button' in dialog.data ? dialog.widgets[dialog.data['default_button']] : dialog.widgets['button0']);
     xy = vec_add(xy, [-Math.floor(dialog.wh[0]/2),Math.floor(-(default_button.xy[1] + default_button.wh[1]/2 + 7))]);
-    xy = vec_sub(xy, dialog.get_absolute_xy());
 
     // resize dialog to fit the proper number of buttons
     var wh = [dialog.wh[0], dialog.data['dimensions'][1] + buttons.length * dialog.data['widgets']['button']['array_offset'][1]];
@@ -19922,7 +19921,7 @@ function invoke_generic_context_menu(xy, buttons, dialog_name, special_buttons) 
     if(xy[0] + wh[0] >= canvas_width) { xy[0] = canvas_width - wh[0]; }
     if(xy[1] < 0) { xy[1] = 0; }
     if(xy[1] + wh[1] >= canvas_height) { xy[1] = canvas_height - wh[1]; }
-    dialog.xy = xy;
+    dialog.xy = vec_sub(xy, dialog.get_absolute_xy());
     dialog.wh = wh;
     dialog.widgets['bg'].wh = wh;
 
