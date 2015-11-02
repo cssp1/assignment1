@@ -533,6 +533,24 @@
         }
     },
 
+    "chat_player_context_menu": {
+        "dimensions": [202,32],
+        "clip_children": 0,
+        "widgets": {
+            // virtual widget that catches clicks outside the area, acts like close button
+            "bg_close_button": { "kind": "ActionButton", "xy": [-1000,-1000], "dimensions": [2000,2000] },
+            "bg": { "kind": "StaticImage", "xy":[0,0], "dimensions":[202,10], "asset": "dialog_resizable", "bg_image_resizable": 1},
+
+            "title":  { "kind": "TextField", "xy": [0,8], "dimensions": [202, 17], "text_style": "bold", "text_size": 13, "max_chars": 12 },
+            "button": { "kind": "ActionButton", "xy": [9,31], "dimensions": [184,28], "text_offset": [0,1], "ui_tooltip": "", "tooltip_delay": 0,
+                        "bg_image": "action_button_resizable", "bg_image_resizable": 1, "text_size": 13, "text_style": "bold",
+                        "ui_name_report": "Report Abuse", "ui_tooltip_report": "Report player for disruptive behavior in chat",
+                        "ui_tooltip_already_reported": "Player has already been reported",
+                        // note: these buttons are created dynamically in JavaScript
+                        "array": [1,0], "array_offset": [0,36] }
+        }
+    },
+
     "friend_bar_popout": {
         "bg_image": "building_context_3buttons_bg",
         "dimensions": [152,157],
