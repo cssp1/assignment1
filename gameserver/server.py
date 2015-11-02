@@ -27048,7 +27048,7 @@ class AdminResource(resource.Resource):
     isLeaf = True
     def render(self, request):
         # do not return a revealing error message on exceptions
-        ret = catch_all('ADMIN')(resource.Resource.render)(request)
+        ret = catch_all('ADMIN')(resource.Resource.render)(self, request)
         if ret is None:
             request.setResponseCode(http.BAD_REQUEST)
             ret = 'spinpunch error'
