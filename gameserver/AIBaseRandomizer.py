@@ -63,7 +63,7 @@ MINE_LEVELS = {"anti_infantry": [[0,0], # townhall L1
                                  [0,0], # townhall L2
                                  [0,0], # townhall L3
                                  [6,9], # townhall L4
-                                 [9,12], # townhall L5+
+                                 [9,10], # townhall L5+
                                  ],
                "anti_tank": [[0,0], # townhall L1
                               [0,0], # townhall L2
