@@ -426,8 +426,8 @@ def run_batch(batch_num, batch, total_count, limit, dry_run, verbose):
             sender.notify_user(batch[i], pcache_list[i], index = BATCH_SIZE*batch_num + i, total_count = total_count)
         except KeyboardInterrupt:
             raise # allow Ctrl-C to abort
-        except:
-            sys.stderr.write(('error processing user %d: '%(batch[i])) + traceback.format_exc())
+        except Exception as e:
+            sys.stderr.write('error processing user %d: %r\n%s\n'% (batch[i], e, traceback.format_exc()))
 
         if limit >= 0 and sender.sent_now >= limit:
             print >> msg_fd, 'limit reached'
