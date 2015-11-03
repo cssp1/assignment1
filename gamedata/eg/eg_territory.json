@@ -175,6 +175,9 @@
     "neighbor_search_radius": 8, // when relocating base, how far away from the desired location to search for an empty spot
     "map_placement_gen": 3, // temporary - generation number for successive map placement trials
 
+    "enable_auto_resolve": 1,
+    "enable_pre_resolve": 1,
+
     "tiles":
 #include "$GAME_ID_territory_tiles.json"
 
