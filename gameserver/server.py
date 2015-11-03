@@ -7380,9 +7380,17 @@ def spawn_units(owner, base, units, temporary = False,
                 cur_space_usage['ALL'] += space
                 cur_space_usage[str(destination_squad)] += space
 
+            # global setting
+            persist_temporary_units = gamedata.get('persist_temporary_units', False)
+
+            # per-base setting
+            if base.base_type == 'hive':
+                template = gamedata['hives']['templates'].get(base.base_template, None)
+                if template and template.get('persist_temporary_units', False):
+                    persist_temporary_units = True
+
             if (not temporary) or \
-               (gamedata.get('persist_temporary_units', False) and \
-                base.base_landlord_id == owner.user_id): # don't adopt security teams into foreign bases!
+               (persist_temporary_units and base.base_landlord_id == owner.user_id): # don't adopt security teams into foreign bases!
                 base.adopt_object(newobj)
             new_objects.append(newobj)
 
