@@ -39,22 +39,25 @@ ANTI_MISSILE_TYPES = {'auto_cannon': ['auto_cannon_anti_missile_L1', # townhall 
                                       'auto_cannon_anti_missile_L1', # townhall L2
                                       'auto_cannon_anti_missile_L1', # townhall L3
                                       'auto_cannon_anti_missile_L1', # townhall L4
-                                      'auto_cannon_anti_missile_L3', # townhall L5
-                                      'auto_cannon_anti_missile_L3', # townhall L6
-                                      'auto_cannon_anti_missile_L5', # townhall L7+
+                                      'auto_cannon_anti_missile_L1', # townhall L5
+                                      'auto_cannon_anti_missile_L1', # townhall L6
+                                      'auto_cannon_anti_missile_L3', # townhall L7
+                                      'auto_cannon_anti_missile_L3', # townhall L8
+                                      'auto_cannon_anti_missile_L5', # townhall L9
+                                      'auto_cannon_anti_missile_L5', # townhall L10+
                                       ]
                       }
 
 ANTI_MISSILE_CHANCE = [0, # townhall L1
                        0, # townhall L2
                        0, # townhall L3
-                       0.20, # townhall L4
-                       0.35, # townhall L5
-                       0.45, # townhall L6
-                       0.55, # townhall L7
-                       0.65, # townhall L8
-                       0.75, # townhall L9
-                       0.85, # townhall L10+
+                       0, # townhall L4
+                       0.2, # townhall L5
+                       0.18, # townhall L6
+                       0.16, # townhall L7
+                       0.145, # townhall L8
+                       0.13, # townhall L9
+                       0.12, # townhall L10+
                        ]
 
 # MINES
