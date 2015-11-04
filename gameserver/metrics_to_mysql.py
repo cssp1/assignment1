@@ -117,8 +117,10 @@ if __name__ == '__main__':
                 if 'count' in row:
                     keyvals.append(('stack',row['count']))
             elif row['event_name'] == '4701_change_region_success':
-                if row.get('reason',None) in ('player_request','CustomerSupport'): # only include player- and PCHECK-initiated changes
+                if row.get('reason',None) in ('player_request',): # only include player-initiated changes
                     keyvals.append(('spec',row.get('new_region',None))) # stick the new region name in the 'spec' column
+                else:
+                    continue # do not dump "involuntary" region changes to SQL
             elif row['event_name'] == '4702_region_close_notified':
                 keyvals.append(('spec',row.get('region',None))) # stick the region name in the 'spec' column
 
