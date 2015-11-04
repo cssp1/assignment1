@@ -808,6 +808,10 @@
     "loading_screen_beta": "BETA",
     "loading_screen_loading": "Loading art (%pct%)...",
 
+    "report_confirm": { "ui_title": "Report Chat Abuse",
+                        "ui_description": "Report %target for this chat message?\n\n\"%context\"",
+                        "ui_button": "Report"
+                      },
     "report_sent": { "ui_title": "Report Sent",
                      "ui_description": "This player has been reported, and is blocked from contacting you again.\n\nTo unblock, click the \"Unblock\" button on the Player Info menu."
                    },
