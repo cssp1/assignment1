@@ -2127,7 +2127,7 @@ class User:
                         # XXX refund?
 
                     # note: send AFTER executing spell, so that player state is already updated
-                    if 'tag' in payment_data: retmsg.append(["FBPAYMENT_ORDER_ACK", payment_data['tag']])
+                    if 'tag' in payment_data: retmsg.append(["FBPAYMENT_ORDER_ACK", payment_data['tag'], True])
 
         # fire deferred completion
         if d: d.callback(True)
@@ -14449,7 +14449,7 @@ class Store:
         # update client's version of spend metrics
         session.deferred_history_update = True
         if tag: # send acknowledgement to client
-            session.outgoing_messages.append([{'fbcredits':"FBCREDITS_ORDER_ACK",'kgcredits':"KGCREDITS_ORDER_ACK"}[currency], tag])
+            session.outgoing_messages.append([{'fbcredits':"FBCREDITS_ORDER_ACK",'kgcredits':"KGCREDITS_ORDER_ACK"}[currency], tag, True])
         session.queue_flush_outgoing_messages()
         return session
 

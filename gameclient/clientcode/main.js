@@ -41509,8 +41509,21 @@ Store.place_order = function(currency, unit_id, spellname, spellarg, cb, props) 
     }
 };
 
-Store.gamebucks_order_serial = 6543;
-Store.gamebucks_order_receivers = {};
+Store.order_serial = 6543;
+Store.order_receiver = new goog.events.EventTarget();
+
+/** @param {string} tag_prefix
+    @param {function(boolean)|null} cb
+    @return {string} tag to send with the order */
+Store.listen_for_order_ack = function(tag_prefix, cb) {
+    Store.order_serial += 1;
+    var tag = tag_prefix+Store.order_serial.toString();
+    if(cb) {
+        // need this adaptor to pull the .success property out of the event object
+        Store.order_receiver.listenOnce(tag, (function (_cb) { return function(event) { _cb(event.success); }; })(cb));
+    }
+    return tag;
+};
 
 Store.place_gamebucks_order = function(price, unit_id, spellname, spellarg, cb) {
     if(price > 0 && player.resource_state['gamebucks'] < price) {
@@ -41527,18 +41540,12 @@ Store.place_gamebucks_order = function(price, unit_id, spellname, spellarg, cb) 
         return false;
     }
 
-    Store.gamebucks_order_serial += 1;
-    var tag = "gbo"+Store.gamebucks_order_serial.toString();
-    send_to_server.func(["GAMEBUCKS_ORDER", tag,
-                    price, unit_id, spellname, spellarg, Math.floor(server_time)]);
-    if(cb) {
-        Store.gamebucks_order_receivers[tag] = cb;
-    }
+    var tag = Store.listen_for_order_ack('gbo', cb);
+    send_to_server.func(["GAMEBUCKS_ORDER", tag, price, unit_id, spellname, spellarg, Math.floor(server_time)]);
+
     return true;
 };
 
-Store.item_order_serial = 7345;
-Store.item_order_receivers = {};
 Store.place_item_order = function(specname, price, unit_id, spellname, spellarg, cb) {
     var has_qty = player.inventory_item_quantity(specname);
     if(has_qty < price) {
@@ -41548,17 +41555,12 @@ Store.place_item_order = function(specname, price, unit_id, spellname, spellarg,
         return false;
     }
 
-    Store.item_order_serial += 1;
-    var tag = "io"+Store.item_order_serial.toString();
+    var tag = Store.listen_for_order_ack('io', cb);
     send_to_server.func(["ITEM_ORDER", tag, specname, price, unit_id, spellname, spellarg, Math.floor(server_time)]);
-    if(cb) {
-        Store.item_order_receivers[tag] = cb;
-    }
+
     return true;
 }
 
-Store.fungible_order_serial = 7345;
-Store.fungible_order_receivers = {};
 Store.place_fungible_order = function(resname, price, unit_id, spellname, spellarg, cb) {
     var has_qty = player.resource_state[resname][1];
     if(has_qty < price) {
@@ -41573,12 +41575,8 @@ Store.place_fungible_order = function(resname, price, unit_id, spellname, spella
         return false;
     }
 
-    Store.fungible_order_serial += 1;
-    var tag = "fo"+Store.fungible_order_serial.toString();
+    var tag = Store.listen_for_order_ack('fo', cb);
     send_to_server.func(["FUNGIBLE_ORDER", tag, resname, price, unit_id, spellname, spellarg, Math.floor(server_time)]);
-    if(cb) {
-        Store.fungible_order_receivers[tag] = cb;
-    }
 
     // client-side prediction
     player.resource_state[resname][1] -= price;
@@ -41607,12 +41605,8 @@ Store.place_score_order = function(stat_name, price, unit_id, spellname, spellar
         return false;
     }
 
-    Store.fungible_order_serial += 1;
-    var tag = "so"+Store.fungible_order_serial.toString();
+    var tag = Store.listen_for_order_ack('so', cb);
     send_to_server.func(["SCORE_ORDER", tag, stat_name, price, unit_id, spellname, spellarg, Math.floor(server_time)]);
-    if(cb) {
-        Store.fungible_order_receivers[tag] = cb;
-    }
 
     // client-side prediction
     if(price != 0) {
@@ -41621,9 +41615,6 @@ Store.place_score_order = function(stat_name, price, unit_id, spellname, spellar
 
     return true;
 }
-
-Store.credits_order_serial = 9241;
-Store.credits_order_receivers = {};
 
 Store.place_fbcredits_order = function(price, unit_id, spellname, spellarg, on_finish) {
     var descr = spellname;
@@ -41642,11 +41633,7 @@ Store.place_fbcredits_order = function(price, unit_id, spellname, spellarg, on_f
         icon = player.get_any_abtest_value('fb_order_dialog_generic_icon', gamedata['store']['fb_order_dialog_generic_icon']);
     }
 
-    Store.credits_order_serial += 1;
-    var tag = "fbo"+Store.credits_order_serial.toString();
-    if(on_finish) {
-        Store.credits_order_receivers[tag] = on_finish;
-    }
+    var tag = Store.listen_for_order_ack('fbo', on_finish);
 
     // this is arbitrary custom data for our server
     var order_info = {
@@ -41758,11 +41745,7 @@ Store.place_kgcredits_order = function(price, unit_id, spellname, spellarg, on_f
 
     var icon = player.get_any_abtest_value('fb_order_dialog_gamebucks_icon', gamedata['store']['fb_order_dialog_gamebucks_icon']);
 
-    Store.credits_order_serial += 1;
-    var tag = "kgo"+Store.credits_order_serial.toString();
-    if(on_finish) {
-        Store.credits_order_receivers[tag] = on_finish;
-    }
+    var tag = Store.listen_for_order_ack('kgo', on_finish);
 
     // this is arbitrary custom data for our server
     var order_info = {
@@ -41842,9 +41825,6 @@ Store.place_kgcredits_order = function(price, unit_id, spellname, spellarg, on_f
     return true;
 };
 
-Store.fbpayments_order_serial = 1538;
-Store.fbpayments_order_receivers = {};
-
 Store.place_fbpayments_order = function(fbpayments_currency, price, unit_id, spellname, spellarg, on_finish, options) {
     if(!options) { options = {}; }
     var on_fail = options['fail_cb'] || null;
@@ -41868,8 +41848,9 @@ Store.place_fbpayments_order = function(fbpayments_currency, price, unit_id, spe
     var product_url = ogpapi_url({'spellname':spellname, 'type':gamedata['game_id']+'_sku'});
     var quantity = 1;
 
-    Store.fbpayments_order_serial += 1;
-    var request_id = gamedata['game_id']+'_'+session.user_id.toString()+'_'+spin_session_id+'_'+Store.fbpayments_order_serial.toString();
+    var tag = Store.listen_for_order_ack('fbp', on_finish);
+
+    var request_id = gamedata['game_id']+'_'+session.user_id.toString()+'_'+spin_session_id+'_'+tag;
 
     var props = {'currency': currency,
                  'price': price,
@@ -41877,12 +41858,6 @@ Store.place_fbpayments_order = function(fbpayments_currency, price, unit_id, spe
                  'product_url': product_url,
                  'request_id': request_id,
                  'quantity': 1};
-
-
-    var tag = "fbp"+Store.fbpayments_order_serial.toString();
-    if(on_finish) {
-        Store.fbpayments_order_receivers[tag] = on_finish;
-    }
 
     send_to_server.func(["FBPAYMENT_CREATE", tag, request_id, unit_id, spellname, spellarg, price, currency,
                          product_url, quantity, Math.floor(server_time), gift_order]);
@@ -44723,41 +44698,10 @@ function handle_server_message(data) {
             session.manufacture_overflow_warned = true;
             notification_queue.push(function() { invoke_ingame_tip('manufacture_overflow_to_reserves_tip', {frequency: GameTipFrequency.ALWAYS_UNLESS_IGNORED}); });
         }
-    } else if(msg == "GAMEBUCKS_ORDER_ACK") {
+    } else if(msg == "GAMEBUCKS_ORDER_ACK" || msg == "ITEM_ORDER_ACK" || msg == "FUNGIBLE_ORDER_ACK" || msg == "SCORE_ORDER_ACK" ||
+              msg == "FBCREDITS_ORDER_ACK" || msg == "KGCREDITS_ORDER_ACK" || msg == "FBPAYMENT_ORDER_ACK") {
         var tag = data[1], success = data[2];
-        if(tag in Store.gamebucks_order_receivers) {
-            var cb = Store.gamebucks_order_receivers[tag];
-            delete Store.gamebucks_order_receivers[tag];
-            cb(success);
-        }
-    } else if(msg == "ITEM_ORDER_ACK") {
-        var tag = data[1], success = data[2];
-        if(tag in Store.item_order_receivers) {
-            var cb = Store.item_order_receivers[tag];
-            delete Store.item_order_receivers[tag];
-            cb(success);
-        }
-    } else if(msg == "FUNGIBLE_ORDER_ACK" || msg == "SCORE_ORDER_ACK") {
-        var tag = data[1], success = data[2];
-        if(tag in Store.fungible_order_receivers) {
-            var cb = Store.fungible_order_receivers[tag];
-            delete Store.fungible_order_receivers[tag];
-            cb(success);
-        }
-    } else if(msg == "FBCREDITS_ORDER_ACK" || msg == "KGCREDITS_ORDER_ACK") {
-        var tag = data[1];
-        if(tag in Store.credits_order_receivers) {
-            var cb = Store.credits_order_receivers[tag];
-            delete Store.credits_order_receivers[tag];
-            cb();
-        }
-    } else if(msg == "FBPAYMENT_ORDER_ACK") {
-        var tag = data[1];
-        if(tag in Store.fbpayments_order_receivers) {
-            var cb = Store.fbpayments_order_receivers[tag];
-            delete Store.fbpayments_order_receivers[tag];
-            cb();
-        }
+        Store.order_receiver.dispatchEvent({type: tag, success: success});
     } else if(msg == "XSOLLA_GET_TOKEN_RESULT") {
         var tag = data[1], token = data[2];
         if(tag in Store.xsolla_token_receivers) {
