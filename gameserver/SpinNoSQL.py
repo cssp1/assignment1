@@ -758,6 +758,29 @@ class NoSQLClient (object):
         ret.reverse() # oldest messages first
         return ret
 
+    def decode_chat_row(self, row):
+        if '_id' in row:
+            row['id'] = self.decode_object_id(row['_id'])
+            del row['_id']
+        return row
+    # retrieve up to 2*limit messages sent aorund center_time +/- time_limit
+    def chat_get_context(self, channel, sender_id, center_time, time_limit, limit = -1, reason = ''):
+        return self.instrument('chat_get_context(%s)'%reason, self._chat_get_context, (channel, sender_id, center_time, time_limit, limit))
+    def _chat_get_context(self, channel, sender_id, center_time, time_limit, limit):
+        qs = {'sender.user_id': sender_id, 'channel': channel}
+
+        qs['time'] = {'$gte': center_time, '$lt': center_time + time_limit}
+        after = self.chat_buffer_table().find(qs).sort([('time',pymongo.ASCENDING)])
+        if limit > 0: after = after.limit(limit)
+        after = list(after)
+
+        qs['time'] = {'$gt': center_time - time_limit, '$lt': center_time}
+        before =  self.chat_buffer_table().find(qs).sort([('time',pymongo.ASCENDING)])
+        if limit > 0: before = before.limit(limit)
+        before = list(before)
+
+        return map(self.decode_chat_row, before + after)
+
     ###### CHAT REPORTS ######
 
     def chat_reports_table(self):
@@ -766,10 +789,12 @@ class NoSQLClient (object):
             coll.create_index('millitime', expireAfterSeconds=7*86400) # automatically clear after one week
             self.seen_chat_reports = True
         return coll
-    def chat_report(self, channel, reporter_id, target_id, context, reason=''):
-        return self.instrument('chat_report(%s)'%reason, self._chat_report, (channel, reporter_id, target_id, context))
-    def _chat_report(self, channel, reporter_id, target_id, context):
-        props = {'millitime':datetime.datetime.utcfromtimestamp(float(self.time)),
+    # note: the "time" of a chat report is the time the target said the objectionable thing. "report_time" is when it was reported.
+    def chat_report(self, channel, reporter_id, target_id, report_time, target_time, context, reason=''):
+        return self.instrument('chat_report(%s)'%reason, self._chat_report, (channel, reporter_id, target_id, report_time, target_time, context))
+    def _chat_report(self, channel, reporter_id, target_id, report_time, target_time, context):
+        props = {'millitime':datetime.datetime.utcfromtimestamp(target_time),
+                 'report_time': report_time,
                  'channel': channel, 'reporter_id': reporter_id, 'target_id': target_id,
                  'resolved': False}
         if context is not None:
@@ -793,7 +818,7 @@ class NoSQLClient (object):
     def chat_report_resolve(self, id, reason=''):
         return self.instrument('chat_report_resolve(%s)'%reason, self._chat_report_resolve, (id,))
     def _chat_report_resolve(self, id):
-        return self.chat_reports_table().update_one({'_id': self.encode_object_id(id)}, {'$set': {'resolved': True}}).matched_count > 0
+        return self.chat_reports_table().update_one({'_id': self.encode_object_id(id), 'resolved': False}, {'$set': {'resolved': True}}).matched_count > 0
 
 
     ###### PLAYER ALIAS UNIQUE RESERVATIONS ######
@@ -2780,14 +2805,22 @@ if __name__ == '__main__':
         # test maintenance
         #client.do_maint(time_now, cur_season, cur_week)
 
+        # test chat
+        client.chat_buffer_table().drop(); client.seen_chat = False
+        for n in range(4):
+            client.chat_record('global_en', {'user_id': 1112, 'chat_name': 'test'}, 'Test message %d' % n)
+        chat_context = client.chat_get_context('global_en', 1112, time_now, 5, limit = 10)
+        assert len(chat_context) == 4
+
         # test chat reports
         client.chat_reports_table().drop(); client.seen_chat_reports = False
-        client.chat_report('global_en', 1112, 1113, 'you are a poopyhead')
+        client.chat_report('global_en', 1112, 1113, time_now, time_now - 2, 'you are a poopyhead')
         rep_list = client.chat_reports_get(time_now - 60, time_now + 60)
         assert len(rep_list) == 1
         rep = rep_list[0]
         print rep
-        client.chat_report_resolve(rep['id'])
+        assert client.chat_report_resolve(rep['id']) # first resolution should succeed
+        assert not client.chat_report_resolve(rep['id']) # second attempt should fail
         assert len(client.chat_reports_get(time_now - 60, time_now + 60)) == 0
 
         # test player aliases

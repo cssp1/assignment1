@@ -14893,23 +14893,37 @@ function chat_frame_size(dialog, big, forced) {
     }
 };
 
-function invoke_chat_player_context_menu(user_id, ui_name, ui_context, mloc) {
+/** @constructor
+    @param {number} user_id of offender
+    @param {string} channel in which offensive text was said
+    @param {string} ui_name of the offender to show in the GUI
+    @param {string} ui_context offensive txt string to show in the GUI
+    @param {number} context_time - timestamp of the offensive text (used to locate the text on server side - maybe replace with DB id later?) */
+var AdvancedChatReportArgs = function(user_id, channel, ui_name, ui_context, context_time) {
+    this.user_id = user_id; this.channel = channel; this.ui_name = ui_name; this.ui_context = ui_context; this.context_time = context_time;
+};
+
+/** @param {number} user_id
+    @param {string} ui_name of the user to show in the GUI
+    @param {!AdvancedChatReportArgs} report_args
+    @param {!Array.<number>} mloc */
+function invoke_chat_player_context_menu(user_id, ui_name, report_args, mloc) {
     var buttons = [];
     buttons.push(new ContextMenuButton({ui_name: gamedata['dialogs']['player_info_frame']['widgets']['title']['ui_name'],
                                         onclick: (function (_user_id) { return function() {
                                             change_selection_ui(null);
                                             PlayerInfoDialog.invoke(_user_id);
                                         }; })(user_id)}));
-    if(ui_context) {
+    if(report_args.ui_context) {
         if(player.has_blocked_user(user_id)) {
             buttons.push(new ContextMenuButton({ui_name: gamedata['dialogs']['chat_player_context_menu']['widgets']['button']['ui_name_report'],
                                                 state: 'disabled', ui_tooltip: gamedata['dialogs']['chat_player_context_menu']['widgets']['button']['ui_tooltip_already_reported']}));
         } else {
             buttons.push(new ContextMenuButton({ui_name: gamedata['dialogs']['chat_player_context_menu']['widgets']['button']['ui_name_report'],
-                                                onclick: (function (_user_id, _ui_name, _ui_context) { return function() {
+                                                onclick: (function (_report_args) { return function() {
                                                     change_selection_ui(null);
-                                                    invoke_advanced_chat_report_dialog(_user_id, _ui_name, _ui_context);
-                                                }; })(user_id, ui_name, ui_context)
+                                                    invoke_advanced_chat_report_dialog(_report_args);
+                                                }; })(report_args)
                                                }));
         }
     }
@@ -14925,9 +14939,25 @@ function invoke_chat_player_context_menu(user_id, ui_name, ui_context, mloc) {
     return dialog;
 }
 
-function invoke_advanced_chat_report_dialog(user_id, ui_name, ui_context) {
-    var ui_context_censored = ChatFilter.censor(ui_context);
-    // XXXXXX implement
+/** @param {!AdvancedChatReportArgs} args */
+function invoke_advanced_chat_report_dialog(args) {
+    var s = gamedata['strings']['report_confirm'];
+    var ui_context_censored = ChatFilter.censor(args.ui_context);
+    return invoke_child_message_dialog(s['ui_title'],
+                                       s['ui_description'].replace('%target', args.ui_name).replace('%context', args.ui_context),
+                                       {'dialog': 'message_dialog_big',
+                                        'cancel_button': true,
+                                        'ok_button_ui_name': s['ui_button'],
+                                        'on_ok': (function (_args) { return function() {
+                                            send_to_server.func(["CHAT_REPORT2", _args.user_id, _args.channel, _args.context_time]);
+                                            player.block_user(_args.user_id);
+                                            invoke_ui_locker(synchronizer.request_sync(), function() {
+                                                change_selection(null);
+                                                var report_sent = gamedata['strings']['report_sent'];
+                                                invoke_message_dialog(report_sent['ui_title'], report_sent['ui_description'], {'dialog':'message_dialog_big'});
+                                            });
+                                        }; })(args)}
+                                      );
 }
 
 function invoke_damage_protection_notice() {
@@ -44264,24 +44294,31 @@ function handle_server_message(data) {
 
             var bb_text = gamedata['strings']['chat_templates'][template];
 
-            var reportable_text = (bb_text.indexOf('%body') >= 0 ? body : null);
+            // is this text reportable for abuse?
+            var report_args;
+            if(channel_name !== 'ALLIANCE' && bb_text.indexOf('%body') >= 0 && ('time' in sender_info) && ('chat_name' in sender_info) &&
+               ('user_id' in sender_info) && sender_info['user_id'] > 0 && !is_ai_user_id_range(sender_info['user_id']) && sender_info['user_id'] != session.user_id) {
+                report_args = new AdvancedChatReportArgs(sender_info['user_id'], channel_name, sender_info['chat_name'], body, sender_info['time']);
+            } else {
+                report_args = null;
+            }
 
             // functions run when part of the chat message is clicked
             var bbcode_click_handlers = {
-                'player': { 'onclick': (function (_reportable_text) { return function (_suser_id, _ui_name) {
+                'player': { 'onclick': (function (_report_args) { return function (_suser_id, _ui_name) {
                     return function(w, mloc) {
                         if(!_suser_id) { return; }
                         var _user_id = parseInt(_suser_id,10);
                         if(!_user_id || is_ai_user_id_range(_user_id) || _user_id < 0) { return; }
 
-                        if(player.has_advanced_chat_reporting() && _reportable_text && _user_id != session.user_id) {
-                            invoke_chat_player_context_menu(_user_id, _ui_name, _reportable_text, mloc);
+                        if(player.has_advanced_chat_reporting() && _report_args) {
+                            invoke_chat_player_context_menu(_user_id, _ui_name, _report_args, mloc);
                         } else {
                             change_selection_ui(null);
                             PlayerInfoDialog.invoke(_user_id);
                         }
 
-                    }; }; })(reportable_text)},
+                    }; }; })(report_args)},
                 'alliance': { 'onclick': function(salliance_id) { return function(w, mloc) {
                     var alliance_id = parseInt(salliance_id,10);
                     if(alliance_id >= 0) {

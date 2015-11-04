@@ -3767,6 +3767,24 @@ class Session(object):
         else:
             self.do_chat_send('DEVELOPER', '(%s) REPORTED user %d' % (self.user.country, target_uid))
 
+    def do_chat_report2(self, target_uid, channel, context_time):
+        # check cooldown
+        if not self.player.is_developer():
+            cdname = 'chat_report:%d' % target_uid
+            if self.player.cooldown_active(cdname): return
+            self.player.cooldown_trigger(cdname, gamedata['chat_report_cooldown'])
+
+        # don't let gagged players make reports
+        if (not self.user.chat_can_interact()) or self.player.stattab.get_player_stat('chat_gagged'): return
+
+        # retrieve context
+        context_list = gamesite.nosql_client.chat_get_context(channel, target_uid, context_time, gamedata.get('chat_report_context_time', 10), gamedata.get('chat_report_context_limit', 2), reason = 'do_chat_report2')
+
+        if not context_list: return # no messages found
+        ui_context = '\n'.join(x['text'] for x in context_list if x.get('text'))
+
+        gamesite.nosql_client.chat_report(channel, self.user.user_id, target_uid, server_time, context_time, ui_context, reason = 'do_chat_report2')
+
     def do_chat_send(self, channel, text, retmsg = None, bypass_gag = False, props = None):
         assert channel
 
@@ -24535,6 +24553,16 @@ class GAMEAPI(resource.Resource):
             target_uid = arg[1]
             target_chat_name = SpinHTTP.unwrap_string(arg[2])
             session.do_chat_report(target_uid, target_chat_name, retmsg)
+        elif arg[0] == "CHAT_REPORT2":
+            target_uid = arg[1]
+            channel = {'GLOBAL': session.global_chat_channel,
+                       'REGION': session.region_chat_channel,
+                       }.get(arg[2], None)
+            context_time = arg[3]
+            if not channel:
+                retmsg.append(["ERROR", "INVALID_CHAT_CHANNEL"])
+                return
+            session.do_chat_report2(target_uid, channel, context_time)
 
         elif arg[0] == "UNIT_REPAIR_TICK":
             self.do_unit_repair_tick(session, retmsg, must_reply = True)
