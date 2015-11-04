@@ -793,7 +793,7 @@ class NoSQLClient (object):
     def chat_report(self, channel, reporter_id, target_id, report_time, target_time, context, reason=''):
         return self.instrument('chat_report(%s)'%reason, self._chat_report, (channel, reporter_id, target_id, report_time, target_time, context))
     def _chat_report(self, channel, reporter_id, target_id, report_time, target_time, context):
-        props = {'millitime':datetime.datetime.utcfromtimestamp(target_time),
+        props = {'millitime':datetime.datetime.utcfromtimestamp(float(target_time)),
                  'report_time': report_time,
                  'channel': channel, 'reporter_id': reporter_id, 'target_id': target_id,
                  'resolved': False}
@@ -813,7 +813,7 @@ class NoSQLClient (object):
         return row
     def _chat_reports_get(self, start_time, end_time):
         return [self.decode_chat_report(x) for x in \
-                self.chat_reports_table().find({'millitime':{'$gte':datetime.datetime.utcfromtimestamp(start_time), '$lt': datetime.datetime.utcfromtimestamp(end_time)},
+                self.chat_reports_table().find({'millitime':{'$gte':datetime.datetime.utcfromtimestamp(float(start_time)), '$lt': datetime.datetime.utcfromtimestamp(float(end_time))},
                                                 'resolved': False})]
     def chat_report_resolve(self, id, reason=''):
         return self.instrument('chat_report_resolve(%s)'%reason, self._chat_report_resolve, (id,))
