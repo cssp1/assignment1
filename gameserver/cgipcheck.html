@@ -1253,43 +1253,6 @@ var refresh_server_status = function() {
     }
 };
 
-var method_skynet_query = function() {
-    var query = $("#skynet_query")[0].value;
-    if(query && query.length>0) {
-        var interval = $('input:radio[name=skynet_interval]:checked').val();
-        send_request('skynet', 'graph', {'query':query, 'time_interval':interval.toString()}, function(result) {
-            $("#skynet_graph_area").empty();
-            //console.log(result);
-            $('#skynet_info')[0].innerHTML = 'Skynet: %s (%d ads)'.replace('%s', result['query']).replace('%d', result['adgroup_list_len'].toString());
-            if(result['graphs'].length > 0) {
-                for(var graph_id = 0; graph_id < result['graphs'].length; graph_id++) {
-                    if('ui_name' in result['graphs'][graph_id]) { $("#skynet_graph_area").append('<p>'+result['graphs'][graph_id]['ui_name']); }
-                    $("#skynet_graph_area").append('<div id="skynet_graph'+graph_id.toString()+'" style="width:650px; height:200px;">');
-                    $.plot("#skynet_graph"+graph_id.toString(), result['graphs'][graph_id]['series'],
-                           $.extend(result['graphs'][graph_id]['plot_params'],
-                                    {'legend':{'position':'nw'},
-                                     'grid': {'hoverable':true},
-                                     'zoom': {'interactive':true},
-                                     'pan': {'interactive':true}
-                                    }));
-                    $("#skynet_graph"+graph_id.toString()).bind("plothover", function (event, pos, item) {
-                        if(item) {
-                            var x = item.datapoint[0].toFixed(2),
-                            y = item.datapoint[1].toFixed((item.datapoint[1] >= 1000 ? 0 : 2));
-                            $("#graph_tooltip").html(item.series.label +': ' + y).css({top: item.pageY+5, left: item.pageX+5}).fadeIn(30);
-                        } else {
-                            $("#graph_tooltip").hide();
-                        }
-                    });
-                }
-            }
-            if(result['ui_info']) {
-                $("#skynet_graph_area").append('<p><font color="#ff0000">Info: '+result['ui_info']+'</color>');
-            }
-        });
-    }
-};
-
 var refresh_clock = function() {
     var text = (new Date()).toUTCString().slice(0,22)+' UTC.';
     text += ' Logged in as <b>$SPIN_USERNAME$</b>.';
@@ -1325,8 +1288,6 @@ $(function() {
             if(spin_token_data['roles'].indexOf('SKYNET') != -1) {
                 refresh_credits();
             }
-        } else if(panel.is('#mode_skynet')) {
-            $('#skynet_query').focus();
         }
     };
 
@@ -1376,12 +1337,7 @@ $(function() {
 
     if(spin_token_data['roles'].indexOf('SKYNET') == -1) {
         // no skynet permission, no credits display
-       $('#mode_skynet_tab').remove();
-       $('#mode_skynet').remove();
        $('#credits_status_area').remove();
-    } else {
-        // skynet enabled
-        $('#skynet_interval_1h')[0].checked = true;
     }
 
     $('#player_lookup').tabs();
@@ -1418,8 +1374,6 @@ $(function() {
     } else {
             $('#change_region_destination').append('<option value="LIMBO">Banish from all maps</option>');
     }
-    $('#skynet_query').bind('enterKey', method_skynet_query);
-    $('#skynet_query').keyup(function(e) { if(e.keyCode == 13) { $(this).trigger('enterKey'); } });
 
     // with ADMIN permission, default to server status page
     if(spin_token_data['roles'].indexOf('ADMIN') != -1) {
@@ -1450,7 +1404,6 @@ $(function() {
     <li id="mode_payment_tab"><a href="#mode_payment">FB Payment</a></li>
     <li id="mode_server_tab"><a href="#mode_server">Server</a></li>
     <li id="mode_logs_tab"><a href="#mode_logs">Logs</a></li>
-    <li id="mode_skynet_tab"><a href="#mode_skynet">Skynet</a></li>
    </ul>
 
 <div id="mode_player">
@@ -1707,21 +1660,6 @@ Status: <span id="payment_status"></span>
 </div>
 
 </div> <!-- END mode_logs -->
-
-<div id="mode_skynet">
-<input type="text" id="skynet_query" name="skynet_query" value="">
-<button onclick="method_skynet_query()" class="spin_button" style="height:33px;">Go</button>
-    Interval:
-<input type="radio" name="skynet_interval" id="skynet_interval_1h" class="spin_radio" value="3600" checked>1 Hour</input>
-<input type="radio" name="skynet_interval" id="skynet_interval_4h" class="spin_radio" value="14400">4 Hours</input>
-<input type="radio" name="skynet_interval" id="skynet_interval_8h" class="spin_radio" value="28800">8 Hours</input>
-<input type="radio" name="skynet_interval" id="skynet_interval_24h" class="spin_radio" value="68400">24 Hours</input>
-<p>
-<div id="skynet_info">SKYNET</div>
-<p>
-<div id="skynet_graph_area"></div>
-</div>
-</div> <!-- END mode_skynet -->
 
 <div id="loading_dialog" title="Working..." style="display:none;" >
 Contacting server...
