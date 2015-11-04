@@ -789,7 +789,7 @@ class NoSQLClient (object):
             coll.create_index('millitime', expireAfterSeconds=7*86400) # automatically clear after one week
             self.seen_chat_reports = True
         return coll
-    # note: the "time" of a chat report is the time the target said the objectionable thing. "report_time" is when it was reported.
+    # note: the "time" of a chat report is the time the target said the objectionable thing. "report_time" is when it was reported, "resolution_time" is when it was resolved.
     def chat_report(self, channel, reporter_id, reporter_ui_name, target_id, target_ui_name, report_time, target_time, context, reason=''):
         return self.instrument('chat_report(%s)'%reason, self._chat_report, (channel, reporter_id, reporter_ui_name, target_id, target_ui_name, report_time, target_time, context))
     def _chat_report(self, channel, reporter_id, reporter_ui_name, target_id, target_ui_name, report_time, target_time, context):
@@ -814,13 +814,15 @@ class NoSQLClient (object):
         return row
     def _chat_reports_get(self, start_time, end_time):
         return [self.decode_chat_report(x) for x in \
-                self.chat_reports_table().find({'millitime':{'$gte':datetime.datetime.utcfromtimestamp(float(start_time)), '$lt': datetime.datetime.utcfromtimestamp(float(end_time))},
-                                                'resolved': False})]
-    def chat_report_resolve(self, id, resolution, reason=''):
-        return self.instrument('chat_report_resolve(%s)'%reason, self._chat_report_resolve, (id, resolution))
-    def _chat_report_resolve(self, id, resolution):
+                self.chat_reports_table().find({'millitime':{'$gte':datetime.datetime.utcfromtimestamp(float(start_time)),
+                                                             '$lt': datetime.datetime.utcfromtimestamp(float(end_time))}
+                                                })]
+
+    def chat_report_resolve(self, id, resolution, resolution_time, reason=''):
+        return self.instrument('chat_report_resolve(%s)'%reason, self._chat_report_resolve, (id, resolution, resolution_time))
+    def _chat_report_resolve(self, id, resolution, resolution_time):
         return self.chat_reports_table().update_one({'_id': self.encode_object_id(id), 'resolved': False},
-                                                    {'$set': {'resolved': True, 'resolution': resolution}}).matched_count > 0
+                                                    {'$set': {'resolved': True, 'resolution': resolution, 'resolution_time': resolution_time}}).matched_count > 0
 
 
     ###### PLAYER ALIAS UNIQUE RESERVATIONS ######
@@ -2821,9 +2823,9 @@ if __name__ == '__main__':
         assert len(rep_list) == 1
         rep = rep_list[0]
         print rep
-        assert client.chat_report_resolve(rep['id'], 'ignore') # first resolution should succeed
-        assert not client.chat_report_resolve(rep['id'], 'ignore') # second attempt should fail
-        assert len(client.chat_reports_get(time_now - 60, time_now + 60)) == 0
+        assert client.chat_report_resolve(rep['id'], 'ignore', time_now) # first resolution should succeed
+        assert not client.chat_report_resolve(rep['id'], 'ignore', time_now) # second attempt should fail
+        assert len(filter(lambda x: not x.get('resolved'), client.chat_reports_get(time_now - 60, time_now + 60))) == 0
 
         # test player aliases
         client.player_alias_table().drop(); client.seen_player_aliases = False

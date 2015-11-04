@@ -1256,6 +1256,8 @@ var refresh_server_status = function() {
 
 var chat_pending = false;
 var cur_chat_reports = [];
+var cur_chat_report_rows = {};
+
 var refresh_chat = function() {
     if(!chat_pending) {
         $('#chat_table').empty();
@@ -1263,9 +1265,10 @@ var refresh_chat = function() {
         $('#chat_status_loading')[0].innerHTML = 'Loading...';
         var time_now = (new Date()).getTime()/1000;
 
-        send_request('chat', 'get_reports', {'start_time':time_now - 86400, 'end_time':time_now}, function(result) {
+        send_request('chat', 'get_reports', {'start_time':time_now - 86400, 'end_time':time_now, 'filter': 'unresolved'}, function(result) {
             chat_pending = false;
             cur_chat_reports = result;
+            cur_chat_report_rows = {};
             var time_now = (new Date()).getTime()/1000;
 
             $('#chat_status_loading')[0].innerHTML = 'Unresolved chat reports from the last 24 hours:';
@@ -1284,6 +1287,7 @@ var refresh_chat = function() {
             $.each(result, function(index, item) {
                 var row = $('<tr>');
                 refresh_chat_report_row(row, item, time_now);
+                cur_chat_report_rows[item['id']] = row;
                 $('#chat_table').append(row);
             });
         }, true);
@@ -1346,14 +1350,30 @@ var refresh_chat_report_row = function(row, item, time_now) {
 };
 
 var resolve_chat_report = function(row, item, action) {
+    var async = (action === 'ignore');
     send_request('chat', 'resolve_report', {'id': item['id'], 'user_id': item['target_id'], 'action': action},
                  (function (_row, _item, _action) {
                      return function(result) {
                          row.empty();
                          if(_action == 'violate') {
                              alert("Success!\n"+result.toString());
+
+                             // clear unresolved reports that refer to things said before this violation
+                             cur_chat_reports = cur_chat_reports.filter(function(other) {
+                                 if(other['target_id'] == item['target_id'] && other['id'] in cur_chat_report_rows) {
+                                     cur_chat_report_rows[other['id']].empty();
+                                     delete cur_chat_report_rows[other['id']];
+                                     return false;
+                                 }
+                                 return true;
+                             });
+
                          }
-                     }; })(row, item, action));
+
+                     }; })(row, item, action), async);
+    if(async) {
+        row.empty();
+    }
 };
 
 var refresh_clock = function() {
