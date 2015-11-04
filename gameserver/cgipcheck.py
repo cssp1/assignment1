@@ -366,6 +366,22 @@ def do_action(path, method, args, spin_token_data, nosql_client):
                     qs['time']['$lt'] = int(args['end_time'])
 
                 result = {'result': list(nosql_client.chat_buffer_table().find(qs, {'_id':0,'channel':1,'sender':1,'text':1,'time':1}).sort([('time',-1)]).limit(1000))}
+            elif method == 'get_reports':
+                result = {'result': list(nosql_client.chat_reports_get(args['start_time'], args['end_time'])) }
+            elif method == 'resolve_report':
+                assert args['action'] in ('ignore', 'violate')
+                do_log = True
+                if args['action'] == 'ignore':
+                    result = {'result': nosql_client.chat_report_resolve(args['id'], 'ignore') }
+                elif args['action'] == 'violate':
+                    nosql_client.chat_report_resolve(args['id'], 'violate') # start here to avoid race condition
+                    control_args = args.copy()
+                    control_args['user_id'] = args['user_id'] # trusting the client - but they have the power to violate anyone anyway.
+                    if 'spin_token' in control_args: # do not pass credentials along
+                        del control_args['spin_token']
+                    control_args['spin_user'] = spin_token_data['spin_user']
+                    violate_result = chat_abuse_violate(control_args)
+                    result = {'result': violate_result }
             else:
                 raise Exception('unknown '+path[0]+' method '+method)
 

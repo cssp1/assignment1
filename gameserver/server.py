@@ -3780,10 +3780,23 @@ class Session(object):
         # retrieve context
         context_list = gamesite.nosql_client.chat_get_context(channel, target_uid, context_time, gamedata.get('chat_report_context_time', 10), gamedata.get('chat_report_context_limit', 2), reason = 'do_chat_report2')
 
-        if not context_list: return # no messages found
-        ui_context = '\n'.join(x['text'] for x in context_list if x.get('text'))
+        ui_context_list = []
+        target_chat_name = 'unknown'
+        for x in context_list:
+            if not x.get('text'): continue # system message or non-default template
+            if 'chat_name' in x['sender']:
+                target_chat_name = x['sender']['chat_name']
+            if x['time'] == context_time:
+                ui_text = '*** '+x['text']+' ***'
+            else:
+                ui_text = x['text']
+            ui_context_list.append(ui_text)
 
-        gamesite.nosql_client.chat_report(channel, self.user.user_id, target_uid, server_time, context_time, ui_context, reason = 'do_chat_report2')
+        if not ui_context_list: return # no messages found
+        ui_context = '\n'.join(ui_context_list)
+
+        gamesite.nosql_client.chat_report(channel, self.user.user_id, self.user.get_chat_name(self.player),
+                                          target_uid, target_chat_name, server_time, context_time, ui_context, reason = 'do_chat_report2')
 
     def do_chat_send(self, channel, text, retmsg = None, bypass_gag = False, props = None):
         assert channel

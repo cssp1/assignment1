@@ -20,6 +20,7 @@ input { font-family: monospace; font-size: 16px; height:28px; padding:0; }
 .spin_radio { vertical-align: bottom; }
 .ui-widget select { font-size: 18px; }
 table, th, td { border: 1px solid #808080; border-collapse: collapse; }
+.spin_chat_report_td { padding: 5px; }
 </style>
 
 <script type="text/javascript">
@@ -1253,6 +1254,108 @@ var refresh_server_status = function() {
     }
 };
 
+var chat_pending = false;
+var cur_chat_reports = [];
+var refresh_chat = function() {
+    if(!chat_pending) {
+        $('#chat_table').empty();
+        chat_pending = true;
+        $('#chat_status_loading')[0].innerHTML = 'Loading...';
+        var time_now = (new Date()).getTime()/1000;
+
+        send_request('chat', 'get_reports', {'start_time':time_now - 86400, 'end_time':time_now}, function(result) {
+            chat_pending = false;
+            cur_chat_reports = result;
+            var time_now = (new Date()).getTime()/1000;
+
+            $('#chat_status_loading')[0].innerHTML = 'Unresolved chat reports from the last 24 hours:';
+            // show most recent at top
+            result.sort(function (a, b) {
+                if(a['time'] > b['time']) {
+                    return -1;
+                } else if(a['time'] < b['time']) {
+                    return 1;
+                } else if(a['id'] > b['id']) {
+                    return -1;
+                } else {
+                    return 1;
+                }
+            });
+            $.each(result, function(index, item) {
+                var row = $('<tr>');
+                refresh_chat_report_row(row, item, time_now);
+                $('#chat_table').append(row);
+            });
+        }, true);
+    }
+};
+
+// detect '*** ... ***' added by server and replace with boldface
+var prettify_context = function(sender_ui_name, text) {
+    var lines = text.split('\n');
+    for(var i = 0; i < lines.length; i++) {
+        var line = lines[i];
+        var hit = null;
+        if(line.indexOf('*** ') == 0 && line.slice(line.length-4, line.length) == ' ***') {
+            hit = line.slice(4, line.length-4);
+        }
+        line = sender_ui_name+': '+(hit ? hit : line);
+        if(hit) {
+            line = '<b>'+line+'</b>';
+        }
+        lines[i] = line;
+    }
+    return lines.join('\n');
+};
+
+var refresh_chat_report_row = function(row, item, time_now) {
+    row.empty();
+    var target_ui_name = (item['target_ui_name'] || 'unknown');
+    var reporter_ui_name = (item['reporter_ui_name'] || 'unknown');
+    var s = '%abstime (%relhoursh ago), player %target_id <b>%target_ui_name</b> said in channel <tt>%channel</tt>:<br><pre>%context</pre>and was reported by player %reporter_id <b>%reporter_ui_name</b> at %report_time';
+    s = s.replace('%abstime', pretty_print_ts(item['time']));
+    s = s.replace('%relhours', ((time_now - item['time'])/3600.0).toFixed(1));
+    s = s.replace('%target_id', item['target_id'].toString());
+    s = s.replace('%reporter_id', item['reporter_id'].toString());
+    s = s.replace('%target_ui_name', target_ui_name);
+    s = s.replace('%reporter_ui_name', reporter_ui_name);
+    s = s.replace('%channel', item['channel']);
+    s = s.replace('%context', prettify_context(target_ui_name, $.trim(item['context'])));
+    s = s.replace('%report_time', pretty_print_ts(item['report_time']));
+
+    var text_div = $('<div>', {html: s}).css("float","left");
+
+    var button_div = $('<div>').css("float","right");
+    var btn_list = [{'action':'ignore','ui_name':'Ignore','color':'#d0d0d0'},
+                    {'action':'violate','ui_name':'Add Offense','color':'#ff8080'}];
+    $.each(btn_list,
+           function(index, btn) {
+               var button = $('<button>', {html: btn['ui_name']}).addClass('spin_button');
+               button.css("background-color", btn['color']);
+               button.click((function (_row, _item, _action) { return function() {
+                   resolve_chat_report(_row, _item, _action);
+               }; })(row, item, btn['action']));
+               button_div.append(button);
+           });
+
+    var cell = $('<td>').addClass('spin_chat_report_td');
+    cell.append(text_div);
+    cell.append(button_div);
+
+    row.append(cell);
+};
+
+var resolve_chat_report = function(row, item, action) {
+    send_request('chat', 'resolve_report', {'id': item['id'], 'user_id': item['target_id'], 'action': action},
+                 (function (_row, _item, _action) {
+                     return function(result) {
+                         row.empty();
+                         if(_action == 'violate') {
+                             alert("Success!\n"+result.toString());
+                         }
+                     }; })(row, item, action));
+};
+
 var refresh_clock = function() {
     var text = (new Date()).toUTCString().slice(0,22)+' UTC.';
     text += ' Logged in as <b>$SPIN_USERNAME$</b>.';
@@ -1288,6 +1391,8 @@ $(function() {
             if(spin_token_data['roles'].indexOf('SKYNET') != -1) {
                 refresh_credits();
             }
+        } else if(panel.is('#mode_chat')) {
+            refresh_chat();
         }
     };
 
@@ -1300,6 +1405,8 @@ $(function() {
         // no ban or developer flag permission
         $('#player_tools_ban').remove();
         $('#player_tools_ban_header').remove();
+        $('#mode_chat_tab').remove(); // XXXXXX temporary - remove once chat is working
+        $('#mode_chat').remove();
     }
 
     if(spin_token_data['roles'].indexOf('PCHECK-WRITE') == -1) {
@@ -1402,6 +1509,7 @@ $(function() {
    <ul>
     <li><a href="#mode_player">Player</a></li>
     <li id="mode_payment_tab"><a href="#mode_payment">FB Payment</a></li>
+    <li id="mode_chat_tab"><a href="#mode_chat">(BETA) Chat Moderation</a></li>
     <li id="mode_server_tab"><a href="#mode_server">Server</a></li>
     <li id="mode_logs_tab"><a href="#mode_logs">Logs</a></li>
    </ul>
@@ -1614,6 +1722,17 @@ Status: <span id="payment_status"></span>
 <hr>
 <textarea id="payment_lookup_output" readonly style="width:100%;height:10%;font-family:monospace;font-size:12px;"></textarea>
 </div>  <!-- END per_payment -->
+
+</div> <!-- END mode_payment -->
+
+<div id="mode_chat">
+<div id="chat_status" style="position:relative;">
+<div id="chat_status_loading">STATUS</div>
+<p>
+<table id="chat_table" width="100%" style="font-size:12;font-family:sans-serif;"></table>
+<br>
+
+</div> <!-- END mode_chat -->
 
 </div> <!-- END mode_payment -->
 
