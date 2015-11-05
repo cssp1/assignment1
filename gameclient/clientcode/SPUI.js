@@ -1730,21 +1730,23 @@ SPUI.RichTextField.prototype.on_mouseup = function(uv, offset, button) {
        uv[1] >= this.xy[1]+offset[1] &&
        uv[1]  < this.xy[1]+offset[1]+this.wh[1]) { // click is inside the area
         if(this.state === 'disabled') { return true; }
-        var testxy = [uv[0]-this.xy[0]-offset[0]-this.text_offset[0],
-                      uv[1]-this.xy[1]-offset[1]-this.text_offset[1]];
-        testxy[1] += this.font.size; // XXX adjust for baseline in SPText
-        var props = SPText.detect_hit(this.rtxt, testxy);
-        if(props && (props.onclick || (props.onclick_state && props.onclick_state.callback))) {
-            if(props.onclick) {
-                props.onclick(this, uv);
-            } else {
-                props.onclick_state.callback(this, uv);
+        if(this.rtxt) {
+            var testxy = [uv[0]-this.xy[0]-offset[0]-this.text_offset[0],
+                          uv[1]-this.xy[1]-offset[1]-this.text_offset[1]];
+            testxy[1] += this.font.size; // XXX adjust for baseline in SPText
+            var props = SPText.detect_hit(this.rtxt, testxy);
+            if(props && (props.onclick || (props.onclick_state && props.onclick_state.callback))) {
+                if(props.onclick) {
+                    props.onclick(this, uv);
+                } else {
+                    props.onclick_state.callback(this, uv);
+                }
+                // force the tooltip to disappear
+                if(this.tooltip) { this.tooltip.onleave(); }
+                return true;
             }
-            // force the tooltip to disappear
-            if(this.tooltip) { this.tooltip.onleave(); }
-            return true;
-
-        } else if(this.onclick) {
+        }
+        if(this.onclick) {
             // force the tooltip to disappear
             if(this.tooltip) { this.tooltip.onleave(); }
             this.onclick(this, button);
