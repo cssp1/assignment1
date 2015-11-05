@@ -1580,6 +1580,7 @@ SPUI.RichTextField = function(data) {
     this.text_offset = data['text_offset'] || [0,0];
     this.drop_shadow = data['drop_shadow'] || false;
     this.resize_to_fit_text = data['resize_to_fit_text'] || false;
+    this.push_text = ('push_text' in data ? data['push_text'] : false); // whether text gets "pushed"
     this.text = null;
     this.sblines = null;
     this.rtxt = null;
@@ -1663,7 +1664,7 @@ SPUI.RichTextField.prototype.do_draw = function(offset) {
     }
     SPUI.ctx.save();
     SPUI.ctx.font = this.font.str();
-    var text_offset = vec_add(this.text_offset, [offset[0], offset[1] + (this.pushed ? 1 : 0)]);
+    var text_offset = vec_add(this.text_offset, [offset[0], offset[1] + ((this.pushed && this.push_text) ? 1 : 0)]);
     if(this.drop_shadow) {
         SPUI.ctx.fillStyle = '#000000';
         SPText.render_text(this.rtxt, [text_offset[0]+this.xy[0]+this.drop_shadow,text_offset[1]+this.xy[1]+this.drop_shadow], this.font, true);
@@ -1729,7 +1730,21 @@ SPUI.RichTextField.prototype.on_mouseup = function(uv, offset, button) {
        uv[1] >= this.xy[1]+offset[1] &&
        uv[1]  < this.xy[1]+offset[1]+this.wh[1]) { // click is inside the area
         if(this.state === 'disabled') { return true; }
-        if(this.onclick) {
+        var testxy = [uv[0]-this.xy[0]-offset[0]-this.text_offset[0],
+                      uv[1]-this.xy[1]-offset[1]-this.text_offset[1]];
+        testxy[1] += this.font.size; // XXX adjust for baseline in SPText
+        var props = SPText.detect_hit(this.rtxt, testxy);
+        if(props && (props.onclick || (props.onclick_state && props.onclick_state.callback))) {
+            if(props.onclick) {
+                props.onclick(this, uv);
+            } else {
+                props.onclick_state.callback(this, uv);
+            }
+            // force the tooltip to disappear
+            if(this.tooltip) { this.tooltip.onleave(); }
+            return true;
+
+        } else if(this.onclick) {
             // force the tooltip to disappear
             if(this.tooltip) { this.tooltip.onleave(); }
             this.onclick(this, button);
