@@ -17922,7 +17922,14 @@ function invoke_message_dialog(title_text, body_text, props) {
         dialog.widgets['title'].text_color = SPUI.make_colorv(props['title_text_color']);
     }
 
-    dialog.widgets['description'].set_text_with_linebreaking(body_text);
+    if(props['use_bbcode']) {
+        dialog.widgets['description_bbcode'].set_text_bbcode(body_text);
+        dialog.widgets['description_bbcode'].show = true;
+        dialog.widgets['description'].show = false;
+    } else {
+        dialog.widgets['description'].set_text_with_linebreaking(body_text);
+    }
+
     if('close_button' in props && !props['close_button']) {
         dialog.widgets['close_button'].show = false;
     }
@@ -17973,7 +17980,13 @@ function invoke_child_message_dialog(title_text, body_text, props) {
         dialog.widgets['title'].text_color = SPUI.make_colorv(props['title_text_color']);
     }
 
-    dialog.widgets['description'].set_text_with_linebreaking(body_text);
+    if(props['use_bbcode']) {
+        dialog.widgets['description_bbcode'].set_text_bbcode(body_text);
+        dialog.widgets['description_bbcode'].show = true;
+        dialog.widgets['description'].show = false;
+    } else {
+        dialog.widgets['description'].set_text_with_linebreaking(body_text);
+    }
 
     if('close_button' in props && !props['close_button']) {
         dialog.widgets['close_button'].show = false;

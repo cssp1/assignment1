@@ -53,8 +53,13 @@
 
             "title": { "kind": "TextField", "xy": [182,35], "dimensions": [277, 25], "text_size": 17, "text_style": "bold",
                        "text_hjustify": "left", "ui_name": "" },
-            "description": { "kind": "TextField", "xy": [182,69], "dimensions": [277, 25], "text_size": 13, "text_style": "normal",
-                             "text_hjustify": "left", "text_vjustify": "top", "ui_name": "" },
+            "description": { "kind": "TextField", "xy": [182,69], "dimensions": [277, 145], "text_size": 13, "text_style": "normal",
+                             "text_hjustify": "left", "text_vjustify": "top" },
+
+            // optional rich text version
+            "description_bbcode": { "show": 0, "kind": "RichTextField", "xy": [182,69], "dimensions": [277, 145], "text_size": 13, "text_style": "normal",
+                                    "text_hjustify": "left", "text_vjustify": "top" },
+
             "close_button": { "show": 0,
                               "kind": "ActionButton", "xy": [463,1], "dimensions": [19,22], "bg_image": "close_button_small", "push_bg_image": 1 },
 
