@@ -225,6 +225,7 @@ SPText.cstring_to_ablocks_bbcode = function(str, props, plugins) {
                     // also note we need to add a *reference* to a state object, not a literal, since inner blocks are going to clone this.
                     if('onclick' in plugins[root]) {
                         word_props.onclick_state = {root:root, handler: plugins[root]['onclick'], arg:arg, callback:null};
+                        word_props.onclick = null; // remove any existing old-style handler
                    }
                 } else {
                     console.log("parse error: unknown BBCode "+code);

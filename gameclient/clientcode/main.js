@@ -14904,31 +14904,40 @@ var AdvancedChatReportArgs = function(user_id, channel, ui_name, ui_context, con
 };
 
 /** @param {number} user_id
+    @param {number} alliance_id
     @param {string} ui_name of the user to show in the GUI
-    @param {!AdvancedChatReportArgs} report_args
+    @param {AdvancedChatReportArgs|null} report_args
     @param {!Array.<number>} mloc */
-function invoke_chat_player_context_menu(user_id, ui_name, report_args, mloc) {
+function invoke_chat_player_context_menu(user_id, alliance_id, ui_name, report_args, mloc) {
     var buttons = [];
-    buttons.push(new ContextMenuButton({ui_name: gamedata['dialogs']['player_info_frame']['widgets']['title']['ui_name'],
-                                        onclick: (function (_user_id) { return function() {
-                                            change_selection_ui(null);
+    buttons.push(new ContextMenuButton({ui_name: gamedata['dialogs']['chat_player_context_menu']['widgets']['button']['ui_name_player_info'],
+                                        onclick: (function (_user_id) { return function(w) {
+                                            close_parent_dialog(w); // change_selection_ui(null); safe?
                                             PlayerInfoDialog.invoke(_user_id);
                                         }; })(user_id)}));
-    if(report_args.ui_context) {
+    if(alliance_id > 0) {
+        buttons.push(new ContextMenuButton({ui_name: gamedata['dialogs']['chat_player_context_menu']['widgets']['button']['ui_name_alliance_info'],
+                                            onclick: (function (_alliance_id) { return function(w) {
+                                                close_parent_dialog(w); // change_selection_ui(null); safe?
+                                                invoke_alliance_info(_alliance_id);
+                                            }; })(alliance_id)}));
+    }
+    if(player.has_advanced_chat_reporting() && report_args && report_args.ui_context &&
+       report_args.user_id !== session.user_id && report_args.channel !== 'ALLIANCE') {
         if(player.has_blocked_user(user_id)) {
             buttons.push(new ContextMenuButton({ui_name: gamedata['dialogs']['chat_player_context_menu']['widgets']['button']['ui_name_report'],
                                                 state: 'disabled', ui_tooltip: gamedata['dialogs']['chat_player_context_menu']['widgets']['button']['ui_tooltip_already_reported']}));
         } else {
             buttons.push(new ContextMenuButton({ui_name: gamedata['dialogs']['chat_player_context_menu']['widgets']['button']['ui_name_report'],
-                                                onclick: (function (_report_args) { return function() {
-                                                    change_selection_ui(null);
+                                                onclick: (function (/** !AdvancedChatReportArgs */ _report_args) { return function(w) {
+                                                    close_parent_dialog(w); // change_selection_ui(null); safe?
                                                     invoke_advanced_chat_report_dialog(_report_args);
                                                 }; })(report_args)
                                                }));
         }
     }
 
-    var dialog = invoke_generic_context_menu(vec_add(mloc, [0, 15]), buttons, 'chat_player_context_menu');
+    var dialog = invoke_generic_context_menu(vec_add(mloc, [0, 8]), buttons, 'chat_player_context_menu');
     dialog.widgets['title'].str = ui_name;
     var name_wh = dialog.widgets['title'].font.measure_string(dialog.widgets['title'].str);
     // abbreviate the name if it overflows
@@ -44270,30 +44279,32 @@ function handle_server_message(data) {
             var bb_text = gamedata['strings']['chat_templates'][template];
 
             // is this text reportable for abuse?
+            // note: for the onclick handlers below to work, report_args must be set up even if it's your own message, or a private channel
             var report_args;
-            if(channel_name !== 'ALLIANCE' && bb_text.indexOf('%body') >= 0 && ('time' in sender_info) && ('chat_name' in sender_info) &&
-               ('user_id' in sender_info) && sender_info['user_id'] > 0 && !is_ai_user_id_range(sender_info['user_id']) && sender_info['user_id'] != session.user_id) {
+            if(bb_text.indexOf('%body') >= 0 && ('time' in sender_info) && ('chat_name' in sender_info) &&
+               ('user_id' in sender_info) && sender_info['user_id'] > 0 && !is_ai_user_id_range(sender_info['user_id'])) {
                 report_args = new AdvancedChatReportArgs(sender_info['user_id'], channel_name, sender_info['chat_name'], body, sender_info['time']);
             } else {
                 report_args = null;
             }
+            var alliance_id = ('alliance_id' in sender_info ? sender_info['alliance_id'] : -1);
 
             // functions run when part of the chat message is clicked
             var bbcode_click_handlers = {
-                'player': { 'onclick': (function (_report_args) { return function (_suser_id, _ui_name) {
+                'player': { 'onclick': (function (_report_args, _alliance_id) { return function (_suser_id, _ui_name) {
                     return function(w, mloc) {
                         if(!_suser_id) { return; }
                         var _user_id = parseInt(_suser_id,10);
                         if(!_user_id || is_ai_user_id_range(_user_id) || _user_id < 0) { return; }
 
-                        if(player.has_advanced_chat_reporting() && _report_args) {
-                            invoke_chat_player_context_menu(_user_id, _ui_name, _report_args, mloc);
-                        } else {
-                            change_selection_ui(null);
-                            PlayerInfoDialog.invoke(_user_id);
+                        // note: this might refer to a DIFFERENT player than the main message - if so, ignore report_args and alliance_id
+                        if(!_report_args || (_user_id !== _report_args.user_id)) {
+                            _alliance_id = -1;
+                            _report_args = null;
                         }
+                        invoke_chat_player_context_menu(_user_id, _alliance_id, _ui_name, _report_args, mloc);
 
-                    }; }; })(report_args)},
+                    }; }; })(report_args, alliance_id)},
                 'alliance': { 'onclick': function(salliance_id) { return function(w, mloc) {
                     var alliance_id = parseInt(salliance_id,10);
                     if(alliance_id >= 0) {
@@ -44312,6 +44323,18 @@ function handle_server_message(data) {
                     }
                 }; } }
             };
+
+            var base_props = {};
+            if('time' in sender_info) {
+                base_props.tooltip_func = (function (_send_time) { return function() {
+                    return gamedata['strings']['chat_age'].replace('%s', pretty_print_time(server_time - _send_time));
+                }; })(sender_info['time']);
+            }
+
+            // set up a default onclick handler for the entire blob of text
+            if(report_args) {
+                base_props.onclick = bbcode_click_handlers['player']['onclick'](report_args.user_id.toString(), report_args.ui_name);
+            }
 
             // replace alliance chat tag
             if(bb_text.indexOf('%tag') != -1) {
@@ -44362,13 +44385,6 @@ function handle_server_message(data) {
                     bb_text = bb_text.replace(repl_key, SPText.bbcode_quote(sender_info[sender_key].toString()));
                 }
                                 });
-
-            var base_props = {};
-            if('time' in sender_info) {
-                base_props.tooltip_func = (function (_send_time) { return function() {
-                    return gamedata['strings']['chat_age'].replace('%s', pretty_print_time(server_time - _send_time));
-                }; })(sender_info['time']);
-            }
 
             var text = SPText.cstring_to_ablocks_bbcode(bb_text, base_props, bbcode_click_handlers);
 

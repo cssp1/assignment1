@@ -546,6 +546,8 @@
                         "bg_image": "action_button_resizable", "bg_image_resizable": 1, "text_size": 13, "text_style": "bold",
                         "ui_name_report": "Report Abuse", "ui_tooltip_report": "Report player for disruptive behavior in chat",
                         "ui_tooltip_already_reported": "Player has already been reported",
+                        "ui_name_player_info": "Player Info",
+                        "ui_name_alliance_info": "Alliance Info",
                         // note: these buttons are created dynamically in JavaScript
                         "array": [1,0], "array_offset": [0,36] }
         }
