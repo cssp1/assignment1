@@ -1265,13 +1265,13 @@ var refresh_chat = function() {
         $('#chat_status_loading')[0].innerHTML = 'Loading...';
         var time_now = (new Date()).getTime()/1000;
 
-        send_request('chat', 'get_reports', {'start_time':time_now - 86400, 'end_time':time_now, 'filter': 'unresolved'}, function(result) {
+        send_request('chat', 'get_reports', {'start_time':time_now - 2*86400, 'end_time':time_now, 'filter': 'unresolved'}, function(result) {
             chat_pending = false;
             cur_chat_reports = result;
             cur_chat_report_rows = {};
             var time_now = (new Date()).getTime()/1000;
 
-            $('#chat_status_loading')[0].innerHTML = 'Unresolved chat reports from the last 24 hours:';
+            $('#chat_status_loading')[0].innerHTML = 'Unresolved chat reports from the last 48 hours:';
             // show most recent at top
             result.sort(function (a, b) {
                 if(a['time'] > b['time']) {
