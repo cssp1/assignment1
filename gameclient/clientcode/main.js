@@ -14969,6 +14969,24 @@ function invoke_advanced_chat_report_dialog(args) {
                                       );
 }
 
+function invoke_report_abuse_dialog(user_id) {
+    var dialog_data = gamedata['dialogs']['report_abuse_dialog'];
+    var dialog = new SPUI.Dialog(dialog_data);
+    dialog.user_data['dialog'] = 'report_abuse_dialog';
+    install_child_dialog(dialog);
+    dialog.auto_center();
+    dialog.modal = true;
+    dialog.widgets['close_button'].onclick = close_parent_dialog;
+    goog.array.forEach(['chat_abuse', 'hacking', 'other'], function(reason) {
+        dialog.widgets[reason+'_button'].onclick = (function (_reason) { return function(w) {
+            var s = w.parent.data['widgets'][reason+'_button'];
+            close_parent_dialog(w);
+            invoke_child_message_dialog(s['ui_name'], s['ui_instructions'].replace('%user_id', user_id.toString()),
+                                        {'dialog': 'message_dialog_big', 'use_bbcode': true});
+        }; })(reason);
+    });
+}
+
 function invoke_damage_protection_notice() {
     var dsk = desktop_dialogs['aura_bar'];
 

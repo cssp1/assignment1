@@ -618,6 +618,10 @@ PlayerInfoDialog.invoke_profile_tab = function(parent) {
     PlayerInfoDialog.update_blockstate(dialog);
 
     dialog.widgets['report_button'].onclick = (function(uid) { return function() {
+        if(player.has_advanced_chat_reporting()) {
+            return invoke_report_abuse_dialog(uid);
+        }
+
         // come up with a fake chat name for the report confirmation
         var fake_chat_name = dialog.widgets['name'].str;
         send_to_server.func(["CHAT_REPORT", uid, SPHTTP.wrap_string(fake_chat_name)]);
