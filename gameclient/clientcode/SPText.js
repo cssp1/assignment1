@@ -63,7 +63,9 @@ SPText.cstring_to_ablocks = function(str, props) {
     return ret;
 };
 
-// quote all special characters so that an arbitrary string will not trigger BBCode
+/** quote all special characters so that an arbitrary string will not trigger BBCode
+    @param {string} str
+    @return {string} */
 SPText.bbcode_quote = function(str) {
     var r = '';
     for(var i = 0; i < str.length; i++) {
@@ -326,12 +328,15 @@ SPText.break_lines = function(inlines, width, default_font) {
         for(var b = 0; b < inl.length; b++) {
 
             var inb = inl[b];
+            var has_state = false;
+
             if(inb.props && inb.props.style && inb.props.style == 'bold') {
+                SPUI.ctx.save();
+                has_state = true;
                 if(!bold_font) {
                     bold_font = SPUI.make_font(default_font.size, default_font.leading, 'bold');
                 }
                 SPUI.ctx.font = bold_font.str();
-                SPUI.ctx.save();
             }
 
             if(inb.kind != 'a') { throw Error('input is not ABlocks'); }
@@ -384,7 +389,8 @@ SPText.break_lines = function(inlines, width, default_font) {
             if(block.str.length > 0) {
                 line.push(block);
             }
-            if(inb.props && inb.props.style) {
+
+            if(has_state) {
                 SPUI.ctx.restore();
             }
         }
