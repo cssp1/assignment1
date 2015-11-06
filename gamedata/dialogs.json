@@ -559,10 +559,10 @@
     },
 
     "report_abuse_dialog": { // replacement for the old generic "Report" button
-        "dimensions": [330,305],
+        "dimensions": [330,359],
         "clip_children": 0,
         "widgets": {
-            "bg":{"kind":"StaticImage","xy":[0,0],"dimensions":[330,305],"asset":"dialog_resizable","bg_image_resizable":1},
+            "bg":{"kind":"StaticImage","xy":[0,0],"dimensions":[330,359],"asset":"dialog_resizable","bg_image_resizable":1},
 
             "title": { "kind": "TextField", "xy": [25,20], "dimensions": [280, 25], "text_size": 17, "text_style": "bold",
                        "text_hjustify": "left", "ui_name": "Report Abuse" },
@@ -579,7 +579,11 @@
                                 "bg_image": "action_button_resizable", "bg_image_resizable": 1, "ui_name": "Hacking/Cheating",
                                 "ui_instructions": "[color=#ffff00][u][url=https://spinpunch.zendesk.com/entries/25564676-What-is-the-Anti-Hacking-Cheating-policy-]Click here to read the hacking/cheating policy.[/url][/u][/color]\n\nTo report suspected hacking or cheating:\n\n1. Take a screenshot of the suspicious activity.\n[color=#ffff00][u][url=https://spinpunch.zendesk.com/entries/26750733-How-can-I-send-a-screenshot-in-to-the-support-team-]Click here for instructions on how to take a screenshot.[/url][/u][/color]\n\n2. Click the \"Contact Support\" button at the bottom of the game window to file a report. Please include the screenshot and the ID number of the suspicious player (%user_id).\n\nThank you!"
                               },
-            "other_button": { "kind": "ActionButton", "xy": [65,228], "dimensions": [200,32], "text_size": 13, "text_style": "bold",
+            "alt_accounts_button": { "kind": "ActionButton", "xy": [65,228], "dimensions": [200,32], "text_size": 13, "text_style": "bold",
+                                    "bg_image": "action_button_resizable", "bg_image_resizable": 1, "ui_name": "Alt Accounts",
+                                    "ui_instructions": "[color=#ffff00][u][url=https://spinpunch.zendesk.com/entries/25711408-What-is-the-Alternate-Account-policy-]Click here to read the policy on multiple (\"alt\") accounts.[/url][/u][/color]\n\nNote: [b]Some maps may allow alt accounts.[/b]\nCheck your \"Relocate Base\" menu. Alt accounts are prohibited in any map with an enforced anti-alt policy.\n\nViolations of this policy are detected and handled automatically within a few hours. There is no need to submit a report."
+                            },
+            "other_button": { "kind": "ActionButton", "xy": [65,282], "dimensions": [200,32], "text_size": 13, "text_style": "bold",
                               "bg_image": "action_button_resizable", "bg_image_resizable": 1, "ui_name": "Other",
                               "ui_instructions": "To report any other abusive behavior:\n\n1. Click the \"Contact Support\" button at the bottom of the game window to file a report. If possible, please include a screenshot and the ID number of the suspicious player (%user_id).\n\n[color=#ffff00][u][url=https://spinpunch.zendesk.com/entries/26750733-How-can-I-send-a-screenshot-in-to-the-support-team-]Click here for instructions on how to take a screenshot.[/url][/u][/color]\n\nThank you!"
                             }

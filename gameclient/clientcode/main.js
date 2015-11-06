@@ -14978,7 +14978,12 @@ function invoke_report_abuse_dialog(user_id) {
     dialog.auto_center();
     dialog.modal = true;
     dialog.widgets['close_button'].onclick = close_parent_dialog;
-    goog.array.forEach(['chat_abuse', 'hacking', 'other'], function(reason) {
+    goog.array.forEach(['chat_abuse', 'hacking', 'alt_accounts', 'other'], function(reason) {
+        // don't show alt-account info unless in a region
+        if(reason == 'alt_accounts' && !session.region.map_enabled()) {
+            dialog.widgets[reason+'_button'].show = false;
+            return;
+        }
         dialog.widgets[reason+'_button'].onclick = (function (_reason) { return function(w) {
             var s = w.parent.data['widgets'][reason+'_button'];
             close_parent_dialog(w);
