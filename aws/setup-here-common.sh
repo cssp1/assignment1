@@ -11,11 +11,12 @@ GAME_ID_LONG="example" # only for "prod" server type
 
 # run on mothership machine
 
+SCRIPT_DIR=`dirname $0`
 SSHDEST="ec2-user@$AWSHOST"
 SSHARGS="-i $AWSKEY"
 
 echo "Building overlay tarball..."
-(cd "${KIND}" && sudo tar zcvf "/tmp/overlay-${KIND}.tar.gz" .)
+(cd "${SCRIPT_DIR}/${KIND}" && sudo tar zcvf "/tmp/overlay-${KIND}.tar.gz" .)
 
 # bash conveniences
 FILESTOGO="$HOME/.bashrc \
@@ -25,7 +26,11 @@ FILESTOGO="$HOME/.bashrc \
            $HOME/.nanorc $HOME/.nano"
 
 # remote setup scripts
-FILESTOGO+=" setup-there-common.sh setup-there-${KIND}.sh fix-ec2-mail.py ec2-send-memory-metrics.py cron-mail-to-sns.py"
+FILESTOGO+=" ${SCRIPT_DIR}/setup-there-common.sh \
+             ${SCRIPT_DIR}/setup-there-${KIND}.sh \
+             ${SCRIPT_DIR}/fix-ec2-mail.py \
+             ${SCRIPT_DIR}/ec2-send-memory-metrics.py \
+             ${SCRIPT_DIR}/cron-mail-to-sns.py"
 
 # overlay
 FILESTOGO+=" /tmp/overlay-${KIND}.tar.gz"
@@ -36,4 +41,4 @@ scp -r $SSHARGS $FILESTOGO $SSHDEST:/home/ec2-user
 echo "Running setup script on cloud host..."
 ssh $SSHARGS -t $SSHDEST "/home/ec2-user/setup-there-common.sh ${AWSCRED_KEYID} ${AWSCRED_SECRET} ${AWS_CRON_SNS_TOPIC} && /home/ec2-user/setup-there-${KIND}.sh ${GAME_ID} ${GAME_ID_LONG}"
 
-rm -f "/tmp/overlay-${KIND}.tar.gz"
+sudo rm -f "/tmp/overlay-${KIND}.tar.gz"

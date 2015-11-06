@@ -1,6 +1,6 @@
 #!/bin/sh
 
-YUMPACKAGES="s3cmd xfsprogs httpd mod_ssl telnet mysql-server php php-mysql subversion MySQL-python php-mbstring php-mcrypt php-pecl-apc"
+YUMPACKAGES="git s3cmd xfsprogs httpd mod_ssl telnet mysql-server php php-mysql subversion MySQL-python php-mbstring php-mcrypt php-pecl-apc"
 YUMPACKAGES+=" python-boto python-twisted python-simplejson emacs strace"
 YUMPACKAGES+=" python-imaging python-imaging-devel numpy"
 YUMPACKAGES+=" libxml2 libxml2-devel"
@@ -57,9 +57,9 @@ sudo ./fix-ec2-mail.py
 
 echo "SETUP(remote): www setup done!"
 echo "MISSING: /etc/sysconfig/network hostname and sudo hostname <HOSTNAME>"
+echo "MISSING: adjust /etc/cron.daily/ backup script parameters"
 echo "MISSING: /home/ec2-user/.ssh/www-mysql-root-password for backups."
-echo "MISSING: /home/ec2-user/.ssh/www-awssecret for backups."
 echo "MISSING: SSL certs, from s3://spinpunch-config/ssl-spinpunch.com.tar.gz.gpg."
 echo "MISSING: /usr/bin/mysql_secure_installation, set MySQL passwords on root and wordpress_user accounts, and create spinpunch_wordpress database"
-echo "MISSING: ensure public IP is added to SPF record for spinpunch.com"
+echo "MISSING: ensure public IP is added to SPF record for spinpunch.com (if this server is going to send any email)"
 echo "MISSING: /etc/aliases: add 'root: awstech@example.com' mail alias"

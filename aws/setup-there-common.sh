@@ -9,7 +9,7 @@ AWS_CRON_SNS_TOPIC=$3
 
 # stop SSH brute-force attacks
 echo "SETUP(remote): Setting up fail2ban..."
-sudo yum install fail2ban
+sudo yum -y install fail2ban
 sudo sh -c '/bin/cat > /etc/fail2ban/jail.local' <<EOF
 [DEFAULT]
 bantime = 3600
@@ -71,7 +71,7 @@ done
 sudo chown -R ec2-user:ec2-user /home/ec2-user/.aws
 
 # set up cron-to-sns gateway
-sudo yum install python-boto
+sudo yum -y install python-boto
 sudo install ./cron-mail-to-sns.py /usr/local/bin/cron-mail-to-sns.py
 sudo sh -c "/bin/cat > /etc/sysconfig/crond" <<EOF
 # SpinPunch - send cron errors via SNS instead of system mail
