@@ -14953,8 +14953,9 @@ function invoke_advanced_chat_report_dialog(args) {
     var s = gamedata['strings']['report_confirm'];
     var ui_context_censored = ChatFilter.censor(args.ui_context);
     return invoke_child_message_dialog(s['ui_title'],
-                                       s['ui_description'].replace('%target', args.ui_name).replace('%context', args.ui_context),
+                                       s['ui_description'].replace('%target', args.ui_name).replace('%context', SPText.bbcode_quote(args.ui_context)),
                                        {'dialog': 'message_dialog_big',
+                                        'use_bbcode': true,
                                         'cancel_button': true,
                                         'ok_button_ui_name': s['ui_button'],
                                         'on_ok': (function (_args) { return function() {
