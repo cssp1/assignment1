@@ -200,9 +200,9 @@ def slave(func, verbose = False):
                     raise Exception('deliberately injected error')
                 else:
                     ret = func(task)
-            except:
+            except Exception as e:
                 status.append('error')
-                errors.append(traceback.format_exc())
+                errors.append('%r\n%s' % (e, traceback.format_exc()))
                 results.append(None)
                 if on_error == 'break':
                     break
