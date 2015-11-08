@@ -26485,17 +26485,19 @@ function notify_achievements() {
 }
 
 /** @param {string} _scope to request (comma-separated list)
-    @param {function()=} _cb callback to call after permissions granted */
-function invoke_facebook_permissions_dialog(_scope, _cb) {
+    @param {function()=} _cb callback to call after permissions granted
+    @param {function()=} _fail_cb callback to call after failure
+*/
+function invoke_facebook_permissions_dialog(_scope, _cb, _fail_cb) {
     var display_mode = gamedata['permissions_request_display']; // 'popup' or 'iframe' FB.ui mode - note that 'popup' must be triggered by a click to avoid popup blockers
     metric_event('0036_request_permission_add_scope_ingame', {'scope': _scope, 'method':'ingame', 'display':display_mode});
     SPFB.ui({'method':'permissions.request','perms':_scope, // request new permissions
              'display': display_mode},
-            (function (__scope, __cb) { return function (bad_resp) {
+            (function (__scope, __cb, __fail_cb) { return function (bad_resp) {
                 console.log("permissions.request returned"); console.log(bad_resp);
 
                 // note: resp doesn't contain anything, you have to query it manually...
-                SPFB.api('/me/permissions', (function (___scope, ___cb) { return function(resp) { // confirm new permissions
+                SPFB.api('/me/permissions', (function (___scope, ___cb, ___fail_cb) { return function(resp) { // confirm new permissions
                     if(resp && ('data' in resp) && (resp['data'].length>=1)) {
                         var new_perms = [];
                         if('permission' in resp['data'][0]) {
@@ -26516,24 +26518,43 @@ function invoke_facebook_permissions_dialog(_scope, _cb) {
                         // asynchronously update oauth token
                         // XXXXXX replace with subscription https://developers.facebook.com/docs/reference/javascript/FB.Event.subscribe
                         if(success) {
-                            SPFB.getLoginStatus((function (____cb) { return function(response) {
+                            SPFB.getLoginStatus((function (____cb, ____fail_cb) { return function(response) {
                                 if(response['status'] === 'connected') {
                                     var new_token = response['authResponse']['accessToken'];
                                     console.log('Updating spin_facebook_oauth_token = "'+new_token+'"');
                                     spin_facebook_oauth_token = new_token;
                                     if(____cb) { ____cb(); }
+                                } else {
+                                    if(____fail_cb) { ____fail_cb(); }
                                 }
-                            }; })(___cb), true);
+                            }; })(___cb, ___fail_cb), true);
+                        } else {
+                            if(___fail_cb) { ___fail_cb(); }
                         }
                     }
-                }; })(__scope, __cb));
-            }; })(_scope, _cb));
+                }; })(__scope, __cb, __fail_cb));
+            }; })(_scope, _cb, _fail_cb));
 }
 
-/** @return {boolean} if the call was synchronous */
-function call_with_facebook_permissions(scope, cb) { // XXXXXX needs a "fail_cb" as well for GUI locking
+/** @param {string} scope you want
+    @param {function()=} cb callback to call after permissions granted
+    @param {function()=} fail_cb callback to call after failure
+    @return {boolean} if the call was synchronous */
+function call_with_facebook_permissions(scope, cb, fail_cb) {
     if(!player.has_facebook_permissions(scope)) {
-        invoke_facebook_permissions_dialog(scope, cb);
+        // add an error message to fail_cb
+        var wrapped_fail_cb = (function (_scope, _fail_cb) { return function() {
+            if(_fail_cb) { _fail_cb(); }
+            var error_name = 'FACEBOOK_PERMISSION_REQUIRED_'+_scope.toUpperCase();
+            if(error_name in gamedata['errors']) {
+                var s = gamedata['errors'][error_name];
+                var descr = s['ui_name'];
+                while(descr.indexOf('%game') >= 0) { descr = descr.replace('%game', gamedata['strings']['game_name']); }
+                invoke_child_message_dialog(s['title'], descr, {'dialog': 'message_dialog_big'});
+            }
+        }; })(scope, fail_cb);
+
+        invoke_facebook_permissions_dialog(scope, cb, wrapped_fail_cb);
         return false;
     } else {
         cb();

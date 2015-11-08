@@ -76,6 +76,8 @@
     "INVALID_LOGIN_SIGNATURE_FAIL": { "ui_name": "Login problem: failed signature check" },
     "INVALID_LOGIN_EXPIRED_TOKEN": { "ui_name": "Login problem: Facebook token is expired" },
     "FACEBOOK_PROFILE_API_ERROR": { "ui_name": "Error retrieving user profile from Facebook API" },
+    "FACEBOOK_PERMISSION_REQUIRED_USER_FRIENDS": { "ui_title": "Friend List Access Required",
+                                                   "ui_name": "To send invites or gifts, %game needs access to your friends list.\n\nTo allow access, open your Facebook Settings (\"triangle\" button at top-right of screen), click \"Apps\", then \"%game\", then click \"Remove App\". Finally, log back in to the game." },
 
     "LOAD_AI_BASE_ERROR": { "ui_title": "Failed to load AI base", "ui_name": "Server returned error:\n%s" },
     "SAVE_AI_BASE_ERROR": { "ui_title": "Failed to save AI base", "ui_name": "Server returned error:\n%s" },
