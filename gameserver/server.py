@@ -2189,7 +2189,6 @@ class User:
     def retrieve_facebook_requests_start(self):
         if not SpinConfig.config['enable_facebook']:
             return
-        assert self.fb_oauth_token
         ver = SpinFacebook.api_version_number('apprequests')
         if ver >= 2.0:
             self.retrieve_facebook_requests_start_v2() # new /apprequests method
@@ -2197,6 +2196,7 @@ class User:
             self.retrieve_facebook_requests_start_v1() # old fql method
 
     def retrieve_facebook_requests_start_v1(self):
+        assert self.fb_oauth_token
         query = 'SELECT recipient_uid, request_id, app_id, sender_uid, message, data, created_time'
         query += ' FROM apprequest WHERE recipient_uid = me() AND app_id = '+SpinConfig.config['facebook_app_id']
         query_tok = urllib.urlencode(dict(query = query, access_token = self.fb_oauth_token)) # SpinConfig.config['facebook_app_access_token'] ?
@@ -2251,8 +2251,8 @@ class User:
             gamesite.AsyncHTTP_Facebook.queue_request(server_time, delete_url, lambda x: None)
 
     def retrieve_facebook_requests_start_v2(self):
-        request_url = SpinFacebook.versioned_graph_endpoint('apprequests', 'me/apprequests') + \
-                                                 '?'+ urllib.urlencode(dict(access_token = self.fb_oauth_token))
+        request_url = SpinFacebook.versioned_graph_endpoint('apprequests', '%s/apprequests' % self.facebook_id) + \
+                                                 '?'+ urllib.urlencode(dict(access_token = SpinConfig.config['facebook_app_access_token']))
         gamesite.AsyncHTTP_Facebook.queue_request(server_time, request_url, lambda result: self.retrieve_facebook_requests_paged_v2(result))
 
     def retrieve_facebook_requests_paged_v2(self, result, buffer = None):
@@ -2312,7 +2312,7 @@ class User:
 
             batch = [{'method':'DELETE', 'relative_url': str(id)} for id in to_delete]
             delete_url = SpinFacebook.versioned_graph_endpoint('apprequests', '') + \
-                         '?' + urllib.urlencode(dict(access_token=self.fb_oauth_token, batch=SpinJSON.dumps(batch)))
+                         '?' + urllib.urlencode(dict(access_token=SpinConfig.config['facebook_app_access_token'], batch=SpinJSON.dumps(batch)))
             gamesite.AsyncHTTP_Facebook.queue_request(server_time, delete_url, lambda x: None, method = 'POST')
 
     def create_fb_open_graph_action(self, action, params):
