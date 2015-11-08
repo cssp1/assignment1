@@ -16227,7 +16227,10 @@ function invoke_gift_prompt_dialog() {
  */
 var invoke_send_gifts_dialog = function(to_user, reason, info_list) {
     if(spin_frame_platform === 'fb') {
-        return FBSendRequests.invoke_send_gifts_dialog(to_user, reason, info_list);
+        call_with_facebook_permissions('user_friends', (function (_to_user, _reason, _info_list) { return function() {
+            FBSendRequests.invoke_send_gifts_dialog(_to_user, _reason, _info_list);
+        }; })(to_user, reason, info_list));
+        return null; // async!
     } else if(spin_frame_platform === 'ag') {
         return AGSendRequests.invoke_send_gifts_dialog(to_user, reason, info_list || null);
     } else {
