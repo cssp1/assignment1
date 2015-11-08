@@ -2311,9 +2311,12 @@ class User:
                 gamesite.exception_log.event(server_time, 'player %s deleting %d FB apprequests' % (self.user_id, len(to_delete)))
 
             batch = [{'method':'DELETE', 'relative_url': str(id)} for id in to_delete]
-            delete_url = SpinFacebook.versioned_graph_endpoint('apprequests', '') + \
-                         '?' + urllib.urlencode(dict(access_token=SpinConfig.config['facebook_app_access_token'], batch=SpinJSON.dumps(batch)))
-            gamesite.AsyncHTTP_Facebook.queue_request(server_time, delete_url, lambda x: None, method = 'POST')
+            limit = 50 # facebook limits batches to 50
+            batches = [batch[i:i+limit] for i in xrange(0, len(batch), limit)]
+            for this_batch in batches:
+                delete_url = SpinFacebook.versioned_graph_endpoint('apprequests', '') + \
+                             '?' + urllib.urlencode(dict(access_token=SpinConfig.config['facebook_app_access_token'], batch=SpinJSON.dumps(this_batch)))
+                gamesite.AsyncHTTP_Facebook.queue_request(server_time, delete_url, lambda x: None, method = 'POST')
 
     def create_fb_open_graph_action(self, action, params):
         if not SpinConfig.config['enable_facebook']:
@@ -2371,7 +2374,7 @@ class User:
         # this is a bad hack just for Thunder Run while it's not whitelisted in the U.S. - we use the app token rather than the session token
         tok_qs = app_tok_qs if SpinConfig.config.get('use_facebook_app_access_token_for_user_data',False) else session_tok_qs
 
-        profile_url = SpinFacebook.versioned_graph_endpoint('user', endpoint)+'?fields=id,birthday,email,name,first_name,last_name,gender,locale,third_party_id,currency,is_eligible_promo,permissions&'+tok_qs # app_tok_qs results in no birthday info and no currency/promo data
+        profile_url = SpinFacebook.versioned_graph_endpoint('user', endpoint)+'?fields=id,birthday,email,name,first_name,last_name,gender,locale,third_party_id,currency,is_eligible_promo,permissions&'+tok_qs # app_tok_qs results in no birthday info and no is_eligible_promo data
         friends_url = SpinFacebook.versioned_graph_endpoint('friend', endpoint+'/friends')+'?limit=500&offset=0&'+tok_qs # app_tok_qs
         likes_url = SpinFacebook.versioned_graph_endpoint('like', endpoint+'/likes')+'?limit=500&offset=0&'+tok_qs # app_tok_qs
 
