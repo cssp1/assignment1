@@ -76,8 +76,15 @@ def new_analytics_tag_info(tag, event_klass):
             'reset_interval': None,
             'repeat_interval': None}
 
+def is_historical(start_time, end_time, reset_interval, repeat_interval):
+    return (start_time >= 0) and (not (repeat_interval > 0)) and (start_time < time_now - 14*86400)
+
 # incorporate timing info from one AI base or hive into the info for the entire event tag
 def apply_timing_info(info, start_end_times):
+    # to avoid disturbing historical data, do not update runs that were long in the past
+    start_end_times = filter(lambda s_e_t: not is_historical(*s_e_t), start_end_times)
+    if len(start_end_times) < 1: return
+
     # overwrite existing contents
     info['start_end_times'] = []
     for start_time, end_time, reset_interval, repeat_interval in start_end_times:
@@ -202,8 +209,9 @@ if __name__ == '__main__':
         # note: upsert into ai_analytics_tag_info
         if len(analytics_tag_info) > 0:
             cur.executemany("DELETE FROM "+sql_util.sym(ai_analytics_tag_info_table)+" WHERE analytics_tag = %s AND start_time >= %s",
-                            [(k, info['start_time']) for k, info in analytics_tag_info.iteritems()])
-            if verbose: print 'minimum start_time of modified data:', min(info['start_time'] for info in analytics_tag_info.itervalues() if info['start_time'] > 0)
+                            [(k, info['start_time']) for k, info in analytics_tag_info.iteritems() if info['start_time'] is not None])
+
+            if verbose: print 'replacing ai_analytics_tag_info:\n', '\n'.join('%s start >= %d, start_end_times %r' % (k, info['start_time'], info['start_end_times']) for k, info in analytics_tag_info.iteritems() if info['start_time'] is not None)
             sql_util.do_insert_batch(cur, ai_analytics_tag_info_table, [(('analytics_tag',entry['analytics_tag']),
                                                                          ('event_type',entry['event_type']),
                                                                          ('num_difficulties', len(entry['difficulties']) if entry['difficulties'] else None),
@@ -213,15 +221,15 @@ if __name__ == '__main__':
                                                                          ('end_time', entry['end_time']),
                                                                          ('reset_interval', entry['reset_interval']),
                                                                          ('repeat_interval', entry['repeat_interval']))
-                                                                        for entry in analytics_tag_info.itervalues()])
+                                                                        for entry in analytics_tag_info.itervalues() if entry['start_time'] is not None])
             # upsert into ai_analytics_tag_assignments
             assignments_keys = [] # master keys to upsert
             assignments_rows = []
             for entry in analytics_tag_info.itervalues():
-                if entry['start_end_times']:
-                    start_end_times = entry['start_end_times']
-                else:
-                    start_end_times = [[-1,-1,None,None]]
+                if entry['start_time'] is None:
+                    continue
+
+                start_end_times = entry['start_end_times']
 
                 for base_id in entry['base_ids']:
                     base = gamedata['ai_bases']['bases'][str(base_id)]
