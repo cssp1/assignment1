@@ -63,8 +63,8 @@ def dump_user(seg, id, entry, method, cache_fd, nosql_table, nosql_deltas_only, 
 
     try:
         obj = SpinUpcache.update_upcache_entry(id, userdb_driver, entry, time_now, gamedata, user_mtime = user_mtime)
-    except:
-        sys.stderr.write('error updating user %d:\n' % id + traceback.format_exc() + '\n')
+    except Exception as e:
+        sys.stderr.write('error updating user %d: %r\n%s\n' % (id, e, traceback.format_exc()))
 
     if not obj:
         return None
