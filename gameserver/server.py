@@ -2458,8 +2458,13 @@ class User:
                 self.facebook_third_party_id = self.facebook_profile['third_party_id']
             if 'is_eligible_promo' in self.facebook_profile:
                 self.fb_is_eligible_promo = bool(self.facebook_profile['is_eligible_promo'])
-            if 'permissions' in self.facebook_profile and self.active_session:
-                self.active_session.player.facebook_permissions = self.facebook_profile['permissions']['data'][0].keys()
+            if ('permissions' in self.facebook_profile) and self.active_session and ('data' in self.facebook_profile['permissions']) and (len(self.facebook_profile['permissions']['data']) > 0):
+                def parse_facebook_permissions(data_list):
+                    if 'permission' in data_list[0]: # current API
+                        return [x['permission'] for x in data_list if x.get('status',None) == 'granted']
+                    else: # legacy data
+                        return [k for k,v in data_list[0].iteritems() if v]
+                self.active_session.player.facebook_permissions = parse_facebook_permissions(self.facebook_profile['permissions']['data'])
         else:
             self.facebook_name = '(Facebook API error)'
             self.facebook_first_name = 'Unknown(fbapierr)'
