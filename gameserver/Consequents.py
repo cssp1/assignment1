@@ -249,6 +249,7 @@ class ApplyAuraConsequent(Consequent):
         Consequent.__init__(self, data)
         self.name = data['aura_name']
         self.duration = data.get('aura_duration',-1)
+        self.duration_from_event = data.get('aura_duration_from_event', None)
         self.strength = data.get('aura_strength',1)
         self.level = data.get('aura_level',1)
         if 'aura_data' in data:
@@ -272,6 +273,16 @@ class ApplyAuraConsequent(Consequent):
     def execute(self, session, player, retmsg, context=None):
         stack = -1
         duration = self.duration
+
+        if self.duration_from_event:
+            event_kind = self.duration_from_event.get('event_kind', 'current_event')
+            event_name = self.duration_from_event.get('event_name', None)
+            neg_time_to_end = player.get_event_time(event_kind, event_name, 'end', ignore_activation = True)
+            if neg_time_to_end is None or (-neg_time_to_end) < 0: # event not happening?
+                return
+            else:
+                togo = -neg_time_to_end
+                duration = togo if (duration < 0) else min(duration, togo)
 
         if self.stack > 0:
             stack = self.stack
