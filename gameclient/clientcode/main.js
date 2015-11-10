@@ -24341,7 +24341,7 @@ function invoke_aura_context(inv_dialog, slot_xy, slot, aura, show_dropdown) {
     if(descr.indexOf('%level') >= 0) {
         descr = descr.replace('%level', pretty_print_number(level));
     }
-    if(descr.indexOf('%gamebucks') >= 0) {
+    while(descr.indexOf('%gamebucks') >= 0) {
         descr = descr.replace('%gamebucks', player.get_any_abtest_value('gamebucks_ui_name', gamedata['store']['gamebucks_ui_name']));
     }
     if(descr.indexOf('%modstats') >= 0) {

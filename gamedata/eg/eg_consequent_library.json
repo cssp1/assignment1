@@ -3,4 +3,11 @@
 // found in the LICENSE file.
 
 {
+    "on_login_pre_hello": { "consequent": "AND", "subconsequents": [
+        // Facebook sales - apply GUI aura
+        {"consequent": "IF", "if": {"predicate": "AND", "subpredicates": [{"predicate": "FRAME_PLATFORM", "platform": "fb"},
+                                                                          {"predicate": "EVENT_TIME", "event_kind": "facebook_sale", "method": "inprogress", "ignore_activation": 1}]},
+         "then": {"consequent": "APPLY_AURA", "aura_name": "generic_sale", "aura_duration_from_event": {"event_kind": "facebook_sale"}, "aura_strength": 0.30,
+                  "aura_data": {"kind": "facebook_sale"}}}
+    ]}
 }

@@ -202,6 +202,16 @@
         "on_click": {"consequent": "INVOKE_BUY_GAMEBUCKS_DIALOG"}
         // effects happen via AURA_(IN)ACTIVE predicates
     },
+    "generic_sale": {
+        "name": "generic_sale",
+        "icon": "gamebucks_inventory_icon",
+        "client": 0, "server": 0,
+        "help": 1, "cancelable": 0,
+        "ui_name": "Facebook Sale", "show": 1, "name_color": [0,1,0.25,1],
+        "ui_description": "More FREE bonus %gamebucks with purchases from the Buy %gamebucks menu. Act quickly, this offer ends soon!",
+        "on_click": {"consequent": "INVOKE_BUY_GAMEBUCKS_DIALOG"}
+        // no effects, for GUI only
+    },
 
     // these are only applied during AI base visits or attacks, triggered by the consequents generated in make_ai_skeleton.py
     "ai_base_first_time_loot_bonus": {
