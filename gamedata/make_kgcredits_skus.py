@@ -38,7 +38,7 @@ if __name__ == '__main__':
     COMMENTS = [None, None, 'Most Popular', None, None, None]
 
     SLATES = { "P100M": { "level": 100, "slate": "M",
-                          "currency": "kgcredits", "ui_warning": "Limited time special offers:",
+                          "currency": "kgcredits",
                           "requires": [{"predicate": "ALWAYS_FALSE"}], # disabled at 1403467211
                           "skus": [{'alloy': 20000, 'kgcredits':2000},
                                    {'alloy': 10000, 'kgcredits': 1000},
@@ -48,7 +48,7 @@ if __name__ == '__main__':
                                    {'alloy': 500, 'kgcredits': 50}
                                    ] },
                "P100D1": { "level": 100, "slate": "D1",
-                          "currency": "kgcredits", "ui_warning": "Limited time special offers:",
+                          "currency": "kgcredits",
                           "requires": [{"predicate": "ALWAYS_TRUE"}], # enabled at 1403467211
                           "skus": [{'alloy': 24000, 'kgcredits':1999, 'nominal_alloy': 20000, 'ui_comment': 'Best Value', 'ui_pile_size': 5},
                                    {'alloy': 11500, 'kgcredits': 999, 'nominal_alloy': 10000, 'ui_comment': None, 'ui_pile_size': 4},
@@ -107,7 +107,6 @@ if __name__ == '__main__':
                 'price': data[val['currency']],
                 }
             if 'ui_pile_size' in data: sku['ui_pile_size'] = data['ui_pile_size']
-            if 'ui_warning' in val: sku['ui_warning'] = val['ui_warning']
             if 'nominal_alloy' in data: sku['nominal_quantity'] = data['nominal_alloy']
             if comment: sku['ui_comment'] = comment
 

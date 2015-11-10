@@ -36157,9 +36157,6 @@ function invoke_buy_gamebucks_dialog23(ver, reason, amount, order) {
 
             dialog.user_data['any_sku_has_bonus'] = Math.max(dialog.user_data['any_sku_has_bonus'], bonus_lines);
 
-            // note: picks up last ui_warning among all SKUs
-            if(spell['ui_warning']) { dialog.widgets['warning_text'].str = spell['ui_warning']; }
-
             spell_list.push(spellname);
         }
     }
@@ -36321,6 +36318,32 @@ function update_buy_gamebucks_dialog2(dialog) {
 
     dialog.widgets['scroll_left_jewel'].user_data['count'] = left_jewels;
     dialog.widgets['scroll_right_jewel'].user_data['count'] = right_jewels;
+
+    // set dialog "warning" text
+    var ui_warning = null, expire_time = -1;
+    for(var i = 0; i < gamedata['store']['ui_buy_gamebucks_warning'].length; i++) {
+        var pred = read_predicate(gamedata['store']['ui_buy_gamebucks_warning'][i][0]);
+        var ui_text = gamedata['store']['ui_buy_gamebucks_warning'][i][1];
+        if(pred.is_satisfied(player, null)) {
+            ui_warning = ui_text;
+            expire_time = pred.ui_expire_time(player);
+            break;
+        }
+    }
+
+    if(ui_warning) {
+        if(ui_warning.indexOf('%togo') >= 0) {
+            if(expire_time > 0) {
+                ui_warning = ui_warning.replace('%togo', pretty_print_time(expire_time - server_time));
+            } else {
+                throw Error('ui_warning with %togo but no expire_time: '+ui_warning);
+            }
+        }
+        dialog.widgets['warning_text'].show = true;
+        dialog.widgets['warning_text'].set_text_bbcode(ui_warning);
+    } else {
+        dialog.widgets['warning_text'].show = false;
+    }
 }
 
 function update_buy_gamebucks_sku2(dialog) {

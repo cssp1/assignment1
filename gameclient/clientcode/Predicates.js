@@ -109,6 +109,7 @@ Predicate.prototype.ui_difficulty = function() { return 0; }
 function AlwaysTruePredicate(data) { goog.base(this, data); }
 goog.inherits(AlwaysTruePredicate, Predicate);
 AlwaysTruePredicate.prototype.is_satisfied = function(player, qdata) { return true; };
+AlwaysTruePredicate.prototype.ui_expire_time = function(player) { return -1; };
 
 /** @constructor
   * @extends Predicate */
@@ -704,7 +705,9 @@ function AuraActivePredicate(data) {
     this.match_data = data['match_data'] || null;
 }
 goog.inherits(AuraActivePredicate, Predicate);
-AuraActivePredicate.prototype.is_satisfied = function(player, qdata) {
+/** @private
+    @return {Object|null} */
+AuraActivePredicate.prototype.find_aura = function(player, qdata) {
     for(var i = 0; i < player.player_auras.length; i++) {
         var aura = player.player_auras[i];
         if(aura['spec'] == this.aura_name && ((aura['stack']||1) >= this.min_stack)) {
@@ -720,13 +723,22 @@ AuraActivePredicate.prototype.is_satisfied = function(player, qdata) {
                 }
                 if(!is_matched) { continue; }
             }
-            return true;
+            return aura;
         }
     }
-    return false;
+    return null;
 };
+
+AuraActivePredicate.prototype.is_satisfied = function(player, qdata) { return this.find_aura(player, qdata) !== null; };
 AuraActivePredicate.prototype.do_ui_describe = function(player) {
     return new PredicateUIDescription(gamedata['strings']['predicates'][this.kind]['ui_name'].replace('%s', gamedata['auras'][this.aura_name]['ui_name']));
+};
+AuraActivePredicate.prototype.ui_expire_time = function(player) {
+    var aura = this.find_aura(player, null);
+    if(aura && ('end_time' in aura) && (aura['end_time'] > 0)) {
+        return aura['end_time'];
+    }
+    return -1;
 };
 
 /** @constructor
@@ -1240,6 +1252,7 @@ goog.inherits(FramePlatformPredicate, Predicate);
 FramePlatformPredicate.prototype.is_satisfied = function(player, qdata) {
     return spin_frame_platform == this.platform;
 };
+FramePlatformPredicate.prototype.ui_expire_time = function(player) { return -1; };
 
 /** @constructor
   * @extends Predicate */

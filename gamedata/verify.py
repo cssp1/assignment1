@@ -3401,7 +3401,7 @@ def main(args):
     error |= check_cond_or_literal(gamedata['continent_assignment'], reason = 'continent_assignment')
 
     # check some cond chains in the store
-    for checkable in ('payments_api', 'buy_gamebucks_sku_kind', 'buy_gamebucks_sku_currency'):
+    for checkable in ('payments_api', 'buy_gamebucks_sku_kind', 'buy_gamebucks_sku_currency', 'ui_buy_gamebucks_warning'):
         if type(gamedata['store'][checkable]) is list:
             error |= check_cond_chain(gamedata['store'][checkable], reason = 'store.'+checkable)
 

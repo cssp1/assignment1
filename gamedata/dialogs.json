@@ -7199,8 +7199,7 @@
             "title_bold": { "kind": "TextField", "xy": [118,13], "dimensions": [514, 40], "text_size": 27, "text_style": "bold",
                             "text_hjustify": "center", "text_vjustify": "center", "ui_name": "Buy %s" },
 
-            "warning_text":  { "kind": "TextField", "xy": [44,28], "dimensions": [100,24], "text_size": 13, "text_style": "normal",
-                               "text_color": [1,0.8,0.1,1], "text_hjustify": "left" },
+            "warning_text":  { "kind": "RichTextField", "xy": [27,27], "dimensions": [276,24], "text_size": 13, "text_hjustify": "left" },
 
             "sunken": {"kind": "StaticImage", "xy":[8,64], "dimensions":[734,298], "asset": "dialog_sunken_resizable", "bg_image_resizable": 1, "alpha": 1 },
             "sku": { "kind": "Dialog",
