@@ -71,8 +71,9 @@ compiled-client.js: clientcode/*.js
 		--compiler_flags='--compilation_level=ADVANCED_OPTIMIZATIONS' \
 		--compiler_flags='--summary_detail_level=2' \
 		--compiler_flags='--warning_level=VERBOSE' \
+		--compiler_flags='--language_in=ECMASCRIPT6_STRICT' \
+		--compiler_flags='--language_out=ECMASCRIPT5' \
 		--compiler_flags='--create_renaming_reports' \
-		--compiler_flags='--language_in=ECMASCRIPT5' \
 		${CHECK_FLAGS} ${OPT_FLAGS} \
 		--output_file=$@ || (rm -f $@ *.out *.date; false) # clean up on failure
 	@echo "var gameclient_build_date = \"${BUILD_DATE}\";" >> $@
@@ -87,7 +88,7 @@ check: clientcode/*.js
 
 	@google/closure/bin/build/closurebuilder.py \
 		--root='google'	--root='clientcode' \
-		--input='clientcode/main.js' \
+		--namespace='SPINPUNCHGAME' \
 		--output_mode=compiled \
 		--compiler_jar=google/compiler.jar \
 		--compiler_flags='--js=google/closure/goog/deps.js' \
@@ -95,7 +96,8 @@ check: clientcode/*.js
 		--compiler_flags='--compilation_level=ADVANCED_OPTIMIZATIONS' \
 		--compiler_flags='--summary_detail_level=2' \
 		--compiler_flags='--warning_level=VERBOSE' \
-		--compiler_flags='--language_in=ECMASCRIPT5' \
+		--compiler_flags='--language_in=ECMASCRIPT6_STRICT' \
+		--compiler_flags='--language_out=ECMASCRIPT5' \
 		--output_file=/dev/null \
 		${CHECK_FLAGS} ${OPT_FLAGS}
 
