@@ -1271,7 +1271,8 @@ var refresh_chat = function() {
             cur_chat_report_rows = {};
             var time_now = (new Date()).getTime()/1000;
 
-            $('#chat_status_loading')[0].innerHTML = 'Unresolved chat reports from the last 48 hours:';
+            $('#chat_status_loading')[0].innerHTML = (result.length > 0 ? 'Unresolved chat reports from the last 48 hours:' : 'There are no unresolved chat reports in the last 48 hours.');
+
             // show most recent at top
             result.sort(function (a, b) {
                 if(a['time'] > b['time']) {
