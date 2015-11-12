@@ -1356,6 +1356,8 @@ var resolve_chat_report = function(row, item, action) {
                  (function (_row, _item, _action) {
                      return function(result) {
                          row.empty();
+                         cur_chat_reports = cur_chat_reports.filter(function(other) { return other['id'] !== _item['id']; });
+
                          if(_action == 'violate') {
                              alert("Success!\n"+result.toString());
 
@@ -1368,7 +1370,10 @@ var resolve_chat_report = function(row, item, action) {
                                  }
                                  return true;
                              });
+                         }
 
+                         if(cur_chat_reports.length == 0) {
+                             $('#chat_status_loading')[0].innerHTML = 'There are no more unresolved chat reports in the last 48 hours.';
                          }
 
                      }; })(row, item, action), async);
@@ -1528,7 +1533,7 @@ $(function() {
    <ul>
     <li><a href="#mode_player">Player</a></li>
     <li id="mode_payment_tab"><a href="#mode_payment">FB Payment</a></li>
-    <li id="mode_chat_tab"><a href="#mode_chat">(BETA) Chat Moderation</a></li>
+    <li id="mode_chat_tab"><a href="#mode_chat">Chat Moderation</a></li>
     <li id="mode_server_tab"><a href="#mode_server">Server</a></li>
     <li id="mode_logs_tab"><a href="#mode_logs">Logs</a></li>
    </ul>
