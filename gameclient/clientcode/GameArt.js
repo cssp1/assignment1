@@ -25,9 +25,177 @@ GameArt.file_kinds = {
     AUDIO : 1
 };
 
+/** @constructor
+    @param {GameArt.file_kinds} kind
+    @param {boolean} delay_load
+    @param {!GameArt.Source} gameart_obj
+    @param {string} filename
+    @param {boolean} needs_cors
+    @param {number} priority
+    @implements {BinaryHeap.Element} */
+GameArt.FileEntry = function(kind, delay_load, gameart_obj, filename, needs_cors, priority) {
+    this.kind = kind;
+    this.delay_load = delay_load;
+    this.gameart_objects = [gameart_obj];
+    this.filename = filename;
+    // flag to indicate that the image needs special handling because it may trigger CORS
+    // security problems on IE
+    this.needs_cors = needs_cors;
+    this.watchdog = null;
+    this.dl_complete = false;
+    this.dl_started = false;
+    this.priority = priority;
+    this.heapscore = 0;
+};
+
+/** @param {!GameArt.Source} gameart_obj
+    @param {number} priority
+    @param {boolean} delay_load */
+GameArt.FileEntry.prototype.attach = function(gameart_obj, priority, delay_load) {
+    this.gameart_objects.push(gameart_obj);
+    this.priority = Math.max(this.priority, priority);
+    if(!delay_load) { this.delay_load = false; }
+};
+
+GameArt.FileEntry.prototype.start_load = function() {
+    this.dl_started = true;
+};
+
+
+/** @constructor
+    @extends GameArt.FileEntry
+    @param {boolean} delay_load
+    @param {!GameArt.Image} gameart_obj
+    @param {string} filename
+    @param {boolean} needs_cors
+    @param {number} priority */
+GameArt.ImageFileEntry = function(delay_load, gameart_obj, filename, needs_cors, priority) {
+    goog.base(this, GameArt.file_kinds.IMAGE, delay_load, gameart_obj, filename, needs_cors, priority);
+
+    this.html_element = new Image();
+    // this.html_element.setAttribute('crossOrigin','anonymous'); // ???
+    this.html_element.crossOrigin = 'Anonymous'; // necessary to allow getImageData to work via CORS on Firefox and Chrome
+    // note: html_element.src is set by GameArt.init after all the Assets are set up
+    this.html_element.onload = goog.bind(this.onload, this);
+    this.html_element.onerror = goog.bind(this.onerror, this);
+};
+goog.inherits(GameArt.ImageFileEntry, GameArt.FileEntry);
+
+GameArt.ImageFileEntry.prototype.onload = function() {
+    if(this.watchdog) {
+        window.clearTimeout(this.watchdog);
+        this.watchdog = null;
+    }
+    var el = this.html_element;
+    if(!el.complete || el.width < 1 || el.height < 1) {
+        var msg = 'unknown';
+        if(!el.complete) {
+            msg = 'loaded_but_not_complete';
+        } else if(el.width < 1 || el.height < 1) {
+            msg = 'loaded_but_bad_dimensions';
+        }
+        GameArt.image_onerror(this.filename, msg);
+        return;
+    }
+
+    for(var i = 0; i < this.gameart_objects.length; i++) {
+        var o = /** !GameArt.Image */ (this.gameart_objects[i]);
+        o.got_data();
+    }
+    GameArt.image_onload(this.filename);
+};
+GameArt.ImageFileEntry.prototype.onerror = function() {
+    if(this.watchdog) {
+        window.clearTimeout(this.watchdog);
+        this.watchdog = null;
+    }
+    GameArt.image_onerror(this.filename, 'html_onerror');
+};
+
+GameArt.ImageFileEntry.prototype.start_load = function() {
+    goog.base(this, 'start_load');
+    this.html_element.src = GameArt.art_url(this.filename, this.needs_cors);
+    if(this.html_element.complete) { // synchronous completion
+        window.setTimeout(this.html_element.onload, 1);
+    } else {
+        if(gamedata['client']['art_download_timeout']['image'] > 0) {
+            this.watchdog = window.setTimeout((function (_this) { return function() {
+                GameArt.image_ontimeout(_this.filename);
+            }; })(this), 1000 * gamedata['client']['art_download_timeout']['image']);
+        }
+    }
+};
+
+/** @constructor
+    @extends GameArt.FileEntry
+    @param {boolean} delay_load
+    @param {!GameArt.Sound} gameart_obj
+    @param {string} filename
+    @param {boolean} needs_cors
+    @param {number} priority */
+GameArt.AudioFileEntry = function(delay_load, gameart_obj, filename, needs_cors, priority) {
+    goog.base(this, GameArt.file_kinds.AUDIO, delay_load, gameart_obj, filename, needs_cors, priority);
+    /* XXXXXX type {SPAudio.Sample|null} */
+    this.sample = null;
+};
+goog.inherits(GameArt.AudioFileEntry, GameArt.FileEntry);
+
+GameArt.AudioFileEntry.prototype.start_load = function() {
+    goog.base(this, 'start_load');
+    this.sample = GameArt.audio_driver.create_sample(GameArt.art_url(this.filename, this.needs_cors), this.kind,
+                                                     goog.bind(this.success_cb, this),
+                                                     goog.bind(this.fail_cb, this));
+
+    for(var i = 0; i < this.gameart_objects.length; i++) {
+        var o = /** !GameArt.Sound */ (this.gameart_objects[i]);
+        o.audio = this.sample;
+    }
+
+    this.sample.load();
+
+    if(gamedata['client']['art_download_timeout']['audio'] > 0) {
+        this.watchdog = window.setTimeout((function (/** !GameArt.FileEntry */  _this) { return function() {
+            GameArt.image_ontimeout(_this.filename);
+        }; })(this), 1000 * gamedata['client']['art_download_timeout']['audio']);
+    }
+};
+
+ // function that is called when the download completes
+GameArt.AudioFileEntry.prototype.success_cb = function() {
+    if(this.watchdog) {
+        window.clearTimeout(this.watchdog);
+        this.watchdog = null;
+    }
+    for(var i = 0; i < this.gameart_objects.length; i++) {
+        var snd = /** !GameArt.Sound */ (this.gameart_objects[i]);
+        snd.data_loaded = true;
+        if(snd.load_looped) {
+            snd.audio.loop();
+            snd.play(GameArt.time);
+        } else if(snd.play_on_load > 0) {
+            snd.play(snd.play_on_load);
+            snd.play_on_load = -1;
+        }
+        if(snd.load_faded != -1) {
+            snd.fadeTo(snd.load_faded, 0.5);
+        }
+    }
+    GameArt.image_onload(this.filename);
+};
+
+// called when download fails
+GameArt.AudioFileEntry.prototype.fail_cb = function() {
+    if(this.watchdog) {
+        window.clearTimeout(this.watchdog);
+        this.watchdog = null;
+    }
+    GameArt.image_onerror(this.filename, 'audio_sample_onerror');
+};
+
 // dictionary mapping filenames to {html_element, kind, filename, priority, [GameArt.Images/GameArt.Sounds...]}
 // this is to allow different GameArt.Images to share the same HTML Image elements
 // and different GameArt.Sounds to share the same sound samples
+/** @type {!Object<string, !GameArt.FileEntry>} */
 GameArt.file_list = {};
 
 GameArt.stats = function() {
@@ -259,12 +427,9 @@ GameArt.init = function(time, canvas, ctx, art_json, dl_callback, audio_driver_n
     }
 
     // sort download requests by priority
-    GameArt.dl_heap = new BinaryHeap.BinaryHeap();
+    GameArt.dl_heap = /** @type {!BinaryHeap.BinaryHeap<!GameArt.FileEntry>} */ (new BinaryHeap.BinaryHeap());
     for(var name in GameArt.file_list) {
         var entry = GameArt.file_list[name];
-
-        entry.dl_complete = false;
-        entry.dl_started = false;
 
         if(entry.delay_load) { continue; }
         // if(entry.kind === GameArt.file_kinds.AUDIO) { continue; }
@@ -299,12 +464,11 @@ GameArt.download_more_assets = function() {
         if(SLOWTEST && entry.priority < GameArt.essential_priority) {
             // simulate slow net connection
             console.log('GameArt: Simulating slow net connection!');
-            var cb = (function(e) { return function() { e.start_load(e); }; })(entry);
+            var cb = (function(e) { return function() { e.start_load(); }; })(entry);
             window.setTimeout(cb, 3000*GameArt.all_dl_pending_count);
         } else {
             //console.log('queueing '+entry.filename+' prio '+entry.priority);
-            entry.dl_started = true;
-            entry.start_load(entry);
+            entry.start_load();
         }
     }
 };
@@ -949,6 +1113,10 @@ GameArt.CompoundSprite.prototype.do_draw = function(xy, facing, time, dest_wh) {
     }
 };
 
+/** Shared base class for raw images/sounds
+    @constructor */
+GameArt.Source = function() {};
+
 // GameArt.Image
 // this is a wrapper around an HTML5 Image element
 // it brings loading into the GameArt framework and allows delayed loading
@@ -956,6 +1124,7 @@ GameArt.CompoundSprite.prototype.do_draw = function(xy, facing, time, dest_wh) {
 
 /** @constructor
     @struct
+    @extends GameArt.Source
     @param {string} filename
     @param {Array.<number>|null} origin
     @param {Array.<number>|null} wh
@@ -963,6 +1132,7 @@ GameArt.CompoundSprite.prototype.do_draw = function(xy, facing, time, dest_wh) {
     @param {boolean} delay_load
 */
 GameArt.Image = function(filename, origin, wh, load_priority, delay_load) {
+    goog.base(this);
     this.origin = origin;
     this.wh = wh;
     this.data_loaded = false;
@@ -977,77 +1147,13 @@ GameArt.Image = function(filename, origin, wh, load_priority, delay_load) {
     if(filename in GameArt.file_list) {
         // attach to existing download request
         this.entry = GameArt.file_list[filename];
-        this.img = this.entry.html_element;
-        this.entry.gameart_objects.push(this);
-        this.entry.priority = Math.max(this.entry.priority, load_priority);
-        if(!delay_load) { this.entry.delay_load = false; }
-
+        this.entry.attach(this, load_priority, delay_load);
     } else {
-        // create new download request
-        this.img = new Image();
-        // this.img.setAttribute('crossOrigin','anonymous'); // ???
-        this.img.crossOrigin = 'Anonymous'; // necessary to allow getImageData to work via CORS on Firefox and Chrome
-
-        // note: img.src is set by GameArt.init after all the Assets are set up
-
-        this.entry = {html_element: this.img,
-                      kind: GameArt.file_kinds.IMAGE,
-                      delay_load: delay_load,
-                      gameart_objects: [this],
-                      filename:filename,
-                      // flag to indicate that the image needs special handling because it may trigger CORS
-                      // security problems on IE
-                      needs_cors:false,
-                      watchdog:null,
-                      start_load: function(e) {
-                          e.html_element.src = GameArt.art_url(e.filename, e.needs_cors);
-
-                          if(e.html_element.complete) { // synchronous completion
-                              window.setTimeout(e.html_element.onload, 1);
-                          } else {
-                              if(gamedata['client']['art_download_timeout']['image'] > 0) {
-                                  e.watchdog = window.setTimeout((function (_e) { return function() {
-                                      GameArt.image_ontimeout(_e.filename);
-                                  }; })(e), 1000 * gamedata['client']['art_download_timeout']['image']);
-                              }
-                          }
-                      },
-                      priority:load_priority};
-
-        this.img.onload = (function (_entry) { return function() {
-            if(_entry.watchdog) {
-                window.clearTimeout(_entry.watchdog);
-                _entry.watchdog = null;
-            }
-            var el = _entry.html_element;
-            if(!el.complete || el.width < 1 || el.height < 1) {
-                var msg = 'unknown';
-                if(!el.complete) {
-                    msg = 'loaded_but_not_complete';
-                } else if(el.width < 1 || el.height < 1) {
-                    msg = 'loaded_but_bad_dimensions';
-                }
-                GameArt.image_onerror(_entry.filename, msg);
-                return;
-            }
-
-            for(var i = 0; i < _entry.gameart_objects.length; i++) {
-                _entry.gameart_objects[i].got_data();
-            }
-            GameArt.image_onload(_entry.filename);
-        }; })(this.entry);
-
-        this.img.onerror = (function (_entry) { return function() {
-            if(_entry.watchdog) {
-                window.clearTimeout(_entry.watchdog);
-                _entry.watchdog = null;
-            }
-            GameArt.image_onerror(_entry.filename, 'html_onerror');
-        }; })(this.entry);
-
-        GameArt.file_list[filename] = this.entry;
+        GameArt.file_list[filename] = this.entry = new GameArt.ImageFileEntry(delay_load, this, filename, false, load_priority);
     }
+    this.img = this.entry.html_element;
 };
+goog.inherits(GameArt.Image, GameArt.Source);
 
 // called when this.img (the html_element) becomes valid to draw
 GameArt.Image.prototype.got_data = function() {
@@ -1060,8 +1166,7 @@ GameArt.Image.prototype.check_delay_load = function() {
     if(GameArt.dl_inflight_count >= GameArt.dl_inflight_max) { return; }
     GameArt.dl_inflight_count += 1;
 
-    this.entry.dl_started = true;
-    this.entry.start_load(this.entry);
+    this.entry.start_load();
 };
 
 GameArt.Image.prototype.check_for_badness = function() {
@@ -1303,6 +1408,7 @@ GameArt.TintedImage.prototype.prep_for_draw = function() {
 
 /** @constructor
     @struct
+    @extends GameArt.Source
     @param {string} filename
     @param {number} volume - 0.0-1.0
     @param {number} priority
@@ -1311,6 +1417,7 @@ GameArt.TintedImage.prototype.prep_for_draw = function() {
     @param {GameArt.file_kinds} kind
 */
 GameArt.Sound = function(filename, volume, priority, load_priority, delay_load, kind) {
+    goog.base(this);
     this.entry = null;
 
     /* XXXXXX type {SPAudio.Sample|null} */
@@ -1343,76 +1450,13 @@ GameArt.Sound = function(filename, volume, priority, load_priority, delay_load, 
 
     if(this.filename in GameArt.file_list) {
         // attach to existing download request
-        var entry = GameArt.file_list[this.filename];
-        this.entry = entry;
-        entry.gameart_objects.push(this);
-        entry.priority = Math.max(entry.priority, load_priority);
-        if(!this.delay_load) { entry.delay_load = false; }
+        this.entry = GameArt.file_list[this.filename];
+        this.entry.attach(this, load_priority, this.delay_load);
     } else {
-        var entry = {};
-        entry.kind = GameArt.file_kinds.AUDIO;
-        entry.delay_load = this.delay_load;
-        entry.sample = null;
-        entry.priority = load_priority;
-        entry.gameart_objects = [this];
-        entry.filename = this.filename;
-        entry.watchdog = null;
-
-        // function that is called to begin the download request
-        entry.start_load = function (e) {
-
-            // function that is called when the download completes
-            var success_cb = (function(entry) { return function() {
-                if(entry.watchdog) {
-                    window.clearTimeout(entry.watchdog);
-                    entry.watchdog = null;
-                }
-                for(var i = 0; i < entry.gameart_objects.length; i++) {
-                    var snd = entry.gameart_objects[i];
-                    snd.data_loaded = true;
-                    if(snd.load_looped) {
-                        snd.audio.loop();
-                        snd.play(GameArt.time);
-                    } else if(snd.play_on_load > 0) {
-                        snd.play(snd.play_on_load);
-                        snd.play_on_load = -1;
-                    }
-                    if(snd.load_faded != -1) {
-                        snd.fadeTo(snd.load_faded, 0.5);
-                    }
-                }
-                GameArt.image_onload(entry.filename);
-            }; })(e);
-
-            // called when download fails
-            var fail_cb = (function(entry) { return function() {
-                if(entry.watchdog) {
-                    window.clearTimeout(entry.watchdog);
-                    entry.watchdog = null;
-                }
-                GameArt.image_onerror(entry.filename, 'audio_sample_onerror');
-            }; })(e);
-
-            e.sample = GameArt.audio_driver.create_sample(GameArt.art_url(e.filename, false), e.kind, success_cb, fail_cb);
-
-            for(var i = 0; i < entry.gameart_objects.length; i++) {
-                entry.gameart_objects[i].audio = e.sample;
-            }
-
-            e.sample.load();
-
-            if(gamedata['client']['art_download_timeout']['audio'] > 0) {
-                e.watchdog = window.setTimeout((function (_e) { return function() {
-                    GameArt.image_ontimeout(_e.filename);
-                }; })(e), 1000 * gamedata['client']['art_download_timeout']['audio']);
-            }
-        };
-
-        this.entry = entry;
-        GameArt.file_list[this.filename] = entry;
+        GameArt.file_list[this.filename] = this.entry = new GameArt.AudioFileEntry(this.delay_load, this, this.filename, false, load_priority);
     }
 };
-
+goog.inherits(GameArt.Sound, GameArt.Source);
 
 /** @param {number} t */
 GameArt.Sound.prototype.stop = function(t) { if(this.audio && this.data_loaded) { this.audio.stop(t); } };
@@ -1447,8 +1491,7 @@ GameArt.Sound.prototype.check_delay_load = function() {
     if(GameArt.dl_inflight_count >= GameArt.dl_inflight_max) { return; }
     GameArt.dl_inflight_count += 1;
 
-    this.entry.dl_started = true;
-    this.entry.start_load(this.entry);
+    this.entry.start_load();
 };
 
 /** @param {number} time
