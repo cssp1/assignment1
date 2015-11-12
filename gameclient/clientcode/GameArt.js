@@ -151,13 +151,14 @@ GameArt.AudioFileEntry.prototype.start_load = function() {
         o.audio = this.sample;
     }
 
-    this.sample.load();
-
     if(gamedata['client']['art_download_timeout']['audio'] > 0) {
+        if(this.watchdog) { throw Error('duplicate start_load on '+this.filename); }
         this.watchdog = window.setTimeout((function (/** !GameArt.FileEntry */  _this) { return function() {
             GameArt.image_ontimeout(_this.filename);
         }; })(this), 1000 * gamedata['client']['art_download_timeout']['audio']);
     }
+
+    this.sample.load();
 };
 
  // function that is called when the download completes
