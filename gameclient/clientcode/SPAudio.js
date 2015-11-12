@@ -265,7 +265,9 @@ SPAudio.ACDriver = function(client_time) {
         this.context = new webkitAudioContext();
         this.impl = SPAudio.ACDriverImpl.WEBKIT;
         // name changed from Chrome implementation (createGainNode) to final Web Audio API (createGain)
-        this.context.createGain = this.context.createGainNode;
+        if(typeof(this.context['createGain']) === 'undefined') {
+            this.context['createGain'] = this.context['createGainNode'];
+        }
     }
 
     this.time_offset = this.context.currentTime - client_time;

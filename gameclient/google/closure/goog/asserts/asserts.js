@@ -16,6 +16,8 @@
  * @fileoverview Utilities to check the preconditions, postconditions and
  * invariants runtime.
  *
+ * @suppress {reportUnknownTypes} DJM/SpinPunch
+ *
  * Methods in this package should be given special treatment by the compiler
  * for type-inference. For example, <code>goog.asserts.assert(foo)</code>
  * will restrict <code>foo</code> to a truthy value.

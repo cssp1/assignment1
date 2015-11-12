@@ -1149,7 +1149,7 @@ AStar.CachedAStarContext.prototype.ring_search = function(start_pos, end_pos, ri
         if(!checker_key) { throw Error('must provide a checker_key'); }
 
         // adapt path_checker to evaluate ring around target
-        cell_checker = /** @type {AStar.BlockChecker} */ (function(cell) {
+        cell_checker = /** @type {AStar.BlockChecker} */ (function(/** !AStar.AStarCell */ cell) {
             // not sure what to pass for the "path" here
             return  path_checker(cell, [cell.pos]);
         });
