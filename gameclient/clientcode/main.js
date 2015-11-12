@@ -40550,7 +40550,7 @@ Store.get_price = function(sale_currency, unit_id, spell, spellarg, ignore_error
     if(sale_currency === p_currency) {
         return p;
     } else if(sale_currency == 'fbcredits') {
-        if(p_currency = 'gamebucks') {
+        if(p_currency == 'gamebucks') {
             return Math.floor(p/player.get_any_abtest_value('gamebucks_per_fbcredit', gamedata['store']['gamebucks_per_fbcredit']))+1;
         } else {
             return -1;
