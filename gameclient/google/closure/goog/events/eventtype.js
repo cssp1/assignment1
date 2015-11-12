@@ -16,7 +16,6 @@
  * @fileoverview Event Types.
  *
  * @author arv@google.com (Erik Arvidsson)
- * @author mirkov@google.com (Mirko Visontai)
  */
 
 
@@ -46,13 +45,22 @@ goog.events.getVendorPrefixedName_ = function(eventName) {
 goog.events.EventType = {
   // Mouse events
   CLICK: 'click',
+  RIGHTCLICK: 'rightclick',
   DBLCLICK: 'dblclick',
   MOUSEDOWN: 'mousedown',
   MOUSEUP: 'mouseup',
   MOUSEOVER: 'mouseover',
   MOUSEOUT: 'mouseout',
   MOUSEMOVE: 'mousemove',
+  MOUSEENTER: 'mouseenter',
+  MOUSELEAVE: 'mouseleave',
+  // Select start is non-standard.
+  // See http://msdn.microsoft.com/en-us/library/ie/ms536969(v=vs.85).aspx.
   SELECTSTART: 'selectstart', // IE, Safari, Chrome
+
+  // Wheel events
+  // http://www.w3.org/TR/DOM-Level-3-Events/#events-wheelevents
+  WHEEL: 'wheel',
 
   // Key events
   KEYPRESS: 'keypress',
@@ -76,6 +84,7 @@ goog.events.EventType = {
 
   // Forms
   CHANGE: 'change',
+  RESET: 'reset',
   SELECT: 'select',
   SUBMIT: 'submit',
   INPUT: 'input',
@@ -90,7 +99,9 @@ goog.events.EventType = {
   DROP: 'drop',
   DRAGEND: 'dragend',
 
-  // WebKit touch events.
+  // Touch events
+  // Note that other touch events exist, but we should follow the W3C list here.
+  // http://www.w3.org/TR/touch-events/#list-of-touchevent-types
   TOUCHSTART: 'touchstart',
   TOUCHMOVE: 'touchmove',
   TOUCHEND: 'touchend',
@@ -112,7 +123,7 @@ goog.events.EventType = {
   UNLOAD: 'unload',
 
   // HTML 5 History events
-  // See http://www.w3.org/TR/html5/history.html#event-definitions
+  // See http://www.w3.org/TR/html5/browsers.html#event-definitions-0
   HASHCHANGE: 'hashchange',
   PAGEHIDE: 'pagehide',
   PAGESHOW: 'pageshow',
@@ -151,8 +162,22 @@ goog.events.EventType = {
   /** @suppress {missingRequire} */
   TRANSITIONEND: goog.events.getVendorPrefixedName_('TransitionEnd'),
 
+  // W3C Pointer Events
+  // http://www.w3.org/TR/pointerevents/
+  POINTERDOWN: 'pointerdown',
+  POINTERUP: 'pointerup',
+  POINTERCANCEL: 'pointercancel',
+  POINTERMOVE: 'pointermove',
+  POINTEROVER: 'pointerover',
+  POINTEROUT: 'pointerout',
+  POINTERENTER: 'pointerenter',
+  POINTERLEAVE: 'pointerleave',
+  GOTPOINTERCAPTURE: 'gotpointercapture',
+  LOSTPOINTERCAPTURE: 'lostpointercapture',
+
   // IE specific events.
-  // See http://msdn.microsoft.com/en-us/library/ie/hh673557(v=vs.85).aspx
+  // See http://msdn.microsoft.com/en-us/library/ie/hh772103(v=vs.85).aspx
+  // Note: these events will be supplanted in IE11.
   MSGESTURECHANGE: 'MSGestureChange',
   MSGESTUREEND: 'MSGestureEnd',
   MSGESTUREHOLD: 'MSGestureHold',
@@ -163,13 +188,17 @@ goog.events.EventType = {
   MSLOSTPOINTERCAPTURE: 'MSLostPointerCapture',
   MSPOINTERCANCEL: 'MSPointerCancel',
   MSPOINTERDOWN: 'MSPointerDown',
+  MSPOINTERENTER: 'MSPointerEnter',
+  MSPOINTERHOVER: 'MSPointerHover',
+  MSPOINTERLEAVE: 'MSPointerLeave',
   MSPOINTERMOVE: 'MSPointerMove',
-  MSPOINTEROVER: 'MSPointerOver',
   MSPOINTEROUT: 'MSPointerOut',
+  MSPOINTEROVER: 'MSPointerOver',
   MSPOINTERUP: 'MSPointerUp',
 
   // Native IMEs/input tools events.
-  TEXTINPUT: 'textinput',
+  TEXT: 'text',
+  TEXTINPUT: 'textInput',
   COMPOSITIONSTART: 'compositionstart',
   COMPOSITIONUPDATE: 'compositionupdate',
   COMPOSITIONEND: 'compositionend',
@@ -184,5 +213,25 @@ goog.events.EventType = {
   LOADSTOP: 'loadstop',
   RESPONSIVE: 'responsive',
   SIZECHANGED: 'sizechanged',
-  UNRESPONSIVE: 'unresponsive'
+  UNRESPONSIVE: 'unresponsive',
+
+  // HTML5 Page Visibility API.  See details at
+  // {@code goog.labs.dom.PageVisibilityMonitor}.
+  VISIBILITYCHANGE: 'visibilitychange',
+
+  // LocalStorage event.
+  STORAGE: 'storage',
+
+  // DOM Level 2 mutation events (deprecated).
+  DOMSUBTREEMODIFIED: 'DOMSubtreeModified',
+  DOMNODEINSERTED: 'DOMNodeInserted',
+  DOMNODEREMOVED: 'DOMNodeRemoved',
+  DOMNODEREMOVEDFROMDOCUMENT: 'DOMNodeRemovedFromDocument',
+  DOMNODEINSERTEDINTODOCUMENT: 'DOMNodeInsertedIntoDocument',
+  DOMATTRMODIFIED: 'DOMAttrModified',
+  DOMCHARACTERDATAMODIFIED: 'DOMCharacterDataModified',
+
+  // Print events.
+  BEFOREPRINT: 'beforeprint',
+  AFTERPRINT: 'afterprint'
 };

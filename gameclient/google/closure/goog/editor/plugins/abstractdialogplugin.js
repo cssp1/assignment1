@@ -17,7 +17,6 @@
  * Trogedit dialog has its own plugin.
  *
  * @author nicksantos@google.com (Nick Santos)
- * @author marcosalmeida@google.com (Marcos Almeida)
  */
 
 goog.provide('goog.editor.plugins.AbstractDialogPlugin');
@@ -25,11 +24,11 @@ goog.provide('goog.editor.plugins.AbstractDialogPlugin.EventType');
 
 goog.require('goog.dom');
 goog.require('goog.dom.Range');
-goog.require('goog.editor.Field.EventType');
+goog.require('goog.editor.Field');
 goog.require('goog.editor.Plugin');
 goog.require('goog.editor.range');
 goog.require('goog.events');
-goog.require('goog.ui.editor.AbstractDialog.EventType');
+goog.require('goog.ui.editor.AbstractDialog');
 
 
 // *** Public interface ***************************************************** //
@@ -49,6 +48,8 @@ goog.require('goog.ui.editor.AbstractDialog.EventType');
 goog.editor.plugins.AbstractDialogPlugin = function(command) {
   goog.editor.Plugin.call(this);
   this.command_ = command;
+  /** @private {function()} */
+  this.restoreScrollPosition_ = function() {};
 };
 goog.inherits(goog.editor.plugins.AbstractDialogPlugin, goog.editor.Plugin);
 
@@ -170,6 +171,8 @@ goog.editor.plugins.AbstractDialogPlugin.prototype.execCommandInternal =
   var tempRange = this.getFieldObject().getRange();
   // saveUsingDom() did not work as well as saveUsingNormalizedCarets(),
   // not sure why.
+
+  this.restoreScrollPosition_ = this.saveScrollPosition();
   this.savedRange_ = tempRange && goog.editor.range.saveUsingNormalizedCarets(
       tempRange);
   goog.dom.Range.clearSelection(
@@ -209,6 +212,7 @@ goog.editor.plugins.AbstractDialogPlugin.prototype.handleAfterHide = function(
     e) {
   this.getFieldObject().setModalMode(false);
   this.restoreOriginalSelection();
+  this.restoreScrollPosition_();
 
   if (!this.reuseDialog_) {
     this.disposeDialog_();
@@ -264,7 +268,7 @@ goog.editor.plugins.AbstractDialogPlugin.prototype.disposeOriginalSelection =
 goog.editor.plugins.AbstractDialogPlugin.prototype.disposeInternal =
     function() {
   this.disposeDialog_();
-  goog.base(this, 'disposeInternal');
+  goog.editor.plugins.AbstractDialogPlugin.base(this, 'disposeInternal');
 };
 
 

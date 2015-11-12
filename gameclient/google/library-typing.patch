@@ -1,17 +1,18 @@
-diff -ruN goog.clean/array/array.js goog/array/array.js
---- goog.clean/array/array.js	2015-11-12 11:10:08.000000000 +0100
-+++ goog/array/array.js	2015-02-24 10:43:37.000000000 +0100
-@@ -15,6 +15,7 @@
+diff -ruN /Users/dmaas/Downloads/goog.clean/array/array.js goog/array/array.js
+--- /Users/dmaas/Downloads/goog.clean/array/array.js	2015-11-12 11:20:13.000000000 +0100
++++ goog/array/array.js	2015-11-12 11:22:03.000000000 +0100
+@@ -14,7 +14,7 @@
+ 
  /**
   * @fileoverview Utilities for manipulating arrays.
-  *
+- *
 + * @suppress {reportUnknownTypes} DJM/SpinPunch
+  * @author arv@google.com (Erik Arvidsson)
   */
  
- 
-diff -ruN goog.clean/asserts/asserts.js goog/asserts/asserts.js
---- goog.clean/asserts/asserts.js	2015-11-12 11:09:36.000000000 +0100
-+++ goog/asserts/asserts.js	2015-11-12 11:11:27.000000000 +0100
+diff -ruN /Users/dmaas/Downloads/goog.clean/asserts/asserts.js goog/asserts/asserts.js
+--- /Users/dmaas/Downloads/goog.clean/asserts/asserts.js	2015-11-12 11:20:13.000000000 +0100
++++ goog/asserts/asserts.js	2015-11-12 11:20:30.000000000 +0100
 @@ -16,6 +16,8 @@
   * @fileoverview Utilities to check the preconditions, postconditions and
   * invariants runtime.
@@ -21,9 +22,59 @@ diff -ruN goog.clean/asserts/asserts.js goog/asserts/asserts.js
   * Methods in this package should be given special treatment by the compiler
   * for type-inference. For example, <code>goog.asserts.assert(foo)</code>
   * will restrict <code>foo</code> to a truthy value.
-diff -ruN goog.clean/base.js goog/base.js
---- goog.clean/base.js	2015-11-12 11:10:08.000000000 +0100
-+++ goog/base.js	2015-02-24 10:43:37.000000000 +0100
+diff -ruN /Users/dmaas/Downloads/goog.clean/async/freelist.js goog/async/freelist.js
+--- /Users/dmaas/Downloads/goog.clean/async/freelist.js	2015-11-12 11:20:13.000000000 +0100
++++ goog/async/freelist.js	2015-11-12 11:27:02.000000000 +0100
+@@ -14,6 +14,7 @@
+ 
+ /**
+  * @fileoverview Simple freelist.
++ * @suppress {reportUnknownTypes} DJM/SpinPunch
+  *
+  * An anterative to goog.structs.SimplePool, it imposes the requirement that the
+  * objects in the list contain a "next" property that can be used to maintain
+diff -ruN /Users/dmaas/Downloads/goog.clean/async/nexttick.js goog/async/nexttick.js
+--- /Users/dmaas/Downloads/goog.clean/async/nexttick.js	2015-11-12 11:20:13.000000000 +0100
++++ goog/async/nexttick.js	2015-11-12 11:27:13.000000000 +0100
+@@ -16,6 +16,7 @@
+  * @fileoverview Provides a function to schedule running a function as soon
+  * as possible after the current JS execution stops and yields to the event
+  * loop.
++ * @suppress {reportUnknownTypes} DJM/SpinPunch
+  *
+  */
+ 
+diff -ruN /Users/dmaas/Downloads/goog.clean/async/run.js goog/async/run.js
+--- /Users/dmaas/Downloads/goog.clean/async/run.js	2015-11-12 11:20:13.000000000 +0100
++++ goog/async/run.js	2015-11-12 11:31:55.000000000 +0100
+@@ -12,6 +12,10 @@
+ // See the License for the specific language governing permissions and
+ // limitations under the License.
+ 
++/** @fileoverview
++ * @suppress {reportUnknownTypes} DJM/SpinPunch
++ */
++
+ goog.provide('goog.async.run');
+ 
+ goog.require('goog.async.WorkQueue');
+diff -ruN /Users/dmaas/Downloads/goog.clean/async/workqueue.js goog/async/workqueue.js
+--- /Users/dmaas/Downloads/goog.clean/async/workqueue.js	2015-11-12 11:20:13.000000000 +0100
++++ goog/async/workqueue.js	2015-11-12 11:31:40.000000000 +0100
+@@ -12,6 +12,10 @@
+ // See the License for the specific language governing permissions and
+ // limitations under the License.
+ 
++/** @fileoverview
++ * @suppress {reportUnknownTypes} DJM/SpinPunch
++ */
++
+ goog.provide('goog.async.WorkItem');
+ goog.provide('goog.async.WorkQueue');
+ 
+diff -ruN /Users/dmaas/Downloads/goog.clean/base.js goog/base.js
+--- /Users/dmaas/Downloads/goog.clean/base.js	2015-11-12 11:20:13.000000000 +0100
++++ goog/base.js	2015-11-12 11:20:30.000000000 +0100
 @@ -14,6 +14,7 @@
  
  /**
@@ -32,9 +83,9 @@ diff -ruN goog.clean/base.js goog/base.js
   *
   * In uncompiled mode base.js will write out Closure's deps file, unless the
   * global <code>CLOSURE_NO_DEPS</code> is set to true.  This allows projects to
-diff -ruN goog.clean/crypt/base64.js goog/crypt/base64.js
---- goog.clean/crypt/base64.js	2015-11-12 11:10:08.000000000 +0100
-+++ goog/crypt/base64.js	2015-02-25 09:12:16.000000000 +0100
+diff -ruN /Users/dmaas/Downloads/goog.clean/crypt/base64.js goog/crypt/base64.js
+--- /Users/dmaas/Downloads/goog.clean/crypt/base64.js	2015-11-12 11:20:13.000000000 +0100
++++ goog/crypt/base64.js	2015-11-12 11:20:30.000000000 +0100
 @@ -16,6 +16,7 @@
   * @fileoverview Base64 en/decoding. Not much to say here except that we
   * work with decoded values in arrays of bytes. By "byte" I mean a number
@@ -42,10 +93,10 @@ diff -ruN goog.clean/crypt/base64.js goog/crypt/base64.js
 + * @suppress {reportUnknownTypes} DJM/SpinPunch
   *
   * @author doughtie@google.com (Gavin Doughtie)
-  * @author fschneider@google.com (Fritz Schneider)
-diff -ruN goog.clean/crypt/crypt.js goog/crypt/crypt.js
---- goog.clean/crypt/crypt.js	2015-11-12 11:10:08.000000000 +0100
-+++ goog/crypt/crypt.js	2015-02-25 09:12:16.000000000 +0100
+  */
+diff -ruN /Users/dmaas/Downloads/goog.clean/crypt/crypt.js goog/crypt/crypt.js
+--- /Users/dmaas/Downloads/goog.clean/crypt/crypt.js	2015-11-12 11:20:13.000000000 +0100
++++ goog/crypt/crypt.js	2015-11-12 11:20:30.000000000 +0100
 @@ -14,6 +14,7 @@
  
  /**
@@ -54,9 +105,9 @@ diff -ruN goog.clean/crypt/crypt.js goog/crypt/crypt.js
   */
  
  goog.provide('goog.crypt');
-diff -ruN goog.clean/debug/debug.js goog/debug/debug.js
---- goog.clean/debug/debug.js	2015-11-12 11:10:08.000000000 +0100
-+++ goog/debug/debug.js	2015-02-25 09:12:16.000000000 +0100
+diff -ruN /Users/dmaas/Downloads/goog.clean/debug/debug.js goog/debug/debug.js
+--- /Users/dmaas/Downloads/goog.clean/debug/debug.js	2015-11-12 11:20:13.000000000 +0100
++++ goog/debug/debug.js	2015-11-12 11:20:30.000000000 +0100
 @@ -14,6 +14,7 @@
  
  /**
@@ -65,9 +116,9 @@ diff -ruN goog.clean/debug/debug.js goog/debug/debug.js
   *
   * @see ../demos/debug.html
   */
-diff -ruN goog.clean/debug/logbuffer.js goog/debug/logbuffer.js
---- goog.clean/debug/logbuffer.js	2015-11-12 11:10:08.000000000 +0100
-+++ goog/debug/logbuffer.js	2015-02-25 09:12:16.000000000 +0100
+diff -ruN /Users/dmaas/Downloads/goog.clean/debug/logbuffer.js goog/debug/logbuffer.js
+--- /Users/dmaas/Downloads/goog.clean/debug/logbuffer.js	2015-11-12 11:20:13.000000000 +0100
++++ goog/debug/logbuffer.js	2015-11-12 11:20:30.000000000 +0100
 @@ -20,6 +20,7 @@
   * log records and expect that they are not overwriten at a later point.
   *
@@ -76,9 +127,9 @@ diff -ruN goog.clean/debug/logbuffer.js goog/debug/logbuffer.js
   */
  
  goog.provide('goog.debug.LogBuffer');
-diff -ruN goog.clean/debug/logger.js goog/debug/logger.js
---- goog.clean/debug/logger.js	2015-11-12 11:10:08.000000000 +0100
-+++ goog/debug/logger.js	2015-02-25 09:12:16.000000000 +0100
+diff -ruN /Users/dmaas/Downloads/goog.clean/debug/logger.js goog/debug/logger.js
+--- /Users/dmaas/Downloads/goog.clean/debug/logger.js	2015-11-12 11:20:13.000000000 +0100
++++ goog/debug/logger.js	2015-11-12 11:20:30.000000000 +0100
 @@ -16,6 +16,7 @@
   * @fileoverview Definition of the Logger class. Please minimize dependencies
   * this file has on other closure classes as any dependency it takes won't be
@@ -87,9 +138,9 @@ diff -ruN goog.clean/debug/logger.js goog/debug/logger.js
   *
   * @see ../demos/debug.html
   */
-diff -ruN goog.clean/disposable/disposable.js goog/disposable/disposable.js
---- goog.clean/disposable/disposable.js	2015-11-12 11:10:08.000000000 +0100
-+++ goog/disposable/disposable.js	2015-02-25 09:12:16.000000000 +0100
+diff -ruN /Users/dmaas/Downloads/goog.clean/disposable/disposable.js goog/disposable/disposable.js
+--- /Users/dmaas/Downloads/goog.clean/disposable/disposable.js	2015-11-12 11:20:13.000000000 +0100
++++ goog/disposable/disposable.js	2015-11-12 11:20:30.000000000 +0100
 @@ -16,6 +16,7 @@
   * @fileoverview Implements the disposable interface. The dispose method is used
   * to clean up references and resources.
@@ -98,9 +149,9 @@ diff -ruN goog.clean/disposable/disposable.js goog/disposable/disposable.js
   */
  
  
-diff -ruN goog.clean/events/browserevent.js goog/events/browserevent.js
---- goog.clean/events/browserevent.js	2015-11-12 11:10:08.000000000 +0100
-+++ goog/events/browserevent.js	2015-02-25 09:12:16.000000000 +0100
+diff -ruN /Users/dmaas/Downloads/goog.clean/events/browserevent.js goog/events/browserevent.js
+--- /Users/dmaas/Downloads/goog.clean/events/browserevent.js	2015-11-12 11:20:13.000000000 +0100
++++ goog/events/browserevent.js	2015-11-12 11:20:30.000000000 +0100
 @@ -14,6 +14,7 @@
  
  /**
@@ -109,9 +160,9 @@ diff -ruN goog.clean/events/browserevent.js goog/events/browserevent.js
   *
   * <pre>
   * The patched event object contains the following members:
-diff -ruN goog.clean/events/browserfeature.js goog/events/browserfeature.js
---- goog.clean/events/browserfeature.js	2015-11-12 11:10:08.000000000 +0100
-+++ goog/events/browserfeature.js	2015-02-25 09:12:16.000000000 +0100
+diff -ruN /Users/dmaas/Downloads/goog.clean/events/browserfeature.js goog/events/browserfeature.js
+--- /Users/dmaas/Downloads/goog.clean/events/browserfeature.js	2015-11-12 11:20:13.000000000 +0100
++++ goog/events/browserfeature.js	2015-11-12 11:20:30.000000000 +0100
 @@ -14,6 +14,7 @@
  
  /**
@@ -120,9 +171,9 @@ diff -ruN goog.clean/events/browserfeature.js goog/events/browserfeature.js
   *
   */
  
-diff -ruN goog.clean/events/events.js goog/events/events.js
---- goog.clean/events/events.js	2015-11-12 11:10:08.000000000 +0100
-+++ goog/events/events.js	2015-02-25 09:12:16.000000000 +0100
+diff -ruN /Users/dmaas/Downloads/goog.clean/events/events.js goog/events/events.js
+--- /Users/dmaas/Downloads/goog.clean/events/events.js	2015-11-12 11:20:13.000000000 +0100
++++ goog/events/events.js	2015-11-12 11:20:30.000000000 +0100
 @@ -17,6 +17,7 @@
   * targets and custom JavaScript event targets
   * ({@code goog.events.Listenable}). This provides an abstraction
@@ -131,9 +182,9 @@ diff -ruN goog.clean/events/events.js goog/events/events.js
   *
   * It also provides a simulation of W3C event model's capture phase in
   * Internet Explorer (IE 8 and below). Caveat: the simulation does not
-diff -ruN goog.clean/events/eventtarget.js goog/events/eventtarget.js
---- goog.clean/events/eventtarget.js	2015-11-12 11:10:08.000000000 +0100
-+++ goog/events/eventtarget.js	2015-02-25 09:12:16.000000000 +0100
+diff -ruN /Users/dmaas/Downloads/goog.clean/events/eventtarget.js goog/events/eventtarget.js
+--- /Users/dmaas/Downloads/goog.clean/events/eventtarget.js	2015-11-12 11:20:13.000000000 +0100
++++ goog/events/eventtarget.js	2015-11-12 11:20:30.000000000 +0100
 @@ -16,6 +16,7 @@
   * @fileoverview A disposable implementation of a custom
   * listenable/event target. See also: documentation for
@@ -141,21 +192,21 @@ diff -ruN goog.clean/events/eventtarget.js goog/events/eventtarget.js
 + * @suppress {reportUnknownTypes} DJM/SpinPunch
   *
   * @author arv@google.com (Erik Arvidsson) [Original implementation]
-  * @author pupius@google.com (Daniel Pupius) [Port to use goog.events]
-diff -ruN goog.clean/events/listenable.js goog/events/listenable.js
---- goog.clean/events/listenable.js	2015-11-12 11:10:08.000000000 +0100
-+++ goog/events/listenable.js	2015-02-25 09:12:16.000000000 +0100
+  * @see ../demos/eventtarget.html
+diff -ruN /Users/dmaas/Downloads/goog.clean/events/listenable.js goog/events/listenable.js
+--- /Users/dmaas/Downloads/goog.clean/events/listenable.js	2015-11-12 11:20:13.000000000 +0100
++++ goog/events/listenable.js	2015-11-12 11:22:29.000000000 +0100
 @@ -14,6 +14,7 @@
  
  /**
   * @fileoverview An interface for a listenable JavaScript object.
 + * @suppress {reportUnknownTypes} DJM/SpinPunch
+  * @author chrishenry@google.com (Chris Henry)
   */
  
- goog.provide('goog.events.Listenable');
-diff -ruN goog.clean/events/listenermap.js goog/events/listenermap.js
---- goog.clean/events/listenermap.js	2015-11-12 11:10:08.000000000 +0100
-+++ goog/events/listenermap.js	2015-02-25 09:12:16.000000000 +0100
+diff -ruN /Users/dmaas/Downloads/goog.clean/events/listenermap.js goog/events/listenermap.js
+--- /Users/dmaas/Downloads/goog.clean/events/listenermap.js	2015-11-12 11:20:13.000000000 +0100
++++ goog/events/listenermap.js	2015-11-12 11:20:30.000000000 +0100
 @@ -16,6 +16,7 @@
   * @fileoverview A map of listeners that provides utility functions to
   * deal with listeners on an event target. Used by
@@ -164,9 +215,53 @@ diff -ruN goog.clean/events/listenermap.js goog/events/listenermap.js
   *
   * WARNING: Do not use this class from outside goog.events package.
   *
-diff -ruN goog.clean/iter/iter.js goog/iter/iter.js
---- goog.clean/iter/iter.js	2015-11-12 11:10:08.000000000 +0100
-+++ goog/iter/iter.js	2015-02-25 09:12:16.000000000 +0100
+diff -ruN /Users/dmaas/Downloads/goog.clean/functions/functions.js goog/functions/functions.js
+--- /Users/dmaas/Downloads/goog.clean/functions/functions.js	2015-11-12 11:20:13.000000000 +0100
++++ goog/functions/functions.js	2015-11-12 11:27:30.000000000 +0100
+@@ -15,6 +15,7 @@
+ /**
+  * @fileoverview Utilities for creating functions. Loosely inspired by the
+  * java classes: http://goo.gl/GM0Hmu and http://goo.gl/6k7nI8.
++ * @suppress {reportUnknownTypes} DJM/SpinPunch
+  *
+  * @author nicksantos@google.com (Nick Santos)
+  */
+diff -ruN /Users/dmaas/Downloads/goog.clean/html/safehtml.js goog/html/safehtml.js
+--- /Users/dmaas/Downloads/goog.clean/html/safehtml.js	2015-11-12 11:20:13.000000000 +0100
++++ goog/html/safehtml.js	2015-11-12 11:31:18.000000000 +0100
+@@ -15,6 +15,7 @@
+ 
+ /**
+  * @fileoverview The SafeHtml type and its builders.
++ * @suppress {reportUnknownTypes} DJM/SpinPunch
+  *
+  * TODO(xtof): Link to document stating type contract.
+  */
+diff -ruN /Users/dmaas/Downloads/goog.clean/html/safestyle.js goog/html/safestyle.js
+--- /Users/dmaas/Downloads/goog.clean/html/safestyle.js	2015-11-12 11:20:13.000000000 +0100
++++ goog/html/safestyle.js	2015-11-12 11:31:08.000000000 +0100
+@@ -14,6 +14,7 @@
+ 
+ /**
+  * @fileoverview The SafeStyle type and its builders.
++ * @suppress {reportUnknownTypes} DJM/SpinPunch
+  *
+  * TODO(xtof): Link to document stating type contract.
+  */
+diff -ruN /Users/dmaas/Downloads/goog.clean/html/safestylesheet.js goog/html/safestylesheet.js
+--- /Users/dmaas/Downloads/goog.clean/html/safestylesheet.js	2015-11-12 11:20:13.000000000 +0100
++++ goog/html/safestylesheet.js	2015-11-12 11:30:56.000000000 +0100
+@@ -14,6 +14,7 @@
+ 
+ /**
+  * @fileoverview The SafeStyleSheet type and its builders.
++ * @suppress {reportUnknownTypes} DJM/SpinPunch
+  *
+  * TODO(xtof): Link to document stating type contract.
+  */
+diff -ruN /Users/dmaas/Downloads/goog.clean/iter/iter.js goog/iter/iter.js
+--- /Users/dmaas/Downloads/goog.clean/iter/iter.js	2015-11-12 11:20:13.000000000 +0100
++++ goog/iter/iter.js	2015-11-12 11:20:30.000000000 +0100
 @@ -15,6 +15,7 @@
  /**
   * @fileoverview Python style iteration utilities.
@@ -175,9 +270,9 @@ diff -ruN goog.clean/iter/iter.js goog/iter/iter.js
   */
  
  
-diff -ruN goog.clean/json/json.js goog/json/json.js
---- goog.clean/json/json.js	2015-11-12 11:10:08.000000000 +0100
-+++ goog/json/json.js	2015-02-25 09:12:16.000000000 +0100
+diff -ruN /Users/dmaas/Downloads/goog.clean/json/json.js goog/json/json.js
+--- /Users/dmaas/Downloads/goog.clean/json/json.js	2015-11-12 11:20:13.000000000 +0100
++++ goog/json/json.js	2015-11-12 11:20:30.000000000 +0100
 @@ -15,6 +15,7 @@
  /**
   * @fileoverview JSON utility functions.
@@ -186,9 +281,31 @@ diff -ruN goog.clean/json/json.js goog/json/json.js
   */
  
  
-diff -ruN goog.clean/net/xhrio.js goog/net/xhrio.js
---- goog.clean/net/xhrio.js	2015-11-12 11:10:08.000000000 +0100
-+++ goog/net/xhrio.js	2015-02-25 09:12:16.000000000 +0100
+diff -ruN /Users/dmaas/Downloads/goog.clean/labs/useragent/browser.js goog/labs/useragent/browser.js
+--- /Users/dmaas/Downloads/goog.clean/labs/useragent/browser.js	2015-11-12 11:20:13.000000000 +0100
++++ goog/labs/useragent/browser.js	2015-11-12 11:30:15.000000000 +0100
+@@ -19,6 +19,7 @@
+  * sub-namespaces in goog.labs.userAgent, goog.labs.userAgent.platform,
+  * goog.labs.userAgent.device respectively.)
+  *
++ * @suppress {reportUnknownTypes} DJM/SpinPunch
+  * @author martone@google.com (Andy Martone)
+  */
+ 
+diff -ruN /Users/dmaas/Downloads/goog.clean/math/math.js goog/math/math.js
+--- /Users/dmaas/Downloads/goog.clean/math/math.js	2015-11-12 11:20:13.000000000 +0100
++++ goog/math/math.js	2015-11-12 11:27:45.000000000 +0100
+@@ -14,6 +14,7 @@
+ 
+ /**
+  * @fileoverview Additional mathematical functions.
++ * @suppress {reportUnknownTypes} DJM/SpinPunch
+  */
+ 
+ goog.provide('goog.math');
+diff -ruN /Users/dmaas/Downloads/goog.clean/net/xhrio.js goog/net/xhrio.js
+--- /Users/dmaas/Downloads/goog.clean/net/xhrio.js	2015-11-12 11:20:13.000000000 +0100
++++ goog/net/xhrio.js	2015-11-12 11:20:30.000000000 +0100
 @@ -14,6 +14,7 @@
  
  /**
@@ -197,19 +314,9 @@ diff -ruN goog.clean/net/xhrio.js goog/net/xhrio.js
   *
   * One off requests can be sent through goog.net.XhrIo.send() or an
   * instance can be created to send multiple requests.  Each request uses its
-@@ -478,7 +479,8 @@
-   try {
-     goog.log.fine(this.logger_, this.formatMsg_('Opening Xhr'));
-     this.inOpen_ = true;
--    this.xhr_.open(method, url, true);  // Always async!
-+    var url2 = /** @type {string} */ (url); // DJM/SpinPunch
-+    this.xhr_.open(method, url2, true);  // Always async!
-     this.inOpen_ = false;
-   } catch (err) {
-     goog.log.fine(this.logger_,
-diff -ruN goog.clean/net/xmlhttp.js goog/net/xmlhttp.js
---- goog.clean/net/xmlhttp.js	2015-11-12 11:10:08.000000000 +0100
-+++ goog/net/xmlhttp.js	2015-02-25 09:12:16.000000000 +0100
+diff -ruN /Users/dmaas/Downloads/goog.clean/net/xmlhttp.js goog/net/xmlhttp.js
+--- /Users/dmaas/Downloads/goog.clean/net/xmlhttp.js	2015-11-12 11:20:13.000000000 +0100
++++ goog/net/xmlhttp.js	2015-11-12 11:20:30.000000000 +0100
 @@ -14,6 +14,7 @@
  
  /**
@@ -218,42 +325,70 @@ diff -ruN goog.clean/net/xmlhttp.js goog/net/xmlhttp.js
   * @author arv@google.com (Erik Arvidsson)
   * @author dbk@google.com (David Barrett-Kahn)
   */
-diff -ruN goog.clean/object/object.js goog/object/object.js
---- goog.clean/object/object.js	2015-11-12 11:10:08.000000000 +0100
-+++ goog/object/object.js	2015-02-24 10:43:37.000000000 +0100
+diff -ruN /Users/dmaas/Downloads/goog.clean/object/object.js goog/object/object.js
+--- /Users/dmaas/Downloads/goog.clean/object/object.js	2015-11-12 11:20:13.000000000 +0100
++++ goog/object/object.js	2015-11-12 11:23:23.000000000 +0100
 @@ -14,6 +14,7 @@
  
  /**
   * @fileoverview Utilities for manipulating objects/maps/hashes.
 + * @suppress {reportUnknownTypes} DJM/SpinPunch
+  * @author arv@google.com (Erik Arvidsson)
   */
  
- goog.provide('goog.object');
-diff -ruN goog.clean/reflect/reflect.js goog/reflect/reflect.js
---- goog.clean/reflect/reflect.js	2015-11-12 11:10:08.000000000 +0100
-+++ goog/reflect/reflect.js	2015-02-25 09:12:16.000000000 +0100
+diff -ruN /Users/dmaas/Downloads/goog.clean/promise/promise.js goog/promise/promise.js
+--- /Users/dmaas/Downloads/goog.clean/promise/promise.js	2015-11-12 11:20:13.000000000 +0100
++++ goog/promise/promise.js	2015-11-12 11:28:07.000000000 +0100
+@@ -12,6 +12,10 @@
+ // See the License for the specific language governing permissions and
+ // limitations under the License.
+ 
++/** @fileoverview
++ * @suppress {reportUnknownTypes} DJM/SpinPunch
++*/
++
+ goog.provide('goog.Promise');
+ 
+ goog.require('goog.Thenable');
+diff -ruN /Users/dmaas/Downloads/goog.clean/promise/thenable.js goog/promise/thenable.js
+--- /Users/dmaas/Downloads/goog.clean/promise/thenable.js	2015-11-12 11:20:13.000000000 +0100
++++ goog/promise/thenable.js	2015-11-12 11:28:25.000000000 +0100
+@@ -14,7 +14,9 @@
+ 
+ goog.provide('goog.Thenable');
+ 
+-
++/** @fileoverview
++ * @suppress {reportUnknownTypes} DJM/SpinPunch
++*/
+ 
+ /**
+  * Provides a more strict interface for Thenables in terms of
+diff -ruN /Users/dmaas/Downloads/goog.clean/reflect/reflect.js goog/reflect/reflect.js
+--- /Users/dmaas/Downloads/goog.clean/reflect/reflect.js	2015-11-12 11:20:13.000000000 +0100
++++ goog/reflect/reflect.js	2015-11-12 11:20:30.000000000 +0100
 @@ -14,6 +14,7 @@
  
  /**
   * @fileoverview Useful compiler idioms.
 + * @suppress {reportUnknownTypes} DJM/SpinPunch
   *
+  * @author johnlenz@google.com (John Lenz)
   */
- 
-diff -ruN goog.clean/string/string.js goog/string/string.js
---- goog.clean/string/string.js	2015-11-12 11:10:08.000000000 +0100
-+++ goog/string/string.js	2015-02-24 10:43:37.000000000 +0100
+diff -ruN /Users/dmaas/Downloads/goog.clean/string/string.js goog/string/string.js
+--- /Users/dmaas/Downloads/goog.clean/string/string.js	2015-11-12 11:20:13.000000000 +0100
++++ goog/string/string.js	2015-11-12 11:23:34.000000000 +0100
 @@ -14,6 +14,7 @@
  
  /**
   * @fileoverview Utilities for string manipulation.
 + * @suppress {reportUnknownTypes} DJM/SpinPunch
+  * @author arv@google.com (Erik Arvidsson)
   */
  
- 
-diff -ruN goog.clean/structs/map.js goog/structs/map.js
---- goog.clean/structs/map.js	2015-11-12 11:10:08.000000000 +0100
-+++ goog/structs/map.js	2015-02-25 09:12:16.000000000 +0100
+diff -ruN /Users/dmaas/Downloads/goog.clean/structs/map.js goog/structs/map.js
+--- /Users/dmaas/Downloads/goog.clean/structs/map.js	2015-11-12 11:20:13.000000000 +0100
++++ goog/structs/map.js	2015-11-12 11:20:30.000000000 +0100
 @@ -14,6 +14,7 @@
  
  /**
@@ -261,10 +396,10 @@ diff -ruN goog.clean/structs/map.js goog/structs/map.js
 + * @suppress {reportUnknownTypes} DJM/SpinPunch
   *
   * @author arv@google.com (Erik Arvidsson)
-  * @author jonp@google.com (Jon Perlow) Optimized for IE6
-diff -ruN goog.clean/structs/set.js goog/structs/set.js
---- goog.clean/structs/set.js	2015-11-12 11:10:08.000000000 +0100
-+++ goog/structs/set.js	2015-02-25 09:12:16.000000000 +0100
+  *
+diff -ruN /Users/dmaas/Downloads/goog.clean/structs/set.js goog/structs/set.js
+--- /Users/dmaas/Downloads/goog.clean/structs/set.js	2015-11-12 11:20:13.000000000 +0100
++++ goog/structs/set.js	2015-11-12 11:20:30.000000000 +0100
 @@ -14,6 +14,7 @@
  
  /**
@@ -272,10 +407,10 @@ diff -ruN goog.clean/structs/set.js goog/structs/set.js
 + * @suppress {reportUnknownTypes} DJM/SpinPunch
   *
   * @author arv@google.com (Erik Arvidsson)
-  * @author pallosp@google.com (Peter Pallos)
-diff -ruN goog.clean/structs/structs.js goog/structs/structs.js
---- goog.clean/structs/structs.js	2015-11-12 11:10:08.000000000 +0100
-+++ goog/structs/structs.js	2015-02-25 09:12:16.000000000 +0100
+  *
+diff -ruN /Users/dmaas/Downloads/goog.clean/structs/structs.js goog/structs/structs.js
+--- /Users/dmaas/Downloads/goog.clean/structs/structs.js	2015-11-12 11:20:13.000000000 +0100
++++ goog/structs/structs.js	2015-11-12 11:20:30.000000000 +0100
 @@ -14,6 +14,7 @@
  
  /**
@@ -284,20 +419,20 @@ diff -ruN goog.clean/structs/structs.js goog/structs/structs.js
   *
   * @author arv@google.com (Erik Arvidsson)
   *
-diff -ruN goog.clean/timer/timer.js goog/timer/timer.js
---- goog.clean/timer/timer.js	2015-11-12 11:10:08.000000000 +0100
-+++ goog/timer/timer.js	2015-02-25 09:12:16.000000000 +0100
+diff -ruN /Users/dmaas/Downloads/goog.clean/timer/timer.js goog/timer/timer.js
+--- /Users/dmaas/Downloads/goog.clean/timer/timer.js	2015-11-12 11:20:13.000000000 +0100
++++ goog/timer/timer.js	2015-11-12 11:23:55.000000000 +0100
 @@ -15,6 +15,7 @@
  /**
-  * @fileoverview A timer class to which other classes and objects can
-  * listen on.  This is only an abstraction above setInterval.
+  * @fileoverview A timer class to which other classes and objects can listen on.
+  * This is only an abstraction above {@code setInterval}.
 + * @suppress {reportUnknownTypes} DJM/SpinPunch
   *
   * @see ../demos/timers.html
   */
-diff -ruN goog.clean/uri/utils.js goog/uri/utils.js
---- goog.clean/uri/utils.js	2015-11-12 11:10:08.000000000 +0100
-+++ goog/uri/utils.js	2015-02-25 09:12:16.000000000 +0100
+diff -ruN /Users/dmaas/Downloads/goog.clean/uri/utils.js goog/uri/utils.js
+--- /Users/dmaas/Downloads/goog.clean/uri/utils.js	2015-11-12 11:20:13.000000000 +0100
++++ goog/uri/utils.js	2015-11-12 11:20:30.000000000 +0100
 @@ -14,6 +14,7 @@
  
  /**
@@ -306,9 +441,9 @@ diff -ruN goog.clean/uri/utils.js goog/uri/utils.js
   *
   * This is intended to be a lightweight alternative to constructing goog.Uri
   * objects.  Whereas goog.Uri adds several kilobytes to the binary regardless
-diff -ruN goog.clean/useragent/useragent.js goog/useragent/useragent.js
---- goog.clean/useragent/useragent.js	2015-11-12 11:10:08.000000000 +0100
-+++ goog/useragent/useragent.js	2015-02-25 09:12:16.000000000 +0100
+diff -ruN /Users/dmaas/Downloads/goog.clean/useragent/useragent.js goog/useragent/useragent.js
+--- /Users/dmaas/Downloads/goog.clean/useragent/useragent.js	2015-11-12 11:20:13.000000000 +0100
++++ goog/useragent/useragent.js	2015-11-12 11:20:30.000000000 +0100
 @@ -14,6 +14,7 @@
  
  /**

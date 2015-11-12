@@ -94,6 +94,8 @@ goog.provide('goog.ui.ac.InputHandler');
 goog.require('goog.Disposable');
 goog.require('goog.Timer');
 goog.require('goog.a11y.aria');
+goog.require('goog.a11y.aria.Role');
+goog.require('goog.a11y.aria.State');
 goog.require('goog.dom');
 goog.require('goog.dom.selection');
 goog.require('goog.events.EventHandler');
@@ -146,6 +148,13 @@ goog.ui.ac.InputHandler = function(opt_separators, opt_literals,
   this.literals_ = opt_literals || '';
 
   /**
+   * Whether to prevent highlighted item selection when tab is pressed.
+   * @type {boolean}
+   * @private
+   */
+  this.preventSelectionOnTab_ = false;
+
+  /**
    * Whether to prevent the default behavior (moving focus to another element)
    * when tab is pressed.  This occurs by default only for multi-value mode.
    * @type {boolean}
@@ -168,14 +177,14 @@ goog.ui.ac.InputHandler = function(opt_separators, opt_literals,
 
   /**
    * Event handler used by the input handler to manage events.
-   * @type {goog.events.EventHandler}
+   * @type {goog.events.EventHandler<!goog.ui.ac.InputHandler>}
    * @private
    */
   this.eh_ = new goog.events.EventHandler(this);
 
   /**
    * Event handler to help us find an input element that already has the focus.
-   * @type {goog.events.EventHandler}
+   * @type {goog.events.EventHandler<!goog.ui.ac.InputHandler>}
    * @private
    */
   this.activateHandler_ = new goog.events.EventHandler(this);
@@ -437,12 +446,13 @@ goog.ui.ac.InputHandler.prototype.setCursorPosition = function(pos) {
  * should be a textarea, input box, or other focusable element with the
  * same interface.
  * @param {Element|goog.events.EventTarget} target An element to attach the
- *     input handler too.
+ *     input handler to.
  */
 goog.ui.ac.InputHandler.prototype.attachInput = function(target) {
   if (goog.dom.isElement(target)) {
     var el = /** @type {!Element} */ (target);
-    goog.a11y.aria.setState(el, 'haspopup', true);
+    goog.a11y.aria.setRole(el, goog.a11y.aria.Role.COMBOBOX);
+    goog.a11y.aria.setState(el, goog.a11y.aria.State.AUTOCOMPLETE, 'list');
   }
 
   this.eh_.listen(target, goog.events.EventType.FOCUS, this.handleFocus);
@@ -458,7 +468,7 @@ goog.ui.ac.InputHandler.prototype.attachInput = function(target) {
       var ownerDocument = goog.dom.getOwnerDocument(
           /** @type {Element} */ (target));
       if (goog.dom.getActiveElement(ownerDocument) == target) {
-        this.processFocus(/** @type {Element} */ (target));
+        this.processFocus(/** @type {!Element} */ (target));
       }
     }
   }
@@ -471,6 +481,12 @@ goog.ui.ac.InputHandler.prototype.attachInput = function(target) {
  *     input handler from.
  */
 goog.ui.ac.InputHandler.prototype.detachInput = function(target) {
+  if (goog.dom.isElement(target)) {
+    var el = /** @type {!Element} */ (target);
+    goog.a11y.aria.removeRole(el);
+    goog.a11y.aria.removeState(el, goog.a11y.aria.State.AUTOCOMPLETE);
+  }
+
   if (target == this.activeElement_) {
     this.handleBlur();
   }
@@ -515,7 +531,9 @@ goog.ui.ac.InputHandler.prototype.detachInputs = function(var_args) {
  * @return {boolean} Whether to suppress the update event.
  */
 goog.ui.ac.InputHandler.prototype.selectRow = function(row, opt_multi) {
-  this.setTokenText(row.toString(), opt_multi);
+  if (this.activeElement_) {
+    this.setTokenText(row.toString(), opt_multi);
+  }
   return false;
 };
 
@@ -548,7 +566,7 @@ goog.ui.ac.InputHandler.prototype.setTokenText =
     // Ensure there's whitespace wrapping the entries, if whitespaceWrapEntries_
     // has been set to true.
     if (this.whitespaceWrapEntries_) {
-      if (index != 0 && !goog.string.isEmpty(entries[index - 1])) {
+      if (index != 0 && !goog.string.isEmptyOrWhitespace(entries[index - 1])) {
         replaceValue = ' ' + replaceValue;
       }
       // Add a space only if it's the last token; otherwise, we assume the
@@ -574,6 +592,7 @@ goog.ui.ac.InputHandler.prototype.setTokenText =
       // to do this only if there is an uncommitted IME, but this isn't possible
       // to detect. Since text editing is finicky we restrict this
       // workaround to Firefox and IE 9 where it's necessary.
+      // (Note: this has been fixed in Edge and since FF 41)
       if (goog.userAgent.GECKO ||
           (goog.userAgent.IE && goog.userAgent.isVersionOrHigher('9'))) {
         el.blur();
@@ -686,6 +705,16 @@ goog.ui.ac.InputHandler.prototype.setTrimmingRegExp = function(trimmer) {
  */
 goog.ui.ac.InputHandler.prototype.setPreventDefaultOnTab = function(newValue) {
   this.preventDefaultOnTab_ = newValue;
+};
+
+
+/**
+ * Sets whether we will prevent highlighted item selection on TAB.
+ * @param {boolean} newValue Whether to prevent selection on TAB.
+ */
+goog.ui.ac.InputHandler.prototype.setPreventSelectionOnTab =
+    function(newValue) {
+  this.preventSelectionOnTab_ = newValue;
 };
 
 
@@ -803,7 +832,7 @@ goog.ui.ac.InputHandler.prototype.handleKeyEvent = function(e) {
     // action is also prevented if the input is a multi input, to prevent the
     // user tabbing out of the field.
     case goog.events.KeyCodes.TAB:
-      if (this.ac_.isOpen() && !e.shiftKey) {
+      if (this.ac_.isOpen() && !e.shiftKey && !this.preventSelectionOnTab_) {
         // Ensure the menu is up to date before completing.
         this.update();
         if (this.ac_.selectHilited() && this.preventDefaultOnTab_) {
@@ -918,7 +947,7 @@ goog.ui.ac.InputHandler.prototype.addEventHandlers_ = function() {
   this.eh_.listen(this.activeElement_,
       goog.events.EventType.MOUSEDOWN, this.onMouseDown_);
 
-  // IE also needs a keypress to check if the user typed a separator
+  // IE6 also needs a keypress to check if the user typed a separator
   if (goog.userAgent.IE) {
     this.eh_.listen(this.activeElement_,
         goog.events.EventType.KEYPRESS, this.onIeKeyPress_);
@@ -1000,19 +1029,19 @@ goog.ui.ac.InputHandler.prototype.handleBlur = function(opt_e) {
     // In order to fix the bug, we set a timeout to process the blur event, so
     // that any pending selection event can be processed first.
     this.activeTimeoutId_ =
-        window.setTimeout(goog.bind(this.processBlur_, this), 0);
+        window.setTimeout(goog.bind(this.processBlur, this), 0);
     return;
   } else {
-    this.processBlur_();
+    this.processBlur();
   }
 };
 
 
 /**
  * Helper function that does the logic to handle an element blurring.
- * @private
+ * @protected
  */
-goog.ui.ac.InputHandler.prototype.processBlur_ = function() {
+goog.ui.ac.InputHandler.prototype.processBlur = function() {
   // it's possible that a blur event could fire when there's no active element,
   // in the case where attachInput was called on an input that already had
   // the focus
@@ -1272,7 +1301,7 @@ goog.ui.ac.InputHandler.prototype.getTokenIndex_ = function(text, caret) {
  * entries.
  *
  * @param {string} text Input text.
- * @return {Array} Parsed array.
+ * @return {!Array<string>} Parsed array.
  * @private
  */
 goog.ui.ac.InputHandler.prototype.splitInput_ = function(text) {

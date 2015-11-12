@@ -122,11 +122,11 @@ def _GetInputByPath(path, sources):
 
   Returns:
     The source from sources identified by path, if found.  Converts to
-    absolute paths for comparison.
+    real paths for comparison.
   """
   for js_source in sources:
-    # Convert both to absolute paths for comparison.
-    if os.path.abspath(path) == os.path.abspath(js_source.GetPath()):
+    # Convert both to real paths for comparison.
+    if os.path.realpath(path) == os.path.realpath(js_source.GetPath()):
       return js_source
 
 
@@ -176,9 +176,21 @@ class _PathSource(source.Source):
 
     self._path = path
 
+  def __str__(self):
+    return 'PathSource %s' % self._path
+
   def GetPath(self):
     """Returns the path."""
     return self._path
+
+
+def _WrapGoogModuleSource(src):
+  return ('goog.loadModule(function(exports) {{'
+          '"use strict";'
+          '{0}'
+          '\n'  # terminate any trailing single line comment.
+          ';return exports'
+          '}});\n').format(src)
 
 
 def main():
@@ -234,8 +246,21 @@ def main():
   if output_mode == 'list':
     out.writelines([js_source.GetPath() + '\n' for js_source in deps])
   elif output_mode == 'script':
-    out.writelines([js_source.GetSource() for js_source in deps])
+    for js_source in deps:
+      src = js_source.GetSource()
+      if js_source.is_goog_module:
+        src = _WrapGoogModuleSource(src)
+      out.write(src.encode('utf-8') + '\n')
   elif output_mode == 'compiled':
+    logging.warning("""\
+Closure Compiler now natively understands and orders Closure dependencies and
+is prefererred over using this script for performing JavaScript compilation.
+
+Please migrate your codebase.
+
+See:
+https://github.com/google/closure-compiler/wiki/Manage-Closure-Dependencies
+""")
 
     # Make sure a .jar is specified.
     if not options.compiler_jar:
@@ -251,7 +276,7 @@ def main():
         compiler_flags=options.compiler_flags)
 
     logging.info('JavaScript compilation succeeded.')
-    out.write(compiled_source)
+    out.write(compiled_source.encode('utf-8'))
 
   else:
     logging.error('Invalid value for --output flag.')

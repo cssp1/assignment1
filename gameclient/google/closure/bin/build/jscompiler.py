@@ -20,22 +20,6 @@ import os
 import re
 import subprocess
 
-# SpinPunch - make compatible with Python 2.6
-if not hasattr(subprocess, 'check_output'):
-    def check_output(*popenargs, **kwargs):
-        if 'stdout' in kwargs:
-            raise ValueError('stdout argument not allowed, it will be overridden.')
-        process = subprocess.Popen(stdout=subprocess.PIPE, *popenargs, **kwargs)
-        output, unused_err = process.communicate()
-        retcode = process.poll()
-        if retcode:
-            cmd = kwargs.get("args")
-            if cmd is None:
-                cmd = popenargs[0]
-            raise subprocess.CalledProcessError(retcode, cmd)
-        return output
-    subprocess.check_output = check_output
-
 
 # Pulls just the major and minor version numbers from the first line of
 # 'java -version'. Versions are in the format of [0-9]+\.[0-9]+\..* See:
@@ -89,8 +73,8 @@ def _GetJsCompilerArgs(compiler_jar_path, java_version, source_paths,
                        jvm_flags, compiler_flags):
   """Assembles arguments for call to JsCompiler."""
 
-  if java_version < (1, 6):
-    raise JsCompilerError('Closure Compiler requires Java 1.6 or higher. '
+  if java_version < (1, 7):
+    raise JsCompilerError('Closure Compiler requires Java 1.7 or higher. '
                           'Please visit http://www.java.com/getjava')
 
   args = ['java']
