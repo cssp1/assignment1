@@ -101,7 +101,7 @@ var spin_try_start = function(module) {
     if(module == 'code') { spin_code_loaded = true; }
     if(spin_gamedata_loaded && spin_code_loaded && spin_allow_start) {
           spin_allow_start = false; //spin_try_start = function(module) {};
-          SPINPUNCHGAME_EXPORT.init();
+          SPINPUNCHGAME.init();
      }
 };
 

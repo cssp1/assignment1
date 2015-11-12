@@ -50107,8 +50107,8 @@ function test_consequent(cons) {
     read_consequent(cons).execute();
 };
 
-goog.exportSymbol('SPINPUNCHGAME_EXPORT.init', SPINPUNCHGAME.init);
-goog.exportSymbol('SPINPUNCHGAME_EXPORT.shutdown', SPINPUNCHGAME.shutdown);
+goog.exportSymbol('SPINPUNCHGAME.init', SPINPUNCHGAME.init);
+goog.exportSymbol('SPINPUNCHGAME.shutdown', SPINPUNCHGAME.shutdown);
 goog.exportSymbol('start_ai_attack', start_ai_attack);
 goog.exportSymbol('visit_base', visit_base);
 goog.exportSymbol('change_region', change_region);
