@@ -23464,7 +23464,7 @@ function invoke_inventory_context(inv_dialog, parent_widget, slot, item, show_dr
                 var rec_name = spec['associated_crafting_recipes'][i];
                 var rec_spec = gamedata['crafting']['recipes'][rec_name];
                 var rec_level = ('max_level' in rec_spec ? (item['level'] || 1) + 1 : 1); // assume recipe level is item level + 1, if recipe is leveled
-                if('max_level' in rec_spec && rec_level >= rec_spec['max_level']) { continue; }
+                if('max_level' in rec_spec && rec_level > rec_spec['max_level']) { continue; }
                 if('show_if' in rec_spec && !read_predicate(get_leveled_quantity(rec_spec['show_if'], rec_level)).is_satisfied(player, null)) { continue; }
                 dialog.user_data['buttons'].push(new InventoryContextButton({ui_name:gamedata['crafting']['categories'][rec_spec['crafting_category']]['ui_verb'],
                                                                              ui_name_pending:gamedata['strings']['inventory']['pending'],
