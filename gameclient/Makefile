@@ -67,7 +67,7 @@ compiled-client.js: clientcode/*.js
 		--output_mode=compiled \
 		--compiler_jar=google/compiler.jar \
 		--compiler_flags='--js=google/closure/goog/deps.js' \
-		--compiler_flags='--externs=clientcode/externs.js' \
+		--compiler_flags='--externs=externs.js' \
 		--compiler_flags='--compilation_level=ADVANCED_OPTIMIZATIONS' \
 		--compiler_flags='--summary_detail_level=2' \
 		--compiler_flags='--warning_level=VERBOSE' \
@@ -92,7 +92,7 @@ check: clientcode/*.js
 		--output_mode=compiled \
 		--compiler_jar=google/compiler.jar \
 		--compiler_flags='--js=google/closure/goog/deps.js' \
-		--compiler_flags='--externs=clientcode/externs.js' \
+		--compiler_flags='--externs=externs.js' \
 		--compiler_flags='--compilation_level=ADVANCED_OPTIMIZATIONS' \
 		--compiler_flags='--summary_detail_level=2' \
 		--compiler_flags='--warning_level=VERBOSE' \
