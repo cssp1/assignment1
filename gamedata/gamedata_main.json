@@ -128,7 +128,7 @@
         "concurrent_art_downloads": { "default": 20, "iOS": 5 },
 
         // number of seconds before asset-load-failure watchdog fires (-1 to disable)
-        "art_download_timeout": { "image": 180, "audio": 360 },
+        "art_download_timeout": { "image": 180, "audio": -1 },
 
         "proxy_portraits": 1, // enable proxying of FB/KG profile pictures to avoid tainting the Canvas
         "portrait_proxy_cache_rev": "2", // cache "version" tag for forcing refreshes
