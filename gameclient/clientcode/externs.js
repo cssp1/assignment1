@@ -152,27 +152,6 @@ var XPayStationWidget = {
     "off": function() {}
 };
 
-// HTML5 audio stuff
-var Audio;
-var webkitAudioContext = {
-    "currentTime": {},
-    "destination": {},
-    "createBuffer": function () {},
-    "decodeAudioData": function () {},
-    "createBufferSource": function () {},
-    "createGainNode": function () {},
-    "createGain": function () {}
-};
-var AudioContext = {
-    "currentTime": {},
-    "destination": {},
-    "createBuffer": function () {},
-    "decodeAudioData": function () {},
-    "createBufferSource": function () {},
-    "createGainNode": function () {},
-    "createGain": function () {}
-};
-
 // JQuery
 var $ = {
     "fn": {
