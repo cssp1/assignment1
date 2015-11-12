@@ -253,18 +253,14 @@ UpgradeBar.update_contents = function(dialog, kind, specname, new_level, obj_id)
 
     dialog.widgets['output'].clear_text();
 
-    // console.log(s);
-    if(0) {
-        // safe version, but not scrollable line-by-line
-        dialog.widgets['output'].append_text(SPText.cstring_to_ablocks_bbcode(s, {}, click_handlers));
-    } else {
-        // break lines, protecting BBCode
-        var broken_s = SPUI.break_lines(s, dialog.widgets['output'].font, dialog.widgets['output'].wh, {bbcode:true})[0];
-        //console.log(broken_s.split('\n'));
-        goog.array.forEach(broken_s.split('\n'), function(line) {
-            dialog.widgets['output'].append_text(SPText.cstring_to_ablocks_bbcode(line, {}, click_handlers));
-        });
-    }
+    // safe version, but not scrollable line-by-line
+    // dialog.widgets['output'].append_text(SPText.cstring_to_ablocks_bbcode(s, {}, click_handlers));
+
+    // break lines, protecting BBCode
+    var broken_s = SPUI.break_lines(s, dialog.widgets['output'].font, dialog.widgets['output'].wh, {bbcode:true})[0];
+    goog.array.forEach(broken_s.split('\n'), function(line) {
+        dialog.widgets['output'].append_text(SPText.cstring_to_ablocks_bbcode(line, {}, click_handlers));
+    });
 
     // if contents changed, then reset scroll
     if(kind != prev_kind || specname != prev_specname || new_level != prev_new_level || obj_id != prev_obj_id) {

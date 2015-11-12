@@ -199,12 +199,7 @@ QuestBar.update = function(dialog) {
                 player.record_feature_use('quest_bar');
                 var mis = invoke_missions_dialog(true, _quest);
                 if(mis) {
-                    if(player.can_complete_quest(_quest)) {
-                        // trigger claim
-                        if(0 && mis.widgets['claim_button'].state != 'disabled') {
-                            mis.widgets['claim_button'].onclick(mis.widgets['claim_button']);
-                        }
-                    } else {
+                    if(!player.can_complete_quest(_quest)) {
                         // trigger tracker
                         tutorial_opt_in(_quest);
                     }

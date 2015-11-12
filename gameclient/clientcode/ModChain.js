@@ -386,9 +386,7 @@ ModChain.display_tooltip = function(stat, modchain, show_base, ui_data) {
     ModChain.check_chain(modchain);
 
     var ui_base = ModChain.display_value(modchain['val'], display_mode, 'tooltip');
-    if(0 && modchain['mods'].length < 2) {
-        return gamedata['strings']['modstats']['base_value'].replace('%value', ui_base).replace('%level', modchain['mods'][0]['level'].toString());
-    } else {
+
         var ls = [];
         goog.array.forEach(modchain['mods'], function(mod, i) {
 
@@ -454,7 +452,6 @@ ModChain.display_tooltip = function(stat, modchain, show_base, ui_data) {
         });
         var ui_mods = ls.join(gamedata['strings']['modstats']['mod_value_sep']);
         return ui_mods;
-    }
 };
 
 /** Set a SPUI TextWidget to display the right text label and tooltip for a stat

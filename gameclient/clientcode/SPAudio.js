@@ -220,16 +220,12 @@ SPAudio.BuzzSample.prototype.play = function(time, volume) {
     // prevent overlap on non-looped samples
     if(!this.play_looped && time > 0 && time < this.end_time) { return false; }
     this.buzz_sound.setVolume(100*volume);
-    if(0) {
-        // potential multishot solution for FireFox?
-        // this.buzz_sound.sound.cloneNode().play();
-    } else {
-        this.end_time = time + this.duration;
-        try {
-            this.buzz_sound.play();
-        } catch (ex) {
-            log_exception(ex, 'buzz.play "'+this.url+'"');
-        }
+
+    this.end_time = time + this.duration;
+    try {
+        this.buzz_sound.play();
+    } catch (ex) {
+        log_exception(ex, 'buzz.play "'+this.url+'"');
     }
     return true;
 };

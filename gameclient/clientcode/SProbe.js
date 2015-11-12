@@ -213,9 +213,11 @@ SProbe.ProbeRun = function(cb, proxy_host, proxy_http_port, proxy_ssl_port,
         this.tests['graphics'] = new SProbe.GraphicsTest(framerate, canvas_width, canvas_height, canvas_oversample, devicePixelRatio);
     }
     this.tests['connection'] = new SProbe.ConnectionTest();
-    if(false && parseInt(proxy_http_port,10) > 0) { // no browsers allow this in the HTTPS facebook frame
+    /* no browsers allow this in the HTTPS facebook frame
+    if(parseInt(proxy_http_port,10) > 0) {
         this.tests['proxy_http'] = new SProbe.AJAXPing("http://"+proxy_host+":"+proxy_http_port+"/PING", "");
     }
+    */
     if(parseInt(proxy_ssl_port,10) > 0) {
         this.tests['proxy_ssl'] = new SProbe.AJAXPing("https://"+proxy_host+":"+proxy_ssl_port+"/PING", "");
     }

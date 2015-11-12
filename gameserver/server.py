@@ -14023,10 +14023,6 @@ class Store:
 
             if formula == 'upgrade':
                 # check requirements
-                if 0 and session.player.foreman_is_busy():
-                    # allow instant upgrades while foreman is busy?
-                    error_reason.append('foreman is busy')
-                    return -1, p_currency
 
                 max_level = unit.spec.maxlevel
                 if unit.spec.max_ui_level and (not session.player.is_cheater):

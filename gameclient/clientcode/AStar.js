@@ -1053,11 +1053,8 @@ AStar.CachedAStarContext.prototype.ensure_connectivity = function() {
 
 /** @param {CanvasRenderingContext2D} ctx */
 AStar.CachedAStarContext.prototype.debug_draw = function(ctx) {
-    if(0 && this.connectivity) {
-        this.connectivity.debug_draw(ctx);
-    } else {
-        return goog.base(this, 'debug_draw', ctx);
-    }
+    // if(this.connectivity) { this.connectivity.debug_draw(ctx); }
+    return goog.base(this, 'debug_draw', ctx);
 };
 AStar.CachedAStarContext.prototype.debug_dump = function() {
     console.log(this.hits.toString()+' hits '+this.misses.toString()+' misses ('+(100.0*this.hits/this.misses).toFixed(3)+'%) peak size: '+this.peak_size.toString());

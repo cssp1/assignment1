@@ -346,10 +346,8 @@ RegionMap.MoveCursor.prototype.on_mouseup = function(cell, button) {
         }
 
         this.map.cursor = null;
-        return true;
     } else {
         // invalid movement location
-        return true;
     }
 
     return true;
@@ -607,13 +605,6 @@ RegionMap.RegionMap.prototype.pan_to_field = function(fxy, options) {
         this.pan_goal = null;
         this.pan = [fxy[0], fxy[1]];
     }
-    if(options && options.with_zoom) {
-        /*
-        var old_zoom = this.zoom_linear;
-        this.zoom_to_default();
-        this.set_zoom_linear(Math.max(old_zoom, this.zoom_linear));
-        */
-    }
 };
 
 // returns field coordinate of upper-left corner of the cell
@@ -857,27 +848,22 @@ RegionMap.RegionMap.prototype.on_mousemove = function(uv, offset) {
             }
             return hit[0];
         } else {
-            if(1 || hit[0]) {
-                var wxy = [this.xy[0]+uv[0]+offset[0],
-                           this.xy[1]+uv[1]+offset[1]];
-                var DEADZONE = 5;
-                if(this.drag_full ||
-                   Math.abs(wxy[0]-this.drag_start[0]) >= DEADZONE ||
-                   Math.abs(wxy[1]-this.drag_start[1]) >= DEADZONE) {
+            var wxy = [this.xy[0]+uv[0]+offset[0],
+                       this.xy[1]+uv[1]+offset[1]];
+            var DEADZONE = 5;
+            if(this.drag_full ||
+               Math.abs(wxy[0]-this.drag_start[0]) >= DEADZONE ||
+               Math.abs(wxy[1]-this.drag_start[1]) >= DEADZONE) {
 
-                    this.drag_full = true;
-                    this.set_popup(null);
-                    this.pan = [this.pan[0] - (wxy[0]-this.drag_start[0])/(this.zoom),
-                                this.pan[1] - (wxy[1]-this.drag_start[1])/(this.zoom)];
-                    this.drag_start = wxy;
+                this.drag_full = true;
+                this.set_popup(null);
+                this.pan = [this.pan[0] - (wxy[0]-this.drag_start[0])/(this.zoom),
+                            this.pan[1] - (wxy[1]-this.drag_start[1])/(this.zoom)];
+                this.drag_start = wxy;
 
-                    player.record_feature_use('region_map_scrolled');
-                }
-                return true;
-            } else {
-                this.drag_start = null;
-                this.drag_full = false;
+                player.record_feature_use('region_map_scrolled');
             }
+            return true;
         }
     } else {
         this.drag_start = null;
@@ -1045,9 +1031,7 @@ RegionMap.RegionMap.update_feature_popup_menu = function(dialog) {
             }
 
         // OWN NOT-SQUAD (BASE OR QUARRY)
-        } else if(1 ||
-                  (player.travel_satisfied(feature['base_map_loc']) &&
-                   feature['base_id'] != player.home_base_id)) {
+        } else {
 
             // BASE WE'RE LOOKING AT NOW
             if(session.viewing_base.base_id === feature['base_id']) {
@@ -1120,36 +1104,10 @@ RegionMap.RegionMap.update_feature_popup_menu = function(dialog) {
                 }
             }
 
-            if(0 && feature['base_type'] === 'quarry') {
-                var togo = Math.max(player.cooldown_togo('quarry_collect'), player.cooldown_togo('quarry_collect_'+feature['base_id']));
-                buttons.push([(togo <= 0 ? gamedata['strings']['regional_map']['collect_now'] : gamedata['strings']['regional_map']['collect_in'].replace('%s',pretty_print_time_brief(togo+1))),
-                              (function (_mapwidget, _feature) { return function() {
-                                  send_to_server.func(["QUARRY_COLLECT", _feature['base_id'], true]);
-                                  _mapwidget.set_popup(null);
-                              }; })(mapwidget, feature),
-                              (togo <= 0 ? 'normal' : 'disabled')]);
-            }
-
             if(feature['base_type'] === 'quarry') {
                 buttons.push(mapwidget.make_bookmark_button(feature));
             }
 
-        } else if(mapwidget.region.data['storage'] != 'nosql') {
-            // OWN TRAVEL DESTINATION
-            if(player.travel_state['dest_loc'] && vec_equals(player.travel_state['dest_loc'], feature['base_map_loc'])) {
-                buttons.push([gamedata['strings']['regional_map']['cancel_travel'], (function(_mapwidget) { return function() {
-                    send_to_server.func(["TRAVEL_BEGIN", null, 0]);
-                    _mapwidget.set_popup(null);
-                }; })(mapwidget), 'passive']);
-
-            // OWN QUARRY
-            } else if(feature['base_id'] != player.home_base_id) {
-                buttons.push([gamedata['strings']['regional_map']['reinforce'].replace('%s',pretty_print_time(player.travel_time_to(feature['base_map_loc']))),
-                              (function(_mapwidget, _feature) { return function() {
-                                  send_to_server.func(["TRAVEL_BEGIN", _feature['base_map_loc'], player.travel_time_to(_feature['base_map_loc'])]);
-                                  _mapwidget.set_popup(null);
-                              }; })(mapwidget, feature), 'passive']);
-            }
         }
 
     } else if(feature['base_type'] == 'home') {
@@ -2788,19 +2746,20 @@ RegionMap.RegionMap.prototype.draw = function(offset) {
                         throw Error('gamedata.art.region_tiles missing sprite '+tile_type);
                     }
 
-                    // something is bad about IE performance rendering the little tiles...
+                    /* something is bad about IE performance rendering the little tiles...
                     if((spin_demographics['browser_name'] !== 'Explorer') && false && (this.zoom < 0.15)) {
                         SPUI.ctx.fillStyle = sprite.avg_color;
                         SPUI.ctx.fillRect(xy[0], xy[1], skip*gamedata['territory']['cell_size'][0], skip*gamedata['territory']['cell_size'][1]);
-                    } else {
-                        var tile_xy = [xy[0]-cover[0], xy[1]-cover[1]];
+                        continue;
+                    } */
 
-                        if(sprite.wh[0] != csize[0]+2*cover[0] || sprite.wh[1] != csize[1]+2*cover[1]) {
-                            throw Error('region tile has unexpected size, got '+sprite.wh[0]+'x'+sprite.wh[1]+' wanted '+(csize[0]+2*cover[0])+'x'+(csize[1]+2*cover[1]));
-                        }
+                    var tile_xy = [xy[0]-cover[0], xy[1]-cover[1]];
 
-                        sprite.draw_topleft(tile_xy, 0, 0);
+                    if(sprite.wh[0] != csize[0]+2*cover[0] || sprite.wh[1] != csize[1]+2*cover[1]) {
+                        throw Error('region tile has unexpected size, got '+sprite.wh[0]+'x'+sprite.wh[1]+' wanted '+(csize[0]+2*cover[0])+'x'+(csize[1]+2*cover[1]));
                     }
+
+                    sprite.draw_topleft(tile_xy, 0, 0);
                 }
             }
             SPUI.ctx.restore();

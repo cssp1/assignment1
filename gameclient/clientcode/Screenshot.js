@@ -124,12 +124,12 @@ Screenshot.apply_watermark = function(canvas, context, watermark) {
     }
     bounds[1] = [y_start - Math.floor(leading/2), y_start + (lines.length-1) * leading];
 
-    if(0) {
-        // fill background
-        var BGPAD = 12;
-        context.fillStyle = 'rgba(0,0,0,0.5)';
-        context.fillRect(bounds[0][0]-BGPAD, bounds[1][0]-BGPAD, bounds[0][1]-bounds[0][0]+2*BGPAD, bounds[1][1]-bounds[1][0]+2*BGPAD);
-    }
+    /*
+    // fill background
+    var BGPAD = 12;
+    context.fillStyle = 'rgba(0,0,0,0.5)';
+    context.fillRect(bounds[0][0]-BGPAD, bounds[1][0]-BGPAD, bounds[0][1]-bounds[0][0]+2*BGPAD, bounds[1][1]-bounds[1][0]+2*BGPAD);
+    */
 
     for(var n = 0; n < lines.length; n++) {
         var line = lines[n];

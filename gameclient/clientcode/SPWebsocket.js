@@ -13,14 +13,8 @@ goog.require('goog.events');
 /** @enum {number} */
 SPWebsocket.SocketState = {CONNECTING:0, CONNECTED:1, CLOSING:2, CLOSED:3, TIMEOUT:4, FAILED:99};
 
-SPWebsocket.is_supported = function() {
-    try {
-        if(typeof(WebSocket) != 'undefined') {
-            return true;
-        }
-    } catch(e) {};
-    return false;
-};
+/** @return {boolean} */
+SPWebsocket.is_supported = function() { return (typeof(WebSocket) != 'undefined'); };
 
 /** @constructor
     @struct

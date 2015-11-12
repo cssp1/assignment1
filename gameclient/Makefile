@@ -15,7 +15,7 @@ CHECK_FLAGS += --jscomp_error=accessControls
 CHECK_FLAGS += --jscomp_error=visibility
 CHECK_FLAGS += --jscomp_warning=globalThis
 CHECK_FLAGS += --jscomp_warning=duplicate
-CHECK_FLAGS += --jscomp_off=uselessCode # XXXXXX change to jscomp_warning
+CHECK_FLAGS += --jscomp_warning=uselessCode
 OPT_FLAGS :=
 
 # note: accessControls/visibility does not work unless checkTypes is also enabled :P

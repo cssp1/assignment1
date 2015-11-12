@@ -455,11 +455,7 @@ SPUI.Container.prototype.on_mousewheel = function(uv, offset, delta) {
         }
         // inside of client area but not on a child element
         // note: never interfere with mousewheel events by default
-        if(1 || this.transparent_to_mouse) {
-            return false;
-        } else {
-            return true;
-        }
+        return false;
     }
     return false;
 };
@@ -941,15 +937,13 @@ SPUI.Dialog.prototype.destroy = function() {
 
 SPUI.Dialog.prototype.get_address = function() {
     var ret = 'Dialog';
-    if(false && this.user_data['dialog']) {
-        ret += '('+this.user_data['dialog']+')';
-    } else {
-        for(var name in gamedata['dialogs']) {
-            if(gamedata['dialogs'][name] === this.data) {
-                ret += '('+name+')';
-            }
+
+    for(var name in gamedata['dialogs']) {
+        if(gamedata['dialogs'][name] === this.data) {
+            ret += '('+name+')';
         }
     }
+
     ret = goog.base(this, 'get_address') + '-'+ret;
     return ret;
 };
@@ -1859,19 +1853,18 @@ SPUI.Tooltip.prototype.draw = function(offset) {
                    [this.xy[0]+offset[0]-this.pad, this.xy[1]+offset[1]+this.wh[1]+this.pad]];
 
     // draw dark background
-    if(1) {
-        var sprite = GameArt.assets['tooltip_bg'].states['normal'];
-        sprite.draw_topleft_at_size([corners[0][0], corners[0][1]], 0, SPUI.time, [corners[2][0] - corners[0][0], corners[2][1] - corners[0][1]]);
-    } else {
-        SPUI.ctx.fillStyle = SPUI.tooltip_bg_color.str();
-        SPUI.ctx.fillRect(corners[0][0], corners[0][1], corners[2][0] - corners[0][0], corners[2][1] - corners[0][1]);
+    var sprite = GameArt.assets['tooltip_bg'].states['normal'];
+    sprite.draw_topleft_at_size([corners[0][0], corners[0][1]], 0, SPUI.time, [corners[2][0] - corners[0][0], corners[2][1] - corners[0][1]]);
 
-        SPUI.ctx.strokeStyle = this.text_color.str(); /* SPUI.tooltip_outline_color.str(); */
-        SPUI.ctx.lineWidth = 1;
-        SPUI.ctx.beginPath();
-        SPUI.ctx.rect(corners[0][0], corners[0][1], corners[2][0] - corners[0][0], corners[2][1] - corners[0][1]);
-        SPUI.ctx.stroke();
-    }
+    /*
+    SPUI.ctx.fillStyle = SPUI.tooltip_bg_color.str();
+    SPUI.ctx.fillRect(corners[0][0], corners[0][1], corners[2][0] - corners[0][0], corners[2][1] - corners[0][1]);
+    SPUI.ctx.strokeStyle = this.text_color.str(); // SPUI.tooltip_outline_color.str()
+    SPUI.ctx.lineWidth = 1;
+    SPUI.ctx.beginPath();
+    SPUI.ctx.rect(corners[0][0], corners[0][1], corners[2][0] - corners[0][0], corners[2][1] - corners[0][1]);
+    SPUI.ctx.stroke();
+    */
 
     SPUI.ctx.fillStyle = this.text_color.str();
 
@@ -3519,9 +3512,6 @@ SPUI.SpellIcon.prototype.do_draw = function(offset) {
         SPUI.ctx.fillRect(this.xy[0]+offset[0]+this.inset[0], this.xy[1]+offset[1]+this.inset[1], 50, 50);
     } else {
         var icon_offset = [offset[0]+this.inset[0], offset[1]+this.inset[1]];
-        if(this.pushed || this.pushed_key) {
-            //icon_offset[1] += 1;
-        }
         this.icon.draw_topleft([this.xy[0]+icon_offset[0], this.xy[1]+icon_offset[1]], 0, client_time);
         // draw text on top
         /*

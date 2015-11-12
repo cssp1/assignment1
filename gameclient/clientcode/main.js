@@ -5028,7 +5028,8 @@ Base.prototype.draw_base_perimeter = function(purpose) {
         shade_quad_quantize([ortho_to_draw([0,mid[1]+rad[1]]), ortho_to_draw([ncells[0], mid[1]+rad[1]]), ortho_to_draw([ncells[0], ncells[1]]), ortho_to_draw([0, ncells[1]])]);
     }
 
-    if(0 && shade_offmap) { // XXX this is broken in view_is_zoomed case
+    /* XXX this is broken in view_is_zoomed case
+    if(shade_offmap) {
         var top = ortho_to_draw([0,0]), right = ortho_to_draw([ncells[0], 0]), bottom = ortho_to_draw([ncells[0], ncells[1]]), left = ortho_to_draw([0, ncells[1]]);
         // bar across the top
         if(top[1] > 0) { shade_quad_quantize([[0,0], [canvas_width,0], [canvas_width, top[1]], [0, top[1]]]); }
@@ -5043,6 +5044,7 @@ Base.prototype.draw_base_perimeter = function(purpose) {
         // bar across the bottom
         if(bottom[1] < canvas_height) { shade_quad_quantize([[0,bottom[1]], [canvas_width,bottom[1]], [canvas_width,canvas_height], [0,canvas_height]]); }
     }
+    */
 
     // draw thin outline, for guiding building placement
     if(stroke_outside) {
@@ -12239,9 +12241,6 @@ function start_ai_attack(uid) {
         // hack - only works with DISPLAY_MESSAGE consequents
         if('on_visit' in base && base['on_visit']['consequent'] == 'DISPLAY_MESSAGE' &&
            (!base['on_visit']['tag'] || !(base['on_visit']['tag'] in DisplayMessageConsequent_seen)) ) {
-            if(base['on_visit']['tag'] && base['on_visit']['frequency'] == 'session') {
-                //DisplayMessageConsequent_seen[base['on_visit']['tag']] = 1;
-            }
             var dialog = create_splash_message(base['on_visit']);
             install_child_dialog(dialog);
             dialog.modal = true;
@@ -12885,15 +12884,9 @@ function update_desktop_dialogs() {
         // research button
         if(enable_produce || robotics_lab != null) {
             dialog.widgets['research_button'].state = 'normal';
-            dialog.widgets['research_button'].onclick = (function (fact) {
-                return function() {
-                                    if(0 && fact && fact.research_item) { // no point prompting for speedup since you might want to start research on a different category
-                                        change_selection(fact);
-                                        invoke_speedup_dialog('speedup');
-                                    } else {
-                                        invoke_research_dialog('army');
-                                    } };
-            })(robotics_lab);
+            dialog.widgets['research_button'].onclick = function(w) {
+                invoke_research_dialog('army');
+            };
         } else {
             dialog.widgets['research_button'].state = 'disabled';
         }
@@ -14172,6 +14165,7 @@ function do_build(ji) {
                 change_selection(null);
                 var after_build_cb = null;
 
+                /*
                 if(0 && ('limit_requires' in spec) && (current+1 < spec['limit_requires'].length && !read_predicate(spec['limit_requires'][current+1]).is_satisfied(player,null))) {
                     // instruct player what to do in order to build more
                     after_build_cb = (function (_spec, _current) { return function() {
@@ -14179,6 +14173,7 @@ function do_build(ji) {
                         if(helper) { helper(); }
                     }; })(spec, current);
                 }
+                */
 
                 invoke_ui_locker(synchronizer.request_sync(), after_build_cb);
             }
@@ -14430,22 +14425,12 @@ AOEUICursor.prototype.draw = function(offset) {
 };
 
 function reload_game() {
-    if(false /*spin_facebook_enabled || spin_kongregate_enabled || spin_armorgames_enabled */) {
-        // running inside of the real frame
-        // XXX this doesn't work due to browser restrictions :(
-        if(top.location.href == spin_game_container_url) {
-            top.location.reload(true);
-        } else {
-            top.location.href = spin_game_container_url;
-        }
+    // running outside the frame
+    // XXX this may have problems if spin_page_url points to the Facebook root and there is no valid signed request
+    if(location.href == spin_page_url) {
+        location.reload(true);
     } else {
-        // running outside the frame
-        // XXX this may have problems if spin_page_url points to the Facebook root and there is no valid signed request
-        if(location.href == spin_page_url) {
-            location.reload(true);
-        } else {
-            location.href = spin_page_url;
-        }
+        location.href = spin_page_url;
     }
 }
 
@@ -16638,23 +16623,19 @@ function update_attack_button_dialog(dialog) {
             dialog.widgets['auto_resolve_button'].show = player.auto_resolve_enabled() && (session.viewing_base.base_type === 'squad' || player.is_cheater) && !(!session.home_base && session.viewing_base.base_landlord_id === session.user_id);
             dialog.widgets['auto_resolve_button'].str = dialog.data['widgets']['auto_resolve_button'][(player.is_cheater && session.viewing_base.base_type !== 'squad') ? 'ui_name_dev': 'ui_name'];
 
-            if(0 && session.deployed_unit_space <= 0) {
-                dialog.widgets['auto_resolve_button'].state = 'disabled';
-                dialog.widgets['auto_resolve_button'].tooltip.str = dialog.data['widgets']['auto_resolve_button']['ui_tooltip_no_units'];
-            } else {
-                dialog.widgets['auto_resolve_button'].state = 'normal';
-                dialog.widgets['auto_resolve_button'].tooltip.str = dialog.data['widgets']['auto_resolve_button']['ui_tooltip'];
-                dialog.widgets['auto_resolve_button'].onclick = function(w) {
-                    var s = gamedata['strings']['auto_resolve_confirm'];
-                    invoke_child_message_dialog(s['ui_title'], s['ui_description'],
-                                                {'cancel_button': true,
-                                                 'ok_button_ui_name': s['ui_button'],
-                                                 'on_ok': function() {
-                                                     send_to_server.func(["AUTO_RESOLVE"]);
-                                                     retreat_from_attack(true);
-                                                 }});
-                };
-            }
+
+            dialog.widgets['auto_resolve_button'].state = 'normal';
+            dialog.widgets['auto_resolve_button'].tooltip.str = dialog.data['widgets']['auto_resolve_button']['ui_tooltip'];
+            dialog.widgets['auto_resolve_button'].onclick = function(w) {
+                var s = gamedata['strings']['auto_resolve_confirm'];
+                invoke_child_message_dialog(s['ui_title'], s['ui_description'],
+                                            {'cancel_button': true,
+                                             'ok_button_ui_name': s['ui_button'],
+                                             'on_ok': function() {
+                                                 send_to_server.func(["AUTO_RESOLVE"]);
+                                                 retreat_from_attack(true);
+                                             }});
+            };
         }
 
     } else { // has_attacked is FALSE
@@ -16724,18 +16705,7 @@ function update_attack_button_dialog(dialog) {
 
         var limit_quarry_control = !(session.region.data && ('limit_quarry_control' in session.region.data) && !session.region.data['limit_quarry_control']);
 
-        if(0 && session.viewing_base.base_type == 'quarry' && session.viewing_base.base_landlord_id == session.user_id) {
-            // friendly quarry
-            var togo = Math.max(player.cooldown_togo('quarry_collect'), player.cooldown_togo('quarry_collect_'+session.viewing_base.base_id));
-
-            dialog.widgets['attack_button'].state = (togo > 0 ? 'disabled' : 'attack');
-            dialog.widgets['attack_button'].str = dialog.data['widgets']['attack_button']['ui_name_collect' + (togo > 0 ? '_cooldown' : '')].replace('%s', pretty_print_time_brief(togo));
-            dialog.widgets['attack_button'].tooltip.str = dialog.data['widgets']['attack_button']['ui_tooltip_collect' + (togo > 0 ? '_cooldown' : '')];
-            dialog.widgets['attack_button'].onclick = function() {
-                send_to_server.func(["QUARRY_COLLECT", session.viewing_base.base_id, true]);
-            };
-
-        } else if(is_under_protection ||
+        if(is_under_protection ||
                   (session.pvp_balance === 'player') ||
                   (session.pvp_balance === 'enemy_strict') ||
                   (session.pvp_balance === 'same_alliance') ||
@@ -17990,16 +17960,15 @@ function invoke_child_message_dialog(title_text, body_text, props) {
     var dialog = new SPUI.Dialog(dialog_data);
 
     if(!props.parentless) {
-        if(0) { // XXXXXX this code is actually more correct - try it sometime
-            dialog.modal = true;
-            install_child_dialog(dialog);
-            dialog.auto_center();
-        } else {
-            dialog.xy[0] = Math.floor((selection.ui.wh[0]-dialog.wh[0])/2);
-            dialog.xy[1] = Math.floor((selection.ui.wh[1]-dialog.wh[1])/2);
-            dialog.modal = true;
-            selection.ui.add(dialog);
-        }
+        /* XXXXXX this code is actually more correct - try it sometime
+           dialog.modal = true;
+           install_child_dialog(dialog);
+           dialog.auto_center();
+        */
+        dialog.xy[0] = Math.floor((selection.ui.wh[0]-dialog.wh[0])/2);
+        dialog.xy[1] = Math.floor((selection.ui.wh[1]-dialog.wh[1])/2);
+        dialog.modal = true;
+        selection.ui.add(dialog);
     }
 
     dialog.widgets['title'].str = title_text;
@@ -19453,8 +19422,6 @@ function add_change_region_button(buttons) {
         var togo = player.cooldown_togo(spell['cooldown_name']);
         if(!pred.is_satisfied(player, null)) {
             buttons.push(new ContextMenuButton({ui_name: ui_name, onclick: get_requirements_help(pred), state: 'disabled_clickable', ui_tooltip: spell['ui_tooltip_unmet'].replace('%s',pred.ui_describe(player)), asset: 'menu_button_resizable'}));
-        } else if(0 && player.region_map_building_is_busy()) {
-            buttons.push(new ContextMenuButton({ui_name: ui_name, state: 'disabled', ui_tooltip: spell['ui_tooltip_busy'], asset: 'menu_button_resizable'}));
         } else if(togo > 0) {
             if(player.squads_enabled() || player.get_any_abtest_value('show_base_relocation_in_store', gamedata['store']['show_base_relocation_in_store'])) {
                 buttons.push(new ContextMenuButton({ui_name: ui_name, onclick: function() { change_selection_ui(null); invoke_change_region_offer_dialog(); }, ui_tooltip: spell['ui_tooltip_cooldown'].replace('%s', pretty_print_time(togo)), asset: 'menu_button_resizable'}));
@@ -19579,9 +19546,7 @@ function invoke_building_context_menu(mouse_xy) {
 
         if(session.home_base && obj.spec['name'] == gamedata['squad_building'] && !obj.is_under_construction()) {
             if(obj.spec['name'] !== gamedata['townhall']) { upgrade_is_active = false; }
-            if(0 && player.squad_bay_is_busy()) {
-                buttons.push(new ContextMenuButton({ui_name: gamedata['spells']['MANAGE_SQUADS']['ui_name'], state: 'disabled', ui_tooltip: gamedata['spells']['MANAGE_SQUADS']['ui_name_busy']}));
-            } else if(player.squads_enabled()) {
+            if(player.squads_enabled()) {
                 // MANAGE SQUADS button
                 buttons.push(new ContextMenuButton({ui_name: gamedata['spells']['MANAGE_SQUADS']['ui_name'], onclick: function() { change_selection_ui(null); SquadControlDialog.invoke_normal(); }}));
                 add_deploy_squads_button(buttons);
@@ -21604,21 +21569,6 @@ function change_region_for_free(spellarg) {
 }
 
 function invoke_change_region_dialog(callback, spellname) {
-    if(0) {
-        // check if squads are deployed
-        var any_deployed = false;
-        goog.object.forEach(player.squads, function(squad_data) {
-            if(player.squad_is_deployed(squad_data['id'])) {
-                any_deployed = true;
-            }
-        });
-        if(any_deployed) {
-            var s = gamedata['errors']['CANNOT_CHANGE_REGION_SQUAD_DEPLOYED'];
-            invoke_child_message_dialog(s['ui_title'], s['ui_name'], {'dialog':'message_dialog_big'});
-            return;
-        }
-    }
-
     var dialog = new SPUI.Dialog(gamedata['dialogs']['change_region_dialog']);
     dialog.user_data['dialog'] = 'change_region_dialog';
     dialog.user_data['spellname'] = spellname;
@@ -22987,17 +22937,6 @@ function update_inventory_grid(dialog) {
     var warehouse_busy = player.warehouse_is_busy();
 
     var craft_products = [], craft_product_i = 0;
-    if(player.max_usable_inventory() < player.max_inventory && false /*gamedata['crafting_delivery_method'] == 'reserve_slot_on_start'*/) {
-        for(var id in session.cur_objects.objects) {
-            var obj = session.cur_objects.objects[id];
-            if(obj.is_building() && obj.is_crafting() && (obj.team === 'player')) {
-                goog.array.forEach(obj.get_crafting_queue(), function(bus) {
-                    var recipe = gamedata['crafting']['recipes'][bus['craft']['recipe']];
-                    craft_products = craft_products.concat(recipe['product']);
-                });
-            }
-        }
-    }
 
     // need to update scrolling per-frame as player.inventory changes
     var slots_per_page = dialog.user_data['rows_per_page'] * dialog.user_data['cols_per_page'];
@@ -25785,16 +25724,16 @@ function battle_log_change_page(dialog, page) {
 
     // XXX temp until scrolling gets better
     dialog.widgets['scroll_text'].show = 0;
-    if(true ||
-       !dialog.user_data['log'] || !dialog.widgets['log'].can_scroll_up()) {
-        show_ports = true;
-        dialog.widgets['log'].xy[1] = 172;
-        dialog.widgets['log'].wh[1] = 221;
-    } else {
-        show_ports = false;
-        dialog.widgets['log'].xy[1] = 80;
-        dialog.widgets['log'].wh[1] = 313;
-    }
+    show_ports = true;
+    dialog.widgets['log'].xy[1] = 172;
+    dialog.widgets['log'].wh[1] = 221;
+
+    /*
+      show_ports = false;
+      dialog.widgets['log'].xy[1] = 80;
+      dialog.widgets['log'].wh[1] = 313;
+    */
+
     dialog.widgets['attacker_portrait'].show =
         dialog.widgets['attacker_name'].show =
         dialog.widgets['attacker_type'].show =
@@ -32641,13 +32580,9 @@ function research_dialog_scroll(dialog, page) {
                 };
             })(name);
 
-            if(able_to_research || 1) {
-                widget.tooltip.str = '';
-                widget.tooltip.text_color = SPUI.default_text_color;
-            } else {
-                widget.tooltip.str = tooltip_text.join('\n');
-                widget.tooltip.text_color = SPUI.error_text_color;
-            }
+            widget.tooltip.str = null;
+            widget.tooltip.text_color = SPUI.default_text_color;
+
             grid_x += 1;
             if(grid_x >= dialog.data['widgets']['grid']['array'][0]) {
                 grid_x = 0; grid_y += 1;
@@ -32796,16 +32731,11 @@ function update_research_dialog(dialog) {
                     dialog.widgets['grid'+widget_name].bg_image_offset[1] = dialog.data['widgets']['grid']['bg_image_offset_'+(tech['associated_unit'] ? 'unit':'icon')][1] + height;
 
                     var tsize = dialog.widgets['grid_status'+widget_name].data['text_size'];
-                    if(1 || unlocked) {
-                        if(current == 0) {
-                            dialog.widgets['grid_status'+widget_name].str = dialog.data['widgets']['grid_status']['ui_name_click_to_unlock'];
-                            dialog.widgets['grid_status'+widget_name].font = SPUI.make_font(tsize, tsize+3, 'normal');
-                        } else {
-                            dialog.widgets['grid_status'+widget_name].str = dialog.data['widgets']['grid_status']['ui_name_level'].replace('%cur',current.toString()).replace('%max',limit.toString());
-                            dialog.widgets['grid_status'+widget_name].font = SPUI.make_font(tsize, tsize+3, 'normal');
-                        }
+                    if(current == 0) {
+                        dialog.widgets['grid_status'+widget_name].str = dialog.data['widgets']['grid_status']['ui_name_click_to_unlock'];
+                        dialog.widgets['grid_status'+widget_name].font = SPUI.make_font(tsize, tsize+3, 'normal');
                     } else {
-                        dialog.widgets['grid_status'+widget_name].str = dialog.data['widgets']['grid_status']['ui_name_locked'];
+                        dialog.widgets['grid_status'+widget_name].str = dialog.data['widgets']['grid_status']['ui_name_level'].replace('%cur',current.toString()).replace('%max',limit.toString());
                         dialog.widgets['grid_status'+widget_name].font = SPUI.make_font(tsize, tsize+3, 'normal');
                     }
 
@@ -33443,14 +33373,6 @@ function missions_dialog_select_mission(dialog, row) {
         }
     }
 
-    if(0) {
-        if(!pending) {
-            // add tooltip to explain why quest is not complete yet
-            dialog.widgets['claim_button'].tooltip.str = pred.ui_describe(player);
-        } else {
-            dialog.widgets['claim_button'].tooltip.str = '';
-        }
-    }
     player.quest_tracked_dirty = true;
 }
 
@@ -33730,11 +33652,7 @@ function update_map_dialog(dialog) {
 
             var attackability_str = null, attackability_col = dialog.data['widgets']['row_attackability']['text_color'];
 
-            if(false /*(friend.protection_end_time == 1 || friend.protection_end_time > server_time) XXX obsolete, needs PlayerCache */ ) {
-                attackability_str = dialog.data['widgets']['row_attackability']['ui_name_protection'];
-            } else if(false /* friend.attack_cooldown_expire > server_time XXX obsolete, needs PlayerCache */ ) {
-                attackability_str = dialog.data['widgets']['row_attackability']['ui_name_cooldown']; // .replace('%s', pretty_print_time_brief(friend.attack_cooldown_expire - server_time));
-            } else if(friend.is_ai()) {
+            if(friend.is_ai()) {
                 var base = gamedata['ai_bases_client']['bases'][friend.user_id.toString()];
 
                 if('ui_spy_button' in base) {
@@ -35443,12 +35361,8 @@ function invoke_generic_upgrade_congrats(small_asset, alt_bg, sound_name, title,
     dialog.widgets['description'].set_text_with_linebreaking(text);
     dialog.widgets['close_button'].onclick = function() { change_selection(null); };
 
-    if(1) { // old A/B test
-        dialog.widgets['flash'].show = true;
-        dialog.widgets['glow'].show = true;
-    } else if(sound_name) {
-        play_level_up_sound(sound_name);
-    }
+    dialog.widgets['flash'].show = true;
+    dialog.widgets['glow'].show = true;
 
     var viral = get_facebook_viral(viral_name);
     if(viral) {
@@ -35700,12 +35614,7 @@ function invoke_buy_gamebucks_dialog1(reason, amount, order) {
         }
     }
 
-    if(0 && amount > 0) {
-        dialog.widgets['message'].set_text_with_linebreaking(dialog.data['widgets']['message']['ui_name'].replace('%d', Store.display_user_currency_amount(amount, 'compact')).replace('%s', Store.gamebucks_ui_name()));
-        dialog.widgets['message'].show = true;
-    } else {
-        dialog.widgets['mf_logo'].show = true;
-    }
+    dialog.widgets['mf_logo'].show = true;
 
     var spell_list = [];
 
@@ -36270,15 +36179,6 @@ function invoke_buy_gamebucks_dialog23(ver, reason, amount, order) {
 function update_buy_gamebucks_dialog2(dialog) {
     var spell_list = dialog.user_data['spell_list'];
 
-    if(!dialog.user_data['scrolled'] &&
-       ((client_time - dialog.user_data['open_time']) < gamedata['store']['store_scroll_flash_time']) &&
-       false &&
-       player.get_any_abtest_value('enable_store_scroll_flash', gamedata['store']['enable_store_scroll_flash'])) {
-        if(dialog.widgets['scroll_right'].state != 'disabled') {
-            dialog.widgets['scroll_right'].state = ((((client_time/gamedata['store']['store_scroll_flash_period']) % 1) >= 0.5) ? 'highlight' : 'normal');
-        }
-    }
-
     if(dialog.user_data['scroll_pos'] != dialog.user_data['scroll_goal']) {
         var delta = dialog.user_data['scroll_goal'] - dialog.user_data['scroll_pos'];
         var sign = (delta > 0 ? 1 : -1);
@@ -36584,7 +36484,7 @@ function update_buy_gamebucks_sku2(dialog) {
 var g_ui_locker = null; // global instance
 
 /** @param {number|null=} sync_marker
-    @param {function()=} cb */
+    @param {function()|null=} cb */
 function invoke_ui_locker(sync_marker, cb) {
     if(!sync_marker && (sync_marker !== 0)) { sync_marker = synchronizer.request_sync(); }
     if(g_ui_locker) {
@@ -37365,16 +37265,16 @@ function update_new_store_sku(d) {
         var tip_item_spec = (tip_item ? ItemDisplay.get_inventory_item_spec(tip_item['spec']) : null);
         if('currency' in spell) { sale_currency = spell['currency']; }
 
+        // note: adding the subtitles here causes too much clutter
+        /*
         if(tip_item_spec) {
             var subtitle = ItemDisplay.get_inventory_item_ui_subtitle(tip_item_spec);
             if(subtitle) {
-                // adding the subtitles here causes too much clutter
-                /*
                 info_str = subtitle;
                 info_high = true; info_small = true;
-                */
             }
         }
+        */
 
         price = Store.get_price(sale_currency, GameObject.VIRTUAL_ID, spell, null);
         if(price < 0) {
@@ -38813,26 +38713,21 @@ function get_requirements_help(kind, arg, options) {
                         break;
                     }
                 }
-                if(0) {
-                    // try to simulate a click on the widget representing this building
-                    if(widget && widget.onclick && widget.state != 'disabled') {
-                        widget.onclick(widget);
-                    }
-                } else {
-                    // wire up the ENTER key to build it
-                    dialog.default_button = widget;
 
-                    // create a tutorial arrow pointing to the building
-                    var dir = 'down';
-                    var arrow = make_ui_arrow(dir);
-                    player.quest_root.add(arrow);
-                    arrow.ondraw = update_tutorial_arrow_for_button(arrow, dialog.user_data['dialog'], widget_name, dir);
+                // wire up the ENTER key to build it
+                dialog.default_button = widget;
 
-                    // hack - invoke_build_dialog() dirties the quest tracker state, we need to "reset" it here so
-                    // that the arrow we make doesn't immediately get cleared
-                    player.quest_tracked_dirty = false;
-                    selection.ui_change_time = -1;
-                }
+                // create a tutorial arrow pointing to the building
+                var dir = 'down';
+                var arrow = make_ui_arrow(dir);
+                player.quest_root.add(arrow);
+                arrow.ondraw = update_tutorial_arrow_for_button(arrow, dialog.user_data['dialog'], widget_name, dir);
+
+                // hack - invoke_build_dialog() dirties the quest tracker state, we need to "reset" it here so
+                // that the arrow we make doesn't immediately get cleared
+                player.quest_tracked_dirty = false;
+                selection.ui_change_time = -1;
+
             }
         }; })(target);
     } else if(verb == 'upgrade' || verb == 'upgrade_cc') {
@@ -38892,7 +38787,7 @@ function get_requirements_help(kind, arg, options) {
         help_function = function() {
             change_selection_ui(null);
             PlayerInfoDialog.invoke(session.user_id, function(dialog) {
-                // XXX this doesn't work :(.
+                /* XXX this doesn't work :(.
                 // If "child":0, then the quest_root is being cleared by something before it appears.
                 // If "child":1, it doesn't detect the profile tab dialog on first appearance.
                 if(0) {
@@ -38902,6 +38797,7 @@ function get_requirements_help(kind, arg, options) {
                                      'dialog_name':'player_info_profile_tab',
                                      'widget_name':'set_alias_button'}).execute();
                 }
+                */
             });
         };
     }
@@ -40070,9 +39966,10 @@ function update_upgrade_dialog(dialog) {
         if(dialog.widgets['use_resources_button'].state == 'normal') {
             // make use_resources_button yellow and default
             dialog.widgets['use_resources_button'].state = 'active';
-        } else if(dialog.widgets['use_resources_button'].state == 'disabled_clickable') {
-            // dialog.widgets['use_resources_button'].state = 'normal'; ?
         }
+        // else if(dialog.widgets['use_resources_button'].state == 'disabled_clickable') {
+        // dialog.widgets['use_resources_button'].state = 'normal'; ?
+        // }
     } else {
         dialog.default_button = dialog.widgets['instant_button'];
 
@@ -40691,10 +40588,12 @@ function can_cast_spell_detailed(unit_id, spellname, spellarg) {
                 return [false, gamedata['strings']['unmet_requirements'].replace('%s',pred.ui_describe(player)), [pred,null]];
             }
         }
+        /*
         if(0 && spec['consumes_power'] &&
            (session.viewing_base.power_state[1] + get_leveled_quantity(spec['consumes_power'],1)) > session.viewing_base.power_state[0]) {
             return [false, gamedata['errors']['POWER_LIMIT']['ui_name'], ['power',null]];
         }
+        */
         if(spec['limit']) {
             var current = 0;
             for(var id in session.cur_objects.objects) {
@@ -41268,10 +41167,6 @@ Store.get_base_price = function(unit_id, spell, spellarg, ignore_error) {
         var price;
 
         if(formula === 'upgrade') {
-            if(0 && player.foreman_is_busy()) {
-                // still allow instant upgrades while foreman is busy?
-                return [-1, p_currency];
-            }
             if(unit.level >= unit.get_max_ui_level()) {
                 return [-1, p_currency];
             }
@@ -42287,12 +42182,14 @@ function install_child_dialog(dialog) {
     }
 
     if(parent) {
-        if(0) { // XXXXXX descend hierarchy of child dialogs - this is actually more correct, try it sometime
+        /* XXXXXX descend hierarchy of child dialogs - this is actually more correct, try it sometime
+        if(0) {
             // (otherwise the current code appends to the topmost selection.ui, even if it already has a child dialog!)
             while(parent.children.length >= 1 && parent.children[parent.children.length-1].user_data && parent.children[parent.children.length-1].user_data['dialog']) {
                 parent = parent.children[parent.children.length-1];
             }
         }
+        */
 
         if(parent.onleave) { parent.onleave(); }
         parent.add(dialog);
@@ -42876,12 +42773,12 @@ function handle_server_message(data) {
             change_chat_tab(global_chat_frame, null);
 
             if(init && global_chat_frame.is_visible()) {
-                var do_maximize;
-                if(0 && 'chat_frame_minimized' in player.preferences) { // turned off for now
+                var do_maximize = read_predicate(gamedata['client']['maximize_chat_on_login_if']).is_satisfied(player,null);
+                /* turned off for now
+                if('chat_frame_minimized' in player.preferences) {
                     do_maximize = !player.preferences['chat_frame_minimized'];
-                } else {
-                    do_maximize = read_predicate(gamedata['client']['maximize_chat_on_login_if']).is_satisfied(player,null);
                 }
+                */
                 if(do_maximize) {
                     chat_frame_size(global_chat_frame, true, true);
                 }
@@ -43282,8 +43179,6 @@ function handle_server_message(data) {
             var pred = player.get_any_abtest_value('popup_notification_on_login_if', gamedata['client']['popup_notification_on_login_if']);
             if(pred && read_predicate(pred).is_satisfied(player, null)) {
                 notification_queue.push_with_priority(function() { invoke_missions_dialog(true); }, -5);
-            } else if(0 && player.has_unread_mail()) {
-                notification_queue.push_with_priority(function() { invoke_mail_dialog(true); }, -5);
             }
         }
 
@@ -45088,12 +44983,9 @@ function handle_server_message(data) {
                 invoke_squad_error(_title, _str);
             }; })(display_title, display_string);
 
-            if(1) { // OLD
-                change_selection(null);
-                notification_queue.push(cb);
-            } else {
-                cb();
-            }
+            change_selection(null);
+            notification_queue.push(cb);
+
             if(name !== "LADDER_MATCH_FAILED") {
                 if(!session.home_base) {
                     // note: Might not want to visit_base_home() unconditionally when name.indexOf("CANNOT_SPY") == 0,
@@ -47612,11 +47504,7 @@ function do_draw() {
         //console.log('any '+any_enemy+' any_onscreen' +any_enemy_onscreen+' offscreen_enemy_unit '+!!offscreen_enemy_unit);
 
         var arrow_pos = null;
-        if(false && selection.ui && selection.ui.user_data && selection.ui.user_data['cursor'] == 'DeployUICursor' &&
-           session.viewing_base.base_landlord_id != session.user_id && session.viewing_base.has_deployment_zone()) {
-            // when deploying into a base that has a polygonal deployment zone, show arrow towards deployment zone
-            arrow_pos = session.viewing_base.deployment_buffer['vertices'][0];
-        } else if(any_enemy && !any_enemy_onscreen && offscreen_enemy_unit) {
+        if(any_enemy && !any_enemy_onscreen && offscreen_enemy_unit) {
             arrow_pos = offscreen_enemy_unit.interpolate_pos();
         } else if(session.incoming_attack_pending() && session.incoming_attack_direction && session.incoming_attack_direction != 'tutorial') {
             var spawn_location = gamedata['ai_attacks_client']['directions'][session.incoming_attack_direction];
@@ -48936,8 +48824,9 @@ function draw_building_or_inert(obj, powerfac) {
         icon.draw(draw_quantize(ortho_to_draw([obj.x-wall_seg_offset, obj.y+wall_spacing])), facing, icon_time, icon_state + '_ns');
     }
 
+    /*
     // draw lottery scans remaining
-    if(0 && obj.team === 'player' && obj.is_building() && obj.is_lottery_building() && obj.contents >= 1) {
+    if(obj.team === 'player' && obj.is_building() && obj.is_lottery_building() && obj.contents >= 1) {
         ctx.save();
         ctx.beginPath();
         ctx.fillStyle = 'rgba(213,0,0,1)';
@@ -48949,6 +48838,7 @@ function draw_building_or_inert(obj, powerfac) {
         ctx.fillText(pretty_print_number(obj.contents), txy[0], txy[1]);
         ctx.restore();
     }
+    */
 
     // draw harvest glow
     if(obj.harvest_glow_time > 0) {
@@ -49376,11 +49266,6 @@ function draw_unit(unit) {
         if(alpha != 1) { ctx.restore(); }
     }
 
-    if(0 /*PLAYFIELD_DEBUG*/) {
-        // draw team tag
-        draw_centered_text(ctx, unit.spec['ui_name'] + ' (' + unit.team + ')', [xy[0],xy[1]+15]);
-    }
-
     if(unit.hp > 0 && unit.spec['elite_marker_offset'] && (SPFX.detail < 2) && !player.get_any_abtest_value('enable_pixel_manipulation_in_low_gfx', gamedata['client']['enable_pixel_manipulation_in_low_gfx'])) {
         GameArt.assets['elite_marker'].states['normal'].draw(vec_add(xy, unit.spec['elite_marker_offset']), 0, 0);
     }
@@ -49462,9 +49347,6 @@ function draw_unit(unit) {
                    (xy[0] < view_roi[1][0]) &&
                    (xy[1] >= view_roi[0][1]) &&
                    (xy[1] < view_roi[1][1]));
-    if(0) {
-        console.log(unit.spec['ui_name']+' vis '+visible+' xy '+xy[0].toString()+','+xy[1].toString()+' roi '+view_roi[0][0].toString()+','+view_roi[0][1].toString()+' - '+view_roi[1][0].toString()+','+view_roi[1][1].toString());
-    }
     return visible;
 }
 
@@ -49993,6 +49875,7 @@ function draw_bar(xy, w, h, prog, prog2, colors, throb_speed) {
     }
 
     // throbbing NOTE: disabled for now
+    /*
     if(0 && throb_speed > 0) {
         ctx.strokeStyle = '#FFFFFF';
         ctx.globalAlpha = 0.4;
@@ -50009,6 +49892,8 @@ function draw_bar(xy, w, h, prog, prog2, colors, throb_speed) {
         ctx.stroke();
         ctx.globalAlpha = 1;
     }
+    */
+
     // stroke outline
     ctx.lineWidth = 1; // (h >= 6 ? 2 : 1);
     ctx.strokeStyle = colors['outline'];
@@ -50041,16 +49926,6 @@ function draw_debug_astar_paths() {
             ctx.lineTo(xy[0], xy[1]);
         }
         ctx.stroke();
-
-        if(0) {
-            ctx.strokeStyle = '#00ff00';
-            ctx.beginPath();
-            xy = ortho_to_draw(pos);
-            ctx.moveTo(xy[0], xy[1]);
-            xy = ortho_to_draw(unit.dest);
-            ctx.lineTo(xy[0], xy[1]);
-            ctx.stroke();
-        }
     }
     ctx.restore();
 };
@@ -50084,20 +49959,8 @@ function draw_debug_map() {
                 continue;
             }
 
-            if(1) {
-                // draw grid cell as sprite
-                sprite.drawSubImage([0,0], sprite.wh, xy, sprite.wh);
-            } else {
-                // draw grid cell as diamond outline
-                var inset = 1;
-                ctx.beginPath();
-                ctx.moveTo(xy[0]+inset,xy[1]+cellsize[1]/2);
-                ctx.lineTo(xy[0]+cellsize[0]/2,xy[1]+inset);
-                ctx.lineTo(xy[0]+cellsize[0]-inset,xy[1]+cellsize[1]/2);
-                ctx.lineTo(xy[0]+cellsize[0]/2,xy[1]+cellsize[1]-inset);
-                ctx.closePath();
-                ctx.stroke();
-            }
+            // draw grid cell as sprite
+            sprite.drawSubImage([0,0], sprite.wh, xy, sprite.wh);
         }
     }
     ctx.restore();
