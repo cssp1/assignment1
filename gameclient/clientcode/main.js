@@ -42960,7 +42960,7 @@ function handle_server_message(data) {
 
         if(battle_type === 'home') {
             if(player.tutorial_state != "COMPLETE") {
-                cb = goog.bind(invoke_ai_attack_finish_dialog, battle_loot);
+                cb = goog.partial(invoke_ai_attack_finish_dialog, battle_loot);
             } else {
                 cb = (function (_type, _base, _uid, _fbid, _level, _fr, _name, out, loot, dmg, ladder_state) { return function() {
                     invoke_defense_end_dialog(_type, _base, _uid, _fbid, _level, _fr, _name, out, loot, dmg, ladder_state);
