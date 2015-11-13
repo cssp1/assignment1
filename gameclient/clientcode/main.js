@@ -47071,7 +47071,14 @@ function do_draw() {
     }
 
     // set default graphics state
-    ctx.font = SPUI.desktop_font.str();
+
+    // Firefox craps out when you set the font on a context that's in an iframe in some (hidden?) states - if so, skip draw
+    try {
+        ctx.font = SPUI.desktop_font.str();
+    } catch(e) {
+        return;
+    }
+
     ctx.fillStyle = "#ffffff";
     ctx.strokeStyle = "#ffffff";
     ctx.lineWidth = 1;
