@@ -78,6 +78,7 @@ GameArt.ImageFileEntry = function(delay_load, gameart_obj, filename, needs_cors,
     // note: html_element.src is set by GameArt.init after all the Assets are set up
     this.html_element.onload = goog.bind(this.onload, this);
     this.html_element.onerror = goog.bind(this.onerror, this);
+    this.url = 'no start_load() yet';
 };
 goog.inherits(GameArt.ImageFileEntry, GameArt.FileEntry);
 
@@ -94,7 +95,7 @@ GameArt.ImageFileEntry.prototype.onload = function() {
         } else if(el.width < 1 || el.height < 1) {
             msg = 'loaded_but_bad_dimensions';
         }
-        GameArt.image_onerror(this.filename, el.src, msg);
+        GameArt.image_onerror(this.filename, this.url, msg);
         return;
     }
 
@@ -109,18 +110,18 @@ GameArt.ImageFileEntry.prototype.onerror = function() {
         window.clearTimeout(this.watchdog);
         this.watchdog = null;
     }
-    GameArt.image_onerror(this.filename, this.html_element.src, 'html_onerror');
+    GameArt.image_onerror(this.filename, this.url, 'html_onerror');
 };
 
 GameArt.ImageFileEntry.prototype.start_load = function() {
     goog.base(this, 'start_load');
-    this.html_element.src = GameArt.art_url(this.filename, this.needs_cors);
+    this.html_element.src = this.url = GameArt.art_url(this.filename, this.needs_cors);
     if(this.html_element.complete) { // synchronous completion
         window.setTimeout(this.html_element.onload, 1);
     } else {
         if(gamedata['client']['art_download_timeout']['image'] > 0) {
             this.watchdog = window.setTimeout((function (_this) { return function() {
-                GameArt.image_ontimeout(_this.filename, _this.html_element.src);
+                GameArt.image_ontimeout(_this.filename, _this.url);
             }; })(this), 1000 * gamedata['client']['art_download_timeout']['image']);
         }
     }
@@ -1180,7 +1181,7 @@ GameArt.Image.prototype.check_for_badness = function() {
 
     if(!this.img.complete || this.img.width < 1 || this.img.height < 1) {
         this.data_loaded = false;
-        GameArt.report_asset_load_fail(this.entry.filename, this.img.src, (!this.img.complete ? 'draw_but_not_complete': 'draw_but_bad_dimensions'));
+        GameArt.report_asset_load_fail(this.entry.filename, this.entry.url, (!this.img.complete ? 'draw_but_not_complete': 'draw_but_bad_dimensions'));
         return true;
     }
     return false;
