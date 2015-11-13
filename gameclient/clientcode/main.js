@@ -9818,7 +9818,7 @@ function flush_message_queue(force, my_timeout) {
             var on_websocket_shutdown = function(event) { // server-initiated shutdown
                 if(!the_websocket || SPINPUNCHGAME.shutdown_in_progress) { return; } // irrelevant
                 the_websocket = null;
-                session.connect_time = -1; // disconnect session
+                session.connect_time = -3; // disconnect session
                 invoke_timeout_message('0600_client_idle_timeout', {}, {});
                 SPINPUNCHGAME.shutdown();
             };
@@ -10047,7 +10047,7 @@ SPINPUNCHGAME.shutdown = function() {
         flush_message_queue(true);
 
         // mark session as not connected anymore so we don't try to send messages again
-        session.connect_time = -1;
+        session.connect_time = -2;
     }
 
     if(the_websocket) {
@@ -47064,6 +47064,10 @@ function do_draw() {
         if(spin_frame_platform == 'fb' && spin_facebook_enabled && gamedata['client']['facebook_iframe_resize_hack'] && (typeof FB != 'undefined')) {
             fb_iframe_update(null);
         }
+    }
+
+    if(!ctx || !SPUI.desktop_font) {
+        throw Error('do_draw() in invalid state: ctx '+(ctx ? 'OK' : '0')+' SPUI '+(SPUI.desktop_font ? 'OK': '0') + ' shutdown_in_progress '+SPINPUNCHGAME.shutdown_in_progress.toString()+' connect_time '+session.connect_time.toString());
     }
 
     // set default graphics state
