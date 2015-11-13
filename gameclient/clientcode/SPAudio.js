@@ -307,6 +307,7 @@ SPAudio.ACSample = function(driver, url, success_cb, fail_cb) {
     this.play_looped = false;
 
     this.request = new XMLHttpRequest();
+    this.request.open('GET', url, true);
     this.request.responseType = 'arraybuffer';
 
     var onload = (function(sample) { return function() {
@@ -329,7 +330,6 @@ SPAudio.ACSample = function(driver, url, success_cb, fail_cb) {
 
     this.request.onload = onload;
     this.request.onerror = onerror;
-    this.request.open('GET', url, true);
 };
 SPAudio.ACSample.prototype.load = function() { this.request.send(); };
 SPAudio.ACSample.prototype.get_duration = function() { return (this.buffer ? this.buffer['duration'] : -1); };
