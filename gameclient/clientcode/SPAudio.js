@@ -292,6 +292,7 @@ SPAudio.ACDriver.prototype.create_sample = function(url, kind, success_cb, fail_
 /** @constructor */
 SPAudio.ACSample = function(driver, url, success_cb, fail_cb) {
     this.driver = driver;
+    this.url = url;
     this.buffer = null;
     /** @type {?} */
     this.last_voice = null;

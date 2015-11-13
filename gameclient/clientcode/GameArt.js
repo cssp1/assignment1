@@ -94,7 +94,7 @@ GameArt.ImageFileEntry.prototype.onload = function() {
         } else if(el.width < 1 || el.height < 1) {
             msg = 'loaded_but_bad_dimensions';
         }
-        GameArt.image_onerror(this.filename, msg);
+        GameArt.image_onerror(this.filename, el.src, msg);
         return;
     }
 
@@ -109,7 +109,7 @@ GameArt.ImageFileEntry.prototype.onerror = function() {
         window.clearTimeout(this.watchdog);
         this.watchdog = null;
     }
-    GameArt.image_onerror(this.filename, 'html_onerror');
+    GameArt.image_onerror(this.filename, this.html_element.src, 'html_onerror');
 };
 
 GameArt.ImageFileEntry.prototype.start_load = function() {
@@ -120,7 +120,7 @@ GameArt.ImageFileEntry.prototype.start_load = function() {
     } else {
         if(gamedata['client']['art_download_timeout']['image'] > 0) {
             this.watchdog = window.setTimeout((function (_this) { return function() {
-                GameArt.image_ontimeout(_this.filename);
+                GameArt.image_ontimeout(_this.filename, _this.html_element.src);
             }; })(this), 1000 * gamedata['client']['art_download_timeout']['image']);
         }
     }
@@ -154,7 +154,7 @@ GameArt.AudioFileEntry.prototype.start_load = function() {
     if(gamedata['client']['art_download_timeout']['audio'] > 0) {
         if(this.watchdog) { throw Error('duplicate start_load on '+this.filename); }
         this.watchdog = window.setTimeout((function (/** !GameArt.FileEntry */  _this) { return function() {
-            GameArt.image_ontimeout(_this.filename);
+            GameArt.image_ontimeout(_this.filename, _this.sample.url);
         }; })(this), 1000 * gamedata['client']['art_download_timeout']['audio']);
     }
 
@@ -190,7 +190,7 @@ GameArt.AudioFileEntry.prototype.fail_cb = function() {
         window.clearTimeout(this.watchdog);
         this.watchdog = null;
     }
-    GameArt.image_onerror(this.filename, 'audio_sample_onerror');
+    GameArt.image_onerror(this.filename, this.sample.url, 'audio_sample_onerror');
 };
 
 // dictionary mapping filenames to {html_element, kind, filename, priority, [GameArt.Images/GameArt.Sounds...]}
@@ -537,22 +537,22 @@ GameArt.image_onload = function(filename) {
 // only send one asset_load_fail per session to avoid spamming server
 GameArt.asset_load_fail_sent = false;
 
-GameArt.report_asset_load_fail = function(filename, reason) {
+GameArt.report_asset_load_fail = function(filename, url, reason) {
     if(!GameArt.asset_load_fail_sent) {
         GameArt.asset_load_fail_sent = true;
-        metric_event('0660_asset_load_fail', add_demographics({'method':filename, 'reason':reason}));
+        metric_event('0660_asset_load_fail', add_demographics({'method':filename, 'url':url, 'reason':reason}));
     }
 };
 
-GameArt.image_onerror = function(filename, reason) {
-    console.log('Error loading art file '+filename+' for reason: '+reason);
-    GameArt.report_asset_load_fail(filename, reason);
+GameArt.image_onerror = function(filename, url, reason) {
+    console.log('Error loading art file '+filename+' from URL '+url+' for reason: '+reason);
+    GameArt.report_asset_load_fail(filename, url, reason);
     GameArt.image_onload(filename);
 };
 
-GameArt.image_ontimeout = function(filename) {
-    console.log('Timeout loading art file '+filename);
-    GameArt.report_asset_load_fail(filename, 'timeout');
+GameArt.image_ontimeout = function(filename, url) {
+    console.log('Timeout loading art file '+filename+' from URL '+url);
+    GameArt.report_asset_load_fail(filename, url, 'timeout');
     // do not call image_onload() here to abort the load, in case the browser eventually does get the data
 };
 
@@ -1180,7 +1180,7 @@ GameArt.Image.prototype.check_for_badness = function() {
 
     if(!this.img.complete || this.img.width < 1 || this.img.height < 1) {
         this.data_loaded = false;
-        GameArt.report_asset_load_fail(this.entry.filename, (!this.img.complete ? 'draw_but_not_complete': 'draw_but_bad_dimensions'));
+        GameArt.report_asset_load_fail(this.entry.filename, this.img.src, (!this.img.complete ? 'draw_but_not_complete': 'draw_but_bad_dimensions'));
         return true;
     }
     return false;
