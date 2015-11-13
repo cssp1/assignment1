@@ -9773,7 +9773,7 @@ function flush_message_queue(force, my_timeout) {
                                    'serial': last_websocket_serial,
                                    'len': last_websocket_xmit_len,
                                    'elapsed': client_time - last_websocket_xmit_time,
-                                   'since_connect': (session.connected() ? client_time - session.connect_time : -1),
+                                   'since_connect': (session.connected() ? client_time - session.connect_time : session.connect_time),
                                    'since_pageload': client_time - spin_pageload_begin,
                                    'connection': gameapi_connection_method()
                                   };
@@ -10110,7 +10110,7 @@ function log_exception(e, where) {
     var MAX_LEN = gamedata['client']['max_exception_msg_length'];
     if(msg.length > MAX_LEN) { msg = msg.slice(0,MAX_LEN); }
     metric_event('0970_client_exception', add_demographics({'method':msg, 'location':where,
-                                                            'since_connect': (session.connected() ? client_time - session.connect_time : -1),
+                                                            'since_connect': (session.connected() ? client_time - session.connect_time : session.connect_time),
                                                             'since_pageload': client_time - spin_pageload_begin,
                                                             'gameclient_build_date':(typeof gameclient_build_date === 'undefined' ? 'unknown' : gameclient_build_date),
                                                             'gamedata_build_info':gamedata['gamedata_build_info']}));
@@ -42308,7 +42308,7 @@ function on_ajax_goog(event) {
         var msg = '';
         var conntime;
         if(!session.connected()) {
-            conntime = -1;
+            conntime = session.connect_time;
             if(spin_game_direct_connect) {
                 msg += 'FIRST(direct) ';
             } else {
@@ -45052,7 +45052,7 @@ function invoke_timeout_message(event_name, props, options) {
             SPINPUNCHGAME.client_death_sent = event_name;
 
             props['connection'] = gameapi_connection_method();
-            props['since_connect'] = (session.connected() ? client_time - session.connect_time : -1);
+            props['since_connect'] = (session.connected() ? client_time - session.connect_time : session.connect_time);
             props['since_pageload'] = client_time - spin_pageload_begin;
             if(spin_user_id) { props['user_id'] = spin_user_id; }
 
