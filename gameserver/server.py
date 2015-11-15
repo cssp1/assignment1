@@ -14906,6 +14906,19 @@ class Store:
                     metric_event_coded(session.user.user_id, '4501_payer_promo_claimed', props.copy())
                 metric_event_coded(session.user.user_id, '4590_promo_gamebucks_earned', props.copy())
 
+            if spell.get('loot_table'): # item bundle
+                assert not gift_order # XXX no code path yet for gifted bundles
+                items = session.get_loot_items(session.player, gamedata['loot_tables'][spell['loot_table']]['loot'], -1, -1)
+                if items:
+                    if session.player.get_any_abtest_value('modal_looting', gamedata['modal_looting']) and \
+                       session.player.find_object_by_type(gamedata['inventory_building']):
+                        session.player.loot_buffer += items
+                        for item in items:
+                            session.player.inventory_log_event('5125_item_obtained', item['spec'], item.get('stack',1), item.get('expire_time',-1), level=item.get('level',None), reason=spellname)
+                        retmsg.append(["LOOT_BUFFER_UPDATE", session.player.loot_buffer, True])
+                    else:
+                        session.player.send_loot_mail('', 0, items, retmsg, mail_template = gamedata['strings']['gamebucks_loot_mail'])
+
             if gift_order:
                 # try to send gamebucks gift. On failure, leave the gamebucks in the player's balance
                 total_gift_amount = 0

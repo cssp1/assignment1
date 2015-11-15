@@ -697,6 +697,11 @@
                    "ui_subject": "%s L%level Loot",
                    "ui_body": "Commander,\n\nWe recovered a special item from our victory over %s on %day at %time GMT.\n\nWARNING: Messages expire, store items quickly."},
 
+    "gamebucks_loot_mail": { "ui_from": "Narrator",
+                             "duration": 604800,
+                             "ui_subject": "Bonus Items",
+                             "ui_body": "Bonus items for your Gold purchase on %day at %time GMT.\n\nWARNING: Messages expire, store these items soon."},
+
     "quest_reward_mail": { "ui_from": "Narrator",
                            "duration": 604800,
                            "ui_subject": "%s Reward",

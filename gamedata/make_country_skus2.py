@@ -1268,6 +1268,7 @@ if __name__ == '__main__':
 
             if 'ui_pile_size' in data: sku['ui_pile_size'] = data['ui_pile_size']
             if 'nominal_alloy' in data: sku['nominal_quantity'] = data['nominal_alloy']
+            if 'loot_table' in data: sku['loot_table'] = data['loot_table']
 
             if 'ui_banner' in data:
                sku['ui_banner'] = data['ui_banner'] # SKU can override slate
