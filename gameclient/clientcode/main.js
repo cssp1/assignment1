@@ -36031,7 +36031,6 @@ function invoke_buy_gamebucks_dialog23(ver, reason, amount, order) {
     if(order && order['price'] > 0 && order['price'] > player.resource_state['gamebucks'] &&
        (player.get_any_abtest_value('gamebucks_per_fbcredit_topup', gamedata['store']['gamebucks_per_fbcredit_topup']) > 0)) {
         topup_bucks = order['price'] - player.resource_state['gamebucks'];
-
     }
     dialog.user_data['topup_bucks'] = topup_bucks;
     dialog.user_data['any_sku_has_bonus'] = 0;
@@ -36189,31 +36188,21 @@ function update_buy_gamebucks_dialog2(dialog) {
 
     for(var i = 0; i < spell_list.length; i++) {
         var w = dialog.widgets['sku'+i.toString()];
-        /*
-        var skudata = w.user_data['skudata'];
-        if(!new_store_allow_sku(skudata)) {
-            w.show = false;
-            continue;
-        }
-        */
-        var n_up = dialog.user_data['spell_list'].length;
-        if(!('array_offset_'+n_up.toString()+'up' in dialog.data['widgets']['sku'])) {
-            throw Error('unhandled number of skus: '+n_up.toString()+' ('+JSON.stringify(spell_list)+')');
-        }
-        var offset = dialog.data['widgets']['sku']['array_offset_'+n_up.toString()+'up'];
-        var base = dialog.data['widgets']['sku'][('xy_'+n_up.toString()+'up' in dialog.data['widgets']['sku'] ? 'xy_'+n_up.toString()+'up' : 'xy')];
-        w.user_data['base_xy']= [i*offset[0] - dialog.user_data['scroll_pos'] + base[0], base[1]];
-        /*
-        if(('jewel' in skudata) && read_predicate(skudata['jewel']).is_satisfied(player, null)) {
-            if(w.user_data['base_xy'][0] + 0.66*w.wh[0] < 0) { left_jewels += 1; }
-            if(w.user_data['base_xy'][0] + 0.33*w.wh[0] >= dialog.widgets['sunken'].xy[0] + dialog.widgets['sunken'].wh[0]) { right_jewels += 1; }
+
+        var offset, base;
+        if(dialog.user_data['ver'] == 3) { // fixed-size version
+            var n_up = dialog.user_data['spell_list'].length;
+            if(!('array_offset_'+n_up.toString()+'up' in dialog.data['widgets']['sku'])) {
+                throw Error('unhandled number of skus: '+n_up.toString()+' ('+JSON.stringify(spell_list)+')');
+            }
+            offset = dialog.data['widgets']['sku']['array_offset_'+n_up.toString()+'up'];
+            base = dialog.data['widgets']['sku'][('xy_'+n_up.toString()+'up' in dialog.data['widgets']['sku'] ? 'xy_'+n_up.toString()+'up' : 'xy')];
+        } else {
+            offset = dialog.data['widgets']['sku']['array_offset'];
+            base = dialog.data['widgets']['sku']['xy'];
         }
 
-        // reposition tooltips
-        if(w.user_data['context']) {
-            w.user_data['context'].user_data['props']['parent_offset'] = w.user_data['base_xy'];
-        }
-        */
+        w.user_data['base_xy']= [i*offset[0] - dialog.user_data['scroll_pos'] + base[0], base[1]];
     }
 
     dialog.widgets['scroll_left_jewel'].user_data['count'] = left_jewels;
