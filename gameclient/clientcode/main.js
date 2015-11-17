@@ -10979,7 +10979,7 @@ function scroll_friend_bar(dialog, page) {
                     dialog.widgets['gift_button'].onclick = function(w) {
                         var uid = w.parent.user_data['user_id'];
                         change_selection_ui(null);
-                        invoke_send_gifts_dialog(uid, 'friend_bar');
+                        invoke_send_gifts(uid, 'friend_bar');
                     };
                 } else if(player.get_any_abtest_value('ungiftable_fallback_to_invite', gamedata['client']['ungiftable_fallback_to_invite'])) {
                     dialog.widgets['gift_button'].state = 'normal';
@@ -10989,7 +10989,7 @@ function scroll_friend_bar(dialog, page) {
                         // ANY giftable friends?
                         player.get_giftable_friend_info_list_async(function (ret) {
                             if(ret.length > 0) {
-                                invoke_send_gifts_dialog(null, 'friend_bar_fallback', ret);
+                                invoke_send_gifts(null, 'friend_bar_fallback', ret);
                             } else {
                                 var s = gamedata['errors']['NO_GIFTABLE_FRIENDS'];
                                 var options = {'dialog': 'message_dialog_big'};
@@ -15888,7 +15888,7 @@ function invoke_gift_received_dialog(override_ls) {
     dialog.widgets['send_button'].show = player.resource_gifts_enabled();
     dialog.widgets['send_button'].onclick = function() {
         change_selection(null);
-        invoke_send_gifts_dialog(null, 'gift_received_dialog');
+        invoke_send_gifts(null, 'gift_received_dialog');
     };
 };
 
@@ -16200,7 +16200,7 @@ function invoke_gift_prompt_dialog() {
 
         dialog.widgets['send_button'].onclick = (function (_info_list) { return function(w) {
             change_selection(null);
-            invoke_send_gifts_dialog(null, 'gift_prompt_dialog', _info_list);
+            invoke_send_gifts(null, 'gift_prompt_dialog', _info_list);
         }; })(ret);
     });
 };
@@ -16210,7 +16210,7 @@ function invoke_gift_prompt_dialog() {
  * @param {string} reason for metrics purposes
  * @param {(!Array.<Object>|null)=} info_list - list of PlayerCache entries for giftable friends (if null, we will query)
  */
-var invoke_send_gifts_dialog = function(to_user, reason, info_list) {
+function invoke_send_gifts(to_user, reason, info_list) {
     if(spin_frame_platform === 'fb') {
         call_with_facebook_permissions('user_friends', (function (_to_user, _reason, _info_list) { return function() {
             FBSendRequests.invoke_send_gifts_dialog(_to_user, _reason, _info_list);
@@ -28180,7 +28180,7 @@ function alliance_info_member_rowfunc(dialog, row, rowdata) {
 
                                                            player.get_giftable_friend_info_list_async((function (__user_id) { return function (ret) {
                                                                if(ret.length > 0) {
-                                                                   invoke_send_gifts_dialog(__user_id, 'alliance_manage', ret);
+                                                                   invoke_send_gifts(__user_id, 'alliance_manage', ret);
                                                                } else {
                                                                    var s = gamedata['errors']['NO_GIFTABLE_FRIENDS'];
                                                                    var options = {'dialog': 'message_dialog_big'};
