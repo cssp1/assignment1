@@ -36036,6 +36036,7 @@ function invoke_buy_gamebucks_dialog23(ver, reason, amount, order) {
     dialog.user_data['any_sku_has_bonus'] = 0;
     dialog.user_data['max_displayed_quantity'] = 0;
     dialog.user_data['expire_time'] = -1; // for UI display on invidiual SKUs
+    dialog.user_data['context'] = null; // inventory_context
 
     // construct slate of SKUs from fixed-price bundles
     var spell_list = [];
@@ -36101,6 +36102,7 @@ function invoke_buy_gamebucks_dialog23(ver, reason, amount, order) {
         d.user_data['spell'] = spell;
         d.user_data['ui_index'] = i;
         d.user_data['base_xy'] = [d.xy[0], d.xy[1]];
+        d.user_data['context_parent'] = dialog; // dialog that will be the parent of any spawned inventory context menus
 
         d.widgets['name'].set_text_with_linebreaking(spell['ui_new_store_name'] || spell['ui_name']);
         //d.widgets['icon'].asset = spell['new_store_icon'] || spell['icon'];
@@ -36488,13 +36490,84 @@ function update_buy_gamebucks_sku2(dialog) {
 function update_buy_gamebucks_sku2_attachments(dialog, spell) {
     if(!('attachments0' in dialog.widgets)) { return; } // inapplicable
     var item_list = [];
-    // XXXXXX implement
-    var row = 0;
-    var n_rows = dialog.data['widgets']['attachments']['array'][0] * dialog.data['widgets']['attachments']['array'][1];
-    while(row < n_rows) {
-        dialog.widgets['attachments'+row.toString()].show = false;
-        dialog.widgets['dividers'+row.toString()].show = false;
-        row += 1;
+
+    // special case for bonus gamebucks
+    if('nominal_quantity' in spell && spell['nominal_quantity'] < spell['quantity']) {
+        item_list.push({'spec': 'gamebucks', 'stack': spell['quantity'] - spell['nominal_quantity'],
+                        'ui_name': dialog.widgets['attachments0'].data['widgets']['name']['ui_name_bonus_quantity'].replace('%qty', pretty_print_number(spell['quantity'] - spell['nominal_quantity'])).replace('%GAMEBUCKS_NAME', Store.gamebucks_ui_name())
+                       });
+    }
+    if('loot_table' in spell) {
+        var loot_table = gamedata['loot_tables_client'][spell['loot_table']]['loot'];
+        if(loot_table.length === 1 && ('multi' in loot_table[0])) {
+            goog.array.forEach(loot_table[0]['multi'], function(entry) {
+                if('spec' in entry) {
+                    item_list.push(entry);
+                } else {
+                    throw Error('unparseable loot table entry: '+JSON.stringify(entry));
+                }
+            });
+        } else {
+            throw Error('unparseable loot table: '+JSON.stringify(loot_table));
+        }
+    }
+
+    var visible_rows = dialog.data['widgets']['attachments']['array'][0] * dialog.data['widgets']['attachments']['array'][1];
+    var pages = Math.floor((item_list.length + visible_rows - 1) / visible_rows);
+    var cur_page = (pages > 1 ? Math.floor(client_time % pages) : 0);
+    for(var row = 0; row < visible_rows; row += 1) {
+        var index = cur_page * visible_rows + row;
+        if(index < item_list.length) {
+            var item = item_list[index];
+            var item_spec = ItemDisplay.get_inventory_item_spec(item['spec']);
+            var attach = dialog.widgets['attachments'+row.toString()];
+            attach.show = true;
+            dialog.widgets['dividers'+row.toString()].show = (row != visible_rows - 1); // hide under last row
+            ItemDisplay.set_inventory_item_asset(attach.widgets['icon'], item_spec);
+            var stack = ('stack' in item ? item['stack'] : 1);
+            var ui_quantity;
+            if(item['spec'] === 'gamebucks') {
+                ui_quantity = pretty_print_number(stack);
+            } else {
+                if(stack == 1) {
+                    ui_quantity = '1x';
+                } else {
+                    ui_quantity = goog.string.trim(ItemDisplay.get_inventory_item_stack_prefix(item_spec, stack));
+                }
+            }
+            attach.widgets['quantity'].str = ui_quantity;
+            attach.widgets['name'].str = ('ui_name' in item ? item['ui_name'] : ItemDisplay.get_inventory_item_ui_name(item_spec));
+
+            // pass through clicks to purchase the SKU
+            attach.widgets['tooltip_maker'].onclick = function(w) {
+                var sku_dialog = w.parent.parent;
+                if(sku_dialog.widgets['bg'].state !== 'disabled') {
+                    sku_dialog.widgets['bg'].onclick(sku_dialog.widgets['bg']);
+                }
+            };
+
+            // unique address for this attachment to this SKU
+            var slot = dialog.user_data['ui_index'].toString()+':'+row.toString();
+            attach.widgets['tooltip_maker'].onenter = (function (_slot, _item) { return function(w) {
+ var dialog = w.parent;
+                var context_parent = w.parent.parent.user_data['context_parent'];
+                if(context_parent.user_data['context'] && context_parent.user_data['context'].user_data['slot'] === _slot) { return; }
+
+                invoke_inventory_context(context_parent, w, _slot, _item, false, {'parent_dialog': context_parent});
+
+                // set transparent so that onleave is always called reliably
+                if(context_parent.user_data['context']) { context_parent.user_data['context'].transparent_to_mouse = true; }
+            }; })(slot, item);
+            attach.widgets['tooltip_maker'].onleave_cb = (function (_slot, _item) { return function(w) {
+                var context_parent = w.parent.parent.user_data['context_parent'];
+                if(context_parent.user_data['context'] && context_parent.user_data['context'].user_data['slot'] === _slot) {
+                    invoke_inventory_context(context_parent, w, -1, null, false);
+                }
+            }; })(slot, item);
+        } else {
+            dialog.widgets['attachments'+row.toString()].show =
+                dialog.widgets['dividers'+row.toString()].show = false;
+        }
     }
 }
 

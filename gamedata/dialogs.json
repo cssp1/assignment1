@@ -7284,7 +7284,7 @@
                               "gradient": "vinout", "gradient_midpoint": 0.25, "alpha": 0.5 },
 
             "name": { "kind": "TextField",
-                      "xy": [72,22], "dimensions": [122, 56],
+                      "xy": [72,22], "dimensions": [120, 56],
                       "text_size_nobonus": 21, "text_size_nobonus_big": 19,
                       "text_size_withbonus": 21, "text_size_withbonus_big": 19,
                       "text_style": "bold", "drop_shadow": 2,
@@ -7297,7 +7297,7 @@
                       "ui_name_withbonus": "%qty %gamebucks",
                       "text_hjustify": "right", "text_vjustify": "top" },
             "name2": { "kind": "TextField", "show": 0,
-                       "xy": [8,15], "dimensions": [118, 206], // deliberately oversized to make tooltip appear over wide area
+                       "xy": [8,15], "dimensions": [118, 206],
                        "text_size_nobonus": 18,
                        "text_size_withbonus": 13,
                        "text_leading": 15,
@@ -7316,14 +7316,14 @@
                        "text_hjustify": "right", "text_vjustify": "bottom" },
 
             "comment": { "kind": "TextField",
-                         "xy": [72,48], "dimensions": [122, 46],
+                         "xy": [72,48], "dimensions": [120, 46],
                          "ui_name_best_value": "Best Value",
                          "text_size": 13, "text_style": "normal", "drop_shadow": 1,
                          "text_color": [0.1,1,0.2,1],
                          "text_hjustify": "right", "text_vjustify": "top" },
             // mutually exclusive with comment
             "expire_time": { "kind": "TextField", "show": 1,
-                             "xy": [72,49], "dimensions": [124, 46],
+                             "xy": [72,49], "dimensions": [122, 46],
                              "ui_name": "Ending in %togo",
                              "text_size": 12, "text_style": "normal", "drop_shadow": 1,
                              "text_color": [1,0,0,1],
@@ -7378,10 +7378,11 @@
                             "outline_color": [0.4,0.4,0.4,1],
                             "outline_width": 1 },
             "name": { "kind": "TextField", "xy": [36,2], "dimensions": [154, 25], "text_size": 13, "text_hjustify": "left", "text_vjustify": "center", "text_style": "normal", "clip_to": [36,2,125,27],
-                      "text_color": [0.8,0.8,0.8,1],
-                      "drop_shadow":1, "ui_name": "Test Item mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm" },
+                      "text_color": [0.8,0.8,0.8,1], "drop_shadow":1,
+                      "ui_name_bonus_quantity": "Bonus %GAMEBUCKS_NAME"
+                    },
             "quantity": { "kind": "TextField", "xy": [36,2], "dimensions": [154, 25], "text_size": 13, "text_hjustify": "right", "text_vjustify": "center", "text_style": "normal",
-                          "drop_shadow":1, "ui_name": "x%d" },
+                          "drop_shadow":1 },
             // this exists only to generate the inventory context tooltip
             "tooltip_maker": { "kind": "ActionButton", "xy": [0,0], "dimensions": [196,29] }
         }
