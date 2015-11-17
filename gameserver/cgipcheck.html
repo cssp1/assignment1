@@ -1331,14 +1331,22 @@ var refresh_chat_report_row = function(row, item, time_now) {
     var text_div = $('<div>', {html: s}).css("float","left");
 
     var button_div = $('<div>').css("float","right");
-    var btn_list = [{'action':'ignore','ui_name':'Ignore','color':'#d0d0d0'},
-                    {'action':'violate','ui_name':'Add Offense','color':'#ff8080'}];
+    var btn_list = [];
+    if($GOOGLE_TRANSLATE_ENABLED$) {
+        btn_list.push({'action':'translate','ui_name': 'Google Translate','color':'#ffffd0'});
+    }
+    btn_list.push({'action':'ignore','ui_name':'Ignore','color':'#d0d0d0'});
+    btn_list.push({'action':'violate','ui_name':'Add Offense','color':'#ff8080'});
     $.each(btn_list,
            function(index, btn) {
                var button = $('<button>', {html: btn['ui_name']}).addClass('spin_button');
                button.css("background-color", btn['color']);
                button.click((function (_row, _item, _action) { return function() {
-                   resolve_chat_report(_row, _item, _action);
+                   if(_action === 'translate') {
+                       translate_chat_report(_item);
+                   } else {
+                       resolve_chat_report(_row, _item, _action);
+                   }
                }; })(row, item, btn['action']));
                button_div.append(button);
            });
@@ -1348,6 +1356,12 @@ var refresh_chat_report_row = function(row, item, time_now) {
     cell.append(button_div);
 
     row.append(cell);
+};
+
+var translate_chat_report = function(item) {
+    send_request('chat', 'translate', {'text': item['context'], 'to_language': 'en'}, (function(_item) { return function(result) {
+        alert("Google Translate says this is language \"%source_language\" and means:\n\n%translation".replace('%source_language', ('source_language' in result ? result['source_language'] : 'unknown')).replace('%translation',result['translation']));
+    }; })(item));
 };
 
 var resolve_chat_report = function(row, item, action) {

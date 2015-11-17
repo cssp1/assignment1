@@ -128,6 +128,7 @@ echo "    key /home/ec2-user/.ssh/hipchat.token for automated messages"
 echo "    key /home/ec2-user/.ssh/slack.token (with incoming webhook for game channel) for automated messages"
 echo "    key /home/ec2-user/.ssh/mattermost-webhook-url for automated messages"
 echo "    key /home/ec2-user/.ssh/dropbox-access-token for tournament winner list uploads"
+echo "    key /home/ec2-user/.ssh/google-translate-api-key for PCHECK translation"
 
 # CUSTOMIZED PYTHON PACKAGES
 echo "build/install ujson, blist, and lz4 libraries. (python setup.py build; sudo python setup.py install)"

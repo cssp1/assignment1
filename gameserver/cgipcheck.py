@@ -93,6 +93,7 @@ def do_gui(spin_token_data, spin_token_raw, spin_token_cookie_name, my_endpoint,
         '$SPIN_TOKEN_COOKIE_NAME$': spin_token_cookie_name,
         '$SPIN_TOKEN_DOMAIN$': SpinConfig.config['spin_token_domain'],
         '$GOOGLE_ACCESS_TOKEN$': spin_token_data['google_access_token'],
+        '$GOOGLE_TRANSLATE_ENABLED$': 'true' if SpinConfig.config.get('google_translate_api_key') else 'false',
         '$SPIN_USERNAME$': spin_token_data['spin_user'],
         '$SPIN_URL$': my_endpoint,
         '$SPIN_GAME_ID$': SpinConfig.game(),
@@ -401,6 +402,12 @@ def do_action(path, method, args, spin_token_data, nosql_client):
                     control_args['spin_user'] = spin_token_data['spin_user']
                     violate_result = chat_abuse_violate(control_args)
                     result = {'result': violate_result}
+            elif method == 'translate':
+                # use Google Translate API conventions
+                from_language = args.get('from_language', None)
+                to_language = args.get('to_language', 'en')
+                text = args['text']
+                result = {'result': do_google_translate(from_language, to_language, text)}
             else:
                 raise Exception('unknown '+path[0]+' method '+method)
 
@@ -467,6 +474,24 @@ def do_action(path, method, args, spin_token_data, nosql_client):
 
     except:
         return {"error":traceback.format_exc()}
+
+def do_google_translate(from_language, to_language, text):
+    args = {'target': to_language, 'q': text}
+    if from_language:
+        args['source'] = from_language
+    args['key'] = SpinConfig.config['google_translate_api_key']
+    url = 'https://www.googleapis.com/language/translate/v2?' + urllib.urlencode(args)
+    try:
+        request = urllib2.urlopen(url)
+        response_text = request.read()
+    except urllib2.HTTPError as e:
+        raise Exception('Google Translate API error:\n%s' % e.read())
+    response = SpinJSON.loads(response_text.strip())
+    translation = response['data']['translations'][0]
+    ret = {'translation': translation['translatedText']}
+    if 'detectedSourceLanguage' in translation:
+        ret['source_language'] = translation['detectedSourceLanguage']
+    return ret
 
 def do_CONTROLAPI(args, host = None, port = None):
     host = host or SpinConfig.config['proxyserver'].get('external_listen_host','localhost')
