@@ -36035,6 +36035,7 @@ function invoke_buy_gamebucks_dialog23(ver, reason, amount, order) {
     dialog.user_data['topup_bucks'] = topup_bucks;
     dialog.user_data['any_sku_has_bonus'] = 0;
     dialog.user_data['max_displayed_quantity'] = 0;
+    dialog.user_data['expire_time'] = -1; // for UI display on invidiual SKUs
 
     // construct slate of SKUs from fixed-price bundles
     var spell_list = [];
@@ -36114,21 +36115,22 @@ function invoke_buy_gamebucks_dialog23(ver, reason, amount, order) {
     // scrolling setup
     dialog.user_data['scroll_pos'] = 0;
     dialog.user_data['scroll_goal'] = 0;
-    dialog.user_data['scroll_limits'] = [0, spell_list.length * dialog.data['widgets']['sku']['array_offset'][0] - dialog.widgets['sunken'].wh[0] + dialog.data['widgets']['sku']['xy'][0] + 3];
+    dialog.user_data['scroll_limits'] = [0, spell_list.length * dialog.data['widgets']['sku']['array_offset'][0] - dialog.widgets['sunken'].wh[0] + dialog.data['widgets']['sku']['xy'][0] - 20];
     dialog.user_data['open_time'] = client_time;
     dialog.user_data['scrolled'] = false;
 
     var scroller = function(incr) { return function(w) {
         var dialog = w.parent;
-        dialog.user_data['scroll_goal'] = clamp(dialog.user_data['scroll_goal']+dialog.data['widgets']['sku']['array_offset'][0]*incr,
+        dialog.user_data['scroll_goal'] = clamp(dialog.user_data['scroll_goal']+dialog.data['widgets']['sku']['array_offset'][0]*dialog.data['scroll_incr']*incr,
                                                 dialog.user_data['scroll_limits'][0], dialog.user_data['scroll_limits'][1]);
         dialog.widgets['scroll_left'].state = (dialog.user_data['scroll_goal'] <= dialog.user_data['scroll_limits'][0] ? 'disabled' : 'normal');
         dialog.widgets['scroll_right'].state = (dialog.user_data['scroll_goal'] >= dialog.user_data['scroll_limits'][1] ? 'disabled' : 'normal');
-        if(incr > 0 && !dialog.user_data['scrolled']) {
+        if(incr !== 0 && !dialog.user_data['scrolled']) {
             dialog.user_data['scrolled'] = true;
             metric_event('4431_buy_gamebucks_dialog_scroll', {'gui_version': dialog.user_data['ver'], 'api':SPay.api, 'purchase_ui_event': true, 'client_time': Math.floor(client_time)});
         }
     }; };
+
     dialog.widgets['scroll_left'].onclick = scroller(-1);
     dialog.widgets['scroll_right'].onclick = scroller(1);
     dialog.widgets['scroll_left_jewel'].ondraw =
@@ -36142,6 +36144,12 @@ function invoke_buy_gamebucks_dialog23(ver, reason, amount, order) {
 
     dialog.widgets['scroll_left_jewel'].show = dialog.widgets['scroll_right_jewel'].show =
         dialog.widgets['scroll_left'].show && false;
+
+    // set initial scroll state
+    if(dialog.widgets['scroll_left'].show) {
+        scroller(0)(dialog.widgets['scroll_left']);
+        dialog.user_data['scroll_pos'] = dialog.user_data['scroll_goal'];
+    }
 
     // redeem gift card setup
     if(spin_frame_platform == 'fb' && player.get_any_abtest_value('enable_fb_gift_cards', eval_cond_or_literal(gamedata['store']['enable_fb_gift_cards'], player, null))) {
@@ -36181,7 +36189,7 @@ function update_buy_gamebucks_dialog2(dialog) {
     if(dialog.user_data['scroll_pos'] != dialog.user_data['scroll_goal']) {
         var delta = dialog.user_data['scroll_goal'] - dialog.user_data['scroll_pos'];
         var sign = (delta > 0 ? 1 : -1);
-        dialog.user_data['scroll_pos'] += sign * Math.floor(0.15 * Math.abs(delta) + 0.5);
+        dialog.user_data['scroll_pos'] += sign * Math.floor(dialog.data['scroll_speed'] * Math.abs(delta) + 0.5);
     }
 
     var left_jewels = 0, right_jewels = 0; // count number of jeweled SKUs to the left and right of the window
@@ -36219,6 +36227,7 @@ function update_buy_gamebucks_dialog2(dialog) {
             break;
         }
     }
+    dialog.user_data['expire_time'] = expire_time;
 
     if(ui_warning) {
         if(ui_warning.indexOf('%togo') >= 0) {
@@ -36244,9 +36253,8 @@ function update_buy_gamebucks_sku2(dialog) {
     var hi = (dialog.mouse_enter_time > 0) && (!dialog.widgets['hider'].show) && !pending;
     dialog.xy = [dialog.user_data['base_xy'][0],
                  dialog.user_data['base_xy'][1] - (hi && !dialog.widgets['bg'].pushed ? 1 : 0)];
-    dialog.widgets['bg'].bg_image = dialog.data['widgets']['bg']['bg_image_'+ (true ? 'normal' : 'special')];
     dialog.widgets['bg_shine'].alpha = (hi ? (dialog.widgets['bg'].pushed ? 1 : 0.66 ) : 0.5);
-    dialog.widgets['price_bg_shine'].alpha = 0.8 * (hi ? (dialog.widgets['bg'].pushed ? 0.8 : 0.66 ) : 0.6);
+
     if('buy_text' in dialog.widgets) {
         dialog.widgets['buy_text'].text_color = SPUI.make_colorv(dialog.data['widgets']['buy_text']['text_color'+(hi? '_highlight':'')]);
     }
@@ -36373,17 +36381,28 @@ function update_buy_gamebucks_sku2(dialog) {
         dialog.widgets['name2'].tooltip.str = null;
     }
 
-    // do not display a comment unless at least one SKU has a bonus
-    if(dialog.parent.user_data['any_sku_has_bonus']) {
-        if('ui_comment' in spell) {
-            dialog.widgets['comment'].str = spell['ui_comment'];
-        } else if(('nominal_quantity' in spell) && (spell['nominal_quantity'] < spell['quantity']) && (spell['quantity'] >= dialog.parent.user_data['max_displayed_quantity'])) {
-            dialog.widgets['comment'].str = dialog.data['widgets']['comment']['ui_name_best_value'];
-        } else {
-            dialog.widgets['comment'].str = '';
+    // display expire time, if applicable
+    if(dialog.data['widgets']['expire_time']['show'] && dialog.parent.user_data['expire_time'] > 0) {
+        dialog.widgets['expire_time'].show = true;
+        dialog.widgets['comment'].show = false;
+        dialog.widgets['expire_time'].str = dialog.data['widgets']['expire_time']['ui_name'].replace('%togo', pretty_print_time(dialog.parent.user_data['expire_time'] - server_time));
+    } else {
+        dialog.widgets['expire_time'].show = false;
+        dialog.widgets['comment'].show = true;
+
+        // do not display a comment unless at least one SKU has a bonus
+        if(dialog.parent.user_data['any_sku_has_bonus']) {
+            if('ui_comment' in spell) {
+                dialog.widgets['comment'].str = spell['ui_comment'];
+            } else if(('nominal_quantity' in spell) && (spell['nominal_quantity'] < spell['quantity']) && (spell['quantity'] >= dialog.parent.user_data['max_displayed_quantity'])) {
+                dialog.widgets['comment'].str = dialog.data['widgets']['comment']['ui_name_best_value'];
+            } else {
+                dialog.widgets['comment'].str = null;
+            }
         }
     }
 
+    update_buy_gamebucks_sku2_attachments(dialog, spell);
 
     //dialog.widgets['price_display'].bg_image = player.get_any_abtest_value('price_display_asset', gamedata['store']['price_display_asset']);
     //if(payment_currency == 'kgcredits') {
@@ -36466,6 +36485,18 @@ function update_buy_gamebucks_sku2(dialog) {
     }
 }
 
+function update_buy_gamebucks_sku2_attachments(dialog, spell) {
+    if(!('attachments0' in dialog.widgets)) { return; } // inapplicable
+    var item_list = [];
+    // XXXXXX implement
+    var row = 0;
+    var n_rows = dialog.data['widgets']['attachments']['array'][0] * dialog.data['widgets']['attachments']['array'][1];
+    while(row < n_rows) {
+        dialog.widgets['attachments'+row.toString()].show = false;
+        dialog.widgets['dividers'+row.toString()].show = false;
+        row += 1;
+    }
+}
 
 // utility to completely lock up the UI until server catches up, with optional cb to call after we close
 
