@@ -65,8 +65,15 @@ ${BUILT}/${GAME_ID}_hives_client.json: ${GAMEDATA}/make_hives_client.py ${BUILT}
 	@echo "    ${GAME_ID}_hives_client.json..." && ${GAMEDATA}/make_hives_client.py ${BUILT}/${GAME_ID}_hives_compiled.json $@
 ${BUILT}/${GAME_ID}_quarries_client.json: ${GAMEDATA}/make_quarries_client.py ${BUILT}/${GAME_ID}_quarries_compiled.json
 	@echo "    ${GAME_ID}_quarries_client.json..." && ${GAMEDATA}/make_quarries_client.py ${BUILT}/${GAME_ID}_quarries_compiled.json $@
-${BUILT}/${GAME_ID}_loot_tables_client.json: ${GAMEDATA}/make_loot_tables_client.py ${BUILT}/${GAME_ID}_loot_tables.json
-	@echo "    ${GAME_ID}_loot_tables_client.json..." && ${GAMEDATA}/make_loot_tables_client.py ${BUILT}/${GAME_ID}_loot_tables.json $@
+
+# needs the gamebucks SKUs to detect item bundles
+${BUILT}/${GAME_ID}_loot_tables_client.json: ${GAMEDATA}/make_loot_tables_client.py ${BUILT}/${GAME_ID}_loot_tables.json \
+						${BUILT}/${GAME_ID}_spells_gamebucks_skus.json \
+						${BUILT}/${GAME_ID}_spells_kgcredits_skus.json
+	@echo "    ${GAME_ID}_loot_tables_client.json..." && ${GAMEDATA}/make_loot_tables_client.py -o $@ \
+								${BUILT}/${GAME_ID}_loot_tables.json \
+								${BUILT}/${GAME_ID}_spells_gamebucks_skus.json \
+								${BUILT}/${GAME_ID}_spells_kgcredits_skus.json
 
 # shipped JSON
 ${BUILT}/${GAME_ID}_spells_gamebucks_skus.json: ${GAMEDATA}/make_country_skus2.py
