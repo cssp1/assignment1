@@ -25,4 +25,6 @@
 
 // note: this opts out of "click here" guidance for the EXTENDED tutorial (after coming home from Lion Stone)
 // there is no way to opt out of the initial "rails" tutorial, because it is completely hard-coded
-"skip_tutorial_button": 1
+"skip_tutorial_button": 1,
+
+"advanced_chat_reporting": 1
