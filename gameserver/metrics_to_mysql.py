@@ -145,6 +145,13 @@ if __name__ == '__main__':
             elif row['event_name'] == '6000_reacquisition_gift_sent':
                 keyvals.append(('spec', row['gift']))
 
+            elif row['event_name'] == '5141_dp_cancel_aura_acquired':
+                keyvals.append(('spec', row['aura_name']))
+                keyvals.append(('stack', int(100*row['aura_strength'])))
+            elif row['event_name'] == '5142_dp_cancel_aura_ended':
+                keyvals.append(('spec', row['aura_name']))
+                keyvals.append(('stack', row['start_time']))
+
             elif row['event_name'] in ('0113_account_deauthorized',
                                        '0140_tutorial_oneway_ticket',
                                        '0140_tutorial_start',

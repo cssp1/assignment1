@@ -7795,7 +7795,9 @@ class Player(AbstractPlayer):
             if is_recalc_stattab and ends_on == 'recalc_stattab':
                 to_remove.append(aura); continue
             if (self.resources.protection_end_time > server_time) and ends_on == 'damage_protection':
-                to_remove.append(aura); continue
+                to_remove.append(aura)
+                metric_event_coded(self.user_id, '5142_dp_cancel_aura_ended', {'aura_name': aura['spec'], 'start_time': aura.get('start_time',-1)}) # XXX hack
+                continue
 
         for aura in to_remove: self.player_auras.remove(aura)
         return bool(to_remove)

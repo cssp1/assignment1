@@ -237,6 +237,8 @@ def MetricsLogFilter(child):
                                   #'5130_item_activated',
                                   #'5131_item_trashed',
                                   #'5140_mail_attachment_collected'
+                                  '5141_dp_cancel_aura_acquired',
+                                  '5142_dp_cancel_aura_ended',
 
                                   '5149_turret_heads_migrated',
 
