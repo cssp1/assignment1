@@ -1578,7 +1578,7 @@ class User:
         else:
             # note: must match proxyserver.py test credentials
             test_response = SpinJSON.dumps({"friends":[],"muted_users":[],"friend_ids":[12345],"muted_user_ids":[],"user_id":12345,"username":"example1","private":False,"page_num":1,"num_pages":1,"success":True,"user_vars":{"username":"example1","level":1,"points":15,"avatar_url":"http://cdn4.kongcdn.com/assets/resize-image/50x50/assets/avatars/defaults/frog.png","chat_avatar_url":"http://cdn4.kongcdn.com/assets/resize-image/16x16/assets/avatars/defaults/frog.png","developer":False,"moderator":False,"admin":False,"gender":None,"age":32,"game_title":"Test Game","game_url":"http://www.kongregate.com/games/example1/test-game"}})
-            reactor.callLater(0, lambda _self=self, _session=session, _retmsg=retmsg: _self.retrieve_kg_info_complete(_session, None, test_response))
+            reactor.callLater(2, lambda _self=self, _session=session, _retmsg=retmsg: _self.retrieve_kg_info_complete(_session, None, test_response)) # delay to expose timing bugs
 
     def retrieve_kg_info_start(self, session):
         gamesite.AsyncHTTP_Kongregate.queue_request(server_time,
@@ -1626,7 +1626,7 @@ class User:
                 'birthday': "0000-00-00",
                 'gender':"Male",
                 'created_on': "1335466318" } })
-            reactor.callLater(0, lambda _self=self, _session=session, _retmsg=retmsg: _self.retrieve_ag_info_complete(_session, None, test_response))
+            reactor.callLater(2, lambda _self=self, _session=session, _retmsg=retmsg: _self.retrieve_ag_info_complete(_session, None, test_response)) # delay to expose timing bugs
             friends_response = SpinJSON.dumps({'version': 1, 'code': 200, 'message': "OK", 'payload': [
                 {
                 'uid':"example2" if self.ag_id == "example1" else "example1",
@@ -1637,7 +1637,7 @@ class User:
                 'gender': "Female",
                 'created_on': "1198082452",
                 'plays_game': "1"}]})
-            reactor.callLater(0, lambda _self=self, _session=session, _retmsg=retmsg: _self.retrieve_ag_friends_complete(_session, None, friends_response))
+            reactor.callLater(2, lambda _self=self, _session=session, _retmsg=retmsg: _self.retrieve_ag_friends_complete(_session, None, friends_response)) # delay to expose timing bugs
 
     def retrieve_ag_info_start(self, session):
         gamesite.AsyncHTTP_ArmorGames.queue_request(server_time,
@@ -1724,14 +1724,14 @@ class User:
 
         self.fb_hit_time = server_time
         if SpinConfig.config['enable_facebook']:
-            log.msg('Retrieving users\'s profile from Facebook...')
             self.retrieve_facebook_info_start(retmsg)
         else:
-            log.msg('Facebook API disabled, using fake test profile')
-            self.facebook_profile  = SpinJSON.load(open("test-facebook-profile.txt"))
-            self.facebook_friends  = SpinJSON.load(open("test-facebook-friends.txt"))['data']
-            self.facebook_likes    = SpinJSON.load(open("test-facebook-likes.txt"))['data']
-            self.retrieve_facebook_info_complete(retmsg)
+            def retrieve_facebook_info_fake(self, retmsg):
+                self.facebook_profile  = SpinJSON.load(open("test-facebook-profile.txt"))
+                self.facebook_friends  = SpinJSON.load(open("test-facebook-friends.txt"))['data']
+                self.facebook_likes    = SpinJSON.load(open("test-facebook-likes.txt"))['data']
+                self.retrieve_facebook_info_complete(retmsg)
+            reactor.callLater(2, functools.partial(retrieve_facebook_info_fake, self, retmsg)) # delay to expose timing bugs
 
     def ping_fbpayments(self, session, retmsg, request_ids):
         # batch this?
