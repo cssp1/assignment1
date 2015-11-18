@@ -229,7 +229,7 @@ SCORES2_MIGRATION_VERSION = 9
 
 def conceal_protection_time(x):
     if gamedata['server']['conceal_protection_time']:
-        if x >= server_time:
+        if x > server_time:
             return 1
         else:
             return -1
@@ -7656,12 +7656,9 @@ class Player(AbstractPlayer):
         # start post-tutorial attack protection timer
         prot_time = Predicates.eval_cond_or_literal(self.get_any_abtest_value('starting_protection_time', gamedata['starting_conditions']['protection_time']), None, self)
         if prot_time > 0:
-            self.record_protection_event('3880_protection_from_new_account', {'prot_time':prot_time,
-                                                                              'prev_end_time': self.resources.protection_end_time,
-                                                                              'new_end_time': server_time + prot_time})
-            self.resources.protection_end_time = server_time + prot_time
+            self.set_protection_end_time(None, server_time + prot_time, '3880_protection_from_new_account')
         else:
-            self.resources.protection_end_time = -1
+            self.set_protection_end_time(None, -1, None)
 
         auras = self.get_any_abtest_value('starting_player_auras', gamedata['starting_conditions']['player_auras'])
         for aura in auras:
@@ -7796,6 +7793,8 @@ class Player(AbstractPlayer):
             if is_session_change and ends_on in ('session_change','battle_end'):
                 to_remove.append(aura); continue
             if is_recalc_stattab and ends_on == 'recalc_stattab':
+                to_remove.append(aura); continue
+            if (self.resources.protection_end_time > server_time) and ends_on == 'damage_protection':
                 to_remove.append(aura); continue
 
         for aura in to_remove: self.player_auras.remove(aura)
@@ -10638,6 +10637,41 @@ class Player(AbstractPlayer):
 
         # note: if we're being loaded as a PvP opponent, this migration might happen more than once
         self.history['scores2_migration'] = SCORES2_MIGRATION_VERSION # mark as migrated
+
+    def set_protection_end_time(self, session, new_end_time, event_name, extra_event_props = None):
+        old_end_time = self.resources.protection_end_time
+
+        if event_name:
+            props = {'prev_end_time': old_end_time, 'new_end_time': new_end_time, 'count': self.protection_attack_count}
+            if new_end_time > server_time: props['prot_time'] = new_end_time - server_time
+            if extra_event_props: props.update(extra_event_props)
+            self.record_protection_event(event_name, props)
+
+        self.resources.protection_end_time = new_end_time
+
+        was_active = (old_end_time > server_time)
+        is_active = (new_end_time > server_time)
+
+        if was_active != is_active:
+            self.protection_attack_count = 0
+
+        # perform external updates
+        is_changed = (was_active != is_active) or (is_active and (new_end_time != old_end_time))
+
+        if is_changed and session:
+            if self.prune_player_auras():
+                session.send([["PLAYER_AURAS_UPDATE" if self is session.player else "ENEMY_AURAS_UPDATE", self.player_auras]])
+
+            gamesite.pcache_client.player_cache_update(self.user_id, {'protection_end_time': new_end_time if new_end_time > server_time else None}, reason = 'set_protection_end_time')
+            if self.is_on_map(): # XXX double-check that this is actually safe
+                gamesite.nosql_client.update_map_feature(self.my_home.base_region, self.my_home.base_id,
+                                                         {'protection_end_time': new_end_time if new_end_time > server_time else None,
+                                                          'preserve_locks': 1}, reason = 'set_protection_end_time')
+
+            if (self is session.player): # only run for connected player
+                session.deferred_ladder_point_decay_check = True
+                session.deferred_player_state_update = True
+                session.deferred_stattab_update = True
 
     def record_protection_event(self, event_name, props):
         if not gamedata['server']['record_protection_history']: return
@@ -15786,14 +15820,11 @@ class GAMEAPI(resource.Resource):
                         protection_based_on = 'ladder_battle'
                         prot_time = ladder_prot_time
                         if prot_time > 0:
-                            session.viewing_player.record_protection_event('3881_protection_from_ladder_battle',
+                            session.viewing_player.set_protection_end_time(session, server_time + int(prot_time),
+                                                                           '3881_protection_from_ladder_battle',
                                                                            {'attacker_id': session.player.user_id,
-                                                                            'prev_end_time': session.viewing_player.resources.protection_end_time,
-                                                                            'new_end_time': server_time + int(prot_time),
-                                                                            'prot_time': int(prot_time),
                                                                             'base_damage': base_damage,
                                                                             'precurve_storage_damage': precurve_storage_damage})
-                            session.viewing_player.resources.protection_end_time = server_time + int(prot_time)
 
                             if gamedata['server']['enable_protection_fatigue']:
                                 session.player.cooldown_trigger('protection_fatigue:%d'%session.viewing_player.user_id, gamedata['server']['protection_fatigue_duration'], add_stack = 1)
@@ -15806,7 +15837,7 @@ class GAMEAPI(resource.Resource):
                                 if gamedata['server']['global_protection_cooldown'] > 0:
                                     session.viewing_player.cooldown_trigger('global_protection', int(prot_time + gamedata['server']['global_protection_cooldown']*prot_time))
                         else:
-                            session.viewing_player.resources.protection_end_time = -1
+                            session.viewing_player.set_protection_end_time(session, -1, None)
 
                     # ordinary attacks: based on damage suffered (only if the battle_start code gave a nonzero time)
                     elif session.viewing_player.resources.protection_end_time > 0:
@@ -15831,15 +15862,12 @@ class GAMEAPI(resource.Resource):
                                 prot_time = min(prot_time, ladder_prot_time)
 
                         if prot_time > 0:
-                            session.viewing_player.record_protection_event('3882_protection_from_nonladder_battle',
+                            session.viewing_player.set_protection_end_time(session, server_time + int(prot_time),
+                                                                           '3882_protection_from_nonladder_battle',
                                                                            {'attacker_id': session.player.user_id,
-                                                                            'prev_end_time': session.viewing_player.resources.protection_end_time,
-                                                                            'new_end_time': server_time + int(prot_time),
-                                                                            'prot_time': int(prot_time),
                                                                             'base_damage': base_damage,
                                                                             'damage':damage,
                                                                             'precurve_storage_damage': precurve_storage_damage})
-                            session.viewing_player.resources.protection_end_time = server_time + int(prot_time)
 
                             if gamedata['server']['enable_protection_fatigue']:
                                 session.player.cooldown_trigger('protection_fatigue:%d'%session.viewing_player.user_id, gamedata['server']['protection_fatigue_duration'], add_stack = 1)
@@ -15849,13 +15877,13 @@ class GAMEAPI(resource.Resource):
                                         if aid > 0:
                                             session.player.cooldown_trigger('protection_fatigue:a%d' % aid, gamedata['server']['protection_fatigue_duration'], add_stack = 1)
                         else:
-                            session.viewing_player.resources.protection_end_time = -1
+                            session.viewing_player.set_protection_end_time(session, -1, None)
 
                     else:
                         # temp, for tracking how the test works
                         protection_based_on = 'none_given'
                         prot_time = 0
-                        session.viewing_player.resources.protection_end_time = -1
+                        session.viewing_player.set_protection_end_time(session, -1, None)
 
                     summary['prot_time'] = prot_time
 
@@ -15899,7 +15927,7 @@ class GAMEAPI(resource.Resource):
 
             else: # viewing_player.is_ai()
                 # AI players do not receive attack protection
-                session.viewing_player.resources.protection_end_time = 0
+                session.viewing_player.set_protection_end_time(None, 0, None)
                 if 0:
                     gamesite.exception_log.event(server_time, 'AI attack end %d (L%d) vs AI %d (L%d): loot %d units %d' % \
                                                  (session.user.user_id,
@@ -16101,7 +16129,6 @@ class GAMEAPI(resource.Resource):
                                'base_damage': session.viewing_player.my_home.calc_base_damage(),
                                'base_repair_time': -1,
                                'last_defense_time': server_time,
-                               'protection_end_time': session.viewing_player.resources.protection_end_time,
                                'last_fb_notification_time': session.viewing_player.last_fb_notification_time
                                }
                 gamesite.pcache_client.player_cache_update(session.viewing_user.user_id, cache_props, reason = 'attack_victim')
@@ -17777,15 +17804,8 @@ class GAMEAPI(resource.Resource):
                 metric_event_coded(session.player.user_id, event_name, event_props)
 
         elif spellname.startswith("BUY_PROTECTION"):
-            session.player.record_protection_event('3883_protection_from_spell',
-                                                   {'prev_end_time': session.player.resources.protection_end_time,
-                                                    'new_end_time': max(session.player.resources.protection_end_time, server_time) + spell['duration'],
-                                                    'prot_time': spell['duration'],
-                                                    'spellname': spellname,
-                                                    'reason': reason})
-            session.player.resources.protection_end_time = max(session.player.resources.protection_end_time, server_time) + spell['duration']
-            session.deferred_ladder_point_decay_check = True
-            session.deferred_player_state_update = True
+            session.player.set_protection_end_time(session, max(session.player.resources.protection_end_time, server_time) + spell['duration'],
+                                                   '3883_protection_from_spell', {'spellname': spellname, 'reason':reason})
 
         elif spellname.startswith("FREE_RANDOM_") or spellname.startswith("BUY_RANDOM_"):
             items = session.get_loot_items(session.player, gamedata['loot_tables'][spell['loot_table']]['loot'], -1, -1)
@@ -20115,16 +20135,9 @@ class GAMEAPI(resource.Resource):
                     (session.viewing_base.base_type == 'quarry' and gamedata['territory']['quarries_affect_protection']) or \
                     (session.viewing_base.base_type == 'squad' and gamedata['territory']['squads_affect_protection'])):
                     # remove the protection timer of the player making the attack
-                    old_end_time = session.player.resources.protection_end_time
-                    if old_end_time > server_time:
-                        session.player.record_protection_event('3884_protection_removed',
-                                                               {'prev_end_time': session.player.resources.protection_end_time,
-                                                                'new_end_time': 0,
-                                                                'defender_id':session.viewing_player.user_id})
-                    session.player.resources.protection_end_time = 0
-                    session.deferred_ladder_point_decay_check = True
-
-                    session.player.protection_attack_count = 0
+                    session.player.set_protection_end_time(session, 0,
+                                                           '3884_protection_removed' if session.player.resources.protection_end_time > server_time else None,
+                                                           {'defender_id':session.viewing_player.user_id})
                     session.setmax_player_metric('last_pvp_aggression_time', server_time, time_series = False)
 
             if session.player.tutorial_state != "COMPLETE":
@@ -20162,7 +20175,7 @@ class GAMEAPI(resource.Resource):
 
             # INITIAL damage protection calculation
             # at the start of the battle, we check whether any damage protection is potentially available (based on recent attacks, who is attacking, etc)
-            # if available, set protection_end_time > 0 here, otherwise protection_end_time = 0
+            # if available, set protection_end_time > 0 here, otherwise set protection_end_time to 0
             # after the battle, we'll calculate the exact amount of time based on damage done
 
             enable_protection = session.viewing_player.is_human() and (session.viewing_base is session.viewing_player.my_home)
@@ -20219,15 +20232,14 @@ class GAMEAPI(resource.Resource):
 
                     if session.is_ladder_battle():
                         # for ladder battles, enable directly
-                        session.viewing_player.resources.protection_end_time = server_time # protection IS enabled
+                        session.viewing_player.set_protection_end_time(session, server_time, None) # protection IS enabled
                     else:
                         # for non-ladder battles, wait for N attacks
                         if session.viewing_player.protection_attack_count >= session.viewing_player.get_any_abtest_value('protection_attacks', gamedata['server']['protection_attacks']):
                             # trigger the protection timer (exact amount computed on battle end)
-                            session.viewing_player.resources.protection_end_time = server_time # protection IS enabled
-                            session.viewing_player.protection_attack_count = 0
+                            session.viewing_player.set_protection_end_time(session, server_time, None) # protection IS enabled
                         else:
-                            session.viewing_player.resources.protection_end_time = 0 # protection NOT enabled
+                            session.viewing_player.set_protection_end_time(session, 0, None) # protection NOT enabled
 
                 else:
                     # AI players, and Facebook friends, do not receive attack protection
@@ -20243,9 +20255,9 @@ class GAMEAPI(resource.Resource):
                         if gamedata['server']['log_alt_accounts'] >= 1:
                             gamesite.exception_log.event(server_time, 'denying protection to known alt account: %d vs. %d' % (session.user.user_id, session.viewing_user.user_id))
 
-                    session.viewing_player.resources.protection_end_time = 0 # protection NOT enabled
+                    session.viewing_player.set_protection_end_time(session, 0, None) # protection NOT enabled
             else:
-                session.viewing_player.resources.protection_end_time = 0 # protection NOT enabled
+                session.viewing_player.set_protection_end_time(session, 0, None) # protection NOT enabled
 
             if gamedata['server'].get('track_battle_streaks',0) > 0:
                 cd_list = ['battle_streak']
@@ -24568,14 +24580,7 @@ class GAMEAPI(resource.Resource):
             if specname == 'damage_protection': # special case
                 old_end_time = session.player.resources.protection_end_time
                 if old_end_time > server_time:
-                    session.player.record_protection_event('3886_protection_removed_manually',
-                                                           {'prev_end_time': session.player.resources.protection_end_time,
-                                                            'new_end_time': 0})
-                    session.player.resources.protection_end_time = 0
-                    session.player.protection_attack_count = 0
-                    session.deferred_ladder_point_decay_check = True
-                    session.deferred_player_state_update = True
-                    # XXXXXX all things that affect protection_end_time should probably cause a map and/or player_cache update!
+                    session.player.set_protection_end_time(session, 0, '3886_protection_removed_manually')
             else:
                 session.player.remove_aura(session, retmsg, specname)
 
