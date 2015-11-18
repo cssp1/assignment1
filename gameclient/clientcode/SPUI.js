@@ -1660,10 +1660,10 @@ SPUI.RichTextField.prototype.do_draw = function(offset) {
     SPUI.ctx.font = this.font.str();
     var text_offset = vec_add(this.text_offset, [offset[0], offset[1] + ((this.pushed && this.push_text) ? 1 : 0)]);
     if(this.drop_shadow) {
-        SPUI.ctx.fillStyle = '#000000';
+        SPUI.ctx.fillStyle = SPUI.ctx.strokeStyle = '#000000';
         SPText.render_text(this.rtxt, [text_offset[0]+this.xy[0]+this.drop_shadow,text_offset[1]+this.xy[1]+this.drop_shadow], this.font, true);
     }
-    SPUI.ctx.fillStyle = SPUI.default_text_color.str();
+    SPUI.ctx.fillStyle = SPUI.ctx.strokeStyle = SPUI.default_text_color.str();
     SPText.render_text(this.rtxt, [text_offset[0]+this.xy[0],text_offset[1]+this.xy[1]], this.font);
     SPUI.ctx.restore();
     return true;
@@ -3325,7 +3325,7 @@ SPUI.ScrollingTextField.prototype.do_draw = function(offset) {
     }
     SPUI.ctx.font = this.font.str();
     if(this.drop_shadow) {
-        SPUI.ctx.fillStyle = '#000000';
+        SPUI.ctx.fillStyle = SPUI.ctx.strokeStyle = '#000000';
         SPText.render_text(this.rtxt, [offset[0]+this.xy[0]+this.drop_shadow,offset[1]+this.xy[1]+this.drop_shadow], this.font, true);
     }
     SPUI.ctx.fillStyle = SPUI.ctx.strokeStyle = this.text_color.str();
