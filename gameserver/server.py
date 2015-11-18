@@ -12927,7 +12927,7 @@ class OGPAPI(resource.Resource):
 
     def render_GET(self, request):
         SpinHTTP.set_access_control_headers(request)
-        ret = catch_all('OGPAPI request %s args %r' % (request.uri.encode('utf-8'), dict((k,v[0].encode('utf-8')) for k,v in request.args.iteritems())))(self.handle_request)(request)
+        ret = catch_all('OGPAPI request %s args %r' % (request.uri.decode('utf-8'), dict((k,v[0].decode('utf-8')) for k,v in request.args.iteritems())))(self.handle_request)(request)
         if ret is None:
             request.setResponseCode(http.BAD_REQUEST)
             ret = 'spinpunch error'
