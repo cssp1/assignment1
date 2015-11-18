@@ -240,6 +240,8 @@ ModChain.display_value = function(value, display_mode, context) {
             ui_value = (100*(1-value)).toFixed(parsed.precision)+'%';
         } else if(parsed.mode == 'pct') {
             ui_value = (100*value).toFixed(parsed.precision)+'%';
+        } else if(parsed.mode == 'pct_minus_one') {
+            ui_value = (100*(value-1)).toFixed(parsed.precision)+'%';
         } else if(parsed.mode == 'integer') {
             ui_value = pretty_print_number(value);
         } else if(parsed.mode == 'fixed') {
