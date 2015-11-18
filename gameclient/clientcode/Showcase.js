@@ -659,13 +659,20 @@ Showcase.collect_active_sales_data = function(sku, path) {
     } else if (('item' in sku) && ('ui_banner' in sku) && (eval_cond_or_literal(sku['ui_banner'], player, null)||'').toUpperCase().indexOf('SALE') != -1) {
         if(!(read_predicate(sku['show_if']).is_satisfied(player, null))) { return []; }
         var sale = {'path': path + sku['item']};
-        if('ui_name' in sku) {
-            sale['ui_name'] = ''+sku['ui_name'];
-            while(sale['ui_name'].indexOf('\n') != -1) { // get rid of newlines
-                sale['ui_name'] = sale['ui_name'].replace('\n', ' ');
+        var item_ui_name = ItemDisplay.get_inventory_item_ui_name(ItemDisplay.get_inventory_item_spec(sku['item']));
+        var sale_ui_name = null;
+        if('ui_name' in sku) { // SKU has a name override
+            sale_ui_name = ''+sku['ui_name'];
+            while(sale_ui_name.indexOf('\n') != -1) { // get rid of newlines
+                sale_ui_name = sale_ui_name.replace('\n', ' ');
             }
+        }
+        // SKU name overrides item name
+        // but, special case - if the SKU name is too long to fit the dialog, and the item name is shorter, then use the item name
+        if(sale_ui_name && ((sale_ui_name.length < item_ui_name.length) || sale_ui_name.length < 33)) {
+            sale['ui_name'] = sale_ui_name;
         } else {
-            sale['ui_name'] = ItemDisplay.get_inventory_item_ui_name(ItemDisplay.get_inventory_item_spec(sku['item']));
+            sale['ui_name'] = item_ui_name;
         }
         return [sale];
     }
