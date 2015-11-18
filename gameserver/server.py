@@ -1088,6 +1088,7 @@ class User:
     def __init__(self, user_id):
         self.user_id = user_id
         self.fb_hit_time = -1 # server_time at which the user's Facebook data was downloaded
+        self.fb_retrieve_semaphore = None # set of outstanding profile/friends/likes requests (by string name) to keep track of what's in progress
         self.account_creation_time = -1 # server_time at which account was originally created
         self.last_login_time = -1 # last time at which user played a game
         self.last_login_ip = '' # last IP address from which this user logged in
@@ -1132,7 +1133,7 @@ class User:
         self.facebook_likes = None
         self.facebook_currency = None
         self.facebook_third_party_id = None
-        self.fb_is_eligible_promo = None
+
         self.fb_gamer_status = -1
         self.fb_credit_balance = -1
         self.credit_info_request_outstanding = False
@@ -1450,11 +1451,8 @@ class User:
         if len(self.acquisition_data) > 0:
             self.acquisition_campaign = self.acquisition_data[0]['type']
 
-    def repopulate_ai_list(self, retmsg):
+    def repopulate_ai_list(self, session):
         # add AI opponents to friends list
-
-        player = self.active_session.player
-        assert player
 
         ai_list = set()
 
@@ -1463,8 +1461,8 @@ class User:
             if 'activation' not in base: continue
 
             pred = Predicates.read_predicate(base['activation'])
-            if not pred.is_satisfied(player, None):
-                if ('show_if' in base) and Predicates.read_predicate(base['show_if']).is_satisfied(player, None):
+            if not pred.is_satisfied(session.player, None):
+                if ('show_if' in base) and Predicates.read_predicate(base['show_if']).is_satisfied(session.player, None):
                     # still show it
                     pass
                 else:
@@ -1475,7 +1473,7 @@ class User:
 
         # first remove AIs that are no longer valid from the client
         for id in self.client_ai_friends.difference(ai_list):
-            retmsg.append(["REM_FRIEND", id])
+            session.send([["REM_FRIEND", id]])
             self.client_ai_friends.remove(id)
             self.client_friends.remove(id)
 
@@ -1487,30 +1485,20 @@ class User:
             friend_name = base['ui_name']
             friend_level = base['resources']['player_level']
 
-            retmsg.append(["ADD_FRIEND", id, -1, # AI
+            session.send([["ADD_FRIEND", id, -1, # AI
                            friend_name,
                            friend_level,
-                           player.get_battle_data_for_client(id),
+                           session.player.get_battle_data_for_client(id),
                            False, False, -1, [{'user_id': id,
                                                'social_id': 'ai',
                                                'ui_name': friend_name,
                                                'player_level': friend_level
-                }]])
+                }]]])
 
 
+    def populate_friends_who_play(self, session):
 
-    def populate_friends_who_play(self, retmsg):
-        if retmsg is None:
-            retmsg = self.active_session.outgoing_messages
-            assert retmsg is not None
-
-        assert self.active_session
-
-        # peek at our own player data for battle and giftability info
-        self_player = self.active_session.player
-        assert self_player
-
-        self.repopulate_ai_list(retmsg)
+        self.repopulate_ai_list(session)
 
         if (self.facebook_friends is None) and (self.kg_friend_ids is None) and (self.ag_friend_ids is None):
             return # probably still waiting on the API
@@ -1531,7 +1519,7 @@ class User:
 
         if friend_id_list:
             # query the player cache
-            add_props = gamesite.gameapi.do_query_player_cache(self.active_session, friend_id_list, reason = 'populate_friends_who_play')
+            add_props = gamesite.gameapi.do_query_player_cache(session, friend_id_list, reason = 'populate_friends_who_play')
 
         for i in xrange(len(friend_id_list)):
             friend_id = friend_id_list[i]
@@ -1551,20 +1539,19 @@ class User:
 
             self.client_social_friends.add(friend_id)
 
-            msg = ["ADD_FRIEND", friend_id, friend_props.get('facebook_id',None), pcache_get_ui_name(friend_props), # human
-                   friend_props.get('player_level',1),
-                   self_player.get_battle_data_for_client(friend_id),
-                   not self_player.cooldown_active('send_gift:'+str(friend_id)),
-                   True, # is a real Facebook friend (not a stranger)
-                   conceal_protection_time(friend_props.get('protection_end_time',-1)),
-                   [friend_props]
-                   ]
-            retmsg.append(msg)
+            session.send([["ADD_FRIEND", friend_id, friend_props.get('facebook_id',None), pcache_get_ui_name(friend_props), # human
+                           friend_props.get('player_level',1),
+                           session.player.get_battle_data_for_client(friend_id),
+                           not session.player.cooldown_active('send_gift:'+str(friend_id)),
+                           True, # is a real Facebook friend (not a stranger)
+                           conceal_protection_time(friend_props.get('protection_end_time',-1)),
+                           [friend_props]
+                           ]])
 
-        if not self_player.history.has_key('initial_friends_in_game'):
-            self_player.history['initial_friends_in_game'] = len(self.client_social_friends)
+        if not session.player.history.has_key('initial_friends_in_game'):
+            session.player.history['initial_friends_in_game'] = len(self.client_social_friends)
 
-        self.active_session.setmax_player_metric('friends_in_game', len(self.client_social_friends), bucket = True, bucket_size=60*60)
+        session.setmax_player_metric('friends_in_game', len(self.client_social_friends), bucket = True, bucket_size=60*60)
 
     def retrieve_kg_info(self, session, retmsg):
         if (None not in (self.kg_username, self.kg_avatar_url, self.kg_friend_ids)) and \
@@ -1691,47 +1678,7 @@ class User:
             if self.active_session:
                 retmsg = self.active_session.outgoing_messages
         if retmsg is not None:
-            self.populate_friends_who_play(retmsg)
-
-    # try to obtain the user's Facebook profile, friends and likes
-    # this is cached in user_table; if the cache is empty or stale,
-    # send asynchronous HTTP requests to Facebook to get the data
-
-    def retrieve_facebook_info(self, retmsg):
-        if (self.facebook_profile != None) and type(self.facebook_profile) == dict and len(self.facebook_profile) > 0 and \
-           (self.facebook_friends != None) and \
-           (self.facebook_likes != None) and \
-           (self.facebook_currency != None) and \
-           (self.facebook_first_name != None) and \
-           (self.active_session.player.facebook_permissions is not None) and \
-           ((server_time - self.fb_hit_time) < gamedata['server'].get('facebook_cache_lifetime', 14400)):
-            # data is present in cache and fresh enough to use
-            #log.msg('Users\'s Facebook profile data is cached and fresh.')
-            return
-
-        # keep old profile in case Facebook gives us a malformed response
-        if self.facebook_profile is not None:
-            self.facebook_profile_backup = self.facebook_profile
-        else:
-            # cannot be None, because the callback uses "is None" to check for completion
-            self.facebook_profile_backup = {}
-
-        # delete old cache entries
-        self.facebook_profile = None
-        self.facebook_friends = None
-        self.facebook_likes = None
-        self.facebook_currency = None
-
-        self.fb_hit_time = server_time
-        if SpinConfig.config['enable_facebook']:
-            self.retrieve_facebook_info_start(retmsg)
-        else:
-            def retrieve_facebook_info_fake(self, retmsg):
-                self.facebook_profile  = SpinJSON.load(open("test-facebook-profile.txt"))
-                self.facebook_friends  = SpinJSON.load(open("test-facebook-friends.txt"))['data']
-                self.facebook_likes    = SpinJSON.load(open("test-facebook-likes.txt"))['data']
-                self.retrieve_facebook_info_complete(retmsg)
-            reactor.callLater(2, functools.partial(retrieve_facebook_info_fake, self, retmsg)) # delay to expose timing bugs
+            self.populate_friends_who_play(session)
 
     def ping_fbpayments(self, session, retmsg, request_ids):
         # batch this?
@@ -2356,8 +2303,25 @@ class User:
                                                                                                                                     'spec': spec_name})
                                                               })
 
+    # try to obtain the user's Facebook profile, friends and likes
+    # this is cached in user_table; if the cache is empty or stale,
+    # send asynchronous HTTP requests to Facebook to get the data
+
+    def retrieve_facebook_info(self, session):
+        if (self.facebook_profile is not None) and type(self.facebook_profile) == dict and len(self.facebook_profile) > 0 and \
+           (self.facebook_friends is not None) and \
+           (self.facebook_likes is not None) and \
+           (self.facebook_currency is not None) and \
+           (self.facebook_first_name is not None) and \
+           (self.active_session.player.facebook_permissions is not None) and \
+           ((server_time - self.fb_hit_time) < gamedata['server'].get('facebook_cache_lifetime', 14400)):
+            # data is present in cache and fresh enough to use
+            return
+
+        self.retrieve_facebook_info_start(session)
+
     # launch the asynchronous HTTP requests to Facebook's servers
-    def retrieve_facebook_info_start(self, retmsg):
+    def retrieve_facebook_info_start(self, session):
         assert self.fb_oauth_token
         session_tok = self.fb_oauth_token
         session_tok_qs = urllib.urlencode(dict(access_token=session_tok))
@@ -2378,51 +2342,30 @@ class User:
         friends_url = SpinFacebook.versioned_graph_endpoint('friend', endpoint+'/friends')+'?limit=500&offset=0&'+tok_qs # app_tok_qs
         likes_url = SpinFacebook.versioned_graph_endpoint('like', endpoint+'/likes')+'?limit=500&offset=0&'+tok_qs # app_tok_qs
 
-        gamesite.AsyncHTTP_Facebook.queue_request(server_time, profile_url, lambda raw: self.retrieve_facebook_info_receive('profile', raw))
-        gamesite.AsyncHTTP_Facebook.queue_request(server_time, friends_url, lambda raw: self.retrieve_facebook_info_receive_paged('friends', raw))
-        gamesite.AsyncHTTP_Facebook.queue_request(server_time, likes_url, lambda raw: self.retrieve_facebook_info_receive_paged('likes', raw))
+        # keep track of outstanding requests
+        self.fb_retrieve_semaphore = set(['profile', 'friends', 'likes'])
 
-    def retrieve_facebook_info_receive_paged(self, dest, raw_result, buffer = None):
+        if not SpinConfig.config['enable_facebook']: # mock path
+            reactor.callLater(2, functools.partial(self.retrieve_facebook_info_receive, session, 'profile', open("test-facebook-profile.txt").read())) # delay to expose timing bugs
+            reactor.callLater(2, functools.partial(self.retrieve_facebook_info_receive_paged, session, 'friends', [], open("test-facebook-friends.txt").read())) # delay to expose timing bugs
+            reactor.callLater(2, functools.partial(self.retrieve_facebook_info_receive_paged, session, 'likes', [], open("test-facebook-likes.txt").read())) # delay to expose timing bugs
+        else:
+            gamesite.AsyncHTTP_Facebook.queue_request(server_time, profile_url, functools.partial(self.retrieve_facebook_info_receive, session, 'profile'))
+            gamesite.AsyncHTTP_Facebook.queue_request(server_time, friends_url, functools.partial(self.retrieve_facebook_info_receive_paged, session, 'friends', []))
+            gamesite.AsyncHTTP_Facebook.queue_request(server_time, likes_url, functools.partial(self.retrieve_facebook_info_receive_paged, session, 'likes', []))
+
+    def retrieve_facebook_info_receive_paged(self, session, dest, buffer, raw_result):
         result = SpinJSON.loads(raw_result)
 
-        if buffer is None:
-            buffer = []
         buffer += result['data']
 
         if ('paging' in result) and ('next' in result['paging']) and \
            (('count' not in result) or (len(buffer) < int(result['count']))):
             # fetch next page
-            gamesite.AsyncHTTP_Facebook.queue_request(server_time, result['paging']['next'],
-                                                      lambda raw: self.retrieve_facebook_info_receive_paged(dest, raw, buffer = buffer))
+            gamesite.AsyncHTTP_Facebook.queue_request(server_time, result['paging']['next'], functools.partial(self.retrieve_facebook_info_receive_paged, session, dest, buffer))
         else:
             # it's complete now
-            self.retrieve_facebook_info_receive(dest, None, result = buffer)
-
-    # this callback is called for each URL downloaded asynchronously
-    @admin_stats.measure_latency('AsyncHTTP(facebook_profile/friends/likes)')
-    def retrieve_facebook_info_receive(self, dest, raw_result, result = None):
-
-        if result is not None:
-            pass # caller supplied pre-parsed result
-        else:
-            result = SpinJSON.loads(raw_result)
-
-        if dest == 'profile':
-            if type(result) == dict and len(result) > 0:
-                self.facebook_profile = result
-            else:
-                gamesite.exception_log.event(server_time, ('Facebook sent bad profile data for user %d: ' % self.user_id)+repr(raw_result))
-                self.facebook_profile = self.facebook_profile_backup
-        elif dest == 'friends':
-            self.facebook_friends = result
-        elif dest == 'likes':
-            self.facebook_likes = result
-            if self.active_session:
-                self.active_session.player.user_facebook_likes = self.facebook_likes
-
-        if (self.facebook_profile != None) and (self.facebook_friends != None) and (self.facebook_likes != None):
-            self.retrieve_facebook_info_complete(None)
-
+            self.retrieve_facebook_info_receive(session, dest, None, result = buffer)
 
     def facebook_permissions_ok(self, wanted):
         if self.active_session.player.facebook_permissions is None: return False
@@ -2431,100 +2374,105 @@ class User:
                 return False
         return True
 
-    # call this function after profile, friends, and likes are all downloaded
-    def retrieve_facebook_info_complete(self, retmsg):
-        #log.msg(('User %d\'s Facebook profile: ' % self.user_id)+repr(self.facebook_profile))
-        #log.msg(('User %d\'s Facebook friends: ' % self.user_id)+repr(self.facebook_friends))
-        #log.msg(('User %d\'s Facebook likes: ' % self.user_id)+repr(self.facebook_likes))
+    # this callback is called for each URL downloaded asynchronously
+    @admin_stats.measure_latency('AsyncHTTP(facebook_profile/friends/likes)')
+    def retrieve_facebook_info_receive(self, session, dest, raw_result, result = None):
 
-        # set safe defaults in case of failure
-        self.facebook_currency = {'user_currency': 'Facebook Credits', 'currency_exchange': 1, 'currency_exchange_inverse': 1, 'currency_offset': 1}
-        self.fb_is_eligible_promo = False
-        if self.active_session:
-            self.active_session.player.facebook_permissions = []
+        self.fb_retrieve_semaphore.remove(dest)
+        if len(self.fb_retrieve_semaphore) == 0:
+            # all complete (set this before any possible parsing errors to avoid getting "stuck")
+            self.fb_hit_time = server_time
 
-        # pull vital fields out of the cached facebook_profile
-        if self.facebook_profile:
-            if 'name' in self.facebook_profile:
-                self.facebook_name = self.facebook_profile['name']
-            if 'first_name' in self.facebook_profile:
-                self.facebook_first_name = self.facebook_profile['first_name']
-            else:
-                self.facebook_first_name = self.facebook_name.split(' ')[0]
-
-            if 'currency' in self.facebook_profile:
-                self.facebook_currency = self.facebook_profile['currency']
-            if 'third_party_id' in self.facebook_profile:
-                self.facebook_third_party_id = self.facebook_profile['third_party_id']
-            if 'is_eligible_promo' in self.facebook_profile:
-                self.fb_is_eligible_promo = bool(self.facebook_profile['is_eligible_promo'])
-            if ('permissions' in self.facebook_profile) and self.active_session and ('data' in self.facebook_profile['permissions']) and (len(self.facebook_profile['permissions']['data']) > 0):
-                def parse_facebook_permissions(data_list):
-                    if 'permission' in data_list[0]: # current API
-                        return [x['permission'] for x in data_list if x.get('status',None) == 'granted']
-                    else: # legacy data
-                        return [k for k,v in data_list[0].iteritems() if v]
-                self.active_session.player.facebook_permissions = parse_facebook_permissions(self.facebook_profile['permissions']['data'])
+        if result is not None:
+            pass # caller supplied pre-parsed result
         else:
-            self.facebook_name = '(Facebook API error)'
-            self.facebook_first_name = 'Unknown(fbapierr)'
+            result = SpinJSON.loads(raw_result)
 
-        if retmsg is None:
-            if self.active_session:
-                retmsg = self.active_session.outgoing_messages
+        if dest == 'friends':
+            self.facebook_friends = result
+            self.populate_friends_who_play(session)
 
-        if retmsg is not None:
-            retmsg.append(["FACEBOOK_NAME_UPDATE", self.facebook_name])
-            if self.active_session:
-                retmsg.append(["PLAYER_UI_NAME_UPDATE", self.get_ui_name(self.active_session.player)])
+        elif dest == 'likes':
+            self.facebook_likes = result
+            session.player.user_facebook_likes = self.facebook_likes
 
-            self.populate_friends_who_play(retmsg)
+        elif dest == 'profile':
+            if type(result) == dict and len(result) > 0:
+                self.facebook_profile = result
 
-            retmsg.append(["FACEBOOK_CURRENCY_UPDATE", self.facebook_currency])
+                # only check for promo on non-cached result
+                if ('is_eligible_promo' in result) and bool(result['is_eligible_promo']) and \
+                   session.player.get_any_abtest_value('enable_payer_promo', gamedata['enable_payer_promo']) and \
+                   session.player.get_any_abtest_value('currency', gamedata['currency']) == 'gamebucks' and \
+                   (server_time - session.player.last_payer_promo) >= gamedata['payer_promo_interval'] and \
+                   session.player.tutorial_state == "COMPLETE" and \
+                   session.player.history.get('logged_in_times',0) >= gamedata['payer_promo_min_logins']:
+                    self.offer_payer_promo(session)
 
-            if self.facebook_third_party_id:
-                retmsg.append(["FACEBOOK_THIRD_PARTY_ID_UPDATE", self.facebook_third_party_id])
+            else:
+                gamesite.exception_log.event(server_time, ('Facebook sent bad profile data for user %d: ' % self.user_id)+repr(raw_result))
+                # note: continue to use previous profile data
 
-            if self.active_session:
-                player = self.active_session.player
+            # set safe defaults in case of failure
+            self.facebook_currency = {'user_currency': 'Facebook Credits', 'currency_exchange': 1, 'currency_exchange_inverse': 1, 'currency_offset': 1}
+            session.player.facebook_permissions = []
+
+            # pull vital fields out of the cached facebook_profile
+            if self.facebook_profile:
+                if 'name' in self.facebook_profile:
+                    self.facebook_name = self.facebook_profile['name']
+                if 'first_name' in self.facebook_profile:
+                    self.facebook_first_name = self.facebook_profile['first_name']
+                else:
+                    self.facebook_first_name = self.facebook_name.split(' ')[0]
 
                 if 'birthday' in self.facebook_profile:
                     try:
                         m, d, y = map(int, self.facebook_profile['birthday'].split('/'))
                         self.birthday = SpinConfig.cal_to_unix((y,m,d))
                     except Exception:
-                        gamesite.exception_log.event(server_time, 'could not parse player %d FB facebook_profile birthday "%s"' % (player.user_id, self.facebook_profile['birthday']))
+                        gamesite.exception_log.event(server_time, 'could not parse player %d FB facebook_profile birthday "%s"' % (self.user_id, self.facebook_profile['birthday']))
                         pass
+                if 'currency' in self.facebook_profile:
+                    self.facebook_currency = self.facebook_profile['currency']
+                if 'third_party_id' in self.facebook_profile:
+                    self.facebook_third_party_id = self.facebook_profile['third_party_id']
+                if ('permissions' in self.facebook_profile) and self.active_session and ('data' in self.facebook_profile['permissions']) and (len(self.facebook_profile['permissions']['data']) > 0):
+                    def parse_facebook_permissions(data_list):
+                        if 'permission' in data_list[0]: # current API
+                            return [x['permission'] for x in data_list if x.get('status',None) == 'granted']
+                        else: # legacy data
+                            return [k for k,v in data_list[0].iteritems() if v]
+                    session.player.facebook_permissions = parse_facebook_permissions(self.facebook_profile['permissions']['data'])
+            else:
+                self.facebook_name = '(Facebook API error)'
+                self.facebook_first_name = 'Unknown(fbapierr)'
 
-                # see if we need to ask for more permissions
-                want_permissions = SpinConfig.config.get('facebook_auth_scope', 'email')
-                if gamedata['server'].get('gameserver_check_auth_scope', False) and \
-                   (not self.facebook_permissions_ok(want_permissions)) and \
-                   (server_time - player.last_permissions_request) >= gamedata['permissions_request_interval']:
-                    player.last_permissions_request = server_time
-                    metric_event_coded(self.user_id, '0035_request_permission_add_scope', {'scope': want_permissions, 'method': 'gameserver'})
-                    retmsg.append(["INVOKE_FACEBOOK_AUTH", want_permissions,
-                                   'Permission Requested',
-                                   'Commander, to show your scores on Facebook we need additional authorization.'])
+            session.send([["FACEBOOK_NAME_UPDATE", self.facebook_name]])
+            session.send([["PLAYER_UI_NAME_UPDATE", self.get_ui_name(session.player)]])
+            session.send([["FACEBOOK_CURRENCY_UPDATE", self.facebook_currency]])
 
-                elif self.fb_is_eligible_promo and \
-                   player.get_any_abtest_value('enable_payer_promo', gamedata['enable_payer_promo']) and \
-                   player.get_any_abtest_value('currency', gamedata['currency']) == 'gamebucks' and \
-                   (server_time - player.last_payer_promo) >= gamedata['payer_promo_interval'] and \
-                   player.tutorial_state == "COMPLETE" and \
-                   player.history.get('logged_in_times',0) >= gamedata['payer_promo_min_logins']:
-                    self.offer_payer_promo(self.active_session, retmsg)
+            if self.facebook_third_party_id:
+                session.send([["FACEBOOK_THIRD_PARTY_ID_UPDATE", self.facebook_third_party_id]])
 
-        # note: userdb entry is stored on logout only now, to cut down on I/O
+            # see if we need to ask for more permissions
+            want_permissions = SpinConfig.config.get('facebook_auth_scope', 'email')
+            if gamedata['server'].get('gameserver_check_auth_scope', False) and \
+               (not self.facebook_permissions_ok(want_permissions)) and \
+               (server_time - session.player.last_permissions_request) >= gamedata['permissions_request_interval']:
+                session.player.last_permissions_request = server_time
+                metric_event_coded(self.user_id, '0035_request_permission_add_scope', {'scope': want_permissions, 'method': 'gameserver'})
+                session.send([["INVOKE_FACEBOOK_AUTH", want_permissions,
+                               'Permission Requested',
+                               'Commander, to show your scores on Facebook we need additional authorization.']])
 
 
-
-    def offer_payer_promo(self, session, retmsg):
+    def offer_payer_promo(self, session):
         session.player.last_payer_promo = server_time
         currency_url = OGPAPI_instance.get_object_endpoint({'type':OGPAPI.object_type('gamebucks')})
         session.increment_player_metric('payer_promo_offered', 1)
         metric_event_coded(session.user.user_id, '4500_payer_promo_offered', {'currency_url':currency_url})
-        retmsg.append(["OFFER_PAYER_PROMO", currency_url])
+        session.send([["OFFER_PAYER_PROMO", currency_url]])
 
     def log_adnetwork_event(self, api, props):
         props['account_creation_time'] = self.account_creation_time
@@ -16375,7 +16323,7 @@ class GAMEAPI(resource.Resource):
                 retmsg.append(["PLAYER_AURAS_UPDATE", session.player.player_auras])
 
             if (session.viewing_player.is_ai() or session.incoming_attack_data) and (outcome == 'victory'):
-                session.user.repopulate_ai_list(retmsg)
+                session.user.repopulate_ai_list(session)
 
             # update score_foo history fields for leaderboard rankings
             if (not session.player.isolate_pvp):
@@ -17522,7 +17470,7 @@ class GAMEAPI(resource.Resource):
         retmsg.append(["COMPLETED_QUEST", quest.name, qdata])
 
         # some quests may reveal new AI enemies on completion
-        session.user.repopulate_ai_list(retmsg)
+        session.user.repopulate_ai_list(session)
 
         props = {'quest':quest.name,
                  'sum': session.player.get_denormalized_summary_props('brief')
@@ -22415,7 +22363,7 @@ class GAMEAPI(resource.Resource):
                 needs_daily_attack = True
 
         if session.user.frame_platform == 'fb':
-            user.retrieve_facebook_info(retmsg)
+            user.retrieve_facebook_info(session)
             user.retrieve_facebook_requests_start()
             user.retrieve_facebook_credit_info_start()
 
@@ -22625,7 +22573,7 @@ class GAMEAPI(resource.Resource):
             retmsg.append(["ALLIANCE_JOIN_REQUESTS", alliance_join_requests, pcache_data])
 
         # check cache and begin background retrieval of user's Facebook info
-        user.populate_friends_who_play(retmsg)
+        user.populate_friends_who_play(session)
 
         # send applicable daily messages
         session.player.get_daily_messages(session, retmsg)
