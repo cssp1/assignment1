@@ -1360,7 +1360,7 @@ var refresh_chat_report_row = function(row, item, time_now) {
 
 var translate_chat_report = function(item) {
     send_request('chat', 'translate', {'text': item['context'], 'to_language': 'en'}, (function(_item) { return function(result) {
-        alert("Google Translate says this is language \"%source_language\" and means:\n\n%translation".replace('%source_language', ('source_language' in result ? result['source_language'] : 'unknown')).replace('%translation',result['translation']));
+        display_response("Google Translate says this is language <b>%source_language</b> and means:<p>%translation".replace('%source_language', ('source_language' in result ? result['source_language'] : 'unknown')).replace('%translation',result['translation']));
     }; })(item));
 };
 
@@ -1373,7 +1373,7 @@ var resolve_chat_report = function(row, item, action) {
                          cur_chat_reports = cur_chat_reports.filter(function(other) { return other['id'] !== _item['id']; });
 
                          if(_action == 'violate') {
-                             alert("Success!\n"+result.toString());
+                             display_response("Success!\n"+result.toString());
 
                              // clear unresolved reports that refer to things said before this violation
                              cur_chat_reports = cur_chat_reports.filter(function(other) {
