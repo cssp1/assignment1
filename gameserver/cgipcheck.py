@@ -231,7 +231,7 @@ def filter_chat_report_list(reports):
 
     return filter(lambda x:
                   (not x.get('resolved')) and # unresolved
-                  (x['time'] > latest_violations.get(report['target_id'],-1)), # no later violation
+                  (x['time'] > latest_violations.get(x['target_id'],-1)), # no later violation
                   reports)
 
 def do_action(path, method, args, spin_token_data, nosql_client):
