@@ -366,6 +366,7 @@ class HandleClearCooldown(Handler):
 
 class HandleCooldownTogo(Handler):
     read_only = True
+    need_user = False
     # note: returns duration remaining
     # note: no logging, directly override exec()
     def exec_online(self, session, retmsg):
@@ -378,6 +379,7 @@ class HandleCooldownTogo(Handler):
 
 class HandleCooldownActive(Handler):
     read_only = True
+    need_user = False
     # note: returns number of active stacks
     # note: no logging, directly override exec()
     def exec_online(self, session, retmsg):
@@ -391,6 +393,7 @@ class HandleCooldownActive(Handler):
         return ReturnValue(result = stacks)
 
 class HandleTriggerCooldown(Handler):
+    need_user = False
     def __init__(self, *args, **kwargs):
         Handler.__init__(self, *args, **kwargs)
         self.cd_name = self.args['name']
@@ -473,6 +476,10 @@ class HandleApplyAura(HandleApplyOrRemoveAura):
         return ReturnValue(result = 'ok')
 
 class HandleChatGag(Handler):
+    def __init__(self, *args, **kwargs):
+        Handler.__init__(self, *args, **kwargs)
+        if 'duration' in self.args:
+            self.need_user = False
     def do_exec_online(self, session, retmsg):
         if 'duration' in self.args:
             # new-style gag
@@ -517,6 +524,7 @@ class HandleChatUngag(Handler):
         return ReturnValue(result = 'ok')
 
 class MessageSender(Handler):
+    need_user = False
     def get_msg_id(self): return str(self.time_now)+'-'+str(int(1000*random.random()))
     def make_message(self): raise Exception('implement this')
     def do_exec_online(self, session, retmsg):
