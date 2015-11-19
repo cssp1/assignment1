@@ -161,9 +161,17 @@ def chat_abuse_clear(control_args):
     return "Player was unmuted and reduced to %d chat offense(s)." % new_stacks
 
 def chat_abuse_violate(control_args):
-    check_stacks_args = control_args.copy()
-    check_stacks_args.update({'method': 'cooldown_active', 'name': 'chat_abuse_violation'})
-    active_stacks = max(do_CONTROLAPI_checked(check_stacks_args), 0)
+    # query current repeat-offender stacks and gag status
+    check_args = control_args.copy()
+    check_args.update({'method': 'player_batch', 'batch': SpinJSON.dumps([{'method': 'cooldown_active', 'args': {'name': 'chat_abuse_violation'}},
+                                                                          {'method': 'aura_active', 'args': {'aura_name': 'chat_gagged'}}])})
+    check_result = do_CONTROLAPI_checked(check_args)
+    active_stacks = max(check_result[0], 0)
+    is_gagged_now = bool(check_result[1])
+
+    if is_gagged_now:
+        return "Player is currently muted, perhaps because of a recent violation.\nNo action taken."
+
     # for policy see https://sites.google.com/a/spinpunch.com/support/about-zendesk/chat-moderation-process
     # active_stacks 0 -> message and 24h mute
     # active_stacks 1 -> message and 48h mute

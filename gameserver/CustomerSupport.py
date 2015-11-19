@@ -475,6 +475,21 @@ class HandleApplyAura(HandleApplyOrRemoveAura):
             player['player_auras'].append(aura)
         return ReturnValue(result = 'ok')
 
+class HandleAuraActive(Handler):
+    read_only = True
+    need_user = False
+    # note: no logging, directly override exec()
+    def exec_online(self, session, retmsg):
+        return ReturnValue(result = self.aura_active(session.player.player_auras, self.args['aura_name']))
+    def exec_offline(self, user, player):
+        return ReturnValue(result = self.aura_active(player.get('player_auras', []), self.args['aura_name']))
+    def aura_active(self, player_auras, aura_name):
+        for aura in player_auras:
+            if aura.get('end_time',-1) > 0 and aura['end_time'] < self.time_now: continue
+            if aura['spec'] == aura_name:
+                return True
+        return False
+
 class HandleChatGag(Handler):
     def __init__(self, *args, **kwargs):
         Handler.__init__(self, *args, **kwargs)
@@ -953,6 +968,7 @@ methods = {
     'trigger_cooldown': HandleTriggerCooldown,
     'apply_aura': HandleApplyAura,
     'remove_aura': HandleRemoveAura,
+    'aura_active': HandleAuraActive,
     'check_idle': HandleCheckIdle,
     'chat_gag': HandleChatGag,
     'chat_ungag': HandleChatUngag,
