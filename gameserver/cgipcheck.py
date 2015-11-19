@@ -196,26 +196,23 @@ def chat_abuse_violate(control_args):
         permanent_mute = True
         permanent_mute_alts = True
 
+    batch = []
     if add_stack:
-        add_stack_args = control_args.copy()
-        add_stack_args.update({'method': 'trigger_cooldown', 'name': 'chat_abuse_violation', 'add_stack': 1, 'duration': CHAT_ABUSE_MEMORY_DURATION})
-        assert do_CONTROLAPI_checked(add_stack_args) == 'ok'
+        batch.append({'method': 'trigger_cooldown', 'args':{'name': 'chat_abuse_violation', 'add_stack': 1, 'duration': CHAT_ABUSE_MEMORY_DURATION}})
         ui_actions.append("Offense count increased to %d" % (active_stacks + 1))
     if message_body:
-        send_message_args = control_args.copy()
-        send_message_args.update({'method': 'send_message', 'message_subject': 'Chat Warning', 'message_body': message_body})
-        assert do_CONTROLAPI_checked(send_message_args) == 'ok'
+        batch.append({'method': 'send_message', 'args':{'message_subject': 'Chat Warning', 'message_body': message_body}})
         ui_actions.append("Sent warning message")
     if temporary_mute_duration > 0:
-        temporary_mute_args = control_args.copy()
-        temporary_mute_args.update({'method': 'chat_gag', 'duration': temporary_mute_duration})
-        assert do_CONTROLAPI_checked(temporary_mute_args) == 'ok'
+        batch.append({'method': 'chat_gag', 'args':{'duration': temporary_mute_duration}})
         ui_actions.append("Muted player for %d hours" % (temporary_mute_duration / 3600))
     if permanent_mute:
-        permanent_mute_args = control_args.copy()
-        permanent_mute_args.update({'method': 'chat_gag'})
-        assert do_CONTROLAPI_checked(permanent_mute_args) == 'ok'
+        batch.append({'method': 'chat_gag'})
         ui_actions.append("Muted player permanently")
+
+    batch_args = control_args.copy()
+    batch_args.update({'method': 'player_batch', 'batch': SpinJSON.dumps(batch)})
+    assert do_CONTROLAPI_checked(batch_args) == ['ok',]*len(batch)
 
     if permanent_mute_alts or alt_message_body:
         pass # XXXXXX no handling for alts yet
@@ -505,7 +502,7 @@ def do_CONTROLAPI(args, host = None, port = None):
 def do_CONTROLAPI_checked(args):
     ret = do_CONTROLAPI(args)
     if 'error' in ret:
-        raise Exception('CONTROLAPI method failed: '+ret['error'])
+        raise Exception('CONTROLAPI method failed: ' + (ret['error'] if isinstance(ret['error'], basestring) else repr(ret['error'])))
     else:
         return ret['result']
 

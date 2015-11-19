@@ -885,6 +885,50 @@ class HandleInvokeFacebookAuth(Handler): # no logging
         session.send([["INVOKE_FACEBOOK_AUTH", scope, "Test", "Test authorization"]], flush_now = True)
         return ReturnValue(result = 'ok')
 
+class HandlePlayerBatch(Handler):
+    read_only = True
+    need_user = False
+    need_player = False
+    def __init__(self, time_now, user_id, gamedata, gamesite, args):
+        Handler.__init__(self, time_now, user_id, gamedata, gamesite, args)
+        batch = SpinJSON.loads(self.args['batch']) # [{'method': 'method0', 'args':{'foo':'bar'}}, ...]
+        self.handlers = []
+        for entry in batch:
+            handler = methods[entry['method']](time_now, user_id, gamedata, gamesite, entry.get('args',{}))
+            if not handler.read_only: self.read_only = False
+            if handler.need_user: self.need_user = True
+            if handler.need_player: self.need_player = True
+            self.handlers.append(handler)
+        self.handlers.reverse() # we're going to use pop() to pull off entries, so go back-to-front
+
+    def exec_offline(self, user, player):
+        self.results = []
+        while self.handlers:
+            h = self.handlers.pop()
+            ret = h.exec_offline(user, player)
+            assert not ret.async # XXX async case not handled
+            self.results.append(ret)
+        return self.reduce_results(self.results)
+    def exec_online(self, session, retmsg):
+        self.results = []
+        while self.handlers:
+            h = self.handlers.pop()
+            ret = h.exec_online(session, retmsg)
+            assert not ret.async # XXX async case not handled
+            self.results.append(ret)
+        return self.reduce_results(self.results)
+
+    def reduce_results(self, retlist):
+        if any(x.error for x in retlist):
+            result = None
+            error = [x.error for x in retlist]
+        else:
+            result = [x.result for x in retlist]
+            error = None
+        return ReturnValue(result = result, error = error,
+                           kill_session = any(x.kill_session for x in retlist),
+                           async = False)
+
 methods = {
     'get_raw_player': HandleGetRawPlayer,
     'get_raw_user': HandleGetRawUser,
@@ -924,5 +968,6 @@ methods = {
     'client_eval': HandleClientEval,
     'offer_payer_promo': HandleOfferPayerPromo,
     'invoke_facebook_auth': HandleInvokeFacebookAuth,
+    'player_batch': HandlePlayerBatch,
     # not implemented yet: join_abtest, clear_abtest
 }
