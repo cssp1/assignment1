@@ -805,24 +805,42 @@ class NoSQLClient (object):
         self.chat_reports_table().with_options(write_concern = pymongo.write_concern.WriteConcern(w=0)).insert_one(props)
 
     def chat_reports_get(self, start_time, end_time, reason=''):
-        return self.instrument('chat_reports_get(%s)'%reason, self._chat_reports_get, (start_time, end_time))
+        qs = {'millitime':{'$gte':datetime.datetime.utcfromtimestamp(float(start_time)),
+                           '$lt': datetime.datetime.utcfromtimestamp(float(end_time))}
+              }
+        return self.instrument('chat_reports_get(%s)'%reason, self._chat_reports_query, (qs,))
     def decode_chat_report(self, row):
         row['id'] = self.decode_object_id(row['_id']); del row['_id'] # convert native ObjectID to string
         if 'millitime' in row: # convert datetime.datetime to UNIX timestamp
             row['time'] = calendar.timegm(row['millitime'].timetuple())
             del row['millitime']
         return row
-    def _chat_reports_get(self, start_time, end_time):
-        return [self.decode_chat_report(x) for x in \
-                self.chat_reports_table().find({'millitime':{'$gte':datetime.datetime.utcfromtimestamp(float(start_time)),
-                                                             '$lt': datetime.datetime.utcfromtimestamp(float(end_time))}
-                                                })]
+    def _chat_reports_query(self, qs, limit = -1):
+        cursor = self.chat_reports_table().find(qs)
+        if limit > 0:
+            cursor = cursor.limit(limit)
+        return [self.decode_chat_report(x) for x in cursor]
 
     def chat_report_resolve(self, id, resolution, resolution_time, reason=''):
+        assert resolution in ('ignore','violate')
         return self.instrument('chat_report_resolve(%s)'%reason, self._chat_report_resolve, (id, resolution, resolution_time))
     def _chat_report_resolve(self, id, resolution, resolution_time):
         return self.chat_reports_table().update_one({'_id': self.encode_object_id(id), 'resolved': False},
                                                     {'$set': {'resolved': True, 'resolution': resolution, 'resolution_time': resolution_time}}).matched_count > 0
+
+    # check if a chat report is obsolete - i.e. there exists a later resolved-violated chat report on the same player
+    def chat_report_is_obsolete(self, id, reason=''):
+        # first look up the target report to determine its "when said" timestamp
+        target_reports = self.instrument('chat_report_is_obsolete(%s)'%reason, self._chat_reports_query, ({'_id': self.encode_object_id(id)}, 1))
+        if len(target_reports) != 1: raise Exception('cannot find report: %r' % id)
+        target_report = target_reports[0]
+        # look for any later resolved-violated chat report on the same player
+        qs = {'_id': {'$ne': self.encode_object_id(id)},
+              'millitime':{'$gte':datetime.datetime.utcfromtimestamp(float(target_report['time'] - 5))}, # add fudge margin
+              'resolved': True, 'resolution': 'violate', 'target_id': target_report['target_id']}
+
+        later_resolved_reports = self.instrument('chat_report_is_obsolete(%s)'%reason, self._chat_reports_query, (qs, 1))
+        return len(later_resolved_reports) > 0
 
 
     ###### PLAYER ALIAS UNIQUE RESERVATIONS ######
@@ -2818,14 +2836,26 @@ if __name__ == '__main__':
 
         # test chat reports
         client.chat_reports_table().drop(); client.seen_chat_reports = False
-        client.chat_report('global_en', 1112, 'Reporter', 1113, 'Target', time_now, time_now - 2, 'you are a poopyhead')
-        rep_list = client.chat_reports_get(time_now - 60, time_now + 60)
+        report_time = time_now - 2
+        client.chat_report('global_en', 1112, 'Reporter', 1113, 'Target', time_now, report_time, 'you are a poopyhead')
+        rep_list = client.chat_reports_get(time_now - 600, time_now + 600)
         assert len(rep_list) == 1
         rep = rep_list[0]
         print rep
-        assert client.chat_report_resolve(rep['id'], 'ignore', time_now) # first resolution should succeed
+        assert client.chat_report_resolve(rep['id'], 'violate', time_now) # first resolution should succeed
         assert not client.chat_report_resolve(rep['id'], 'ignore', time_now) # second attempt should fail
-        assert len(filter(lambda x: not x.get('resolved'), client.chat_reports_get(time_now - 60, time_now + 60))) == 0
+        assert len(filter(lambda x: not x.get('resolved'), client.chat_reports_get(time_now - 600, time_now + 600))) == 0
+        # add an obsolete report
+        client.chat_report('global_en', 1114, 'Reporter', 1113, 'Target', time_now, report_time-60, 'you are a poopyhead (earlier)')
+        rep_list = client.chat_reports_get(time_now - 600, time_now + 600)
+        print '---'
+        print '\n'.join([repr(x) for x in rep_list])
+        print '---'
+        for rep in rep_list:
+            if not rep.get('resolved'):
+                assert client.chat_report_is_obsolete(rep['id'])
+            else:
+                assert not client.chat_report_is_obsolete(rep['id'])
 
         # test player aliases
         client.player_alias_table().drop(); client.seen_player_aliases = False

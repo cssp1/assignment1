@@ -391,14 +391,17 @@ def do_action(path, method, args, spin_token_data, nosql_client):
                     result = {'result': nosql_client.chat_report_resolve(args['id'], 'ignore', time_now)}
                 elif args['action'] == 'violate':
                     if not nosql_client.chat_report_resolve(args['id'], 'violate', time_now): # start here to avoid race condition
-                        raise Exception('race condition - this report was already resolved')
-                    control_args = args.copy()
-                    control_args['user_id'] = args['user_id'] # trusting the client - but they have the power to violate anyone anyway.
-                    if 'spin_token' in control_args: # do not pass credentials along
-                        del control_args['spin_token']
-                    control_args['spin_user'] = spin_token_data['spin_user']
-                    violate_result = chat_abuse_violate(control_args)
-                    result = {'result': violate_result}
+                        result = {'result': 'This report has already been resolved, perhaps by another PCHECK user.'}
+                    elif nosql_client.chat_report_is_obsolete(args['id']):
+                        result = {'result': 'This report is obsolete. The player has already been punished for a more recent report.'}
+                    else:
+                        control_args = args.copy()
+                        control_args['user_id'] = args['user_id'] # trusting the client - but they have the power to violate anyone anyway.
+                        if 'spin_token' in control_args: # do not pass credentials along
+                            del control_args['spin_token']
+                        control_args['spin_user'] = spin_token_data['spin_user']
+                        violate_result = chat_abuse_violate(control_args)
+                        result = {'result': violate_result}
             elif method == 'translate':
                 # use Google Translate API conventions
                 from_language = args.get('from_language', None)
