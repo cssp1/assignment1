@@ -1521,6 +1521,8 @@ class NoSQLClient (object):
             props['base_map_path_eta'] = props['base_map_path'][-1]['eta']
         elif 'base_map_path' in props:
             del props['base_map_path']
+        # hack - for client-side propagation only, don't write to the DB
+        if 'preserve_locks' in props: del props['preserve_locks']
         self.region_table(region, 'map').update_one({'_id':base_id}, {'$set': props}, upsert = False)
 
     def create_map_feature(self, region, base_id, props, exclusive = -1, exclude_filter = None, originator=None, do_hook = True, reason=''):
@@ -1756,6 +1758,9 @@ class NoSQLClient (object):
                                                                   {'base_map_path':{'$all':[{'$elemMatch': {'eta': {'$lt': self.time}}}]}}
                                                                   ]},
                                                          {'$unset':{'base_map_path':1}})
+        if 1: # clean up legacy features that have a field that should not have been written to the DB
+            self.region_table(region, 'map').update_many({'preserve_locks': {'$exists':True}},
+                                                         {'$unset':{'preserve_locks':1}})
 
     ###### MAP OBJECTS (FIXED/MOBILE) TABLES ######
 
