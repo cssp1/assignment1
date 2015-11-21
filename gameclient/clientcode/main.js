@@ -36082,7 +36082,6 @@ function invoke_buy_gamebucks_dialog23(ver, reason, amount, order) {
     dialog.user_data['topup_bucks'] = topup_bucks;
     dialog.user_data['any_sku_has_bonus'] = 0;
     dialog.user_data['max_displayed_quantity'] = 0;
-    dialog.user_data['expire_time'] = -1; // for UI display on invidiual SKUs
     dialog.user_data['context'] = null; // inventory_context
 
     // construct slate of SKUs from fixed-price bundles
@@ -36257,6 +36256,7 @@ function update_buy_gamebucks_dialog23(dialog) {
 
 function update_buy_gamebucks_dialog23_warning_text(dialog) {
     // set dialog "warning" text and expire_time
+    // note: this uses the ui_buy_gamebucks_warning cond chain, which is separate from per-SKU expire_times
     var ui_warning = null, expire_time = -1;
     for(var i = 0; i < gamedata['store']['ui_buy_gamebucks_warning'].length; i++) {
         var pred = read_predicate(gamedata['store']['ui_buy_gamebucks_warning'][i][0]);
@@ -36267,7 +36267,6 @@ function update_buy_gamebucks_dialog23_warning_text(dialog) {
             break;
         }
     }
-    dialog.user_data['expire_time'] = expire_time;
 
     if(ui_warning) {
         if(ui_warning.indexOf('%togo') >= 0) {
@@ -36284,13 +36283,28 @@ function update_buy_gamebucks_dialog23_warning_text(dialog) {
     }
 }
 
+/** Get the UI-visible expire time for an active BUY_GAMEBUCKS sku spell
+    @param {!Object} spell
+    @return {number} */
+function gamebucks_spell_ui_expire_time(spell) {
+    var expire_time = -1;
+    goog.array.forEach(['show_if', 'requires'], function(pred_name) {
+        if(pred_name in spell) {
+            var t = read_predicate(spell[pred_name]).ui_expire_time(player);
+            if(t > 0) {
+                expire_time = (expire_time > 0 ? Math.min(expire_time, t) : t);
+            }
+        }
+    });
+    return expire_time;
+}
+
 function update_buy_gamebucks_sku23(dialog) {
     // info needed from the parent/context
     // note: callbacks also look at parent's user_data['pending']
     var pending = (dialog.parent && ('pending' in dialog.parent.user_data) ? dialog.parent.user_data['pending'] : false);
     var any_sku_has_bonus = (dialog.parent && ('any_sku_has_bonus' in dialog.parent.user_data) ? dialog.parent.user_data['any_sku_has_bonus'] : 0);
     var max_displayed_quantity = (dialog.parent && ('max_displayed_quantity' in dialog.parent.user_data) ? dialog.parent.user_data['max_displayed_quantity'] : 0);
-    var expire_time = (dialog.parent && ('expire_time' in dialog.parent.user_data) ? dialog.parent.user_data['expire_time'] : -1);
     var topup_bucks = (dialog.parent && ('topup_bucks' in dialog.parent.user_data) ? dialog.parent.user_data['topup_bucks'] : -1);
     var order = (dialog.parent && ('order' in dialog.parent.user_data) ? dialog.parent.user_data['order'] : null);
     dialog.user_data['ver'] = (dialog.parent && ('ver' in dialog.parent.user_data) ? dialog.parent.user_data['ver'] : -1);
@@ -36431,6 +36445,8 @@ function update_buy_gamebucks_sku23(dialog) {
     }
 
     // display expire time, if applicable
+    var expire_time = gamebucks_spell_ui_expire_time(spell);
+
     if(dialog.data['widgets']['expire_time']['show'] && expire_time > 0) {
         dialog.widgets['expire_time'].show = true;
         dialog.widgets['comment'].show = false;
