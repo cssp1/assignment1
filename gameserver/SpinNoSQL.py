@@ -1430,7 +1430,7 @@ class NoSQLClient (object):
             del props['base_map_path']
 
         # omit unwanted fields
-        for UNWANTED in ('base_map_loc_flat','base_map_path_eta'):
+        for UNWANTED in ('base_map_loc_flat','base_map_path_eta','preserve_locks'):
             if UNWANTED in props: del props[UNWANTED]
 
         return props
