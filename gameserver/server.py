@@ -10665,7 +10665,9 @@ class Player(AbstractPlayer):
                 session.send([["PLAYER_AURAS_UPDATE" if self is session.player else "ENEMY_AURAS_UPDATE", self.player_auras]])
 
             gamesite.pcache_client.player_cache_update(self.user_id, {'protection_end_time': new_end_time if new_end_time > server_time else None}, reason = 'set_protection_end_time')
-            if self.is_on_map(): # XXX double-check that this is actually safe
+
+            # XXXXXX this causes desync issues
+            if gamedata['server'].get('update_map_feature_on_protection_time_change',False) and self.is_on_map():
                 gamesite.nosql_client.update_map_feature(self.my_home.base_region, self.my_home.base_id,
                                                          {'protection_end_time': new_end_time if new_end_time > server_time else None,
                                                           'preserve_locks': 1}, reason = 'set_protection_end_time')
