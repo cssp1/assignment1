@@ -808,13 +808,19 @@ function GamedataVarPredicate(data, name, value, method) {
     this.method = method || '==';
 }
 goog.inherits(GamedataVarPredicate, Predicate);
-GamedataVarPredicate.prototype.is_satisfied = function(player, qdata) {
-    var path = this.name.split('.');
+/** Perform lookup of a gamedata variable. May return a cond chain.
+    @private */
+GamedataVarPredicate.prototype.get_value = function(player, varname) {
+    var path = varname.split('.');
     var v = gamedata;
     for(var i = 0; i < path.length; i++) {
-        if(!(path[i] in v)) { throw Error('lookup of undefined var "'+this.name+'"'); }
+        if(!(path[i] in v)) { throw Error('lookup of undefined var "'+varname+'"'); }
         v = v[path[i]];
     }
+    return v;
+};
+GamedataVarPredicate.prototype.is_satisfied = function(player, qdata) {
+    var v = this.get_value(player, this.name);
     var test_value = eval_cond_or_literal(v, player, null);
     if(this.method == '==') {
         return test_value == this.value;
@@ -823,6 +829,23 @@ GamedataVarPredicate.prototype.is_satisfied = function(player, qdata) {
     } else {
         throw Error('unknown method '+this.method);
     }
+};
+GamedataVarPredicate.prototype.ui_expire_time = function(player) {
+    var etime = -1;
+    var v = this.get_value(player, this.name);
+    if(is_cond_chain(v)) {
+        var chain = v;
+        // return expire time of the first true predicate
+        for(var i = 0; i < chain.length; i++) {
+            var pred = read_predicate(chain[i][0]);
+            if(pred.is_satisfied(player, null)) {
+                var t = pred.ui_expire_time(player);
+                etime = (etime > 0 ? Math.min(etime, t) : t);
+                break;
+            }
+        }
+    }
+    return etime;
 };
 
 /** @constructor
@@ -1097,6 +1120,7 @@ goog.inherits(CountryPredicate, Predicate);
 CountryPredicate.prototype.is_satisfied = function(player, qdata) {
     return goog.array.contains(this.countries, player.country);
 };
+CountryPredicate.prototype.ui_expire_time = function(player) { return -1; };
 
 /** @constructor
   * @extends Predicate */
@@ -1903,8 +1927,21 @@ function eval_cond(chain, player, qdata) {
     return null;
 }
 
-// evaluate a "cond" expression that might also be a literal value
 /** @param {?} qty
+    @return {boolean} */
+function is_cond_chain(qty) {
+    if((typeof qty) == 'undefined') {
+        throw Error('is_cond_chain of undefined');
+    }
+    // if it's a list, treat it as a cond chain, otherwise assume it's a literal
+    return (qty && (typeof qty === 'object') && (qty instanceof Array) &&
+        // exception: if it's a list and the first element is not itself a list, treat it as a literal
+        // (this happens with e.g. ai_ambush_progression_showcase with "progression_reward_items"
+            !(qty.length > 0 && !(qty[0] instanceof Array)));
+}
+
+/** Evaluate a "cond" expression that might also be a literal value
+    @param {?} qty
     @param {Object} player
     @param {Object=} qdata */
 function eval_cond_or_literal(qty, player, qdata) {
@@ -1912,15 +1949,9 @@ function eval_cond_or_literal(qty, player, qdata) {
         throw Error('eval_cond_or_literal of undefined');
     }
 
-    // if it's a list, treat it as a cond chain, otherwise assume it's a literal
-    if(qty && (typeof qty === 'object') && (qty instanceof Array)) {
-
-        // exception: if it's a list and the first element is not itself a list, treat it as a literal
-        // (this happens with e.g. ai_ambush_progression_showcase with "progression_reward_items"
-        if(qty.length > 0 && !(qty[0] instanceof Array)) {
-            return qty;
-        }
+    if(is_cond_chain(qty)) {
         return eval_cond(qty, player, qdata);
+    } else {
+        return qty;
     }
-    return qty;
 }
