@@ -11821,6 +11821,29 @@ function update_combat_damage_bar(dialog) {
         if(dialog.user_data['base_damage_server_flags']['is_ladder_win'] && !dialog.user_data['base_damage_client_flags']['is_ladder_win']) {
             dialog.user_data['base_damage_client_flags']['is_ladder_win'] = dialog.user_data['base_damage_server_flags']['is_ladder_win'];
             var points = dialog.user_data['base_damage_client_flags']['ladder_win_points'] = dialog.user_data['base_damage_server_flags']['ladder_win_points'];
+            // note: this is the MAX point count for a win - it might need to be scaled down by base damage
+
+            var trophy_type = (player.is_ladder_player() || player.current_trophy_pvp_challenge_name() ? 'pvp' : 'pve');
+            var max_win = 0, min_win = 0, win_scale_by = null;
+            goog.array.forEach(player.player_auras, function(aura) {
+                var spec = gamedata['auras'][aura['spec']];
+                var cons = spec['on_battle_end_victory'] || spec['on_battle_end_defeat'] || null;
+                if(cons && cons['consequent'] == 'GIVE_TROPHIES' && cons['trophy_kind'] == trophy_type) {
+                    var method = cons['method'] || '+';
+                    var stack = ('stack' in aura ? aura['stack'] : 1);
+                    if(method == '+') {
+                        max_win += stack;
+                        win_scale_by = cons['scale_by'] || null;
+                        min_win = Math.max(min_win, cons['min_amount'] || 0);
+                    }
+                }
+            });
+            // points = max_win; ?
+            if(win_scale_by == 'base_damage') {
+                points = Math.floor(points * base_damage + 0.5);
+                points = Math.max(points, min_win);
+            }
+
             SPFX.add_ui(new SPFX.CombatText(vec_add(vec_add(dialog.xy, dialog.widgets['damage_prog'].xy), transform_text_offset(dialog.data['widgets']['damage_prog']['victory_text_offset'])), 0,
                                             gamedata['strings']['combat_messages']['ladder_victory'+(points==1 ? '':'_plural')].replace('%d', points.toString()),
                                             [1,1,0], null, 3.0,
