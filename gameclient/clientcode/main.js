@@ -11670,8 +11670,9 @@ function invoke_combat_damage_bar() {
     dialog.user_data['base_damage_server'] = 0;
     dialog.user_data['base_damage_server_flags'] = {};
     dialog.user_data['base_damage_client_flags'] = {};
-    dialog.user_data['base_damage_ping_pending'] = false;
-    dialog.user_data['base_damage_ping_time'] = 0;
+    dialog.user_data['base_damage_ping_pending'] = 0; // amount of base_damage client saw when last ping was sent
+    dialog.user_data['base_damage_ping_send_time'] = 0;
+    dialog.user_data['base_damage_ping_recv_time'] = 0;
     dialog.ondraw = update_combat_damage_bar;
     return dialog;
 }
@@ -11745,6 +11746,8 @@ function update_combat_damage_bar(dialog) {
     if(session.has_deployed && !visit_base_pending &&
        (session.viewing_base.base_landlord_id != session.user_id) && (session.viewing_base.base_type == 'home')) {
 
+        var need_base_damage_ping_for_battle_star = -1; // base_damage threshold for most recent battle star client thinks it deserves
+
         if('battle_stars' in gamedata) {
             var i = 0;
             for(var name in gamedata['battle_stars']) {
@@ -11756,6 +11759,9 @@ function update_combat_damage_bar(dialog) {
                         dialog.user_data['battle_star_'+name+'_pending'] = 1;
                         flush_dirty_objects({buildings_only:true, skip_check:true});
                         send_to_server.func(["CLAIM_BATTLE_STAR", name]);
+                        if(gamedata['matchmaking']['ladder_win_condition']=='battle_stars') {
+                            need_base_damage_ping_for_battle_star = base_damage;
+                        }
                     }
                 } else {
                     // server says we have it now, announce it if we haven't announced it yet
@@ -11799,22 +11805,39 @@ function update_combat_damage_bar(dialog) {
         }
 
         // figure out if we want to do a base damage ping
-        // note: assumes ladder_win_damage is <= lowest ladder_protection threshold
-        if((FORCE_BASE_DAMAGE_PING || (session.is_ladder_battle() && base_damage >= gamedata['matchmaking']['ladder_win_damage'])) &&
-           !dialog.user_data['base_damage_ping_pending'] &&
-           (client_time - dialog.user_data['base_damage_ping_time']) > gamedata['client']['base_damage_ping_interval']) {
 
-            if(FORCE_BASE_DAMAGE_PING || Math.abs(base_damage-dialog.user_data['base_damage_server']) > 0.0001) {
-                // send ping request
-                dialog.user_data['base_damage_ping_pending'] = true;
-                flush_dirty_objects({buildings_only:true, skip_check:true});
-                var damaged_objects = null;
-                if(gamedata['client']['base_damage_ping_detail']) {
-                    damaged_objects = do_calc_base_damage({detail:true})[1];
-                }
-                send_to_server.func(["PING_BASE_DAMAGE", session.viewing_base.base_id, base_damage, damaged_objects, session.viewing_base.power_state]);
+        // highest damage amount for which we have an acknowledged or in-flight request
+        var last_request_damage = dialog.user_data['base_damage_ping_pending'];
+
+        // highest damage amount we need to know about (critical thresholds for win, battle star, and protection)
+        var want_damage = 0;
+        if(base_damage >= 1) { want_damage = Math.max(want_damage, base_damage); }
+        if(session.is_ladder_battle() && (base_damage >= gamedata['matchmaking']['ladder_win_damage'])) { want_damage = Math.max(want_damage, gamedata['matchmaking']['ladder_win_damage']); }
+        goog.array.forEach(['ladder_bonus_damage', 'ladder_protection'], function(kind) {
+            if(kind in gamedata['matchmaking']) {
+                goog.array.forEach(gamedata['matchmaking'][kind], function(entry, i) {
+                    if(entry[0] > 0) {
+                        if(base_damage >= entry[0]) { want_damage = Math.max(want_damage, entry[0]); }
+                    }
+                });
             }
+        });
+        want_damage = Math.max(want_damage, need_base_damage_ping_for_battle_star);
+        var is_out_of_sync = (Math.abs(base_damage - dialog.user_data['base_damage_server']) > 0.0001);
 
+        if(last_request_damage < want_damage ||
+           (is_out_of_sync && (client_time - dialog.user_data['base_damage_ping_send_time'] > gamedata['client']['base_damage_ping_interval']))) {
+
+            // send ping request
+            dialog.user_data['base_damage_ping_pending'] = base_damage;
+            dialog.user_data['base_damage_ping_send_time'] = client_time;
+            flush_dirty_objects({buildings_only:true, skip_check:true});
+            var damaged_objects = null;
+            if(gamedata['client']['base_damage_ping_detail']) {
+                damaged_objects = do_calc_base_damage({detail:true})[1];
+            }
+            send_to_server.func(["PING_BASE_DAMAGE", session.viewing_base.base_id, base_damage, damaged_objects, session.viewing_base.power_state]);
+            //console.log('last_request_damage '+last_request_damage.toString()+' want_damage '+want_damage.toString()+' base_damage '+base_damage.toString()+' out_of_sync '+is_out_of_sync.toString());
         }
 
         // show new base-damage-related state
@@ -44864,10 +44887,9 @@ function handle_server_message(data) {
     } else if(msg == "PING_BASE_DAMAGE_RESULT") {
         var base_id = data[1], base_damage = data[2], damage_flags = data[3];
         if(base_id != session.viewing_base.base_id || base_damage < 0 || damage_flags === null) { return; }
-        var bars = desktop_dialogs['combat_resource_bars'];
+        var bars = desktop_dialogs['combat_damage_bar'];
         if(!bars) { return; }
-        bars.user_data['base_damage_ping_pending'] = false;
-        bars.user_data['base_damage_ping_time'] = client_time;
+        bars.user_data['base_damage_ping_recv_time'] = client_time;
         bars.user_data['base_damage_server'] = base_damage;
         bars.user_data['base_damage_server_flags'] = damage_flags;
     } else if(msg == "MANUFACTURE_OVERFLOW_TO_RESERVES") {

@@ -108,7 +108,7 @@
         "player_ping_interval": 29.0, // max number of seconds between automatic PING_PLAYER requests
         "combat_state_save_interval": 44.0, // max number of seconds between flushing dirty position/HP values with OBJECT_COMBAT_STATES message
         "unit_repair_ping_interval": 8.0, // min number of seconds between UNIT_REPAIR_TICK requests when looking for completed repairs
-        "base_damage_ping_interval": 5.0, // min number of seconds between pings of base damage during ladder battles
+        "base_damage_ping_interval": 10.0, // min number of seconds between PING_BASE_DAMAGE when used for non-critical synchronization
         "base_damage_ping_detail": true, // whether to send detailed info with the base damage ping, for debugging only
 
         "quarry_collect_poll_interval": -1, // delay before polling for quarry collect results after a Collect All, in seconds (no longer needed since quarry collection is synchronous in NoSQL-land)
