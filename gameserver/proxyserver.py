@@ -18,7 +18,7 @@ if sys.platform == 'linux2':
     from twisted.internet import epollreactor
     epollreactor.install()
 
-from twisted.internet import reactor, task, defer, protocol
+from twisted.internet import reactor, task, defer, protocol, utils
 from twisted.web import proxy, resource, static, http, twcgi
 import twisted.web.error
 import twisted.web.server
@@ -606,6 +606,26 @@ def send_payment_dispute_notification(response, user_id, dry_run = False):
     if dry_run: args.append('--dry-run')
     reactor.spawnProcess(PaymentDisputeProcess(exe, response), exe, args=args, env=os.environ)
 
+# call scmtool to get the SCM version, then send a status notification
+@defer.inlineCallbacks
+def send_proxyserver_status_notification(status_json):
+    if 'server_status_recipients' not in SpinConfig.config: return
+    scm_version_root = yield utils.getProcessOutput('../scmtool.sh', args=['git-version'], env=os.environ)
+    scm_version_root = scm_version_root.strip()[0:8] # truncate git checksum
+    scm_version_gamedata = yield utils.getProcessOutput('../scmtool.sh', args=['git-version', 'gamedata/%s' % SpinConfig.game().encode('ascii')], env=os.environ)
+    scm_version_gamedata = scm_version_gamedata.strip()[0:8] # truncate git checksum
+    exe = './SpinReminders.py'
+    args = ['--from', '%s proxyserver' % SpinConfig.game_id_long(),
+            '--subject', 'Update deployed',
+            '--body', 'Now serving engine version %s, %s gamedata version %s (builds: gamedata "%s" gameclient "%s")' % \
+            (scm_version_root,
+             SpinConfig.game().upper().encode('ascii'),
+             scm_version_gamedata,
+             status_json['gamedata_build'].encode('ascii'),
+             status_json['gameclient_build'].encode('ascii')),
+            '--recipients', SpinJSON.dumps(SpinConfig.config['server_status_recipients'])]
+    ret = yield utils.getProcessValue(exe, args=args, env=os.environ)
+    defer.returnValue(ret)
 
 class GameProxy(proxy.ReverseProxyResource):
     proxyClientFactoryClass = GameProxyClientFactory
@@ -2748,6 +2768,7 @@ def reconfig():
         status_json = admin_stats.get_server_status_json()
         if db_client:
             db_client.server_status_update('proxyserver', status_json, reason='reconfig')
+        send_proxyserver_status_notification(status_json)
         return {'result':status_json}
     except:
         msg = traceback.format_exc()
@@ -2863,6 +2884,8 @@ def do_main():
     signal.signal(signal.SIGHUP, handle_SIGHUP)
 
     print 'Proxy server up and running on ports %d (HTTP) %d (SSL)' % (myport_http, myport_ssl)
+
+    send_proxyserver_status_notification(admin_stats.get_server_status_json())
 
     if proxy_daemonize:
         Daemonize.daemonize()

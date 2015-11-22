@@ -6,7 +6,7 @@
 
 # utility for sending out reminders via email or hipchat, used by dev_reminders.py and report_slow_mysql.py
 
-import smtplib, urllib, urllib2, getpass, os
+import smtplib, urllib, urllib2, getpass, os, time
 from email.mime.text import MIMEText
 from email.header import Header
 import SpinJSON
@@ -71,6 +71,12 @@ def send_reminder_amazon_sns(region, topic_arn, subject, body):
     con = boto.sns.connect_to_region(region)
     con.publish(topic = topic_arn, message = body, subject = subject)
 
+def send_reminder_file(filename, subject, body):
+    fd = open(filename, 'a+')
+    ui_time = time.strftime('%Y-%m-%dZ%H:%M:%S', time.gmtime())
+    fd.write('Time: %s\nSubject: %s\n%s\n---\n' % (ui_time, subject, body))
+    fd.close()
+
 def send_reminders(sender_name, recip_list, subject, body, dry_run = False):
     if dry_run:
         print 'body is:', body
@@ -86,6 +92,8 @@ def send_reminders(sender_name, recip_list, subject, body, dry_run = False):
             send_reminder_mattermost(sender_name, recip.get('channel'), recip.get('ats',[]), subject, body)
         elif recip['type'] == 'amazon_sns':
             send_reminder_amazon_sns(recip.get('region'), recip['topic_arn'], subject, body)
+        elif recip['type'] == 'file':
+            send_reminder_file(recip['filename'], subject, body)
 
 if __name__=='__main__':
     import getopt, sys
