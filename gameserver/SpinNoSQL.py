@@ -809,6 +809,11 @@ class NoSQLClient (object):
                            '$lt': datetime.datetime.utcfromtimestamp(float(end_time))}
               }
         return self.instrument('chat_reports_get(%s)'%reason, self._chat_reports_query, (qs,))
+    def chat_report_get_one(self, id, reason=''):
+        qs = {'_id': self.encode_object_id(id)}
+        report_list = self.instrument('chat_report_get_one(%s)'%reason, self._chat_reports_query, (qs,))
+        if len(report_list) != 1: raise Exception('cannot find report: %r' % id)
+        return report_list[0]
     def decode_chat_report(self, row):
         row['id'] = self.decode_object_id(row['_id']); del row['_id'] # convert native ObjectID to string
         if 'millitime' in row: # convert datetime.datetime to UNIX timestamp
@@ -829,16 +834,11 @@ class NoSQLClient (object):
                                                     {'$set': {'resolved': True, 'resolution': resolution, 'resolution_time': resolution_time}}).matched_count > 0
 
     # check if a chat report is obsolete - i.e. there exists a later resolved-violated chat report on the same player
-    def chat_report_is_obsolete(self, id, reason=''):
-        # first look up the target report to determine its "when said" timestamp
-        target_reports = self.instrument('chat_report_is_obsolete(%s)'%reason, self._chat_reports_query, ({'_id': self.encode_object_id(id)}, 1))
-        if len(target_reports) != 1: raise Exception('cannot find report: %r' % id)
-        target_report = target_reports[0]
+    def chat_report_is_obsolete(self, target_report, reason=''):
         # look for any later resolved-violated chat report on the same player
-        qs = {'_id': {'$ne': self.encode_object_id(id)},
+        qs = {'_id': {'$ne': self.encode_object_id(target_report['id'])},
               'millitime':{'$gte':datetime.datetime.utcfromtimestamp(float(target_report['time'] - 5))}, # add fudge margin
               'resolved': True, 'resolution': 'violate', 'target_id': target_report['target_id']}
-
         later_resolved_reports = self.instrument('chat_report_is_obsolete(%s)'%reason, self._chat_reports_query, (qs, 1))
         return len(later_resolved_reports) > 0
 
@@ -2842,7 +2842,7 @@ if __name__ == '__main__':
         # test chat reports
         client.chat_reports_table().drop(); client.seen_chat_reports = False
         report_time = time_now - 2
-        client.chat_report('global_en', 1112, 'Reporter', 1113, 'Target', time_now, report_time, 'you are a poopyhead')
+        client.chat_report('global_en', 1112, 'Reporter', 1113, 'Target', time_now, report_time, u'you are a poopyhead \u4f60\u597d')
         rep_list = client.chat_reports_get(time_now - 600, time_now + 600)
         assert len(rep_list) == 1
         rep = rep_list[0]
@@ -2858,9 +2858,9 @@ if __name__ == '__main__':
         print '---'
         for rep in rep_list:
             if not rep.get('resolved'):
-                assert client.chat_report_is_obsolete(rep['id'])
+                assert client.chat_report_is_obsolete(rep)
             else:
-                assert not client.chat_report_is_obsolete(rep['id'])
+                assert not client.chat_report_is_obsolete(rep)
 
         # test player aliases
         client.player_alias_table().drop(); client.seen_player_aliases = False
