@@ -21,7 +21,8 @@ function usage {
     echo "  revert - revert changes to origin (leaving new untracked files alone)"
     echo "  force-revert - revert changes to origin (deleting new untracked files)"
     echo "  site-patch - apply all patches in the *-private/ directory"
-    echo "  version - get current version"
+    echo "  version - get current version, in active SCM system"
+    echo "  git-version - get current Git version (from active Git, or from git-sync.txt if SVN slave)"
     echo "  stat - show modified file list"
     echo "  diff - show differences"
     echo "  commit [MESSAGE] - make a commit"
@@ -62,6 +63,10 @@ function do_force_up_svn {
 }
 function do_version_svn {
     (cd "$ROOT" && svn info | grep Revision | cut -d' ' -f 2)
+}
+function do_git_version_svn {
+    SUBPATH="$2" # optional - path underneath the root to query the version for
+    (cd "${ROOT}/${SUBPATH}" && cat 'git-sync.txt')
 }
 function do_stat_svn {
     (cd "$ROOT" && svn stat)
@@ -143,7 +148,8 @@ function do_force_revert_git {
     (cd "$ROOT" && git reset --hard HEAD && git clean -f -d)
 }
 function do_version_git {
-    (cd "$ROOT" && git rev-parse HEAD)
+    SUBPATH="$2" # optional - path underneath the root to query the version for
+    (cd "${ROOT}/${SUBPATH}" && git rev-parse HEAD)
 }
 function do_stat_git {
     for dir in $GIT_DIRS; do
@@ -192,6 +198,9 @@ else
             version)
                 do_version_git $@
                 ;;
+	    git-version)
+                do_version_git $@
+                ;;
             stat)
                 do_stat_git $@
                 ;;
@@ -227,6 +236,9 @@ else
                 ;;
             version)
                 do_version_svn $@
+                ;;
+            git-version)
+                do_git_version_svn $@
                 ;;
             stat)
                 do_stat_svn $@

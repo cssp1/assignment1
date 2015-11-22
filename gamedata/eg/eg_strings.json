@@ -820,6 +820,12 @@
     "report_sent": { "ui_title": "Report Sent",
                      "ui_description": "This player has been reported, and is blocked from contacting you again.\n\nTo unblock, click the \"Unblock\" button on the Player Info menu."
                    },
+    "chat_blocked": { "ui_title": "Chat Blocked",
+                     "ui_description": "[b]%target[/b] is blocked from contacting you again.\n\nTo unblock, click the \"Unblock\" button on one of their chat messages, or on the Player Info menu."
+                   },
+    "chat_unblocked": { "ui_title": "Chat Unblocked",
+                     "ui_description": "[b]%target[/b] can now message you again."
+                   },
 
     "gamebucks_discovered_in_deposit": { "ui_title": "%s discovered",
                                          "ui_description": "Commander, we have discovered %s in this cache. Check daily to discover more." },

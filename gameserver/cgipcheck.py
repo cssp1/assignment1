@@ -160,7 +160,10 @@ def chat_abuse_clear(control_args):
     assert do_CONTROLAPI_checked(ungag_args) == 'ok'
     return "Player was unmuted and reduced to %d chat offense(s)." % new_stacks
 
-def chat_abuse_violate(control_args):
+def chat_abuse_violate(control_args, ui_context):
+    ui_reason = 'The player said: "%s"' % ui_context
+    spin_user = control_args['spin_user']
+
     # query current repeat-offender stacks and gag status
     check_args = control_args.copy()
     check_args.update({'method': 'player_batch', 'batch': SpinJSON.dumps([{'method': 'cooldown_active', 'args': {'name': 'chat_abuse_violation'}},
@@ -206,16 +209,16 @@ def chat_abuse_violate(control_args):
 
     batch = []
     if add_stack:
-        batch.append({'method': 'trigger_cooldown', 'args':{'name': 'chat_abuse_violation', 'add_stack': 1, 'duration': CHAT_ABUSE_MEMORY_DURATION}})
+        batch.append({'method': 'trigger_cooldown', 'args':{'name': 'chat_abuse_violation', 'add_stack': 1, 'duration': CHAT_ABUSE_MEMORY_DURATION, 'spin_user': spin_user}})
         ui_actions.append("Offense count increased to %d" % (active_stacks + 1))
     if message_body:
-        batch.append({'method': 'send_message', 'args':{'message_subject': 'Chat Warning', 'message_body': message_body}})
+        batch.append({'method': 'send_message', 'args':{'message_subject': 'Chat Warning', 'message_body': message_body, 'ui_reason': ui_reason, 'spin_user': spin_user}})
         ui_actions.append("Sent warning message")
     if temporary_mute_duration > 0:
-        batch.append({'method': 'chat_gag', 'args':{'duration': temporary_mute_duration}})
+        batch.append({'method': 'chat_gag', 'args':{'duration': temporary_mute_duration, 'spin_user': spin_user}})
         ui_actions.append("Muted player for %d hours" % (temporary_mute_duration / 3600))
     if permanent_mute:
-        batch.append({'method': 'chat_gag'})
+        batch.append({'method': 'chat_gag', 'args':{'ui_reason': ui_reason, 'spin_user': spin_user}})
         ui_actions.append("Muted player permanently")
 
     batch_args = control_args.copy()
@@ -400,7 +403,9 @@ def do_action(path, method, args, spin_token_data, nosql_client):
                 elif args['action'] == 'violate':
                     if not nosql_client.chat_report_resolve(args['id'], 'violate', time_now): # start here to avoid race condition
                         result = {'result': 'This report has already been resolved, perhaps by another PCHECK user.'}
-                    elif nosql_client.chat_report_is_obsolete(args['id']):
+                    # query for the report so we can get the context and time
+                    target_report = nosql_client.chat_report_get_one(args['id'])
+                    if nosql_client.chat_report_is_obsolete(target_report):
                         result = {'result': 'This report is obsolete. The player has already been punished for a more recent report.'}
                     else:
                         control_args = args.copy()
@@ -408,7 +413,7 @@ def do_action(path, method, args, spin_token_data, nosql_client):
                         if 'spin_token' in control_args: # do not pass credentials along
                             del control_args['spin_token']
                         control_args['spin_user'] = spin_token_data['spin_user']
-                        violate_result = chat_abuse_violate(control_args)
+                        violate_result = chat_abuse_violate(control_args, target_report['context'])
                         result = {'result': violate_result}
             elif method == 'translate':
                 # use Google Translate API conventions

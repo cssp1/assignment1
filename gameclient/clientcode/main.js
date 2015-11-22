@@ -14960,6 +14960,37 @@ function invoke_chat_player_context_menu(user_id, alliance_id, ui_name, report_a
                                                 invoke_alliance_info(_alliance_id);
                                             }; })(alliance_id)}));
     }
+
+    if(user_id !== session.user_id) {
+        if(player.has_blocked_user(user_id)) {
+            buttons.push(new ContextMenuButton({ui_name: gamedata['dialogs']['chat_player_context_menu']['widgets']['button']['ui_name_unblock'],
+                                                ui_tooltip: gamedata['dialogs']['chat_player_context_menu']['widgets']['button']['ui_tooltip_unblock'],
+                                                onclick: (function (/** number */ _user_id, /** string */ _ui_name) { return function(w) {
+                                                    close_parent_dialog(w);
+                                                    player.unblock_user(_user_id);
+                                                    var s = gamedata['strings']['chat_unblocked'];
+                                                    invoke_child_message_dialog(s['ui_title'],
+                                                                                s['ui_description'].replace('%target', SPText.bbcode_quote(_ui_name)),
+                                                                                {'dialog': 'message_dialog_big',
+                                                                                 'use_bbcode': true});
+                                                }; })(user_id, ui_name)
+                                               }));
+        } else {
+            buttons.push(new ContextMenuButton({ui_name: gamedata['dialogs']['chat_player_context_menu']['widgets']['button']['ui_name_block'],
+                                                ui_tooltip: gamedata['dialogs']['chat_player_context_menu']['widgets']['button']['ui_tooltip_block'],
+                                                onclick: (function (/** number */ _user_id, /** string */ _ui_name) { return function(w) {
+                                                    close_parent_dialog(w);
+                                                    player.block_user(_user_id);
+                                                    var s = gamedata['strings']['chat_blocked'];
+                                                    invoke_child_message_dialog(s['ui_title'],
+                                                                                s['ui_description'].replace('%target', SPText.bbcode_quote(_ui_name)),
+                                                                                {'dialog': 'message_dialog_big',
+                                                                                 'use_bbcode': true});
+                                                }; })(user_id, ui_name)
+                                               }));
+        }
+    }
+
     if(player.has_advanced_chat_reporting() && report_args && report_args.ui_context &&
        report_args.user_id !== session.user_id && report_args.channel !== 'ALLIANCE') {
         if(player.has_blocked_user(user_id)) {
@@ -14967,6 +14998,7 @@ function invoke_chat_player_context_menu(user_id, alliance_id, ui_name, report_a
                                                 state: 'disabled', ui_tooltip: gamedata['dialogs']['chat_player_context_menu']['widgets']['button']['ui_tooltip_already_reported']}));
         } else {
             buttons.push(new ContextMenuButton({ui_name: gamedata['dialogs']['chat_player_context_menu']['widgets']['button']['ui_name_report'],
+                                                ui_tooltip: gamedata['dialogs']['chat_player_context_menu']['widgets']['button']['ui_tooltip_report'],
                                                 onclick: (function (/** !AdvancedChatReportArgs */ _report_args) { return function(w) {
                                                     close_parent_dialog(w); // change_selection_ui(null); safe?
                                                     invoke_advanced_chat_report_dialog(_report_args);
