@@ -616,7 +616,7 @@ def send_proxyserver_status_notification(status_json):
     scm_version_gamedata = scm_version_gamedata.strip()[0:8] # truncate git checksum
     exe = './SpinReminders.py'
     args = ['--from', '%s proxyserver' % SpinConfig.game_id_long(),
-            '--subject', 'Update deployed',
+            '--subject', '%s Update deployed' % SpinConfig.game_id_long().upper(),
             '--body', 'Now serving engine version %s, %s gamedata version %s (builds: gamedata "%s" gameclient "%s")' % \
             (scm_version_root,
              SpinConfig.game().upper().encode('ascii'),
@@ -2885,8 +2885,6 @@ def do_main():
 
     print 'Proxy server up and running on ports %d (HTTP) %d (SSL)' % (myport_http, myport_ssl)
 
-    send_proxyserver_status_notification(admin_stats.get_server_status_json())
-
     if proxy_daemonize:
         Daemonize.daemonize()
 
@@ -2912,6 +2910,8 @@ def do_main():
         log.addObserver(log_exceptions)
 
     TwistedLatency.setup(reactor, admin_stats.record_latency)
+
+    send_proxyserver_status_notification(admin_stats.get_server_status_json())
 
     reactor.run()
 

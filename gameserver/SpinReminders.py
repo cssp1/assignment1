@@ -75,6 +75,7 @@ def send_reminder_file(filename, subject, body):
     fd = open(filename, 'a+')
     ui_time = time.strftime('%Y-%m-%dZ%H:%M:%S', time.gmtime())
     fd.write('Time: %s\nSubject: %s\n%s\n---\n' % (ui_time, subject, body))
+    fd.flush()
     fd.close()
 
 def send_reminders(sender_name, recip_list, subject, body, dry_run = False):
