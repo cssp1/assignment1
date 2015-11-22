@@ -20495,6 +20495,9 @@ Region.prototype.check_map_integrity = function(where) {
                     continue;
                 }
                 seen[feature['base_id']] = cell;
+                if(!vec_equals(feature['base_map_loc'], cell.pos)) {
+                    report_err('feature listed as blocker but base_map_loc is not here', cell, feature);
+                }
                 if(feature != _this.map_index.get_by_base_id(feature['base_id'])) {
                     report_err('feature listed as blocker but not found in index!', cell, feature);
                 }
@@ -20509,16 +20512,16 @@ Region.prototype.check_map_integrity = function(where) {
 };
 
 Region.prototype.receive_feature_update = function(res) {
-    var preserve_locks = false;
+    var incremental = false;
     if(res['preserve_locks']) {
-        preserve_locks = true;
+        incremental = true;
         delete res['preserve_locks'];
     }
 
     var feature = /** @type {Object|null} */ (this.map_index.get_by_base_id(res['base_id']));
 
     if(feature) {
-        // update or delete
+        // update or delete feature we already know about
         if(res['DELETED']) {
             if(gamedata['territory']['check_map_integrity'] >= 2) { this.check_map_integrity('receive_feature_update, existing, DELETED, enter'); }
 
@@ -20535,15 +20538,13 @@ Region.prototype.receive_feature_update = function(res) {
             if(gamedata['territory']['check_map_integrity'] >= 2) { this.check_map_integrity('receive_feature_update, existing, update, enter'); }
             var do_block = this.feature_blocks_map(feature);
 
-            if(!preserve_locks) {
-                // for incremental updates, a missing
-                // LOCK_STATE or protection timer means that it was dropped
-                if('LOCK_STATE' in feature) { delete feature['LOCK_STATE']; }
-                if('LOCK_OWNER' in feature) { delete feature['LOCK_OWNER']; }
-                if('protection_end_time' in feature) { delete feature['protection_end_time']; }
+            var cur_loc = feature['base_map_loc'] || null, new_loc = ('base_map_loc' in res ? res['base_map_loc'] : cur_loc);
+
+            if(!incremental) { // full replacement of all properties
+                goog.object.clear(feature);
+                feature['base_id'] = res['base_id'];
             }
 
-            var cur_loc = feature['base_map_loc'] || null, new_loc = ('base_map_loc' in res ? res['base_map_loc'] : cur_loc);
             if((!cur_loc && new_loc) ||
                (cur_loc && (!new_loc || cur_loc[0] != new_loc[0] || cur_loc[1] != new_loc[1]))) {
 
@@ -20561,16 +20562,22 @@ Region.prototype.receive_feature_update = function(res) {
             }
 
             for(var propname in res) {
-                feature[propname] = res[propname]; // might want to delete if null
+                if(res[propname] !== null) {
+                    feature[propname] = res[propname];
+                } else if(propname in feature) { // delete if null?
+                    delete feature[propname];
+                }
             }
 
             if(gamedata['territory']['check_map_integrity'] >= 2) { this.check_map_integrity('receive_feature_update, existing, update, exit'); }
         }
-    } else {
+    } else { // no record of this feature yet
         if(res['DELETED']) {
             // could be due to a base that is added and removed before we see it the first time
             if(gamedata['territory']['check_map_integrity'] >= 2) { this.check_map_integrity('receive_feature_update, new, DELETED'); }
         } else {
+            if(incremental) { return; }
+
             if(gamedata['territory']['check_map_integrity'] >= 2) { this.check_map_integrity('receive_feature_update, new, enter'); }
             this.features.push(res);
             if(res['base_map_loc']) {
@@ -20598,6 +20605,11 @@ Region.prototype.receive_update = function(db_time, result, last_db_time) {
         }
         if(gamedata['territory']['check_map_integrity'] >= 1) { this.check_map_integrity('receive_update incremental'); }
     } else {
+        // make sure there weren't any incremental updates mixed in here
+        goog.array.forEach(result, function(feature) {
+            if(feature['preserve_locks']) { throw Error('got non-incremental feature with preserve_locks: '+feature['base_id']); }
+        });
+
         this.features = result;
         this.occupancy.clear();
         this.map_index.clear();
@@ -28883,7 +28895,8 @@ player.squad_move = function(squad_id, path) {
 
         session.region.receive_feature_update({'base_id':player.squad_base_id(squad_id),
                                                'base_map_path': map_path,
-                                               'base_map_loc': path[path.length-1]});
+                                               'base_map_loc': path[path.length-1],
+                                               'preserve_locks': 1});
         squad_data['map_loc'] = path[path.length-1];
         squad_data['map_path'] = map_path;
     }

@@ -626,6 +626,7 @@ class HandleChangeRegion(Handler):
 
         townhall_level = player['history'].get(self.gamedata['townhall']+'_level', 1)
         if townhall_level > 0: props[self.gamedata['townhall']+'_level'] = townhall_level
+        props['protection_end_time'] = player.resources.protection_end_time
         return props
 
     def recall_squad(self, player, region_id, squad_id):

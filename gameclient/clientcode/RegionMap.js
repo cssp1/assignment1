@@ -1317,6 +1317,11 @@ RegionMap.RegionMap.update_feature_popup = function(dialog) {
     var ftype = feature['base_type'];
     var owned = (feature['base_landlord_id'] === session.user_id);
 
+    if(!mapwidget.region.feature_shown(feature)) { // the feature got moved off the map
+        mapwidget.set_popup(null);
+        return;
+    }
+
     // when panning in from well off-screen, wait until the base is in view before showing popup
     var BUFFER = vec_scale(0.5, dialog.wh);
     if(base_wxy[0] < -BUFFER[0] || base_wxy[0] >= mapwidget.wh[0]+BUFFER[0] ||

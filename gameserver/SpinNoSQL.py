@@ -1509,7 +1509,9 @@ class NoSQLClient (object):
     def update_map_feature(self, region, base_id, props, originator=None, do_hook = True, reason=''):
         ret = self.instrument('update_map_feature(%s)'%reason, self._update_map_feature, (region,base_id,props))
         if self.map_update_hook and do_hook:
-            self.map_update_hook(region, base_id, props, originator)
+            hook_props = props.copy()
+            hook_props['preserve_locks'] = 1
+            self.map_update_hook(region, base_id, hook_props, originator)
         return ret
     def _update_map_feature(self, region, base_id, caller_props):
         props = caller_props.copy()
@@ -1536,7 +1538,7 @@ class NoSQLClient (object):
         if ret and self.map_update_hook and do_hook:
             self.map_update_hook(region, base_id, {'base_id':base_id,
                                                    'base_map_loc':props['base_map_loc'],
-                                                   'base_map_path':props.get('base_map_path',None)}, originator)
+                                                   'base_map_path':props.get('base_map_path',None), 'preserve_locks':1}, originator)
         return ret
 
     def _create_map_feature(self, region, base_id, caller_props, originator, exclusive, exclude_filter, old_loc, old_path):
@@ -1671,7 +1673,7 @@ class NoSQLClient (object):
     def map_feature_lock_acquire(self, region, base_id, owner_id, generation = -1, do_hook = True, reason=''):
         state = self.instrument('map_feature_lock_acquire(%s)'%(reason), self._map_feature_lock_acquire, (region,base_id,owner_id,generation))
         if state > 0 and self.map_update_hook and do_hook:
-            self.map_update_hook(region, base_id, {'LOCK_STATE':state,'LOCK_OWNER':owner_id}, owner_id)
+            self.map_update_hook(region, base_id, {'LOCK_STATE':state, 'LOCK_OWNER':owner_id, 'preserve_locks':1}, owner_id)
         return state
     def _map_feature_lock_acquire(self, region, base_id, owner_id, generation):
         LOCK_IS_OPEN = {'$or':[{'LOCK_STATE':{'$exists':False}},
@@ -1707,12 +1709,12 @@ class NoSQLClient (object):
 
         return -self.LOCK_BEING_ATTACKED
 
-    def map_feature_lock_release(self, region, base_id, owner_id, generation = -1, extra_props = None, do_hook = True, reason=''):
-        ret = self.instrument('map_feature_lock_release(%s)'%reason, self._map_feature_lock_release, (region,base_id,owner_id,generation,extra_props))
+    def map_feature_lock_release(self, region, base_id, owner_id, generation = -1, do_hook = True, reason=''):
+        ret = self.instrument('map_feature_lock_release(%s)'%reason, self._map_feature_lock_release, (region,base_id,owner_id,generation))
         if self.map_update_hook and do_hook:
-            self.map_update_hook(region, base_id, {'LOCK_STATE':0}, owner_id)
+            self.map_update_hook(region, base_id, {'LOCK_STATE':0, 'preserve_locks':1}, owner_id)
         return ret
-    def _map_feature_lock_release(self, region, base_id, owner_id, generation, extra_props):
+    def _map_feature_lock_release(self, region, base_id, owner_id, generation):
         qs = {'$set':{'last_mtime':self.time},
               '$unset':{'LOCK_STATE':1,'LOCK_OWNER':1,'LOCK_TIME':1}}
         if generation >= 0:
@@ -1721,9 +1723,6 @@ class NoSQLClient (object):
             # do NOT unset lock generation, leave it alone
             pass
 
-        if extra_props:
-            for k,v in extra_props.iteritems():
-                qs['$set'][k] = v
         return self.region_table(region, 'map').update_one({'_id':base_id}, qs)
 
     def map_feature_lock_keepalive_batch(self, region, base_ids, reason=''):

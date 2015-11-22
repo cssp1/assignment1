@@ -3682,11 +3682,11 @@ class Session(object):
         if self.viewing_squad_locks and (lock_id in self.viewing_squad_locks):
             self.viewing_squad_locks[lock_id] = -2 # special tombstone marker that means "we had a lock, but the squad map feature has been dropped"
 
-    def release_base(self, viewing_base = None, extra_base_props = None):
+    def release_base(self, viewing_base = None):
         if viewing_base is None: viewing_base = self.viewing_base
 
         if self.viewing_base_lock is not None:
-            gamesite.nosql_client.map_feature_lock_release(viewing_base.base_region, viewing_base.base_id, self.player.user_id, generation=viewing_base.base_generation + 1, extra_props = extra_base_props, reason='release_base')
+            gamesite.nosql_client.map_feature_lock_release(viewing_base.base_region, viewing_base.base_id, self.player.user_id, generation=viewing_base.base_generation + 1, reason='release_base')
             self.viewing_base_lock = None
 
         if self.viewing_squad_locks is not None:
@@ -10667,11 +10667,8 @@ class Player(AbstractPlayer):
 
             gamesite.pcache_client.player_cache_update(self.user_id, {'protection_end_time': new_end_time if new_end_time > server_time else None}, reason = 'set_protection_end_time')
 
-            # XXXXXX this causes desync issues
-            if gamedata['server'].get('update_map_feature_on_protection_time_change',False) and self.is_on_map():
-                gamesite.nosql_client.update_map_feature(self.my_home.base_region, self.my_home.base_id,
-                                                         {'protection_end_time': new_end_time if new_end_time > server_time else None,
-                                                          'preserve_locks': 1}, reason = 'set_protection_end_time')
+            if self.is_on_map():
+                gamesite.nosql_client.update_map_feature(self.my_home.base_region, self.my_home.base_id, {'protection_end_time': new_end_time if new_end_time > server_time else None}, reason = 'set_protection_end_time')
 
             if (self is session.player): # only run for connected player
                 session.deferred_ladder_point_decay_check = True
@@ -12469,7 +12466,7 @@ class LivePlayer(Player):
                 i += 1
                 self.my_home.base_region = new_region
                 self.my_home.base_map_loc = tr
-                props = self.my_home.get_cache_props()
+                props = self.my_home.get_cache_props(extra_props = {'protection_end_time': self.resources.protection_end_time})
 
                 if (new_region == old_region):
                     success = gamesite.nosql_client.move_map_feature(self.my_home.base_region, self.my_home.base_id, props, old_loc = old_loc,
@@ -16447,7 +16444,8 @@ class GAMEAPI(resource.Resource):
         def finish(session, io_type):
             if io_type == 'store_viewing_player':
                 # release squads and home map feature lock
-                session.release_base(extra_base_props = {'protection_end_time': session.viewing_player.resources.protection_end_time})
+                session.release_base()
+
                 # release lock AFTER playerdb store completes
                 gamesite.lock_client.player_lock_release(session.viewing_user.user_id,
                                                          session.viewing_player.generation,
@@ -22637,6 +22635,10 @@ class GAMEAPI(resource.Resource):
                 if gamesite.nosql_client.map_feature_lock_acquire(session.player.my_home.base_region, session.player.my_home.base_id, session.player.user_id,
                                                                   reason = 'SERVER_HELLO') == Player.LockState.being_attacked:
                     session.player_base_lock = (session.player.my_home.base_region, session.player.my_home.base_id)
+
+                    # XXXXXX only necessary during migration, shouldn't be necessary once all updates are sent in real-time
+                    gamesite.nosql_client.update_map_feature(session.player.my_home.base_region, session.player.my_home.base_id, {'protection_end_time': session.player.resources.protection_end_time}, reason = 'SERVER_HELLO')
+
                 else:
                     # uh oh, can't acquire our own home base lock - playerdb and map feature state are out of sync
                     gamesite.exception_log.event(server_time, 'player %d could not get own home base lock in %s on login, plucking from map!' % (session.player.user_id, session.player.home_region))
@@ -22845,8 +22847,7 @@ class GAMEAPI(resource.Resource):
         if session.player.is_on_map():
             # update status of player's home base on map, and broadcast lock release
             # assert session.player_base_lock
-            gamesite.nosql_client.map_feature_lock_release(session.player.my_home.base_region, session.player.my_home.base_id, session.player.user_id,
-                                                           extra_props = {'protection_end_time': session.player.resources.protection_end_time}, reason = 'log_out')
+            gamesite.nosql_client.map_feature_lock_release(session.player.my_home.base_region, session.player.my_home.base_id, session.player.user_id, reason = 'log_out')
             session.player_base_lock = None
 
         ascdebug('UNLOCKED player %d (normal logout)' % session.user.user_id)
