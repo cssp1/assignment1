@@ -549,10 +549,12 @@
             "title":  { "kind": "TextField", "xy": [0,8], "dimensions": [202, 17], "text_style": "bold", "text_size": 13, "max_chars": 12 },
             "button": { "kind": "ActionButton", "xy": [9,31], "dimensions": [184,28], "text_offset": [0,1], "ui_tooltip": "", "tooltip_delay": 0,
                         "bg_image": "action_button_resizable", "bg_image_resizable": 1, "text_size": 13, "text_style": "bold",
-                        "ui_name_report": "Report Abuse", "ui_tooltip_report": "Report inappropriate chat message",
-                        "ui_tooltip_already_reported": "Player has already been reported",
+                        "ui_name_report": "Report Abuse", "ui_tooltip_report": "Report an inappropriate chat message",
+                        "ui_tooltip_already_reported": "Player has already been reported or blocked",
                         "ui_name_player_info": "Player Info",
                         "ui_name_alliance_info": "Alliance Info",
+                        "ui_name_block": "Block Chat", "ui_tooltip_block": "Block future messages from this player",
+                        "ui_name_unblock": "Unblock Chat", "ui_tooltip_unblock": "Unblock future messages from this player",
                         // note: these buttons are created dynamically in JavaScript
                         "array": [1,0], "array_offset": [0,36] }
         }
