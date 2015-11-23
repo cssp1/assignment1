@@ -994,6 +994,7 @@ AnyABTestPredicate.prototype.is_satisfied = function(player, qdata) {
     var cur_value = player.get_any_abtest_value(this.key, this.def);
     return cur_value == this.value;
 };
+AnyABTestPredicate.prototype.ui_expire_time = function(player) { return -1; };
 
 /** @constructor
   * @extends Predicate */
