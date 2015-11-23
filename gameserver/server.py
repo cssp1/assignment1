@@ -10715,6 +10715,7 @@ class Player(AbstractPlayer):
         metric_event_coded(self.user_id, event_name, props)
 
     def send_fb_notification(self, user, text, config, force = False):
+        if not user.facebook_id: return # not on Facebook
 
         if (not self.has_write_lock):
             gamesite.exception_log.event(server_time, 'attempt to send_fb_notification without write lock! %d' % self.user_id)
@@ -14939,11 +14940,11 @@ class Store:
 
                     # send notifications
                     config = gamedata['fb_notifications']['notifications'].get('you_sent_gift_order',None)
-                    if config:
+                    if config and session.user.facebook_id:
                         notif_text = config['ui_name'].replace('%GAMEBUCKS_AMOUNT', str(gift_amount)).replace('%RECEIVER', entry['recipient_ui_name']).replace('%GAMEBUCKS_NAME',gamedata['store']['gamebucks_ui_name'])
                         session.player.do_send_fb_notification_to(session.user.facebook_id, notif_text, config, config['ref'])
                     config = gamedata['fb_notifications']['notifications'].get('you_got_gift_order',None)
-                    if config:
+                    if config and entry.get('recipient_facebook_id'):
                         notif_text = config['ui_name'].replace('%GAMEBUCKS_AMOUNT', str(gift_amount)).replace('%SENDER', session.user.get_chat_name(session.player)).replace('%GAMEBUCKS_NAME',gamedata['store']['gamebucks_ui_name'])
                         session.player.do_send_fb_notification_to(entry['recipient_facebook_id'], notif_text, config, config['ref'])
 
@@ -20621,7 +20622,7 @@ class GAMEAPI(resource.Resource):
                         session.increment_player_metric('gift_orders_received', 1)
                         session.increment_player_metric('gamebucks_received_from_gift_orders', gift_amount)
                         config = gamedata['fb_notifications']['notifications'].get('your_gift_order_was_received',None)
-                        if config:
+                        if config and msg.get('from_fbid'):
                             notif_text = config['ui_name'].replace('%GAMEBUCKS_AMOUNT', str(gift_amount)).replace('%RECEIVER', session.user.get_chat_name(session.player)).replace('%GAMEBUCKS_NAME',gamedata['store']['gamebucks_ui_name'])
                             session.player.do_send_fb_notification_to(msg['from_fbid'], notif_text, config, config['ref'])
 
@@ -24265,7 +24266,7 @@ class GAMEAPI(resource.Resource):
 
                 # send FB notifications XXXXXX need to rewrite this path so that it respects enable_fb_notifications preference
                 config = gamedata['fb_notifications']['notifications'].get('alliance_promoted' if new_role > old_role else 'alliance_demoted',None)
-                if config and ('facebook_id' in pcache_data):
+                if config and pcache_data.get('facebook_id'):
                     notif_text = config['ui_name'].replace('%ACTOR_NAME', session.user.get_chat_name(session.player)).replace('%ACTOR_ROLE', my_role_info['ui_name']).replace('%NEW_ROLE', new_role_info['ui_name']).replace('%ALLIANCE_NAME', alliance_display_name(info))
                     session.player.do_send_fb_notification_to(pcache_data['facebook_id'], notif_text, config, config['ref'])
 
