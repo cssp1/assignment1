@@ -36214,11 +36214,19 @@ function invoke_buy_gamebucks_dialog23(ver, reason, amount, order) {
 
             dialog.user_data['any_sku_has_bonus'] = Math.max(dialog.user_data['any_sku_has_bonus'], bonus_lines);
 
-            spell_list.push({'spellname': spellname, 'spellarg': null});
+            // get expected loot
+            var item_list = null;
+            if('loot_table' in spell) {
+                var loot_table = gamedata['loot_tables_client'][spell['loot_table']]['loot'];
+                item_list = expect_loot(loot_table);
+                if(item_list.length <= 0) { item_list = null; }
+            }
+
+            spell_list.push({'spellname': spellname, 'spellarg': null, 'expect_loot': item_list});
 
             // always add a NON-bundled version of any loot-table-bearing SKU
-            if(spell['loot_table']) {
-                spell_list.push({'spellname': spellname, 'spellarg': {'want_loot':false}})
+            if(item_list && item_list.length > 0) {
+                spell_list.push({'spellname': spellname, 'spellarg': {'want_loot':false}, 'expect_loot': null})
             }
         }
     }
@@ -36226,7 +36234,7 @@ function invoke_buy_gamebucks_dialog23(ver, reason, amount, order) {
     spell_list.sort(function (a,b) {
         var sa = gamedata['spells'][a['spellname']], sb = gamedata['spells'][b['spellname']];
         // put loot-bearing SKUs first
-        var la = sa['loot_table'] && (!a['spellarg'] || a['spellarg']['want_loot']), lb = sb['loot_table'] && (!b['spellarg'] || b['spellarg']['want_loot']);
+        var la = !!a['expect_loot'], lb = !!b['expect_loot'];
         if(la && !lb) { return -1; } else if(!la && lb) { return 1; }
         var va = sa['quantity'], vb = sb['quantity'];
         if(va > vb) { return 1; } else if(va < vb) { return -1; } else { return 0; }
