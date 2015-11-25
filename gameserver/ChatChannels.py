@@ -14,10 +14,10 @@ class ChatChannel(object):
     def leave(self, member):
         if member in self.listeners:
             self.listeners.remove(member)
-    def send(self, sender_info, text, exclude_listener = None):
+    def send(self, id, sender_info, text, exclude_listener = None):
         for member in self.listeners:
             if member is exclude_listener: continue
-            member.chat_recv(self.name, sender_info, text)
+            member.chat_recv(self.name, id, sender_info, text)
 
 # note: "relay" is optionally an instance of SpinChatClient.Client,
 # to perform relaying to/from the global chat server
@@ -39,17 +39,18 @@ class ChatChannelMgr(object):
         if channame in self.channels:
             self.channels[channame].leave(session)
 
-    def send(self, channame, sender, text, log = True, exclude_listener = None):
+    def send(self, id, channame, sender, text, log = True, exclude_listener = None):
         if channame in self.channels:
-            self.channels[channame].send(sender, text, exclude_listener = exclude_listener)
+            self.channels[channame].send(id, sender, text, exclude_listener = exclude_listener)
         if self.relay:
-            self.relay.chat_send({'channel':channame, 'sender':sender, 'text': text}, log = log)
+            self.relay.chat_send({'id':id, 'channel':channame, 'sender':sender, 'text': text}, log = log)
 
     def relay_recv(self, data):
         channel = data['channel']
         sender = data['sender']
         text = data.get('text','')
+        id = data.get('id',None)
         if channel not in self.channels:
             self.channels[channel] = ChatChannel(channel)
-        self.channels[channel].send(sender, text)
+        self.channels[channel].send(id, sender, text)
 

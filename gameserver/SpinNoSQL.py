@@ -165,6 +165,7 @@ class NoSQLClient (object):
         self.seen_sessions = False
         self.seen_client_perf = False
         self.seen_chat = False
+        self.chat_id_generator = None
         self.seen_chat_reports = False
         self.seen_logs = {}
         self.seen_battles = False
@@ -732,12 +733,29 @@ class NoSQLClient (object):
             self.seen_chat = True
         return coll
     def chat_record(self, channel, sender, text, reason=''):
-        return self.instrument('chat_record(%s)'%reason, self._chat_record, (channel, sender, text))
-    def _chat_record(self, channel, sender, text):
-        props = {'time':self.time,'channel':channel,'sender':sender}
+        # generate and return a unique ID for the message
+        if not self.chat_id_generator:
+            self.chat_id_generator = SpinNoSQLId.Generator()
+        self.chat_id_generator.set_time(self.time)
+        id = self.chat_id_generator.generate()
+        self.instrument('chat_record(%s)'%reason, self._chat_record, (id, channel, sender, text))
+        return id
+
+    def _chat_record(self, id, channel, sender, text):
+        props = {'_id':self.encode_object_id(id), 'time':self.time,'channel':channel,'sender':sender}
         if text:
             props['text'] = unicode(text)
         self.chat_buffer_table().with_options(write_concern = pymongo.write_concern.WriteConcern(w=0)).insert_one(props)
+
+    def decode_chat_row(self, row):
+        if '_id' in row:
+            row['id'] = self.decode_object_id(row['_id'])
+            del row['_id']
+        # insert missing 'time' field on legacy chat messages
+        if type(row['sender']) is dict and ('time' not in row['sender']):
+            row['sender']['time'] = row['time']
+        return row
+
     def chat_catchup(self, channel, start_time = -1, end_time = -1, skip = 0, limit = -1, reason=''):
         return self.instrument('chat_catchup(%s)'%reason, self._chat_catchup, (channel,start_time,end_time,skip,limit))
     def _chat_catchup(self, channel, start_time, end_time, skip, limit):
@@ -746,24 +764,14 @@ class NoSQLClient (object):
             props['time'] = {}
             if start_time > 0: props['time']['$gte'] = start_time
             if end_time > 0: props['time']['$lt'] = end_time
-        cur = self.chat_buffer_table().find(props, {'_id':0,'sender':1,'text':1,'time':1}).sort([('time',pymongo.DESCENDING)])
+        cur = self.chat_buffer_table().find(props).sort([('time',pymongo.DESCENDING)])
         if skip > 0: cur = cur.skip(skip)
         if limit > 0: cur = cur.limit(limit)
-        ret = []
-        for row in cur:
-            # insert missing 'time' field on legacy chat messages
-            if type(row['sender']) is dict and ('time' not in row['sender']):
-                row['sender']['time'] = row['time']
-            ret.append(row)
+        ret = map(self.decode_chat_row, cur)
         ret.reverse() # oldest messages first
         return ret
 
-    def decode_chat_row(self, row):
-        if '_id' in row:
-            row['id'] = self.decode_object_id(row['_id'])
-            del row['_id']
-        return row
-    # retrieve up to 2*limit messages sent aorund center_time +/- time_limit
+    # retrieve up to 2*limit messages sent around center_time +/- time_limit
     def chat_get_context(self, channel, sender_id, center_time, time_limit, limit = -1, reason = ''):
         return self.instrument('chat_get_context(%s)'%reason, self._chat_get_context, (channel, sender_id, center_time, time_limit, limit))
     def _chat_get_context(self, channel, sender_id, center_time, time_limit, limit):
