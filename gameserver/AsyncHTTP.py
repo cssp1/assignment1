@@ -26,7 +26,7 @@ class AsyncHTTPRequester(object):
     class Request:
         def __init__(self, qtime, method, url, headers, callback, error_callback, preflight_callback, postdata, max_tries, callback_type):
             self.method = method
-            self.url = str(url)
+            self.url = url
             self.headers = headers
             self.callback = callback
             self.error_callback = error_callback
@@ -132,7 +132,7 @@ class AsyncHTTPRequester(object):
 
         # this is like calling twisted.web.client.getPage, but we want the full HTTPClientFactory
         # and not just its .deferred member, since we want access to response headers.
-        getter = twisted.web.client._makeGetterFactory(request.url, twisted.web.client.HTTPClientFactory,
+        getter = twisted.web.client._makeGetterFactory(bytes(request.url), twisted.web.client.HTTPClientFactory,
                                                        method=request.method,
                                                        headers=request.headers,
                                                        agent='SpinPunch Game Server',
