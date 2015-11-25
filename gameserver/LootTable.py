@@ -28,6 +28,8 @@ def get_loot(tables, tab, tabname = 'toplevel', depth = 0, cond_resolver = None,
     if verbose:
         print '\t'*depth, '->', tabname
 
+    if len(tab) <= 0: return []
+
     breakpoints = []
     bp = 0.0
     for item in tab:
