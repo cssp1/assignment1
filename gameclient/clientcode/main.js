@@ -14832,6 +14832,7 @@ function init_chat_frame() {
         dialog.user_data['channel_to_tab'][dialog.user_data['channel_names'][i]] = i;
         tab.user_data['last_timestamp'] = 0;
         tab.user_data['unit_donation_requests'] = {};
+        tab.user_data['chat_messages_by_id'] = {};
         var invert = !!tab.data['widgets']['output']['invert'];
         tab.widgets['output'].scroll_up_button = tab.widgets[(invert ? 'scroll_down' : 'scroll_up')];
         tab.widgets['output'].scroll_down_button = tab.widgets[(invert ? 'scroll_up' : 'scroll_down')];
@@ -14936,9 +14937,16 @@ function chat_frame_size(dialog, big, forced) {
     @param {string} channel in which offensive text was said
     @param {string} ui_name of the offender to show in the GUI
     @param {string} ui_context offensive txt string to show in the GUI
-    @param {number} context_time - timestamp of the offensive text (used to locate the text on server side - maybe replace with DB id later?) */
-var AdvancedChatReportArgs = function(user_id, channel, ui_name, ui_context, context_time) {
-    this.user_id = user_id; this.channel = channel; this.ui_name = ui_name; this.ui_context = ui_context; this.context_time = context_time;
+    @param {number} context_time - timestamp of the offensive text
+    @param {string} message_id - unique database ID of the offensive text
+*/
+var AdvancedChatReportArgs = function(user_id, channel, ui_name, ui_context, context_time, message_id) {
+    this.user_id = user_id;
+    this.channel = channel;
+    this.ui_name = ui_name;
+    this.ui_context = ui_context;
+    this.context_time = context_time;
+    this.message_id = message_id;
 };
 
 /** @param {number} user_id
@@ -15029,7 +15037,7 @@ function invoke_advanced_chat_report_dialog(args) {
                                         'cancel_button': true,
                                         'ok_button_ui_name': s['ui_button'],
                                         'on_ok': (function (_args) { return function() {
-                                            send_to_server.func(["CHAT_REPORT2", _args.user_id, _args.channel, _args.context_time]);
+                                            send_to_server.func(["CHAT_REPORT2", _args.user_id, _args.channel, _args.context_time, _args.message_id]);
                                             player.block_user(_args.user_id);
                                             invoke_ui_locker(synchronizer.request_sync(), function() {
                                                 change_selection(null);
@@ -44376,6 +44384,7 @@ function handle_server_message(data) {
         var channel_name = data[1];
         var sender_info = data[2];
         var wrapped_body = data[3];
+        var chat_msg_id = (data.length >= 5 ? data[4] : null);
 
         if(!global_chat_frame) { return; }
 
@@ -44393,7 +44402,15 @@ function handle_server_message(data) {
             return;
         }
 
-        if(sender_info['type'] == 'unit_donation_request_invalidation') {
+        if(sender_info['type'] == 'message_hide') {
+            if(sender_info['target_user_id'] == session.user_id) { return; } // keep showing to original sender
+            goog.array.forEach(tablist, function(tab) {
+                if(sender_info['target_message_id'] in tab.user_data['chat_messages_by_id']) {
+                    var node = tab.user_data['chat_messages_by_id'][sender_info['target_message_id']];
+                    tab.widgets['output'].remove_text(node);
+                }
+            });
+        } else if(sender_info['type'] == 'unit_donation_request_invalidation') {
             if(sender_info['user_id'] == session.user_id) { return; }
 
             for(var i = 0; i < tablist.length; i++) {
@@ -44454,7 +44471,7 @@ function handle_server_message(data) {
                                                                           'recipient_fbid': sender_info['facebook_id'],
                                                                           'recipient_name': sender_info['chat_name']};
                     node.on_destroy = (function (_req, _tab) { return function(_node) {
-                        delete tab.user_data['unit_donation_requests'][_req['tag']];
+                        delete _tab.user_data['unit_donation_requests'][_req['tag']];
                     }; })(req, tab);
                 } else {
                     // it's a donation towards a request that we do not have - ignore it
@@ -44512,7 +44529,7 @@ function handle_server_message(data) {
             var report_args;
             if(bb_text.indexOf('%body') >= 0 && ('time' in sender_info) && ('chat_name' in sender_info) &&
                ('user_id' in sender_info) && sender_info['user_id'] > 0 && !is_ai_user_id_range(sender_info['user_id'])) {
-                report_args = new AdvancedChatReportArgs(sender_info['user_id'], channel_name, sender_info['chat_name'], body, sender_info['time']);
+                report_args = new AdvancedChatReportArgs(sender_info['user_id'], channel_name, sender_info['chat_name'], body, sender_info['time'], chat_msg_id);
             } else {
                 report_args = null;
             }
@@ -44630,14 +44647,19 @@ function handle_server_message(data) {
 
             for(var i = 0; i < tablist.length; i++) {
                 var tab = tablist[i];
-                tab.widgets['output'].append_text(disp_text, disp_user_data);
+                var node = tab.widgets['output'].append_text(disp_text, disp_user_data);
+                if(chat_msg_id) {
+                    tab.user_data['chat_messages_by_id'][chat_msg_id] = node;
+                    node.on_destroy = (function (_tab, _chat_msg_id) { return function(_node) {
+                        delete _tab.user_data['chat_messages_by_id'][_chat_msg_id];
+                    }; })(tab, chat_msg_id);
+                }
             }
         }
 
-        // update timestamps for jewel notification, but not if we typed the message ourself, and not for ordinary unit donation and login updates
+        // update timestamps for jewel notification, but not if we typed the message ourself, and not for non-text updates
         if(sender_info['user_id'] != session.user_id &&
-           sender_info['type'] != 'unit_donation' && sender_info['type'] != 'welcome' &&
-           sender_info['type'] != 'logged_in' && sender_info['type'] != 'logged_out') {
+           !goog.array.contains(['unit_donation', 'welcome', 'logged_in', 'logged_out', 'message_hide'], sender_info['type'])) {
             for(var i = 0; i < tablist.length; i++) {
                 var tab = tablist[i];
                 tab.user_data['last_timestamp'] = sender_info['time'] || server_time;

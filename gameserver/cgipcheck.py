@@ -160,7 +160,7 @@ def chat_abuse_clear(control_args):
     assert do_CONTROLAPI_checked(ungag_args) == 'ok'
     return "Player was unmuted and reduced to %d chat offense(s)." % new_stacks
 
-def chat_abuse_violate(control_args, ui_context):
+def chat_abuse_violate(control_args, ui_context, channel_name, message_id):
     ui_reason = 'The player said: "%s"' % ui_context
     spin_user = control_args['spin_user']
 
@@ -171,9 +171,6 @@ def chat_abuse_violate(control_args, ui_context):
     check_result = do_CONTROLAPI_checked(check_args)
     active_stacks = max(check_result[0], 0)
     is_gagged_now = bool(check_result[1])
-
-    if is_gagged_now:
-        return "Player is currently muted, perhaps because of a recent violation.\nNo action taken."
 
     # for policy see https://sites.google.com/a/spinpunch.com/support/about-zendesk/chat-moderation-process
     # active_stacks 0 -> message and 24h mute
@@ -188,7 +185,15 @@ def chat_abuse_violate(control_args, ui_context):
     permanent_mute = False
     permanent_mute_alts = False
 
-    if active_stacks == 0:
+    if message_id and channel_name:
+        censor_args = {'method': 'censor_chat_message', 'channel': channel_name, 'target_user_id': control_args['user_id'], 'message_id': message_id}
+        assert do_CONTROLAPI_checked(censor_args) == 'ok'
+        ui_actions.append("Hid this chat message from other players")
+
+    if is_gagged_now:
+        ui_actions.append("Player is currently muted, perhaps because of a recent violation. No action taken against the player.")
+
+    elif active_stacks == 0:
         message_body = "Hello! You were recently reported for violating our in-game chat rules of conduct. This message is to serve as a warning, and a notification that you are receiving a temporary mute from in-game chat. Any future offenses may result in a longer temporary or permanent mute from chat. Thanks in advance for your understanding."
         add_stack = True
         temporary_mute_duration = 24*3600
@@ -221,9 +226,10 @@ def chat_abuse_violate(control_args, ui_context):
         batch.append({'method': 'chat_gag', 'args':{'ui_reason': ui_reason, 'spin_user': spin_user}})
         ui_actions.append("Muted player permanently")
 
-    batch_args = control_args.copy()
-    batch_args.update({'method': 'player_batch', 'batch': SpinJSON.dumps(batch)})
-    assert do_CONTROLAPI_checked(batch_args) == ['ok',]*len(batch)
+    if batch:
+        batch_args = control_args.copy()
+        batch_args.update({'method': 'player_batch', 'batch': SpinJSON.dumps(batch)})
+        assert do_CONTROLAPI_checked(batch_args) == ['ok',]*len(batch)
 
     if permanent_mute_alts or alt_message_body:
         pass # XXXXXX no handling for alts yet
@@ -270,7 +276,7 @@ def do_action(path, method, args, spin_token_data, nosql_client):
                 result = {'result':do_lookup(control_args)}
             # chat abuse handling doesn't map 1-to-1 with CONTROLAPI calls, so handle them specially
             elif method == 'chat_abuse_violate':
-                result = {'result':chat_abuse_violate(control_args)}
+                result = {'result':chat_abuse_violate(control_args, 'Manual PCHECK action', None, None)}
             elif method == 'chat_abuse_clear':
                 result = {'result':chat_abuse_clear(control_args)}
             elif method in ('give_item','send_message','chat_gag','chat_ungag','chat_block','chat_unblock','apply_aura','remove_aura','get_raw_player','ban','unban',
@@ -413,7 +419,7 @@ def do_action(path, method, args, spin_token_data, nosql_client):
                         if 'spin_token' in control_args: # do not pass credentials along
                             del control_args['spin_token']
                         control_args['spin_user'] = spin_token_data['spin_user']
-                        violate_result = chat_abuse_violate(control_args, target_report['context'])
+                        violate_result = chat_abuse_violate(control_args, target_report['context'], target_report['channel'], target_report.get('message_id',None))
                         result = {'result': violate_result}
             elif method == 'translate':
                 # use Google Translate API conventions

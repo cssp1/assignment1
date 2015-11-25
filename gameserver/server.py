@@ -3748,7 +3748,7 @@ class Session(object):
         else:
             self.do_chat_send('DEVELOPER', '(%s) REPORTED user %d' % (self.user.country, target_uid))
 
-    def do_chat_report2(self, target_uid, channel, context_time):
+    def do_chat_report2(self, target_uid, channel, context_time, target_message_id):
         # check cooldown
         if not self.player.is_developer():
             cdname = 'chat_report:%d' % target_uid
@@ -3759,25 +3759,39 @@ class Session(object):
         if (not self.user.chat_can_interact()) or self.player.stattab.get_player_stat('chat_gagged'): return
 
         # retrieve context
-        context_list = gamesite.nosql_client.chat_get_context(channel, target_uid, context_time, gamedata.get('chat_report_context_time', 10), gamedata.get('chat_report_context_limit', 2), reason = 'do_chat_report2')
+        context_list = gamesite.nosql_client.chat_get_context(channel, target_uid, context_time,
+                                                              gamedata.get('chat_report_context_time', 10),
+                                                              gamedata.get('chat_report_context_limit', 2), reason = 'do_chat_report2')
 
         ui_context_list = []
         target_chat_name = 'unknown'
+
+        # target_message_id is untrusted client input, so don't pass it along in the report unless it matches something in the context
+        found_message_id = None
+
         for x in context_list:
             if not x.get('text'): continue # system message or non-default template
             if 'chat_name' in x['sender']:
                 target_chat_name = x['sender']['chat_name']
-            if x['time'] == context_time:
+            if x['time'] == context_time or (target_message_id and x.get('id',None) == target_message_id):
                 ui_text = '*** '+x['text']+' ***'
             else:
                 ui_text = x['text']
             ui_context_list.append(ui_text)
 
-        if not ui_context_list: return # no messages found
-        ui_context = '\n'.join(ui_context_list)
+            if target_message_id and x.get('id',None) == target_message_id:
+                found_message_id = target_message_id
 
+        # no messages found, or bogus message_id
+        if (not ui_context_list) or \
+           (target_message_id and (not found_message_id)):
+            gamesite.exception_log.event(server_time, 'rejecting invalid chat report: message id %r channel %r context_time %r target_uid %r' % \
+                                         (target_message_id, channel, context_time, target_uid))
+            return
+
+        ui_context = '\n'.join(ui_context_list)
         gamesite.nosql_client.chat_report(channel, self.user.user_id, self.user.get_chat_name(self.player),
-                                          target_uid, target_chat_name, server_time, context_time, ui_context, reason = 'do_chat_report2')
+                                          target_uid, target_chat_name, server_time, context_time, found_message_id, ui_context, reason = 'do_chat_report2')
 
     def do_chat_send(self, channel, text, retmsg = None, bypass_gag = False, props = None):
         assert channel
@@ -13544,6 +13558,18 @@ class CONTROLAPI(resource.Resource):
         for session in iter_sessions():
             for channel in ('GLOBAL', 'ALLIANCE', 'REGION'):
                 session.chat_recv(channel, None, {'chat_name':'System', 'type':'system', 'time': server_time, 'facebook_id':'-1', 'user_id':-1}, body)
+
+    # one server gets this request, and then it goes out to all local sessions and other servers via broadcast
+    def handle_censor_chat_message(self, request, channel = None, message_id = None, target_user_id = None):
+        assert channel and message_id
+        if target_user_id: target_user_id = int(target_user_id)
+        gamesite.chat_mgr.send(channel, None,
+                               {'time': server_time,
+                                'type': 'message_hide',
+                                'chat_name': 'System', 'user_id': -1,
+                                'target_user_id': target_user_id,
+                                'target_message_id': message_id}, '', log = True)
+        return SpinJSON.dumps({'result': 'ok'}, newline=True)
     def handle_broadcast_map_update(self, request, region_id = None, base_id = None, data = None, server = None, originator = None):
         assert region_id and base_id and server
         # note: ignore our own broadcasts
@@ -24581,10 +24607,12 @@ class GAMEAPI(resource.Resource):
                        'REGION': session.region_chat_channel,
                        }.get(arg[2], None)
             context_time = arg[3]
+            target_message_id = arg[4] if len(arg) >= 5 else None
             if not channel:
                 retmsg.append(["ERROR", "INVALID_CHAT_CHANNEL"])
                 return
-            session.do_chat_report2(target_uid, channel, context_time)
+            assert target_uid > 0
+            session.do_chat_report2(target_uid, channel, context_time, target_message_id)
 
         elif arg[0] == "UNIT_REPAIR_TICK":
             self.do_unit_repair_tick(session, retmsg, must_reply = True)

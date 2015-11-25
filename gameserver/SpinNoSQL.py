@@ -796,14 +796,15 @@ class NoSQLClient (object):
             self.seen_chat_reports = True
         return coll
     # note: the "time" of a chat report is the time the target said the objectionable thing. "report_time" is when it was reported, "resolution_time" is when it was resolved.
-    def chat_report(self, channel, reporter_id, reporter_ui_name, target_id, target_ui_name, report_time, target_time, context, reason=''):
-        return self.instrument('chat_report(%s)'%reason, self._chat_report, (channel, reporter_id, reporter_ui_name, target_id, target_ui_name, report_time, target_time, context))
-    def _chat_report(self, channel, reporter_id, reporter_ui_name, target_id, target_ui_name, report_time, target_time, context):
+    def chat_report(self, channel, reporter_id, reporter_ui_name, target_id, target_ui_name, report_time, target_time, message_id, context, reason=''):
+        return self.instrument('chat_report(%s)'%reason, self._chat_report, (channel, reporter_id, reporter_ui_name, target_id, target_ui_name, report_time, target_time, message_id, context))
+    def _chat_report(self, channel, reporter_id, reporter_ui_name, target_id, target_ui_name, report_time, target_time, message_id, context):
         props = {'millitime':datetime.datetime.utcfromtimestamp(float(target_time)),
                  'report_time': report_time,
                  'channel': channel, 'reporter_id': reporter_id, 'target_id': target_id,
                  'reporter_ui_name': reporter_ui_name, 'target_ui_name': target_ui_name,
                  'resolved': False}
+        if message_id: props['message_id'] = self.encode_object_id(message_id)
         if context is not None:
             assert isinstance(context, basestring)
             context = unicode(context)
@@ -825,6 +826,7 @@ class NoSQLClient (object):
         if 'millitime' in row: # convert datetime.datetime to UNIX timestamp
             row['time'] = calendar.timegm(row['millitime'].timetuple())
             del row['millitime']
+        if 'message_id' in row: row['message_id'] = self.decode_object_id(row['message_id'])
         return row
     def _chat_reports_query(self, qs, limit = -1):
         cursor = self.chat_reports_table().find(qs)
@@ -2847,7 +2849,7 @@ if __name__ == '__main__':
         # test chat reports
         client.chat_reports_table().drop(); client.seen_chat_reports = False
         report_time = time_now - 2
-        client.chat_report('global_en', 1112, 'Reporter', 1113, 'Target', time_now, report_time, u'you are a poopyhead \u4f60\u597d')
+        client.chat_report('global_en', 1112, 'Reporter', 1113, 'Target', time_now, report_time, None, u'you are a poopyhead \u4f60\u597d')
         rep_list = client.chat_reports_get(time_now - 600, time_now + 600)
         assert len(rep_list) == 1
         rep = rep_list[0]
@@ -2856,7 +2858,7 @@ if __name__ == '__main__':
         assert not client.chat_report_resolve(rep['id'], 'ignore', time_now) # second attempt should fail
         assert len(filter(lambda x: not x.get('resolved'), client.chat_reports_get(time_now - 600, time_now + 600))) == 0
         # add an obsolete report
-        client.chat_report('global_en', 1114, 'Reporter', 1113, 'Target', time_now, report_time-60, 'you are a poopyhead (earlier)')
+        client.chat_report('global_en', 1114, 'Reporter', 1113, 'Target', time_now, report_time-60, None, 'you are a poopyhead (earlier)')
         rep_list = client.chat_reports_get(time_now - 600, time_now + 600)
         print '---'
         print '\n'.join([repr(x) for x in rep_list])
