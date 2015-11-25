@@ -3505,7 +3505,7 @@ class Session(object):
 
     def do_chat_catchup(self, true_channel, retmsg):
         for x in gamesite.nosql_client.chat_catchup(true_channel, limit = gamedata['server']['chat_memory']):
-            self.chat_recv(true_channel, x['sender'], x.get('text',''), retmsg = retmsg)
+            self.chat_recv(true_channel, x.get('id',None), x['sender'], x.get('text',''), retmsg = retmsg)
 
     def init_alliance(self, retmsg, chat_catchup = True, reason = 'Session.init_alliance'):
         if self.alliance_chat_channel:
@@ -3522,7 +3522,7 @@ class Session(object):
             txt = alliance_info.get('chat_motd', None)
             if not txt:
                 txt = "Welcome to \"%s\" chat!" % alliance_info.get('ui_name', 'unknown')
-            self.chat_recv(self.alliance_chat_channel,
+            self.chat_recv(self.alliance_chat_channel, None,
                            {'chat_name': gamedata['strings']['alliance_chat_motd_sender'], 'type': 'welcome',
                             'time': server_time, 'facebook_id':'-1', 'user_id':-1},
                            txt, retmsg = retmsg)
@@ -3542,7 +3542,7 @@ class Session(object):
             self.global_chat_channel += '_'+divert
 
         # put welcome message into chat
-        self.chat_recv(self.global_chat_channel,
+        self.chat_recv(self.global_chat_channel, None,
                        {'chat_name': 'Global', 'type':'welcome', 'time': server_time, 'facebook_id': '-1', 'user_id': -1},
                        'Welcome to Global chat! Please be respectful. Offensive behavior is not tolerated.',
                        retmsg = retmsg)
@@ -3559,7 +3559,7 @@ class Session(object):
         self.region_chat_channel = 'r:'+str(new_region)
 
         ui_name = gamedata['regions'][new_region]['ui_name']
-        self.chat_recv(self.region_chat_channel,
+        self.chat_recv(self.region_chat_channel, None,
                        {'chat_name':'Region', 'type':'welcome', 'time': server_time, 'facebook_id':'-1', 'user_id':-1},
                        "Welcome to %s region chat! Please be respectful. Offensive behavior is not tolerated." % ui_name,
                        retmsg = retmsg)
@@ -3724,8 +3724,9 @@ class Session(object):
             # give feedback to the sender that the report was sent
             for chan in (self.global_chat_channel, self.region_chat_channel):
                 if chan:
-                    self.chat_recv(chan, {'chat_name':'System', 'time':server_time,
-                                          'type': 'you_sent_chat_report', 'target_user_id':target_uid, 'target_chat_name':target_chat_name},
+                    self.chat_recv(chan, None,
+                                   {'chat_name':'System', 'time':server_time,
+                                    'type': 'you_sent_chat_report', 'target_user_id':target_uid, 'target_chat_name':target_chat_name},
                                    '', force = True, retmsg = retmsg)
 
         # check cooldown
@@ -3807,10 +3808,12 @@ class Session(object):
         if self.player.home_region:
             sender_info['home_region'] = self.player.home_region
 
+        id = gamesite.nosql_id_generator.generate()
+
         if gamesite.chat_log:
-            gamesite.nosql_client.chat_record(channel, sender_info, text, reason='do_chat_send(local)')
+            gamesite.nosql_client.chat_record(channel, id, sender_info, text, reason='do_chat_send(local)')
             gamesite.chat_log.event(server_time, {'chat_name': sender_info['chat_name'],
-                                                  'channel': channel,
+                                                  'id': id, 'channel': channel,
                                                   'user_id': self.user.user_id,
                                                   'player_level': self.player.resources.player_level,
                                                   'facebook_id': self.user.facebook_id,
@@ -3820,17 +3823,17 @@ class Session(object):
             if self.player.stattab.get_player_stat('chat_gagged'):
                 # new-style gag - let the player know
                 sender_info['type'] = 'you_are_gagged'
-                self.chat_recv(channel, sender_info, '', force = True)
+                self.chat_recv(channel, id, sender_info, '', force = True)
             else:
                 # old-style gag - simulate a chat broadcast, but it only goes to the sender.
-                self.chat_recv(channel, sender_info, text, force = True)
+                self.chat_recv(channel, id, sender_info, text, force = True)
 
             # privately send to developers
-            # gamesite.chat_mgr.send('DEVELOPER', sender_info, '(MUTED) '+text)
+            # gamesite.chat_mgr.send('DEVELOPER', None, sender_info, '(MUTED) '+text)
 
         else:
-            gamesite.chat_mgr.send(channel, sender_info, text, exclude_listener = self)
-            self.chat_recv(channel, sender_info, text, retmsg = retmsg)
+            gamesite.chat_mgr.send(channel, id, sender_info, text, exclude_listener = self)
+            self.chat_recv(channel, id, sender_info, text, retmsg = retmsg)
 
         if (not props) or (props.get('type','default') in ('default','turf_winner',)):
             # only increment chat_messages_sent for genuine player-input messages
@@ -3882,7 +3885,7 @@ class Session(object):
                 gamesite.gameapi.complete_longpoll(request, self)
 
     # function for sending chat messages to the client
-    def chat_recv(self, channel, sender_info, text, force = False, retmsg = None):
+    def chat_recv(self, channel, id, sender_info, text, force = False, retmsg = None):
         if (not force) and (not self.user.chat_can_interact()):
             return
         # map channel
@@ -3895,7 +3898,7 @@ class Session(object):
 
         # hide sender fields that clients should not know about (_sum table dimensions)
         sender_info_clean = dict((k,v) for k,v in sender_info.iteritems() if not k.startswith('_'))
-        msg = ["CHAT_RECV", channel, sender_info_clean, SpinHTTP.wrap_string(text)]
+        msg = ["CHAT_RECV", channel, sender_info_clean, SpinHTTP.wrap_string(text), id]
         if retmsg is not None:
             retmsg.append(msg)
         else:
@@ -13247,7 +13250,7 @@ class CONTROLAPI(resource.Resource):
         return server.NOT_DONE_YET
 
     # function for receiving cross-server IPC broadcasts
-    def chat_recv(self, channel, sender_info, text):
+    def chat_recv(self, channel, id, sender_info, text):
         assert channel == 'CONTROL'
         if gamedata['server']['log_controlapi']:
             gamesite.exception_log.event(server_time, 'CONTROLAPI(CHAT): %s got %s %s' % (spin_server_name, repr(sender_info), text))
@@ -13540,7 +13543,7 @@ class CONTROLAPI(resource.Resource):
     def handle_system_announcement(self, request, body = None):
         for session in iter_sessions():
             for channel in ('GLOBAL', 'ALLIANCE', 'REGION'):
-                session.chat_recv(channel, {'chat_name':'System', 'type':'system', 'time': server_time, 'facebook_id':'-1', 'user_id':-1}, body)
+                session.chat_recv(channel, None, {'chat_name':'System', 'type':'system', 'time': server_time, 'facebook_id':'-1', 'user_id':-1}, body)
     def handle_broadcast_map_update(self, request, region_id = None, base_id = None, data = None, server = None, originator = None):
         assert region_id and base_id and server
         # note: ignore our own broadcasts
@@ -24525,7 +24528,7 @@ class GAMEAPI(resource.Resource):
             if togo > 0:
                 success = False
                 retmsg.append(["CHAT_RECV", channel, {'chat_name': 'System', 'time': server_time, 'facebook_id': -1, 'user_id': -1},
-                               SpinHTTP.wrap_string(gamedata['errors']['CHAT_THROTTLED']['ui_name'].replace('%d', str(togo)))])
+                               SpinHTTP.wrap_string(gamedata['errors']['CHAT_THROTTLED']['ui_name'].replace('%d', str(togo))), None])
 
             retmsg.append(["COOLDOWNS_UPDATE", session.player.cooldowns])
 
@@ -26258,12 +26261,12 @@ class GAMEAPI(resource.Resource):
                     session.send([upd], flush_now = False) # avoid storms
 
         if send_to_net:
-            gamesite.chat_mgr.send('CONTROL', {'secret':SpinConfig.config['proxy_api_secret'],
-                                               'server':spin_server_name,
-                                               'method':'broadcast_map_update',
-                                               'args': { 'region_id': region_id, 'base_id': base_id, 'data': data,
-                                                         'server': spin_server_name, 'originator': originator },
-                                               }, '', log = False)
+            gamesite.chat_mgr.send('CONTROL', None, {'secret':SpinConfig.config['proxy_api_secret'],
+                                                     'server':spin_server_name,
+                                                     'method':'broadcast_map_update',
+                                                     'args': { 'region_id': region_id, 'base_id': base_id, 'data': data,
+                                                               'server': spin_server_name, 'originator': originator },
+                                                     }, '', log = False)
 
     def broadcast_map_attack(self, region_id, feature, attacker_id, defender_id, summary, pcache_info, send_to_net = True, msg = None):
         if msg is None:
@@ -26275,15 +26278,15 @@ class GAMEAPI(resource.Resource):
                     session.send([upd], flush_now = (session.user.user_id in (attacker_id, defender_id)))
 
         if send_to_net:
-            gamesite.chat_mgr.send('CONTROL', {'secret':SpinConfig.config['proxy_api_secret'],
-                                               'server':spin_server_name,
-                                               'method':'broadcast_map_attack',
-                                               'args': { 'msg': msg,
-                                                         'region_id': region_id, 'feature': feature,
-                                                         'attacker_id': attacker_id, 'defender_id': defender_id,
-                                                         'summary': summary, 'pcache_info': pcache_info,
-                                                         'server': spin_server_name },
-                                               }, '', log = False)
+            gamesite.chat_mgr.send('CONTROL', None, {'secret':SpinConfig.config['proxy_api_secret'],
+                                                     'server':spin_server_name,
+                                                     'method':'broadcast_map_attack',
+                                                     'args': { 'msg': msg,
+                                                               'region_id': region_id, 'feature': feature,
+                                                               'attacker_id': attacker_id, 'defender_id': defender_id,
+                                                               'summary': summary, 'pcache_info': pcache_info,
+                                                               'server': spin_server_name },
+                                                     }, '', log = False)
 
     def handle_protocol_error(self, session, retmsg, arg):
         # called when there is a problem with the AJAX message the client sent
@@ -26573,6 +26576,9 @@ class GameSite(server.Site):
         d.addErrback(lambda err, self=self: self.exception_log.event(server_time, 'stop_all_sessions() exception: %s' % err.getTraceback()))
         d.addCallback(lambda _, self=self: self.stop_all_clients())
         d.addErrback(lambda err, self=self: self.exception_log.event(server_time, 'stop_all_clients() exception: %s' % err.getTraceback()))
+        if self.chat_client:
+            d.addCallback(lambda _, self=self: self.chat_client.disconnect())
+            d.addErrback(lambda err, self=self: self.exception_log.event(server_time, 'chat_client.disconnect() exception: %s' % err.getTraceback()))
         d.addCallback(lambda _: io_system.shutdown())
         d.addErrback(lambda err, self=self: self.exception_log.event(server_time, 'io_system.shutdown() exception: %s' % err.getTraceback()))
         # send a final server status update when we're finished
