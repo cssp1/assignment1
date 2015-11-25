@@ -20,6 +20,15 @@ if __name__ == '__main__':
 
     out = dict([(data['name'], data) for data in [
 
+        # Gamebucks SKU item bundles
+
+        # for the ~$5 USD, 500-gamebuck SKU
+        {"name": "item_bundle_500", "loot": []},
+        # for the ~$10 USD, 1000-gamebuck SKU
+        {"name": "item_bundle_1000", "loot": []},
+        # for the ~$50 USD, 5000-gamebuck SKU
+        {"name": "item_bundle_5000", "loot": []},
+
         # return one packaged L1+ unit that represents the "sexiest" unit the player has already unlocked
         {"name": "sexy_unlocked_unit",
          "loot": [{"cond": [
