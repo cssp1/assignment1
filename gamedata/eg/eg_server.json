@@ -39,15 +39,6 @@
     // retry_delay = seconds to wait before retrying a failed request
     "AsyncHTTP_metrics": { "concurrent_request_limit": 50, "total_request_limit": 200, "request_timeout": 15, "max_tries": 5, "retry_delay": 10.0 },
     "AsyncHTTP_Facebook": { "concurrent_request_limit": 50, "total_request_limit": 200, "request_timeout": 30, "max_tries": 2, "retry_delay": 5.0 },
-    "AsyncHTTP_S3": { "concurrent_request_limit": -1, "total_request_limit": -1, "request_timeout": 30,
-                      "max_tries": 10, "retry_delay": 2.0,
-
-                      // wait this many seconds after the actual HTTP response before returning success from an async write
-                      // this is necessary to deal with S3's "eventual consistency" model, so that player files don't get
-                      // over-written with old data when being attacked immediately after logging out
-                      // need to keep it as low as possible, because it adds directly to complete_attack() latency
-                      "post_write_delay": 5.0
-                    },
 
     "use_http_keep_alive": true, // whether or not to allow persistent (HTTP/1.1 Connection: keep-alive) connections to GAMEAPI
 

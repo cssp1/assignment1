@@ -844,11 +844,22 @@ class S3IOSystem (IOSystem):
         IOSystem.__init__(self, config)
         assert isinstance(SpinUserDB.driver, SpinUserDB.S3Driver)
         self.s3 = SpinUserDB.driver.s3con # SpinS3.S3(SpinUserDB.driver.key_file)
-        data = gamedata['server']['AsyncHTTP_S3']
+
+        config = gamedata['server'].get('AsyncHTTP_S3', {})
+        request_timeout = config.get('request_timeout', 30)
+        max_tries = config.get('max_tries', 20)
+        retry_delay = config.get('retry_delay', 4)
+
+        # Wait this many seconds after the actual HTTP response before returning success from an async write.
+        # This is necessary to deal with S3's "eventual consistency" model, so that player files don't get
+        # over-written with old data when being attacked immediately after logging out
+        # Need to keep it as low as possible, because it adds directly to post-attack latency.
+        self.post_write_delay = config.get('post_write_delay', 2)
+
         # hard-code max request count to infinite, since we can't drop them (but can throttle logins instead)
-        self.s3_req = AsyncHTTP.AsyncHTTPRequester(-1, -1, data['request_timeout'], 0,
+        self.s3_req = AsyncHTTP.AsyncHTTPRequester(-1, -1, request_timeout, 0,
                                                    lambda x: gamesite.exception_log.event(server_time, x),
-                                                   error_on_404 = False, max_tries = data['max_tries'], retry_delay = data['retry_delay'])
+                                                   error_on_404 = False, max_tries = max_tries, retry_delay = retry_delay)
     def overloaded(self):
         limit = gamedata['server']['io_backends']['s3'].get('max_in_flight', 50)
         current = self.s3_req.num_on_wire()
@@ -874,8 +885,7 @@ class S3IOSystem (IOSystem):
     def do_async_write(self, path, buf, success_cb, fsync, procnum):
         bucket, objname = path
         url, headers = self.s3.put_request(bucket, objname, len(buf))
-        delay = gamedata['server']['AsyncHTTP_S3']['post_write_delay']
-        self.s3_req.queue_request(server_time, url, functools.partial(self.async_write_helper, 0, success_cb, delay),
+        self.s3_req.queue_request(server_time, url, functools.partial(self.async_write_helper, 0, success_cb, self.post_write_delay),
                                   error_callback = self.async_write_error,
                                   preflight_callback = functools.partial(self.preflight_put_request, bucket, objname, len(buf)),
                                   method = 'PUT', headers = headers, postdata = buf)
