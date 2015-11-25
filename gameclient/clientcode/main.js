@@ -36121,10 +36121,12 @@ function invoke_you_got_bonus_units() {
 /** @param {!SPUI.Dialog} dialog - this dialog
     @param {!SPUI.Dialog} parent of this dialog
     @param {string} spellname
+    @param {Object|null} spellarg
     @param {number} ui_index */
-function init_buy_gamebucks_sku23(dialog, parent, spellname, ui_index) {
+function init_buy_gamebucks_sku23(dialog, parent, spellname, spellarg, ui_index) {
     var spell = gamedata['spells'][spellname];
     dialog.user_data['spellname'] = spellname;
+    dialog.user_data['spellarg'] = spellarg;
     dialog.user_data['spell'] = spell;
     dialog.user_data['ui_index'] = ui_index;
     dialog.user_data['context_parent'] = parent; // dialog that will be the parent of any spawned inventory context menus
@@ -36138,7 +36140,7 @@ function init_buy_gamebucks_sku23(dialog, parent, spellname, ui_index) {
     dialog.ondraw = update_buy_gamebucks_sku23;
 }
 
-function invoke_gamebucks_sku_highlight_dialog(spellname) {
+function invoke_gamebucks_sku_highlight_dialog(spellname, spellarg) {
     var dialog = new SPUI.Dialog(gamedata['dialogs']['gamebucks_sku_highlight_dialog']);
     dialog.user_data['dialog'] = 'gamebucks_sku_highlight_dialog';
     install_child_dialog(dialog);
@@ -36148,7 +36150,7 @@ function invoke_gamebucks_sku_highlight_dialog(spellname) {
     dialog.user_data['pending'] = false;
     dialog.user_data['any_sku_has_bonus'] = 0; // ?
     dialog.user_data['expire_time'] = -1; // XXX does this need a per-sku override?
-    init_buy_gamebucks_sku23(dialog.widgets['sku'], dialog, spellname, 0);
+    init_buy_gamebucks_sku23(dialog.widgets['sku'], dialog, spellname, spellarg, 0);
 
     dialog.widgets['close_button'].onclick = close_parent_dialog;
 
@@ -36212,18 +36214,26 @@ function invoke_buy_gamebucks_dialog23(ver, reason, amount, order) {
 
             dialog.user_data['any_sku_has_bonus'] = Math.max(dialog.user_data['any_sku_has_bonus'], bonus_lines);
 
-            spell_list.push(spellname);
+            spell_list.push({'spellname': spellname, 'spellarg': null});
+
+            // always add a NON-bundled version of any loot-table-bearing SKU
+            if(spell['loot_table']) {
+                spell_list.push({'spellname': spellname, 'spellarg': {'want_loot':false}})
+            }
         }
     }
 
     spell_list.sort(function (a,b) {
-        var sa = gamedata['spells'][a], sb = gamedata['spells'][b];
+        var sa = gamedata['spells'][a['spellname']], sb = gamedata['spells'][b['spellname']];
+        // put loot-bearing SKUs first
+        var la = sa['loot_table'] && (!a['spellarg'] || a['spellarg']['want_loot']), lb = sb['loot_table'] && (!b['spellarg'] || b['spellarg']['want_loot']);
+        if(la && !lb) { return -1; } else if(!la && lb) { return 1; }
         var va = sa['quantity'], vb = sb['quantity'];
         if(va > vb) { return 1; } else if(va < vb) { return -1; } else { return 0; }
     });
 
     if(topup_bucks > 0) {
-        spell_list = ["BUY_GAMEBUCKS_TOPUP"].concat(spell_list);
+        spell_list = [{'spellname': 'BUY_GAMEBUCKS_TOPUP', 'spellarg': topup_bucks}].concat(spell_list);
     }
 
     if(spell_list.length < 1) {
@@ -36238,9 +36248,8 @@ function invoke_buy_gamebucks_dialog23(ver, reason, amount, order) {
     // SKU setup
     var i = 0;
     for(; i < spell_list.length; i++) {
-        var spellname = spell_list[i];
         var d = new SPUI.Dialog(gamedata['dialogs'][dialog.data['widgets']['sku']['dialog']]);
-        init_buy_gamebucks_sku23(d, dialog, spellname, i);
+        init_buy_gamebucks_sku23(d, dialog, spell_list[i]['spellname'], spell_list[i]['spellarg'] || null, i);
         dialog.add(d); dialog.widgets['sku'+i.toString()] = d;
         d.clip_to = [dialog.widgets['sunken'].xy[0], dialog.widgets['sunken'].xy[1],
                      dialog.widgets['sunken'].wh[0], dialog.widgets['sunken'].wh[1]];
@@ -36410,6 +36419,7 @@ function update_buy_gamebucks_sku23(dialog) {
 
     var spellname = dialog.user_data['spellname'];
     var spell = dialog.user_data['spell'];
+    var spellarg = dialog.user_data['spellarg'];
 
     dialog.widgets['loading_spinner'].show = dialog.widgets['hider'].show = pending;
     var hi = (dialog.mouse_enter_time > 0) && (!dialog.widgets['hider'].show) && !pending;
@@ -36444,7 +36454,6 @@ function update_buy_gamebucks_sku23(dialog) {
     }
 
     var alloy_qty = (spell['price_formula'] == 'gamebucks_topup' ? topup_bucks : spell['quantity']);
-    var spellarg = (spell['price_formula'] == 'gamebucks_topup' ? topup_bucks : null);
 
     var payment_currency = ('currency' in spell ? spell['currency'] : 'fbcredits');
     if(SPay.api == 'fbpayments' || SPay.api == 'xsolla') {
@@ -36566,7 +36575,7 @@ function update_buy_gamebucks_sku23(dialog) {
         }
     }
 
-    update_buy_gamebucks_sku2_attachments(dialog, spell);
+    update_buy_gamebucks_sku2_attachments(dialog, spell, spellarg);
 
     //dialog.widgets['price_display'].bg_image = player.get_any_abtest_value('price_display_asset', gamedata['store']['price_display_asset']);
     //if(payment_currency == 'kgcredits') {
@@ -36649,7 +36658,25 @@ function update_buy_gamebucks_sku23(dialog) {
     }
 }
 
-function update_buy_gamebucks_sku2_attachments(dialog, spell) {
+function expect_loot(loot_table) {
+    var item_list = [];
+    if(loot_table.length === 0) {
+        // it's empty
+    } else if(loot_table.length === 1 && ('multi' in loot_table[0])) {
+        goog.array.forEach(loot_table[0]['multi'], function(entry) {
+            if('spec' in entry) {
+                item_list.push(entry);
+            } else {
+                throw Error('unparseable loot table entry: '+JSON.stringify(entry));
+            }
+        });
+    } else {
+        throw Error('unparseable loot table: '+JSON.stringify(loot_table));
+    }
+    return item_list;
+}
+
+function update_buy_gamebucks_sku2_attachments(dialog, spell, spellarg) {
     if(!('attachments0' in dialog.widgets)) { return; } // inapplicable
     var item_list = [];
 
@@ -36659,19 +36686,9 @@ function update_buy_gamebucks_sku2_attachments(dialog, spell) {
                         'ui_name': dialog.widgets['attachments0'].data['widgets']['name']['ui_name_bonus_quantity'].replace('%qty', pretty_print_number(spell['quantity'] - spell['nominal_quantity'])).replace('%GAMEBUCKS_NAME', Store.gamebucks_ui_name())
                        });
     }
-    if('loot_table' in spell) {
+    if('loot_table' in spell && (!spellarg || spellarg['want_loot'])) {
         var loot_table = gamedata['loot_tables_client'][spell['loot_table']]['loot'];
-        if(loot_table.length === 1 && ('multi' in loot_table[0])) {
-            goog.array.forEach(loot_table[0]['multi'], function(entry) {
-                if('spec' in entry) {
-                    item_list.push(entry);
-                } else {
-                    throw Error('unparseable loot table entry: '+JSON.stringify(entry));
-                }
-            });
-        } else {
-            throw Error('unparseable loot table: '+JSON.stringify(loot_table));
-        }
+        item_list = item_list.concat(expect_loot(loot_table));
     }
 
     var visible_rows = dialog.data['widgets']['attachments']['array'][0] * dialog.data['widgets']['attachments']['array'][1];

@@ -14903,10 +14903,18 @@ class Store:
 
         elif spellname.startswith("BUY_GAMEBUCKS_") or spellname in ("FB_PROMO_GAMEBUCKS", "FB_TRIALPAY_GAMEBUCKS", "XSOLLA_PAYMENT", "FB_GAMEBUCKS_PAYMENT"):
             spell = gamedata['spells'][spellname]
+            want_loot = spell.get('loot_table') # whether to give loot items
+
             if spellname in ("FB_PROMO_GAMEBUCKS", "FB_TRIALPAY_GAMEBUCKS", "XSOLLA_PAYMENT", "FB_GAMEBUCKS_PAYMENT", "BUY_GAMEBUCKS_TOPUP"):
                 bucks = int(spellarg)
             else:
                 bucks = spell['quantity']
+                if want_loot:
+                    if spellarg:
+                        assert isinstance(spellarg, dict)
+                        if not spellarg.get('want_loot', True):
+                            want_loot = False
+
             session.player.resources.gain_gamebucks(bucks, reason='payment')
             metric_event_coded(session.user.user_id, '5090_purchase_gamebucks', {'amount_added':bucks,
                                                                                  'sku': spellname,
@@ -14946,7 +14954,7 @@ class Store:
                     metric_event_coded(session.user.user_id, '4501_payer_promo_claimed', props.copy())
                 metric_event_coded(session.user.user_id, '4590_promo_gamebucks_earned', props.copy())
 
-            if spell.get('loot_table'): # item bundle
+            if want_loot: # item bundle
                 assert not gift_order # XXX no code path yet for gifted bundles
                 items = session.get_loot_items(session.player, gamedata['loot_tables'][spell['loot_table']]['loot'], -1, -1)
                 if items:
