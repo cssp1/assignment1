@@ -39,11 +39,13 @@ class ChatChannelMgr(object):
         if channame in self.channels:
             self.channels[channame].leave(session)
 
-    def send(self, id, channame, sender, text, log = True, exclude_listener = None):
+    def send(self, channame, id, sender, text, log = True, exclude_listener = None):
         if channame in self.channels:
             self.channels[channame].send(id, sender, text, exclude_listener = exclude_listener)
         if self.relay:
-            self.relay.chat_send({'id':id, 'channel':channame, 'sender':sender, 'text': text}, log = log)
+            props = {'channel':channame, 'sender':sender, 'text': text}
+            if id: props['id'] = id
+            self.relay.chat_send(props, log = log)
 
     def relay_recv(self, data):
         channel = data['channel']

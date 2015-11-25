@@ -165,7 +165,6 @@ class NoSQLClient (object):
         self.seen_sessions = False
         self.seen_client_perf = False
         self.seen_chat = False
-        self.chat_id_generator = None
         self.seen_chat_reports = False
         self.seen_logs = {}
         self.seen_battles = False
@@ -732,19 +731,18 @@ class NoSQLClient (object):
             coll.create_index([('channel',pymongo.ASCENDING),('time',pymongo.ASCENDING)])
             self.seen_chat = True
         return coll
-    def chat_record(self, channel, sender, text, reason=''):
-        # generate and return a unique ID for the message
-        if not self.chat_id_generator:
-            self.chat_id_generator = SpinNoSQLId.Generator()
-        self.chat_id_generator.set_time(self.time)
-        id = self.chat_id_generator.generate()
+
+    # note: id must be a pre-generated unique ID compatible with MongoDB, or None to auto-generate one (that won't be returned)
+    def chat_record(self, channel, id, sender, text, reason=''):
         self.instrument('chat_record(%s)'%reason, self._chat_record, (id, channel, sender, text))
         return id
 
     def _chat_record(self, id, channel, sender, text):
-        props = {'_id':self.encode_object_id(id), 'time':self.time,'channel':channel,'sender':sender}
+        props = {'time':self.time,'channel':channel,'sender':sender}
         if text:
             props['text'] = unicode(text)
+        if id:
+            props['_id'] = self.encode_object_id(id)
         self.chat_buffer_table().with_options(write_concern = pymongo.write_concern.WriteConcern(w=0)).insert_one(props)
 
     def decode_chat_row(self, row):
@@ -2842,7 +2840,7 @@ if __name__ == '__main__':
         # test chat
         client.chat_buffer_table().drop(); client.seen_chat = False
         for n in range(4):
-            client.chat_record('global_en', {'user_id': 1112, 'chat_name': 'test'}, 'Test message %d' % n)
+            client.chat_record('global_en', None, {'user_id': 1112, 'chat_name': 'test'}, 'Test message %d' % n)
         chat_context = client.chat_get_context('global_en', 1112, time_now, 5, limit = 10)
         assert len(chat_context) == 4
 

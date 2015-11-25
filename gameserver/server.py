@@ -3785,9 +3785,10 @@ class Session(object):
         if self.player.home_region:
             sender_info['home_region'] = self.player.home_region
 
-        id = None
+        id = gamesite.nosql_id_generator.generate()
+
         if gamesite.chat_log:
-            id = gamesite.nosql_client.chat_record(channel, sender_info, text, reason='do_chat_send(local)')
+            gamesite.nosql_client.chat_record(channel, id, sender_info, text, reason='do_chat_send(local)')
             gamesite.chat_log.event(server_time, {'chat_name': sender_info['chat_name'],
                                                   'id': id, 'channel': channel,
                                                   'user_id': self.user.user_id,
@@ -3805,10 +3806,10 @@ class Session(object):
                 self.chat_recv(channel, id, sender_info, text, force = True)
 
             # privately send to developers
-            # gamesite.chat_mgr.send('DEVELOPER', sender_info, '(MUTED) '+text)
+            # gamesite.chat_mgr.send('DEVELOPER', None, sender_info, '(MUTED) '+text)
 
         else:
-            gamesite.chat_mgr.send(channel, sender_info, text, exclude_listener = self)
+            gamesite.chat_mgr.send(channel, id, sender_info, text, exclude_listener = self)
             self.chat_recv(channel, id, sender_info, text, retmsg = retmsg)
 
         if (not props) or (props.get('type','default') in ('default','turf_winner',)):
@@ -24504,7 +24505,7 @@ class GAMEAPI(resource.Resource):
             if togo > 0:
                 success = False
                 retmsg.append(["CHAT_RECV", channel, {'chat_name': 'System', 'time': server_time, 'facebook_id': -1, 'user_id': -1},
-                               SpinHTTP.wrap_string(gamedata['errors']['CHAT_THROTTLED']['ui_name'].replace('%d', str(togo)))])
+                               SpinHTTP.wrap_string(gamedata['errors']['CHAT_THROTTLED']['ui_name'].replace('%d', str(togo))), None])
 
             retmsg.append(["COOLDOWNS_UPDATE", session.player.cooldowns])
 
@@ -26237,12 +26238,12 @@ class GAMEAPI(resource.Resource):
                     session.send([upd], flush_now = False) # avoid storms
 
         if send_to_net:
-            gamesite.chat_mgr.send('CONTROL', {'secret':SpinConfig.config['proxy_api_secret'],
-                                               'server':spin_server_name,
-                                               'method':'broadcast_map_update',
-                                               'args': { 'region_id': region_id, 'base_id': base_id, 'data': data,
-                                                         'server': spin_server_name, 'originator': originator },
-                                               }, '', log = False)
+            gamesite.chat_mgr.send('CONTROL', None, {'secret':SpinConfig.config['proxy_api_secret'],
+                                                     'server':spin_server_name,
+                                                     'method':'broadcast_map_update',
+                                                     'args': { 'region_id': region_id, 'base_id': base_id, 'data': data,
+                                                               'server': spin_server_name, 'originator': originator },
+                                                     }, '', log = False)
 
     def broadcast_map_attack(self, region_id, feature, attacker_id, defender_id, summary, pcache_info, send_to_net = True, msg = None):
         if msg is None:
@@ -26254,15 +26255,15 @@ class GAMEAPI(resource.Resource):
                     session.send([upd], flush_now = (session.user.user_id in (attacker_id, defender_id)))
 
         if send_to_net:
-            gamesite.chat_mgr.send('CONTROL', {'secret':SpinConfig.config['proxy_api_secret'],
-                                               'server':spin_server_name,
-                                               'method':'broadcast_map_attack',
-                                               'args': { 'msg': msg,
-                                                         'region_id': region_id, 'feature': feature,
-                                                         'attacker_id': attacker_id, 'defender_id': defender_id,
-                                                         'summary': summary, 'pcache_info': pcache_info,
-                                                         'server': spin_server_name },
-                                               }, '', log = False)
+            gamesite.chat_mgr.send('CONTROL', None, {'secret':SpinConfig.config['proxy_api_secret'],
+                                                     'server':spin_server_name,
+                                                     'method':'broadcast_map_attack',
+                                                     'args': { 'msg': msg,
+                                                               'region_id': region_id, 'feature': feature,
+                                                               'attacker_id': attacker_id, 'defender_id': defender_id,
+                                                               'summary': summary, 'pcache_info': pcache_info,
+                                                               'server': spin_server_name },
+                                                     }, '', log = False)
 
     def handle_protocol_error(self, session, retmsg, arg):
         # called when there is a problem with the AJAX message the client sent
