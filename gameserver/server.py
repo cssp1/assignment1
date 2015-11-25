@@ -26553,6 +26553,9 @@ class GameSite(server.Site):
         d.addErrback(lambda err, self=self: self.exception_log.event(server_time, 'stop_all_sessions() exception: %s' % err.getTraceback()))
         d.addCallback(lambda _, self=self: self.stop_all_clients())
         d.addErrback(lambda err, self=self: self.exception_log.event(server_time, 'stop_all_clients() exception: %s' % err.getTraceback()))
+        if self.chat_client:
+            d.addCallback(lambda _, self=self: self.chat_client.disconnect())
+            d.addErrback(lambda err, self=self: self.exception_log.event(server_time, 'chat_client.disconnect() exception: %s' % err.getTraceback()))
         d.addCallback(lambda _: io_system.shutdown())
         d.addErrback(lambda err, self=self: self.exception_log.event(server_time, 'io_system.shutdown() exception: %s' % err.getTraceback()))
         # send a final server status update when we're finished
