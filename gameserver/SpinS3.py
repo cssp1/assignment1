@@ -39,6 +39,7 @@ class Policy404(object):
     IGNORE = 1
 
 # note: assumes "func" returns a requests response object, or None if you don't care about HTTP errors
+# XXX this should update header timestamps on retry
 def retry_logic(func_name, bucket, filename, policy_404, func, *args, **kwargs):
     attempt = 0
     last_err = None

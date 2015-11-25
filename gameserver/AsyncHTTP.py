@@ -24,12 +24,13 @@ class AsyncHTTPRequester(object):
     CALLBACK_FULL = 'full'
 
     class Request:
-        def __init__(self, qtime, method, url, headers, callback, error_callback, postdata, max_tries, callback_type):
+        def __init__(self, qtime, method, url, headers, callback, error_callback, preflight_callback, postdata, max_tries, callback_type):
             self.method = method
             self.url = str(url)
             self.headers = headers
             self.callback = callback
             self.error_callback = error_callback
+            self.preflight_callback = preflight_callback
             self.postdata = postdata
             self.fire_time = qtime
             self.max_tries = max_tries
@@ -98,7 +99,7 @@ class AsyncHTTPRequester(object):
             self.idle_cb = None
             cb()
 
-    def queue_request(self, qtime, url, user_callback, method='GET', headers=None, postdata=None, error_callback=None, max_tries=None, callback_type = CALLBACK_BODY_ONLY):
+    def queue_request(self, qtime, url, user_callback, method='GET', headers=None, postdata=None, error_callback=None, preflight_callback=None, max_tries=None, callback_type = CALLBACK_BODY_ONLY):
         if self.total_request_limit > 0 and len(self.queue) >= self.total_request_limit:
             self.log_exception_func('AsyncHTTPRequester queue is full, dropping request %s %s!' % (method,url))
             self.n_dropped += 1
@@ -109,7 +110,8 @@ class AsyncHTTPRequester(object):
         else:
             max_tries = max(max_tries, self.default_max_tries)
 
-        request = AsyncHTTPRequester.Request(qtime, method, url, headers, user_callback, error_callback, postdata, max_tries, callback_type)
+        if headers: assert isinstance(headers, dict)
+        request = AsyncHTTPRequester.Request(qtime, method, url, headers, user_callback, error_callback, preflight_callback, postdata, max_tries, callback_type)
 
         self.queue.append(request)
         if self.verbosity >= 1:
@@ -121,6 +123,8 @@ class AsyncHTTPRequester(object):
 
     def _send_request(self):
         request = self.queue.popleft()
+        if request.preflight_callback: # allow caller to adjust headers/url/etc at the last minute before transmission
+            request.preflight_callback(request)
         self.n_attempted += 1
         self.on_wire.add(request)
         if self.verbosity >= 1:

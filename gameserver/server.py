@@ -855,24 +855,37 @@ class S3IOSystem (IOSystem):
         return (current >= limit)
     def get_stats(self):
         return self.s3_req.get_stats_html(server_time)
+
+    # "preflight" callbacks update the request URL/headers to bump timestamps in case of retry problems
+    def preflight_get_request(self, bucket, objname, request):
+        request.url, request.headers = self.s3.get_request(bucket, objname)
+    def preflight_put_request(self, bucket, objname, length, request):
+        request.url, request.headers = self.s3.put_request(bucket, objname, length)
+    def preflight_delete_request(self, bucket, objname, request):
+        request.url, request.headers = self.s3.delete_request(bucket, objname)
+
     def do_async_read(self, path, success_cb, error_cb, procnum):
         bucket, objname = path
         url, headers = self.s3.get_request(bucket, objname)
         self.s3_req.queue_request(server_time, url, success_cb,
-                                  error_callback = error_cb, method = 'GET', headers = headers)
+                                  error_callback = error_cb,
+                                  preflight_callback = functools.partial(self.preflight_get_request, bucket, objname),
+                                  method = 'GET', headers = headers)
     def do_async_write(self, path, buf, success_cb, fsync, procnum):
         bucket, objname = path
         url, headers = self.s3.put_request(bucket, objname, len(buf))
         delay = gamedata['server']['AsyncHTTP_S3']['post_write_delay']
         self.s3_req.queue_request(server_time, url, functools.partial(self.async_write_helper, 0, success_cb, delay),
-                                  error_callback = self.async_write_error, method = 'PUT', headers = headers,
-                                  postdata = buf)
+                                  error_callback = self.async_write_error,
+                                  preflight_callback = functools.partial(self.preflight_put_request, bucket, objname, len(buf)),
+                                  method = 'PUT', headers = headers, postdata = buf)
     def do_async_delete(self, path, success_cb, procnum):
         bucket, objname = path
         url, headers = self.s3.delete_request(bucket, objname)
         self.s3_req.queue_request(server_time, url, functools.partial(self.async_write_helper, 1, success_cb, 0),
-                                  error_callback = self.async_write_error, method = 'DELETE', headers = headers)
-
+                                  error_callback = self.async_write_error,
+                                  preflight_callback = functools.partial(self.preflight_delete_request, bucket, objname),
+                                  method = 'DELETE', headers = headers)
 
 IO_SYSTEMS = { 'file': FileIOSystem, 'ioslave': IOSlaveIOSystem, 's3': S3IOSystem }
 io_system = None
