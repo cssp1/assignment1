@@ -1940,11 +1940,11 @@ def range_overlap(a0, a1, b0, b1):
     return True
 
 # keep track of how many map bases are spawned by time interval
-# data structure is a list of [t,pop] pairs ("spawn count is 'pop' at time 't'")
-def spawn_pop_init(): return [[0,0]]
+# data structure is a list of [t,pop,templates] tuples ("spawn count is 'pop' at time 't'")
+def spawn_pop_init(): return [[0,0,[]]]
 
 # at time "when", add "incr" bases (may be negative to remove bases)
-def spawn_pop_update(pop, when, incr):
+def spawn_pop_update(pop, when, incr, ui_name):
     i = 0
     while i < len(pop):
         if pop[i][0] >= when:
@@ -1952,22 +1952,26 @@ def spawn_pop_update(pop, when, incr):
         i += 1
 
     if i >= len(pop) or pop[i][0] != when:
-        pop.insert(i, [when, pop[i-1][1]])
+        pop.insert(i, [when, pop[i-1][1], pop[i-1][2][:]])
 
     for j in xrange(i, len(pop)):
         pop[j][1] += incr
+        if incr > 0:
+            pop[j][2].append(ui_name)
+        elif incr < 0:
+            pop[j][2].remove(ui_name)
 
 if 0: # test code
     p = spawn_pop_init()
-    spawn_pop_update(p, 2, 100)
-    spawn_pop_update(p, 4, -100)
-    spawn_pop_update(p, 2, 100)
-    spawn_pop_update(p, 4, -100)
-    spawn_pop_update(p, 3, 50)
-    spawn_pop_update(p, 5, -50)
-    spawn_pop_update(p, 1, 50)
+    spawn_pop_update(p, 2, 100, "a")
+    spawn_pop_update(p, 4, -100, "a")
+    spawn_pop_update(p, 2, 100, "b")
+    spawn_pop_update(p, 4, -100, "b")
+    spawn_pop_update(p, 3, 50, "c")
+    spawn_pop_update(p, 5, -50, "c")
+    spawn_pop_update(p, 1, 50, "d")
     print p
-    assert p == [[0, 0], [1, 50], [2, 250], [3, 300], [4, 100], [5, 50]]
+    assert p == [[0, 0, []], [1, 50, ['d']], [2, 250, ['a','b','d']], [3, 300, ['a','b','c','d']], [4, 100, ['c','d']], [5, 50, ['d']]]
     sys.exit(0)
 
 
@@ -1977,6 +1981,14 @@ def check_hives(hives):
 
     for spawn_array_name, spawn_array in filter(lambda k_v: k_v[0] == 'spawn' or k_v[0].startswith('spawn_for'), hives.iteritems()):
         spawn_pop = spawn_pop_init()
+
+        # hack - instead of figuring out all the complex logic to handle infinitely-repeating events that mesh
+        # with once-only events, instead just make a fixed number of copies of repeats, and ignore problems that
+        # happen "far" in the future
+        future_limit = float('inf')
+        past_limit = time_now
+        repeat_copies = 5
+
         if spawn_array_name == 'spawn':
             region_id = 'ALL'
         else:
@@ -1997,38 +2009,51 @@ def check_hives(hives):
                     error |= 1
                     print 'hive %s: these two templates have overlapping ID ranges (note: num can be multiplied by %.2f for max_region_pop)!\n%s\n%s' % (spawn_array_name, max_region_pop, repr(item), repr(other))
             if item.get('active', 1):
-                if 'spawn_times' in item:
-                    for start_time, end_time in item['spawn_times']:
-                        spawn_pop_update(spawn_pop, start_time if start_time > 0 else 0, item['num']) # hives appear
-                        if end_time > 0:
-                            spawn_pop_update(spawn_pop, end_time, -item['num']) # hives disappear
+                if (('start_time' in item) or ('end_time' in item)) and ('spawn_times' in item):
+                    error |= 1
+                    print 'hive %s: this template has both spawn_times and start_time/end_time specified\n%s' % (spawn_array_name, repr(item))
 
-                    if ('start_time' in item) or ('end_time' in item):
-                        error |= 1
-                        print 'hive %s: this template has both spawn_times and start_time/end_time specified\n%s' % (spawn_array_name, repr(item))
+                if 'spawn_times' in item:
+                    start_end_list = item['spawn_times']
                 else:
-                    start_time = item.get('start_time',-1)
-                    end_time = item.get('end_time',-1)
-                    spawn_pop_update(spawn_pop, start_time if start_time > 0 else 0, item['num']) # hives appear
-                    if end_time > 0:
-                        spawn_pop_update(spawn_pop, end_time, -item['num']) # hives disappear
+                    start_end_list = [[item.get('start_time',-1), item.get('end_time',-1)]]
+
+                repeat_interval = item.get('repeat_interval',0)
+                if repeat_interval > 0:
+                    # set time range we care about for checking hive populations
+
+                    # don't care about anything after the last simulated run of any scheduled repeating event
+                    future_limit = min(future_limit, start_end_list[-1][0] + (repeat_copies-1) * repeat_interval)
+                    # DO care about old repeating runs, even if before current time
+                    past_limit = min(past_limit, start_end_list[0][0])
+
+                    # for repeating events, duplicate the start_end entries repeat_copies times
+                    start_end_list = [[x[0] + repeat_interval*rep, x[1] + repeat_interval*rep] for rep in xrange(repeat_copies) for x in start_end_list]
+
+                for start, end in start_end_list:
+                    spawn_pop_update(spawn_pop, start if start > 0 else 0, item['num'], item['template']) # hives appear
+                    if end > 0:
+                        spawn_pop_update(spawn_pop, end, -item['num'], item['template']) # hives disappear
 
         # check future spawn population for abnormally low or high intervals
         if len(spawn_pop) > 1 and gamedata['game_id'] != 'mf': # ignore MF
             i = 0
-            while spawn_pop[i+1][0] < time_now: # ignore intervals before current time
+            while spawn_pop[i+1][0] < past_limit: # ignore intervals before past_limit
                 i += 1
+
             for j in xrange(i, len(spawn_pop)):
-                entry = spawn_pop[j]
+                entry_t, pop, ui_names = spawn_pop[j]
+                if entry_t >= future_limit: # ignore intervals further in the future than we've computed out
+                    break
                 warn = None
-                if entry[1] < 10:
-                    warn  = 'LOW (%d)' % entry[1]
-                elif entry[1] >= 1000:
-                    warn = 'HIGH (%d)' % entry[1]
+                if pop < 10:
+                    warn  = 'LOW (%d)' % pop
+                elif pop >= 1000:
+                    warn = 'HIGH (%d)' % pop
                 if warn:
-                    interval = [entry[0], spawn_pop[j+1][0] if j+1 < len(spawn_pop) else -1]
+                    interval = [entry_t, spawn_pop[j+1][0] if j+1 < len(spawn_pop) else -1]
                     ui_interval = map(lambda x: time.strftime('%Y %b %d', time.gmtime(x)) if x > 0 else 'infinity', interval)
-                    print 'warning:', warn, 'number of hives set to spawn in region %s in the interval %d,%d (%s -> %s)' % (region_id, interval[0], interval[1], ui_interval[0], ui_interval[1])
+                    print 'warning:', warn, 'number of hives set to spawn in region %s in the interval %d,%d (%s -> %s): %r' % (region_id, interval[0], interval[1], ui_interval[0], ui_interval[1], ui_names)
             #print spawn_pop[i:]
 
     for strid, data in hives['templates'].iteritems():
