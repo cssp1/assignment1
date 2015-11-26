@@ -38,7 +38,7 @@ def migrate_to_s3(filename):
         return
     print 'uploaded'
 
-    #wrote_data = con.do_delete(bucket, objname)
+    #wrote_data = con.delete(bucket, objname)
     #print 'DELETE OK', wrote_data
 
 def migrate_from_s3(data):

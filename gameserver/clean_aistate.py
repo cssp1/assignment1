@@ -19,4 +19,4 @@ if __name__ == '__main__':
         if data['name'].endswith('_tr_10.txt'):
             if data['mtime'] < time_now - 3600:
                 print "DEL", data['name']
-                con.do_delete(SpinConfig.config['aistate_s3_bucket'], data['name'])
+                con.delete(SpinConfig.config['aistate_s3_bucket'], data['name'])

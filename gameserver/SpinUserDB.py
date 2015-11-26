@@ -223,7 +223,7 @@ class S3Driver (Driver):
     def sync_write_user(self, id, buf): self._sync_write(*(self.get_user_path(id)+(buf,)))
     def sync_write_player(self, id, buf): self._sync_write(*(self.get_player_path(id)+(buf,)))
     def sync_write_base(self, region, id, buf): self._sync_write(*(self.get_base_path(region, id)+(buf,)))
-    def sync_delete_base(self, region, id): self.s3con.do_delete(*self.get_base_path(region, id))
+    def sync_delete_base(self, region, id): self.s3con.delete(*self.get_base_path(region, id))
     def collect_aistate_garbage(self, min_time): pass # auto-collected by S3 lifecycle rule
 
 DRIVERS = { 'flat': FlatDirectoryDriver,
