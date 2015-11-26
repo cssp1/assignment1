@@ -39,7 +39,6 @@ class Policy404(object):
     IGNORE = 1
 
 # note: assumes "func" returns a requests response object, or None if you don't care about HTTP errors
-# XXX this should update header timestamps on retry
 def retry_logic(func_name, bucket, filename, policy_404, func, *args, **kwargs):
     attempt = 0
     last_err = None
@@ -205,12 +204,8 @@ class S3 (object):
     # note! if sharing this socket with an external process like gzip, set allow_keepalive = False,
     # otherwise the socket will not be closed when the server has finished sending all data.
     def get_open(self, bucket, filename, allow_keepalive = True):
-        url, headers = self.get_request(bucket, filename)
-        if not allow_keepalive:
-            headers['Connection'] = 'close'
-
         response = retry_logic('get_open', bucket, filename, Policy404.RAISE,
-                               self.requests_session.get, url, headers = headers, stream = True, timeout = S3_REQUEST_TIMEOUT)
+                               self.do_get_open, bucket, filename, allow_keepalive)
 
         if not allow_keepalive:
             # remove nonblocking mode on the file descriptor
@@ -221,6 +216,12 @@ class S3 (object):
                 fcntl.fcntl(fdno, fcntl.F_SETFL, flags)
 
         return response.raw
+
+    def do_get_open(self, bucket, filename, allow_keepalive):
+        url, headers = self.get_request(bucket, filename)
+        if not allow_keepalive:
+            headers['Connection'] = 'close'
+        return self.requests_session.get(url, headers=headers, stream = True, timeout = S3_REQUEST_TIMEOUT)
 
     # perform synchronous GET to disk file
     def get_file(self, bucket, filename, dest, bufsize=64*1024):
@@ -253,10 +254,8 @@ class S3 (object):
             mtime_str = None
 
             # use HEAD method on object
-            url, headers = self.get_request(bucket, filename, method = 'HEAD')
-
             response = retry_logic('exists', bucket, filename, Policy404.IGNORE,
-                                   self.requests_session.head, url, headers = headers, timeout = S3_REQUEST_TIMEOUT)
+                                   self.do_exists, bucket, filename)
             if response.status_code == 404:
                 return False
             mtime_str = response.headers['Last-Modified']
@@ -270,36 +269,44 @@ class S3 (object):
                 return ls[0]['mtime']
             else:
                 return False
+    def do_exists(self, bucket, filename):
+        url, headers = self.get_request(bucket, filename, method = 'HEAD')
+        return self.requests_session.head(url, headers=headers, timeout = S3_REQUEST_TIMEOUT)
 
     # get entire contents of an S3 object
     def get_slurp(self, bucket, filename, query = None):
-        url, headers = self.get_request(bucket, filename, query = query)
         response = retry_logic('get_slurp', bucket, filename, Policy404.RAISE,
-                               self.requests_session.get, url, headers = headers, timeout = S3_REQUEST_TIMEOUT)
+                               self.do_get_slurp, bucket, filename, query)
         buf = response.content
         if 'Content-Length' in response.headers:
             assert len(buf) == int(response.headers['Content-Length'])
         return buf
+    def do_get_slurp(self, bucket, filename, query):
+        url, headers = self.get_request(bucket, filename, query = query)
+        return self.requests_session.get(url, headers=headers, timeout = S3_REQUEST_TIMEOUT)
 
     # synchronous DELETE
+    def delete(self, bucket, filename):
+        if self.verbose: print 'DELETE', bucket, filename
+        response = retry_logic('delete', bucket, filename, Policy404.IGNORE,
+                               self.do_delete, bucket, filename)
+        return response.content
     def do_delete(self, bucket, filename):
         url, headers = self.delete_request(bucket, filename)
-        if self.verbose: print 'DELETE', url
-        response = retry_logic('do_delete', bucket, filename, Policy404.IGNORE,
-                               self.requests_session.delete, url, headers = headers, timeout = S3_REQUEST_TIMEOUT)
-        return response.content
+        return self.requests_session.delete(url, headers=headers, timeout = S3_REQUEST_TIMEOUT)
 
     # synchronous PUT from memory buffer
     def put_buffer(self, bucket, filename, raw_buf, **kwargs):
         return self.put_putbuf(bucket, filename, self.PutBuf(buf = raw_buf), **kwargs)
 
     def put_putbuf(self, bucket, filename, buf, **kwargs):
-        url, headers = self.put_request_from_buf(buf, bucket, filename, **kwargs)
-        if self.verbose: print 'PUT', len(buf.buffer()), 'bytes to', url
-
+        if self.verbose: print 'PUT', len(buf.buffer()), 'bytes to', bucket, filename
         response = retry_logic('put_putbuf', bucket, filename, Policy404.RAISE,
-                               self.requests_session.put, url, headers = headers, data = buf.buffer(), timeout = S3_REQUEST_TIMEOUT)
+                               self.do_put_putbuf, bucket, filename, buf, kwargs)
         return response.content
+    def do_put_putbuf(self, bucket, filename, buf, kwargs):
+        url, headers = self.put_request_from_buf(buf, bucket, filename, **kwargs)
+        return self.requests_session.put(url, headers=headers, data=buf.buffer(), timeout = S3_REQUEST_TIMEOUT)
 
     # synchronous PUT from disk file
     # optionally override timeout for slow/big streaming uploads
@@ -314,13 +321,13 @@ class S3 (object):
             return self.put_putbuf(bucket, filename, buf)
         else:
             size = os.fstat(fd.fileno()).st_size
-            url, headers = self.put_request(bucket, filename, size, **kwargs)
             retry_logic('put_file', bucket, filename, Policy404.RAISE,
-                        self.do_put_file_streaming, url, headers, fd, timeout)
+                        self.do_put_file_streaming, bucket, filename, size, fd, timeout, kwargs)
             return size
 
-    def do_put_file_streaming(self, url, headers, fd, timeout):
+    def do_put_file_streaming(self, bucket, filename, size, fd, timeout, kwargs):
         fd.seek(0)
+        url, headers = self.put_request(bucket, filename, size, **kwargs)
         return self.requests_session.put(url, data=fd, headers=headers, timeout = timeout)
 
     # synchronous bucket listing
@@ -417,5 +424,5 @@ if __name__ == '__main__':
     # DELETE
     if 1:
         for filename in ('testdir/zzz.txt', 'testdir/zzz2.txt'):
-            wrote_data = con.do_delete(TEST_BUCKET, filename)
+            wrote_data = con.delete(TEST_BUCKET, filename)
             print 'DELETE OK', wrote_data
