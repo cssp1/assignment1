@@ -5482,7 +5482,7 @@ session.get_item_spec_forced_expiration = function(spec, prev_expire_time, ref_t
 };
 
 /** Query a loot table for what items you'd get (just for GUI purposes, has nothing to do with actual looting mechanics).
-    @return {Array<!Object>} loot items */
+    @return {!LootTable.Result} */
 session.get_loot_items = function(player, loot_table) {
     return LootTable.get_loot(gamedata['loot_tables_client'], loot_table, function(pred) { return read_predicate(pred).is_satisfied(player, null); });
 };
@@ -36239,7 +36239,7 @@ function invoke_buy_gamebucks_dialog23(ver, reason, amount, order, options) {
             // get expected loot
             var item_list = null;
             if('loot_table' in spell) {
-                item_list = session.get_loot_items(player, gamedata['loot_tables_client'][spell['loot_table']]['loot']);
+                item_list = session.get_loot_items(player, gamedata['loot_tables_client'][spell['loot_table']]['loot']).item_list;
                 if(item_list.length <= 0) { item_list = null; }
             }
 
@@ -36423,7 +36423,7 @@ function update_buy_gamebucks_dialog23_warning_text(dialog) {
 /** Get the UI-visible expire time for an active BUY_GAMEBUCKS sku spell
     @param {!Object} spell
     @return {number} */
-function gamebucks_spell_ui_expire_time(spell) {
+function gamebucks_spell_ui_expire_time(spell, spellarg) {
     var expire_time = -1;
     goog.array.forEach(['show_if', 'requires'], function(pred_name) {
         if(pred_name in spell) {
@@ -36433,6 +36433,17 @@ function gamebucks_spell_ui_expire_time(spell) {
             }
         }
     });
+
+    // get expire time of loot attachments
+    if('loot_table' in spell && (!spellarg || spellarg['want_loot'])) {
+        var loot = session.get_loot_items(player, gamedata['loot_tables_client'][spell['loot_table']]['loot']);
+        if(loot.predicate) {
+            var t = read_predicate(loot.predicate).ui_expire_time(player);
+            if(t > 0) {
+                expire_time = (expire_time > 0 ? Math.min(expire_time, t) : t);
+            }
+        }
+    }
     return expire_time;
 }
 
@@ -36582,7 +36593,7 @@ function update_buy_gamebucks_sku23(dialog) {
     }
 
     // display expire time, if applicable
-    var expire_time = gamebucks_spell_ui_expire_time(spell);
+    var expire_time = gamebucks_spell_ui_expire_time(spell, spellarg);
 
     if(dialog.data['widgets']['expire_time']['show'] && expire_time > 0) {
         dialog.widgets['expire_time'].show = true;
@@ -36698,7 +36709,7 @@ function update_buy_gamebucks_sku2_attachments(dialog, spell, spellarg) {
                        });
     }
     if('loot_table' in spell && (!spellarg || spellarg['want_loot'])) {
-        item_list = item_list.concat(session.get_loot_items(player, gamedata['loot_tables_client'][spell['loot_table']]['loot']));
+        item_list = item_list.concat(session.get_loot_items(player, gamedata['loot_tables_client'][spell['loot_table']]['loot']).item_list);
     }
 
     var visible_rows = dialog.data['widgets']['attachments']['array'][0] * dialog.data['widgets']['attachments']['array'][1];

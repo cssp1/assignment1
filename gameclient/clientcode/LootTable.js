@@ -30,14 +30,22 @@ LootTable.CondEntry;
 /** @typedef {!Array<!LootTable.CondEntry>} */
 LootTable.CondChain;
 
+/** Final result of loot table query. Includes the item list as well as the most restrictive predicate
+    that was referenced in creating it.
+    @typedef {{item_list: !LootTable.ItemList, predicate: (LootTable.PredDict|null)}} */
+LootTable.Result;
+
 /** @param {!Object} tables - gamedata['loot_tables'], in case there is an external reference
     @param {!LootTable.LootList} tab - the table you want the result from
     @param {function(!LootTable.PredDict):boolean} cond_resolver - resolves predicates
-    @return {!LootTable.ItemList} item list */
+    @return {!LootTable.Result} */
 LootTable.get_loot = function(tables, tab, cond_resolver) {
     if(!(tab instanceof Array)) { throw Error('non-list loot table '+JSON.stringify(tab)); }
 
-    if(tab.length <= 0) { return []; }
+    /** @type {!LootTable.Result} */
+    var ret = { item_list: [], predicate: null };
+
+    if(tab.length <= 0) { return ret; }
 
     var groupnum;
     if(tab.length === 1) {
@@ -60,20 +68,17 @@ LootTable.get_loot = function(tables, tab, cond_resolver) {
 
     var data = tab[groupnum];
 
-    /** @type {!LootTable.ItemList} */
-    var ret;
-
     if('table' in data) {
-        ret = LootTable.get_loot(tables, tables[data['table']]['loot'], cond_resolver);
+        ret = LootTable.combine_result(ret, LootTable.get_loot(tables, tables[data['table']]['loot'], cond_resolver));
     } else if('cond' in data) {
         var cond = /** @type {LootTable.CondChain} */ (data['cond']);
-        ret = [];
         for(var i = 0; i < cond.length; i++) {
             var pred_result = cond[i];
             var pred = /** @type {!LootTable.PredDict} */ (pred_result[0]);
             var result = /** @type {!LootTable.LootList} */ (pred_result[1]);
             if(cond_resolver(pred)) {
-                ret = LootTable.get_loot(tables, (result instanceof Array) ? result : [result], cond_resolver);
+                ret.predicate = pred;
+                ret = LootTable.combine_result(ret, LootTable.get_loot(tables, (result instanceof Array) ? result : [result], cond_resolver));
                 break;
             }
         }
@@ -89,25 +94,40 @@ LootTable.get_loot = function(tables, tab, cond_resolver) {
             // pick a random stack amount between the min and max, inclusive
             ret_item['stack'] = Math.floor(random_stack[0] + Math.random()*(random_stack[1]+1-random_stack[0]));
         }
-        ret = [ret_item];
+        ret.item_list = [ret_item];
     } else if('multi' in data) {
         // combine multiple loot drops into a flat list
         var multi = /** @type {!LootTable.LootList} */ (data['multi']);
-        ret = goog.array.reduce(multi, /** !LootTable.ItemList */ function(/** !LootTable.ItemList */ accum, /** !LootTable.LootEntry */ x) {
+        ret = goog.array.reduce(multi, /** !LootTable.ItemList */ function(/** !LootTable.Result */ accum, /** !LootTable.LootEntry */ x) {
             var next = LootTable.get_loot(tables, (x instanceof Array) ? x : [x], cond_resolver);
-            return (/** @type {!Array<!Object>} */ (accum.concat(next)));
-        }, /** @type {!LootTable.ItemList} */ ([]));
+            return LootTable.combine_result(accum, next);
+        }, ret);
 
         if('multi_stack' in data) {
-            goog.array.forEach(ret, function(item) {
+            goog.array.forEach(ret.item_list, function(/** !LootTable.ItemDict */ item) {
                 item['stack'] = ('stack' in item ? (/** @type {number} */ (item['stack'])) : 1) * /** @type {number} */ (data['multi_stack']);
             });
         }
     } else if(data['nothing']) {
-        return [];
+        // nothing
     } else {
         throw Error('invalid loot table entry ' + JSON.stringify(data));
     }
 
+    return ret;
+};
+
+/** @param {!LootTable.Result} a
+    @param {!LootTable.Result} b
+    @return {!LootTable.Result} */
+LootTable.combine_result = function(a, b) {
+    /** @type {!LootTable.Result} */
+    var ret = {item_list: a.item_list.concat(b.item_list),
+               predicate: null};
+    if(a.predicate && b.predicate) {
+        ret.predicate = {'predicate': 'AND', 'subpredicates': [a.predicate, b.predicate]};
+    } else {
+        ret.predicate = a.predicate || b.predicate || null;
+    }
     return ret;
 };
