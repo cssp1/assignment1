@@ -35670,7 +35670,11 @@ function purchase_ui_event(event_name, extra_props) {
     metric_event(event_name, props);
 }
 
-function invoke_buy_gamebucks_dialog(reason, amount, order) {
+/** @param {string} reason
+    @param {number} amount
+    @param {Object|null} order - to chain to auto-complete an attempted gamebucks order
+    @param {Object|null=} options */
+function invoke_buy_gamebucks_dialog(reason, amount, order, options) {
     var ver = eval_cond_or_literal(player.get_any_abtest_value('buy_gamebucks_dialog_version', gamedata['store']['buy_gamebucks_dialog_version'] || 1), player, null);
 
     // this option controls whether the game will automatically
@@ -35684,13 +35688,17 @@ function invoke_buy_gamebucks_dialog(reason, amount, order) {
     }
 
     if(ver == 1) {
-        return invoke_buy_gamebucks_dialog1(reason, amount, order);
+        return invoke_buy_gamebucks_dialog1(reason, amount, order, options);
     } else {
-        return invoke_buy_gamebucks_dialog23(ver, reason, amount, order);
+        return invoke_buy_gamebucks_dialog23(ver, reason, amount, order, options);
     }
 }
 
-function invoke_buy_gamebucks_dialog1(reason, amount, order) {
+/** @param {string} reason
+    @param {number} amount
+    @param {Object|null} order - to chain to auto-complete an attempted gamebucks order
+    @param {Object|null=} options */
+function invoke_buy_gamebucks_dialog1(reason, amount, order, options) {
     var dialog = new SPUI.Dialog(gamedata['dialogs']['buy_gamebucks_dialog']);
     dialog.user_data['dialog'] = 'buy_gamebucks_dialog';
     dialog.user_data['order'] = (order || null);
@@ -36161,7 +36169,14 @@ function update_gamebucks_sku_highlight_dialog(dialog) {
     update_buy_gamebucks_dialog23_warning_text(dialog);
 }
 
-function invoke_buy_gamebucks_dialog23(ver, reason, amount, order) {
+/** @param {string} reason
+    @param {number} amount
+    @param {Object|null} order - to chain to auto-complete an attempted gamebucks order
+    @param {Object|null=} options */
+function invoke_buy_gamebucks_dialog23(ver, reason, amount, order, options) {
+    if(!options) { options = {}; }
+
+    // XXXXXX if(options['highlight_only']) { set close_button on highlight to close it all }
     var dialog = new SPUI.Dialog(gamedata['dialogs']['buy_gamebucks_dialog'+ver.toString()]);
     dialog.user_data['ver'] = ver;
     dialog.user_data['dialog'] = 'buy_gamebucks_dialog'+ver.toString();

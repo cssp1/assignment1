@@ -398,11 +398,21 @@ InvokeStoreConsequent.prototype.execute = function(state) {
 function InvokeBuyGamebucksConsequent(data) {
     goog.base(this, data);
     this.reason = data['reason'] || 'INVOKE_BUY_GAMEBUCKS_DIALOG';
+    this.highlight_only = data['highlight_only'] || false;
+    this.notification_params = data['notification_params'] || null;
 }
+
 goog.inherits(InvokeBuyGamebucksConsequent, Consequent);
 InvokeBuyGamebucksConsequent.prototype.execute = function(state) {
-    change_selection_ui(null);
-    invoke_buy_gamebucks_dialog(this.reason, -1, null);
+    var cb = (function (_this) { return function() {
+        invoke_buy_gamebucks_dialog(_this.reason, -1, null, {'highlight_only': _this.highlight_only});
+    }; })(this);
+    if(this.notification_params) {
+        notification_queue.push(cb, this.notification_params);
+    } else {
+        change_selection_ui(null);
+        cb();
+    }
 };
 
 /** @constructor

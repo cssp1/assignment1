@@ -594,6 +594,6 @@ def read_consequent(data):
     elif kind == 'HEAL_ALL_UNITS': return HealAllUnitsConsequent(data)
     elif kind == 'HEAL_ALL_BUILDINGS': return HealAllBuildingsConsequent(data)
     elif kind == 'LIBRARY': return LibraryConsequent(data)
-    elif kind in ('INVOKE_UPGRADE_DIALOG','INVOKE_BLUEPRINT_CONGRATS','START_AI_ATTACK','PRELOAD_ART_ASSET','CLEAR_UI'): return ClientConsequent(data)
+    elif kind in ('INVOKE_UPGRADE_DIALOG','INVOKE_BLUEPRINT_CONGRATS','INVOKE_BUY_GAMEBUCKS_DIALOG','START_AI_ATTACK','PRELOAD_ART_ASSET','CLEAR_UI'): return ClientConsequent(data)
     else:
         raise Exception('unknown consequent '+kind)
