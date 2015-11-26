@@ -7165,16 +7165,23 @@
     // highlight a single SKU
     "gamebucks_sku_highlight_dialog": {
         "clip_children": 0,
-        "dimensions": [750,430],
+        "dimensions": [548,396],
         "widgets": {
-            "bg": { "kind": "StaticImage", "xy": [0,0], "dimensions": [750,430], "asset": "dialog_resizable", "bg_image_resizable": 1 },
-            "close_button": { "kind": "ActionButton", "xy": [703,22], "dimensions": [24,24], "bg_image": "close_button_big", "push_bg_image": 1 },
-            "title_bold": { "kind": "TextField", "xy": [118,13], "dimensions": [514, 40], "text_size": 27, "text_style": "bold",
-                            "text_hjustify": "center", "text_vjustify": "center", "ui_name": "Special Offer" },
+            "bg_blanker": { "kind": "SolidRect", "xy": [-1000,-1000], "dimensions": [4670,4670], "color":[0.01,0.01,0.01,1] },
+            "bg": { "kind": "StaticImage", "xy": [0,0], "dimensions": [548,396], "asset": "dialog_resizable", "bg_image_resizable": 1,
+                    "sound": "success_playful_22" },
+            "sunken_left":{"kind":"StaticImage","xy":[15,65],"dimensions":[154,315],"asset":"dialog_sunken_153x315"},
+            "sunken_right":{"kind":"StaticImage","xy":[180,65],"dimensions":[350,315],"asset":"dialog_sunken_resizable", "bg_image_resizable":1},
 
-            "warning_text":  { "kind": "RichTextField", "xy": [27,27], "dimensions": [276,24], "text_size": 13, "text_hjustify": "left" },
+            "sidebar_splash":{"kind":"StaticImage","xy":[20,71],"dimensions":[143,303],"asset":"dialog_sidebar_valentina"},
 
-            "sku": { "kind": "Dialog", "xy": [39,72], "dialog": "buy_gamebucks_sku2" }
+            "close_button": { "kind": "ActionButton", "xy": [495,22], "dimensions": [24,24], "bg_image": "close_button_big", "push_bg_image": 1 },
+            "title_bold": { "kind": "TextField", "xy": [0,13], "dimensions": [550, 40], "text_size": 27, "text_style": "bold",
+                            "text_hjustify": "center", "text_vjustify": "center", "ui_name": "Special Offer!" },
+
+            "warning_text":  { "show": 0, "kind": "RichTextField", "xy": [27,27], "dimensions": [276,24], "text_size": 13, "text_hjustify": "left" },
+
+            "sku": { "kind": "Dialog", "xy": [244,80], "dialog": "buy_gamebucks_sku2" }
         }
     },
 

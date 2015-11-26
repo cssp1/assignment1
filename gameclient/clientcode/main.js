@@ -5213,6 +5213,7 @@ session.battle_outcome_dirty = false; // whether we need to check for win/loss -
 session.deployed_unit_space = 0; // how much "space" worth of units has been deployed into battle
 session.weak_zombie_warned = false; // whether or not we have already shown the "you are about to deploy a zombie unit" warning
 session.manufacture_overflow_warned = false; // whether we have already shown the "base defenders full, new units diverted to reserves" message
+session.buy_gamebucks_sku_highlight_shown = false; // whether we have already shown the SKU highlight upon Buy Gamebucks dialog open
 session.quarry_harvest_sync_marker = Synchronizer.INIT; // synchronizer used for showing Loading... while harvesting quarries
 session.deployable_squads = [];
 session.defending_squads = [];
@@ -35706,6 +35707,9 @@ function invoke_buy_gamebucks_dialog(reason, amount, order, options) {
     @param {Object|null} order - to chain to auto-complete an attempted gamebucks order
     @param {Object|null=} options */
 function invoke_buy_gamebucks_dialog1(reason, amount, order, options) {
+    if(!options) { options = {}; }
+    if(options['highlight_only']) { throw Error('highlight_only not supported'); }
+
     var dialog = new SPUI.Dialog(gamedata['dialogs']['buy_gamebucks_dialog']);
     dialog.user_data['dialog'] = 'buy_gamebucks_dialog';
     dialog.user_data['order'] = (order || null);
@@ -36163,7 +36167,7 @@ function invoke_gamebucks_sku_highlight_dialog(spellname, spellarg) {
     dialog.auto_center();
     dialog.user_data['ver'] = 2; // hard-coded for now
     dialog.user_data['pending'] = false;
-    dialog.user_data['any_sku_has_bonus'] = 0; // ?
+    dialog.user_data['any_sku_has_bonus'] = 1; // force "bonus text" mode
     dialog.user_data['expire_time'] = -1; // XXX does this need a per-sku override?
     init_buy_gamebucks_sku23(dialog.widgets['sku'], dialog, spellname, spellarg, 0);
 
@@ -36183,7 +36187,13 @@ function update_gamebucks_sku_highlight_dialog(dialog) {
 function invoke_buy_gamebucks_dialog23(ver, reason, amount, order, options) {
     if(!options) { options = {}; }
 
-    // XXXXXX if(options['highlight_only']) { set close_button on highlight to close it all }
+    var highlight_only = !!options['highlight_only'];
+    if(highlight_only) {
+        if(ver != 2) {
+            throw Error('highlight_only not supported');
+        }
+    }
+
     var dialog = new SPUI.Dialog(gamedata['dialogs']['buy_gamebucks_dialog'+ver.toString()]);
     dialog.user_data['ver'] = ver;
     dialog.user_data['dialog'] = 'buy_gamebucks_dialog'+ver.toString();
@@ -36337,6 +36347,21 @@ function invoke_buy_gamebucks_dialog23(ver, reason, amount, order, options) {
         dialog.widgets['trialpay_button'].onclick = function(w) { Store.trialpay_invoke(); };
     }
 
+    // highlight the first offer
+    if(spell_list[0]['expect_loot'] && (highlight_only || !session.buy_gamebucks_sku_highlight_shown)) {
+        session.buy_gamebucks_sku_highlight_shown = true; // only show once
+        if(highlight_only) {
+            close_dialog(dialog);
+        }
+        var highlight_dialog = invoke_gamebucks_sku_highlight_dialog(spell_list[0]['spellname'], spell_list[0]['spellarg']);
+        if(highlight_only) {
+            //highlight_dialog.widgets['close_button'].onclick = function(w) { change_selection_ui(null); }
+            return;
+        }
+    } else if(highlight_only) {
+        throw Error('no SKU to highlight');
+    }
+
     var go_away = function(w) {
         purchase_ui_event('4420_buy_gamebucks_dialog_close', {'gui_version': w.parent.user_data['ver']});
         close_parent_dialog(w);
@@ -36394,6 +36419,10 @@ function update_buy_gamebucks_dialog23(dialog) {
 function update_buy_gamebucks_dialog23_warning_text(dialog) {
     // set dialog "warning" text and expire_time
     // note: this uses the ui_buy_gamebucks_warning cond chain, which is separate from per-SKU expire_times
+
+    // hidden per-dialog
+    if(('show' in dialog.data['widgets']['warning_text']) && !dialog.data['widgets']['warning_text']['show']) { return; }
+
     var ui_warning = null, expire_time = -1;
     for(var i = 0; i < gamedata['store']['ui_buy_gamebucks_warning'].length; i++) {
         var pred = read_predicate(gamedata['store']['ui_buy_gamebucks_warning'][i][0]);
@@ -36752,6 +36781,16 @@ function update_buy_gamebucks_sku2_attachments(dialog, spell, spellarg) {
  var dialog = w.parent;
                 var context_parent = w.parent.parent.user_data['context_parent'];
                 if(context_parent.user_data['context'] && context_parent.user_data['context'].user_data['slot'] === _slot) { return; }
+
+                // XXXXXX hack to prevent tooltip show-through into child dialog
+                var enable_tooltip = true;
+                var p = context_parent;
+                while(p.parent) {
+                    if(p.children[p.children.length-1] !== context_parent && p.children[p.children.length-1].modal) {
+                        return; // no tooltip
+                    }
+                    p = p.parent;
+                }
 
                 invoke_inventory_context(context_parent, w, _slot, _item, false, {'parent_dialog': context_parent});
 
