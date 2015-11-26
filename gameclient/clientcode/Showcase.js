@@ -327,7 +327,7 @@ Showcase.apply_showcase_hacks = function(dialog, hack) {
 
         if(hack['ui_final_reward_title_bbcode']) {
             var s = eval_cond_or_literal(hack['ui_final_reward_title_bbcode'],player,null);
-            if(goog.array.contains(s.toLowerCase().split(' '), "sale")) { // XXX hack
+            if(s && goog.array.contains(s.toLowerCase().split(' '), "sale")) { // XXX hack
                 show_active_sales = false;
             }
         }
