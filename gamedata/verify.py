@@ -1403,6 +1403,7 @@ def check_loot_table(table, reason = '', expire_time = -1, duration = -1, max_sl
                 error |= check_loot_table(item, reason = reason, expire_time = expire_time, duration = duration, is_toplevel = False)
         elif 'cond' in entry:
             for pred, loot in entry['cond']:
+                error |= check_predicate(pred, reason = reason + ':cond')
                 error |= check_loot_table(loot, reason = reason + ':' + repr(pred), expire_time = expire_time, duration = duration, is_toplevel = False)
         elif 'table' in entry:
             if entry['table'] not in gamedata['loot_tables']:
