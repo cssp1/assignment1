@@ -27,6 +27,7 @@ goog.require('ChatFilter');
 goog.require('Congrats');
 goog.require('GameArt');
 goog.require('GameTypes');
+goog.require('LootTable');
 goog.require('SPUI');
 goog.require('SPText');
 goog.require('SPHTTP');
@@ -5478,6 +5479,12 @@ session.get_item_spec_forced_expiration = function(spec, prev_expire_time, ref_t
         }
     }
     return expire_time;
+};
+
+/** Query a loot table for what items you'd get (just for GUI purposes, has nothing to do with actual looting mechanics).
+    @return {Array<!Object>} loot items */
+session.get_loot_items = function(player, loot_table) {
+    return LootTable.get_loot(gamedata['loot_tables_client'], loot_table, function(pred) { return read_predicate(pred).is_satisfied(player, null); });
 };
 
 // player state
@@ -36232,8 +36239,7 @@ function invoke_buy_gamebucks_dialog23(ver, reason, amount, order, options) {
             // get expected loot
             var item_list = null;
             if('loot_table' in spell) {
-                var loot_table = gamedata['loot_tables_client'][spell['loot_table']]['loot'];
-                item_list = expect_loot(loot_table);
+                item_list = session.get_loot_items(player, gamedata['loot_tables_client'][spell['loot_table']]['loot']);
                 if(item_list.length <= 0) { item_list = null; }
             }
 
@@ -36681,24 +36687,6 @@ function update_buy_gamebucks_sku23(dialog) {
     }
 }
 
-function expect_loot(loot_table) {
-    var item_list = [];
-    if(loot_table.length === 0) {
-        // it's empty
-    } else if(loot_table.length === 1 && ('multi' in loot_table[0])) {
-        goog.array.forEach(loot_table[0]['multi'], function(entry) {
-            if('spec' in entry) {
-                item_list.push(entry);
-            } else {
-                throw Error('unparseable loot table entry: '+JSON.stringify(entry));
-            }
-        });
-    } else {
-        throw Error('unparseable loot table: '+JSON.stringify(loot_table));
-    }
-    return item_list;
-}
-
 function update_buy_gamebucks_sku2_attachments(dialog, spell, spellarg) {
     if(!('attachments0' in dialog.widgets)) { return; } // inapplicable
     var item_list = [];
@@ -36710,8 +36698,7 @@ function update_buy_gamebucks_sku2_attachments(dialog, spell, spellarg) {
                        });
     }
     if('loot_table' in spell && (!spellarg || spellarg['want_loot'])) {
-        var loot_table = gamedata['loot_tables_client'][spell['loot_table']]['loot'];
-        item_list = item_list.concat(expect_loot(loot_table));
+        item_list = item_list.concat(session.get_loot_items(player, gamedata['loot_tables_client'][spell['loot_table']]['loot']));
     }
 
     var visible_rows = dialog.data['widgets']['attachments']['array'][0] * dialog.data['widgets']['attachments']['array'][1];
