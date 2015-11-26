@@ -2057,6 +2057,7 @@ class User:
                         # new-style player metrics (redundant with old style above)
                         session.increment_player_metric('money_spent', usd_equivalent)
                         session.increment_player_metric('num_purchases', 1)
+                        session.setmax_player_metric('largest_purchase', usd_equivalent)
 
                         if 'money_purchase_history' not in session.player.history:
                             session.player.history['money_purchase_history'] = []
@@ -12102,6 +12103,30 @@ class LivePlayer(Player):
         if gamedata['townhall']+'_level' not in self.history:
             self.history[gamedata['townhall']+'_level'] = self.get_townhall_level()
 
+        # ensure largest_purchase history value is set up
+        if ('money_purchase_history' in self.history) and (('largest_purchase' not in self.history) or ('largest_purchase_gamebucks' not in self.history)):
+            largest = 0
+            largest_gamebucks = 0
+            for x in self.history['money_purchase_history']:
+                if 'dollar_amount' in x:
+                    largest = max(largest, x['dollar_amount'])
+
+                # note: doesn't handle in-kind payments like payer promos/TrialPay
+                spellname = None
+                if x.get('spellname','').startswith('BUY_GAMEBUCKS_'):
+                    spellname = x['spellname']
+                elif x.get('description','').startswith('BUY_GAMEBUCKS_'):
+                    spellname = x['description'].split(',')[0]
+                if spellname:
+                    try:
+                        gamebucks = session.user.parse_buy_gamebucks_spell_quantity(spellname, None)
+                        largest_gamebucks = max(gamebucks, largest_gamebucks)
+                    except:
+                        pass
+
+            self.history['largest_purchase'] = largest
+            self.history['largest_purchase_gamebucks'] = largest_gamebucks
+
         # check resource levels
         if gamedata['server'].get('log_storage_limit', True) and gamedata['loot_storage_limit'] > 0:
             snap = self.resources.calc_snapshot()
@@ -14475,6 +14500,7 @@ class Store:
         # new-style player metrics (redundant with old style above)
         session.increment_player_metric('money_spent', dollar_amount)
         session.increment_player_metric('num_purchases', 1)
+        session.setmax_player_metric('largest_purchase', dollar_amount)
 
         if 'money_purchase_history' not in session.player.history:
             session.player.history['money_purchase_history'] = []
@@ -14916,6 +14942,7 @@ class Store:
                             want_loot = False
 
             session.player.resources.gain_gamebucks(bucks, reason='payment')
+            session.setmax_player_metric('largest_purchase_gamebucks', bucks)
             metric_event_coded(session.user.user_id, '5090_purchase_gamebucks', {'amount_added':bucks,
                                                                                  'sku': spellname,
                                                                                  'currency': currency,
@@ -22401,7 +22428,10 @@ class GAMEAPI(resource.Resource):
 
         on_login_cons = player.get_abtest_consequent('on_login_pre_hello', fail_missing = False)
         if on_login_cons:
-            session.execute_consequent_safe(on_login_cons, session.player, retmsg, reason='on_login_pre_hello')
+            session.execute_consequent_safe(on_login_cons, session.player, retmsg,
+                                            context = {'largest_purchase': session.player.history.get('largest_purchase', 0),
+                                                       'largest_purchase_gamebucks': session.player.history.get('largest_purchase_gamebucks', 0)},
+                                            reason='on_login_pre_hello')
 
         # add to list of days since account creation on which this user logged in
         # player.history['logins_by_day'] = {"0":5, "2":1, "3":1, ...}

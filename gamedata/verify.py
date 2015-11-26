@@ -1692,7 +1692,7 @@ def check_consequent(cons, reason = '', context = None, context_data = None):
         else:
             if type(cons['value']) in (str,unicode) and len(cons['value'])>=1 and cons['value'][0] == '$':
                 # check for valid context variables
-                if cons['value'] not in ('$n_battle_stars',):
+                if cons['value'] not in ('$n_battle_stars','$largest_purchase','$largest_purchase_gamebucks'):
                     error |= 1; print '%s: %s consequent has bad "value" context variable reference "%s"' % (reason, cons['consequent'], cons['value'])
 
         # try to catch common typos
