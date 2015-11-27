@@ -7165,65 +7165,69 @@
     // highlight a single SKU
     "gamebucks_sku_highlight_dialog": {
         "clip_children": 0,
-        "dimensions": [548,396],
+        "dimensions": [548,438],
         "widgets": {
             "bg_blanker": { "kind": "SolidRect", "xy": [-1000,-1000], "dimensions": [4670,4670], "color":[0.01,0.01,0.01,1] },
-            "bg": { "kind": "StaticImage", "xy": [0,0], "dimensions": [548,396], "asset": "dialog_resizable", "bg_image_resizable": 1,
+            "bg": { "kind": "StaticImage", "xy": [0,0], "dimensions": [548,438], "asset": "dialog_resizable", "bg_image_resizable": 1,
                     "sound": "success_playful_22" },
-            "sunken_left":{"kind":"StaticImage","xy":[15,65],"dimensions":[154,315],"asset":"dialog_sunken_153x315"},
-            "sunken_right":{"kind":"StaticImage","xy":[180,65],"dimensions":[350,315],"asset":"dialog_sunken_resizable", "bg_image_resizable":1},
+            "sunken_left":{"kind":"StaticImage","xy":[15,60],"dimensions":[174,350],"asset":"dialog_sunken_resizable", "bg_image_resizable":1},
+            "sunken_right":{"kind":"StaticImage","xy":[200,60],"dimensions":[330,350],"asset":"dialog_sunken_resizable", "bg_image_resizable":1},
 
-            "sidebar_splash":{"kind":"StaticImage","xy":[20,71],"dimensions":[143,303],"asset":"dialog_sidebar_valentina"},
+            "sidebar_splash_frame": { "kind": "SolidRect", "xy": [26,77], "dimensions": [151,316],
+                                      "color": [0,0,0,0.5], "bevel": 3,
+                                      "outline_color": [0.4,0.4,0.4,1],
+                                      "outline_width": 2 },
+            "sidebar_splash":{"kind":"StaticImage","xy":[30,83],"dimensions":[143,303],"asset":"dialog_sidebar_valentina"},
 
-            "close_button": { "kind": "ActionButton", "xy": [495,22], "dimensions": [24,24], "bg_image": "close_button_big", "push_bg_image": 1 },
-            "title_bold": { "kind": "TextField", "xy": [0,13], "dimensions": [550, 40], "text_size": 27, "text_style": "bold",
+            "close_button": { "kind": "ActionButton", "xy": [505,19], "dimensions": [24,24], "bg_image": "close_button_big", "push_bg_image": 1 },
+            "title_bold": { "kind": "TextField", "xy": [0,10], "dimensions": [550, 40], "text_size": 27, "text_style": "bold",
                             "text_hjustify": "center", "text_vjustify": "center", "ui_name": "Special Offer!" },
 
             "warning_text":  { "show": 0, "kind": "RichTextField", "xy": [27,27], "dimensions": [276,24], "text_size": 13, "text_hjustify": "left" },
 
-            "sku": { "kind": "Dialog", "xy": [244,80], "dialog": "buy_gamebucks_sku2" }
+            "sku": { "kind": "Dialog", "xy": [258,66], "dialog": "buy_gamebucks_sku2" }
         }
     },
 
     // based on new_store_category - scrolling variant
     "buy_gamebucks_dialog2": {
         "clip_children": 0,
-        "dimensions": [750,430],
+        "dimensions": [750,485],
         "scroll_incr": 2, "scroll_speed": 0.30,
         "widgets": {
             "bg_blanker": { "show": 0, "kind": "SolidRect", "xy": [-1000,-36], "dimensions": [2670,495], "color":[0.01,0.01,0.01,1], "outline_color": [0,0,0,0], "outline_width": 1 },
-            "glow": { "show": 0, "sound": "success_playful_22", "kind":"StaticImage","xy":[-30,-30],"dimensions":[810,483],"bg_image_resizable":1,"asset":"dialog_glow_resizable",
+            "glow": { "show": 0, "sound": "success_playful_22", "kind":"StaticImage","xy":[-30,-30],"dimensions":[810,538],"bg_image_resizable":1,"asset":"dialog_glow_resizable",
                       "composite_mode": "lighter", "fade":1, "duration": 1.4, "fade_peak": 0.2, "delay": -0.2},
-            "bg": { "kind": "StaticImage", "xy": [0,0], "dimensions": [750,430], "asset": "dialog_resizable", "bg_image_resizable": 1 },
+            "bg": { "kind": "StaticImage", "xy": [0,0], "dimensions": [750,485], "asset": "dialog_resizable", "bg_image_resizable": 1 },
             "close_button": { "kind": "ActionButton", "xy": [703,22], "dimensions": [24,24], "bg_image": "close_button_big", "push_bg_image": 1 },
             "title_bold": { "kind": "TextField", "xy": [118,13], "dimensions": [514, 40], "text_size": 27, "text_style": "bold",
                             "text_hjustify": "center", "text_vjustify": "center", "ui_name": "Buy %s" },
 
             "warning_text":  { "kind": "RichTextField", "xy": [27,27], "dimensions": [276,24], "text_size": 13, "text_hjustify": "left" },
 
-            "sunken": {"kind": "StaticImage", "xy":[38,66], "dimensions":[673,298], "asset": "dialog_sunken_white_resizable", "bg_image_resizable": 1, "alpha": 0.8 },
+            "sunken": {"kind": "StaticImage", "xy":[38,66], "dimensions":[673,353], "asset": "dialog_sunken_white_resizable", "bg_image_resizable": 1, "alpha": 0.8 },
             "sku": { "kind": "Dialog", "xy": [39,72], "dialog": "buy_gamebucks_sku2",
                      "array": [0,1], // these are created dynamically in JavaScript
-                     "array_offset": [206,0] },
+                     "array_offset": [201,0] },
 
-            "trialpay_button": { "show": 0, "kind": "ActionButton", "xy": [38,380], "dimensions": [130,28], "bg_image": "action_button_resizable", "bg_image_resizable": 1,
+            "trialpay_button": { "show": 0, "kind": "ActionButton", "xy": [38,435], "dimensions": [130,28], "bg_image": "action_button_resizable", "bg_image_resizable": 1,
                                  "text_size": 13, "text_style": "bold",
                                  "ui_name": "Earn FREE %s" },
 
             "redeem_gift_card_warning": { "show": 0, "kind": "TextField", "text_size": 13, "text_color": [0.75,0.75,0.75,1],
-                                          "xy":[44,380], "dimensions":[484,32], "text_hjustify": "right",
+                                          "xy":[44,435], "dimensions":[484,32], "text_hjustify": "right",
                                           "ui_name": "Bonus %s not available with use of Facebook Gift Cards" },
 
-            "redeem_gift_card_icon": { "show": 0, "kind": "StaticImage", "xy":[540,380], "dimensions":[32,32], "asset": "facebook_icon"},
-            "redeem_gift_card_button": { "show": 0, "kind": "ActionButton", "xy": [578,380], "dimensions": [134,28], "text_offset": [0,1],
+            "redeem_gift_card_icon": { "show": 0, "kind": "StaticImage", "xy":[540,435], "dimensions":[32,32], "asset": "facebook_icon"},
+            "redeem_gift_card_button": { "show": 0, "kind": "ActionButton", "xy": [578,435], "dimensions": [134,28], "text_offset": [0,1],
                                          "bg_image": "menu_button_134px", "text_size": 13, "text_style": "bold",
                                          "ui_name": "Use Gift Card",
                                          "ui_tooltip": "Redeem a Facebook Gift Card for %s", "tooltip_delay": 0 },
 
-            "scroll_left": { "show": 1, "kind": "ActionButton", "xy": [-12,105], "dimensions": [57,200], "bg_image_offset": [20,50], "bg_image": "dialog_scroll_arrow_left", "push_bg_image": 1 },
-            "scroll_left_jewel": { "show": 0, "kind": "Dialog", "xy": [3,170], "dimensions": [17,14], "dialog": "notification_jewel" },
-            "scroll_right": { "show": 1, "kind": "ActionButton", "xy": [700,105], "dimensions": [57,200], "bg_image_offset": [20,50], "bg_image": "dialog_scroll_arrow_right", "push_bg_image": 1 },
-            "scroll_right_jewel": { "show": 0, "kind": "Dialog", "xy": [731,170], "dimensions": [17,14], "dialog": "notification_jewel" }
+            "scroll_left": { "show": 1, "kind": "ActionButton", "xy": [-12,132], "dimensions": [57,200], "bg_image_offset": [20,50], "bg_image": "dialog_scroll_arrow_left", "push_bg_image": 1 },
+            "scroll_left_jewel": { "show": 0, "kind": "Dialog", "xy": [3,197], "dimensions": [17,14], "dialog": "notification_jewel" },
+            "scroll_right": { "show": 1, "kind": "ActionButton", "xy": [700,132], "dimensions": [57,200], "bg_image_offset": [20,50], "bg_image": "dialog_scroll_arrow_right", "push_bg_image": 1 },
+            "scroll_right_jewel": { "show": 0, "kind": "Dialog", "xy": [731,197], "dimensions": [17,14], "dialog": "notification_jewel" }
         }
     },
     // non-scrolling variant
@@ -7278,22 +7282,22 @@
     },
 
     "buy_gamebucks_sku2": { // big bundle-deal variant
-        "dimensions": [216,282],
+        "dimensions": [211,337],
         "widgets": {
-            "glowfx": { "show": 0, "sound": "success_playful_22", "kind":"StaticImage","xy":[-20,-20],"dimensions":[256,322],"bg_image_resizable":1,"asset":"dialog_glow_resizable", "composite_mode": "lighter",
+            "glowfx": { "show": 0, "sound": "success_playful_22", "kind":"StaticImage","xy":[-20,-20],"dimensions":[251,377],"bg_image_resizable":1,"asset":"dialog_glow_resizable", "composite_mode": "lighter",
                         "fade":1, "duration": 1.4, "fade_peak": 0.2, "delay": -0.2},
 
-            "bg": {"kind": "ActionButton", "xy":[0,0], "dimensions":[216,282], "bg_image": "dialog_blackplate", "bg_image_resizable": 1,
+            "bg": {"kind": "ActionButton", "xy":[0,0], "dimensions":[211,337], "bg_image": "dialog_blackplate", "bg_image_resizable": 1,
                    "mouseover_sound": 1 },
 
             "bg_shine": {"kind": "SolidRect",
-                         "xy":[10,67], "dimensions":[196,154],
+                         "xy":[10,67], "dimensions":[191,209],
                          "gradient_color": [0.005,0.005,0.01,1], "color": [0.15,0.2,0.3,1],
                          "outline_color": [0.3,0.3,0.3,1], "outline_width": 0,
                          "gradient": "hinout",  "gradient_midpoint": 0.4, "alpha": 0.6 },
 
             "name_bg": { "kind": "SolidRect",
-                         "xy": [10,10], "dimensions": [195,60],
+                         "xy": [10,10], "dimensions": [191,60],
                          "bevel": 3, "color":[0,0,0,1], "gradient_color": [0.2,0.2,0.2,1],
                          "outline_color": [0.3,0.3,0.3,1], "outline_width": 2, "alpha": 0.45,
                          "gradient": "vinout", "gradient_midpoint": 0.25
@@ -7304,12 +7308,12 @@
                                 "transform": [0.66,0,0,0.66,0,0] },
 
             "name_bg_shine": {"kind": "SolidRect", "show": 0,
-                              "xy":[20,15], "dimensions":[176,55],
+                              "xy":[20,15], "dimensions":[171,55],
                               "color": [0,0,0,1], "gradient_color": [0.2,0.2,0.2,1],
                               "gradient": "vinout", "gradient_midpoint": 0.25, "alpha": 0.5 },
 
             "name": { "kind": "TextField",
-                      "xy": [72,22], "dimensions": [120, 56],
+                      "xy": [72,22], "dimensions": [118, 56],
                       "text_size_nobonus": 21, "text_size_nobonus_big": 19,
                       "text_size_withbonus": 21, "text_size_withbonus_big": 19,
                       "text_style": "bold", "drop_shadow": 2,
@@ -7322,7 +7326,7 @@
                       "ui_name_withbonus": "%qty %gamebucks",
                       "text_hjustify": "right", "text_vjustify": "top" },
             "name2": { "kind": "TextField", "show": 0,
-                       "xy": [8,15], "dimensions": [118, 206],
+                       "xy": [72,48], "dimensions": [118, 206],
                        "text_size_nobonus": 18,
                        "text_size_withbonus": 13,
                        "text_leading": 15,
@@ -7341,14 +7345,14 @@
                        "text_hjustify": "right", "text_vjustify": "bottom" },
 
             "comment": { "kind": "TextField",
-                         "xy": [72,48], "dimensions": [120, 46],
+                         "xy": [72,47], "dimensions": [118, 46],
                          "ui_name_best_value": "Best Value",
                          "text_size": 13, "text_style": "normal", "drop_shadow": 1,
                          "text_color": [0.1,1,0.2,1],
                          "text_hjustify": "right", "text_vjustify": "top" },
             // mutually exclusive with comment
             "expire_time": { "kind": "TextField", "show": 1,
-                             "xy": [72,49], "dimensions": [122, 46],
+                             "xy": [72,48], "dimensions": [118, 46],
                              "ui_name": "Ending in %togo",
                              "text_size": 12, "text_style": "normal", "drop_shadow": 1,
                              "text_color": [1,0,0,1],
@@ -7356,60 +7360,60 @@
 
             "upperleft_shine": { "kind": "StaticImage", "xy": [7,8], "dimensions": [62,13], "asset": "button_shine", "alpha": 0.8 },
 
-            "attachments": { "kind": "Dialog", "dialog": "buy_gamebucks_sku2_attachment", "xy": [10,72], "dimensions": [196,31], "array": [1,5], "array_offset": [0,29] },
-            "dividers": {"kind": "Line", "xy": [10,101], "dimensions": [196,0], "color":  [0.33,0.33,0.33,0.5], "stroke_width": 1,
-                         "array": [1,5], "array_offset": [0,29]},
+            "attachments": { "kind": "Dialog", "dialog": "buy_gamebucks_sku2_attachment", "xy": [10,72], "dimensions": [191,31], "array": [1,7], "array_offset": [0,29] },
+            "dividers": {"kind": "Line", "xy": [10,101], "dimensions": [191,0], "color":  [0.33,0.33,0.33,0.5], "stroke_width": 1,
+                         "array": [1,7], "array_offset": [0,29]},
 
             "price_bg": { "kind": "SolidRect",
-                          "xy": [15,226], "dimensions": [186,41],
+                          "xy": [15,281], "dimensions": [181,41],
                           "bevel": 3, "color":[0.33,0.07,0.0,1], "gradient_color": [0.7,0.3,0.0,1],
                           "gradient": "hinout", "gradient_midpoint": 0.05,
                           "outline_color": [0.25,0.25,0.25,1], "outline_width": 2
                         },
 
-            "price_display": { "kind": "TextField", "xy": [105,226], "dimensions": [184,41], "text_offset": [0,-1],
+            "price_display": { "kind": "TextField", "xy": [101,281], "dimensions": [184,41], "text_offset": [0,-1],
                                "text_hjustify": "left", "text_vjustify": "center",
                                "text_color": [0,1,0,1], "drop_shadow": 1,
                                "text_size": 16, "text_style": "bold", "ui_tooltip": "", "tooltip_delay": 0 }, // PRICE
 
-            "sale_bg": { "show": 0, "kind": "SolidRect", "xy": [0,2], "dimensions": [1,1], "color": [0.8,0,0,1],
+            "sale_bg": { "show": 0, "kind": "SolidRect", "xy": [0,57], "dimensions": [1,1], "color": [0.8,0,0,1],
                          "path": [[16,242], [33,225], [57,225], [16,264]] },
-            "sale_label": { "show": 0, "kind": "TextField", "xy": [29.5,203], "dimensions": [20,100], "color": [1,1,1,1],
+            "sale_label": { "show": 0, "kind": "TextField", "xy": [29.5,258], "dimensions": [20,100], "color": [1,1,1,1],
                             "text_style": "bold", "text_size": 13, "text_hjustify": "center", "text_angle": -45, "ui_name": "SALE", "xy_shift": { "NEW": [0,-1] } },
 
-            "buy_text": { "kind": "TextField", "xy": [15,226], "dimensions": [80,41], "text_offset": [0,-1],
+            "buy_text": { "kind": "TextField", "xy": [13,281], "dimensions": [78,41], "text_offset": [0,-1],
                           "text_hjustify": "right", "text_vjustify": "center",
                           "text_color": [1,1,1,1],
                           "text_color_highlight": [1,1,1,1],
                           "drop_shadow": 1, "ui_name": "Buy",
                           "text_size": 15, "text_style": "bold", "ui_tooltip": "", "tooltip_delay": 0 },
 
-            "buy_upperleft_shine": { "kind": "StaticImage", "xy": [15,226], "dimensions": [62,13], "asset": "button_shine", "alpha": 1 },
+            "buy_upperleft_shine": { "kind": "StaticImage", "xy": [15,281], "dimensions": [62,13], "asset": "button_shine", "alpha": 1 },
 
-            "hider": { "show": 0, "kind": "SolidRect", "xy":[10,11], "dimensions":[195,262], "color": [0,0,0,0.6], "bevel": 2 },
+            "hider": { "show": 0, "kind": "SolidRect", "xy":[10,11], "dimensions":[190,262], "color": [0,0,0,0.6], "bevel": 2 },
 
-            "loading_spinner": { "kind": "StaticImage", "xy":[57,124], "dimensions":[16,16], "asset":"loading_spinner", "show": 0 },
+            "loading_spinner": { "kind": "StaticImage", "xy":[55,151], "dimensions":[16,16], "asset":"loading_spinner", "show": 0 },
 
-            "jewel": { "show": 0, "kind": "Dialog", "xy": [182,20], "dimensions": [17,14], "dialog": "notification_jewel" }
+            "jewel": { "show": 0, "kind": "Dialog", "xy": [177,20], "dimensions": [17,14], "dialog": "notification_jewel" }
         }
     },
     "buy_gamebucks_sku2_attachment": {
-        "dimensions": [196,29],
+        "dimensions": [191,29],
         "widgets": {
-            "icon": { "kind": "StaticImage", "xy": [4,2], "dimensions": [25,25], "asset": "inventory_unknown",
+            "icon": { "kind": "StaticImage", "xy": [5,2], "dimensions": [25,25], "asset": "inventory_unknown",
                       "transform": [0.5,0,0,0.5,0,0] },
-            "icon_frame": { "kind": "SolidRect", "xy": [4,2], "dimensions": [25,25],
+            "icon_frame": { "kind": "SolidRect", "xy": [5,2], "dimensions": [25,25],
                             "color": [0,0,0,0],
                             "outline_color": [0.4,0.4,0.4,1],
                             "outline_width": 1 },
-            "name": { "kind": "TextField", "xy": [36,2], "dimensions": [154, 25], "text_size": 13, "text_hjustify": "left", "text_vjustify": "center", "text_style": "normal", "clip_to": [36,2,125,27],
+            "name": { "kind": "TextField", "xy": [37,2], "dimensions": [147, 25], "text_size": 13, "text_hjustify": "left", "text_vjustify": "center", "text_style": "normal", "clip_to": [37,2,117,27],
                       "text_color": [0.8,0.8,0.8,1], "drop_shadow":1,
-                      "ui_name_bonus_quantity": "Bonus %GAMEBUCKS_NAME"
+                      "ui_name_bonus_quantity": "+ Bonus %GAMEBUCKS_NAME"
                     },
-            "quantity": { "kind": "TextField", "xy": [36,2], "dimensions": [154, 25], "text_size": 13, "text_hjustify": "right", "text_vjustify": "center", "text_style": "normal",
+            "quantity": { "kind": "TextField", "xy": [36,2], "dimensions": [147, 25], "text_size": 13, "text_hjustify": "right", "text_vjustify": "center", "text_style": "normal",
                           "drop_shadow":1 },
             // this exists only to generate the inventory context tooltip
-            "tooltip_maker": { "kind": "ActionButton", "xy": [0,0], "dimensions": [196,29] }
+            "tooltip_maker": { "kind": "ActionButton", "xy": [0,0], "dimensions": [191,29] }
         }
     },
 
