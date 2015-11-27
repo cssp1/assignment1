@@ -7358,7 +7358,7 @@
 
             "attachments": { "kind": "Dialog", "dialog": "buy_gamebucks_sku2_attachment", "xy": [10,72], "dimensions": [196,31], "array": [1,5], "array_offset": [0,29] },
             "dividers": {"kind": "Line", "xy": [10,101], "dimensions": [196,0], "color":  [0.33,0.33,0.33,0.5], "stroke_width": 1,
-                          "array": [1,5], "array_offset": [0,29]},
+                         "array": [1,5], "array_offset": [0,29]},
 
             "price_bg": { "kind": "SolidRect",
                           "xy": [15,226], "dimensions": [186,41],

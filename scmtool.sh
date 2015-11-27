@@ -198,7 +198,7 @@ else
             version)
                 do_version_git $@
                 ;;
-	    git-version)
+        git-version)
                 do_version_git $@
                 ;;
             stat)
