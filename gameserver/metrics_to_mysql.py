@@ -152,6 +152,9 @@ if __name__ == '__main__':
                 keyvals.append(('spec', row['aura_name']))
                 keyvals.append(('stack', row['start_time']))
 
+            elif row['event_name'] == '4461_promo_warehouse_upgrade':
+                keyvals.append(('stack', row['level']))
+
             elif row['event_name'] in ('0113_account_deauthorized',
                                        '0140_tutorial_oneway_ticket',
                                        '0140_tutorial_start',

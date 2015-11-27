@@ -234,6 +234,7 @@ def MetricsLogFilter(child):
                                   #'4011_quest_complete_again',
                                   '4120_send_gift_completed',
                                   '4056_strategy_guide_opened',
+                                  '4461_promo_warehouse_upgrade',
                                   #'5130_item_activated',
                                   #'5131_item_trashed',
                                   #'5140_mail_attachment_collected'

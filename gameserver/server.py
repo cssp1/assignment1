@@ -11216,7 +11216,7 @@ class LivePlayer(Player):
                 break
             else:
                 # out of space?
-                if len(self.inventory) >= max_slots:
+                if max_slots >= 0 and (len(self.inventory) >= max_slots):
                     #gamesite.exception_log.event(server_time, 'all %s slots used (%d)' % (max_slots, len(self.inventory)))
                     break
 
@@ -13610,7 +13610,7 @@ class CONTROLAPI(resource.Resource):
             if session.player.home_region == region_id:
                 session.send([["REGION_TURF_UPDATE", session.player.home_region, data]])
 
-class Store:
+class Store(object):
 
     # given a list of damaged units and/or in-production manuf queue items, return a dictionary mapping
     # from unit specname to rough gamebucks equivalent of speedup cost.
@@ -14987,10 +14987,28 @@ class Store:
                 if items:
                     if session.player.get_any_abtest_value('modal_looting', gamedata['modal_looting']) and \
                        session.player.find_object_by_type(gamedata['inventory_building']):
-                        session.player.loot_buffer += items
+
+                        # add directly to inventory, allowing over-stuffed warehouse?
+                        bypass_pred = session.player.get_any_abtest_value('buy_gamebucks_bypass_loot_buffer', gamedata['store'].get('buy_gamebucks_bypass_loot_buffer', None))
+
+                        if bypass_pred and ((bypass_pred in (1,True)) or Predicates.read_predicate(bypass_pred).is_satisfied2(session, session.player, {})):
+                            # go directly into inventory
+                            for item in items: session.player.inventory_add_item(item, -1)
+                            session.player.send_inventory_update(retmsg)
+                        else:
+                            # use loot buffer
+
+                            # give promo warehouse space? (XXX note: no GUI for this on the client)
+                            promo_warehouse_pred = session.player.get_any_abtest_value('buy_gamebucks_promo_warehouse_space_if', gamedata['store'].get('buy_gamebucks_promo_warehouse_space_if',None))
+                            if promo_warehouse_pred and ((promo_warehouse_pred in (1,True)) or Predicates.read_predicate(promo_warehouse_pred).is_satisfied2(session, session.player, {})):
+                                cls.give_promo_warehouse_space(session, retmsg, items)
+
+                            session.player.loot_buffer += items
+                            retmsg.append(["LOOT_BUFFER_UPDATE", session.player.loot_buffer, True])
+
                         for item in items:
                             session.player.inventory_log_event('5125_item_obtained', item['spec'], item.get('stack',1), item.get('expire_time',-1), level=item.get('level',None), reason=spellname)
-                        retmsg.append(["LOOT_BUFFER_UPDATE", session.player.loot_buffer, True])
+
                     else:
                         session.player.send_loot_mail('', 0, items, retmsg, mail_template = gamedata['strings']['gamebucks_loot_mail'])
 
@@ -15131,6 +15149,69 @@ class Store:
             raise Exception('Unknown paid spell ' + spellname)
 
         return price_description, detail_props
+
+    @classmethod
+    def give_promo_warehouse_space(cls, session, retmsg, items):
+        warehouse = session.player.find_object_by_type(gamedata['inventory_building'])
+        if not warehouse: return False
+        if warehouse.level >= warehouse.spec.maxlevel: return False
+        can_fit = False
+        while warehouse.level < warehouse.spec.maxlevel:
+            can_fit, extra_slots_needed = inventory_items_can_all_fit(items, session.player.inventory, session.player.resources.calc_snapshot())
+            if can_fit: break
+            if not gamesite.gameapi.do_upgrade_instant(session, retmsg, warehouse, ignore_requires = True): break
+            metric_event_coded(session.user.user_id, '4461_promo_warehouse_upgrade', {'level': warehouse.level})
+
+        return can_fit
+
+def fungible_inventory_item_can_fit(spec, stack, resource_state):
+    if spec['resource'] == 'gamebucks': return True
+    elif spec['resource'] in resource_state:
+        return (stack + resource_state[spec['resource']][1] <= resource_state[spec['resource'][0]])
+    return False
+
+# returns (can_fit, extra_slots_needed)
+def inventory_items_can_all_fit(items, inventory, snapshot):
+    max_usable_inventory = snapshot.max_usable_inventory()
+    can_fit = True
+    extra_slots_needed = 0
+
+    # operate on a copy of the inventory and resources
+    scratch = copy.deepcopy(inventory)
+    scratch_resource_state = dict((res,[snapshot.max_res(res), snapshot.cur_res(res)]) for res in gamedata['resources'])
+
+    for item in items:
+        spec = gamedata['items'][item['spec']]
+        max_stack = spec.get('max_stack', 1)
+        togo = item.get('stack', 1)
+
+        if spec.get('fungible'):
+            # check for entire fungible amount to fit
+            if fungible_inventory_item_can_fit(spec, togo, scratch_resource_state):
+                if spec['resource'] in scratch_resource_state:
+                    scratch_resource_state[spec['resource']][1] += togo
+                continue
+            else:
+                can_fit = False
+                extra_slots_needed += 1
+        else:
+            # check for stackable item
+            for inv in scratch:
+                if inv['spec'] == item['spec'] and inv.get('level',1) == item.get('level',1):
+                    inv_stack = inv.get('stack',1)
+                    if inv_stack < max_stack:
+                        added = min(togo, max_stack - inv_stack)
+                        togo -= added
+                        inv['stack'] = inv_stack + added
+
+            if togo <= 0: continue # able to accommodate everything just by stacking
+            if len(scratch) >= max_usable_inventory:
+                # now we need another slot
+                can_fit = False
+                extra_slots_needed += 1
+            scratch.append(copy.deepcopy(item))
+
+    return can_fit, extra_slots_needed
 
 class CREDITAPI(resource.Resource):
     isLeaf = True
