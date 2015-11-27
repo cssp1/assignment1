@@ -36890,7 +36890,11 @@ function do_invoke_items_discovered(items, duration, where, lottery_dialog) {
     var dialog_data = gamedata['dialogs']['item_discovered'];
     var dialog = new SPUI.Dialog(dialog_data);
     dialog.user_data['dialog'] = 'item_discovered';
+    dialog.user_data['items'] = items;
+    dialog.user_data['duration'] = duration;
+    dialog.user_data['where'] = where;
     dialog.user_data['anim_start_time'] = -1;
+    dialog.user_data['context'] = null;
     install_child_dialog(dialog);
     dialog.modal = true;
     dialog.auto_center();
@@ -36902,40 +36906,49 @@ function do_invoke_items_discovered(items, duration, where, lottery_dialog) {
         dialog.widgets['expiry'].str = dialog.data['widgets']['expiry']['ui_name'].replace('%d', exp_days.toFixed(0));
     }
 
-    // XXXXXX
-    if(items.length > 1) { throw Error('multiple items not supported'); }
+    var all_fungible = true;
+    goog.array.forEach(items, function(item, i) {
+        var spec = gamedata['items'][item['spec']];
+        if(!spec['fungible']) { all_fungible = false; }
 
-    var item = items[0];
-    var spec = gamedata['items'][item['spec']];
-    var sku = dialog.widgets['sku'];
-    sku.widgets['name'].set_text_with_linebreaking(ItemDisplay.get_inventory_item_ui_name(spec));
-    ItemDisplay.set_inventory_item_asset(sku.widgets['icon'], spec);
-    ItemDisplay.set_inventory_item_stack(sku.widgets['icon_stack'], spec, item);
-    sku.widgets['price_icon'].show = false;
-    sku.widgets['price_display'].text_offset = [0,0];
-    var rarity = (spec['rarity'] || 0);
-    sku.widgets['price_display'].str = gamedata['strings']['rarities'][rarity+1].toUpperCase();
-    var col = gamedata['client']['loot_rarity_colors'][rarity+1];
-    sku.widgets['price_display'].text_color = new SPUI.Color(col[0], col[1], col[2], 1);
-    sku.widgets['glowfx'].show = true;
-    sku.widgets['glowfx'].reset_fx();
-    sku.widgets['slot0,0'].show = true;
-    sku.widgets['jewel'].show = false;
+        var sku_glow = SPUI.instantiate_widget(dialog.data['widgets']['sku_glow']);
+        dialog.add(sku_glow);
+        dialog.widgets['sku_glow'+i.toString()] = sku_glow;
 
-    sku.user_data['context'] = null;
-    if(where !== 'loot_buffer') { // set up tooltip, unless in loot buffer
-        sku.widgets['icon_frame'].onenter = (function (_item) { return function(w) {
-            var dialog = w.parent;
-            if(dialog.user_data['context']) { return; }
-            invoke_inventory_context(dialog, w, 0, _item, false);
-            // set transparent so that onleave is always called reliably
-            if(dialog.user_data['context']) { dialog.user_data['context'].transparent_to_mouse = true; }
-        }; })(item);
-        sku.widgets['icon_frame'].onleave_cb = (function (_item) { return function(w) {
-            var dialog = w.parent;
-            if(dialog.user_data['context']) { invoke_inventory_context(dialog, w, -1, null, false); }
-        }; })(item);
-    }
+        var sku = new SPUI.Dialog(gamedata['dialogs'][dialog.data['widgets']['sku']['dialog']]);
+        dialog.add(sku);
+        dialog.widgets['sku'+i.toString()] = sku;
+
+        sku.widgets['name'].set_text_with_linebreaking(ItemDisplay.get_inventory_item_ui_name(spec));
+        ItemDisplay.set_inventory_item_asset(sku.widgets['icon'], spec);
+        ItemDisplay.set_inventory_item_stack(sku.widgets['icon_stack'], spec, item);
+        sku.widgets['price_icon'].show = false;
+        sku.widgets['price_display'].text_offset = [0,0];
+        var rarity = (spec['rarity'] || 0);
+        sku.widgets['price_display'].str = gamedata['strings']['rarities'][rarity+1].toUpperCase();
+        var col = gamedata['client']['loot_rarity_colors'][rarity+1];
+        sku.widgets['price_display'].text_color = new SPUI.Color(col[0], col[1], col[2], 1);
+        sku.widgets['glowfx'].show = true;
+        sku.widgets['glowfx'].reset_fx();
+        sku.widgets['slot0,0'].show = true;
+        sku.widgets['jewel'].show = false;
+
+        if(where !== 'loot_buffer') { // set up tooltip, unless in loot buffer
+            sku.widgets['icon_frame'].onenter = (function (_item, _slot) { return function(w) {
+                var dialog = w.parent.parent;
+                if(dialog.user_data['context'] && dialog.user_data['context'].user_data['slot'] === _slot) { return; }
+                invoke_inventory_context(dialog, w, _slot, _item, false, {'parent_dialog': dialog});
+                // set transparent so that onleave is always called reliably
+                if(dialog.user_data['context']) { dialog.user_data['context'].transparent_to_mouse = true; }
+            }; })(item, i);
+            sku.widgets['icon_frame'].onleave_cb = (function (_item, _slot) { return function(w) {
+                var dialog = w.parent.parent;
+                if(dialog.user_data['context'] && dialog.user_data['context'].user_data['slot'] === _slot) {
+                    invoke_inventory_context(dialog, w, -1, null, false);
+                }
+            }; })(item, i);
+        }
+    });
 
     dialog.widgets['title'].str = dialog.data['widgets']['title'][(items.length === 1 ? 'ui_name' : 'ui_name_plural')];
 
@@ -36950,14 +36963,13 @@ function do_invoke_items_discovered(items, duration, where, lottery_dialog) {
             dialog.widgets['store_soon'].show = true;
             dialog.widgets['close_button'].str = dialog.data['widgets']['close_button']['ui_name_messages'];
         } else if(where == 'inventory') {
-            dialog.widgets['close_button'].str = dialog.data['widgets']['close_button'][(spec['fungible'] ? 'ui_name_inventory_fungible':'ui_name_inventory')].replace('%inventory_building', gamedata['buildings'][gamedata['inventory_building']]['ui_name']);
+            dialog.widgets['close_button'].str = dialog.data['widgets']['close_button'][(all_fungible ? 'ui_name_inventory_fungible':'ui_name_inventory')].replace('%inventory_building', gamedata['buildings'][gamedata['inventory_building']]['ui_name']);
         }
     }
 
     var enable_animation = (where === 'messages');
 
     if(enable_animation) {
-        dialog.ondraw = animate_item_discovered;
         dialog.widgets['close_button'].onclick = close_item_discovered;
     } else {
         dialog.widgets['close_button'].onclick = function(w) {
@@ -36970,14 +36982,13 @@ function do_invoke_items_discovered(items, duration, where, lottery_dialog) {
         dialog.user_data['lottery_dialog'] = lottery_dialog;
         dialog.widgets['lottery_price_display'].show =
             dialog.widgets['lottery_button'].show = true;
-        if(enable_animation) { throw Error('mutually exclusive'); }
-        dialog.ondraw = function(dialog) {
-            update_lottery_dialog_buttons(dialog, dialog.user_data['lottery_dialog']);
-        };
-    }
+     }
 
+    dialog.ondraw = animate_item_discovered;
+    dialog.ondraw(dialog); // set initial sku positions
     return dialog;
 }
+
 function close_item_discovered(widget) {
     var dialog = widget.parent;
     if(dialog.user_data['anim_start_time'] < 0) {
@@ -36986,6 +36997,34 @@ function close_item_discovered(widget) {
 }
 
 function animate_item_discovered(dialog) {
+    var items = dialog.user_data['items'];
+
+    goog.array.forEach(items, function(item, i) {
+        var sku = dialog.widgets['sku'+i.toString()];
+        var sku_glow = dialog.widgets['sku_glow'+i.toString()];
+
+        // center the SKUs and glows
+        var offset = vec_copy(dialog.data['widgets']['sku']['array_offset']);
+        var total_width = offset[0] * (items.length-1) + sku.wh[0];
+
+        var start_xy = [Math.floor((dialog.wh[0] - total_width)/2), dialog.data['widgets']['sku']['xy'][1]];
+        // collapse together if need to scrunch horizontally
+        if(dialog.get_absolute_xy()[0] + start_xy[0] < 0) {
+            var pad = dialog.data['widgets']['sku']['xy_collapsed'][0];
+            start_xy[0] = -dialog.get_absolute_xy()[0] + pad;
+            offset = [Math.floor((canvas_width-2*pad-sku.wh[0]) / (items.length-1)), dialog.data['widgets']['sku']['array_offset_collapsed'][1]];
+            start_xy[1] -= Math.floor(((items.length-1) * dialog.data['widgets']['sku']['array_offset_collapsed'][1])/2);
+        }
+
+        sku.xy = vec_add(start_xy, vec_scale(i, offset));
+        sku_glow.xy = vec_add(sku.xy, vec_sub(dialog.data['widgets']['sku_glow']['xy'], dialog.data['widgets']['sku']['xy']));
+    });
+
+    if(dialog.user_data['lottery_dialog']) {
+        update_lottery_dialog_buttons(dialog, dialog.user_data['lottery_dialog']);
+    }
+
+    if(dialog.user_data['where'] !== 'messages') { return; } // no animation
     if(dialog.user_data['anim_start_time'] < 0) { return; }
 
     var ANIM_TIME = player.get_any_abtest_value('valentina_dialog_anim_time', gamedata['client']['valentina_dialog_anim_time']);
