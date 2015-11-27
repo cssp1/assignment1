@@ -23046,15 +23046,15 @@ function update_inventory_grid(dialog) {
     var any_expiring = false;
 
     var provides = gamedata['buildings'][gamedata['inventory_building']]['provides_inventory'];
-    var max_possible_slots = (typeof(provides) === 'number' ? provides : provides[provides.length-1]);
+    var max_possible_slots = Math.max((typeof(provides) === 'number' ? provides : provides[provides.length-1]), player.inventory.length); // allow for over-stuffed inventory
     var warehouse_busy = player.warehouse_is_busy();
-
+    var max_usable_inventory = Math.max(player.max_usable_inventory(), player.inventory.length); // allow for over-stuffed inventory
     var craft_products = [], craft_product_i = 0;
 
     // need to update scrolling per-frame as player.inventory changes
     var slots_per_page = dialog.user_data['rows_per_page'] * dialog.user_data['cols_per_page'];
     // add as many rowdata entries as necessary to fill the final page, but not beyond that
-    var shown_slots = Math.min(max_possible_slots, slots_per_page * Math.floor((player.max_usable_inventory()-1)/slots_per_page)+ slots_per_page - player.max_usable_inventory() % slots_per_page);
+    var shown_slots = Math.min(max_possible_slots, slots_per_page * Math.floor((max_usable_inventory-1)/slots_per_page)+ slots_per_page - max_usable_inventory % slots_per_page);
 
     // note: rowdata here is just a placeholder null (so that scrollable_dialog_change_page() works)
     // the actual data is in player.inventory
@@ -23063,9 +23063,9 @@ function update_inventory_grid(dialog) {
         for(var s = 0; s < shown_slots; s++) { dialog.user_data['rowdata'].push(null); }
     }
     scrollable_dialog_change_page(dialog, dialog.user_data['page']);
-    dialog.widgets['custom_scroll_text'].str = dialog.data['widgets']['custom_scroll_text']['ui_name'].replace('%d1', pretty_print_number((slots_per_page * dialog.user_data['page'])+1)).replace('%d2', pretty_print_number(Math.min(slots_per_page * (dialog.user_data['page']+1), player.max_usable_inventory()))).replace('%d3', pretty_print_number(player.max_usable_inventory()));
+    dialog.widgets['custom_scroll_text'].str = dialog.data['widgets']['custom_scroll_text']['ui_name'].replace('%d1', pretty_print_number((slots_per_page * dialog.user_data['page'])+1)).replace('%d2', pretty_print_number(Math.min(slots_per_page * (dialog.user_data['page']+1), max_usable_inventory))).replace('%d3', pretty_print_number(player.max_usable_inventory()));
     // hide scroll text if beyond end of usable slots
-    dialog.widgets['custom_scroll_text'].show = (slots_per_page * dialog.user_data['page'])+1 <= player.max_usable_inventory();
+    dialog.widgets['custom_scroll_text'].show = (slots_per_page * dialog.user_data['page'])+1 <= max_usable_inventory;
 
     var cols = dialog.data['widgets']['slot']['array'][0];
     for(var y = 0; y < dialog.data['widgets']['slot']['array'][1]; y++) {
@@ -23080,7 +23080,7 @@ function update_inventory_grid(dialog) {
                 dialog.widgets['pending'+wname].show =
                 dialog.widgets['frame'+wname].show = false;
 
-            if(slot < player.max_usable_inventory()) {
+            if(slot < max_usable_inventory) {
                 dialog.widgets['slot'+wname].show = true;
                 dialog.widgets['slot'+wname].state = 'normal';
                 if(slot < player.inventory.length) {
@@ -23296,6 +23296,11 @@ function update_inventory_grid(dialog) {
                 }; })(warehouse);
             }
         }
+    }
+
+    if('overstuffed_warning' in dialog.widgets) {
+        dialog.widgets['overstuffed_warning'].show = (player.inventory.length > player.max_usable_inventory());
+        dialog.widgets['overstuffed_warning'].str = dialog.data['widgets']['overstuffed_warning'][(warehouse && warehouse.level < warehouse.get_max_ui_level() ? 'ui_name': 'ui_name_maxlevel')].replace('%s', warehouse.spec['ui_name']);
     }
 };
 

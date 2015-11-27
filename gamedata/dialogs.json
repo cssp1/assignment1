@@ -8439,6 +8439,12 @@
                                 "bg_image": "menu_button_134px", "ui_name": "More Info", // "ui_name": "Upgrade (+%d Slot%plural)",
                                 "text_size": 13, "text_style": "bold"},
 
+            "overstuffed_warning": { "kind": "TextField", "xy": [340,326], "dimensions": [663,28], "text_size": 13,
+                                     "ui_name": "%s over-full: Upgrade to add more room.",
+                                     "ui_name_maxlevel": "%s over-full: Discard items to make room.",
+                                     "text_color": [1,0,0,1], "drop_shadow": 1,
+                                     "text_hjustify": "left" },
+
             "instructions_normal": { "kind": "TextField", "xy": [50,366], "dimensions": [663,28], "text_size": 13,
                                      "ui_name": "Double-click to activate items.", "text_color": [0.66,0.66,0.66,1],
                                      "text_hjustify": "left" },
