@@ -25203,7 +25203,7 @@ function update_lottery_dialog_buttons(dialog, lottery_dialog) {
 function lottery_dialog_scan_result(dialog, which_slot, loot) {
     dialog.user_data['scan_pending'] = -1;
     if(loot) {
-        do_invoke_item_discovered(loot, {tip_mode: 'inventory', enable_animation: false, lottery_dialog: dialog});
+        do_invoke_items_discovered(loot, -1, 'inventory', dialog);
     }
 
     // update the slate, if we received the new one
@@ -36693,8 +36693,17 @@ function update_buy_gamebucks_sku23(dialog) {
             var credits_cb = (function (_widget, __order) { return function() {
                 var dialog = _widget.parent;
                 if(dialog) {
-                    if(dialog.parent) { dialog.parent.user_data['pending'] = false; }
-                    close_parent_dialog(dialog); // get rid of buy gamebucks dialog
+                    if(dialog.parent) {
+                        dialog.parent.user_data['pending'] = false;
+
+                        // get rid of buy gamebucks dialog
+                        // XXX hack - UNLESS the only child is item_discovered
+                        if(dialog.parent.children[dialog.parent.children.length-1].user_data &&
+                           dialog.parent.children[dialog.parent.children.length-1].user_data['dialog'] === 'item_discovered') {
+                        } else {
+                            close_dialog(dialog.parent);
+                        }
+                    }
                 }
 
                 if(__order && player.resource_state['gamebucks'] >= __order['price']) {
@@ -36857,32 +36866,27 @@ function invoke_ui_locker_until_closed() {
 }
 
 /** @param {!Array.<Object>} items
-    @param {number} duration */
-function invoke_item_discovered(items, duration) {
+    @param {number} duration
+    @param {string} where
+*/
+function invoke_items_discovered(items, duration, where) {
+    if(!goog.array.contains(['inventory','messages','loot_buffer'], where)) { throw Error('unhandled "where" value '+where); }
+
     // skip if using fast modal looting
-    if(loot_dialog_fast_anim) {
-        // awkward - delay so that the following LOOT_BUFFER_UPDATE takes effect
-        window.setTimeout(function() { invoke_loot_dialog(gamedata['strings']['combat_messages']['item_discovered']); }, 1);
+    if(where === 'loot_buffer' && loot_dialog_fast_anim) {
+        invoke_loot_dialog(gamedata['strings']['combat_messages']['item_discovered']);
         return null;
     }
-    return do_invoke_item_discovered(items, {duration: duration,
-                                             title_mode: 'item_discovered',
-                                             tip_mode: (player.get_any_abtest_value('modal_looting', gamedata['modal_looting']) ? null : 'messages'),
-                                             enable_animation: !player.get_any_abtest_value('modal_looting', gamedata['modal_looting'])
-                                            });
+
+    return do_invoke_items_discovered(items, duration, where, null);
 }
 
 /** @param {!Array.<Object>} items
-    @param {{duration: (number|undefined),
-             title_mode: (string|null|undefined),
-             tip_mode: (string|null|undefined),
-             enable_animation: (boolean|undefined),
-             lottery_dialog: (SPUI.Dialog|null|undefined)
-             }} options
+    @param {number} duration
+    @param {string} where
+    @param {SPUI.Dialog|null=} lottery_dialog
     @return {!SPUI.Dialog} */
-function do_invoke_item_discovered(items, options) {
-    var duration = options.duration || -1;
-
+function do_invoke_items_discovered(items, duration, where, lottery_dialog) {
     var dialog_data = gamedata['dialogs']['item_discovered'];
     var dialog = new SPUI.Dialog(dialog_data);
     dialog.user_data['dialog'] = 'item_discovered';
@@ -36897,6 +36901,9 @@ function do_invoke_item_discovered(items, options) {
     } else {
         dialog.widgets['expiry'].str = dialog.data['widgets']['expiry']['ui_name'].replace('%d', exp_days.toFixed(0));
     }
+
+    // XXXXXX
+    if(items.length > 1) { throw Error('multiple items not supported'); }
 
     var item = items[0];
     var spec = gamedata['items'][item['spec']];
@@ -36916,20 +36923,7 @@ function do_invoke_item_discovered(items, options) {
     sku.widgets['jewel'].show = false;
 
     sku.user_data['context'] = null;
-
-    dialog.widgets['title'].show = !!options.title_mode;
-
-    if(options.tip_mode) {
-        dialog.widgets['subtitle'].show = true;
-        dialog.widgets['subtitle'].str = dialog.data['widgets']['subtitle']['ui_name_'+options.tip_mode];
-
-        if(options.tip_mode == 'messages') {
-            dialog.widgets['store_soon'].show = true;
-            dialog.widgets['close_button'].str = dialog.data['widgets']['close_button']['ui_name_messages'];
-        } else if(options.tip_mode == 'inventory') {
-            dialog.widgets['close_button'].str = dialog.data['widgets']['close_button'][(spec['fungible'] ? 'ui_name_inventory_fungible':'ui_name_inventory')];
-        }
-
+    if(where !== 'loot_buffer') { // set up tooltip, unless in loot buffer
         sku.widgets['icon_frame'].onenter = (function (_item) { return function(w) {
             var dialog = w.parent;
             if(dialog.user_data['context']) { return; }
@@ -36941,12 +36935,28 @@ function do_invoke_item_discovered(items, options) {
             var dialog = w.parent;
             if(dialog.user_data['context']) { invoke_inventory_context(dialog, w, -1, null, false); }
         }; })(item);
-    } else {
-        // modal looting - turn off extra stuff, and no onhover tip
-        dialog.widgets['subtitle'].show = dialog.widgets['expiry'].show = dialog.widgets['store_soon'].show = false;
     }
 
-    if(options.enable_animation) {
+    dialog.widgets['title'].str = dialog.data['widgets']['title'][(items.length === 1 ? 'ui_name' : 'ui_name_plural')];
+
+    if(where === 'loot_buffer') {
+        // modal looting - turn off extra stuff, and no onhover tip
+        dialog.widgets['subtitle'].show = dialog.widgets['expiry'].show = dialog.widgets['store_soon'].show = false;
+    } else {
+        dialog.widgets['subtitle'].show = true;
+        dialog.widgets['subtitle'].str = dialog.data['widgets']['subtitle']['ui_name_'+where];
+
+        if(where === 'messages') {
+            dialog.widgets['store_soon'].show = true;
+            dialog.widgets['close_button'].str = dialog.data['widgets']['close_button']['ui_name_messages'];
+        } else if(where == 'inventory') {
+            dialog.widgets['close_button'].str = dialog.data['widgets']['close_button'][(spec['fungible'] ? 'ui_name_inventory_fungible':'ui_name_inventory')].replace('%inventory_building', gamedata['buildings'][gamedata['inventory_building']]['ui_name']);
+        }
+    }
+
+    var enable_animation = (where === 'messages');
+
+    if(enable_animation) {
         dialog.ondraw = animate_item_discovered;
         dialog.widgets['close_button'].onclick = close_item_discovered;
     } else {
@@ -36956,11 +36966,11 @@ function do_invoke_item_discovered(items, options) {
         };
     }
 
-    if(options.lottery_dialog) {
-        dialog.user_data['lottery_dialog'] = options.lottery_dialog;
+    if(lottery_dialog) {
+        dialog.user_data['lottery_dialog'] = lottery_dialog;
         dialog.widgets['lottery_price_display'].show =
             dialog.widgets['lottery_button'].show = true;
-        if(options.enable_animation) { throw Error('mutually exclusive'); }
+        if(enable_animation) { throw Error('mutually exclusive'); }
         dialog.ondraw = function(dialog) {
             update_lottery_dialog_buttons(dialog, dialog.user_data['lottery_dialog']);
         };
@@ -43964,9 +43974,19 @@ function handle_server_message(data) {
             player.claim_achievements();
         }
 
-    } else if(msg == "ITEM_DISCOVERED") {
-        var items = data[1], duration = data[2];
-        invoke_item_discovered(items, duration);
+    } else if(msg == "ITEMS_DISCOVERED") {
+        var items = data[1], duration = data[2], where = data[3];
+        var invoker = (function(_items, _duration, _where) { return function() {
+            invoke_items_discovered(_items, _duration, _where);
+        }; })(items, duration, where);
+        invoker(); // immediately add
+        /*
+        if(find_dialog('new_store_dialog')) {
+            invoker(); // immediately super-impose
+        } else {
+            notification_queue.push(invoker);
+        }
+        */
     } else if(msg == "YOU_GOT_BONUS_UNITS") {
         notification_queue.push(invoke_you_got_bonus_units);
     } else if(msg == "YOU_SENT_GIFT_ORDER") {

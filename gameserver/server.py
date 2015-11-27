@@ -14995,6 +14995,8 @@ class Store(object):
                             # go directly into inventory
                             for item in items: session.player.inventory_add_item(item, -1)
                             session.player.send_inventory_update(retmsg)
+                            discovered_where = 'inventory'
+
                         else:
                             # use loot buffer
 
@@ -15005,12 +15007,16 @@ class Store(object):
 
                             session.player.loot_buffer += items
                             retmsg.append(["LOOT_BUFFER_UPDATE", session.player.loot_buffer, True])
+                            discovered_where = 'loot_buffer'
 
                         for item in items:
                             session.player.inventory_log_event('5125_item_obtained', item['spec'], item.get('stack',1), item.get('expire_time',-1), level=item.get('level',None), reason=spellname)
 
                     else:
                         session.player.send_loot_mail('', 0, items, retmsg, mail_template = gamedata['strings']['gamebucks_loot_mail'])
+                        discovered_where = 'messages'
+
+                    retmsg.append(["ITEMS_DISCOVERED", items, -1, discovered_where])
 
             if gift_order:
                 # try to send gamebucks gift. On failure, leave the gamebucks in the player's balance
@@ -17980,10 +17986,10 @@ class GAMEAPI(resource.Resource):
             metric_event_coded(session.user.user_id, '5100_free_random_item' if spellname.startswith("FREE_RANDOM_") else '5110_buy_random_item',
                                {'items':items})
 
-            retmsg.append(["ITEM_DISCOVERED", items, spell['mail_template'].get('duration',-1)])
+            use_modal_looting = (session.player.get_any_abtest_value('modal_looting', gamedata['modal_looting']) and \
+                                 session.player.find_object_by_type(gamedata['inventory_building']))
 
-            if session.player.get_any_abtest_value('modal_looting', gamedata['modal_looting']) and \
-               session.player.find_object_by_type(gamedata['inventory_building']):
+            if use_modal_looting:
                 session.player.loot_buffer += items
                 for item in items:
                     session.player.inventory_log_event('5125_item_obtained', item['spec'], item.get('stack',1), item.get('expire_time',-1), level=item.get('level',None), reason=spellname)
@@ -17991,6 +17997,8 @@ class GAMEAPI(resource.Resource):
                 retmsg.append(["LOOT_BUFFER_UPDATE", session.player.loot_buffer, True])
             else:
                 session.player.send_loot_mail('', 0, items, retmsg, mail_template = spell['mail_template'])
+
+            retmsg.append(["ITEMS_DISCOVERED", items, spell['mail_template'].get('duration',-1), 'loot_buffer' if use_modal_looting else 'messages'])
 
         elif spellname == "BUY_ITEM":
             skudata = Store.buy_item_find_skudata(spellarg, session.player)

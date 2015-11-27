@@ -5018,10 +5018,13 @@
             "bg_blanker": { "kind": "SolidRect", "xy": [-2000,-2000], "dimensions": [4000,4000], "color":[0.012,0.012,0.012,0.85] },
 
             "title": { "kind": "TextField", "xy": [0,-17], "dimensions": [300, 21], "text_size": 19, "text_style": "bold", "text_color": [1,1,0,1],
-                       "text_hjustify": "center", "text_vjustify": "center", "ui_name": "ITEM DISCOVERED", "drop_shadow": 1 },
+                       "text_hjustify": "center", "text_vjustify": "center",
+                       "ui_name": "ITEM DISCOVERED", "ui_name_plural": "ITEMS DISCOVERED",
+                       "drop_shadow": 1 },
             "subtitle": { "show": 0, "kind": "TextField", "xy": [0,9], "dimensions": [300, 12], "text_size": 13, "text_style": "normal",
                           "text_hjustify": "center", "text_vjustify": "center",
                           "ui_name_messages": "Check Your Messages",
+                          "ui_name_loot_buffer": "",
                           "ui_name_inventory": ""
                         },
 
@@ -5033,10 +5036,10 @@
 
             "sku": { "kind": "Dialog", "xy": [42,35], "dialog": "new_store_sku" },
 
-            "close_button": { "kind": "ActionButton", "xy": [83,333], "dimensions": [134,28], "bg_image": "menu_button_134px", "push_bg_image": 1,
+            "close_button": { "kind": "ActionButton", "xy": [73,333], "dimensions": [154,30], "bg_image": "menu_button_resizable", "bg_image_resizable": 1, "push_bg_image": 1,
                               "ui_name_messages": "Send to Messages",
-                              "ui_name_inventory": "Done", // warehouse
-                              "ui_name_inventory_fungible": "Done", // storage
+                              "ui_name_inventory": "Store in %inventory_building", // warehouse
+                              "ui_name_inventory_fungible": "Add to Storage", // storage
                               "ui_name": "Accept",
                               "text_size": 13, "text_style": "bold"},
 
@@ -8336,7 +8339,13 @@
             "scroll_right": { "kind": "ActionButton", "xy": [708,182], "dimensions": [22,100], "bg_image": "dialog_scroll_arrow_right",
                               "push_bg_image": 1},
             // don't use "scroll_text" since scrollable_dialog_change_page() doesn't do the right thing
-            "custom_scroll_text": { "kind": "TextField", "xy": [340,350], "dimensions": [600,19], "text_size": 13, "text_hjustify": "left", "ui_name": "Showing slots %d1-%d2 of %d3", "text_color": [0.66,0.66,0.66,1]},
+            "custom_scroll_text": { "kind": "TextField", "xy": [335,350], "dimensions": [200,19], "text_size": 13, "text_hjustify": "right", "ui_name": "Showing slots %d1-%d2 of %d3", "text_color": [0.66,0.66,0.66,1]},
+
+            "overstuffed_warning": { "kind": "TextField", "xy": [335,326], "dimensions": [200,28], "text_size": 13,
+                                     "ui_name": "%s over-full: Upgrade to add more room.",
+                                     "ui_name_maxlevel": "%s over-full: Discard items to make room.",
+                                     "text_color": [1,0,0,1], "drop_shadow": 1,
+                                     "text_hjustify": "right" },
 
             "upgrade_level": { "kind": "TextField", "xy": [335,366], "dimensions": [200,28], "text_size": 13,
                                "ui_name": "Warehouse Level %NEXT adds %SLOT slot%plural", "text_color": [0.66,0.66,0.66,1],
