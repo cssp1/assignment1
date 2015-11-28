@@ -50,11 +50,11 @@ if __name__ == '__main__':
                "P100D1": { "level": 100, "slate": "D1",
                           "currency": "kgcredits",
                           "requires": [{"predicate": "ALWAYS_TRUE"}], # enabled at 1403467211
-                          "skus": [{'alloy': 24000, 'kgcredits':1999, 'nominal_alloy': 20000, 'ui_comment': 'Best Value', 'ui_pile_size': 5},
-                                   {'alloy': 11500, 'kgcredits': 999, 'nominal_alloy': 10000, 'ui_comment': None, 'ui_pile_size': 4},
-                                   {'alloy': 5500, 'kgcredits': 499, 'nominal_alloy': 5000, 'ui_comment': 'Most Popular', 'ui_pile_size': 3},
-                                   {'alloy': 1050, 'kgcredits': 99, 'nominal_alloy': 1000, 'ui_comment': None, 'ui_pile_size': 2},
-                                   {'alloy': 500, 'kgcredits': 49, 'ui_comment': None, 'ui_pile_size': 0}
+                          "skus": [{'alloy': 24000, 'kgcredits':1999, 'nominal_alloy': 20000, 'ui_comment': 'Best Value', 'ui_pile_size': 5, 'loot_table': 'item_bundle_20000'},
+                                   {'alloy': 11500, 'kgcredits': 999, 'nominal_alloy': 10000, 'ui_comment': None, 'ui_pile_size': 4, 'loot_table': 'item_bundle_10000'},
+                                   {'alloy': 5500, 'kgcredits': 499, 'nominal_alloy': 5000, 'ui_comment': 'Most Popular', 'ui_pile_size': 3, 'loot_table': 'item_bundle_5000'},
+                                   {'alloy': 1050, 'kgcredits': 99, 'nominal_alloy': 1000, 'ui_comment': None, 'ui_pile_size': 2, 'loot_table': 'item_bundle_1000'},
+                                   {'alloy': 500, 'kgcredits': 49, 'ui_comment': None, 'ui_pile_size': 0, 'loot_table': 'item_bundle_500'}
                                    ] },
                }
 
@@ -108,6 +108,7 @@ if __name__ == '__main__':
                 }
             if 'ui_pile_size' in data: sku['ui_pile_size'] = data['ui_pile_size']
             if 'nominal_alloy' in data: sku['nominal_quantity'] = data['nominal_alloy']
+            if 'loot_table' in data: sku['loot_table'] = data['loot_table']
             if comment: sku['ui_comment'] = comment
 
             ui_bonus_list = []
