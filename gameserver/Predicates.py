@@ -221,11 +221,17 @@ class TimeInGamePredicate(Predicate):
 class AccountCreationTimePredicate(Predicate):
     def __init__(self, data):
         Predicate.__init__(self, data)
-        self.range = data['range']
+        self.range = data.get('range', None)
+        self.age_range = data.get('age_range', None)
     def is_satisfied(self, player, qdata):
         creat = player.creation_time
-        if self.range[0] >= 0 and creat < self.range[0]: return False
-        if self.range[1] >= 0 and creat > self.range[1]: return False
+        if self.range:
+            if self.range[0] >= 0 and creat < self.range[0]: return False
+            if self.range[1] >= 0 and creat > self.range[1]: return False
+        if self.age_range:
+            age = player.get_absolute_time() - creat
+            if self.age_range[0] >= 0 and age < self.age_range[0]: return False
+            if self.age_range[1] >= 0 and age > self.age_range[1]: return False
         return True
 
 class ObjectUndamagedPredicate(Predicate):

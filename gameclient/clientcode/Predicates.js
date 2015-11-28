@@ -1125,6 +1125,19 @@ CountryPredicate.prototype.ui_expire_time = function(player) { return -1; };
 
 /** @constructor
   * @extends Predicate */
+function PurchasedRecentlyPredicate(data) {
+    goog.base(this, data);
+    this.seconds_ago = data['seconds_ago'];
+}
+goog.inherits(PurchasedRecentlyPredicate, Predicate);
+PurchasedRecentlyPredicate.prototype.is_satisfied = function(player, qdata) {
+    var now = player.get_absolute_time();
+    return ('last_purchase_time' in player.history) && (player.history['last_purchase_time'] >= (now - this.seconds_ago));
+};
+PurchasedRecentlyPredicate.prototype.ui_expire_time = function(player) { return -1; };
+
+/** @constructor
+  * @extends Predicate */
 function EventTimePredicate(data) {
     goog.base(this, data);
     this.name = data['event_name'] || null;
@@ -1196,13 +1209,21 @@ AbsoluteTimePredicate.prototype.ui_expire_time = function(player) {
   * @extends Predicate */
 function AccountCreationTimePredicate(data) {
     goog.base(this, data);
-    this.range = data['range'];
+    this.range = data['range'] || null;
+    this.age_range = data['age_range'] || null;
 }
 goog.inherits(AccountCreationTimePredicate, Predicate);
 AccountCreationTimePredicate.prototype.is_satisfied = function(player, qdata) {
     var creat = player.creation_time;
-    if(this.range[0] >= 0 && creat < this.range[0]) { return false; }
-    if(this.range[1] >= 0 && creat >= this.range[1]) { return false; }
+    if(this.range) {
+        if(this.range[0] >= 0 && creat < this.range[0]) { return false; }
+        if(this.range[1] >= 0 && creat >= this.range[1]) { return false; }
+    }
+    if(this.age_range) {
+        var age = player.get_absolute_time() - creat;
+        if(this.age_range[0] >= 0 && age < this.age_range[0]) { return false; }
+        if(this.age_range[1] >= 0 && age > this.age_range[1]) { return false; }
+    }
     return true;
 };
 AccountCreationTimePredicate.prototype.do_ui_describe = function(player) {
@@ -1843,6 +1864,8 @@ function read_predicate(data) {
         return new UserIDPredicate(data);
     } else if(kind === 'COUNTRY') {
         return new CountryPredicate(data);
+    } else if(kind === 'PURCHASED_RECENTLY') {
+        return new PurchasedRecentlyPredicate(data);
     } else if(kind === 'EVENT_TIME') {
         return new EventTimePredicate(data);
     } else if(kind === 'ABSOLUTE_TIME') {
