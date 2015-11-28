@@ -175,7 +175,9 @@ AndPredicate.prototype.ui_expire_time = function(player) {
     for(var i = 0; i < this.subpredicates.length; i++) {
         // return the min expire time out of all subpredicates
         var t = this.subpredicates[i].ui_expire_time(player);
-        etime = (etime > 0 ? Math.min(etime, t) : t);
+        if(t > 0) {
+            etime = (etime > 0 ? Math.min(etime, t) : t);
+        }
     }
     return etime;
 };
@@ -230,7 +232,9 @@ OrPredicate.prototype.ui_expire_time = function(player) {
         // return the max expire time out of all TRUE subpredicates
         if(this.subpredicates[i].is_satisfied(player, null)) {
             var t = this.subpredicates[i].ui_expire_time(player);
-            etime = (etime > 0 ? Math.max(etime, t) : t);
+            if(t > 0) {
+                etime = (etime > 0 ? Math.max(etime, t) : t);
+            }
         }
     }
     return etime;
