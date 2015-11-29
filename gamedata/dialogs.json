@@ -7249,7 +7249,7 @@
 
             "close_button": { "kind": "ActionButton", "xy": [505,19], "dimensions": [24,24], "bg_image": "close_button_big", "push_bg_image": 1 },
             "title_bold": { "kind": "TextField", "xy": [0,10], "dimensions": [550, 40], "text_size": 27, "text_style": "bold",
-                            "text_hjustify": "center", "text_vjustify": "center", "ui_name": "Special Offer!" },
+                            "text_hjustify": "center", "text_vjustify": "center", "ui_name": "Special Offer Unlocked!" },
 
             "warning_text":  { "show": 0, "kind": "RichTextField", "xy": [27,27], "dimensions": [276,24], "text_size": 13, "text_hjustify": "left" },
 
