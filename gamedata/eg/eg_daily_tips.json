@@ -36,7 +36,7 @@
     // },
 
     {"name": "flash_sale", "recurring": 1, // display more than once
-     "image": "20150721_generic_sale_gold.jpg",
+     "image": "20150721_personal_sale_gold2.jpg",
      "event_countdown_hack": {
          "enable": 1,
          "aura_name": "flash_sale",
