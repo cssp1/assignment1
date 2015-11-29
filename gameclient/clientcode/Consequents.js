@@ -11,6 +11,7 @@ goog.provide('Consequents');
 // for Logic only
 goog.require('Predicates');
 goog.require('GameArt'); // for client graphics
+goog.require('OfferChoice');
 
 // depends on global player/selection stuff from clientcode.js
 // note: this parallel's Consequents.py on the server side, but
@@ -595,6 +596,23 @@ DisplayDailyTipConsequent.prototype.execute = function(state) {
 
 /** @constructor
   * @extends Consequent */
+function InvokeOfferChoiceConsequent(data) {
+    goog.base(this, data);
+    this.then_cons = read_consequent(data['then']);
+}
+goog.inherits(InvokeOfferChoiceConsequent, Consequent);
+InvokeOfferChoiceConsequent.prototype.execute = function(state) {
+    var then_cb = (function (_this) { return function() {
+        _this.then_cons.execute();
+    }; })(this);
+    var invoker = (function (_then_cb) { return function() {
+        OfferChoice.invoke_offer_choice(_then_cb);
+    }; })(then_cb);
+    notification_queue.push(invoker);
+};
+
+/** @constructor
+  * @extends Consequent */
 function EnableCombatResourceBarsConsequent(data) {
     goog.base(this, data);
     this.enabled = data['enable'];
@@ -768,6 +786,7 @@ function read_consequent(data) {
     else if(kind === 'FOCUS_CHAT_GUI') { return new FocusChatGUIConsequent(data); }
     else if(kind === 'DAILY_TIP_UNDERSTOOD') { return new DailyTipUnderstoodConsequent(data); }
     else if(kind === 'DISPLAY_DAILY_TIP') { return new DisplayDailyTipConsequent(data); }
+    else if(kind === 'INVOKE_OFFER_CHOICE') { return new InvokeOfferChoiceConsequent(data); }
     else if(kind === 'ENABLE_COMBAT_RESOURCE_BARS') { return new EnableCombatResourceBarsConsequent(data); }
     else if(kind === 'ENABLE_DIALOG_COMPLETION') { return new EnableDialogCompletionConsequent(data); }
     else if(kind === 'PRELOAD_ART_ASSET') { return new PreloadArtAssetConsequent(data); }

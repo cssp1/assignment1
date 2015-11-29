@@ -1908,6 +1908,7 @@ SPUI.ActionButton = function(data) {
 
     this.fade_unless_hover = data['fade_unless_hover'] || false;
     this.alpha = data['alpha'] || 1;
+    this.composite_mode = data['composite_mode'] || null;
     this.mouseover_sound = data['mouseover_sound'] || false;
 
     if('highlight_text_color' in data) {
@@ -1970,6 +1971,11 @@ SPUI.ActionButton.prototype.do_draw = function(offset) {
         SPUI.ctx.beginPath();
         SPUI.ctx.rect(offset[0]+this.clip_to[0], offset[1]+this.clip_to[1], this.clip_to[2], this.clip_to[3]);
         SPUI.ctx.clip();
+    }
+
+    if(this.composite_mode) {
+        if(!ctx_saved) { SPUI.ctx.save(); ctx_saved = true; }
+        if(this.composite_mode) { SPUI.ctx.globalCompositeOperation = this.composite_mode; }
     }
 
     var text_offset = [offset[0], offset[1]];

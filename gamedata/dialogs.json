@@ -7070,6 +7070,67 @@
         }
     },
 
+    // these need to be separate dialogs so their fade_unless_hover works right
+    "offer_choice_item": {
+        "dimensions": [125,165],
+        "cycle_period": 4.0,
+        "widgets": {
+            "bg_glow": { "kind":"ActionButton","bg_image_resizable":1, "push_bg_image": 1,
+                         "xy":[0,0], "dimensions":[125,165],
+                         "bg_image": "dialog_glow_thinner",
+                         "mouseover_sound": 1,
+                         "composite_mode": "lighter",
+                         "alpha": 0.33, "fade_unless_hover": 0.5
+                       },
+            "border": { "kind": "SolidRect", "xy": [34,29], "dimensions": [56,56],
+                        "color": [0,0,0,0.5], "bevel": 3,
+                        "outline_color": [0.4,0.4,0.4,1], "outline_color_active": [1,0.8,0,1],
+                        "outline_width": 2 },
+            "icon": { "kind": "StaticImage", "xy": [37,32], "dimensions": [50,50],
+                      "asset": "inventory_sensor_charge" },
+            "label": { "kind": "TextField", "xy": [0,100], "dimensions": [125,32], "text_size": 13, "text_hjustify": "center", "text_color": [1,1,0.2,1],
+                       "drop_shadow": 1,
+                       "ui_name": "Random\nOffer #%random"
+                     },
+            "glow": { "show": 0, "kind":"StaticImage","xy":[7,2],"dimensions":[110,110],"bg_image_resizable":1,"asset":"dialog_glow_resizable", "composite_mode": "lighter",
+                      "fade":1, "duration": 1.5, "fade_peak": 0.2
+                    }
+        }
+    },
+
+    "offer_choice_dialog": {
+        "clip_children": 0,
+        "dimensions": [648,438],
+        "widgets": {
+            "bg_blanker": { "kind": "SolidRect", "xy": [-1000,-1000], "dimensions": [4670,4670], "color":[0.01,0.01,0.01,1] },
+            "glow": { "show": 0, "kind":"StaticImage","xy":[-30,-30],"dimensions":[708,498],"bg_image_resizable":1,"asset":"dialog_glow_resizable", "composite_mode": "lighter",
+                      "fade":1, "duration": 1.5, "fade_peak": 0.2, "delay": -0.2,
+                      "sound": "success_sound_exploding_glass_01"
+                    },
+            "bg": { "kind": "StaticImage", "xy": [0,0], "dimensions": [648,438], "asset": "dialog_resizable", "bg_image_resizable": 1 },
+
+            "sunken_left":{"kind":"StaticImage","xy":[15,60],"dimensions":[174,350],"asset":"dialog_sunken_resizable", "bg_image_resizable":1},
+            "sunken_right":{"kind":"StaticImage","xy":[200,60],"dimensions":[430,350],"asset":"dialog_sunken_resizable", "bg_image_resizable":1},
+
+            "sidebar_splash_frame": { "kind": "SolidRect", "xy": [26,77], "dimensions": [151,316],
+                                      "color": [0,0,0,0.5], "bevel": 3,
+                                      "outline_color": [0.4,0.4,0.4,1],
+                                      "outline_width": 2 },
+            "sidebar_splash":{"kind":"StaticImage","xy":[30,83],"dimensions":[143,303],"asset":"dialog_sidebar_valentina"},
+
+            "title_bold": { "kind": "TextField", "xy": [0,10], "dimensions": [650, 40], "text_size": 27, "text_style": "bold",
+                            "text_hjustify": "center", "text_vjustify": "center", "ui_name": "Special Offer!" },
+            "description1": { "kind": "TextField", "xy": [200,85], "dimensions": [430,32], "text_size": 13, "text_style": "bold", "text_hjustify": "center",
+                             "ui_name": "Click one of the choices to activate a new special offer:" },
+
+            "choice": { "kind": "Dialog", "dialog": "offer_choice_item",
+                        "xy":[215,140], "array": [3,1], "array_offset": [135,0]},
+
+            "description2": { "kind": "TextField", "xy": [200,336], "dimensions": [430,32], "text_size": 13, "text_hjustify": "center", "text_color": [0.8,0.8,0.8,1],
+                             "ui_name": "Offers are for you only, and available for a limited time." }
+        }
+    },
+
     "buy_gamebucks_dialog": {
         "dimensions": [756,423],
         "default_button": "no_focus_button",  // buy_button

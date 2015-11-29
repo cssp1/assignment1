@@ -1630,7 +1630,7 @@ CONSEQUENT_TYPES = set(['NULL', 'AND', 'RANDOM', 'IF', 'COND', 'LIBRARY',
                         'INVOKE_CHANGE_REGION_DIALOG', 'INVOKE_BLUEPRINT_CONGRATS', 'INVOKE_TOP_ALLIANCES_DIALOG', 'INVOKE_INVENTORY_DIALOG', 'MARK_BIRTHDAY',
                         'OPEN_URL', 'FOCUS_CHAT_GUI', 'FACEBOOK_PERMISSIONS_PROMPT', 'DAILY_TIP_UNDERSTOOD', 'RANDOM', 'FORCE_SCROLL',
                         'GIVE_UNITS', 'TAKE_UNITS', 'PRELOAD_ART_ASSET', 'HEAL_ALL_UNITS', 'HEAL_ALL_BUILDINGS',
-                        'ENABLE_COMBAT_RESOURCE_BARS', 'ENABLE_DIALOG_COMPLETION', 'INVITE_FRIENDS_PROMPT', 'DISPLAY_DAILY_TIP', 'TAKE_ITEMS',
+                        'ENABLE_COMBAT_RESOURCE_BARS', 'ENABLE_DIALOG_COMPLETION', 'INVITE_FRIENDS_PROMPT', 'DISPLAY_DAILY_TIP', 'INVOKE_OFFER_CHOICE', 'TAKE_ITEMS',
                         'CLEAR_UI', 'CLEAR_NOTIFICATIONS', 'DEV_EDIT_MODE', 'GIVE_GAMEBUCKS', 'LOAD_AI_BASE', 'REPAIR_ALL', 'FPS_COUNTER',
                         'CHANGE_TITLE',
                    ])
@@ -1787,6 +1787,8 @@ def check_consequent(cons, reason = '', context = None, context_data = None):
     elif cons['consequent'] == 'DISPLAY_DAILY_TIP':
         if not any(tip['name'] == cons.get('name', '') for tip in gamedata['daily_tips']):
             error |= 1; print '%s: DISPLAY_DAILY_TIP refers to invalid daily tip %s' % (reason, cons.get('name', ''))
+    elif cons['consequent'] == 'INVOKE_OFFER_CHOICE':
+        error |= check_consequent(cons['then'], reason = reason, context = context, context_data = context_data)
     elif cons['consequent'] in ('GIVE_UNITS','TAKE_UNITS'):
         units = cons['units']
         for name, data in units.iteritems():
