@@ -316,6 +316,11 @@ class WebSocketsProtocol(ProtocolWrapper):
                 self.transport.write(make_hybi07_frame(pong_data, opcode=PONG)) # DJM - this used to say make_hybi07_packet() but there is no definition for that!
 
     def sendFrames(self):
+        # DJM - this shouldn't happen
+        # if self.disconnecting:
+        #     import sys, traceback
+        #     sys.stderr.write('send while disconnecting!\n%r\n%s\n' % (self.pending_frames, ''.join(traceback.format_stack())))
+
         """
         Send all pending frames.
         """

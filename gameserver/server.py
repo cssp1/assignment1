@@ -21967,6 +21967,10 @@ class GAMEAPI(resource.Resource):
             retmsg.append(["PLAYER_CACHE_UPDATE", [self.get_player_cache_props(session.user, session.player, session.alliance_id_cache)]])
 
     def complete_deferred_request(self, request, session, retmsg):
+        # works for both standard HTTP request and WSFakeRequest
+
+        if request and hasattr(request, '_disconnected') and request._disconnected: return
+
         # note: retmsg is ONLY used to convey error messages that happen prior to session set-up
         # once the session is alive, only session.outgoing_messages is used for transmission
 
@@ -21975,6 +21979,7 @@ class GAMEAPI(resource.Resource):
             # DO pay attention to retmsg here
             r = SpinJSON.dumps({'serial':-1, 'clock': server_time, 'msg': retmsg})
             request.setHeader('Connection', 'close') # stop keepalive
+            request.write(r)
 
         else:
             # note: IGNORE retmsg here - all traffic is on session.outgoing_messages
@@ -21982,34 +21987,39 @@ class GAMEAPI(resource.Resource):
                 client_str = 'sid %s' % pretty_print_session(session.session_id)
                 log.msg(('to   client (%s:%d): ' % (client_str, session.outgoing_serial))+repr(retmsg))
 
-            r = SpinJSON.dumps({'serial': session.outgoing_serial,
-                                'clock': time.time() if gamedata['server'].get('send_high_precision_time',True) else server_time,
-                                'msg': session.outgoing_messages})
-            session.outgoing_serial += 1
-            del session.outgoing_messages[:] # note: do not create a new array, since there may be external references
+            msg = session.outgoing_messages[:]
+            del session.outgoing_messages[:] # note: do not create a new array, since in-flight async requests may reference it
 
-        # works for both standard HTTP request and WSFakeRequest
-        if hasattr(request, '_disconnected') and request._disconnected: return
-        request.write(r)
+            if len(msg) == 0 and not isinstance(request, WSFakeRequest): # must send something in HTTP response, but not websocket
+                msg.append(["NOMESSAGE"])
+
+            if len(msg) > 0:
+                r = SpinJSON.dumps({'serial': session.outgoing_serial,
+                                    'clock': time.time() if gamedata['server'].get('send_high_precision_time',True) else server_time,
+                                    'msg': msg})
+                session.outgoing_serial += 1
+                request.write(r)
+
         request.finish()
 
     def complete_longpoll(self, request, session):
+        # works for both standard HTTP request and WSFakeRequest
+
+        if hasattr(request, '_disconnected') and request._disconnected: return
+
         msg = session.outgoing_messages[:]
         del session.outgoing_messages[:] # note: do not create a new array, since in-flight async requests may reference it
 
-        if len(msg) == 0: # must send something
+        if len(msg) == 0 and not isinstance(request, WSFakeRequest): # must send something in HTTP response, but not websocket
             msg.append(["NOMESSAGE"])
 
-        r = SpinJSON.dumps({'serial': session.outgoing_serial, 'longpoll':1,
-                            'clock': time.time() if gamedata['server'].get('send_high_precision_time',True) else server_time,
-                            'msg': msg})
-        session.outgoing_serial += 1
+        if len(msg) > 0:
+            r = SpinJSON.dumps({'serial': session.outgoing_serial, 'longpoll':1,
+                                'clock': time.time() if gamedata['server'].get('send_high_precision_time',True) else server_time,
+                                'msg': msg})
+            session.outgoing_serial += 1
+            request.write(r)
 
-#        if sync:
-#            assert request.__class__ is not WSFakeRequest
-#            return r
-        if hasattr(request, '_disconnected') and request._disconnected: return
-        request.write(r)
         request.finish()
 
     def handle_longpoll(self, request, session):
