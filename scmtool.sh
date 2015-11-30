@@ -159,7 +159,7 @@ function do_stat_git {
 function do_diff_git {
     for dir in $GIT_DIRS; do
         # rewrite the +++/--- part of the diff to have the right relative paths
-        (cd $dir && git diff | sed "s|--- a/|--- $dir/|" | sed "s|+++ b/|+++ $dir/|")
+        (cd $dir && git diff HEAD | sed "s|--- a/|--- $dir/|" | sed "s|+++ b/|+++ $dir/|")
     done
 }
 function do_commit_git {
