@@ -26977,6 +26977,7 @@ class GameSite(server.Site):
         maint_kicks = 0
         if self.maint_kick_time > 0 and server_time >= self.maint_kick_time:
             for session in list(iter_sessions()):
+                session.send([["ERROR", "MAINT_KICK"]], flush_now = True)
                 self.gameapi.log_out_async(session, 'maint_kick')
                 maint_kicks += 1
                 if maint_kicks >= gamedata['server']['maint_kicks_at_once']:
@@ -27000,9 +27001,11 @@ class GameSite(server.Site):
 
             if (server_time - session.last_active_time) > timeout:
                 kick_reason = 'timeout'
+                session.send([["ERROR", "IDLE_KICK"]], flush_now = True)
 
             elif (session.last_active_time <= session.login_time) and ((server_time - session.last_active_time) > gamedata['server']['initial_session_timeout']):
                 kick_reason = 'timeout'
+                session.send([["ERROR", "IDLE_KICK"]], flush_now = True)
                 if gamedata['server']['log_abnormal_logins'] >= 2:
                     gamesite.exception_log.event(server_time, 'user %d - no activity within %d sec of login, kicking.' % (session.user.user_id, gamedata['server']['initial_session_timeout']))
 

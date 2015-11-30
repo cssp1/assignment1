@@ -9834,7 +9834,9 @@ function flush_message_queue(force, my_timeout) {
                 if(!the_websocket || SPINPUNCHGAME.shutdown_in_progress) { return; } // irrelevant
                 the_websocket = null;
                 session.connect_time = -3; // disconnect session
-                invoke_timeout_message('0600_client_idle_timeout', {}, {});
+                if(client_state !== client_states.TIMED_OUT) {
+                    invoke_timeout_message('0600_client_idle_timeout', {}, {});
+                }
                 SPINPUNCHGAME.shutdown();
             };
             var on_websocket_message = function(event) {
@@ -45309,6 +45311,7 @@ function handle_server_message(data) {
 
         var display_title = gamedata['errors'][name]['ui_title'] || null;
         var display_string = gamedata['errors'][name]['ui_name'];
+        var display_button = gamedata['errors'][name]['ui_button'] || null;
         var argument = null;
 
         if(data.length > 0) {
@@ -45325,7 +45328,12 @@ function handle_server_message(data) {
             client_state = client_states.UNABLE_TO_LOGIN;
             invoke_login_error_message(name);
         } else if(name == "UNKNOWN_SESSION") {
+            // non-reportable error, because it can happen right after an idle kick
+            invoke_timeout_message('0601_client_died_from_unknown_session', {}, {'ui_title': display_title, 'ui_description': display_string, 'ui_button': display_button});
+        } else if(name == "IDLE_KICK") {
             invoke_timeout_message('0600_client_idle_timeout', {}, {});
+        } else if(name == "MAINT_KICK") {
+            invoke_timeout_message('0611_client_died_from_maint_kick', {}, {'ui_title': display_title, 'ui_description': display_string, 'ui_button': display_button});
         } else if(name == "SERVER_EXCEPTION") {
             invoke_timeout_message('0610_client_died_from_server_exception', {}, {});
         } else if(name == "TOO_LAGGED") {
