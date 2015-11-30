@@ -20018,7 +20018,7 @@ function invoke_building_context_menu(mouse_xy) {
                 dialog.widgets['head_title'].str = ItemDisplay.strip_inventory_item_ui_name_level_suffix(ItemDisplay.get_inventory_item_ui_name(item_spec));
                 if(item_spec['associated_tech']) {
                     var item_cur_level = item_spec['level']; // note: level of item itself, NOT the tech
-                    var tech_max_level = get_max_level(gamedata['tech'][item_spec['associated_tech']]);
+                    var tech_max_level = get_max_ui_level(gamedata['tech'][item_spec['associated_tech']]);
                     dialog.widgets['head_level'].show = true;
                     dialog.widgets['head_level'].str = dialog.data['widgets']['level']['ui_name'].replace('%d0', item_cur_level).replace('%d1', tech_max_level);
                 }
@@ -46238,7 +46238,7 @@ function create_mouse_tooltip() {
                     str.push(ui_name);
                     if((obj.team === 'player' || gamedata['enemy_tooltip_detail'][obj.spec['kind']])) {
                         var cur_level = item_spec['level'];
-                        var max_level = get_max_level(gamedata['tech'][item_spec['associated_tech']]);
+                        var max_level = get_max_ui_level(gamedata['tech'][item_spec['associated_tech']]);
                         str.push(gamedata['strings']['cursors']['level_x_of_y'].replace('%cur', cur_level.toString()).replace('%max', max_level.toString()));
                     }
                     str.push('---'); // separator between head and emplacement
