@@ -8,7 +8,7 @@
 # 1) uploads earlier days' data to spinpunch-logs bucket in S3
 # 2) deletes data older than the retention period
 
-import sys, os, getopt, time, tempfile
+import sys, os, getopt, time, tempfile, traceback
 import SpinS3
 import SpinConfig
 import SpinNoSQL
@@ -277,7 +277,12 @@ if __name__ == '__main__':
 
     if parallel <= 1:
         for task in task_list:
-            my_slave(task)
+            try:
+                my_slave(task)
+            except KeyboardInterrupt:
+                raise
+            except Exception as e:
+                sys.stderr.write('error in task %r:\n%r\n%s\n' % (task, e, traceback.format_exc()))
     else:
         SpinParallel.go(task_list, [sys.argv[0], '--slave'], on_error = 'continue', nprocs=parallel, verbose = False)
 
