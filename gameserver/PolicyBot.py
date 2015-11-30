@@ -474,11 +474,12 @@ if __name__ == '__main__':
         SpinParallel.slave(my_slave)
         sys.exit(0)
 
-    opts, args = getopt.gnu_getopt(sys.argv[1:], 'v', ['dry-run','test', 'parallel=', 'quiet', 'verbose', 'user-id='])
+    opts, args = getopt.gnu_getopt(sys.argv[1:], 'v', ['dry-run','test', 'parallel=', 'quiet', 'verbose', 'user-id=', 'non-incremental'])
     dry_run = False
     test = False
     parallel = -1
     verbose = 1
+    incremental = True
     manual_user_list = []
 
     for key, val in opts:
@@ -494,6 +495,8 @@ if __name__ == '__main__':
             manual_user_list.append(int(val))
         elif key == '-v' or key == '--verbose':
             verbose = 2
+        elif key == '--non-incremental':
+            incremental = False
 
     if not manual_user_list and not anti_alt_region_names:
         sys.exit(0) # nothing to do
@@ -510,11 +513,12 @@ if __name__ == '__main__':
             id_list = manual_user_list
 
         else:
-            # if we can find a recent run in the log, start from where it left off
-            if verbose: print 'checking for recent completed run...'
-            for last_run in db_client.log_retrieve('log_policy_bot', time_range = [start_time, time_now], code = 7300, sort_direction = -1, limit = 1):
-                start_time = max(start_time, last_run['time'])
-                if verbose: print 'found previous run - starting at', start_time
+            if incremental:
+                # if we can find a recent run in the log, start from where it left off
+                if verbose: print 'checking for recent completed run...'
+                for last_run in db_client.log_retrieve('log_policy_bot', time_range = [start_time, time_now], code = 7300, sort_direction = -1, limit = 1):
+                    start_time = max(start_time, last_run['time'])
+                    if verbose: print 'found previous run - starting at', start_time
 
             id_list = []
 
