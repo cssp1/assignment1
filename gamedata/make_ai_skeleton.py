@@ -1000,22 +1000,16 @@ if __name__ == '__main__':
             else:
                 speedrun_aura = None
 
-            def make_ui_priority_for_time(i, start_time, end_time, repeat_interval):
-                priority = data['map_ui_priority'][diff]
-                default_priority = {'mf':300}.get(game_id,100)
-                if priority != default_priority:
-                    raise Exception('event %s should have map_ui_priority = %d' % (data['event_name'], default_priority))
+            ui_priority = data['map_ui_priority'][diff]
+            default_ui_priority = {'mf':300}.get(game_id,100)
+            if ui_priority != default_ui_priority:
+                raise Exception('event %s should have map_ui_priority = %d' % (data['event_name'], default_priority))
 
-                if start_time > 0: # append the starting week number as a fractional part to the ui_priority so the "freshest" event wins ties.
-                    # does this work with repeat_interval? not sure...
-                    priority += 0.001 * SpinConfig.get_pvp_week(gamedata['matchmaking']['week_origin'], start_time)
-
-                if len(data['difficulties']) > 1:
-                    # ensure difficulties appear in correct order
-                    priority += 0.0001*(1 - 0.1*data['difficulties'].index(diff))
-
-                return priority
-            ui_priority = make_per_run_cond_chain(data, make_ui_priority_for_time)
+            if len(data['difficulties']) > 1:
+                # ensure difficulties appear in correct order
+                ui_difficulty_index = data['difficulties'].index(diff)
+            else:
+                ui_difficulty_index = 0
 
             unskipped_count = 0 # index of this base within the difficulty level, not counting skipped previous bases
             if 'skip' in data:
@@ -1058,6 +1052,7 @@ if __name__ == '__main__':
                     ("ui_progress", format_ui_progress(unskipped_count, num_unskipped_bases, overall_unskipped_count, overall_num_unskipped_bases)),
                     ("ui_difficulty", diff),
                     ("ui_priority", ui_priority),
+                    ("ui_difficulty_index", ui_difficulty_index),
                     ("portrait", data['villain_portrait'][diff]),
                     ("resources", { "player_level": data['starting_ai_level'][diff]+ i * data['ai_level_gain_per_base'],
                                    "water": 0, "iron": 0 }),
@@ -1612,6 +1607,7 @@ if __name__ == '__main__':
                 ("ui_name", data['villain_ui_name']),
                 ("ui_map_name", ui_map_name),
                 ("ui_priority", ui_priority),
+                ("ui_difficulty_index", ui_difficulty_index),
                 ("portrait", data['villain_portrait'][diff]),
                 ("resources", { "player_level": data['starting_ai_level'][diff], "water": 0, "iron": 0 }),
                 ("auto_level", 1),

@@ -34031,31 +34031,50 @@ function map_dialog_change_page(dialog, chapter, page) {
 
         // sort list
         var compare_by_ai_level = function (a,b) {
-            // first sort by ui_priority high to low
-            var ap = eval_cond_or_literal(gamedata['ai_bases_client']['bases'][a.user_id.toString()]['ui_priority'] || 0, player, null);
-            var bp = eval_cond_or_literal(gamedata['ai_bases_client']['bases'][b.user_id.toString()]['ui_priority'] || 0, player, null);
+            var base_a = gamedata['ai_bases_client']['bases'][a.user_id.toString()];
+            var base_b = gamedata['ai_bases_client']['bases'][b.user_id.toString()];
 
-            if(ap < bp) {
+            // first sort by ui_priority high to low
+            var ui_priority_a = eval_cond_or_literal(base_a['ui_priority'] || 0, player, null);
+            var ui_priority_b = eval_cond_or_literal(base_b['ui_priority'] || 0, player, null);
+            if(ui_priority_a < ui_priority_b) {
                 return 1;
-            } else if(ap > bp) {
+            } else if(ui_priority_a > ui_priority_b) {
                 return -1;
-            } else {
-                // then level low to high
-                if(a.get_player_level() < b.get_player_level()) {
-                    return -1;
-                } else if(a.get_player_level() > b.get_player_level()) {
-                    return 1;
-                } else {
-                    // use user_id as final sort key to ensure stable order for AIs
-                    if(a.user_id < b.user_id) {
-                        return 1;
-                    } else if(a.user_id > b.user_id) {
-                        return -1;
-                    } else {
-                        return 0;
-                    }
-                }
             }
+
+            // then "freshness" of a time-limited base
+            var range_a = ('show_if' in base_a ? read_predicate(base_a['show_if']).ui_time_range(player) : [-1,-1]);
+            var range_b = ('show_if' in base_b ? read_predicate(base_b['show_if']).ui_time_range(player) : [-1,-1]);
+            if(range_a[0] < range_b[0]) {
+                return 1;
+            } else if(range_a[0] > range_b[0]) {
+                return -1;
+            }
+
+            // then ui_difficulty_index low to high
+            var ui_diff_a = base_a['ui_difficulty_index'] || 0;
+            var ui_diff_b = base_b['ui_difficulty_index'] || 0;
+            if(ui_diff_a < ui_diff_b) {
+                return -1;
+            } else if(ui_diff_a > ui_diff_b) {
+                return 1;
+            }
+
+            // then level low to high
+            if(a.get_player_level() < b.get_player_level()) {
+                return -1;
+            } else if(a.get_player_level() > b.get_player_level()) {
+                return 1;
+            }
+
+            // use user_id as final sort key to ensure stable order for AIs
+            if(a.user_id < b.user_id) {
+                return 1;
+            } else if(a.user_id > b.user_id) {
+                return -1;
+            }
+            return 0;
         };
         var compare_by_battle_count = function(a,b) {
             if(a.battle_count > b.battle_count) {
