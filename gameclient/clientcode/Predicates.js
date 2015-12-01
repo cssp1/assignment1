@@ -802,6 +802,13 @@ CooldownActivePredicate.prototype.is_satisfied = function(player, qdata) {
 CooldownActivePredicate.prototype.do_ui_describe = function(player) {
     return new PredicateUIDescription(gamedata['strings']['predicates'][this.kind]['ui_name'].replace('%s', this.name));
 };
+CooldownActivePredicate.prototype.ui_time_range = function(player) {
+    var cd = player.cooldown_find(this.name, this.match_data);
+    if(cd) {
+        return [cd['start'], cd['end']];
+    }
+    return [-1,-1];
+}
 
 /** @constructor
   * @extends Predicate */
