@@ -16647,10 +16647,11 @@ class GAMEAPI(resource.Resource):
         elif io_type == 'store_viewing_player':
             player_table.store_async(session.viewing_player, post_result, True, 'complete_attack')
         elif io_type == 'store_viewing_base':
-            if not gamedata['server'].get('nosql_full_store', True):
-                reactor.callLater(0, post_result)
-            else:
+            if gamedata['server'].get('nosql_full_store', False):
+                # should be unnecessary - all updates should have been written out individually
                 base_table.store_async(session.viewing_base, post_result, True, 'complete_attack')
+            else:
+                reactor.callLater(0, post_result)
         elif io_type == 'del_viewing_base':
             base_table.delete_async(session.viewing_base.base_region, session.viewing_base.base_id, post_result)
         else:
