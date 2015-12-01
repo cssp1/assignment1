@@ -543,6 +543,7 @@ BuildingLevelPredicate.prototype.do_ui_help = function(player) {
     }
     return null;
 };
+BuildingLevelPredicate.prototype.ui_expire_time = function(player) { return -1; };
 
 /** @constructor
   * @extends Predicate */
@@ -1205,7 +1206,17 @@ AbsoluteTimePredicate.prototype.do_ui_describe = function(player) {
     return new PredicateUIDescription(s.replace('%d1', this.range[0].toString()).replace('%d2',this.range[1].toString()));
 };
 AbsoluteTimePredicate.prototype.ui_expire_time = function(player) {
-    return this.range[1];
+    if(this.repeat_interval) {
+        var et = player.get_absolute_time();
+        et += this.shift;
+        if(this.mod > 0) {
+            et = et % this.mod;
+        }
+        var delta = (et - this.range[0]) % this.repeat_interval;
+        return et + (this.range[1] - this.range[0]) - delta;
+    } else {
+        return this.range[1];
+    }
 };
 
 
