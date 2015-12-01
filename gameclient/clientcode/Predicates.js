@@ -805,6 +805,8 @@ CooldownActivePredicate.prototype.do_ui_describe = function(player) {
 CooldownActivePredicate.prototype.ui_time_range = function(player) {
     var cd = player.cooldown_find(this.name, this.match_data);
     if(cd) {
+        // XXX when used to determine AI base "freshness", don't base this on cooldown start time?
+        // return [-1, cd['end']];
         return [cd['start'], cd['end']];
     }
     return [-1,-1];

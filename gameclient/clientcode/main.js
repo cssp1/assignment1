@@ -34044,8 +34044,8 @@ function map_dialog_change_page(dialog, chapter, page) {
             }
 
             // then "freshness" of a time-limited base
-            var range_a = ('show_if' in base_a ? read_predicate(base_a['show_if']).ui_time_range(player) : [-1,-1]);
-            var range_b = ('show_if' in base_b ? read_predicate(base_b['show_if']).ui_time_range(player) : [-1,-1]);
+            var range_a = ('show_if' in base_a ? read_predicate(base_a['show_if']).ui_time_range(player) : ('activation' in base_a ? read_predicate(base_a['activation']).ui_time_range(player) : [-1,-1]));
+            var range_b = ('show_if' in base_b ? read_predicate(base_b['show_if']).ui_time_range(player) : ('activation' in base_b ? read_predicate(base_b['activation']).ui_time_range(player) : [-1,-1]));
             if(range_a[0] < range_b[0]) {
                 return 1;
             } else if(range_a[0] > range_b[0]) {
