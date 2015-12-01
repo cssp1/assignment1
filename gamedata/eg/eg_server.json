@@ -10,10 +10,10 @@
 
     "log_machine_stats": false,
     "machine_stats_interval": 600, // number of seconds between metric reports of server memory/CPU/disk stats
-    "session_timeout": 600, // number of seconds after which an idle session is automatically closed by the server
+    "session_timeout": 1200, // number of seconds after which an idle session is automatically closed by the server
     "player_lock_timeout": 600, // number of seconds after which login/attack locks on players are treated as invalid
-    "absolute_session_timeout": 36000, // never let a session go longer than this (a few hours) to avoid abuse
-    "initial_session_timeout": 240, // number of seconds after which to terminate an idle session when no activity happens after login
+    "absolute_session_timeout": 43200, // never let a session go longer than this (a few hours) to avoid abuse
+    "initial_session_timeout": 300, // number of seconds after which to terminate an idle session when no activity happens after login
     "session_signature_time_tolerance": 300, // how many seconds out of date a session signature is allowed to be
     // (this also controls for how long the gameserver remembers session invalidations sent from proxyserver to CONTROLAPI)
 
@@ -25,6 +25,8 @@
         "ioslave": { "max_in_flight": 50 },
         "s3": { "max_in_flight": 150 }
     },
+
+    "log_nosql": 1, // log detail level for NoSQL messages
 
     "log_abnormal_logins": 1, // log overlapped/cancelled logins (0 = off, 1 = log most serious conditions, 2 = log all conditions)
 
