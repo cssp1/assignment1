@@ -7917,8 +7917,10 @@ class Player(AbstractPlayer):
             if (data is not None): aura['data'] = data
 
         else:
-            if (not ignore_limit) and (len(self.player_auras) >= gamedata['player_aura_limit']):
-                return False
+            if (not ignore_limit) and spec.get('limited',True):
+                aura_count = sum((1 for x in self.player_auras if gamedata['auras'][x['spec']].get('limited',True)), 0)
+                if aura_count >= gamedata['player_aura_limit']:
+                    return False
             # create new aura
             aura = {'spec': aura_name, 'start_time': server_time}
             if strength != 1:

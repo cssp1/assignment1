@@ -41043,17 +41043,27 @@ function can_cast_spell_detailed(unit_id, spellname, spellarg) {
         return [true,null,null];
     } else if(spellname == "APPLY_AURA") {
         var target = spellarg[0], aura_name = spellarg[1], aura_strength = spellarg[2], aura_duration = spellarg[3];
-        if(player.player_auras.length >= gamedata['player_aura_limit']) {
-            // see if this will stack an existing aura
-            var found = false;
-            for(var i = 0; i < player.player_auras.length; i++) {
-                if(player.player_auras[i]['spec'] === aura_name) {
-                    found = true;
-                    break;
+        var spec = gamedata['auras'][aura_name];
+        if(!(('limited' in spec) && !spec['limited'])) {
+            var aura_count = 0;
+            goog.array.forEach(player.player_auras, function(x) {
+                var s = gamedata['auras'][x['spec']];
+                if(!(('limited' in s) && !s['limited'])) {
+                    aura_count += 1;
                 }
-            }
-            if(!found) {
-                return [false, gamedata['errors']['PLAYER_AURA_LIMIT']['ui_name'], ['player_aura_limit', null]];
+            });
+            if(aura_count >= gamedata['player_aura_limit']) {
+                // see if this will stack an existing aura
+                var found = false;
+                for(var i = 0; i < player.player_auras.length; i++) {
+                    if(player.player_auras[i]['spec'] === aura_name) {
+                        found = true;
+                        break;
+                    }
+                }
+                if(!found) {
+                    return [false, gamedata['errors']['PLAYER_AURA_LIMIT']['ui_name'], ['player_aura_limit', null]];
+                }
             }
         }
         return [true, null, null];

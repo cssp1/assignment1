@@ -658,6 +658,10 @@ def check_aura(auraname, spec, maxlevel):
         print '%s:name mismatch' % auraname
     if ('icon' in spec) and spec['icon'] != 'gamebucks_inventory_icon':
         error |= require_art_asset(spec['icon'], auraname+':icon')
+    if ('_sale' in spec['name']) or ('_contender' in spec['name']) or spec['name'] == 'damage_protection':
+        if spec.get('limited', True):
+            error |= 1
+            print '%s: should have "limited": 0' % (auraname)
     if ('affects_manufacture_category' in spec) and (spec['affects_manufacture_category'] not in ('ALL','rovers','transports','starcraft')):
         error |= 1
         print '%s:affects_manufacture_category is invalid (must be ALL, rovers, transports, or starcraft)' % (auraname)

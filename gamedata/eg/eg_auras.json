@@ -32,7 +32,7 @@
     "damage_protection": {
         "name": "damage_protection",
         "icon": "inventory_protection",
-        "help": 1, "cancelable": 1,
+        "help": 1, "cancelable": 1, "limited": 0,
         "ui_name": "Damage Protection", "name_color": [1,0.5,0,1],
         "ui_description": "Your base is protected from attack."
     },
@@ -196,7 +196,7 @@
         // note: data attributes "kind" and "duration" are mandatory for metrics logging. "tag" is optional.
         "icon": "gamebucks_inventory_icon",
         "client": 0, "server": 0,
-        "help": 1, "cancelable": 0,
+        "help": 1, "cancelable": 0, "limited": 0,
         "ui_name": "Limited-time Sale", "show": 1, "name_color": [0,1,0.25,1],
         "ui_description": "Up to %oneminuspct% off %gamebucks purchases. Act quickly, this offer ends soon!",
         "on_click": {"consequent": "INVOKE_BUY_GAMEBUCKS_DIALOG"}
@@ -206,7 +206,7 @@
         "name": "generic_sale",
         "icon": "gamebucks_inventory_icon",
         "client": 0, "server": 0,
-        "help": 1, "cancelable": 0,
+        "help": 1, "cancelable": 0, "limited": 0,
         "ui_name": "Facebook Sale", "show": 1, "name_color": [0,1,0.25,1],
         "ui_description": "More FREE bonus %gamebucks with purchases from the Buy %gamebucks menu. Act quickly, this offer ends soon!",
         "on_click": {"consequent": "INVOKE_BUY_GAMEBUCKS_DIALOG"}

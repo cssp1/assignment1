@@ -860,26 +860,25 @@
         //"clip_children": 0,
         "widgets": {
             "aura_glow": {"show": 0, "kind": "StaticImage",
-                          //"xy":[0,55], "asset": "dialog_glow_thinner", "dimensions":[68,68],
                           "xy":[-23,-23], "asset": "dialog_glow_resizable", "dimensions":[96,96],
                           "bg_image_resizable": 1,
                           "alpha": 1, "composite_mode": "lighter",
                           "pulse_frequency": 60,
-                          "array": [8,1], "array_offset": [70,0]
+                          "array": [12,1], "array_offset": [70,0]
                          },
             "aura_slot": { "kind": "StaticImage", "xy": [0,0], "dimensions": [50,50], "asset": "inventory_slot",
-                           "array": [8,1], "array_offset": [70,0] },
+                           "array": [12,1], "array_offset": [70,0] },
             "aura_icon": { "kind": "StaticImage", "xy": [0,0], "dimensions": [50,50],
-                           "array": [8,1], "array_offset": [70,0] },
+                           "array": [12,1], "array_offset": [70,0] },
             "aura_stack": { "kind": "TextField", "xy": [19,27], "dimensions": [24,19], "text_size": 17, "text_style": "thick", "drop_shadow": 1,
                             "text_size_fungible3": 15, "text_size_fungible4": 14, "text_size_fungible5": 11, "text_hjustify": "right",
-                            "array": [8,1], "array_offset": [70,0] },
+                            "array": [12,1], "array_offset": [70,0] },
             "aura_frame": { "kind": "ActionButton", "xy": [0,0], "dimensions": [50,50], "bg_image": "inventory_frame",
-                            "array": [8,1], "array_offset": [70,0] },
+                            "array": [12,1], "array_offset": [70,0] },
             "aura_timer": { "kind": "TextField", "xy": [0,52], "dimensions": [50,15], "text_size": 13,
                             "drop_shadow": 1, "text_style": "thick",
                             "text_hjustify": "center", "text_vjustify": "center",
-                            "array": [8,1], "array_offset": [70,0] }
+                            "array": [12,1], "array_offset": [70,0] }
         }
     },
 
