@@ -36533,7 +36533,9 @@ function update_buy_gamebucks_sku23(dialog) {
     dialog.widgets['gamebucks_pile'].asset = player.get_any_abtest_value('gamebucks_pile_asset', gamedata['store']['gamebucks_pile_asset']);
     dialog.widgets['gamebucks_pile'].state = 'size'+pile_size.toString();
 
-    var banner_text = ('ui_banner' in spell ? eval_cond_or_literal(spell['ui_banner'], player, null) : null);
+    // spell ui_banner takes priority, but always show a default "SALE" banner when there are attached items
+    var banner_text = ('ui_banner' in spell ? eval_cond_or_literal(spell['ui_banner'], player, null) :
+                       (buy_gamebucks_sku2_item_list(spell, spellarg).length > 0 ? dialog.data['widgets']['sale_label']['ui_name'] : null));
     dialog.widgets['sale_bg'].show = dialog.widgets['sale_label'].show = (!!banner_text && (banner_text.length > 0));
     dialog.widgets['sale_label'].str = banner_text;
     if(banner_text in dialog.data['widgets']['sale_label']['xy_shift']) {
@@ -36765,6 +36767,14 @@ function update_buy_gamebucks_sku23(dialog) {
     }
 }
 
+// return list of attachments, not including bonus gamebucks
+function buy_gamebucks_sku2_item_list(spell, spellarg) {
+    if('loot_table' in spell && (!spellarg || spellarg['want_loot'])) {
+        return session.get_loot_items(player, gamedata['loot_tables_client'][spell['loot_table']]['loot']).item_list;
+    }
+    return [];
+}
+
 function update_buy_gamebucks_sku2_attachments(dialog, spell, spellarg) {
     if(!('attachments0' in dialog.widgets)) { return; } // inapplicable
     var item_list = [];
@@ -36775,9 +36785,7 @@ function update_buy_gamebucks_sku2_attachments(dialog, spell, spellarg) {
                         'ui_name': dialog.widgets['attachments0'].data['widgets']['name']['ui_name_bonus_quantity'].replace('%qty', pretty_print_number(spell['quantity'] - spell['nominal_quantity'])).replace('%GAMEBUCKS_NAME', Store.gamebucks_ui_name())
                        });
     }
-    if('loot_table' in spell && (!spellarg || spellarg['want_loot'])) {
-        item_list = item_list.concat(session.get_loot_items(player, gamedata['loot_tables_client'][spell['loot_table']]['loot']).item_list);
-    }
+    item_list = item_list.concat(buy_gamebucks_sku2_item_list(spell, spellarg));
 
     var visible_rows = dialog.data['widgets']['attachments']['array'][0] * dialog.data['widgets']['attachments']['array'][1];
     var pages = Math.floor((item_list.length + visible_rows - 1) / visible_rows);
