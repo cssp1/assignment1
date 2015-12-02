@@ -7475,7 +7475,7 @@
                             "outline_width": 1 },
             "name": { "kind": "TextField", "xy": [37,2], "dimensions": [147, 25], "text_size": 13, "text_hjustify": "left", "text_vjustify": "center", "text_style": "normal", "clip_to": [37,2,117,27],
                       "text_color": [0.8,0.8,0.8,1], "drop_shadow":1,
-                      "ui_name_bonus_quantity": "+ Bonus %GAMEBUCKS_NAME"
+                      "ui_name_bonus_quantity": "+%pct% Bonus %GAMEBUCKS_NAME"
                     },
             "quantity": { "kind": "TextField", "xy": [36,2], "dimensions": [147, 25], "text_size": 13, "text_hjustify": "right", "text_vjustify": "center", "text_style": "normal",
                           "drop_shadow":1 },
