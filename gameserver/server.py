@@ -14983,9 +14983,12 @@ class Store(object):
                     metric_event_coded(session.user.user_id, '4501_payer_promo_claimed', props.copy())
                 metric_event_coded(session.user.user_id, '4590_promo_gamebucks_earned', props.copy())
 
+            items = []
+            discovered_where = None
+
             if want_loot: # item bundle
                 assert not gift_order # XXX no code path yet for gifted bundles
-                items = session.get_loot_items(session.player, gamedata['loot_tables'][spell['loot_table']]['loot'], -1, -1)
+                items += session.get_loot_items(session.player, gamedata['loot_tables'][spell['loot_table']]['loot'], -1, -1)
                 if items:
                     if session.player.get_any_abtest_value('modal_looting', gamedata['modal_looting']) and \
                        session.player.find_object_by_type(gamedata['inventory_building']):
@@ -15018,7 +15021,16 @@ class Store(object):
                         session.player.send_loot_mail('', 0, items, retmsg, mail_template = gamedata['strings']['gamebucks_loot_mail'])
                         discovered_where = 'messages'
 
-                    retmsg.append(["ITEMS_DISCOVERED", items, -1, discovered_where])
+
+            # show "additional" gamebucks earned for purchase as if it were an item
+            if 'nominal_quantity' in spell and spell['nominal_quantity'] < spell['quantity'] and \
+               cls.buy_gamebucks_dialog_gamebucks_as_item(session, session.player):
+                items = [{'spec':'gamebucks', 'stack': spell['quantity'] - spell['nominal_quantity']}] + items
+                if discovered_where is None:
+                    discovered_where = 'inventory' # assume already added
+
+            if items and discovered_where:
+                retmsg.append(["ITEMS_DISCOVERED", items, -1, discovered_where])
 
             if gift_order:
                 # try to send gamebucks gift. On failure, leave the gamebucks in the player's balance
@@ -15171,6 +15183,13 @@ class Store(object):
             metric_event_coded(session.user.user_id, '4461_promo_warehouse_upgrade', {'level': warehouse.level})
 
         return can_fit
+
+    @classmethod
+    def buy_gamebucks_dialog_gamebucks_as_item(cls, session, player):
+        # whether to show "extra" discount gamebucks in ITEMS_DISCOVERED even though they are just part of the SKU
+        # this should happen whenever the "version 2" scrollable buy_gamebucks dialog is in use
+        return Predicates.eval_cond_or_literal(player.get_any_abtest_value('buy_gamebucks_dialog_version', gamedata['store'].get('buy_gamebucks_dialog_version',1)), session, player) == 2
+
 
 def fungible_inventory_item_can_fit(spec, stack, resource_state):
     if spec['resource'] == 'gamebucks': return True

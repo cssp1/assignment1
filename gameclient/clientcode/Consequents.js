@@ -603,7 +603,7 @@ function InvokeOfferChoiceConsequent(data) {
 goog.inherits(InvokeOfferChoiceConsequent, Consequent);
 InvokeOfferChoiceConsequent.prototype.execute = function(state) {
     var then_cb = (function (_this) { return function() {
-        _this.then_cons.execute();
+        _this.then_cons.execute(state);
     }; })(this);
     var invoker = (function (_then_cb) { return function() {
         OfferChoice.invoke_offer_choice(_then_cb);
