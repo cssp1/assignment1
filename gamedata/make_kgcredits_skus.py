@@ -37,9 +37,8 @@ if __name__ == '__main__':
 
     COMMENTS = [None, None, 'Most Popular', None, None, None]
 
-    SLATES = { "P100M": { "level": 100, "slate": "M",
+    SLATES = { "P100M": { "level": 100, "kind": "M",
                           "currency": "kgcredits",
-                          "requires": [{"predicate": "ALWAYS_FALSE"}], # disabled at 1403467211
                           "skus": [{'alloy': 20000, 'kgcredits':2000},
                                    {'alloy': 10000, 'kgcredits': 1000},
                                    {'alloy': 5000, 'kgcredits': 500},
@@ -47,15 +46,42 @@ if __name__ == '__main__':
                                    {'alloy': 1000, 'kgcredits': 100},
                                    {'alloy': 500, 'kgcredits': 50}
                                    ] },
-               "P100D1": { "level": 100, "slate": "D1",
+               "P100D1": { "level": 100, "kind": "D1",
                           "currency": "kgcredits",
-                          "requires": [{"predicate": "ALWAYS_TRUE"}], # enabled at 1403467211
                           "skus": [{'alloy': 24000, 'kgcredits':1999, 'nominal_alloy': 20000, 'ui_comment': 'Best Value', 'ui_pile_size': 5, 'loot_table': 'item_bundle_20000'},
                                    {'alloy': 11500, 'kgcredits': 999, 'nominal_alloy': 10000, 'ui_comment': None, 'ui_pile_size': 4, 'loot_table': 'item_bundle_10000'},
                                    {'alloy': 5500, 'kgcredits': 499, 'nominal_alloy': 5000, 'ui_comment': 'Most Popular', 'ui_pile_size': 3, 'loot_table': 'item_bundle_5000'},
                                    {'alloy': 1050, 'kgcredits': 99, 'nominal_alloy': 1000, 'ui_comment': None, 'ui_pile_size': 2, 'loot_table': 'item_bundle_1000'},
                                    {'alloy': 500, 'kgcredits': 49, 'ui_comment': None, 'ui_pile_size': 0, 'loot_table': 'item_bundle_500'}
                                    ] },
+               "P100D2": { "level": 100, "kind": "D2",
+                          "currency": "kgcredits",
+                          "skus": [{'alloy': 24000, 'kgcredits':1999, 'nominal_alloy': 20000, 'ui_comment': 'Best Value', 'ui_pile_size': 5, 'loot_table': 'item_bundle_20000'},
+                                   {'alloy': 11500, 'kgcredits': 999, 'nominal_alloy': 10000, 'ui_comment': None, 'ui_pile_size': 4, 'loot_table': 'item_bundle_10000'},
+                                   {'alloy': 5500, 'kgcredits': 499, 'nominal_alloy': 5000, 'ui_comment': 'Most Popular', 'ui_pile_size': 3, 'loot_table': 'item_bundle_5000'},
+                                   {'alloy': 2650, 'kgcredits': 249, 'nominal_alloy': 2500, 'ui_comment': None, 'ui_pile_size': 2, 'loot_table': 'item_bundle_2500'},
+                                   {'alloy': 1050, 'kgcredits': 99, 'nominal_alloy': 1000, 'ui_comment': None, 'ui_pile_size': 1, 'loot_table': 'item_bundle_1000'},
+                                   {'alloy': 500, 'kgcredits': 49, 'ui_comment': None, 'ui_pile_size': 0, 'loot_table': 'item_bundle_500'}
+                                   ] },
+               "P100FLASH50": { "level": 50, "kind": "FLASH50", # 50% Off sale for flash offers
+                          "currency": "kgcredits",
+                          "skus": [{'alloy': 24000, 'kgcredits':999, 'ui_pile_size': 5, 'ui_bonus': '50% Off', 'nominal_alloy': 20000, 'ui_banner': 'SALE', 'ui_comment': 'Best Value'},
+                                   {'alloy': 11500, 'kgcredits':499, 'ui_pile_size': 4, 'ui_bonus': '50% Off', 'nominal_alloy': 10000, 'ui_banner': 'SALE', 'ui_comment': None},
+                                   {'alloy': 5500, 'kgcredits': 249, 'ui_pile_size': 3, 'ui_bonus': '50% Off', 'nominal_alloy': 5000, 'ui_banner': 'SALE', 'ui_comment': 'Most Popular'},
+                                   {'alloy': 2650, 'kgcredits': 120, 'ui_pile_size': 2, 'ui_bonus': '50% Off', 'nominal_alloy': 2500, 'ui_banner': 'SALE', 'ui_comment': None},
+                                   {'alloy': 1050, 'kgcredits': 49,'ui_pile_size': 1, 'ui_bonus': '50% Off', 'nominal_alloy': 1000, 'ui_banner': 'SALE', 'ui_comment': None},
+                                   {'alloy': 500, 'kgcredits': 24, 'ui_pile_size': 0, 'ui_bonus': '50% Off', 'ui_banner': 'SALE', 'ui_comment': None},
+                                   ] },
+               "P100FLASH25": { "level": 25, "kind": "FLASH25", # 75% Off sale for flash offers
+                          "currency": "kgcredits",
+                          "skus": [{'alloy': 24000, 'kgcredits':499, 'ui_pile_size': 5, 'ui_bonus': '75% Off', 'nominal_alloy': 20000, 'ui_banner': 'SALE', 'ui_comment': 'Best Value'},
+                                   {'alloy': 11500, 'kgcredits':249, 'ui_pile_size': 4, 'ui_bonus': '75% Off', 'nominal_alloy': 10000, 'ui_banner': 'SALE', 'ui_comment': None},
+                                   {'alloy': 5500, 'kgcredits': 124, 'ui_pile_size': 3, 'ui_bonus': '75% Off', 'nominal_alloy': 5000, 'ui_banner': 'SALE', 'ui_comment': 'Most Popular'},
+                                   {'alloy': 2650, 'kgcredits': 60, 'ui_pile_size': 2, 'ui_bonus': '75% Off', 'nominal_alloy': 2500, 'ui_banner': 'SALE', 'ui_comment': None},
+                                   {'alloy': 1050, 'kgcredits': 24,'ui_pile_size': 1, 'ui_bonus': '75% Off', 'nominal_alloy': 1000, 'ui_banner': 'SALE', 'ui_comment': None},
+                                   {'alloy': 500, 'kgcredits': 12, 'ui_pile_size': 0, 'ui_bonus': '75% Off', 'ui_banner': 'SALE', 'ui_comment': None},
+                                   ] },
+
                }
 
     for slate_name, val in SLATES.iteritems():
@@ -115,18 +141,9 @@ if __name__ == '__main__':
             if ui_bonus_list:
                 sku['ui_bonus'] = '\n'.join(ui_bonus_list)
 
-            # how the predicate works:
-            # SKU is enabled if:
-            # EITHER kgcredits_sku_slate_override matches the slate_name
-            # OR
-            # kgcredits_sku_slate_override has not been set
-
             pred = {'predicate': 'AND', 'subpredicates':[
                        {'predicate': 'FRAME_PLATFORM', 'platform': 'kg'},
-                       {'predicate': 'OR', 'subpredicates': [{'predicate': "ANY_ABTEST", 'key': 'kgcredits_sku_slate_override', 'value': slate_name, 'default': 0 },
-                                                             {'predicate': "AND", 'subpredicates': [{'predicate': "ANY_ABTEST", 'key': 'kgcredits_sku_slate_override', 'value': 'DEFAULT', 'default': 'DEFAULT' },
-                                                                                                    ] + val.get('requires',[]) + data.get('requires',[]) }
-                                                       ] }
+                       {'predicate': 'GAMEDATA_VAR', 'name': 'store.buy_gamebucks_sku_kind', 'value': val.get('kind','UNUSED')},
                        ] }
 
             # prevent player from seeing biggest sku until has purchased at least as much as second-biggest

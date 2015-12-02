@@ -141,8 +141,6 @@
     ],
 
     "buy_gamebucks_sku_kind": [
-        // assertion that we're using fbpayments or xsolla
-        [{"predicate": "NOT", "subpredicates":[{"predicate": "GAMEDATA_VAR", "name": "store.payments_api", "method": "in", "value": ["fbpayments","xsolla"]}]}, null],
         [{"predicate": "AND", "subpredicates": [{"predicate": "FRAME_PLATFORM", "platform": "fb"}, {"predicate": "LIBRARY", "name": "fbpayments_D2SALE_in_effect"}]}, "D2SALE"],
         [{"predicate": "ALWAYS_TRUE"}, "D2"]
     ],
