@@ -44062,7 +44062,13 @@ function handle_server_message(data) {
         var invoker = (function(_items, _duration, _where) { return function() {
             invoke_items_discovered(_items, _duration, _where);
         }; })(items, duration, where);
-        invoker(); // immediately add
+
+        if(!session.server_hello_ended) {
+            // if this comes in from a login_pre_hello consequent, wait for the queue
+            notification_queue.push(invoker);
+        } else {
+            invoker(); // immediately add
+        }
         /*
         if(find_dialog('new_store_dialog')) {
             invoker(); // immediately super-impose

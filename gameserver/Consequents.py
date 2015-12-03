@@ -200,6 +200,7 @@ class GiveLootConsequent(Consequent):
         self.item_duration = data.get('item_duration', -1)
         self.item_expire_at = data.get('item_expire_at', -1)
         self.force_send_by_mail = data.get('force_send_by_mail', False)
+        self.show_items_discovered = data.get('show_items_discovered', False)
     def execute(self, session, player, retmsg, context=None):
         reason = context.get('loot_reason', self.reason) if context else self.reason
         assert reason
@@ -209,7 +210,8 @@ class GiveLootConsequent(Consequent):
                           reason_id = reason_id,
                           mail_template = mail_template,
                           item_duration = self.item_duration, item_expire_at = self.item_expire_at,
-                          force_send_by_mail = self.force_send_by_mail)
+                          force_send_by_mail = self.force_send_by_mail,
+                          show_items_discovered = self.show_items_discovered)
 
 class GiveTrophiesConsequent(Consequent):
     def __init__(self, data):

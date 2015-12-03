@@ -4299,9 +4299,9 @@ class Session(object):
         return loot
 
     def give_loot(self, player, retmsg, loot_table, reason, mail_template = None, item_duration = -1, item_expire_at = -1, reason_id = None,
-                  force_send_by_mail = False):
+                  force_send_by_mail = False, show_items_discovered = False):
         loot = self.get_loot_items(player, loot_table, item_duration, item_expire_at)
-        if not loot: return
+        if not loot: return []
 
         if reason == 'ai_base':
             str_reason = 'AI %d (%s L%d)' % (self.viewing_player.user_id, self.viewing_user.get_ui_name(self.viewing_player), self.viewing_player.resources.player_level)
@@ -4319,19 +4319,24 @@ class Session(object):
             str_reason = 'promo_code:'+reason_id
         else:
             gamesite.exception_log.event(server_time, 'unknown give_loot reason %s!' % reason)
-            return
+            return []
+
+        discovered_where = None
 
         # send modally?
         if (reason not in ('quest','level_up')) and (not force_send_by_mail) and \
            player.get_any_abtest_value('modal_looting', gamedata['modal_looting']) and \
            player.find_object_by_type(gamedata['inventory_building']):
+            discovered_where = 'loot_buffer'
             player.loot_buffer += loot
             for item in loot:
                 player.inventory_log_event('5125_item_obtained', item['spec'], item.get('stack',1), item.get('expire_time',-1), level=item.get('level',None), reason=reason)
         elif reason == 'ai_base':
+            discovered_where = 'messages'
             player.send_loot_mail(self.viewing_user.get_ui_name(self.viewing_player), self.viewing_player.resources.player_level,
                                   loot, retmsg, mail_template = mail_template)
         elif reason == 'ai_attack':
+            discovered_where = 'messages'
             ai_id = self.incoming_attack_id
             if str(ai_id) in gamedata['ai_bases']['bases']:
                 base = gamedata['ai_bases']['bases'][str(ai_id)]
@@ -4339,22 +4344,25 @@ class Session(object):
                                       loot, retmsg, mail_template = mail_template)
             else:
                 gamesite.exception_log.event(server_time, 'unknown give_loot ai_attack %s!' % repr(ai_id))
-                return
+                return []
         elif reason == 'quest':
+            discovered_where = 'messages'
             player.send_loot_mail(gamedata['quests'][reason_id]['ui_name'], 0, loot, retmsg, mail_template = mail_template or gamedata['strings']['quest_reward_mail'])
         elif reason == 'level_up':
+            discovered_where = 'messages'
             player.send_loot_mail(str(player.resources.player_level), 0, loot, retmsg, mail_template = gamedata['strings']['level_up_reward_mail'])
 
         elif reason in ('special','refund','promo_code'):
+            discovered_where = 'messages'
             if mail_template is None:
                 gamesite.exception_log.event(server_time, 'give_loot with %s reason must include a mail_template!' % reason)
-                return
+                return []
             player.send_loot_mail('', 0, loot, retmsg, mail_template = mail_template)
 
         self.increment_player_metric('items_looted', len(loot), time_series = False)
 
         if gamedata['server']['log_item_loot'] >= 1:
-            metric_event_coded(self.player.user_id, '3870_loot_given', {'items':loot,
+            metric_event_coded(self.player.user_id, '3870_loot_given', {'items':copy.deepcopy(loot),
                                                                         'where':self.viewing_base.base_id if self.viewing_base else 'unknown',
                                                                         'reason':str_reason})
             if gamedata['server']['log_item_loot'] >= 2:
@@ -4367,7 +4375,12 @@ class Session(object):
         if add_to_session_loot and loot:
             if 'items' not in self.loot:
                 self.loot['items'] = []
-            self.loot['items'] += loot
+            self.loot['items'] += copy.deepcopy(loot)
+
+        if show_items_discovered and discovered_where and loot:
+            retmsg.append(["ITEMS_DISCOVERED", copy.deepcopy(loot), -1, discovered_where])
+
+        return copy.deepcopy(loot)
 
     def give_trophies(self, player, kind, amount):
         assert self.has_attacked
