@@ -7086,10 +7086,16 @@
                         "outline_color": [0.4,0.4,0.4,1], "outline_color_active": [1,0.8,0,1],
                         "outline_width": 2 },
             "icon": { "kind": "StaticImage", "xy": [37,32], "dimensions": [50,50],
-                      "asset": "inventory_sensor_charge" },
+                      "asset": "inventory_random_offer_A",
+                      "asset_list": ["inventory_random_offer_A",
+                                     "inventory_random_offer_B",
+                                     "inventory_random_offer_C",
+                                     "inventory_random_offer_D",
+                                     "inventory_random_offer_E"]
+                    },
             "label": { "kind": "TextField", "xy": [0,100], "dimensions": [125,32], "text_size": 13, "text_hjustify": "center", "text_color": [1,1,0.2,1],
                        "drop_shadow": 1,
-                       "ui_name": "Random\nOffer #%random"
+                       "ui_name": "Random\nOffer"
                      },
             "glow": { "show": 0, "kind":"StaticImage","xy":[7,2],"dimensions":[110,110],"bg_image_resizable":1,"asset":"dialog_glow_resizable", "composite_mode": "lighter",
                       "fade":1, "duration": 1.5, "fade_peak": 0.2

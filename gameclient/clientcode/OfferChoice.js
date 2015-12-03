@@ -42,6 +42,7 @@ OfferChoice.invoke_offer_choice = function(then_cb) {
     for(var x = 0; x < dialog.data['widgets']['choice']['array'][0]; x++) {
         var choice = dialog.widgets['choice'+x.toString()];
         choice.user_data['cycle'] = -1;
+        choice.user_data['asset_n'] = -1;
         choice.widgets['bg_glow'].onclick = trigger;
     }
 
@@ -59,6 +60,16 @@ OfferChoice.update_offer_choice = function(dialog) {
         var cycle_num = Math.floor((client_time + 0.7*x - open_time) / choice.data['cycle_period']);
         if(cycle_num != choice.user_data['cycle']) {
             choice.widgets['label'].str = choice.data['widgets']['label']['ui_name'].replace('%random', Math.floor(10000*Math.random()).toString());
+
+            // ensure the icon asset changes every time
+            var asset_list = choice.data['widgets']['icon']['asset_list'];
+            var asset_n;
+            do {
+                asset_n = Math.floor(asset_list.length * Math.random());
+            } while(asset_n === choice.user_data['asset_n']);
+            choice.widgets['icon'].asset = asset_list[asset_n];
+            choice.user_data['asset_n'] = asset_n;
+
             choice.user_data['cycle'] = cycle_num;
             choice.widgets['glow'].show = true; choice.widgets['glow'].reset_fx();
         }
