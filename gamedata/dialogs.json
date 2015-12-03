@@ -7444,8 +7444,8 @@
                           "outline_color": [0.25,0.25,0.25,1], "outline_width": 2
                         },
 
-            "price_display": { "kind": "TextField", "xy": [101,281], "dimensions": [184,41], "text_offset": [0,-1],
-                               "text_hjustify": "left", "text_vjustify": "center",
+            "price_display": { "kind": "TextField", "xy": [91,281], "dimensions": [80,41], "text_offset": [0,-1],
+                               "text_hjustify": "center", "text_vjustify": "center",
                                "text_color": [0,1,0,1], "drop_shadow": 1,
                                "text_size": 16, "text_style": "bold", "ui_tooltip": "", "tooltip_delay": 0 }, // PRICE
 
@@ -7454,7 +7454,7 @@
             "sale_label": { "show": 0, "kind": "TextField", "xy": [29.5,258], "dimensions": [20,100], "color": [1,1,1,1],
                             "text_style": "bold", "text_size": 13, "text_hjustify": "center", "text_angle": -45, "ui_name": "SALE", "xy_shift": { "NEW": [0,-1] } },
 
-            "buy_text": { "kind": "TextField", "xy": [13,281], "dimensions": [78,41], "text_offset": [0,-1],
+            "buy_text": { "kind": "TextField", "xy": [13,281], "dimensions": [66,41], "text_offset": [0,-1],
                           "text_hjustify": "right", "text_vjustify": "center",
                           "text_color": [1,1,1,1],
                           "text_color_highlight": [1,1,1,1],
