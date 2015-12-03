@@ -859,7 +859,7 @@ GamedataVarPredicate.prototype.is_satisfied = function(player, qdata) {
 };
 /** @override */
 GamedataVarPredicate.prototype.ui_time_range = function(player) {
-    var range = [-1,1];
+    var range = [-1,-1];
     var v = this.get_value(player, this.name);
     if(is_cond_chain(v)) {
         var chain = v;
