@@ -582,13 +582,15 @@ def get_server_latency(nosql_client):
                                   #get_client_perf_series(nosql_client, 'avg_framerate_us', '$graphics.framerate', {'country':'us', 'time':{'$gte':time_range[0],'$lt':time_range[1]}}),
                                   ]
                        },
-                      {'ui_name': 'Client Pings',
-                       'plot_params': {'yaxis': {'min':0, 'max':2000.0, 'panRange':[0,None]}, 'xaxis': time_axis_params, 'legend':{'position':'nw'} },
-                       'series': [get_client_perf_series(nosql_client, 'avg_ping', '$direct_ssl.ping', {'time':{'$gte':time_range[0],'$lt':time_range[1]}}, rescale=1000),
-                                  get_client_perf_series(nosql_client, 'avg_ping_us', '$direct_ssl.ping', {'country':'us', 'time':{'$gte':time_range[0],'$lt':time_range[1]}}, rescale=1000),
+
+#                      {'ui_name': 'Client Pings',
+#                       'plot_params': {'yaxis': {'min':0, 'max':2000.0, 'panRange':[0,None]}, 'xaxis': time_axis_params, 'legend':{'position':'nw'} },
+#                       'series': [get_client_perf_series(nosql_client, 'avg_ping', '$direct_ssl.ping', {'time':{'$gte':time_range[0],'$lt':time_range[1]}}, rescale=1000),
+#                                  get_client_perf_series(nosql_client, 'avg_ping_us', '$direct_ssl.ping', {'country':'us', 'time':{'$gte':time_range[0],'$lt':time_range[1]}}, rescale=1000),
                                   #get_client_perf_series(nosql_client, 'avg_ping_aunz', '$direct_ssl.ping', {'country':{'$in':['au','nz']}, 'time':{'$gte':time_range[0],'$lt':time_range[1]}}, rescale=1000),
-                                  ]
-                       },
+#                                  ]
+#                       },
+
                       ]}
 
 if __name__ == "__main__":

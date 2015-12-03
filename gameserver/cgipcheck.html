@@ -1,7 +1,10 @@
-<html><head><title>$GAME_NAME$ Support Tools</title>
-<link rel="stylesheet" href="https://code.jquery.com/ui/1.10.3/themes/smoothness/jquery-ui.css" />
-<script src="https://code.jquery.com/jquery-1.10.2.min.js"></script>
-<script src="https://code.jquery.com/ui/1.10.3/jquery-ui.min.js"></script>
+<!DOCTYPE html>
+<html><head>
+<title>$GAME_NAME$ Support Tools</title>
+<link rel="icon" href="$GAME_LOGO_URL$">
+<link rel="stylesheet" href="https://code.jquery.com/ui/1.11.4/themes/smoothness/jquery-ui.css" />
+<script src="https://code.jquery.com/jquery-2.1.4.min.js"></script>
+<script src="https://code.jquery.com/ui/1.11.4/jquery-ui.min.js"></script>
 <script src="https://s3.amazonaws.com/$SPIN_PUBLIC_S3_BUCKET$/jquery.elastic.source.js"></script>
 <script src="https://s3.amazonaws.com/$SPIN_PUBLIC_S3_BUCKET$/jquery.flot.min.js"></script>
 <script src="https://s3.amazonaws.com/$SPIN_PUBLIC_S3_BUCKET$/jquery.flot.time.min.js"></script>
@@ -16,11 +19,17 @@ label { font-size: 14px; }
 select { height:28px; font-size: 16px; }
 input { font-family: monospace; font-size: 16px; height:28px; padding:0; }
 .spin_button { width: 150px; height: 35px; font-size: 16px; padding:0; margin-left: 5px; margin-right: 5px; }
-.spin_button_tiny { line-height: 0px; font-size: 9px !important; }
+.spin_button_tiny { line-height: 0px; font-size: 8px !important; height: 12px; }
 .spin_radio { vertical-align: bottom; }
+.ui-helper-reset { line-height: 100%; font-size: 14px; }
 .ui-widget select { font-size: 18px; }
-table, th, td { border: 1px solid #808080; border-collapse: collapse; }
+.ui-widget button { font-size: 14px; }
+.ui-tabs { font-size: 14px; }
+.ui-tabs-nav { line-height: 120%; }
+table, th, td { border: 1px solid #808080; border-collapse: collapse; padding: 0px; }
 .spin_chat_report_td { padding: 5px; }
+.spin_server_status_td { }
+.spin_server_status_td_div { height: 13px; overflow: hidden; }
 </style>
 
 <script type="text/javascript">
@@ -1041,8 +1050,8 @@ var server_status_fields = [{'name':'server_name','type':'server_name'},
                             {'name':'state','type':'state'},
                             {'name':'sessions','var':'active_sessions','type':'active_sessions'},
                             {'name':'$_sessions','var':'paying_sessions','type':'int'},
-                            {'name':'clients','var':'active_protocol_clients','type':'int'},
-                            {'name':'requests','var':'active_protocol_requests','type':'int'},
+                            //{'name':'clients','var':'active_protocol_clients','type':'int'},
+                            //{'name':'requests','var':'active_protocol_requests','type':'int'},
                             {'name':'load_unhalted','type':'load'},
                             {'name':'machine_stats:machine_mem_free_mb','type':'memory_mb'},
                             {'name':'gameclient_build','type':'build'},
@@ -1147,7 +1156,9 @@ var refresh_server_status_row = function(row, item) {
                 }
             }
         }
-        var cell = $('<td>', {html: s});
+        var s_div = $('<div>', {html: s}).addClass('spin_server_status_td_div');
+        var cell = $('<td>').addClass('spin_server_status_td');
+        cell.append(s_div);
         row.append(cell);
     });
 };
@@ -1224,7 +1235,7 @@ var refresh_server_status = function() {
             if(result['graphs'].length > 0) {
                 for(var graph_id = 0; graph_id < result['graphs'].length; graph_id++) {
                     if('ui_name' in result['graphs'][graph_id]) { $("#server_graph_area").append('<p>'+result['graphs'][graph_id]['ui_name']); }
-                    $("#server_graph_area").append('<p><div id="server_graph'+graph_id.toString()+'" style="width:1000px; height:150px;">');
+                    $("#server_graph_area").append('<p><div id="server_graph'+graph_id.toString()+'" style="width:800px; height:128px;">');
                     $.plot("#server_graph"+graph_id.toString(), result['graphs'][graph_id]['series'],
                           $.extend(result['graphs'][graph_id]['plot_params'],
                                    {'grid': {'hoverable':true}, 'zoom': {'interactive':true, 'frameRate':30}, 'pan': {'interactive':true, 'frameRate':30}}
@@ -1535,7 +1546,7 @@ $(function() {
 <div style="float:right;"><img src="$GAME_LOGO_URL$" width="50" height="50"></div>
 <div style="float:left;"><img src="https://s3.amazonaws.com/$SPIN_PUBLIC_S3_BUCKET$/spinpunch_logo_bonw_256x43.png" width="256" height="43"></div>
 <center>
-<div style="width:25%;line-height:18px;">
+<div style="width:33%;line-height:18px;">
   <div id="clock" style="float:left;"></div>
   <button style="float:right;" onclick="delete_cookie(); var location_href_is_not='https://accounts.google.com/o/oauth2/revoke?token=$GOOGLE_ACCESS_TOKEN$'; location.href='//www.google.com/';">Log out</button>
 </div>
@@ -1572,7 +1583,7 @@ $(function() {
 <div id="per_player" style="position:relative;display:none;">
 
 <div style="position:absolute;top:5px;right:5px;"><button onclick="method_get_raw_player()" style="width:200px;height:30px;">Get PlayerDB File</button></div>
-<textarea id="lookup_output" readonly style="width:100%;height:10%;font-family:monospace;font-size:12px;"></textarea>
+<textarea id="lookup_output" readonly style="width:100%;height:10%;border-style:inset;border-width:2px;font-family:monospace;font-size:11px;"></textarea>
 
 <hr>
 <div id="player_tools" style="display:none;">
@@ -1767,7 +1778,7 @@ Status: <span id="payment_status"></span>
 <div id="chat_status" style="position:relative;">
 <div id="chat_status_loading">STATUS</div>
 <p>
-<table id="chat_table" width="100%" style="font-size:12;font-family:sans-serif;"></table>
+<table id="chat_table" width="100%" style="font-size:12px;font-family:sans-serif;"></table>
 <br>
 
 </div> <!-- END mode_chat -->
@@ -1779,7 +1790,7 @@ Status: <span id="payment_status"></span>
 <div id="server_status_loading">STATUS</div>
 <div style="position:absolute;top:0px;right:0px;"><label style="margin:10px;"><input id="auto_refresh_server_status" type="checkbox" checked="1" style="height:initial;"></input>Auto</label><button onclick="refresh_server_status()" style="width:150px;height:30px;">Refresh</button></div>
 <p>
-<table id="server_status_table" width="100%" style="font-size:12;font-family:sans-serif;"></table>
+<table id="server_status_table" width="100%" style="font-size:11px;font-family:sans-serif;padding:0;"></table>
 <br>
 <button id="scm_up_button" onclick="scm_up()">SCM up</button>
 <button id="download_art_button" onclick="download_art()">Download Art</button>
@@ -1800,20 +1811,20 @@ Status: <span id="payment_status"></span>
 
     <div id="credits_status_area" style="position:absolute;top:0x;left:200px;">
     <button id="credits_status_button" onclick="refresh_credits()" style="height:30px;float:left;">Get Credits</button>
-    <div id="credits_status" style="width:500px;line-height:20px;margin-left:120px;border-style:inset;padding:2px;color:#008000;"></div>
+    <div id="credits_status" style="width:350px;line-height:20px;margin-left:120px;border-style:inset;border-width:2px;padding:2px;color:#008000;"></div>
     <div style="clear:both;"></div>
     </div>
 
 
 <div style="float:right;">
-<button onclick="logs_yesterday()" style="width:150px;height:30px;">Yesterday</button>
-<button onclick="logs_today()" style="width:150px;height:30px;">Today</button>
-<button onclick="logs_clear()" style="width:150px;height:30px;">Clear</button>
+<button onclick="logs_yesterday()" style="width:120px;height:30px;">Yesterday</button>
+<button onclick="logs_today()" style="width:120px;height:30px;">Today</button>
+<button onclick="logs_clear()" style="width:120px;height:30px;">Clear</button>
 </div>
 <div style="clear:both;"></div>
 
 <div style="margin-top:10px;">
-<div id="logs_output" style="width:100%;height:70%;font-family:monospace;font-size:12px;overflow:auto;border-style:inset;padding:3px;"></div>
+<div id="logs_output" style="width:100%;height:70%;font-family:monospace;font-size:11px;overflow:auto;border-style:inset;border-width:2px;padding:3px;"></div>
 </div>
 
 </div> <!-- END mode_logs -->
