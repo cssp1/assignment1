@@ -27,10 +27,12 @@ OfferChoice.invoke_offer_choice = function(then_cb) {
     dialog.modal = true;
 
     var trigger = function(w) {
-        var dialog = w.parent.parent;
+        var choice = w.parent;
+        var dialog = choice.parent;
         dialog.user_data['start_time'] = client_time;
 
         dialog.widgets['glow'].show = true; dialog.widgets['glow'].reset_fx();
+        choice.widgets['glow'].reset_fx();
 
         if(gamedata['client']['vfx']['lottery_scan']) {
             SPFX.add_visual_effect_at_time([0,0], 0, [0,1,0], client_time, gamedata['client']['vfx']['lottery_scan'], true, null);
