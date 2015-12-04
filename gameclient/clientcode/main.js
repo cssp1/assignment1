@@ -9342,10 +9342,14 @@ var fb_iframe_offset = null;
 function fb_iframe_update(cb) {
     FB.Canvas.getPageInfo((function (_cb) { return function(info) {
         // only write console message on active ping and not passive snoop
-        if(_cb) { console.log('FB.Canvas.getPageInfo: '+info.clientWidth+'x'+info.clientHeight); }
-        fb_iframe_dims = [info.clientWidth, info.clientHeight];
-        fb_iframe_scroll = [info.scrollLeft, info.scrollTop];
-        fb_iframe_offset = [info.offsetLeft, info.offsetTop];
+        if(_cb) {
+            console.log('FB.Canvas.getPageInfo: dims '+info['clientWidth'].toString()+'x'+info['clientHeight'].toString()+
+                        ' scroll '+info['scrollLeft'].toString()+'x'+info['scrollTop'].toString()+
+                        ' offset '+info['offsetLeft'].toString()+'x'+info['offsetTop'].toString());
+        }
+        fb_iframe_dims = [info['clientWidth'], info['clientHeight']];
+        fb_iframe_scroll = [info['scrollLeft'], info['scrollTop']];
+        fb_iframe_offset = [info['offsetLeft'], info['offsetTop']];
         if(_cb) { _cb(); }
     }; })(cb));
 }

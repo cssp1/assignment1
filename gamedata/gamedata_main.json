@@ -25,7 +25,8 @@
 
         // enable manual setting of canvas_div size to work around buggy Facebook iframe resizing
         "facebook_iframe_resize_hack": true,
-        "facebook_iframe_footer_peek": 30, // how many pixels to shrink the game canvas vertically to reveal the top of the footer
+        // how many pixels to shrink the game canvas vertically to reveal the top of the footer
+        "facebook_iframe_footer_peek": 44, // XXX this should be 30, but as of 2015 Dec 4, Facebook imposes a horizontal scrollbar at the bottom of the screen, so we add 14 pixels to ensure the linkbar is fully visible
 
         "armorgames_iframe_size_mode": "screen", // initialize AG iframe size based on screen dimensions at connect time
         "armorgames_iframe_margins": [50, 195], // pixels to shrink the iframe relative to the maximum window size, for safety
