@@ -24382,24 +24382,29 @@ function invoke_aura_context(inv_dialog, slot_xy, slot, aura, show_dropdown) {
 
     // DESCRIPTION
     var descr = spec['ui_description' + (('stack' in aura) && (aura['stack'] > 1) && ('ui_description_plural' in spec) ? '_plural' : '')];
-    if('strength' in aura) {
-        descr = descr.replace('%abspct', ((1.0+aura['strength'])*100.0).toFixed(0));
-        descr = descr.replace('%pct', ((aura['strength'])*100.0).toFixed(0));
-        descr = descr.replace('%oneminuspct', ((1.0-aura['strength'])*100.0).toFixed(0));
-        if(descr.indexOf("%price") != -1) {
-            descr = descr.replace("%price", Store.display_user_currency_amount(Store.convert_credit_price_to_user_currency(aura['strength']), 'full'));
-        }
-        if(descr.indexOf("%secteam") != -1) {
-            var unit_dic = aura['strength'][0]['units'];
-            var ls = [];
-            goog.object.forEach(unit_dic, function(qty, specname) {
-                ls.push(qty.toString()+'x '+gamedata['units'][specname]['ui_name']);
-            });
-            descr = descr.replace("%secteam", ls.join(', '));
-        }
+    var strength = ('strength' in aura ? aura['strength'] : 1);
+    if(descr.indexOf('%abspct') >= 0) {
+        descr = descr.replace('%abspct', ((1.0+strength)*100.0).toFixed(0));
     }
-    if('stack' in aura) {
-        descr = descr.replace('%stack', pretty_print_number(aura['stack']));
+    if(descr.indexOf('%pct') >= 0) {
+        descr = descr.replace('%pct', ((strength)*100.0).toFixed(0));
+    }
+    if(descr.indexOf('%oneminuspct') >= 0) {
+        descr = descr.replace('%oneminuspct', ((1.0-strength)*100.0).toFixed(0));
+    }
+    if(descr.indexOf('%price') != -1) {
+        descr = descr.replace('%price', Store.display_user_currency_amount(Store.convert_credit_price_to_user_currency(strength), 'full'));
+    }
+    if(descr.indexOf('%secteam') != -1) {
+        var unit_dic = strength[0]['units'];
+        var ls = [];
+        goog.object.forEach(unit_dic, function(qty, specname) {
+            ls.push(qty.toString()+'x '+gamedata['units'][specname]['ui_name']);
+        });
+        descr = descr.replace("%secteam", ls.join(', '));
+    }
+    if(descr.indexOf('%stack') != -1) {
+        descr = descr.replace('%stack', pretty_print_number(('stack' in aura ? aura['stack'] : 1)));
     }
     if('extra_ui_description' in aura) {
         descr += aura['extra_ui_description'];
