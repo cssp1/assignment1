@@ -824,6 +824,8 @@ CooldownInactivePredicate.prototype.do_ui_describe = function(player) {
     var template = ('ui_cooldown_name' in this.data ? this.data['ui_cooldown_name'] : gamedata['strings']['predicates'][this.kind]['ui_name']);
     return new PredicateUIDescription(template.replace('%s', this.act_pred.name).replace('%togo', pretty_print_time(player.cooldown_togo(this.act_pred.name))));
 };
+/** @override */
+CooldownInactivePredicate.prototype.ui_time_range = function(player) { return [-1,-1]; };
 
 
 /** @constructor

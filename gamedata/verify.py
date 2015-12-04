@@ -3584,6 +3584,11 @@ def main(args):
 
     for name, data in gamedata['loot_tables'].iteritems():
         error |= check_loot_table(data['loot'], reason = 'loot_tables:'+name)
+        if 'on_purchase' in data:
+            error |= check_consequent(data['on_purchase'], reason = 'loot_tables:'+name+':on_purchase')
+        for COND in 'ui_warning', 'metrics_description':
+            if COND in data:
+                error |= check_cond_chain(data[COND], reason = 'loot_tables:'+name+':'+COND)
 
     for name, loot in gamedata.get('lottery_slot_tables',{}).iteritems():
         error |= check_loot_table(loot, reason='lottery_slot_tables:'+name)

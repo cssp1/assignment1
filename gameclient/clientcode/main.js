@@ -36677,6 +36677,13 @@ function update_buy_gamebucks_sku23(dialog) {
 
     update_buy_gamebucks_sku2_attachments(dialog, spell, spellarg);
 
+    if('warning_text' in dialog.widgets) {
+        dialog.widgets['warning_text'].str = buy_gamebucks_sku2_ui_warning(spell, spellarg);
+        goog.array.forEach(['buy_text','price_display'], function(wname) {
+            dialog.widgets[wname].xy = dialog.data['widgets'][wname][(dialog.widgets['warning_text'].str ? 'xy_warning' : 'xy')];
+        });
+    }
+
     //dialog.widgets['price_display'].bg_image = player.get_any_abtest_value('price_display_asset', gamedata['store']['price_display_asset']);
     //if(payment_currency == 'kgcredits') {
     //dialog.widgets['price_display'].state = 'kgcredits';
@@ -36773,6 +36780,14 @@ function buy_gamebucks_sku2_item_list(spell, spellarg) {
         return session.get_loot_items(player, gamedata['loot_tables_client'][spell['loot_table']]['loot']).item_list;
     }
     return [];
+}
+
+// return ui_warning attached to this SKU
+function buy_gamebucks_sku2_ui_warning(spell, spellarg) {
+    if('loot_table' in spell && (!spellarg || spellarg['want_loot'])) {
+        return eval_cond_or_literal(gamedata['loot_tables_client'][spell['loot_table']]['ui_warning'] || null, player, null);
+    }
+    return null;
 }
 
 function update_buy_gamebucks_sku2_attachments(dialog, spell, spellarg) {

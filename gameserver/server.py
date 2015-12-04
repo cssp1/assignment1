@@ -15001,7 +15001,8 @@ class Store(object):
 
             if want_loot: # item bundle
                 assert not gift_order # XXX no code path yet for gifted bundles
-                items += session.get_loot_items(session.player, gamedata['loot_tables'][spell['loot_table']]['loot'], -1, -1)
+                loot_table = gamedata['loot_tables'][spell['loot_table']]
+                items += session.get_loot_items(session.player, loot_table['loot'], -1, -1)
                 if items:
                     if session.player.get_any_abtest_value('modal_looting', gamedata['modal_looting']) and \
                        session.player.find_object_by_type(gamedata['inventory_building']):
@@ -15034,6 +15035,15 @@ class Store(object):
                         session.player.send_loot_mail('', 0, items, retmsg, mail_template = gamedata['strings']['gamebucks_loot_mail'])
                         discovered_where = 'messages'
 
+
+                if 'metrics_description' in loot_table:
+                    extra_description = Predicates.eval_cond_or_literal(loot_table['metrics_description'], session, session.player)
+                    if extra_description:
+                        price_description.append(extra_description)
+
+                # very important to do this last, since it may change the loot/description
+                if 'on_purchase' in loot_table:
+                     session.execute_consequent_safe(loot_table['on_purchase'], session.player, retmsg, reason=spellname+':loot_table')
 
             # show "additional" gamebucks earned for purchase as if it were an item
             if 'nominal_quantity' in spell and spell['nominal_quantity'] < spell['quantity'] and \
