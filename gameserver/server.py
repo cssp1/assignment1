@@ -13607,7 +13607,7 @@ class CONTROLAPI(resource.Resource):
         if target_user_id: target_user_id = int(target_user_id)
         gamesite.chat_mgr.send(channel, None,
                                {'time': server_time,
-                                'type': 'message_hide',
+                                'type': 'message_hide', 'new_type': 'abuse_violated',
                                 'chat_name': 'System', 'user_id': -1,
                                 'target_user_id': target_user_id,
                                 'target_message_id': message_id}, '', log = True)

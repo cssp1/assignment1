@@ -44666,7 +44666,14 @@ function handle_server_message(data) {
             goog.array.forEach(tablist, function(tab) {
                 if(sender_info['target_message_id'] in tab.user_data['chat_messages_by_id']) {
                     var node = tab.user_data['chat_messages_by_id'][sender_info['target_message_id']];
-                    tab.widgets['output'].remove_text(node);
+
+                    // revise, or just delete the message?
+                    var new_type = sender_info['new_type'] || null;
+                    if(new_type && node.user_data && (new_type in gamedata['strings']['chat_templates'])) {
+                        tab.widgets['output'].revise_text(node, SPText.cstring_to_ablocks_bbcode(gamedata['strings']['chat_templates'][new_type].replace('%sender_name', node.user_data['sender_name'])));
+                    } else {
+                        tab.widgets['output'].remove_text(node);
+                    }
                 }
             });
         } else if(sender_info['type'] == 'unit_donation_request_invalidation') {
@@ -44896,7 +44903,9 @@ function handle_server_message(data) {
             var disp_text, disp_user_data;
 
             if(gamedata['strings']['chat_templates'][template].indexOf('%body') != -1) {
-                disp_user_data = {'prebody': text, 'unfiltered_body': body};
+                disp_user_data = {'prebody': text, 'unfiltered_body': body,
+                                  // for later abuse_violated override
+                                  'sender_name': ('chat_name' in sender_info ? SPText.bbcode_quote(sender_info['chat_name']) : 'Unknown')};
                 if(sender_info['home_region']) { disp_user_data['home_region'] = sender_info['home_region']; }
                 disp_text = display_user_chat_body_nodes(disp_user_data);
             } else {
