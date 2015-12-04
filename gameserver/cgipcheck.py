@@ -160,6 +160,15 @@ def chat_abuse_clear(control_args):
     assert do_CONTROLAPI_checked(ungag_args) == 'ok'
     return "Player was unmuted and reduced to %d chat offense(s)." % new_stacks
 
+def bbcode_quote(s):
+    r = ''
+    for c in s:
+        if c in ('\\', '[', ']'):
+            r += '\\'+c
+        else:
+            r += c
+    return r
+
 def chat_abuse_violate(control_args, ui_context, channel_name, message_id):
     ui_reason = 'The player said: "%s"' % ui_context
     spin_user = control_args['spin_user']
@@ -177,6 +186,8 @@ def chat_abuse_violate(control_args, ui_context, channel_name, message_id):
     # active_stacks 1 -> message and 48h mute
     # active_stacks 2 -> message and 72h mute
     # active_stacks 3 -> no message, permanent mute, also mute alts.
+    ui_policy_link = '[color=#ffff00][u][url=https://spinpunch.zendesk.com/entries/88917453-What-is-the-Chat-Abuse-policy-]chat abuse policy[/url][/u][/color]'
+    ui_player_context = '[color=#ff0000]'+bbcode_quote(ui_context)+'[/color]'
     ui_actions = []
     message_body = None
     alt_message_body = None
@@ -194,20 +205,20 @@ def chat_abuse_violate(control_args, ui_context, channel_name, message_id):
         ui_actions.append("Player is currently muted, perhaps because of a recent violation. No action taken against the player.")
 
     elif active_stacks == 0:
-        message_body = "Hello! You were recently reported for violating our in-game chat rules of conduct. This message is to serve as a warning, and a notification that you are receiving a temporary mute from in-game chat. Any future offenses may result in a longer temporary or permanent mute from chat. Thanks in advance for your understanding."
+        message_body = "Hello! You were recently reported for violating our %s. A support agent reviewed this report and confirmed your message was offensive:\n\n%s\n\nThis message is to serve as a warning, and a notification that you are receiving a temporary mute from in-game chat. Any future offenses may result in a longer temporary or permanent mute from chat. Thanks in advance for your understanding." % (ui_policy_link, ui_player_context)
         add_stack = True
         temporary_mute_duration = 24*3600
     elif active_stacks == 1:
-        message_body = "You were recently reported again for violating our in-game chat rules of conduct. This message is to serve as a 2nd warning, and a notification that you are receiving a temporary mute from in-game chat. Any future offenses may result in a longer temporary or permanent mute from chat. Thanks in advance for your understanding."
+        message_body = "You were recently reported again for violating our %s. A support agent reviewed this report and confirmed your message was offensive:\n\n%s\n\nThis message is to serve as a 2nd warning, and a notification that you are receiving a temporary mute from in-game chat. Any future offenses may result in a longer temporary or permanent mute from chat. Thanks in advance for your understanding." % (ui_policy_link, ui_player_context)
         add_stack = True
         temporary_mute_duration = 48*3600
     elif active_stacks == 2:
-        message_body = "Hello! You were recently reported again for violating our in-game chat rules of conduct. This message is to serve as a 3rd warning, and a notification that you are receiving a temporary mute from in-game chat. Any future offenses will result in a permanent chat mute without further warning. Thanks in advance for your understanding."
+        message_body = "You were recently reported again for violating our %s. A support agent reviewed this report and confirmed your message was offensive:\n\n%s\n\nThis message is to serve as a 3rd warning, and a notification that you are receiving a temporary mute from in-game chat. Any future offenses will result in a permanent chat mute without further warning. Thanks in advance for your understanding." % (ui_policy_link, ui_player_context)
         add_stack = True
         temporary_mute_duration = 72*3600
     elif active_stacks >= 3:
         if active_stacks == 3:
-            alt_message_body = "Hello! This message is to inform you that your account has been muted from in-game chat due to there having been confirmed offensive chat violations on a related game account (ID: %d). If you feel this ban may have been made in error, please submit a ticket to our Customer Support team. Thanks in advance for your understanding." % int(control_args['user_id'])
+            alt_message_body = "Hello! This message is to inform you that your account has been muted from in-game chat due to offensive chat violations on a related game account (ID: %d). If you feel this ban may have been made in error, please submit a ticket to our Customer Support team. Thanks in advance for your understanding." % int(control_args['user_id'])
         add_stack = (active_stacks < 4)
         permanent_mute = True
         permanent_mute_alts = True
