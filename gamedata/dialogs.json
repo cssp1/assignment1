@@ -7126,13 +7126,13 @@
             "title_bold": { "kind": "TextField", "xy": [0,10], "dimensions": [650, 40], "text_size": 27, "text_style": "bold",
                             "text_hjustify": "center", "text_vjustify": "center", "ui_name": "Special Offer!" },
             "description1": { "kind": "TextField", "xy": [200,85], "dimensions": [430,32], "text_size": 13, "text_style": "bold", "text_hjustify": "center",
-                             "ui_name": "Click one of the choices to activate a new special offer:" },
+                              "ui_name": "Click one of the choices to activate a new special offer:" },
 
             "choice": { "kind": "Dialog", "dialog": "offer_choice_item",
                         "xy":[215,140], "array": [3,1], "array_offset": [135,0]},
 
             "description2": { "kind": "TextField", "xy": [200,336], "dimensions": [430,32], "text_size": 13, "text_hjustify": "center", "text_color": [0.8,0.8,0.8,1],
-                             "ui_name": "Offers are for you only, and available for a limited time." }
+                              "ui_name": "Offers are for you only, and available for a limited time." }
         }
     },
 
@@ -7462,7 +7462,7 @@
                               //"xy": [13,277], "dimensions": [184,28], "text_size": 13, "text_hjustify": "center",
                               "xy": [72,5], "dimensions": [118,28], "text_size": 11, "text_hjustify": "right",
                               "text_color": [1,1,0,1], "drop_shadow": 1
-                              },
+                            },
 
             "sale_bg": { "show": 0, "kind": "SolidRect", "xy": [0,57], "dimensions": [1,1], "color": [0.8,0,0,1],
                          "path": [[16,242], [33,225], [57,225], [16,264]] },
