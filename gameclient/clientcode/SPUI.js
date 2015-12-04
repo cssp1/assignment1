@@ -3194,6 +3194,18 @@ SPUI.ScrollingTextField.prototype.set_text = function(text, user_data) {
     this.append_text(text, user_data);
 };
 
+/** @param {string} text
+    @param {Object|null=} props
+    @param {Object=} click_handlers
+    @param {Object|null=} user_data */
+SPUI.ScrollingTextField.prototype.append_text_with_linebreaking_bbcode = function(text, props, click_handlers, user_data) {
+    // break lines, protecting BBCode
+    var broken_s = SPUI.break_lines(text, this.font, this.wh, {bbcode:true})[0];
+    goog.array.forEach(broken_s.split('\n'), function(line) {
+        this.append_text(SPText.cstring_to_ablocks_bbcode(line, props, click_handlers), user_data);
+    }, this);
+};
+
 SPUI.ScrollingTextField.prototype.clear_text = function() {
     var next;
     for(var node = this.head.next; node != this.head; node = next) {

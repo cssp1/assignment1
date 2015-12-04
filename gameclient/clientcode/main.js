@@ -22295,7 +22295,9 @@ function mail_dialog_select_mail(dialog, row) {
     dialog.user_data['selected_row'] = row;
     dialog.user_data['selected_row'] = Math.min(Math.max(dialog.user_data['selected_row'], dialog.user_data['first_row']), Math.min(dialog.user_data['first_row']+dialog.user_data['visible_rows']-1, player.mailbox_count()-1));
 
+
     //dialog.widgets['attach_take'].show =
+        dialog.widgets['attach_rect'].show =
         dialog.widgets['attach_scroll_left'].show =
         dialog.widgets['attach_scroll_right'].show =
         dialog.widgets['attach_taken'].show =
@@ -22314,13 +22316,14 @@ function mail_dialog_select_mail(dialog, row) {
 
     dialog.widgets['from_subj_rect'].show =
         dialog.widgets['body_rect'].show =
-        dialog.widgets['attach_rect'].show =
         dialog.widgets['from_label'].show =
         dialog.widgets['from_name'].show =
         dialog.widgets['subj_label'].show =
         dialog.widgets['subj_name'].show =
         dialog.widgets['delete_button'].show =
         dialog.widgets['body'].show =
+        dialog.widgets['body_scroll_left'].show =
+        dialog.widgets['body_scroll_right'].show =
         dialog.widgets['expiration'].show = (dialog.user_data['selected_row'] >= 0);
 
     dialog.widgets['nomail'].show = !dialog.widgets['body'].show;
@@ -22331,7 +22334,7 @@ function mail_dialog_select_mail(dialog, row) {
 
     var mail = player.mailbox_nth(dialog.user_data['selected_row']);
     dialog.user_data['selected_msg_id'] = mail['msg_id'];
-
+    dialog.user_data['body_scroll_pos'] = 0;
     dialog.widgets['delete_button'].show = dialog.widgets['body'].show && player.mail_message_is_discardable(mail);
 
     if('expire_time' in mail && mail['expire_time'] > 0 && server_time >= mail['expire_time']) {
@@ -22358,7 +22361,31 @@ function mail_dialog_select_mail(dialog, row) {
     // update info at right
     dialog.widgets['from_name'].str = mail['from_name'];
     dialog.widgets['subj_name'].str = mail['subject'];
-    dialog.widgets['body'].set_text_with_linebreaking(mail['body']);
+
+    dialog.widgets['attach_rect'].show = ('attachments' in mail || 'attachments_ghost' in mail);
+    dialog.widgets['expiration'].xy = dialog.data['widgets']['expiration'][(dialog.widgets['attach_rect'].show ? 'xy' : 'xy_no_attachments')];
+    goog.array.forEach(['body','body_rect'], function(wname) {
+        dialog.widgets[wname].wh = dialog.data['widgets'][wname][(dialog.widgets['attach_rect'].show ? 'dimensions' : 'dimensions_no_attachments')];
+    });
+    dialog.widgets['body'].clip_to = dialog.data['widgets']['body'][(dialog.widgets['attach_rect'].show ? 'clip_to' : 'clip_to_no_attachments')];
+
+    dialog.widgets['body'].scroll_up_button = dialog.widgets['body_scroll_left'];
+    dialog.widgets['body'].scroll_down_button = dialog.widgets['body_scroll_right'];
+    dialog.widgets['body'].clear_text();
+    dialog.widgets['body'].append_text_with_linebreaking_bbcode(mail['body']);
+
+    var scroller = function (incr) { return function(w) {
+        var dialog = w.parent;
+        if(incr < 0) {
+            dialog.widgets['body'].scroll_up();
+        } else if(incr > 0) {
+            dialog.widgets['body'].scroll_down();
+        }
+        dialog.user_data['body_scroll_pos'] = dialog.widgets['body'].get_scroll_pos_from_head_to_bot();
+    }; };
+    dialog.widgets['body_scroll_left'].onclick = scroller(-1);
+    dialog.widgets['body_scroll_right'].onclick = scroller(1);
+    dialog.widgets['body'].scroll_to_top();
 
     dialog.widgets['delete_button'].onclick = (function (_msg_id) { return function(w) {
         var _mail = player.get_mail_by_msg_id(_msg_id);

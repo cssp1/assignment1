@@ -2980,9 +2980,9 @@
             "row_attachment_icon": { "kind": "StaticImage", "xy": [235,83], "dimensions": [20,20], "asset": "mail_attachment_icon",
                                      "array": [1,11], "array_offset": [0,26] },
 
-            "from_subj_rect": { "kind": "SolidRect", "xy": [289,75], "dimensions": [404,46], "color": [0,0,0,0.5] },
-            "body_rect":   { "kind": "SolidRect", "xy": [289,121], "dimensions": [404,175], "color": [0.05,0.05,0.05,1] },
-            "attach_rect": { "kind": "SolidRect", "xy": [289,296], "dimensions": [404,105], "color": [0,0,0,0.5] },
+            "from_subj_rect": { "kind": "SolidRect", "xy": [289,75], "dimensions": [404,46], "color": [0,0,0,0.5], "bevel": 3 },
+            "body_rect":   { "kind": "SolidRect", "xy": [289,118], "dimensions": [404,181], "dimensions_no_attachments": [404,283], "color": [0.05,0.05,0.05,1] },
+            "attach_rect": { "kind": "SolidRect", "xy": [289,296], "dimensions": [404,105], "color": [0,0,0,0.5], "bevel": 3 },
 
             "from_label": { "kind": "TextField", "xy": [298,80], "dimensions": [60,17], "text_hjustify": "left", "text_size": 13, "text_color":[0.33,0.33,0.33,1], "ui_name": "From:" },
             "from_name": { "kind": "TextField", "xy": [361,80], "dimensions": [334,17], "text_hjustify": "left", "text_size": 13,
@@ -2993,12 +2993,19 @@
             "delete_button": { "kind": "ActionButton", "xy":[665,88], "dimensions":[19,19], "push_bg_image":1, "bg_image": "delete_mail_button",
                                "ui_tooltip": "Delete message", "tooltip_delay": 0 },
 
-            "body":  { "kind": "TextField", "xy": [296,124], "dimensions": [385,142], "text_size": 17, "text_leading": 19,
-                       "text_hjustify": "left", "text_vjustify": "top" },
-            "nomail":  { "kind": "TextField", "xy": [296,128], "dimensions": [388,142], "text_size": 15, "text_leading": 19,
+            "body":  { "kind": "ScrollingTextField", "xy": [298,126],
+                       "dimensions": [362,136], "dimensions_no_attachments": [362,238],
+                       "clip_to": [298,126,362,136], "clip_to_no_attachments": [298,126,362,238],
+                       "text_size": 17, "text_leading": 19, "text_hjustify": "left", "text_vjustify": "top"
+                     },
+            "nomail":  { "kind": "TextField", "xy": [298,126], "dimensions": [362,140], "text_size": 15, "text_leading": 19,
                          "text_hjustify": "center", "text_vjustify": "center", "ui_name": "You have no messages" },
 
-            "expiration": { "kind": "TextField", "xy": [296,276], "dimensions": [388,17], "text_hjustify": "left", "text_size": 13, "text_color":[1,0,0,1],
+            "body_scroll_left": { "kind": "ActionButton", "xy": [662,125], "dimensions": [27,26], "bg_image": "small_scroll_up", "push_bg_image": 1 },
+            "body_scroll_right": { "kind": "ActionButton", "xy": [662,150], "dimensions": [27,26], "bg_image": "small_scroll_down", "push_bg_image": 1 },
+
+            "expiration": { "kind": "TextField", "xy": [296,276], "xy_no_attachments": [296,378],
+                            "dimensions": [388,17], "text_hjustify": "left", "text_size": 13, "text_color":[1,0,0,1],
                             "ui_name": "This message expires in %s." },
 
             "attach_taken": { "kind": "TextField", "xy": [308,370], "dimensions": [368,17], "text_hjustify": "left", "text_size": 13, "text_color":[1,0,0,1],
