@@ -43904,12 +43904,7 @@ function handle_server_message(data) {
             if(immediate) {
                 invoke_loot_dialog();
             } else {
-                var prio = -10;
-                // boost priority so that it shows first when coming in on a promo code
-                if(!session.server_hello_ended && get_query_string('spin_promo_code')) {
-                    prio = 10;
-                }
-                notification_queue.push_with_priority(invoke_loot_dialog, prio);
+                notification_queue.push_with_priority(invoke_loot_dialog, -10);
             }
         }
         refresh_loot_dialog();
