@@ -383,6 +383,14 @@
                 {"predicate":"BROWSER_NAME", "names": ["Explorer"]},
                 {"predicate":"BROWSER_VERSION", "versions": [12,-1]}
             ]}, true],
+            [{"predicate":"AND", "subpredicates":[ // Chrome 47+
+                {"predicate":"BROWSER_NAME", "names": ["Chrome"]},
+                {"predicate":"BROWSER_VERSION", "versions": [47,-1]}
+            ]}, true],
+            [{"predicate":"AND", "subpredicates":[ // Firefox 42+
+                {"predicate":"BROWSER_NAME", "names": ["Firefox"]},
+                {"predicate":"BROWSER_VERSION", "versions": [42,-1]}
+            ]}, true],
             [{"predicate":"ALWAYS_TRUE"}, false]
         ],
 
