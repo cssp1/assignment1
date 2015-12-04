@@ -36794,6 +36794,28 @@ function buy_gamebucks_sku2_ui_warning(spell, spellarg) {
     return null;
 }
 
+// merge identical successive entries in an item list, even if this would violate the max stack size
+function collapse_item_list(ls) {
+    var is_simple_item = function(item) { // true if the item has no keys other than 'spec' and 'stack'
+        return !goog.object.some(item, function(v,k) { return !goog.array.contains(['spec','stack'], k); });
+    };
+    var ret = [];
+    for(var i = 0; i < ls.length; i++) {
+        var item = ls[i];
+        if(ret.length > 0 &&
+           ret[ret.length-1]['spec'] === item['spec'] &&
+           is_simple_item(ret[ret.length-1]) &&
+           is_simple_item(item)) {
+            // merge
+            var last = ret[ret.length-1];
+            last['stack'] = ('stack' in last ? last['stack'] : 1) + ('stack' in item ? item['stack'] : 1);
+            continue;
+        }
+        ret.push(item);
+    }
+    return ret
+};
+
 function update_buy_gamebucks_sku2_attachments(dialog, spell, spellarg) {
     if(!('attachments0' in dialog.widgets)) { return; } // inapplicable
     var item_list = [];
@@ -36806,7 +36828,7 @@ function update_buy_gamebucks_sku2_attachments(dialog, spell, spellarg) {
                         'ui_name': dialog.widgets['attachments0'].data['widgets']['name']['ui_name_bonus_quantity'].replace('%qty', pretty_print_number(spell['quantity'] - spell['nominal_quantity'])).replace('%pct', bonus_pct_str).replace('%GAMEBUCKS_NAME', Store.gamebucks_ui_name())
                        });
     }
-    item_list = item_list.concat(buy_gamebucks_sku2_item_list(spell, spellarg));
+    item_list = item_list.concat(collapse_item_list(buy_gamebucks_sku2_item_list(spell, spellarg)));
 
     var visible_rows = dialog.data['widgets']['attachments']['array'][0] * dialog.data['widgets']['attachments']['array'][1];
     var pages = Math.floor((item_list.length + visible_rows - 1) / visible_rows);
