@@ -594,7 +594,7 @@ var pretty_log_entry = function(e) {
     if(e['code'] == 970) {
         // special handling for client exceptions
         $.each(['_id','time','ip','player_state','event_name','locale','code','anon_id','acquisition_ad_skynet',
-                'gameclient_build_date','gamedata_build_info','browser_hardware','User-Agent'], function(index, field) {
+                'gameclient_build_date','gamedata_build_info','browser_hardware','User-Agent','ident'], function(index, field) {
             if(field in e) { delete e[field]; }
         });
 
@@ -620,7 +620,7 @@ var pretty_log_entry = function(e) {
             delete e['location'];
         }
 
-        text = JSON.stringify(e);
+        text = JSON.stringify(e, null, 1);
         if(location) { text = text + NEWLINE+location; }
         if(method) { text = text + NEWLINE+method; }
         //text = text.replace(new RegExp('","','g'), '",<br>"');
@@ -1825,7 +1825,7 @@ Status: <span id="payment_status"></span>
 <div style="clear:both;"></div>
 
 <div style="margin-top:10px;">
-<div id="logs_output" style="width:100%;height:70%;font-family:monospace;font-size:11px;overflow:auto;border-style:inset;border-width:2px;padding:3px;"></div>
+<div id="logs_output" style="height:70%;font-family:monospace;font-size:11px;overflow:auto;border-style:inset;border-width:2px;padding:3px;"></div>
 </div>
 
 </div> <!-- END mode_logs -->
