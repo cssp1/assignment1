@@ -692,7 +692,7 @@ class HandleChangeRegion(Handler):
                 return ReturnValue(error = 'change_region failed: base is locked')
 
         if new_region and new_region != 'LIMBO':
-            random.seed(self.user_id + self.gamedata['territory']['map_placement_gen'] + int(100*random.random()))
+            randgen = random.Random(self.user_id ^ self.gamedata['territory']['map_placement_gen'] ^ int(self.time_now))
 
             map_dims = self.gamedata['regions'][new_region]['dimensions']
             BORDER = self.gamedata['territory']['border_zone_player']
@@ -703,8 +703,8 @@ class HandleChangeRegion(Handler):
             # rectangle within which we can place the player
             placement_range = [[map_dims[0]//2 - radius[0], map_dims[0]//2 + radius[0]],
                                [map_dims[1]//2 - radius[1], map_dims[1]//2 + radius[1]]]
-            trials = map(lambda x: (min(max(placement_range[0][0] + int((placement_range[0][1]-placement_range[0][0])*random.random()), 2), map_dims[0]-2),
-                                    min(max(placement_range[1][0] + int((placement_range[1][1]-placement_range[1][0])*random.random()), 2), map_dims[1]-2)), xrange(100))
+            trials = map(lambda x: (min(max(placement_range[0][0] + int((placement_range[0][1]-placement_range[0][0])*randgen.random()), 2), map_dims[0]-2),
+                                    min(max(placement_range[1][0] + int((placement_range[1][1]-placement_range[1][0])*randgen.random()), 2), map_dims[1]-2)), xrange(100))
 
             trials = filter(lambda x: not Region(self.gamedata, new_region).obstructs_bases(x), trials)
 

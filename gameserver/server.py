@@ -4249,7 +4249,7 @@ class Session(object):
             if expire_by > 0: expire_time = min(expire_by, expire_time) if (expire_time > 0) else expire_by
         return expire_time
 
-    def get_loot_items(self, player, loot_table, item_duration, item_expire_at, rand_func = random.random, duration_ref_time = None):
+    def get_loot_items(self, player, loot_table, item_duration, item_expire_at, duration_ref_time = None):
         assert player is self.player
 
         absolute_time = player.get_absolute_time()
@@ -4257,7 +4257,7 @@ class Session(object):
             duration_ref_time = absolute_time
 
         loot = LootTable.get_loot(gamedata['loot_tables'], loot_table,
-                                  rand_func = rand_func,
+                                  rand_func = player.random_source.random,
                                   cond_resolver = lambda pred: Predicates.read_predicate(pred).is_satisfied(player,None))
         if item_expire_at > 0:
             expire_time = item_expire_at
@@ -7273,7 +7273,6 @@ class Base(object):
         for obj in to_remove:
             self.drop_object(obj)
 
-        random.seed(seed+1)
         num_to_spawn = gamedata['map']['random_scenery_spawn']
         ncells = self.ncells()
         mid = self.midcell()
@@ -7286,9 +7285,11 @@ class Base(object):
                                                                                      (my_climate in data.get('base_climates',[])))]
         if not speclist: return to_remove, []
 
+        randgen = random.Random(seed+1) # deterministic from the seed
+
         to_add = []
         for i in range(num_to_spawn):
-            index = int(random.random()*len(speclist))
+            index = int(randgen.random()*len(speclist))
             specname = speclist[index]
             spec = GameObjectSpec.lookup(specname)
             rad = gamedata['map'].get('random_scenery_spawn_radius', ncells[0]//2)
@@ -7299,8 +7300,8 @@ class Base(object):
             xrange = [xbound[0]+int(spec.gridsize[0]/2), xbound[1]-int(spec.gridsize[0]/2)-1]
             yrange = [ybound[0]+int(spec.gridsize[1]/2), ybound[1]-int(spec.gridsize[1]/2)-1]
 
-            x = int(xrange[0] + random.random()*(xrange[1]-xrange[0]))
-            y = int(yrange[0] + random.random()*(yrange[1]-yrange[0]))
+            x = int(xrange[0] + randgen.random()*(xrange[1]-xrange[0]))
+            y = int(yrange[0] + randgen.random()*(yrange[1]-yrange[0]))
             x = max(0, min(x, ncells[0]-1))
             y = max(0, min(y, ncells[1]-1))
             newobj = instantiate_object_for_player(observer, EnvironmentOwner, specname, x=x, y=y)
@@ -7517,6 +7518,9 @@ class Player(AbstractPlayer):
         self.ladder_rival_override = None
         self.travel_override = None
         self.leaderboard_override = None
+
+        # reseed random source on load
+        self.random_source = random.Random(server_time)
 
         # These fields are DUPLICATES of the corresponding User
         # fields, set during the login process. This is necessary for
@@ -10918,7 +10922,7 @@ class LivePlayer(Player):
             return {'count':hist.get('count',0), 'last_time':hist.get('last_time',-1), 'attack_cooldown_expire': self.get_repeat_attack_cooldown_expire_time(opponent_id, home_base_id(opponent_id)) }
         return {}
 
-    def spawn_deposits(self):
+    def spawn_deposits(self, seed):
         if self.tutorial_state != "COMPLETE":
             # no deposits until tutorial is over
             return
@@ -10945,7 +10949,7 @@ class LivePlayer(Player):
         specname = 'iron_deposit'
         spec = self.get_abtest_spec(GameObjectSpec, specname)
 
-        random.seed(server_time + int(1000*random.random()))
+        randgen = random.Random(seed) # deterministic from the seed
 
         for i in range(num_to_spawn):
             ncells = self.my_home.ncells()
@@ -10953,8 +10957,8 @@ class LivePlayer(Player):
 
             # rejection sampling for determining spawn location
             while True:
-                x = int(random.random()*ncells[0])
-                y = int(random.random()*ncells[1])
+                x = int(randgen.random()*ncells[0])
+                y = int(randgen.random()*ncells[1])
                 if self.my_home.is_deposit_location_valid([x,y], spec.gridsize) or iter > 100:
                     break
                 iter += 1
@@ -10962,14 +10966,14 @@ class LivePlayer(Player):
             metadata = {}
             max_pct = config['worth_range'][0]
             min_pct = config['worth_range'][1]
-            amount = max(0, int(max_res * (min_pct + random.random() * (max_pct-min_pct))))
+            amount = max(0, int(max_res * (min_pct + randgen.random() * (max_pct-min_pct))))
             if amount > 0:
                 metadata['iron'] = amount
 
             if self.get_any_abtest_value('currency', gamedata['currency']) == 'gamebucks':
-                contains_gamebucks = (random.random() < config['gamebucks_chance'])
+                contains_gamebucks = (randgen.random() < config['gamebucks_chance'])
                 if contains_gamebucks:
-                    gamebucks_amount = config['gamebucks_range'][0] + int(random.random() * (config['gamebucks_range'][1]-config['gamebucks_range'][0]))
+                    gamebucks_amount = config['gamebucks_range'][0] + int(randgen.random() * (config['gamebucks_range'][1]-config['gamebucks_range'][0]))
                     if gamebucks_amount > 0:
                         metadata['gamebucks'] = gamebucks_amount
 
@@ -12255,9 +12259,7 @@ class LivePlayer(Player):
            (not self.cooldown_active('lottery_reseed')):
 
             self.cooldown_trigger('lottery_reseed', gamedata['lottery_reseed_cooldown'])
-            lottery_seed = random.randint(0, 1<<31)
-            randgen = random.Random(lottery_seed)
-            self.lottery_slate = dict((slot_name, session.get_loot_items(self, tab, -1, -1, rand_func = randgen.random)) for slot_name, tab in slot_tables.iteritems())
+            self.lottery_slate = dict((slot_name, session.get_loot_items(self, tab, -1, -1)) for slot_name, tab in slot_tables.iteritems())
 
     # get the current lottery slate
     def get_lottery_slate(self, session):
@@ -12421,7 +12423,7 @@ class LivePlayer(Player):
         if gamedata['server']['log_map']:
             gamesite.exception_log.event(server_time, 'map: player %d change_region %s %s' % (self.user_id, repr(new_region), repr(new_loc)))
 
-        random.seed(self.user_id + gamedata['territory']['map_placement_gen'] + int(100*random.random()))
+        randgen = random.Random(self.user_id ^ gamedata['territory']['map_placement_gen'] ^ int(server_time))
 
         if (new_region is None) or (type(new_region) is list):
             # load-balance to lowest-population applicable region
@@ -12509,8 +12511,8 @@ class LivePlayer(Player):
                 trials_set = set()
                 rad = gamedata['territory']['neighbor_search_radius']
                 for i in xrange(100):
-                    tr = (new_loc[0] + int((2*random.random()-1)*rad),
-                          new_loc[1] + int((2*random.random()-1)*rad))
+                    tr = (new_loc[0] + int((2*randgen.random()-1)*rad),
+                          new_loc[1] + int((2*randgen.random()-1)*rad))
                     if tr[0] < BORDER or tr[0] >= map_dims[0]-BORDER or tr[1] < BORDER or tr[1] >= map_dims[1]-BORDER:
                         continue # skip, out of bounds
                     trials_set.add(tr)
@@ -12534,8 +12536,8 @@ class LivePlayer(Player):
                 # rectangle within which we can place the player
                 placement_range = [[map_dims[0]//2 - radius[0], map_dims[0]//2 + radius[0]],
                                    [map_dims[1]//2 - radius[1], map_dims[1]//2 + radius[1]]]
-                trials = map(lambda x: (min(max(placement_range[0][0] + int((placement_range[0][1]-placement_range[0][0])*random.random()), 2), map_dims[0]-2),
-                                        min(max(placement_range[1][0] + int((placement_range[1][1]-placement_range[1][0])*random.random()), 2), map_dims[1]-2)), xrange(100))
+                trials = map(lambda x: (min(max(placement_range[0][0] + int((placement_range[0][1]-placement_range[0][0])*randgen.random()), 2), map_dims[0]-2),
+                                        min(max(placement_range[1][0] + int((placement_range[1][1]-placement_range[1][0])*randgen.random()), 2), map_dims[1]-2)), xrange(100))
 
             trials = filter(lambda x: not Region(gamedata, new_region).obstructs_bases(x), trials)
 
@@ -22541,7 +22543,7 @@ class GAMEAPI(resource.Resource):
             # note: this must come AFTER abtests are set up, since they may override starting conditions
             init_game(player, 0)
 
-        player.my_home.spawn_scenery(player, user.user_id)
+        player.my_home.spawn_scenery(player, user.user_id) # time-constant seed
 
         # upon success, retmsg will be ignored, and future client messages should go via session.outgoing_messages
         session.outgoing_messages = retmsg # !!!
@@ -22557,7 +22559,7 @@ class GAMEAPI(resource.Resource):
         player.prune_sessions()
         player.prune_activity()
         player.prune_battle_history()
-        player.spawn_deposits()
+        player.spawn_deposits(user.user_id ^ int(server_time)) # time-varying seed
         player.migrate(session, user.user_id, user.account_creation_time, is_returning_user)
         player.prune_player_auras(is_session_change = True, is_login = True)
 
