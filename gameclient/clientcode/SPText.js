@@ -146,8 +146,8 @@ SPText.bbcode_split_words = function(str) {
                     // do append
                 }
             } else if(state == SPText.BBCODE_STATES.ESCAPED) {
-                word += c;
                 state = SPText.BBCODE_STATES.LITERAL;
+                // do append
             }
         }
         word += c;
