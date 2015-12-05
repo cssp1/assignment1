@@ -81,8 +81,7 @@ for DAY in $YESTERDAY; do
 #    gzip -c $INPUT > $SAVE_DIR/$ZIPFILE
 #
 #    echo "uploading $ZIPFILE to S3..."
-#    $SCRIPT_DIR/aws --secrets-file="$S3_KEYFILE" --md5 put \
-#    spinpunch-logs/$MONTH/$ZIPFILE $SAVE_DIR/$ZIPFILE
+#    aws s3 cp $SAVE_DIR/$ZIPFILE s3://spinpunch-logs/$MONTH/$ZIPFILE 
 #    if [[ $? != 0 ]]; then
 #        echo "S3 upload error!"
 #        ERROR=1
@@ -104,8 +103,7 @@ for DAY in $YESTERDAY; do
 #    echo "uploading $ZIP to S3..."
 #    cp $INPUT $SAVE_DIR/$SRCFILE
 #    (cd $SAVE_DIR && zip $ZIP $SRCFILE && rm -f $SRCFILE)
-#    $SCRIPT_DIR/aws --secrets-file="$S3_KEYFILE" --md5 put \
-#    spinpunch-logs/$MONTH/$ZIP $SAVE_DIR/$ZIP
+#    aws s3 cp $SAVE_DIR/$ZIP s3://spinpunch-logs/$MONTH/$ZIP
 #    if [[ $? != 0 ]]; then
 #        echo "S3 upload error!"
 #        ERROR=1
@@ -132,8 +130,7 @@ for DAY in $YESTERDAY; do
 #    done
 #
 #    echo "uploading $TOTALSFILE to S3..."
-#    $SCRIPT_DIR/aws --secrets-file="$S3_KEYFILE" --md5 put \
-#    spinpunch-logs/$MONTH/$TOTALSFILE $SAVE_DIR/$TOTALSFILE
+#    aws s3 cp $SAVE_DIR/$TOTALSFILE s3://spinpunch-logs/$MONTH/$TOTALSFILE
 #    if [[ $? != 0 ]]; then
 #    echo "S3 upload error!"
 #    ERROR=1

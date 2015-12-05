@@ -5,15 +5,11 @@
 # found in the LICENSE file.
 
 HOST=`hostname | sed 's/.spinpunch.com//'`
-AWSSECRET=/home/ec2-user/.ssh/${HOST}-awssecret
-TARFILE=${HOST}-keys.tar.gz
-ENCFILE=${TARFILE}.gpg
+TARFILE="${HOST}-keys.tar.gz"
+ENCFILE="${TARFILE}.gpg"
+DEST="s3://spinpunch-config/$ENCFILE"
 
-if [ ! -e $AWSSECRET ]; then
-    echo "AWS key file ${AWSSECRET} not found"
-    exit 1
-fi
-
-(cd ~ && chmod 0700 .ssh && chmod 0600 .ssh/* && tar zcvf $TARFILE .ssh && gpg -c $TARFILE)
-../aws/aws --secrets-file="${AWSSECRET}" put spinpunch-config/$ENCFILE ~/$ENCFILE && echo "uploaded spinpunch-config/${ENCFILE}"
-rm -f ~/$TARFILE ~/$ENCFILE
+cd ~
+chmod 0700 .ssh && chmod 0600 .ssh/* && tar zcvf "$TARFILE" .ssh && gpg -c "$TARFILE" && \
+aws s3 cp "$ENCFILE" "$DEST" && echo "uploaded $DEST"
+rm -f "$TARFILE" "$ENCFILE"
