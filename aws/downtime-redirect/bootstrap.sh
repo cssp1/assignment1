@@ -18,14 +18,16 @@ service fail2ban start
 # get SSL keys (requires aws-cli) XXX share with aws/bootstrap/get-ssl-keys.sh
 TMPDIR="/tmp"
 LOC="/ssl-keys"
-ARCHIVE="ssl-spinpunch.com-latest.tar.gz"
+BUCKET="spinpunch-config"
+DOMAIN="spinpunch.com"
+ARCHIVE="ssl-${DOMAIN}-latest.tar.gz"
 mkdir -p "${LOC}" && \
     cd "${TMPDIR}" && \
-    aws s3 cp "s3://spinpunch-config/${ARCHIVE}" . > /dev/null && \
+    aws s3 cp "s3://${BUCKET}/${ARCHIVE}" . > /dev/null && \
     tar zxf ${ARCHIVE} && \
-    cp "ssl-spinpunch.com/private/spinpunch.com.key" "${LOC}/server.key" && chmod 0600 "${LOC}/server.key" && \
-    cp "ssl-spinpunch.com/certs/spinpunch.com_and_gd_bundle.crt" "${LOC}/server.crt" && chmod 0644 "${LOC}/server.crt" && \
-rm -rf "${TMPDIR}/${ARCHIVE}" "${TMPDIR}/ssl-spinpunch.com"
+    cp "ssl-${DOMAIN}/private/${DOMAIN}.key" "${LOC}/server.key" && chmod 0600 "${LOC}/server.key" && \
+    cp "ssl-${DOMAIN}/certs/${DOMAIN}_and_gd_bundle.crt" "${LOC}/server.crt" && chmod 0644 "${LOC}/server.crt" && \
+rm -rf "${TMPDIR}/${ARCHIVE}" "${TMPDIR}/ssl-${DOMAIN}"
 
 # install docker
 yum install -y docker curl
