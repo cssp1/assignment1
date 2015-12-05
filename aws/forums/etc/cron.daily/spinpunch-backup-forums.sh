@@ -20,7 +20,7 @@ TARFILE=spinpunch-forums-backup-`date +%Y%m%d`.tar.gz
 (cd $SAVE_DIR && tar zcf $TARFILE backup-www.tar backup-*.sql)
 
 # upload to AWS
-/home/$AWS_USER/aws --secrets-file="/home/$AWS_USER/.ssh/forums-awssecret" --md5 put spinpunch-forums/$TARFILE $SAVE_DIR/$TARFILE
+aws s3 cp $SAVE_DIR/$TARFILE "s3://spinpunch-forums/{$TARFILE}"
 if [[ $? != 0 ]]; then
     echo "S3 upload error!"
     ERROR=1
