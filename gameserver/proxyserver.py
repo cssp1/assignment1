@@ -441,7 +441,7 @@ class KGVisitor(Visitor):
         if 'kongregate_game_url' in request.args:
             self.game_container = request.args['kongregate_game_url'][0] + q_clean_qs(request.uri)
         else:
-            self.game_container = 'http://www.spinpunch.com' # punt :(
+            self.game_container = SpinConfig.config['proxyserver']['fallback_landing'] # punt :(
 
     def canvas_url(self):
         return self.server_protocol + self.server_host + ':' + self.server_port + '/KGROOT' + q_clean_qs(self.first_hit_uri,
@@ -479,7 +479,7 @@ class AGVisitor(Visitor):
         return ('go_away_whitelist' in SpinConfig.config) and (self.armorgames_id not in SpinConfig.config['go_away_whitelist'])
 
     def set_game_container(self, request):
-        self.game_container = 'http://www.spinpunch.com' # punt :(
+        self.game_container = SpinConfig.config['proxyserver']['fallback_landing'] # punt :(
 
     def canvas_url(self):
         return self.server_protocol + self.server_host + ':' + self.server_port + '/AGROOT' + q_clean_qs(self.first_hit_uri, {})
@@ -1365,11 +1365,11 @@ class GameProxy(proxy.ReverseProxyResource):
 
     def index_visit_prohibited_country(self, request, visitor):
         metric_event_coded(visitor, '0930_prohibited_country', visitor.add_demographics({}))
-        redirect_url = SpinConfig.config['proxyserver'].get('prohibited_country_landing', '//www.spinpunch.com/')
+        redirect_url = SpinConfig.config['proxyserver']['prohibited_country_landing']
         return '<html><body onload="location.href = \'%s\';"></body></html>' % str(redirect_url)
 
     def index_visit_go_away(self, request, visitor):
-        redirect_url = SpinConfig.config['proxyserver'].get('server_maintenance_landing', '//www.spinpunch.com/server-maintenance/')
+        redirect_url = SpinConfig.config['proxyserver']['server_maintenance_landing']
         if ('country' in visitor.demographics) and ('server_maintenance_landing_country_override' in SpinConfig.config['proxyserver']):
             for entry in SpinConfig.config['proxyserver']['server_maintenance_landing_country_override']:
                 if visitor.demographics['country'] in entry['countries']:
@@ -1383,19 +1383,19 @@ class GameProxy(proxy.ReverseProxyResource):
         return '<html><body onload="location.href = \'%s\';"></body></html>' % str(redirect_url)
 
     def index_visit_server_overload(self):
-        redirect_url = SpinConfig.config['proxyserver'].get('server_overload_landing', '//www.spinpunch.com/mars-frontier-server-overload/')
+        redirect_url = SpinConfig.config['proxyserver']['server_overload_landing']
         return '<html><body onload="location.href = \'%s\';"></body></html>' % str(redirect_url)
 
     def index_visit_login_spam(self):
-        redirect_url = SpinConfig.config['proxyserver'].get('login_spam_landing', '//www.spinpunch.com/login-spam/')
+        redirect_url = SpinConfig.config['proxyserver']['login_spam_landing']
         return '<html><body onload="location.href = \'%s\';"></body></html>' % str(redirect_url)
 
     def index_visit_race_condition(self, request, visitor):
-        redirect_url = SpinConfig.config['proxyserver'].get('login_race_condition_landing', '//www.spinpunch.com/login-race-condition/')
+        redirect_url = SpinConfig.config['proxyserver']['login_race_condition_landing']
         return '<html><body onload="location.href = \'%s\';"></body></html>' % str(redirect_url)
 
     def index_visit_coming_soon(self, request, visitor):
-        redirect_url = SpinConfig.config['proxyserver'].get('coming_soon_landing', '//www.spinpunch.com/coming-soon-to-your-country/')
+        redirect_url = SpinConfig.config['proxyserver']['coming_soon_landing']
         return '<html><body onload="location.href = \'%s\';"></body></html>' % str(redirect_url)
 
     def index_visit_authorized(self, request, visitor):
@@ -1796,7 +1796,7 @@ class GameProxy(proxy.ReverseProxyResource):
             '$SIGNED_REQUEST$': "'"+visitor.raw_signed_request+"'" if isinstance(visitor, FBVisitor) else 'null',
             '$FACEBOOK_PERMISSIONS$': visitor.scope_string if (isinstance(visitor, FBVisitor) and visitor.scope_string) else '', # note: client may get more permissions later, this is just the set available upon login
             '$OAUTH_TOKEN$': visitor.auth_token(),
-            '$UNSUPPORTED_BROWSER_LANDING$': SpinConfig.config['proxyserver'].get('unsupported_browser_landing', 'http://www.spinpunch.com/approaching-mars/'),
+            '$UNSUPPORTED_BROWSER_LANDING$': SpinConfig.config['proxyserver'].get('unsupported_browser_landing','http://www.google.com/chrome/'),
 
             '$LOAD_GAME_DATA$': load_game_data,
             '$LOAD_GAME_CODE$': load_game_code,
