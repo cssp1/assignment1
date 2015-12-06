@@ -4,9 +4,9 @@
 
 # Adaptor that sits on top of the SpinDBClient/SpinNoSQLClient
 # database connection and caches the mapping of login platform user IDs to
-# SpinPunch user IDs.
+# game player IDs.
 
-# Due to the that SpinPunch IDs never change once assigned, it's safe
+# Due to the that game player IDs never change once assigned, it's safe
 # to cache them in local process memory.
 
 class SocialIDCache:
@@ -26,7 +26,7 @@ class SocialIDCache:
             self.cache[social_id] = result
         return result
 
-    # query a whole bunch of IDs at once efficiently. Return None for social IDs that have no corresponding SpinPunch ID.
+    # query a whole bunch of IDs at once efficiently. Return None for social IDs that have no corresponding game user ID.
     def social_id_to_spinpunch_batch(self, social_ids):
         query = []
         index = []

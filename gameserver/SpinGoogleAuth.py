@@ -55,7 +55,7 @@ def exchange_code_for_access_token(client_id, client_secret, redirect_uri, param
 def get_google_user_info(access_token):
     return SpinJSON.loads(urllib2.urlopen('https://www.googleapis.com/oauth2/v1/userinfo?'+urllib.urlencode({'access_token':access_token})).read())
 
-# SpinPunch-specific code here
+# Game engine specific code here
 
 import SpinConfig
 import SpinFacebook # borrow some code

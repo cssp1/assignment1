@@ -146,7 +146,7 @@ if __name__ == '__main__':
     do_unisolate = False
     give_item = None
     send_message = False
-    message_sender = 'SpinPunch'
+    message_sender = 'Customer Support'
     message_subject = ''
     message_body = ''
     message_expire_time = -1
@@ -215,13 +215,13 @@ if __name__ == '__main__':
             give_item = 'gamebucks'
             item_stack = max(1, int(val))
             if not message_subject: message_subject = 'Special Item'
-            if not message_body: message_body = 'Commander, the SpinPunch customer support team sent us a special item.'
+            if not message_body: message_body = 'Commander, the Customer Support team sent us a special item.'
         elif key == '--give-protection-time':
             give_protection_time = 3600*int(val)
         elif key == '--give-item':
             give_item = val
             if not message_subject: message_subject = 'Special Item'
-            if not message_body: message_body = 'Commander, the SpinPunch customer support team sent us a special item.'
+            if not message_body: message_body = 'Commander, the Customer Support team sent us a special item.'
         elif key == '--melt-hours':
             item_melt_hours = max(-1, int(val))
         elif key == '--item-stack':
@@ -256,7 +256,7 @@ if __name__ == '__main__':
     if user_id is None and facebook_id is None:
         print 'usage: %s [options]' % sys.argv[0]
         print 'options:'
-        print '    --user-id ID        choose player by SpinPunch user ID'
+        print '    --user-id ID        choose player by game player ID'
         print '    --facebook-id ID    choose player by Facebook user ID'
         print ''
         print '    --game-id ID        look up users for game ID (either mf or tr)'

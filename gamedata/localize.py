@@ -4,7 +4,7 @@
 # Use of this source code is governed by an MIT-style license that can be
 # found in the LICENSE file.
 
-# SpinPunch game localization system
+# GUI text localization system
 
 # This script has two modes:
 

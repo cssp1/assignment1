@@ -65,7 +65,7 @@ if __name__ == '__main__':
         print "HERE", '\n', subject, '\n', body
     else:
         if body:
-            SpinReminders.send_reminders('SpinPunch', recipients, subject, body, dry_run = dry_run)
+            SpinReminders.send_reminders('report_slow_mysql.py', recipients, subject, body, dry_run = dry_run)
 
     if do_prune:
         if verbose: print 'pruning', 'mysql.slow_log'

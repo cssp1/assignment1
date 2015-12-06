@@ -74,7 +74,7 @@ sudo chown -R ec2-user:ec2-user /home/ec2-user/.aws
 sudo yum -y install python-boto
 sudo install ./cron-mail-to-sns.py /usr/local/bin/cron-mail-to-sns.py
 sudo sh -c "/bin/cat > /etc/sysconfig/crond" <<EOF
-# SpinPunch - send cron errors via SNS instead of system mail
+# send cron errors via SNS instead of system mail
 CRONDARGS=" -m '/usr/local/bin/cron-mail-to-sns.py ${AWS_CRON_SNS_TOPIC}'"
 EOF
 

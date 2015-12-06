@@ -27,7 +27,7 @@ class SecureResource(twisted.web.guard.HTTPAuthSessionWrapper):
     def __init__(self, resource_factory, username = default_username, password = default_password):
         passdb = twisted.cred.checkers.InMemoryUsernamePasswordDatabaseDontUse(**{username:password})
         portal = twisted.cred.portal.Portal(self.AdminRealm(resource_factory), [passdb])
-        credfact = twisted.web.guard.DigestCredentialFactory('md5', 'SpinPunch Admin')
+        credfact = twisted.web.guard.DigestCredentialFactory('md5', 'Game Admin')
         twisted.web.guard.HTTPAuthSessionWrapper.__init__(self, portal, [credfact])
     def render(self, request):
         # do not return a revealing error message on exceptions

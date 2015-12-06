@@ -115,8 +115,8 @@ echo "Apply gameserver/http.py.patchX to twisted/web/http.py wherever it is inst
 
 echo "MISSING: SVN: /home/ec2-user/.ssh/spsvnaccess.pem (also .ssh/config with Host/User/IdentityFile)"
 echo "MISSING: GIT: /home/ec2-user/.ssh/${GAME_ID}prod.pem (also .ssh/config with Host/User/IdentityFile)"
-echo "MISSING: GIT: git config --global user.name " # 'SpinPunch Deploy'
-echo "MISSING: GIT: git config --global user.email " # 'awstech@spinpunch.com'
+echo "MISSING: GIT: git config --global user.name " # 'Example Deploy'
+echo "MISSING: GIT: git config --global user.email " # 'awstech@example.com'
 
 echo "game code checkout. symlink gameserver/logs to an ephemeral storage location (consider using xfs for efficiency with 100k+ small files)."
 

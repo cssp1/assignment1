@@ -135,7 +135,7 @@ class AsyncHTTPRequester(object):
         getter = twisted.web.client._makeGetterFactory(bytes(request.url), twisted.web.client.HTTPClientFactory,
                                                        method=request.method,
                                                        headers=request.headers,
-                                                       agent='SpinPunch Game Server',
+                                                       agent='spinpunch game server',
                                                        timeout=self.request_timeout,
                                                        postdata=request.postdata)
         d = getter.deferred

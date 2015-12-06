@@ -569,11 +569,11 @@ class HandleGiveItem(MessageSender):
         return {'type':'mail',
                 'expire_time': expire_time,
                 'msg_id': self.get_msg_id(),
-                'from_name': self.args.get('message_sender', 'SpinPunch'),
+                'from_name': self.args.get('message_sender', 'Customer Support'),
                 'to': [self.user_id],
                 'subject':self.args.get('message_subject', 'Special Item'),
                 'attachments': [item],
-                'body': self.args.get('message_body', 'The SpinPunch customer support team sent us a special item.\n\nClick the item to collect it.') + \
+                'body': self.args.get('message_body', 'The Customer Support team sent us a special item.\n\nClick the item to collect it.') + \
                 ('\n\nIMPORTANT: Activate this item quickly! Its time is limited.' if expire_time > 0 else '')}
 class HandleSendMessage(MessageSender):
     def make_message(self):
@@ -581,9 +581,9 @@ class HandleSendMessage(MessageSender):
         return {'type':'mail',
                 'expire_time': expire_time,
                 'msg_id': self.get_msg_id(),
-                'from_name': self.args.get('message_sender', 'SpinPunch'),
+                'from_name': self.args.get('message_sender', 'Customer Support'),
                 'to': [self.user_id],
-                'subject':self.args.get('message_subject', 'Customer Support'),
+                'subject':self.args.get('message_subject', 'Support Issue'),
                 'body': self.args['message_body']}
 
 class HandleChangeRegion(Handler):

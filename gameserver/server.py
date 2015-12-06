@@ -910,7 +910,7 @@ def ascdebug(msg):
         print msg
         gamesite.exception_log.event(server_time, 'ASC: '+spin_server_name+' '+msg)
 
-# mapping of SpinPunch user IDs to User objects
+# mapping of game user IDs to User objects
 class UserTable:
     # note: these are updated from the login code, so don't read them from the file
     WRITE_ONLY_FIELDS = [('user_id', int), # for reference/recovery only, not used as database key
@@ -1526,7 +1526,7 @@ class User:
         if (self.facebook_friends is None) and (self.kg_friend_ids is None) and (self.ag_friend_ids is None):
             return # probably still waiting on the API
 
-        # batch query for SpinPunch IDs
+        # batch query for game player IDs
         social_id_list = []
         if self.facebook_friends:
             social_id_list += ['fb'+str(friend['id']) for friend in self.facebook_friends]
@@ -1551,7 +1551,7 @@ class User:
             self.client_friends.add(friend_id)
 
             if not friend_props:
-                # the friend has a SpinPunch ID but never created any game state. This is probably because the friend
+                # the friend has a player ID but never created any game state. This is probably because the friend
                 # hit our site but was blocked by country or had an unsupported browser, so they never entered the game.
                 # print 'warning: no PlayerCache entry for friend player %d' % friend_id
                 continue
@@ -2509,7 +2509,7 @@ class User:
         gamesite.do_log_adnetwork_event(api, props)
 
 
-# mapping of (SpinPunch user ID, game_id) tuples to Player objects
+# mapping of (player ID, game_id) tuples to Player objects
 
 def write_json_field(pyobj, jsonobj, field):
     name, coerce_write, coerce_read = field
@@ -22356,7 +22356,7 @@ class GAMEAPI(resource.Resource):
         # prep user ###############################
 
         if user is None:
-            # person has never played a SpinPunch game before
+            # person has never played our game before
             user = User(user_id)
             user.account_creation_time = server_time
             if not spin_secure_mode: # mark new accounts as developers

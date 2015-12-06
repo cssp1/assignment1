@@ -17,7 +17,7 @@ import SpinConfig
 import sys, time, calendar
 import csv
 
-# load SpinPunch Upcache S3 access library
+# load Upcache S3 access library
 import SpinS3, SpinUpcacheIO
 
 # load gamedata so we can reference it if necessary

@@ -906,7 +906,7 @@ class GameProxy(proxy.ReverseProxyResource):
         def on_response(self, response):
             self.d.callback(self.parent.index_visit_ag_verify_response(self.request, self.visitor, response))
         def on_error(self, reason):
-            self.d.callback(self.parent.index_visit_ag_verify_response(self.request, self.visitor, '{"payload":null,"message":"SpinPunch error"}'))
+            self.d.callback(self.parent.index_visit_ag_verify_response(self.request, self.visitor, '{"payload":null,"message":"proxyserver.py error"}'))
 
     def index_visit_ag_verify_response(self, request, visitor, response):
         r = SpinJSON.loads(response)
@@ -997,9 +997,9 @@ class GameProxy(proxy.ReverseProxyResource):
         if (not visitor.raw_signed_request):
             if SpinHTTP.get_twisted_header(request,'user-agent').startswith('facebookexternalhit'):
                 replacements = {
-                    '$FBEXTERNALHIT_TITLE$': SpinConfig.config['proxyserver'].get('fbexternalhit_title', 'SpinPunch'),
-                    '$FBEXTERNALHIT_IMAGE$': SpinConfig.config['proxyserver'].get('fbexternalhit_image', ''),
-                    '$FBEXTERNALHIT_DESCRIPTION$': SpinConfig.config['proxyserver'].get('fbexternalhit_description', ''),
+                    '$FBEXTERNALHIT_TITLE$': SpinConfig.config['proxyserver'].get('fbexternalhit_title', 'FB External Hit TItle'),
+                    '$FBEXTERNALHIT_IMAGE$': SpinConfig.config['proxyserver'].get('fbexternalhit_image', 'FB External Hit Image'),
+                    '$FBEXTERNALHIT_DESCRIPTION$': SpinConfig.config['proxyserver'].get('fbexternalhit_description', 'FB External Hit Description'),
                     }
                 expr = re.compile('|'.join([key.replace('$','\$') for key in replacements.iterkeys()]))
                 template = get_static_include('facebookexternalhit.html')
@@ -1599,9 +1599,9 @@ class GameProxy(proxy.ReverseProxyResource):
         game_query_string = clean_qs(visitor.first_hit_uri if SpinConfig.config.get('secure_mode',0) else request.uri, add_props = extra_query_params)
         replacements = {
             '$DEMOGRAPHICS$': SpinJSON.dumps(visitor.demographics),
-            '$FBEXTERNALHIT_TITLE$': SpinConfig.config['proxyserver'].get('fbexternalhit_title', 'SpinPunch'),
-            '$FBEXTERNALHIT_IMAGE$': SpinConfig.config['proxyserver'].get('fbexternalhit_image', ''),
-            '$FBEXTERNALHIT_DESCRIPTION$': SpinConfig.config['proxyserver'].get('fbexternalhit_description', ''),
+            '$FBEXTERNALHIT_TITLE$': SpinConfig.config['proxyserver'].get('fbexternalhit_title', 'FB External Hit Title'),
+            '$FBEXTERNALHIT_IMAGE$': SpinConfig.config['proxyserver'].get('fbexternalhit_image', 'FB External Hit Image'),
+            '$FBEXTERNALHIT_DESCRIPTION$': SpinConfig.config['proxyserver'].get('fbexternalhit_description', 'FB External Hit Description'),
             '$CANVAS_URL$': visitor.canvas_url(), # https://apps.facebook.com/MYAPP/
             '$GAME_CONTAINER_URL$': visitor.game_container, # https://apps.facebook.com/MYAPP/?original_query_string=goes_here
             # query string sent with GAMEAPI requests - should NOT include signed_request

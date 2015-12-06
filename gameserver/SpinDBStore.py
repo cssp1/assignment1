@@ -6,7 +6,7 @@
 
 # Map: implements a JSON-based mapping from string keys to arbitrary data structure values
 # intended to hold a lot of keys (one per player) and update the backing-store file efficiently
-# used for Facebook ID -> SpinPunch ID mapping
+# used for Facebook ID -> game ID mapping
 
 import SpinJSON
 import AtomicFileWrite

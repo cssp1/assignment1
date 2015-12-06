@@ -4,7 +4,7 @@
 
 # SP3RDPARTY : Twisted : MIT License
 
-# DJM - SpinPunch modified version that replaces what ships with the
+# DJM - modified version that replaces what ships with the
 # Amazon Linux Twisted distribution. The shipped version doesn't have
 # a "render" method on the wrapper, so it cannot protect root resources.
 

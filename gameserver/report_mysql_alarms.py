@@ -123,4 +123,4 @@ if __name__ == '__main__':
         print '--- SUBJECT ---\n', subject, '\n--- BODY ---\n', body
 
     elif body:
-        SpinReminders.send_reminders('SpinPunch', recipients, subject, body, dry_run = dry_run)
+        SpinReminders.send_reminders('report_mysql_alarms.py', recipients, subject, body, dry_run = dry_run)

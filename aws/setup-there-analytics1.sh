@@ -62,8 +62,8 @@ echo "MISSING: /etc/cron.spinpunch.mysql-daily/99-report-slow-queries.sh email"
 echo "MISSING: compile/install ujson library (python setup.py build; sudo python setup.py install)"
 echo "MISSING: SVN: /home/ec2-user/.ssh/spsvnaccess.pem (also .ssh/config with Host/User/IdentityFile)"
 echo "MISSING: GIT: /home/ec2-user/.ssh/analytics1.pem (also .ssh/config with Host/User/IdentityFile)"
-echo "MISSING: GIT: git config --global user.name " # 'SpinPunch Deploy'
-echo "MISSING: GIT: git config --global user.email " # 'awstech@spinpunch.com'
+echo "MISSING: GIT: git config --global user.name " # 'Example Deploy'
+echo "MISSING: GIT: git config --global user.email " # 'awstech@example.com'
 echo "MISSING: /home/ec2-user/.ssh/slack.token (with incoming webhook for analytics channel) for automated messages"
 echo "MISSING: /home/ec2-user/.ssh/host-awssecret"
 echo "MISSING: set up scratch space in /media/aux/tmp for backup script"

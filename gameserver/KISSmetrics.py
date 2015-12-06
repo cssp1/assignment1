@@ -14,7 +14,7 @@ import urllib
 import socket
 from datetime import datetime
 
-# DJM - Async HTTP request for SpinPunch server efficiency
+# DJM - Async HTTP request for game server efficiency
 # pass an AsyncHTTPRequester as the 'async' parameter to KM.__init__
 
 class KM(object):
