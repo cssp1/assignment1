@@ -1809,7 +1809,7 @@ class GameProxy(proxy.ReverseProxyResource):
             '$XSOLLA_SDK$': get_static_include('XsollaSDK.js') if (SpinConfig.config.get('enable_xsolla',0)) else '',
             '$LOADING_SCREEN_NAME$': screen_name,
             '$LOADING_SCREEN_DATA$': SpinJSON.dumps(screen_data),
-            '$INDEX_BODY$': get_static_include('index_body_%s.html' % visitor.frame_platform),
+            '$INDEX_BODY$': get_static_include('index_body_%s.html' % visitor.frame_platform).replace('$GAME_COPYRIGHT_INFO$', SpinConfig.config.get('game_copyright_info', '$YEAR$ Example copyright info').replace('$YEAR$', repr(time.gmtime(proxy_time).tm_year))),
             })
 
         expr = re.compile('|'.join([key.replace('$','\$') for key in replacements.iterkeys()]))
