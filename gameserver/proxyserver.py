@@ -441,7 +441,7 @@ class KGVisitor(Visitor):
         if 'kongregate_game_url' in request.args:
             self.game_container = request.args['kongregate_game_url'][0] + q_clean_qs(request.uri)
         else:
-            self.game_container = SpinConfig.config['proxyserver']['fallback_landing'] # punt :(
+            self.game_container = SpinConfig.config['proxyserver'].get('fallback_landing', '//www.kongregate.com/') # punt :(
 
     def canvas_url(self):
         return self.server_protocol + self.server_host + ':' + self.server_port + '/KGROOT' + q_clean_qs(self.first_hit_uri,
@@ -479,7 +479,7 @@ class AGVisitor(Visitor):
         return ('go_away_whitelist' in SpinConfig.config) and (self.armorgames_id not in SpinConfig.config['go_away_whitelist'])
 
     def set_game_container(self, request):
-        self.game_container = SpinConfig.config['proxyserver']['fallback_landing'] # punt :(
+        self.game_container = SpinConfig.config['proxyserver'].get('fallback_landing', '//www.armorgames.com/') # punt :(
 
     def canvas_url(self):
         return self.server_protocol + self.server_host + ':' + self.server_port + '/AGROOT' + q_clean_qs(self.first_hit_uri, {})
