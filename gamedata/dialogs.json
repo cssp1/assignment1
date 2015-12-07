@@ -4887,7 +4887,7 @@
             "glowfx": { "show": 0, "sound": "success_playful_22", "kind":"StaticImage","xy":[-20,-20],"dimensions":[256,322],"bg_image_resizable":1,"asset":"dialog_glow_resizable", "composite_mode": "lighter",
                         "fade":1, "duration": 1.4, "fade_peak": 0.2, "delay": -0.2},
 
-            "bg": {"kind": "ActionButton", "xy":[0,0], "dimensions":[216,282], "bg_image": "dialog_blackplate", "bg_image_resizable": 1,
+            "bg": {"kind": "ActionButton", "xy":[0,0], "dimensions":[216,282], "bg_image": "dialog_blackplate", "bg_image_resizable": 1, "alpha": 1,
                    "mouseover_sound": 1 },
 
             "bg_shine": {"kind": "SolidRect",
@@ -4901,7 +4901,7 @@
                          "xy": [15,13], "dimensions": [186,52],
                          "xy_category": [15,13], "dimensions_category": [186,43],
                          "bevel": 3, "color":[0,0,0,1],
-                         "outline_color": [0.05,0.05,0.05,1], "outline_width": 1
+                         "outline_color": [0.05,0.05,0.05,1], "outline_width": 1, "alpha": 1
                        },
             "name_bg_shine": {"kind": "SolidRect", "show": 0,
                               "xy":[20,15], "dimensions":[176,55],
@@ -4956,7 +4956,7 @@
                           "xy": [15,224], "dimensions": [186,43],
                           "xy_category": [15,204], "dimensions_category": [186,63],
                           "bevel": 3, "color":[0,0,0,1],
-                          "outline_color": [0.05,0.05,0.05,1], "outline_width": 1
+                          "outline_color": [0.05,0.05,0.05,1], "outline_width": 1, "alpha": 1
                         },
             "price_bg_shine": {"kind": "SolidRect",
                                "xy":[20,226], "dimensions":[176,38],

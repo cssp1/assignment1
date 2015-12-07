@@ -36994,6 +36994,8 @@ function invoke_items_discovered(items, duration, where) {
     @param {SPUI.Dialog|null=} lottery_dialog
     @return {!SPUI.Dialog} */
 function do_invoke_items_discovered(items, duration, where, lottery_dialog) {
+    items = collapse_item_list(items);
+
     var dialog_data = gamedata['dialogs']['item_discovered'];
     var dialog = new SPUI.Dialog(dialog_data);
     dialog.user_data['dialog'] = 'item_discovered';
@@ -37116,15 +37118,22 @@ function animate_item_discovered(dialog) {
 
         var start_xy = [Math.floor((dialog.wh[0] - total_width)/2), dialog.data['widgets']['sku']['xy'][1]];
         // collapse together if need to scrunch horizontally
+        var opacity = 1;
         if(dialog.get_absolute_xy()[0] + start_xy[0] < 0) {
             var pad = dialog.data['widgets']['sku']['xy_collapsed'][0];
             start_xy[0] = -dialog.get_absolute_xy()[0] + pad;
             offset = [Math.floor((canvas_width-2*pad-sku.wh[0]) / (items.length-1)), dialog.data['widgets']['sku']['array_offset_collapsed'][1]];
             start_xy[1] -= Math.floor(((items.length-1) * dialog.data['widgets']['sku']['array_offset_collapsed'][1])/2);
+            // fade to transparent with more overlap
+            opacity = Math.min(Math.max(offset[0] / dialog.data['widgets']['sku']['array_offset'][0], 0.5), 1);
         }
 
         sku.xy = vec_add(start_xy, vec_scale(i, offset));
         sku_glow.xy = vec_add(sku.xy, vec_sub(dialog.data['widgets']['sku_glow']['xy'], dialog.data['widgets']['sku']['xy']));
+        goog.array.forEach(['bg', 'bg_shine', 'name_bg', 'price_bg'], function(wname) {
+            sku.widgets[wname].alpha = opacity * sku.widgets[wname].data['alpha'];
+        });
+        sku_glow.alpha = opacity * sku_glow.data['alpha'];
     });
 
     if(dialog.user_data['lottery_dialog']) {
@@ -37736,6 +37745,7 @@ function update_new_store_category(dialog) {
 function update_new_store_sku(d) {
     var pending = (d.user_data['pending'] > client_time);
     var skudata = d.user_data['skudata'];
+    var alpha = ('alpha' in d.user_data ? d.user_data['alpha'] : 1);
     var price = -1, shown_price = -1, sale_currency = Store.get_user_currency(), buyable = true; // buyable means "show hider if 'requires' predicate is false"
     var set_completed = false;
     var info_str = null, info_col = 'ok', info_small = false, info_high = false;
@@ -38023,7 +38033,8 @@ function update_new_store_sku(d) {
     d.widgets['icon_glow'].wh = vec_copy(d.data['widgets']['icon_glow']['dimensions'+ (d.widgets['bg'].pushed ? '_pushed' : '')]);
     d.widgets['icon_glow'].alpha = (hi ? (d.widgets['bg'].pushed ? 0.66 : 0.2) : 0);
     d.widgets['icon_glow'].asset = d.data['widgets']['icon_glow']['asset'+(d.widgets['bg'].pushed ? '_pushed': '')];
-    d.widgets['bg_shine'].alpha = (hi ? (d.widgets['bg'].pushed ? 1 : 0.66 ) : 0.5) * (set_completed ? 0.5 : 1);
+    d.widgets['bg'].alpha = alpha * d.data['widgets']['bg']['alpha'];
+    d.widgets['bg_shine'].alpha = alpha * (hi ? (d.widgets['bg'].pushed ? 1 : 0.66 ) : 0.5) * (set_completed ? 0.5 : 1);
     d.widgets['price_bg_shine'].alpha = 0.8*  (hi ? (d.widgets['bg'].pushed ? 1 : 0.66 ) : 0.5);
 
     // PRICE
