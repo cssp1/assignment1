@@ -42,7 +42,7 @@ if __name__ == '__main__':
             for percent in (10, 50, 100):
                 out['items'].append({
                     'name': 'boost_%s_%dpct' % (resource, percent),
-                    'ui_name': '%d%% %s Boost' % (percent, ui_Resource),
+                    'ui_name': '%d%% %s Fill' % (percent, ui_Resource),
                     'ui_description': 'Activate to fill your %s storage to 100%%' % ui_resource if percent == 100 else \
                     'Activate to add %d%% of your total %s storage capacity' % (percent, ui_resource),
                     'icon': 'inventory_boost_%s_%dpct' % (resource, percent),
