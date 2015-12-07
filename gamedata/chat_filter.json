@@ -9,10 +9,14 @@
     // regexp matching options (case-insensitive, greedy)
     "options": "ig",
 
+    // optional: setting these enables space-insensitive word matching
+    "space_marker": ".", // will be used to replace whitespace
+    "space_marker_pattern": "\\.", // regex for whitespace_marker
+
     // other characters that are considered the same as a letter,
     // e.g. "o":"0" means that "c0ck" will match with "cock"
     "leet_speak": {
-        "word_space": "\\._!\\'\\|-", // can be inserted between any letters, e.g. "_sh.it_"
+        "letter_space": "\\._!,\\'\\|-", // can be inserted between any letters, e.g. "_sh.it_"
         "a": "4@ă",
         "i": "1y\\|!",
         "l": "1\\|!",
