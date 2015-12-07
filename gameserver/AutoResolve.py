@@ -21,8 +21,21 @@ def compute_dps(shooter, target, session):
 
     # XXX crude approximation of the client-side calculation
     damage = shooter.get_leveled_quantity(spell.get('damage', 0))
-    #cooldown = shooter.get_leveled_quantity(spell.get('cooldown', 1))
+    cooldown = shooter.get_leveled_quantity(spell.get('cooldown', 1))
     #range = shooter.get_leveled_quantity(spell.get('range', 0)) # include somehow?
+
+    # incorporate DoT damage
+    if 'impact_auras' in spell:
+        for aura in spell['impact_auras']:
+            aura_spec = session.player.get_abtest_aura(aura['spec'])
+            aura_strength = shooter.get_leveled_quantity(aura.get('strength',1))
+            aura_duration = shooter.get_leveled_quantity(aura.get('duration',1))
+            uptime = 1
+            if aura_duration < cooldown:
+                uptime = aura_duration / cooldown
+            for effect in aura_spec.get('effects',[]):
+                if effect['code'] == 'on_fire':
+                    damage += uptime * aura_strength
 
     damage_coeff_pre_armor = 1.0
     damage_coeff_post_armor = 1.0
