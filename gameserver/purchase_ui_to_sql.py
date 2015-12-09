@@ -34,6 +34,8 @@ purchase_ui_schema = {
                ('flash_sale_kind', 'VARCHAR(64)'),
                ('flash_sale_duration', 'INT4'),
                ('flash_sale_tag', 'VARCHAR(64)'),
+               ('max_inventory', 'INT4'),
+               ('cur_inventory', 'INT4'),
                ],
     'indices': {'by_time': {'keys': [('time','ASC')]},
                 'by_user_id_time': {'keys': [('user_id','ASC'),('time','ASC')]},
@@ -107,7 +109,7 @@ if __name__ == '__main__':
                 keyvals.append(('gui_version', gui_version))
 
             for FIELD in ('client_time', 'sku', 'method', 'gamebucks', 'currency_price', 'currency',
-                          'flash_sale_kind', 'flash_sale_duration', 'flash_sale_tag'):
+                          'flash_sale_kind', 'flash_sale_duration', 'flash_sale_tag', 'max_inventory', 'cur_inventory'):
                 if FIELD in row:
                     keyvals.append((FIELD, row[FIELD]))
 

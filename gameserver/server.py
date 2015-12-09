@@ -22574,8 +22574,10 @@ class GAMEAPI(resource.Resource):
 
         on_login_cons = player.get_abtest_consequent('on_login_pre_hello', fail_missing = False)
         if on_login_cons:
+            snap = session.player.resources.calc_snapshot()
             session.execute_consequent_safe(on_login_cons, session.player, retmsg,
-                                            context = {'largest_purchase': session.player.history.get('largest_purchase', 0),
+                                            context = {'max_inventory': snap.max_inventory(), 'cur_inventory': snap.cur_inventory(),
+                                                       'largest_purchase': session.player.history.get('largest_purchase', 0),
                                                        'largest_purchase_gamebucks': session.player.history.get('largest_purchase_gamebucks', 0)},
                                             reason='on_login_pre_hello')
 
