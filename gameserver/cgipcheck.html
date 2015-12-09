@@ -352,8 +352,9 @@ var method_chat_abuse_clear = function() {
 var method_chat_abuse_violate = function() {
     var ident = get_ident();
     var ui_reason = check_ui_reason($("#chat_abuse_reason")[0].value);
-    if(ident && ui_reason) {
-        send_request('player', 'chat_abuse_violate', $.extend(ident, {'ui_reason':ui_reason}), function(result) { alert("Success!\n"+result.toString()); });
+    var ui_player_reason = check_ui_reason($("#chat_abuse_player_reason")[0].value);
+    if(ident && ui_reason && ui_player_reason) {
+        send_request('player', 'chat_abuse_violate', $.extend(ident, {'ui_reason':ui_reason, 'ui_player_reason':ui_player_reason}), function(result) { alert("Success!\n"+result.toString()); });
     }
 };
 var method_ban = function() {
@@ -1633,7 +1634,11 @@ $(function() {
       <button onclick="method_chat_abuse_violate()" class="spin_button" style="width:250px;">Add Offense</button>
       <button onclick="method_chat_abuse_clear()" class="spin_button" style="width:300px;">Unmute and Remove 1 Offense</button>
       <p>
-      Reason for this action: <font color="#ff0000">* Will be shown to the player!</font>
+      Tell the player what they are being muted for:
+      <br>
+      <input type="text" id="chat_abuse_player_reason" style="width:500px;">
+      <p>
+      Reason for this action:
       <br>
       <input type="text" id="chat_abuse_reason" style="width:500px;">
     </div>

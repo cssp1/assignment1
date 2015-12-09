@@ -287,7 +287,7 @@ def do_action(path, method, args, spin_token_data, nosql_client):
                 result = {'result':do_lookup(control_args)}
             # chat abuse handling doesn't map 1-to-1 with CONTROLAPI calls, so handle them specially
             elif method == 'chat_abuse_violate':
-                result = {'result':chat_abuse_violate(control_args, control_args['ui_reason'], None, None)}
+                result = {'result':chat_abuse_violate(control_args, control_args['ui_player_reason'], None, None)}
             elif method == 'chat_abuse_clear':
                 result = {'result':chat_abuse_clear(control_args)}
             elif method in ('give_item','send_message','chat_gag','chat_ungag','chat_block','chat_unblock','apply_aura','remove_aura','get_raw_player','ban','unban',
