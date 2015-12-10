@@ -8035,15 +8035,15 @@ class Player(AbstractPlayer):
                                         count += prod.get('stack', 1)
         return count
 
-    def has_item(self, name, min_count = 1, level = None, check_mail = False, check_crafting = False):
+    def has_item(self, name, min_count = 1, level = None, min_level = None, check_mail = False, check_crafting = False):
         count = 0
         for item in self.stored_item_iter(): # inventory and loot buffer
-            if item['spec'] == name and (level is None or item.get('level',1) == level):
+            if item['spec'] == name and (level is None or item.get('level',1) == level) and (min_level is None or item.get('level',1) >= min_level):
                 count += item.get('stack',1)
                 if count >= min_count:
                     return True
         for item in self.equipped_item_iter():
-            if item['spec'] == name and (level is None or item.get('level',1) == level):
+            if item['spec'] == name and (level is None or item.get('level',1) == level) and (min_level is None or item.get('level',1) >= min_level):
                 count += 1
                 if count >= min_count:
                     return True

@@ -761,10 +761,11 @@ class HasItemPredicate(Predicate):
         self.item_name = data['item_name']
         self.min_count = data.get('min_count', 1)
         self.level = data.get('level', None)
+        self.min_level = data.get('min_level', None)
         self.check_mail = data.get('check_mail', False) # also check mailbox attachments
         self.check_crafting = data.get('check_crafting', False)
     def is_satisfied(self, player, qdata):
-        return player.has_item(self.item_name, level = self.level, min_count = self.min_count, check_mail = self.check_mail, check_crafting = self.check_crafting)
+        return player.has_item(self.item_name, level = self.level, min_level = self.min_level, min_count = self.min_count, check_mail = self.check_mail, check_crafting = self.check_crafting)
 
 class HasItemSetPredicate(Predicate):
     def __init__(self, data):

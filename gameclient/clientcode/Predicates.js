@@ -1663,12 +1663,13 @@ function HasItemPredicate(data) {
     this.item_name = data['item_name'];
     this.min_count = data['min_count'] || 1;
     this.level = data['level'] || null;
+    this.min_level = data['min_level'] || null;
     this.check_mail = data['check_mail'] || false;
     this.check_crafting = data['check_crafting'] || false;
 }
 goog.inherits(HasItemPredicate, Predicate);
 HasItemPredicate.prototype.is_satisfied = function(player, qdata) {
-    return player.has_item(this.item_name, this.min_count, this.check_mail, this.check_crafting, this.level);
+    return player.has_item(this.item_name, this.min_count, this.check_mail, this.check_crafting, this.level, this.min_level);
 };
 HasItemPredicate.prototype.ui_progress = function(player, qdata) {
     var ret = gamedata['strings']['predicates'][this.kind]['ui_progress'];

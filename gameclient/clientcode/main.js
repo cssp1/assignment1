@@ -7301,12 +7301,13 @@ player.count_limited_equipped = function(product_spec, delivery_address) {
  * @param {boolean=} check_mail
  * @param {boolean=} check_crafting
  * @param {?number=} level
+ * @param {?number=} min_level
  */
-player.has_item = function(name, min_count, check_mail, check_crafting, level) {
+player.has_item = function(name, min_count, check_mail, check_crafting, level, min_level) {
     if(!min_count) { min_count = 1; }
     var count = 0;
     var func = function(x) {
-        if(x['spec'] == name && (!level || ((x['level']||1) == level))) {
+        if(x['spec'] == name && (!level || ((x['level']||1) == level)) && (!min_level || ((x['level']||1) >= min_level))) {
             count += ('stack' in x ? x['stack'] : 1);
             if(count >= min_count) {
                 return true;
