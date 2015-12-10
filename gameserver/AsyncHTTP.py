@@ -211,7 +211,8 @@ class AsyncHTTPRequester(object):
                     body = None # things like TimeoutError have no .response attribute
 
                 if request.callback_type == self.CALLBACK_FULL:
-                    request.error_callback(ui_reason = ui_reason, body = body, headers = getter.response_headers, status = getter.status)
+                    request.error_callback(ui_reason = ui_reason, body = body, headers = getter.response_headers,
+                                           status = getattr(getter, 'status', '999')) # status may not be present on a failed request
                 else:
                     request.error_callback(ui_reason)
             except:
