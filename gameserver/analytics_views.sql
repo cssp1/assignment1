@@ -233,7 +233,7 @@ RETURN IF(stack<=0, 0, FLOOR(stack *
           IF(specname LIKE 'boost_iron_%', iron_price(CAST(SUBSTRING_INDEX(SUBSTRING_INDEX(specname,'_',3),'_',-1) AS UNSIGNED)), -- iron/water resource boosts
           IF(specname LIKE 'boost_water_%', water_price(CAST(SUBSTRING_INDEX(SUBSTRING_INDEX(specname,'_',3),'_',-1) AS UNSIGNED)), -- iron/water resource boosts
            IF(specname LIKE 'mine_%', 5, -- landmines
-            IF(specname = 'token', 0.02, -- ONP/Solaron
+            IF(specname = 'token', 0.01, -- ONP/Solaron (changed from 0.02 to 0.01 on 2015 Dec 11)
              IF(specname = 'gamebucks' OR specname = 'alloy', 1, -- gamebucks
         50)))))))))); -- anything else
 
