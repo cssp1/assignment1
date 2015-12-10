@@ -36871,6 +36871,7 @@ function update_buy_gamebucks_sku2_attachments(dialog, spell, spellarg) {
         if(index < item_list.length) {
             var item = item_list[index];
             var item_spec = ItemDisplay.get_inventory_item_spec(item['spec']);
+            var item_level = ('level' in item ? item['level'] : 1);
             var attach = dialog.widgets['attachments'+row.toString()];
             attach.show = true;
             dialog.widgets['dividers'+row.toString()].show = (row != visible_rows - 1); // hide under last row
@@ -36881,13 +36882,14 @@ function update_buy_gamebucks_sku2_attachments(dialog, spell, spellarg) {
                 ui_quantity = pretty_print_number(stack);
             } else {
                 if(stack == 1) {
-                    ui_quantity = '1x';
+                    ui_quantity = ''; // '1x';
                 } else {
                     ui_quantity = goog.string.trim(ItemDisplay.get_inventory_item_stack_prefix(item_spec, stack));
                 }
             }
             attach.widgets['quantity'].str = ui_quantity;
-            attach.widgets['name'].str = ('ui_name' in item ? item['ui_name'] : ItemDisplay.get_inventory_item_ui_name(item_spec));
+            attach.widgets['name'].str = ('ui_name' in item ? item['ui_name'] : ItemDisplay.get_inventory_item_ui_name(item_spec, (item_level > 1 ? item_level : null)));
+            attach.widgets['name'].clip_to = attach.widgets['name'].data[(ui_quantity ? 'clip_to' : 'clip_to_no_qty')];
 
             // pass through clicks to purchase the SKU
             attach.widgets['tooltip_maker'].onclick = function(w) {

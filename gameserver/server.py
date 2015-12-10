@@ -8051,7 +8051,7 @@ class Player(AbstractPlayer):
             for mail in self.mailbox:
                 if ('attachments' in mail):
                     for at in mail['attachments']:
-                        if at['spec'] == name and (level is None or at.get('level',1) == level):
+                        if at['spec'] == name and (level is None or at.get('level',1) == level) and (min_level is None or at.get('level',1) >= min_level):
                             count += at.get('stack',1)
                             if count >= min_count:
                                 return True
@@ -8063,7 +8063,7 @@ class Player(AbstractPlayer):
                         recipe = gamedata['crafting']['recipes'].get(recipe_name, None)
                         if recipe:
                             for prod in GameObjectSpec.get_crafting_recipe_product_list(recipe, bus.craft_state.get('level', 1)):
-                                if ('spec' in prod) and prod['spec'] == name and (level is None or prod.get('level',1) == level): # only works with deterministic products!
+                                if ('spec' in prod) and prod['spec'] == name and (level is None or prod.get('level',1) == level) and (min_level is None or prod.get('level',1) >= min_level): # only works with deterministic products!
                                     count += prod.get('stack',1)
                                     if count >= min_count:
                                         return True
@@ -8072,7 +8072,7 @@ class Player(AbstractPlayer):
                             if ingr_list and gamedata['crafting']['categories'][recipe['crafting_category']].get('refund_ingredients', False):
                                 # only check ingredients if they are refundable and thus available to the player if cancelled
                                 for item in ingr_list:
-                                    if item['spec'] == name and (level is None or item.get('level',1) == level):
+                                    if item['spec'] == name and (level is None or item.get('level',1) == level) and (min_level is None or item.get('level',1) >= min_level):
                                         count += item.get('stack',1)
                                         if count >= min_count:
                                             return True
