@@ -18054,12 +18054,18 @@ class GAMEAPI(resource.Resource):
             item = {'spec':skudata['item'], 'stack': stack}
             if 'level' in skudata: item['level'] = skudata['level']
 
+            expire_time = -1
             melt_time = int(skudata.get('melt_time',-1))
             melt_dur = int(skudata.get('melt_duration',-1))
             if melt_dur > 0:
-                item['expire_time'] = server_time + melt_dur
-            if melt_time > 0:
-                item['expire_time'] = melt_time
+                expire_time = server_time + melt_dur
+            elif melt_time > 0:
+                expire_time = melt_time
+
+            expire_time = session.get_item_spec_forced_expiration(gamedata['items'][item['spec']], prev_expire_time = expire_time)
+            if expire_time > 0:
+                assert expire_time >= server_time # don't sell an expired item
+                item['expire_time'] = expire_time
 
             items = [item,]
 
