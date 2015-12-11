@@ -2797,7 +2797,7 @@ def do_main():
 
     myport_http = SpinConfig.config['proxyserver']['external_http_port']
     myport_ssl  = SpinConfig.config['proxyserver'].get('external_ssl_port',-1)
-    backlog = SpinConfig.config['proxyserver'].get('tcp_accept_backlog', 512)
+    backlog = SpinConfig.config['proxyserver'].get('tcp_accept_backlog', 511)
     proxysite = ProxySite()
     reactor.listenTCP(myport_http, proxysite, backlog=backlog)
     if myport_ssl > 0:

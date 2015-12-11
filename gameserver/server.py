@@ -26593,7 +26593,7 @@ class GameSite(server.Site):
             self.game_ssl_port = json.get('game_ssl_port',-1)
             self.game_ws_port = json.get('game_ws_port',-1)
             self.game_wss_port = json.get('game_wss_port',-1)
-            self.tcp_accept_backlog = json.get('tcp_accept_backlog', 512)
+            self.tcp_accept_backlog = json.get('tcp_accept_backlog', 511)
             self.affinities = json.get('affinities',['default'])
             self.start_state = json.get('start_state', 'ok')
 
