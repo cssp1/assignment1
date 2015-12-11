@@ -194,12 +194,8 @@ def is_valid_alias(name):
     if len(name) < 4 or len(name) > 15: return False
     for c in name:
         if c in alias_disallowed_chars: return False
-        # disallow some Unicode special characters
-        # see https://en.wikipedia.org/wiki/Unicode_block
-        codepoint = ord(c)
-        if codepoint >= 0x2100 and codepoint <= 0x2bff:
-            return False
     if chat_filter.is_bad(name): return False
+    if chat_filter.is_ugly(name): return False
     if 'spinpunch' in name.lower(): return False
     return True
 
@@ -24733,6 +24729,13 @@ class GAMEAPI(resource.Resource):
                 text = text[:limit]
 
             if not text: return # don't send empty message
+
+            if chat_filter.is_ugly(text):
+                if gamedata['server'].get('log_ugly_chat', True):
+                    gamesite.exception_log.event(server_time, 'Player %d stopped from sending ugly chat message: %r' % (session.player.user_id, text))
+                retmsg.append(["CHAT_RECV", channel, {'chat_name': 'System', 'time': server_time, 'facebook_id': -1, 'user_id': -1},
+                               SpinHTTP.wrap_string(gamedata['errors']['CHAT_UGLY']['ui_name']), None])
+                return
 
             success = True
 

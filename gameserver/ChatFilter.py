@@ -9,6 +9,7 @@
 
 import re
 import collections
+import unicodedata
 
 class ChatFilter(object):
     def __init__(self, config):
@@ -148,6 +149,40 @@ class ChatFilter(object):
 
         return False
 
+    # block abuse of Unicode special characters to create "ugly" text
+    def is_ugly(self, input):
+        nonspacing_run = 0 # don't allow very long runs of nonspacing characters
+
+        for i in xrange(len(input)):
+            codepoint = ord(input[i])
+            next_codepoint = ord(input[i+1]) if i < len(input)-1 else None
+
+            # disallow some Unicode special characters
+            # see https://en.wikipedia.org/wiki/Unicode_block
+            if codepoint >= 0x2100 and codepoint <= 0x2bff:
+                return True
+
+            # disallow nonsense duplications of nonspacing marks (e.g. Arabic diacritics)
+            if self.is_diacritic(codepoint):
+                if next_codepoint and codepoint == next_codepoint:
+                    return True
+                nonspacing_run += 1
+                if nonspacing_run >= 5:
+                    return True
+            else:
+                nonspacing_run = 0
+
+        return False
+
+    def is_diacritic(self, codepoint):
+        # see http://www.unicode.org/reports/tr44/tr44-4.html#General_Category_Values
+        if codepoint < 0x80: return # ASCII stuff is OK
+        return unicodedata.category(unichr(codepoint)) in ('Mn','Po')
+
+        # see https://en.wikipedia.org/wiki/Arabic_(Unicode_block)
+        #return (codepoint >= 0x610 and codepoint <= 0x61f) or \
+        #       (codepoint >= 0x650 and codepoint <= 0x65f)
+
 if __name__ == '__main__':
     import SpinConfig
     config = SpinConfig.load(SpinConfig.gamedata_component_filename('chat_filter.json'))
@@ -186,4 +221,12 @@ if __name__ == '__main__':
     assert not cf.is_spammy('<======== IWC')
     assert cf.is_spammy('656456456564')
     assert not cf.is_spammy('65645645')
+
+    assert not cf.is_ugly(u'aaabcd')
+    assert cf.is_ugly(u'aa\u21f0aa')
+    assert cf.is_ugly(u'abc\u0627\u0651\u0651\u0651\u0651\u0651\u0651')
+    assert cf.is_ugly(u'abc\u0627\u0651\u0652\u0651\u0652\u0651\u0652\u0651')
+    assert not cf.is_ugly(u'abc\u0627\u0651\u0652\u0653\u0654abcd')
+    assert not cf.is_ugly(u'abc\u0627\u0651\u0627\u0651')
+    assert not cf.is_ugly(u'asdf    fd     dfsdf  _____|||  b asdfasdf!!')
     print 'OK'
