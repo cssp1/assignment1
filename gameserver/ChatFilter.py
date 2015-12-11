@@ -159,7 +159,8 @@ class ChatFilter(object):
 
             # disallow some Unicode special characters
             # see https://en.wikipedia.org/wiki/Unicode_block
-            if codepoint >= 0x2100 and codepoint <= 0x2bff:
+            if codepoint >= 0x2100 and codepoint <= 0x2bff and \
+               codepoint not in (0x263a,0x263b,0x2665): # allow a select few smiley faces that players like
                 return True
 
             # disallow nonsense duplications of nonspacing marks (e.g. Arabic diacritics)
