@@ -92,13 +92,22 @@ def get_twisted_client_ip(request, proxy_secret = None):
 
     forw = get_twisted_header(request, 'X-Forwarded-For')
     if forw:
-        assert validate_x_forwarded(request)
-        # return leftmost non-private address
-        for ip in forw.split(','):
-            ip = ip.strip()
-            if private_ip_re.match(ip): continue # skip private IPs
-            return ip
-        raise Exception('X-Forwarded-For a private address: %r' % forw)
+        if validate_x_forwarded(request):
+            # return leftmost non-private address
+            for ip in forw.split(','):
+                ip = ip.strip()
+                if private_ip_re.match(ip): continue # skip private IPs
+                return ip
+
+            # ... or fall back to native request IP
+
+        else:
+            # can't trust X-Forwarded-For because it came out of a public IP
+            # fall back to the native request IP
+            if private_ip_re.match(request.getClientIP()):
+                raise Exception('X-Forwarded-For a private address: %r' % forw)
+            else:
+                return request.getClientIP()
 
     return request.getClientIP()
 
