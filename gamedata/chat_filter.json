@@ -18,7 +18,7 @@
     "leet_speak": {
         "letter_space": "\\._!,\\'\\|-", // can be inserted between any letters, e.g. "_sh.it_"
         "a": "4@ă",
-        "i": "1y\\|!",
+        "i": "12y\\|!",
         "l": "1\\|!",
         "o": "0",
         "s": "\\$z",
