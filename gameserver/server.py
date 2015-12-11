@@ -843,7 +843,7 @@ class S3IOSystem (IOSystem):
 
         config = gamedata['server'].get('AsyncHTTP_S3', {})
         request_timeout = config.get('request_timeout', 30)
-        max_tries = config.get('max_tries', 20)
+        max_tries = config.get('max_tries', 3) # was: 20 (high is better against S3 errors but worse against server flood attacks)
         retry_delay = config.get('retry_delay', 4)
 
         # Wait this many seconds after the actual HTTP response before returning success from an async write.
