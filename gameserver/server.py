@@ -13561,7 +13561,7 @@ class CONTROLAPI(resource.Resource):
     def handle_maint_kick(self, request):
         return SpinJSON.dumps({'result': gamesite.start_maint_kick()}, newline=True)
     def handle_panic_kick(self, request):
-        gamesite.panic_kick()
+        gamesite.panic_kick(request.transport)
         return SpinJSON.dumps({'result': 'ok'})
     def handle_change_state(self, request, state = None):
         return SpinJSON.dumps({'result':gamesite.change_state(state)}, newline=True)
@@ -26965,14 +26965,15 @@ class GameSite(server.Site):
         return status_json
 
     # immediately kick all sessions, even if they are stuck on I/O
-    def panic_kick(self):
+    def panic_kick(self, ignore_transport):
         for session in list(iter_sessions()):
             try:
                 self.gameapi.log_out_async(session, 'panic', force = True)
             except:
                 pass
         for client in list(self.active_clients):
-            client.transport.abortConnection() # if loseConnection() isn't enough
+            if client.transport is not ignore_transport:
+                client.transport.abortConnection() # if loseConnection() isn't enough
 
     # print Python stack frame to trace log upon receiving SIGUSR1
     def handle_SIGUSR1(self, signum, frm):
