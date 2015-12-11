@@ -176,7 +176,8 @@ class ChatFilter(object):
 
     def is_diacritic(self, codepoint):
         # see http://www.unicode.org/reports/tr44/tr44-4.html#General_Category_Values
-        if codepoint < 0x80: return # ASCII stuff is OK
+        if codepoint < 0x80: return False # ASCII stuff is OK
+        if codepoint == 0x61f: return False # Arabic question mark is OK
         return unicodedata.category(unichr(codepoint)) in ('Mn','Po')
 
         # see https://en.wikipedia.org/wiki/Arabic_(Unicode_block)
