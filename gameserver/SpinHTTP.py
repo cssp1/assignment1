@@ -63,6 +63,8 @@ def set_access_control_headers_for_cdn(request, max_age):
 
 import SpinSignature
 
+private_ip_re = re.compile('(^127.0.0.1)|(^10.)|(^172.1[6-9].)|(^172.2[0-9].)|(^172.3[0-1].)|(^192.168.)')
+
 def validate_proxy_headers(request, proxy_secret):
     # validate the signature applied by proxyserver's add_proxy_headers()
     their_signature = get_twisted_header(request, 'spin-orig-signature')
@@ -76,7 +78,10 @@ def validate_proxy_headers(request, proxy_secret):
         proxy_secret)
     return their_signature == our_signature
 
-private_ip_re = re.compile('(^127.0.0.1)|(^10.)|(^172.1[6-9].)|(^172.2[0-9].)|(^172.3[0-1].)|(^192.168.)')
+# return True if we think we can trust the X-Forwarded-* headers on a request
+def validate_x_forwarded(request):
+    # ensure the request is coming from the "private" (AWS) network
+    return bool(private_ip_re.match(request.getClientIP()))
 
 def get_twisted_client_ip(request, proxy_secret = None):
     if proxy_secret:
@@ -87,11 +92,13 @@ def get_twisted_client_ip(request, proxy_secret = None):
 
     forw = get_twisted_header(request, 'X-Forwarded-For')
     if forw:
-        if False: # XXXXXX validation step for trusting this
-            for ip in forw.split(','):
-                ip = ip.strip()
-                if private_ip_re.match(ip): continue # skip private IPs
-                return ip
+        assert validate_x_forwarded(request)
+        # return leftmost non-private address
+        for ip in forw.split(','):
+            ip = ip.strip()
+            if private_ip_re.match(ip): continue # skip private IPs
+            return ip
+        raise Exception('X-Forwarded-For a private address: %r' % forw)
 
     return request.getClientIP()
 
@@ -104,8 +111,8 @@ def twisted_request_is_ssl(request, proxy_secret = None):
 
     orig_protocol = get_twisted_header(request, 'X-Forwarded-Proto')
     if orig_protocol:
-        if False: # XXXXXX validation step for trusting this
-            return orig_protocol.startswith('https')
+        assert validate_x_forwarded(request)
+        return orig_protocol.startswith('https')
 
     return request.isSecure()
 

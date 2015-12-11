@@ -171,7 +171,7 @@ def get_static_include(name):
 
 def verbose():
     if verbose_in_argv:
-        return 1
+        return 2
     return SpinConfig.config['proxyserver'].get('verbose',0)
 
 def metric_event_coded(visitor, event_name, props):
@@ -245,8 +245,10 @@ def add_proxy_headers(request):
 
 def dump_request(request):
     print 'REQUEST', request
+    print 'getClientIP()', request.getClientIP()
+    print 'isSecure()', request.isSecure()
     print 'HEADERS', repr(request.requestHeaders)
-    print 'COOKIES', request.received_cookies
+    #print 'COOKIES', request.received_cookies
     print 'ARGS', request.args
     #print 'CONTENT', str(request.content)
 
@@ -1836,8 +1838,6 @@ class GameProxy(proxy.ReverseProxyResource):
     def render_API(self, request):
         update_time()
 
-        add_proxy_headers(request)
-
         if verbose() >= 2:
             print '================',self.path,'=================='
             dump_request(request)
@@ -2206,6 +2206,8 @@ class GameProxy(proxy.ReverseProxyResource):
         raise Exception('unhandled API request '+repr(request))
 
     def render_via_proxy(self, hostport, request):
+        add_proxy_headers(request)
+
         self.host = str(hostport[0]) # Twisted barfs if the hostname is Unicode
         self.port = hostport[1]
         return proxy.ReverseProxyResource.render(self, request)
