@@ -27359,7 +27359,7 @@ class AdminResource(resource.Resource):
 
         # protect with auth
         if (not SpinGoogleAuth.twisted_request_is_local(request, proxy_secret = SpinConfig.config['proxy_api_secret'])):
-            if spin_secure_mode and (not SpinGoogleAuth.twisted_request_is_ssl(request, proxy_secret = SpinConfig.config['proxy_api_secret'])): return 'must use HTTPS'
+            if spin_secure_mode and (not SpinHTTP.twisted_request_is_ssl(request, proxy_secret = SpinConfig.config['proxy_api_secret'])): return 'must use HTTPS'
             auth_info = SpinGoogleAuth.twisted_do_auth(request, 'ADMIN', server_time, proxy_secret = SpinConfig.config['proxy_api_secret'])
             if not auth_info['ok']:
                 if 'redirect' in auth_info:
