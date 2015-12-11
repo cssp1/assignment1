@@ -21744,7 +21744,7 @@ class GAMEAPI(resource.Resource):
             request.setHeader('Connection', 'keep-alive')
             request.setHeader('Keep-Alive', 'timeout=%d' % gamedata['server']['http_connection_timeout'])
 
-        client_ip = SpinHTTP.get_twisted_header(request, 'spin-orig-ip') or request.getClientIP()
+        client_ip = SpinHTTP.get_twisted_client_ip(request)
         user_agent = SpinHTTP.get_twisted_header(request, 'user-agent')
         args_dict = dict((k, request.args[k][0]) for k in request.args)
 

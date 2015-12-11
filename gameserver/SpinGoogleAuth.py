@@ -4,7 +4,7 @@
 # Use of this source code is governed by an MIT-style license that can be
 # found in the LICENSE file.
 
-import SpinJSON
+import SpinJSON, SpinHTTP
 import urllib, urllib2, urlparse, traceback
 
 # Generic Google code
@@ -170,14 +170,6 @@ def cgi_do_auth(args, role, time_now):
 
 # convenience functions for twisted apps (gameserver)
 
-# get a raw HTTP header from Twisted request object
-def get_twisted_header(request, x):
-    temp = request.requestHeaders.getRawHeaders(x)
-    if temp and len(temp) > 0:
-        return str(temp[0])
-    else:
-        return ''
-
 def url_to_domain(url):
     # be really careful here, since it could open exploits with carefully-crafted URLs
     domain = urlparse.urlparse(url).netloc
@@ -193,23 +185,18 @@ def url_to_domain(url):
     return domain
 
 def twisted_request_is_local(request):
-    orig_ip = get_twisted_header(request,'spin-orig-ip') or request.getClientIP()
-    return orig_ip == '127.0.0.1'
-def twisted_request_is_ssl(request):
-    orig_protocol = get_twisted_header(request, 'spin-orig-protocol')
-    if orig_protocol and orig_protocol == 'https://': return True
-    return request.isSecure()
+    return SpinHTTP.get_twisted_client_ip(request) == '127.0.0.1'
 
 def twisted_get_my_endpoint(request):
     # get endpoint URL by looking at a Twisted request
-    if get_twisted_header(request,'spin-orig-protocol'):
+    if SpinHTTP.get_twisted_header(request,'spin-orig-protocol'):
         # it's been proxied
-        return get_twisted_header(request,'spin-orig-protocol')+ \
-               get_twisted_header(request,'spin-orig-host')+':'+ \
-               get_twisted_header(request,'spin-orig-port')+ \
-               get_twisted_header(request,'spin-orig-uri')
+        return SpinHTTP.get_twisted_header(request,'spin-orig-protocol')+ \
+               SpinHTTP.get_twisted_header(request,'spin-orig-host')+':'+ \
+               SpinHTTP.get_twisted_header(request,'spin-orig-port')+ \
+               SpinHTTP.get_twisted_header(request,'spin-orig-uri')
     # not proxied
-    return ('https://' if twisted_request_is_ssl(request) else 'http://')+request.getHeader('host')+request.uri
+    return ('https://' if SpinHTTP.twisted_request_is_ssl(request) else 'http://')+request.getHeader('host')+request.uri
 
 
 def twisted_do_auth(request, role, time_now):

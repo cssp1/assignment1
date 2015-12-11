@@ -230,13 +230,13 @@ def get_http_origin(visitor, is_ssl):
 # the server behind the proxy knows where the request originally came from
 
 def add_proxy_headers(request):
-    orig_protocol, orig_host, orig_port = parse_host_port(SpinHTTP.get_twisted_header(request, 'host') or 'unknown', request.isSecure())
+    orig_protocol, orig_host, orig_port = parse_host_port(SpinHTTP.get_twisted_header(request, 'host') or 'unknown', SpinHTTP.twisted_request_is_ssl(request))
     SpinHTTP.set_twisted_header(request,'spin-orig-protocol',orig_protocol)
     SpinHTTP.set_twisted_header(request,'spin-orig-host',orig_host)
     SpinHTTP.set_twisted_header(request,'spin-orig-port',orig_port)
     SpinHTTP.set_twisted_header(request,'spin-orig-uri',request.uri)
-    SpinHTTP.set_twisted_header(request,'spin-orig-ip',request.getClientIP() or 'unknown')
-    SpinHTTP.set_twisted_header(request,'spin-orig-referer',SpinHTTP.get_twisted_header(request, 'referer') or 'unknown')
+    SpinHTTP.set_twisted_header(request,'spin-orig-ip', SpinHTTP.get_twisted_client_ip(request) or 'unknown')
+    SpinHTTP.set_twisted_header(request,'spin-orig-referer', SpinHTTP.get_twisted_header(request, 'referer') or 'unknown')
 
 def dump_request(request):
     print 'REQUEST', request
@@ -250,7 +250,7 @@ def log_request(request):
           ' args '+repr(request.args)+ \
           ' cookies '+repr(request.received_cookies)+ \
           ' user-agent "'+SpinHTTP.get_twisted_header(request,'user-agent')+ \
-          '" ip ' + repr(request.getClientIP())
+          '" ip ' + repr(SpinHTTP.get_twisted_client_ip(request))
     return ret
 
 def set_cookie(request, cookie_name, value, duration):
@@ -332,12 +332,13 @@ class Visitor(object):
         if 'locale_override' in request.args:
             self.demographics['locale'] = request.args['locale_override'][0]
         self.demographics['User-Agent'] = SpinHTTP.get_twisted_header(request, 'user-agent') or 'unknown'
-        self.demographics['ip'] = request.getClientIP() or 'unknown'
+        self.demographics['ip'] = SpinHTTP.get_twisted_client_ip(request) or 'unknown'
         self.browser_info = BrowserDetect.get_browser(self.demographics['User-Agent'])
 
         # canonical protocol/host/port for game server (in case browser needs to reload it)
         self.server_protocol, self.server_host, self.server_port = \
-                              parse_host_port(SpinHTTP.get_twisted_header(request, 'host') or 'unknown', request.isSecure())
+                              parse_host_port(SpinHTTP.get_twisted_header(request, 'host') or 'unknown',
+                                              SpinHTTP.twisted_request_is_ssl(request))
 
         if self.first_hit_uri is None:
             self.set_first_hit(request)
@@ -656,7 +657,7 @@ class GameProxy(proxy.ReverseProxyResource):
         SpinHTTP.set_access_control_headers(request)
 
         # check for spam from this IP
-        ip = request.getClientIP()
+        ip = SpinHTTP.get_twisted_client_ip(request)
         if ip:
             if ip in ip_table:
                 rec = ip_table[ip]
@@ -680,7 +681,7 @@ class GameProxy(proxy.ReverseProxyResource):
         # check for cookie-reflect landing
         if (reflect_cookie in request.received_cookies) and SpinConfig.config['proxyserver'].get('enable_reflect_cookie_landing',True):
             new_args = urlparse.parse_qs(request.received_cookies[reflect_cookie])
-            metric_event_coded(None, '0011_reflect_cookie_landing', {'Viewed URL': request.uri, 'ip': request.getClientIP(), 'referer': SpinHTTP.get_twisted_header(request, 'referer'), 'args': request.args, 'new_args': new_args})
+            metric_event_coded(None, '0011_reflect_cookie_landing', {'Viewed URL': request.uri, 'ip': SpinHTTP.get_twisted_client_ip(request), 'referer': SpinHTTP.get_twisted_header(request, 'referer'), 'args': request.args, 'new_args': new_args})
             for k, v in new_args.iteritems():
                 if k not in request.args:
                     request.args[k] = v
@@ -689,7 +690,7 @@ class GameProxy(proxy.ReverseProxyResource):
         elif ('spin_rfl' in request.args) and SpinConfig.config['proxyserver'].get('enable_reflect_cookie_launch',True):
             new_qs = urllib.urlencode([(k,v[-1]) for k,v in request.args.iteritems() if (k.startswith('spin_') and k != 'spin_rfl')])
             set_cookie(request, reflect_cookie, new_qs, SpinConfig.config['proxyserver'].get('reflect_cookie_duration',300))
-            metric_event_coded(None, '0010_reflect_cookie_launch', {'Viewed URL': request.uri, 'ip': request.getClientIP(), 'referer': SpinHTTP.get_twisted_header(request, 'referer'), 'args': request.args})
+            metric_event_coded(None, '0010_reflect_cookie_launch', {'Viewed URL': request.uri, 'ip': SpinHTTP.get_twisted_client_ip(request), 'referer': SpinHTTP.get_twisted_header(request, 'referer'), 'args': request.args})
             return self.index_visit_redirect(request.args['spin_rfl'][-1])
 
         return self.index_visit(request, frame_platform)
@@ -699,14 +700,14 @@ class GameProxy(proxy.ReverseProxyResource):
         cookie_name = 'spin_anon_id2_'+str(SpinConfig.config['game_id']) + '_' + frame_platform
 
         if (cookie_name in request.received_cookies) and \
-           SpinSignature.AnonID.verify(request.received_cookies[cookie_name], proxy_time, request.getClientIP(), frame_platform, SpinConfig.config['proxy_api_secret']):
+           SpinSignature.AnonID.verify(request.received_cookies[cookie_name], proxy_time, SpinHTTP.get_twisted_client_ip(request), frame_platform, SpinConfig.config['proxy_api_secret']):
             anon_id = request.received_cookies[cookie_name]
             #exception_log.event(proxy_time, 'proxyserver: recognized cookie '+anon_id)
         else:
             # generate anon ID
             duration = SpinConfig.config['proxyserver'].get('anon_id_duration', 600)
             anon_id = SpinSignature.AnonID.create(proxy_time + duration,
-                                                  request.getClientIP(), frame_platform, SpinConfig.config['proxy_api_secret'], str(random.randint(0,100000)))
+                                                  SpinHTTP.get_twisted_client_ip(request), frame_platform, SpinConfig.config['proxy_api_secret'], str(random.randint(0,100000)))
             set_cookie(request, cookie_name, anon_id, duration)
             #exception_log.event(proxy_time, 'proxyserver: NEW cookie '+anon_id)
 
@@ -782,7 +783,7 @@ class GameProxy(proxy.ReverseProxyResource):
         visitor.kongregate_auth_token = str(request.args['kongregate_game_auth_token'][0])
 
         # geolocate country
-        visitor.demographics['country'] = geoip_client.get_country(request.getClientIP())
+        visitor.demographics['country'] = geoip_client.get_country(SpinHTTP.get_twisted_client_ip(request))
 
         if self.the_pool_is_closed():
             return self.index_visit_go_away(request, visitor)
@@ -869,7 +870,7 @@ class GameProxy(proxy.ReverseProxyResource):
         visitor.armorgames_auth_token = str(request.args['auth_token'][0])
 
         # geolocate country
-        visitor.demographics['country'] = geoip_client.get_country(request.getClientIP())
+        visitor.demographics['country'] = geoip_client.get_country(SpinHTTP.get_twisted_client_ip(request))
 
         if self.the_pool_is_closed():
             return self.index_visit_go_away(request, visitor)
@@ -1590,7 +1591,7 @@ class GameProxy(proxy.ReverseProxyResource):
 
     # return dictionary of strings to replace in the Facebook page template
     def get_fb_global_variables(self, request, visitor):
-        http_origin = get_http_origin(visitor, request.isSecure())
+        http_origin = get_http_origin(visitor, SpinHTTP.twisted_request_is_ssl(request))
         # pull promo codes out of request.uri since we need to tack those on to the query string
         extra_query_params = {}
         request_q = urlparse.parse_qs(urlparse.urlparse(request.uri).query)
@@ -1632,7 +1633,7 @@ class GameProxy(proxy.ReverseProxyResource):
         art_path = SpinConfig.config['proxyserver'].get('art_cdn_path', None)
 
         # the page request won't have an Origin: header, but we can figure it out
-        http_origin = get_http_origin(visitor, request.isSecure())
+        http_origin = get_http_origin(visitor, SpinHTTP.twisted_request_is_ssl(request))
 
         if SpinConfig.config['proxyserver'].get('high_latency_tiers', None):
             if ('country' in visitor.demographics) and \
@@ -2631,12 +2632,12 @@ class FlashXDResource(static.Data):
 class SpinCGIScript(twcgi.CGIScript):
     def render(self, request):
         # when server is in secure_mode, do not respond unless it's HTTPS
-        if SpinConfig.config.get('secure_mode',0) and (not request.isSecure()):
+        if SpinConfig.config.get('secure_mode',0) and (not SpinHTTP.twisted_request_is_ssl(request)):
             return TwistedNoResource().render(request)
         return twcgi.CGIScript.render(self, request)
 
     def runProcess(self, env, request, *args, **kwargs):
-        env['SPIN_IS_SSL'] = '1' if request.isSecure() else '0'
+        env['SPIN_IS_SSL'] = '1' if SpinHTTP.twisted_request_is_ssl(request) else '0'
         return twcgi.CGIScript.runProcess(self, env, request, *args, **kwargs)
 
 # first stop for all requests in the hierarchy

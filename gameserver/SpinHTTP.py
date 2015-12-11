@@ -58,6 +58,23 @@ def set_access_control_headers_for_cdn(request, max_age):
         origin = '*'
     _set_access_control_headers(request, origin, max_age)
 
+# get info about an HTTP(S) request, "seeing through" reverse proxies back to the client
+# NOTE! YOU MUST SANITIZE (DELETE HEADERS FROM) REQUESTS ACCEPTED DIRECTLY FROM CLIENTS TO AVOID SPOOFING!
+
+def get_twisted_client_ip(request):
+    forw = get_twisted_header(request, 'spin-orig-ip')
+    if forw:
+        return forw
+    forw = get_twisted_header(request, 'X-Forwarded-For')
+    if forw:
+        return forw.split(',')[0].strip()
+    return request.getClientIP()
+def twisted_request_is_ssl(request):
+    orig_protocol = get_twisted_header(request, 'spin-orig-protocol')
+    if orig_protocol and orig_protocol == 'https://': return True
+    if get_twisted_header(request, 'X-Forwarded-Proto').startswith('https'): return True
+    return request.isSecure()
+
 # this is the final Deferred callback that finishes asynchronous HTTP request handling
 # note that "body" is inserted by Twisted as the return value of the callback chain BEFORE other args.
 
