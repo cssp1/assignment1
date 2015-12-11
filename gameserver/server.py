@@ -26593,6 +26593,7 @@ class GameSite(server.Site):
             self.game_ssl_port = json.get('game_ssl_port',-1)
             self.game_ws_port = json.get('game_ws_port',-1)
             self.game_wss_port = json.get('game_wss_port',-1)
+            self.tcp_accept_backlog = json.get('tcp_accept_backlog', 512)
             self.affinities = json.get('affinities',['default'])
             self.start_state = json.get('start_state', 'ok')
 
@@ -26776,14 +26777,13 @@ class GameSite(server.Site):
         self.listener_ssl = None
 
     def start_listening(self):
-        backlog = gamedata['server'].get('tcp_accept_backlog', 4000)
-        self.listener_tcp = reactor.listenTCP(self.config.game_http_port, self, interface=self.config.game_listen_host, backlog=backlog)
+        self.listener_tcp = reactor.listenTCP(self.config.game_http_port, self, interface=self.config.game_listen_host, backlog=self.config.tcp_accept_backlog)
         if self.config.game_ssl_port > 0:
             self.listener_ssl = reactor.listenSSL(self.config.game_ssl_port, self,
                                                   SpinSSL.ChainingOpenSSLContextFactory(SpinConfig.config['ssl_key_file'],
                                                                                         SpinConfig.config['ssl_crt_file'],
                                                                                         certificateChainFile=SpinConfig.config['ssl_chain_file']),
-                                                  interface=self.config.game_listen_host, backlog=backlog)
+                                                  interface=self.config.game_listen_host, backlog=self.config.tcp_accept_backlog)
 
         # make sure players are logged out and flushed before server shuts down
         reactor.addSystemEventTrigger('before', 'shutdown', self.shutdown)
