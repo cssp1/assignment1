@@ -253,11 +253,15 @@ def dump_request(request):
     #print 'CONTENT', str(request.content)
 
 def log_request(request):
+    try:
+        ip = SpinHTTP.get_twisted_client_ip(request, proxy_secret = SpinConfig.config['proxy_api_secret'])
+    except:
+        ip = '*invalid*'
     ret = repr(request)+ \
           ' args '+repr(request.args)+ \
-          ' cookies '+repr(request.received_cookies)+ \
+          ' headers '+repr(request.requestHeaders)+ \
           ' user-agent "'+SpinHTTP.get_twisted_header(request,'user-agent')+ \
-          '" ip ' + repr(SpinHTTP.get_twisted_client_ip(request, proxy_secret = SpinConfig.config['proxy_api_secret']))
+          '" getClientIP() '+repr(request.getClientIP())+' isSecure() '+repr(request.isSecure())+' parsed ip ' + repr(ip)
     return ret
 
 def set_cookie(request, cookie_name, value, duration):
