@@ -6,7 +6,7 @@
 
 # HTTP utilities
 
-import base64
+import base64, re
 
 # wrap/unwrap Unicode text strings for safe transmission across the AJAX connection
 # mirrors gameclient/clientcode/SPHTTP.js
@@ -61,18 +61,52 @@ def set_access_control_headers_for_cdn(request, max_age):
 # get info about an HTTP(S) request, "seeing through" reverse proxies back to the client
 # NOTE! YOU MUST SANITIZE (DELETE HEADERS FROM) REQUESTS ACCEPTED DIRECTLY FROM CLIENTS TO AVOID SPOOFING!
 
-def get_twisted_client_ip(request):
-    forw = get_twisted_header(request, 'spin-orig-ip')
-    if forw:
-        return forw
+import SpinSignature
+
+def validate_proxy_headers(request, proxy_secret):
+    # validate the signature applied by proxyserver's add_proxy_headers()
+    their_signature = get_twisted_header(request, 'spin-orig-signature')
+    our_signature = SpinSignature.sign_proxy_headers(
+        get_twisted_header(request,'spin-orig-protocol'),
+        get_twisted_header(request,'spin-orig-host'),
+        get_twisted_header(request,'spin-orig-port'),
+        get_twisted_header(request,'spin-orig-uri'),
+        get_twisted_header(request,'spin-orig-ip'),
+        get_twisted_header(request,'spin-orig-referer'),
+        proxy_secret)
+    return their_signature == our_signature
+
+private_ip_re = re.compile('(^127.0.0.1)|(^10.)|(^172.1[6-9].)|(^172.2[0-9].)|(^172.3[0-1].)|(^192.168.)')
+
+def get_twisted_client_ip(request, proxy_secret = None):
+    if proxy_secret:
+        forw = get_twisted_header(request, 'spin-orig-ip')
+        if forw:
+            assert validate_proxy_headers(request, proxy_secret)
+            return forw
+
     forw = get_twisted_header(request, 'X-Forwarded-For')
     if forw:
-        return forw.split(',')[0].strip()
+        if False: # XXXXXX validation step for trusting this
+            for ip in forw.split(','):
+                ip = ip.strip()
+                if private_ip_re.match(ip): continue # skip private IPs
+                return ip
+
     return request.getClientIP()
-def twisted_request_is_ssl(request):
-    orig_protocol = get_twisted_header(request, 'spin-orig-protocol')
-    if orig_protocol and orig_protocol == 'https://': return True
-    if get_twisted_header(request, 'X-Forwarded-Proto').startswith('https'): return True
+
+def twisted_request_is_ssl(request, proxy_secret = None):
+    if proxy_secret:
+        orig_protocol = get_twisted_header(request, 'spin-orig-protocol')
+        if orig_protocol:
+            assert validate_proxy_headers(request, proxy_secret)
+            return orig_protocol == 'https://'
+
+    orig_protocol = get_twisted_header(request, 'X-Forwarded-Proto')
+    if orig_protocol:
+        if False: # XXXXXX validation step for trusting this
+            return orig_protocol.startswith('https')
+
     return request.isSecure()
 
 # this is the final Deferred callback that finishes asynchronous HTTP request handling

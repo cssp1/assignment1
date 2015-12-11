@@ -14,6 +14,11 @@ def sign_session(user_id, country, session_id, session_time, server_name, auth_u
     tosign = str(user_id) + ':' + str(country) + ':' + str(session_id) + ':' + str(session_time) + ':' + str(server_name) + ':' + auth_user + ':' + auth_token + ':' + extra_data + ':' + SALT
     return base64.urlsafe_b64encode(hmac.new(str(secret), msg=tosign, digestmod=hashlib.sha256).digest())
 
+def sign_proxy_headers(protocol, host, port, uri, ip, referer, secret):
+    SALT = 'mzOT9MR8Gs7hWr6FpoSYLXVcCiiqNg9E'
+    tosign = str(protocol)+':'+str(host)+':'+str(port)+':'+str(uri)+':'+str(ip)+':'+str(referer)+':'+SALT
+    return base64.urlsafe_b64encode(hmac.new(str(secret), msg=tosign, digestmod=hashlib.sha256).digest())
+
 class AnonID (object):
     # Mostly-secure tokens for carrying over login information (URL
     # parameters etc) between separate index hits in proxyserver.

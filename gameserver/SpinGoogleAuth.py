@@ -140,6 +140,7 @@ def spin_token_cookie_name():
     return 'spin_'+spin_token_realm()+'_token'
 
 # convenience functions for CGI scripts run from proxyserver (pcheck, analytics)
+# these trust SPIN_IS_SSL and REMOTE_ADDR, which are checked via proxyserver.
 
 def cgi_get_my_endpoint():
     # get endpoint URL by looking at environment variables
@@ -184,22 +185,23 @@ def url_to_domain(url):
         domain = fields[0]
     return domain
 
-def twisted_request_is_local(request):
-    return SpinHTTP.get_twisted_client_ip(request) == '127.0.0.1'
+def twisted_request_is_local(request, proxy_secret = None):
+    return SpinHTTP.get_twisted_client_ip(request, proxy_secret) == '127.0.0.1'
 
-def twisted_get_my_endpoint(request):
+def twisted_get_my_endpoint(request, proxy_secret = None):
     # get endpoint URL by looking at a Twisted request
     if SpinHTTP.get_twisted_header(request,'spin-orig-protocol'):
+        assert SpinHTTP.validate_proxy_headers(request, proxy_secret)
         # it's been proxied
         return SpinHTTP.get_twisted_header(request,'spin-orig-protocol')+ \
                SpinHTTP.get_twisted_header(request,'spin-orig-host')+':'+ \
                SpinHTTP.get_twisted_header(request,'spin-orig-port')+ \
                SpinHTTP.get_twisted_header(request,'spin-orig-uri')
     # not proxied
-    return ('https://' if SpinHTTP.twisted_request_is_ssl(request) else 'http://')+request.getHeader('host')+request.uri
+    return ('https://' if SpinHTTP.twisted_request_is_ssl(request, proxy_secret = proxy_secret) else 'http://')+request.getHeader('host')+request.uri
 
 
-def twisted_do_auth(request, role, time_now):
+def twisted_do_auth(request, role, time_now, proxy_secret = None):
     raw_token = None
     cookie_name = spin_token_cookie_name()
     if 'spin_token' in request.args:
@@ -207,4 +209,4 @@ def twisted_do_auth(request, role, time_now):
     elif cookie_name in request.received_cookies:
         raw_token = request.received_cookies[cookie_name]
 
-    return do_auth(raw_token, spin_token_realm(), spin_token_secret(), role, time_now, twisted_get_my_endpoint(request))
+    return do_auth(raw_token, spin_token_realm(), spin_token_secret(), role, time_now, twisted_get_my_endpoint(request, proxy_secret))

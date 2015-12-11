@@ -21744,7 +21744,7 @@ class GAMEAPI(resource.Resource):
             request.setHeader('Connection', 'keep-alive')
             request.setHeader('Keep-Alive', 'timeout=%d' % gamedata['server']['http_connection_timeout'])
 
-        client_ip = SpinHTTP.get_twisted_client_ip(request)
+        client_ip = SpinHTTP.get_twisted_client_ip(request, proxy_secret = SpinConfig.config['proxy_api_secret'])
         user_agent = SpinHTTP.get_twisted_header(request, 'user-agent')
         args_dict = dict((k, request.args[k][0]) for k in request.args)
 
@@ -27358,9 +27358,9 @@ class AdminResource(resource.Resource):
         update_server_time()
 
         # protect with auth
-        if (not SpinGoogleAuth.twisted_request_is_local(request)):
-            if spin_secure_mode and (not SpinGoogleAuth.twisted_request_is_ssl(request)): return 'must use HTTPS'
-            auth_info = SpinGoogleAuth.twisted_do_auth(request, 'ADMIN', server_time)
+        if (not SpinGoogleAuth.twisted_request_is_local(request, proxy_secret = SpinConfig.config['proxy_api_secret'])):
+            if spin_secure_mode and (not SpinGoogleAuth.twisted_request_is_ssl(request, proxy_secret = SpinConfig.config['proxy_api_secret'])): return 'must use HTTPS'
+            auth_info = SpinGoogleAuth.twisted_do_auth(request, 'ADMIN', server_time, proxy_secret = SpinConfig.config['proxy_api_secret'])
             if not auth_info['ok']:
                 if 'redirect' in auth_info:
                     return str(auth_info['redirect'])

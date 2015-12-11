@@ -230,13 +230,18 @@ def get_http_origin(visitor, is_ssl):
 # the server behind the proxy knows where the request originally came from
 
 def add_proxy_headers(request):
+    # note: don't use proxy_secret here, since we don't double-proxy anything - no spin-orig headers should be set yet
     orig_protocol, orig_host, orig_port = parse_host_port(SpinHTTP.get_twisted_header(request, 'host') or 'unknown', SpinHTTP.twisted_request_is_ssl(request))
+    orig_uri = request.uri
+    orig_ip = SpinHTTP.get_twisted_client_ip(request) or 'unknown'
+    orig_referer = SpinHTTP.get_twisted_header(request, 'referer') or 'unknown'
+    SpinHTTP.set_twisted_header(request,'spin-orig-signature', SpinSignature.sign_proxy_headers(orig_protocol, orig_host, orig_port, orig_uri, orig_ip, orig_referer, SpinConfig.config['proxy_api_secret']))
     SpinHTTP.set_twisted_header(request,'spin-orig-protocol',orig_protocol)
     SpinHTTP.set_twisted_header(request,'spin-orig-host',orig_host)
     SpinHTTP.set_twisted_header(request,'spin-orig-port',orig_port)
-    SpinHTTP.set_twisted_header(request,'spin-orig-uri',request.uri)
-    SpinHTTP.set_twisted_header(request,'spin-orig-ip', SpinHTTP.get_twisted_client_ip(request) or 'unknown')
-    SpinHTTP.set_twisted_header(request,'spin-orig-referer', SpinHTTP.get_twisted_header(request, 'referer') or 'unknown')
+    SpinHTTP.set_twisted_header(request,'spin-orig-uri',orig_uri)
+    SpinHTTP.set_twisted_header(request,'spin-orig-ip',orig_ip)
+    SpinHTTP.set_twisted_header(request,'spin-orig-referer',orig_referer)
 
 def dump_request(request):
     print 'REQUEST', request
@@ -250,7 +255,7 @@ def log_request(request):
           ' args '+repr(request.args)+ \
           ' cookies '+repr(request.received_cookies)+ \
           ' user-agent "'+SpinHTTP.get_twisted_header(request,'user-agent')+ \
-          '" ip ' + repr(SpinHTTP.get_twisted_client_ip(request))
+          '" ip ' + repr(SpinHTTP.get_twisted_client_ip(request, proxy_secret = SpinConfig.config['proxy_api_secret']))
     return ret
 
 def set_cookie(request, cookie_name, value, duration):
