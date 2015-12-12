@@ -66,7 +66,6 @@ if [[ "$FREQ" == "daily" ]]; then
   run_it ./update-analytics-views.sh # requires sessions, metrics, facebook_campaign_map (currently from upcache), fb_notifications, fb_permissions, credits, battles, battle_risk_reward
 
   run_it ./map_to_mysql.py -q
-  run_it ./purchase_ui_to_sql.py -q
   run_it ./damage_protection_to_sql.py -q --prune
   run_it ./ladder_pvp_to_sql.py -q --prune
   run_it ./chat_to_sql.py -q --prune
@@ -108,6 +107,7 @@ elif [[ "$FREQ" == "hourly" ]]; then
   run_it ./fb_notifications_to_sql.py -q --prune
   run_it ./policy_bot_to_sql.py -q --prune
   run_it ./sessions_to_sql.py -q --prune
+  run_it ./purchase_ui_to_sql.py -q
 
   # END hourly
 
