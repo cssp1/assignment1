@@ -8378,7 +8378,7 @@ class Player(AbstractPlayer):
                 must_recall = False
                 # check that no objects are at home
                 if (squad_id in home_objects_by_squad):
-                    if gamedata['server'].get('log_nosql',0) >= 1:
+                    if gamedata['server'].get('log_nosql',0) >= 2:
                         gamesite.exception_log.event(server_time, 'player %d squad %d has map_loc %s but has in-base objects: %s' % \
                                                      (self.user_id, squad_id, repr(squad['map_loc']), repr(home_objects_by_squad[squad_id])))
                     must_recall = True
@@ -8968,7 +8968,7 @@ class Player(AbstractPlayer):
                 assert state['kind'] == 'mobile'
                 assert state['owner_id'] == self.user_id
                 if ('obj_id' in state) and self.get_object_by_obj_id(state['obj_id'], fail_missing = False):
-                    if gamedata['server'].get('log_nosql',0) >= 1:
+                    if gamedata['server'].get('log_nosql',0) >= 2:
                         gamesite.exception_log.event(server_time, 'player %d squad_exit_map %d already has object %s at home, skipping' % \
                                                      (self.user_id, squad_id, state['obj_id']))
                     continue
