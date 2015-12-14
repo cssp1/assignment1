@@ -177,7 +177,7 @@ class S3Driver (Driver):
         self.playerdb_bucket = playerdb_bucket if playerdb_bucket else SpinConfig.config.get('playerdb_s3_bucket', None)
         self.aistate_bucket = aistate_bucket if aistate_bucket else SpinConfig.config.get('aistate_s3_bucket', None)
         self.basedb_bucket = basedb_bucket if basedb_bucket else SpinConfig.config.get('basedb_s3_bucket', None)
-        self.s3con = SpinS3.S3(key_file if key_file else SpinConfig.aws_key_file(), verbose=verbose)
+        self.s3con = SpinS3.S3(key_file if key_file else SpinConfig.aws_key_file(), verbose=verbose, use_ssl=True)
 
     def user_id_bucket(self, id):
         return id % self.nbuckets
