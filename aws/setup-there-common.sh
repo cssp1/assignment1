@@ -61,10 +61,14 @@ for homedir in /root /home/ec2-user; do
     sudo mkdir -p "${homedir}/.aws"
     sudo sh -c "/bin/cat > ${homedir}/.aws/credentials" <<EOF
 [default]
-aws_access_key_id = ${AWSCRED_KEYID}
-aws_secret_access_key = ${AWSCRED_SECRET}
 region = ${CUR_REGION}
 EOF
+    if [ ${AWSCRED_KEYID} != "none" ]; then
+        sudo sh -c "/bin/cat >> ${homedir}/.aws/credentials" <<EOF
+aws_access_key_id = ${AWSCRED_KEYID}
+aws_secret_access_key = ${AWSCRED_SECRET}
+EOF
+    fi
     sudo sh -c "chmod 0700 ${homedir}/.aws"
     sudo sh -c "chmod 0600 ${homedir}/.aws/credentials"
 done
