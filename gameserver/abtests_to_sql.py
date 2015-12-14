@@ -42,11 +42,7 @@ if __name__ == '__main__':
         elif key == '--dry-run': dry_run = True
 
     sql_util = SpinSQLUtil.MySQLUtil()
-    if verbose or True:
-        from warnings import filterwarnings
-        filterwarnings('error', category = MySQLdb.Warning)
-    else:
-        sql_util.disable_warnings()
+    if not verbose: sql_util.disable_warnings()
 
     nosql_client = SpinNoSQL.NoSQLClient(SpinConfig.get_mongodb_config(game_id))
 
