@@ -100,6 +100,7 @@ elif [[ "$FREQ" == "hourly" ]]; then
 
   # BEGIN hourly
 
+  run_it ./abtests_to_mysql.py -q
   run_it ./credits_to_mysql.py -q
   run_it ./client_trouble_to_sql.py -q --prune --optimize
   run_it ./econ_res_to_sql.py -q --prune
