@@ -540,8 +540,10 @@ def do_slave(input):
                     update_resource_levels_entry(res, user.get(res, 0))
 
             # current A/B test memberships
-            for test_name, group_name in user.get('abtests',{}).iteritems():
-                abtest_memberships[(user_id, test_name)] = (group_name, -1)
+            for test_name in gamedata['abtests']:
+                if test_name in user:
+                    group_name = user[test_name]
+                    abtest_memberships[(user_id, test_name)] = (group_name, -1)
 
             batch += 1
             total += 1

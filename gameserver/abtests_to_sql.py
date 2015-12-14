@@ -65,8 +65,8 @@ if __name__ == '__main__':
 
         cur.execute("SELECT join_time FROM "+sql_util.sym(abtests_table)+" ORDER BY join_time DESC LIMIT 1")
         rows = cur.fetchall()
-        if rows:
-            start_time = max(start_time, rows[0]['time'])
+        if rows and rows[0]['join_time'] > 0:
+            start_time = max(start_time, rows[0]['join_time'])
         con.commit()
 
         if verbose:  print 'start_time', start_time, 'end_time', end_time
@@ -74,18 +74,17 @@ if __name__ == '__main__':
         batch = 0
         total = 0
 
-        for row in SpinETL.iterate_from_mongodb(game_id, 'log_metrics', start_time, end_time):
-
-            if row['event_name'] == '0800_abtest_joined':
-                cur.execute("INSERT INTO "+sql_util.sym(abtests_table)+" (join_time,user_id,test_name,group_name) "+\
-                            "VALUES (%s,%s,%s,%s) ON DUPLICATE KEY UPDATE join_time=%s, group_name=%s;",
-                            (row['time'], row['user_id'], row['test_name'], row['group_name'], row['time'], row['group_name']))
-                batch += 1
-                total += 1
-                if commit_interval > 0 and batch >= commit_interval:
-                    batch = 0
-                    con.commit()
-                    if verbose: print total, 'inserted'
+        for row in SpinETL.iterate_from_mongodb(game_id, 'log_metrics', start_time, end_time,
+                                                query = {'event_name': '0800_abtest_joined'}):
+            cur.execute("INSERT INTO "+sql_util.sym(abtests_table)+" (join_time,user_id,test_name,group_name) "+\
+                        "VALUES (%s,%s,%s,%s) ON DUPLICATE KEY UPDATE join_time=%s, group_name=%s;",
+                        (row['time'], row['user_id'], row['test_name'], row['group_name'], row['time'], row['group_name']))
+            batch += 1
+            total += 1
+            if commit_interval > 0 and batch >= commit_interval:
+                batch = 0
+                con.commit()
+                if verbose: print total, 'inserted'
 
         con.commit()
         if verbose: print 'total', total, 'inserted'
