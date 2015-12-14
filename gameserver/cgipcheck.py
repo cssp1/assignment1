@@ -340,7 +340,8 @@ def do_action(path, method, args, spin_token_data, nosql_client):
 
             elif method in ('reconfig','change_state','maint_kick','panic_kick','shutdown'):
                 server_name = args['server']
-                row = nosql_client.server_status_query_one({'_id':server_name}, {'hostname':1, 'game_http_port':1, 'external_http_port':1, 'type':1})
+                row = nosql_client.server_status_query_one({'_id':server_name}, {'hostname':1, 'game_http_port':1, 'game_ssl_port': 1,
+                                                                                 'external_http_port':1, 'external_ssl_port': 1, 'type':1})
                 if not row:
                     raise Exception('server %s not found' % server_name)
                 control_args = args.copy()
@@ -349,7 +350,10 @@ def do_action(path, method, args, spin_token_data, nosql_client):
                 # tell proxyserver to handle it instead of forwarding
                 if row['type'] == 'proxyserver':
                     control_args['server'] = 'proxyserver'
-                result = do_CONTROLAPI(control_args, host = row['hostname'], port = row.get('game_http_port',None) or row.get('external_http_port',None))
+                result = do_CONTROLAPI(control_args, host = row['hostname'],
+                                       http_port = row.get('game_http_port',None) or row.get('external_http_port',None),
+                                       ssl_port = row.get('game_ssl_port',None) or row.get('external_ssl_port',None)
+                                       )
 
             elif method == 'start':
                 server_name = args['server']
@@ -523,10 +527,13 @@ def do_google_translate(from_language, to_language, text):
         ret['source_language'] = translation['detectedSourceLanguage']
     return ret
 
-def do_CONTROLAPI(args, host = None, port = None):
+def do_CONTROLAPI(args, host = None, http_port = None, ssl_port = None):
     host = host or SpinConfig.config['proxyserver'].get('external_listen_host','localhost')
     proto = 'http' if host in ('localhost', socket.gethostname()) else 'https'
-    url = '%s://%s:%d/CONTROLAPI' % (proto, host, port or SpinConfig.config['proxyserver']['external_http_port'])
+    url = '%s://%s:%d/CONTROLAPI' % (proto, host,
+                                     (ssl_port or SpinConfig.config['proxyserver']['external_ssl_port']) if proto == 'https' else \
+                                     (http_port or SpinConfig.config['proxyserver']['external_http_port'])
+                                     )
     args['secret'] = SpinConfig.config['proxy_api_secret']
     response = urllib2.urlopen(url+'?'+urllib.urlencode(args)).read().strip()
     return SpinJSON.loads(response)
