@@ -11649,6 +11649,8 @@ class LivePlayer(Player):
                     gamesite.exception_log.event(server_time, 'override_abtests_from_url: user %d %s -> %s' % \
                                                  (self.user_id, test_name, group))
                     self.abtests[test_name] = group
+                    metric_event_coded(self.user_id, '0800_abtest_joined', {'test_name': test_name, 'group_name': group,
+                                                                            'reason': 'manual_override'})
                 else:
                     gamesite.exception_log.event(server_time, 'override_abtests_from_url: user %d %s GROUP %s NOT FOUND' % \
                                                  (self.user_id, test_name, group))
@@ -11807,6 +11809,7 @@ class LivePlayer(Player):
                         group = want_cohorts[i]
                         if results[i]:
                             self.abtests[test_name] = group # success!
+                            metric_event_coded(self.user_id, '0800_abtest_joined', {'test_name': test_name, 'group_name': group})
 
         # REPLACE OBJECT SPECS WITH A/B TEST VERSIONS
         patch_specs = False

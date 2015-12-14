@@ -222,6 +222,9 @@ def MetricsLogFilter(child):
                                   '0694_idle_check_timeout',
 
                                   '0700_login_abuse_detected',
+
+                                  '0800_abtest_joined',
+
                                   '1500_server_restart',
                                   '3870_loot_given',
                                   '4701_change_region_success',
