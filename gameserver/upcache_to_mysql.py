@@ -17,7 +17,7 @@ import SpinSQLUtil
 import SpinParallel
 import SpinSingletonProcess
 import MySQLdb
-from abtests_to_mysql import abtests_schema
+from abtests_to_sql import abtests_schema
 
 def field_column(key, val):
     return "`%s` %s" % (key, val)
