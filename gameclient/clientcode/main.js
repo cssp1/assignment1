@@ -9113,7 +9113,7 @@ function gameapi_url() {
         }
     } else {
         // go via proxyserver
-        return proxy_gameapi_url();
+        return proxy_gameapi_url(true);
     }
 }
 
@@ -9135,8 +9135,12 @@ function gameapi_connection_method() {
 }
 
 // URL to proxyserver GAMEAPI, used as fallback and for sending keepalives when in direct connect mode
-function proxy_gameapi_url() {
-    return spin_server_protocol+spin_server_host+":"+spin_server_port+"/GAMEAPI";
+function proxy_gameapi_url(try_multiplex) {
+    var ret = spin_server_protocol+spin_server_host+":"+spin_server_port+"/GAMEAPI";
+    if(try_multiplex) { // "help" the proxyserver/haproxy setup to direct this to the gameserver directly
+        ret += "?spin_game_server_port=" + (spin_server_protocol === 'https://' ? spin_game_server_ssl_port : spin_game_server_http_port);
+    }
+    return ret;
 }
 
 /** Construct a URL to the server's OGPAPI (Open Graph endpoint)
@@ -9158,7 +9162,7 @@ function send_proxy_keepalive() {
     var resp = function(event) {
         //console.log('proxy keepalive resp '+event.target.getStatusText()+' text '+event.target.getResponseText());
     };
-    goog.net.XhrIo.send(proxy_gameapi_url(), resp, 'POST',
+    goog.net.XhrIo.send(proxy_gameapi_url(false), resp, 'POST',
                         'proxy_keepalive_only=1&session='+session.session_id.toString(), {},
                         1000*ajax_config['message_timeout_gameplay']);
 }
