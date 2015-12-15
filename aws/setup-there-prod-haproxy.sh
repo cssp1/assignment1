@@ -2,6 +2,7 @@
 
 GAME_ID=$1
 GAME_ID_LONG=$2
+ART_CDN_HOST=$3
 
 YUMPACKAGES="nscd aws-cli git xfsprogs strace patch screen haproxy"
 
@@ -68,7 +69,7 @@ for i in $(seq 0 100); do # set up ports 8001,8003,...,8200 forwarding to 8000,8
     HAPROXY_GAME_BACKEND_SERVERS+="backend game-ws${HTTP_PORT}\n    ${STRIPPER}\n    timeout server 300s\n    server static ${GAME_ID}prod-raw.spinpunch.com:${HTTP_PORT}\n"
 done
 
-sudo perl -pi -e "s/\\\$GAME_PORT_ACLS\\\$/${HAPROXY_GAME_PORT_ACLS}/; s/\\\$GAME_BACKEND_SELECTORS\\\$/${HAPROXY_GAME_BACKEND_SELECTORS}/; s/\\\$GAME_BACKEND_SERVERS\\\$/${HAPROXY_GAME_BACKEND_SERVERS}/; s/\\\$GAME_PROXYSERVER_HOST\\\$/${GAME_ID}prod-raw.spinpunch.com/g; s/\\\$GAME_API_HOST\\\$/${GAME_ID}prod-raw.spinpunch.com/g;" /etc/haproxy/haproxy.cfg
+sudo perl -pi -e "s/\\\$GAME_PORT_ACLS\\\$/${HAPROXY_GAME_PORT_ACLS}/; s/\\\$GAME_BACKEND_SELECTORS\\\$/${HAPROXY_GAME_BACKEND_SELECTORS}/; s/\\\$GAME_BACKEND_SERVERS\\\$/${HAPROXY_GAME_BACKEND_SERVERS}/; s/\\\$GAME_PROXYSERVER_HOST\\\$/${GAME_ID}prod-raw.spinpunch.com/g; s/\\\$GAME_API_HOST\\\$/${GAME_ID}prod-raw.spinpunch.com/g; s/\\\$ART_CDN_HOST\\\$/${ART_CDN_HOST}/g;" /etc/haproxy/haproxy.cfg
 
 echo "SETUP(remote): (Re)starting services..."
 sudo /etc/init.d/nscd restart

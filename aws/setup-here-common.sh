@@ -8,6 +8,7 @@ AWS_CRON_SNS_TOPIC="your-cron-SNS-topic"
 KIND="www" # one of: analytics1, forums, gamemaster, mongo, prod, www
 GAME_ID="eg" # only for "prod" server type
 GAME_ID_LONG="example" # only for "prod" server type
+ART_CDN_HOST="" # for prod-haproxy setup only
 
 # run on mothership machine
 
@@ -42,6 +43,6 @@ scp -r $SSHARGS $FILESTOGO $SSHDEST:/home/ec2-user
 sudo sh -c 'chmod 0600 /etc/ssh/ssh_host_*_key'
 
 echo "Running setup script on cloud host..."
-ssh $SSHARGS -t $SSHDEST "/home/ec2-user/setup-there-common.sh ${AWSCRED_KEYID} ${AWSCRED_SECRET} ${AWS_CRON_SNS_TOPIC} && chmod +x /home/ec2-user/setup-there-${KIND}.sh && /home/ec2-user/setup-there-${KIND}.sh ${GAME_ID} ${GAME_ID_LONG}"
+ssh $SSHARGS -t $SSHDEST "/home/ec2-user/setup-there-common.sh ${AWSCRED_KEYID} ${AWSCRED_SECRET} ${AWS_CRON_SNS_TOPIC} && chmod +x /home/ec2-user/setup-there-${KIND}.sh && /home/ec2-user/setup-there-${KIND}.sh ${GAME_ID} ${GAME_ID_LONG} ${ART_CDN_HOST}"
 
 sudo rm -f "/tmp/overlay-${KIND}.tar.gz"
