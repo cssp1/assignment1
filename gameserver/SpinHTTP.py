@@ -90,24 +90,26 @@ def get_twisted_client_ip(request, proxy_secret = None, trust_x_forwarded = True
             assert validate_proxy_headers(request, proxy_secret)
             return forw
 
-    forw = get_twisted_header(request, 'X-Forwarded-For')
-    if forw:
-        if trust_x_forwarded or validate_x_forwarded(request):
-            # return leftmost non-private address
-            for ip in forw.split(','):
-                ip = ip.strip()
-                if private_ip_re.match(ip): continue # skip private IPs
-                return ip
+    forw_list = request.requestHeaders.getRawHeaders('X-Forwarded-For')
+    if forw_list and len(forw_list) > 0:
+        forw = ','.join(map(str, forw_list))
+        if forw:
+            if trust_x_forwarded or validate_x_forwarded(request):
+                # return leftmost non-private address
+                for ip in forw.split(','):
+                    ip = ip.strip()
+                    if private_ip_re.match(ip): continue # skip private IPs
+                    return ip
 
-            # ... or fall back to native request IP
+                # ... or fall back to native request IP
 
-        else:
-            # can't trust X-Forwarded-For because it came out of a public IP
-            # fall back to the native request IP
-            if private_ip_re.match(request.getClientIP()):
-                raise Exception('X-Forwarded-For a private address: %r' % forw)
             else:
-                return request.getClientIP()
+                # can't trust X-Forwarded-For because it came out of a public IP
+                # fall back to the native request IP
+                if private_ip_re.match(request.getClientIP()):
+                    raise Exception('X-Forwarded-For a private address: %r' % forw)
+                else:
+                    return request.getClientIP()
 
     return request.getClientIP()
 
