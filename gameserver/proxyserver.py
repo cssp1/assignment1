@@ -2307,6 +2307,7 @@ class AdminStats(object):
                 'hostname': SpinConfig.config['proxyserver'].get('external_host', os.getenv('HOSTNAME') or socket.gethostname()),
                 'pid': os.getpid(),
                 'external_listen_host': SpinConfig.config['proxyserver'].get('external_listen_host',''),
+                'internal_listen_host': SpinConfig.config['proxyserver'].get('internal_listen_host',''),
                 'external_http_port': SpinConfig.config['proxyserver']['external_http_port'],
                 'external_ssl_port': SpinConfig.config['proxyserver'].get('external_ssl_port',-1),
                 'gamedata_build': proxysite.proxy_root.static_resources['gamedata-%s-en_US.js' % SpinConfig.game()].build_date,
@@ -2482,7 +2483,7 @@ class PortraitProxy(twisted.web.resource.Resource):
             if origin:
                 listen_host = SpinConfig.config['proxyserver'].get('external_listen_host','')
                 # XXX this may cause problems if we ever have proxyserver listen on different origins
-                if listen_host and origin != listen_host:
+                if listen_host and origin not in (listen_host, 'http://'+listen_host, 'https://'+listen_host):
                     raise Exception('origin mismatch: %s vs %s' % (origin, listen_host))
                 request.args['spin_origin'] = [origin]
 

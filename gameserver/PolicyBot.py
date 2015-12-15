@@ -21,8 +21,9 @@ BATCH_SIZE = 5
 time_now = int(time.time())
 
 def do_CONTROLAPI(args):
-    host = SpinConfig.config['proxyserver'].get('external_listen_host','localhost')
-    proto = 'http' if host in ('localhost', socket.gethostname()) else 'https'
+    host = SpinConfig.config['proxyserver'].get('internal_listen_host',
+                                                SpinConfig.config['proxyserver'].get('external_listen_host','localhost'))
+    proto = 'http' if host in ('localhost', socket.gethostname(), SpinConfig.config['proxyserver'].get('internal_listen_host')) else 'https'
     url = '%s://%s:%d/CONTROLAPI' % (proto, host, SpinConfig.config['proxyserver']['external_http_port' if proto == 'http' else 'external_ssl_port'])
     args['ui_reason'] = 'PolicyBot'
     args['spin_user'] = 'PolicyBot'

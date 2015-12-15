@@ -528,15 +528,20 @@ def do_google_translate(from_language, to_language, text):
     return ret
 
 def do_CONTROLAPI(args, host = None, http_port = None, ssl_port = None):
-    host = host or SpinConfig.config['proxyserver'].get('external_listen_host','localhost')
-    proto = 'http' if host in ('localhost', socket.gethostname()) else 'https'
+    host = host or SpinConfig.config['proxyserver'].get('internal_listen_host',
+                                                        SpinConfig.config['proxyserver'].get('external_listen_host','localhost'))
+    proto = 'http' if host in ('localhost', socket.gethostname(), SpinConfig.config['proxyserver'].get('internal_listen_host')) else 'https'
     url = '%s://%s:%d/CONTROLAPI' % (proto, host,
                                      (ssl_port or SpinConfig.config['proxyserver']['external_ssl_port']) if proto == 'https' else \
                                      (http_port or SpinConfig.config['proxyserver']['external_http_port'])
                                      )
     args['secret'] = SpinConfig.config['proxy_api_secret']
-    response = urllib2.urlopen(url+'?'+urllib.urlencode(args)).read().strip()
-    return SpinJSON.loads(response)
+    try:
+        response = urllib2.urlopen(url+'?'+urllib.urlencode(args)).read().strip()
+        return SpinJSON.loads(response)
+    except urllib2.HTTPError as e:
+        args['secret']='...'
+        raise Exception('CONTROLAPI connection failed: %d %r for %s?%s' % (e.code, e.read(), url, urllib.urlencode(args)))
 
 # this version assumes the CustomerSupport return value conventions
 def do_CONTROLAPI_checked(args):
