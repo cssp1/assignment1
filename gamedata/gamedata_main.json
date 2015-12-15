@@ -94,11 +94,11 @@
                 // since it's more likely people just have slow connections instead of business firewalls.
                 "message_timeout_hello": 120,
                 "message_timeout_gameplay": 120,
-                "enable_proxy": 0 }
+                "enable_proxy": 1 } // needed for haproxy setup
         },
         "websocket_keepalive_interval": 50, // always send something down the websocket this frequently
 
-        "ajax_message_buffer": 10, // number of out-of-order server AJAX requests to buffer before giving up due to lag/packet loss
+        "ajax_message_buffer": 20, // number of out-of-order server AJAX requests to buffer before giving up due to lag/packet loss
 
         "enable_ajax_longpoll": 1, // use longpoll request mechanism
         "ajax_longpoll_timeout": 120, // standard timeout (sec) for longpoll requests - MUST be longer than gamedata.server.ajax_longpoll_wait + bgtask interval
