@@ -83,7 +83,7 @@ def validate_x_forwarded(request):
     # ensure the request is coming from the "private" (AWS) network
     return bool(private_ip_re.match(request.getClientIP()))
 
-def get_twisted_client_ip(request, proxy_secret = None):
+def get_twisted_client_ip(request, proxy_secret = None, trust_x_forwarded = True): # XXXXXX temporary
     if proxy_secret:
         forw = get_twisted_header(request, 'spin-orig-ip')
         if forw:
@@ -92,7 +92,7 @@ def get_twisted_client_ip(request, proxy_secret = None):
 
     forw = get_twisted_header(request, 'X-Forwarded-For')
     if forw:
-        if validate_x_forwarded(request):
+        if trust_x_forwarded or validate_x_forwarded(request):
             # return leftmost non-private address
             for ip in forw.split(','):
                 ip = ip.strip()
@@ -111,7 +111,7 @@ def get_twisted_client_ip(request, proxy_secret = None):
 
     return request.getClientIP()
 
-def twisted_request_is_ssl(request, proxy_secret = None):
+def twisted_request_is_ssl(request, proxy_secret = None, trust_x_forwarded = True): # XXXXXX temporary
     if proxy_secret:
         orig_protocol = get_twisted_header(request, 'spin-orig-protocol')
         if orig_protocol:
@@ -120,7 +120,7 @@ def twisted_request_is_ssl(request, proxy_secret = None):
 
     orig_protocol = get_twisted_header(request, 'X-Forwarded-Proto')
     if orig_protocol:
-        assert validate_x_forwarded(request)
+        assert trust_x_forwarded or validate_x_forwarded(request)
         return orig_protocol.startswith('https')
 
     return request.isSecure()
