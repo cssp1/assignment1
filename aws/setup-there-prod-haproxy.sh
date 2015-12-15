@@ -60,7 +60,7 @@ for i in $(seq 0 100); do # set up ports 8001,8003,...,8200 forwarding to 8000,8
     STRIPPER=""
     STRIPPER+="\n    http-request del-header X-Forwarded-Proto"
     STRIPPER+="\n    http-request add-header X-Forwarded-Proto https"
-    STRIPPER+="\n    http-request del-header X-Forwarded-For"
+#    STRIPPER+="\n    http-request del-header X-Forwarded-For"
     STRIPPER+="\n    option forwardfor       except 127.0.0.0\/8"
     STRIPPER+="\n    reqrep ^(.*?)spin_game_server_port=${SSL_PORT}&(.*) \\\1\\\2" # absorb the & in back if it's first
     STRIPPER+="\n    reqrep ^(.*)&spin_game_server_port=${SSL_PORT}(.*) \\\1\\\2" # strip the & if it's not first
