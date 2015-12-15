@@ -84,7 +84,9 @@
         "ajax_config": {
             "default": {
                 // number of seconds to wait before deciding that an outstanding AJAX request has failed
-                "message_timeout_hello": 12, // timeout used for CLIENT_HELLO connection attempt
+                "message_timeout_hello": 30, // timeout used for CLIENT_HELLO connection attempt
+                // ^ XXXXXX lower this back to 12 after websockets is enabled
+
                 "message_timeout_gameplay": 120, // timeout used for normal gameplay messages
                 "enable_proxy": 1 },
             "high_latency": {
