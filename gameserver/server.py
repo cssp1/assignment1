@@ -27239,9 +27239,9 @@ class WSFakeRequest(object):
     def close_connection_aggressively(self): return self.proto.close_connection_aggressively()
 
 class WS_GAMEAPI_Protocol(protocol.Protocol):
-    def __init__(self, gameapi, addr):
+    def __init__(self, gameapi, peer):
         self.gameapi = gameapi
-        self.peer_ip = None
+        self.peer_ip = str(peer.host)
         self.connected = False
         self.close_connection_watchdog = None
         self.connect_time = -1
@@ -27249,7 +27249,6 @@ class WS_GAMEAPI_Protocol(protocol.Protocol):
         self.last_request_time = -1
 
     def connectionMade(self):
-        self.peer_ip = str(self.transport.getPeer().host)
         self.connected = True
         self.connect_time = int(time.time())
         gamesite.gotClient(self) # XXX not sure how to get a reference to the "site" here

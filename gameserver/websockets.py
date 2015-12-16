@@ -35,9 +35,11 @@ from twisted.protocols.policies import ProtocolWrapper, WrappingFactory
 from twisted.python import log
 from twisted.web.resource import IResource
 from twisted.web.server import NOT_DONE_YET
+from twisted.internet.address import IPv4Address
 from zope.interface import implements
 
 import BrowserDetect
+import SpinHTTP
 
 import twisted.web.error, twisted.web.resource # DJM
 # handle different Twisted versions that moved NoResource around
@@ -515,9 +517,18 @@ class WebSocketsResource(object):
         if codec:
             request.setHeader("Sec-WebSocket-Protocol", codec)
 
+        # DJM - get the true original peer, possibly forwarded
+        peer_ip = SpinHTTP.get_twisted_client_ip(request)
+        forw_port = SpinHTTP.get_twisted_header(request, 'X-Forwarded-Port')
+        if forw_port:
+            peer_port = int(forw_port)
+        else:
+            peer_port = request.transport.getPeer().port
+        peer = IPv4Address('TCP', peer_ip, peer_port)
+
         # Create the protocol. This could fail, in which case we deliver an
         # error status. Status 502 was decreed by glyph; blame him.
-        protocol = self._factory.buildProtocol(request.transport.getPeer())
+        protocol = self._factory.buildProtocol(peer)
         if not protocol:
             request.setResponseCode(502)
             return ""
