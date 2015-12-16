@@ -34,6 +34,12 @@ var spin_game_query_string = '$GAME_QUERY_STRING$';
 var spin_game_direct_connect = $DIRECT_CONNECT$;
 if(document.URL.indexOf('direct_connect=0') != -1) {
     spin_game_direct_connect = false;
+} else if(document.URL.indexOf('direct_connect=1') != -1) {
+    spin_game_direct_connect = true;
+}
+var spin_game_direct_multiplex = $DIRECT_MULTIPLEX$;
+if(document.URL.indexOf('direct_multiplex=1') != -1) {
+    spin_game_direct_multiplex = true;
 }
 var spin_game_use_websocket = false;
 if(document.URL.indexOf('websocket=1') != -1) {

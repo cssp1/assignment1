@@ -9099,11 +9099,22 @@ function send_and_destroy_object(victim, killer) {
 
 // URL to game server GAMEAPI, preferring direct connection if possible
 function gameapi_url() {
-    if(spin_game_use_websocket && parseInt(spin_game_server_wss_port,10) > 0) {
-        return 'wss://'+spin_game_server_host+':'+spin_game_server_wss_port+'/WS_GAMEAPI';
-    } else if(spin_game_use_websocket && parseInt(spin_game_server_ws_port,10) > 0) {
-        return 'ws://'+spin_game_server_host+':'+spin_game_server_ws_port+'/WS_GAMEAPI';
-    } else if(spin_game_direct_connect) {
+    if(spin_game_use_websocket && (parseInt(spin_game_server_wss_port,10) > 0 ||
+                                   parseInt(spin_game_server_ws_port,10) > 0)) {
+        var proto, port;
+        if(parseInt(spin_game_server_wss_port,10) > 0) {
+            proto = 'wss://'; port = spin_game_server_wss_port;
+        } else {
+            proto = 'ws://'; port = spin_game_server_ws_port;
+        }
+        if(spin_game_direct_multiplex) {
+            // "help" the proxyserver/haproxy setup to direct this to the gameserver directly
+            return proto + spin_server_host + ':' + spin_server_port + '/WS_GAMEAPI?spin_game_server_port=' + port;
+        } else {
+            return proto + spin_game_server_host + ':' + port + '/WS_GAMEAPI';
+        }
+
+    } else if(spin_game_direct_connect && !spin_game_direct_multiplex) {
         // most modern browsers now disallow pages hosted via HTTPS from making non-HTTPS AJAX requests :(
         // so prefer HTTPS if available
         if(spin_server_protocol === 'https://') {

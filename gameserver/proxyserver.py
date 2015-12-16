@@ -1788,6 +1788,7 @@ class GameProxy(proxy.ReverseProxyResource):
             '$GAME_SERVER_WS_PORT$': str(server.ws_port),
             '$GAME_SERVER_WSS_PORT$': str(server.wss_port),
             '$DIRECT_CONNECT$': 'true' if SpinConfig.config['proxyserver'].get('direct_connect',0) else 'false',
+            '$DIRECT_MULTIPLEX$': 'true' if SpinConfig.config['proxyserver'].get('direct_multiplex',0) else 'false',
             '$AJAX_CONFIG$': ajax_config,
             '$USER_ID$': str(session.user_id),
             '$LOGIN_COUNTRY$': visitor.demographics['country'],
