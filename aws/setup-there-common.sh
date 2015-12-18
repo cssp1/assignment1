@@ -56,7 +56,7 @@ enabled=1
 EOF
 
 # set up ~/.aws/credentials with host's IAM key proper default region
-CUR_REGION=`curl -s http://169.254.169.254/latest/dynamic/instance-identity/document | grep region | awk -F\" '{print $4}'`
+CUR_REGION=`curl -s http://instance-data/latest/dynamic/instance-identity/document | grep region | awk -F\" '{print $4}'`
 for homedir in /root /home/ec2-user; do
     sudo mkdir -p "${homedir}/.aws"
     sudo sh -c "/bin/cat > ${homedir}/.aws/credentials" <<EOF
