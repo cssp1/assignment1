@@ -221,18 +221,25 @@ SProbe.ProbeRun = function(cb, proxy_host, proxy_http_port, proxy_ssl_port,
     if(parseInt(proxy_ssl_port,10) > 0) {
         this.tests['proxy_ssl'] = new SProbe.AJAXPing("https://"+proxy_host+":"+proxy_ssl_port+"/PING", "");
     }
-    if(!direct_http_must_be_ssl && parseInt(game_http_port,10) > 0) {
+    if(!spin_game_direct_multiplex && !direct_http_must_be_ssl && parseInt(game_http_port,10) > 0) {
         this.tests['direct_http'] = new SProbe.AJAXPing("http://"+game_host+":"+game_http_port+"/GAMEAPI", "ping_only=1");
     }
     if(parseInt(game_ssl_port,10) > 0) {
-        this.tests['direct_ssl'] = new SProbe.AJAXPing("https://"+game_host+":"+game_ssl_port+"/GAMEAPI", "ping_only=1");
+        this.tests['direct_ssl'] = new SProbe.AJAXPing(spin_game_direct_multiplex ?
+                                                       "https://"+proxy_host+":"+proxy_ssl_port+"/GAMEAPI?spin_game_server_port="+game_ssl_port.toString() :
+                                                       "https://"+game_host+":"+game_ssl_port+"/GAMEAPI",
+                                                       "ping_only=1");
     }
     if(typeof(WebSocket) != 'undefined') {
         if(!direct_ws_must_be_ssl && parseInt(game_ws_port,10) > 0) {
-            this.tests['direct_ws'] = new SProbe.WSPing("ws://"+game_host+":"+game_ws_port+"/WS_GAMEAPI");
+            this.tests['direct_ws'] = new SProbe.WSPing(spin_game_direct_multiplex ?
+                                                        "ws://"+proxy_host+":"+proxy_http_port+"/WS_GAMEAPI?spin_game_server_port="+game_ws_port.toString() :
+                                                        "ws://"+game_host+":"+game_ws_port+"/WS_GAMEAPI");
         }
         if(parseInt(game_wss_port,10) > 0) {
-            this.tests['direct_wss'] = new SProbe.WSPing("wss://"+game_host+":"+game_wss_port+"/WS_GAMEAPI");
+            this.tests['direct_wss'] = new SProbe.WSPing(spin_game_direct_multiplex ?
+                                                         "wss://"+proxy_host+":"+proxy_ssl_port+"/WS_GAMEAPI?spin_game_server_port="+game_wss_port.toString() :
+                                                         "wss://"+game_host+":"+game_wss_port+"/WS_GAMEAPI");
         }
     }
 };
