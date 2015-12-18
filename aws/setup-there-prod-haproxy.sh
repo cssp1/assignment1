@@ -1,9 +1,5 @@
 #!/bin/bash
 
-GAME_ID=$1
-GAME_ID_LONG=$2
-ART_CDN_HOST=$3
-
 YUMPACKAGES="nscd aws-cli git xfsprogs strace patch screen haproxy"
 
 echo "SETUP(remote): Installing additional packages..."
@@ -11,6 +7,19 @@ sudo yum -y -q install $YUMPACKAGES
 
 sudo chkconfig nscd on
 sudo chkconfig haproxy on
+
+echo "SETUP(remote): Getting instance tags..."
+
+MY_INSTANCE_ID=`curl http://instance-data/latest/meta-data/instance-id`
+GAME_ID=`aws ec2 describe-tags --filters "Name=resource-id,Values=${MY_INSTANCE_ID}" "Name=key,Values=game_id" --output=text | cut -f5`
+
+aws configure set preview.cloudfront true
+ART_CDN_HOST=`aws cloudfront list-distributions | python -c "
+import json, sys
+a = json.load(sys.stdin)
+print next(x for x in a['DistributionList']['Items'] if any(org['DomainName'].startswith('${GAME_ID}prod') for org in x['Origins']['Items']))['DomainName']"`
+
+echo "SETUP(remote): game_id ${GAME_ID} art_cdn_host ${ART_CDN_HOST}..."
 
 echo "SETUP(remote): Adjusting users, groups, and permissions..."
 
