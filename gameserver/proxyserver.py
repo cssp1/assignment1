@@ -1737,12 +1737,15 @@ class GameProxy(proxy.ReverseProxyResource):
         # look up other accounts logged in from the same IP and tell
         # the gameserver about it so that we can detect alt accounts
 
-        stickiness = SpinConfig.config['proxyserver'].get('alt_ip_stickiness', -1)
-        if stickiness > 0: # use new persistent record
-            db_client.ip_hit_record(session.ip, session.user_id)
-            possible_alts = db_client.ip_hits_get(session.ip, since = proxy_time - stickiness, exclude_user_id = session.user_id)
-        else: # old instantaneous-only approach
-            possible_alts = db_client.sessions_get_users_by_ip(session.ip, exclude_user_id = session.user_id)
+        if session.ip == '10.181.117.67': # bad CloudFlare IP
+            possible_alts = []
+        else:
+            stickiness = SpinConfig.config['proxyserver'].get('alt_ip_stickiness', -1)
+            if stickiness > 0: # use new persistent record
+                db_client.ip_hit_record(session.ip, session.user_id)
+                possible_alts = db_client.ip_hits_get(session.ip, since = proxy_time - stickiness, exclude_user_id = session.user_id)
+            else: # old instantaneous-only approach
+                possible_alts = db_client.sessions_get_users_by_ip(session.ip, exclude_user_id = session.user_id)
 
         if possible_alts:
             # for this account, send the other account IDs with the login message

@@ -12108,6 +12108,13 @@ class LivePlayer(Player):
         if 'attacks_made' not in self.travel_state:
             self.travel_state['attacks_made'] = 0
 
+
+        # dump alt_account data if too old
+        if self.history.get('alt_account_data_age',-1) < 1450520387:
+            self.possible_alt_accounts = {}
+            self.known_alt_accounts = {}
+        self.history['alt_account_data_age'] = server_time
+
         # change format of known_alt_accounts
         if self.known_alt_accounts is None:
             self.known_alt_accounts = {}
