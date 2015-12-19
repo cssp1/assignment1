@@ -13116,8 +13116,15 @@ class OGPAPI(resource.Resource):
             my_extra_prefix = ' product: http://ogp.me/ns/product#'
             my_og_type = 'og:product'
             # note: for localized languages, we'll have to have individual SKUs here
-            my_ui_name = Store.format_ui_string(None, spellname, (request.args['quantity'][0] if 'quantity' in request.args else None), spell, spell['ui_name'])
-            my_ui_description = Store.format_ui_string(None, spellname, (request.args['quantity'][0] if 'quantity' in request.args else None), spell, spell['ui_description'])
+            spellarg = None
+            if 'quantity' in request.args:
+                spellarg = int(request.args['quantity'][0])
+            elif 'want_loot' in request.args: # opt-in to item bundle
+                spellarg = {'want_loot': bool(int(request.args['want_loot'][0]))}
+            else:
+                spellarg = {'want_loot': 0} # default
+            my_ui_name = Store.format_ui_string(None, spellname, spellarg, spell, spell['ui_name'])
+            my_ui_description = Store.format_ui_string(None, spellname, spellarg, spell, spell['ui_description'])
 
             art_asset_s3 = spell.get('fb_open_graph_s3_image', gamedata['store']['fb_open_graph_gamebucks_icon'])
             if 'open_graph_prices' in spell:
@@ -14347,6 +14354,17 @@ class Store(object):
                 if stack > 1:
                     ui_name = ('%dx ' % stack) + ui_name
             s = s.replace('%ITEM_NAME', ui_name)
+        if '%ITEM_BUNDLE' in s:
+            ui_bundle = ''
+            want_loot = spell.get('loot_table')
+            if want_loot and spellarg and (isinstance(spellarg, int) or isinstance(spellarg, basestring)):
+                want_loot = False # quantity-based SKU
+            if want_loot and spellarg and isinstance(spellarg, dict) and not spellarg.get('want_loot', False):
+                want_loot = False
+            # session is None for OGPAPI, which makes want_loot opt-in
+            if want_loot and ((session is None) or session.get_loot_items(session.player, gamedata['loot_tables'][spell['loot_table']], -1, -1)):
+                ui_bundle = ' (plus FREE items)'
+            s = s.replace('%ITEM_BUNDLE', ui_bundle)
         return s
 
     # given the order_info passed from the client, return a dictionary with

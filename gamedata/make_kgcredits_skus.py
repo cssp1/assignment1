@@ -124,8 +124,8 @@ if __name__ == '__main__':
             pretty_alloy_amount = locale.format('%d', data['alloy'], True)
             sku = {
                 'quantity': data['alloy'],
-                'ui_name': '%GAMEBUCKS_QUANTITY %GAME_NAME %GAMEBUCKS_NAME',
-                'ui_description': "%GAMEBUCKS_QUANTITY %GAME_NAME %GAMEBUCKS_NAME, which can be spent in game on speed-ups, resources, and special items",
+                'ui_name': '%GAMEBUCKS_QUANTITY %GAME_NAME %GAMEBUCKS_NAME%ITEM_BUNDLE',
+                'ui_description': "%GAMEBUCKS_QUANTITY %GAME_NAME %GAMEBUCKS_NAME%ITEM_BUNDLE, which can be spent in game on speed-ups, resources, and special items",
                 'activation': 'instant', 'icon': 'store_icon_grow_perimeter',
                 'paid': 1,
                 'currency': val['currency'],

@@ -42358,6 +42358,7 @@ Store.place_fbpayments_order = function(fbpayments_currency, price, unit_id, spe
     }
 
     var currency = fbpayments_currency.split(':')[1];
+    var spell = gamedata['spells'][spellname];
 
     var descr = spellname;
     if(spellarg) {
@@ -42368,7 +42369,13 @@ Store.place_fbpayments_order = function(fbpayments_currency, price, unit_id, spe
         descr += ','+object.spec['name'];
     }
 
-    var product_url = ogpapi_url({'spellname':spellname, 'type':gamedata['game_id']+'_sku'});
+    var product_url_props = {'spellname':spellname, 'type':gamedata['game_id']+'_sku'};
+    if('loot_table' in spell) { // if the spell has an item bundle, opt-in to the want_loot flag
+        if(session.get_loot_items(player, gamedata['loot_tables_client'][spell['loot_table']]['loot']).item_list.length > 0) {
+            product_url_props['want_loot']='1';
+        }
+    }
+    var product_url = ogpapi_url(product_url_props);
     var quantity = 1;
 
     var tag = Store.listen_for_order_ack('fbp', on_finish);
