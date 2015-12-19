@@ -11592,7 +11592,7 @@ class LivePlayer(Player):
         if not alt_data: return
         alt_data['attacks'] = alt_data.get('attacks',0) + 1
 
-    def possible_alt_record_login(self, alt_id):
+    def possible_alt_record_login(self, alt_id, ip = None):
         if alt_id == self.user_id: return
         key = str(alt_id)
 
@@ -11616,6 +11616,8 @@ class LivePlayer(Player):
         if alt_data is not None:
             alt_data['logins'] = alt_data.get('logins',0) + 1
             alt_data['last_login'] = server_time # record time of last simultaneous login
+            if ip:
+                alt_data['last_ip'] = ip
 
     def is_alt_account_unattackable(self, other):
         if (not spin_secure_mode): return False
@@ -22582,7 +22584,7 @@ class GAMEAPI(resource.Resource):
         if client_session_data:
             possible_alts = map(int, client_session_data.split(','))
             for alt in possible_alts:
-                player.possible_alt_record_login(alt)
+                player.possible_alt_record_login(alt, ip = client_ip)
 
         on_login_cons = player.get_abtest_consequent('on_login_pre_hello', fail_missing = False)
         if on_login_cons:

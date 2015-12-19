@@ -1753,6 +1753,8 @@ class GameProxy(proxy.ReverseProxyResource):
 
             # for the other accounts, notify via CONTROLAPI
             if SpinConfig.config['proxyserver'].get('alt_ip_notify', True):
+                if len(possible_alts) >= SpinConfig.config['proxyserver'].get('alt_ip_notify_log_min', 2):
+                    raw_log.event(proxy_time, 'long possible alt list for %r: %r from %s' % (session.user_id, possible_alts, log_request(request)))
                 for alt_user_id in possible_alts:
                     fwd = None
                     alt_session = self.session_emulate(db_client.session_get_by_user_id(alt_user_id, reason='record_alt_login'))
@@ -1767,6 +1769,7 @@ class GameProxy(proxy.ReverseProxyResource):
                                                          controlapi_url(fwd[0], fwd[1]) + '?' + \
                                                          urllib.urlencode(dict(secret = str(SpinConfig.config['proxy_api_secret']),
                                                                                method = 'record_alt_login',
+                                                                               ip = session.ip,
                                                                                other_id = session.user_id,
                                                                                user_id = str(alt_user_id))),
                                                          lambda response: None)

@@ -225,10 +225,14 @@ class HandleRecordAltLogin(Handler):
     def __init__(self, *args, **kwargs):
         Handler.__init__(self, *args, **kwargs)
         self.other_id = int(self.args['other_id'])
+        if 'ip' in self.args:
+            self.ip = str(self.args['ip'])
+        else:
+            self.ip = None
         assert self.other_id != self.user_id
     # note: no logging, directly override exec()
     def exec_online(self, session, retmsg):
-        session.player.possible_alt_record_login(self.other_id)
+        session.player.possible_alt_record_login(self.other_id, ip = self.ip)
         return ReturnValue(result = 'ok')
 
     def exec_offline(self, user, player):
@@ -253,7 +257,8 @@ class HandleRecordAltLogin(Handler):
         if alt_data is not None:
             alt_data['logins'] = alt_data.get('logins',0) + 1
             alt_data['last_login'] = self.time_now # record time of last simultaneous login
-
+            if self.ip:
+                alt_data['last_ip'] = self.ip
         return ReturnValue(result = 'ok')
 
 class HandleIgnoreAlt(Handler):

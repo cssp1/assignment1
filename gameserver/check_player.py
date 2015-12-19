@@ -546,8 +546,9 @@ if __name__ == '__main__':
                 elif entry.get('logins',1) < 0 or entry.get('ignore',False): # marked non-alt
                     print fmt % ('', 'ID: %7d, IGNORED (marked as non-alt)' % (int(s_other_id)))
                     continue
-                print fmt % ('', 'ID: %7d, #Logins: %4d, Last simultanous login: %s' % (int(s_other_id), entry.get('logins',1),
-                                                                         pretty_print_time(time_now - entry['last_login'], limit = 2)+' ago' if 'last_login' in entry else 'Unknown'))
+                print fmt % ('', 'ID: %7d, #Logins: %4d, Last simultanous login: %s (IP %s)' % (int(s_other_id), entry.get('logins',1),
+                                                                                                pretty_print_time(time_now - entry['last_login'], limit = 2)+' ago' if 'last_login' in entry else 'Unknown',
+                                                                                                entry.get('last_ip','Unknown')))
 
         if 'customer_support' in player['history']:
             print fmt % ('Customer Support history', '')
