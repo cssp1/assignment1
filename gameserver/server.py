@@ -14365,7 +14365,7 @@ class Store(object):
             if want_loot and spellarg and isinstance(spellarg, dict) and not spellarg.get('want_loot', False):
                 want_loot = False
             # session is None for OGPAPI, which makes want_loot opt-in
-            if want_loot and ((session is None) or session.get_loot_items(session.player, gamedata['loot_tables'][spell['loot_table']], -1, -1)):
+            if want_loot and ((session is None) or session.get_loot_items(session.player, gamedata['loot_tables'][spell['loot_table']]['loot'], -1, -1)):
                 ui_bundle = ' (plus FREE items)'
             s = s.replace('%ITEM_BUNDLE', ui_bundle)
         return s
