@@ -300,6 +300,13 @@ class AntiAltPolicy(Policy):
             if alt_data.get('ignore',0): continue
             if alt_data.get('logins',0) < self.MIN_LOGINS: continue
             if alt_data.get('last_login',0) < time_now - self.IGNORE_AGE: continue
+
+            # last-chance check for any IGNORE_ALT instructions that were dumped out of alt_account_data
+            # but still logged in customer support history
+            if any(x['method'] == 'ignore_alt' and \
+                   int(x['args']['other_id']) == int(salt_id) \
+                   for x in player['history'].get('customer_support',[])): continue
+
             alt_ids.append(int(salt_id))
 
         if self.verbose >= 2:
