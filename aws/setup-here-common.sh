@@ -1,14 +1,13 @@
 #!/bin/bash
 
-AWSHOST="example.compute-1.amazonaws.com"
-AWSKEY="$HOME/.ssh/www.pem"
-AWSCRED_KEYID="host's-IAM-key-id"
-AWSCRED_SECRET="host's-IAM-key-secret"
-AWS_CRON_SNS_TOPIC="your-cron-SNS-topic"
-KIND="www" # one of: analytics1, forums, gamemaster, mongo, prod, www
-GAME_ID="eg" # only for "prod" server type
-GAME_ID_LONG="example" # only for "prod" server type
-ART_CDN_HOST="" # for prod-haproxy setup only
+AWSHOST="example.amazonaws.com"
+AWSKEY="$HOME/.ssh/example.pem"
+AWSCRED_KEYID="none" # optional: for per-host IAM keys
+AWSCRED_SECRET="none"
+AWS_CRON_SNS_TOPIC="arn:aws:sns:us-east-1:147976285850:spinpunch-technical"
+KIND="prod-haproxy" # one of: analytics1, forums, gamemaster, mongo, prod, prod-haproxy, www
+GAME_ID="" # only for "prod" server type
+GAME_ID_LONG="" # only for "prod" server type
 
 # run on mothership machine
 
