@@ -12112,10 +12112,10 @@ class LivePlayer(Player):
 
 
         # dump alt_account data if too old
-        if self.history.get('alt_account_data_age',-1) < 1450520387:
+        if self.history.get('alt_account_data_epoch',-1) < gamedata['server'].get('alt_account_data_epoch',-1):
             self.possible_alt_accounts = {}
             self.known_alt_accounts = {}
-        self.history['alt_account_data_age'] = server_time
+        self.history['alt_account_data_epoch'] = server_time
 
         # change format of known_alt_accounts
         if self.known_alt_accounts is None:

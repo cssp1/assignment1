@@ -286,6 +286,10 @@ class AntiAltPolicy(Policy):
         if self.test:
             alt_accounts = {str(user_id+1): {'logins': 99, 'last_login': time_now-60}}
         else:
+            # ignore bad old data
+            if player['history'].get('alt_account_data_epoch',-1) < gamedata['server'].get('alt_account_data_epoch',-1):
+                return
+
             alt_accounts = player.get('known_alt_accounts', {})
 
         if not alt_accounts or not isinstance(alt_accounts, dict): return
