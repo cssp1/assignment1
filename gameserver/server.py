@@ -13112,7 +13112,10 @@ class OGPAPI(resource.Resource):
                 return 'invalid spellname'
             spell = gamedata['spells'][spellname]
             assert spell['price_formula'] == 'constant' # price must be only a function of the URL!
-            my_url = self.get_object_endpoint({'type':type, 'spellname': spellname})
+            my_url_props = {'type':type, 'spellname': spellname}
+            if 'want_loot' in request.args:
+                my_url_props['want_loot'] = request.args['want_loot'][0]
+            my_url = self.get_object_endpoint(my_url_props)
             my_extra_prefix = ' product: http://ogp.me/ns/product#'
             my_og_type = 'og:product'
             # note: for localized languages, we'll have to have individual SKUs here
