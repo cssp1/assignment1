@@ -90,6 +90,10 @@ def get_twisted_client_ip(request, proxy_secret = None, trust_x_forwarded = True
             assert validate_proxy_headers(request, proxy_secret)
             return forw
 
+    cf_con = get_twisted_header(request, 'CF-Connecting-IP')
+    if cf_con:
+        return cf_con
+
     forw_list = request.requestHeaders.getRawHeaders('X-Forwarded-For')
     if forw_list and len(forw_list) > 0:
         forw = ','.join(map(str, forw_list))
