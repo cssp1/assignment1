@@ -11,6 +11,7 @@ import socket, os, errno, fcntl
 from urllib import urlencode
 import requests
 import AtomicFileWrite
+import OpenSSL.SSL
 
 class S3Exception(Exception):
     def __init__(self, wrapped, ui_msg, op, bucket, filename, attempt_num):
@@ -76,6 +77,12 @@ def retry_logic(func_name, bucket, filename, policy_404, func, *args, **kwargs):
         except socket.error as e:
             last_err = S3Exception(e, 'socket.error: %s' % errno.errorcode[e.errno], func_name, bucket, filename, attempt)
             if e.errno == errno.ECONNRESET:
+                pass # retry
+            else:
+                raise last_err # abort immediately
+        except OpenSSL.SSL.SysCallError as e:
+            last_err = S3Exception(e, 'OpenSSL.SSL.SysCallError: %r' % e, func_name, bucket, filename, attempt)
+            if e.args == (errno.EPIPE, 'EPIPE'):
                 pass # retry
             else:
                 raise last_err # abort immediately
