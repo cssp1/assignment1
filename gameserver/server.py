@@ -842,9 +842,9 @@ class S3IOSystem (IOSystem):
         self.s3 = SpinUserDB.driver.s3con # SpinS3.S3(SpinUserDB.driver.key_file)
 
         config = gamedata['server'].get('AsyncHTTP_S3', {})
-        request_timeout = config.get('request_timeout', 30)
+        request_timeout = config.get('request_timeout', 15)
         max_tries = config.get('max_tries', 3) # was: 20 (high is better against S3 errors but worse against server flood attacks)
-        retry_delay = config.get('retry_delay', 4)
+        retry_delay = config.get('retry_delay', 3)
 
         # Wait this many seconds after the actual HTTP response before returning success from an async write.
         # This is necessary to deal with S3's "eventual consistency" model, so that player files don't get
