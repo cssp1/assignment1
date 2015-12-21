@@ -81,7 +81,7 @@ for DAY in $YESTERDAY; do
 #    gzip -c $INPUT > $SAVE_DIR/$ZIPFILE
 #
 #    echo "uploading $ZIPFILE to S3..."
-#    aws s3 cp $SAVE_DIR/$ZIPFILE s3://spinpunch-logs/$MONTH/$ZIPFILE 
+#    aws s3 cp $SAVE_DIR/$ZIPFILE s3://spinpunch-logs/$MONTH/$ZIPFILE
 #    if [[ $? != 0 ]]; then
 #        echo "S3 upload error!"
 #        ERROR=1

@@ -62,12 +62,12 @@ function do_conform {
     ADDITIONS=$(find_additions "${GROUP_NAME}" "${IP_LIST}" "${PORT_LIST}" "${GROUP_DESCR}")
 
     if [ "${DELETIONS}" != "" ]; then
-	echo "${GROUP_NAME} DELETE ${DELETIONS}"
-	aws ec2 revoke-security-group-ingress --group-name ${GROUP_NAME} --ip-permissions "${DELETIONS}"
+    echo "${GROUP_NAME} DELETE ${DELETIONS}"
+    aws ec2 revoke-security-group-ingress --group-name ${GROUP_NAME} --ip-permissions "${DELETIONS}"
     fi
     if [ "${ADDITIONS}" != "" ]; then
-	echo "${GROUP_NAME} ADD ${ADDITIONS}"
-	aws ec2 authorize-security-group-ingress --group-name ${GROUP_NAME} --ip-permissions "${ADDITIONS}"
+    echo "${GROUP_NAME} ADD ${ADDITIONS}"
+    aws ec2 authorize-security-group-ingress --group-name ${GROUP_NAME} --ip-permissions "${ADDITIONS}"
     fi
 }
 

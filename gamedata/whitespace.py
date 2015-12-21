@@ -14,6 +14,7 @@ import sys, os, stat, re, getopt, cStringIO, traceback
 IGNORE_DIRS = set(['.svn','.git', # SCM data
                    'userdb','playerdb','basedb','aistate','db','art','built', # server state
                    'logs','ujson','pysvg','dowser','google', # third-party
+                   'puppet', # don't even try
                    ])
 
 def dir_filter(name):
