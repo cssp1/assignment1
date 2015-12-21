@@ -36428,13 +36428,23 @@ function invoke_buy_gamebucks_dialog23(ver, reason, amount, order, options) {
         dialog.widgets['trialpay_button'].onclick = function(w) { Store.trialpay_invoke(); };
     }
 
-    // highlight the first offer
-    if(spell_list[0]['expect_loot'] && (highlight_only || !session.buy_gamebucks_sku_highlight_shown)) {
+    // highlight the first loot-bearing offer for >= 1000 Gamebucks, or the first loot-bearing offer as a fallback
+    var to_highlight = null;
+    for(var h = 0; h < spell_list.length; h++) {
+        var s = spell_list[h];
+        if(s['expect_loot']) {
+            to_highlight = s;
+            if(gamedata['spells'][s['spellname']]['quantity'] >= 1000) {
+                break;
+            }
+        }
+    }
+    if(to_highlight && (highlight_only || !session.buy_gamebucks_sku_highlight_shown)) {
         session.buy_gamebucks_sku_highlight_shown = true; // only show once
         if(highlight_only) {
             close_dialog(dialog);
         }
-        var highlight_dialog = invoke_gamebucks_sku_highlight_dialog(spell_list[0]['spellname'], spell_list[0]['spellarg']);
+        var highlight_dialog = invoke_gamebucks_sku_highlight_dialog(to_highlight['spellname'], to_highlight['spellarg']);
         if(highlight_only) {
             //highlight_dialog.widgets['close_button'].onclick = function(w) { change_selection_ui(null); }
             return;
