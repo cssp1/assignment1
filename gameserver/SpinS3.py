@@ -75,7 +75,7 @@ def retry_logic(func_name, bucket, filename, policy_404, func, *args, **kwargs):
             last_err = S3Exception(e, 'socket.timeout', func_name, bucket, filename, attempt)
             pass # retry
         except socket.error as e:
-            last_err = S3Exception(e, 'socket.error: %s' % errno.errorcode[e.errno], func_name, bucket, filename, attempt)
+            last_err = S3Exception(e, 'socket.error: %r %s' % (e, errno.errorcode.get(e.errno,'Unknown')), func_name, bucket, filename, attempt)
             if e.errno == errno.ECONNRESET:
                 pass # retry
             else:
