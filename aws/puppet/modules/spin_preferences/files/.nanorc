@@ -1,0 +1,13 @@
+include ~/.nano/sh.nanorc
+include ~/.nano/html.nanorc
+include ~/.nano/patch.nanorc
+include ~/.nano/json.nanorc
+
+# set autoindent
+set cut
+set historylog
+set morespace
+set noconvert
+set nowrap
+set tabsize 4
+set tabstospaces

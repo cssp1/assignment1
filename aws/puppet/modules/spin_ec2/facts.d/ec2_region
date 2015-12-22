@@ -1,0 +1,3 @@
+#!/bin/sh
+MYREGION=`curl -s http://instance-data/latest/dynamic/instance-identity/document | grep region | awk -F\" '{print $4}'`
+echo "ec2_region=${MYREGION}"
