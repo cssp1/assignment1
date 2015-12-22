@@ -137,7 +137,7 @@ ItemDisplay.get_inventory_item_stack_prefix = function(spec, count) {
     @returns {SPUI.Font}
  */
 ItemDisplay.get_font_for_stack = function(widget, is_fungible, stack) {
-    var font_size = widget.data[(is_fungible ? 'text_size' : 'text_size'+(stack >= 10000 ? '_fungible5' : (stack >= 1000 ? '_fungible4' : (stack >= 100 ? '_fungible3' : ''))))];
+    var font_size = widget.data[(is_fungible ? 'text_size' : 'text_size'+(stack >= 1000000 ? '_fungible7' : (stack >= 100000 ? '_fungible6' : (stack >= 10000 ? '_fungible5' : (stack >= 1000 ? '_fungible4' : (stack >= 100 ? '_fungible3' : ''))))))];
     return SPUI.make_font(font_size, font_size+3, 'thick');
 };
 
