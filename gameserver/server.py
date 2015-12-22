@@ -15028,6 +15028,7 @@ class Store(object):
                 metric_event_coded(session.user.user_id, '4590_promo_gamebucks_earned', props.copy())
 
             items = []
+            loggable_items = []
             discovered_where = None
 
             if want_loot: # item bundle
@@ -15035,6 +15036,7 @@ class Store(object):
                 loot_table = gamedata['loot_tables'][spell['loot_table']]
                 items += session.get_loot_items(session.player, loot_table['loot'], -1, -1)
                 if items:
+                    loggable_items = copy.deepcopy(items) # because inventory operations might mutate it
                     if session.player.get_any_abtest_value('modal_looting', gamedata['modal_looting']) and \
                        session.player.find_object_by_type(gamedata['inventory_building']):
 
@@ -15059,7 +15061,7 @@ class Store(object):
                             retmsg.append(["LOOT_BUFFER_UPDATE", session.player.loot_buffer, True])
                             discovered_where = 'loot_buffer'
 
-                        for item in items:
+                        for item in loggable_items:
                             session.player.inventory_log_event('5125_item_obtained', item['spec'], item.get('stack',1), item.get('expire_time',-1), level=item.get('level',None), reason=spellname)
 
                     else:
@@ -15079,12 +15081,14 @@ class Store(object):
             # show "additional" gamebucks earned for purchase as if it were an item
             if 'nominal_quantity' in spell and spell['nominal_quantity'] < spell['quantity'] and \
                cls.buy_gamebucks_dialog_gamebucks_as_item(session, session.player):
-                items = [{'spec':'gamebucks', 'stack': spell['quantity'] - spell['nominal_quantity']}] + items
+                gamebucks_item = {'spec':'gamebucks', 'stack': spell['quantity'] - spell['nominal_quantity']}
+                items = [gamebucks_item,] + items
+                loggable_items = [gamebucks_item,] + loggable_items
                 if discovered_where is None:
                     discovered_where = 'inventory' # assume already added
 
-            if items and discovered_where:
-                retmsg.append(["ITEMS_DISCOVERED", items, -1, discovered_where])
+            if loggable_items and discovered_where:
+                retmsg.append(["ITEMS_DISCOVERED", loggable_items, -1, discovered_where])
 
             if gift_order:
                 # try to send gamebucks gift. On failure, leave the gamebucks in the player's balance
@@ -15153,8 +15157,8 @@ class Store(object):
 
                         return 'packaged_'+unit_name+ (('_L%d' % level) if (level > 1) else '')
 
-                    items = [{'spec':item_sku(session.player, name, cc_level), 'stack':qty} for name, qty in spell['give_units'].iteritems() if (name in gamedata['units'])]
-                    session.player.send_loot_mail('', 0, items, retmsg, mail_template = gamedata['strings']['buy_gamebucks_bonus_mail'])
+                    unit_items = [{'spec':item_sku(session.player, name, cc_level), 'stack':qty} for name, qty in spell['give_units'].iteritems() if (name in gamedata['units'])]
+                    session.player.send_loot_mail('', 0, unit_items, retmsg, mail_template = gamedata['strings']['buy_gamebucks_bonus_mail'])
                     retmsg.append(["YOU_GOT_BONUS_UNITS"])
                 else:
                     session.spawn_new_units_for_player(session.player, retmsg, spell['give_units'])
