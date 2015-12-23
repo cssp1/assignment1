@@ -86,7 +86,7 @@ def resolve(session, log_func = None):
         if (not obj.is_destroyed()):
             if obj.is_shooter():
                 shooter_list.append(obj)
-            if (not obj.is_inert()): # it can be killed
+            if (not obj.is_inert()) and (not obj.spec.worth_less_xp): # it can/should be killed (note: ignore barriers)
                 target_list.append(obj)
                 target_cur_hp[obj.obj_id] = obj.hp
 
