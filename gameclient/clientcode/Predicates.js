@@ -660,6 +660,7 @@ TechLevelPredicate.prototype.do_ui_help = function(player) {
     }
     return null;
 };
+TechLevelPredicate.prototype.ui_time_range = function(player) { return [-1,-1]; };
 
 /** @type {(Object.<string,boolean>|null)} special cache just for QuestCompletedPredicate to avoid O(N^2) behavior */
 var quest_completed_predicate_cache = null;
