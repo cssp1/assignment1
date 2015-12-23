@@ -6,6 +6,8 @@
 
 # library for use by the game server to calculate auto-resolve battle results
 
+from Equipment import Equipment
+
 # pretty-print a list of GameObjects
 def pretty_obj_list(ls):
     return '['+', '.join('%s L%d %d/%d' % (x.spec.name, x.level, x.hp, x.max_hp) for x in ls)+']'
@@ -67,6 +69,28 @@ def compute_dps(shooter, target, session):
 
     return damage
 
+def item_affects_dps(owner, item):
+    spec = owner.get_abtest_item(item['spec'])
+    if spec:
+        if 'equip' in spec and 'effects' in spec['equip']:
+            for effect in spec['equip']['effects']:
+                if effect['code'] == 'modstat' and effect['stat'] in ('weapon','weapon_level'):
+                    return True
+    return False
+
+def equipment_key(obj):
+    if obj.is_building() and obj.equipment:
+        item_names = '|'.join(sorted('%s_L%d' % (item['spec'], item.get('level',1)) \
+                                     for item in Equipment.equip_iter(obj.equipment) \
+                                     if item_affects_dps(obj.owner, item)))
+        return item_names
+    return ''
+
+def make_dps_key(shooter, target):
+    return '%d:%s:L%d:%s vs %d:%s:L%d:%s' % \
+           (shooter.owner.user_id, shooter.spec.name, shooter.level, equipment_key(shooter),
+            target.owner.user_id, target.spec.name, target.level, equipment_key(target))
+
 # returns list of actions, where each action is a list arguments to call the server functions
 # destroy_object() and object_combat_updates().
 
@@ -95,10 +119,6 @@ def resolve(session, log_func = None):
 
     # cache object vs object DPS to avoid recomputation
     dps_cache = {}
-    def make_dps_key(shooter, target):
-        return '%d:%s:L%d vs %d:%s:L%d' % \
-               (shooter.owner.user_id, shooter.spec.name, shooter.level,
-                target.owner.user_id, target.spec.name, target.level)
 
     # iterate until nothing that can shoot is left alive OR
     # nothing can be damaged by what's left.
@@ -125,12 +145,7 @@ def resolve(session, log_func = None):
                         dps = compute_dps(shot, obj, session)
                         dps_cache[dps_key] = dps
                         if log_func:
-                            log_func('DPS of %s %s L%d vs. %s %s L%d = %r' % \
-                                     (('player' if shot.owner is session.player else 'enemy'),
-                                      shot.spec.name, shot.level,
-                                      ('player' if obj.owner is session.player else 'enemy'),
-                                      obj.spec.name, obj.level,
-                                      dps))
+                            log_func('DPS of %r = %r' % (dps_key, dps))
 
                     if dps > biggest_dps:
                         biggest_dps = dps
