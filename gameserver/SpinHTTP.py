@@ -94,6 +94,10 @@ def get_twisted_client_ip(request, proxy_secret = None, trust_x_forwarded = True
     if cf_con:
         return cf_con
 
+    incap = get_twisted_header(request, 'incap-client-ip')
+    if incap:
+        return incap
+
     forw_list = request.requestHeaders.getRawHeaders('X-Forwarded-For')
     if forw_list and len(forw_list) > 0:
         forw = ','.join(map(str, forw_list))
