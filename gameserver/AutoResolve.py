@@ -91,6 +91,16 @@ def make_dps_key(shooter, target):
            (shooter.owner.user_id, shooter.spec.name, shooter.level, equipment_key(shooter),
             target.owner.user_id, target.spec.name, target.level, equipment_key(target))
 
+def get_killer_info(session, killer):
+    ret = {'team': 'player' if killer.owner is session.player else 'enemy',
+           'spec': killer.spec.name, 'level': killer.level, 'id': killer.obj_id}
+    if killer.is_building():
+        if killer.is_minefield() and killer.is_minefield_armed():
+            ret['mine'] = killer.minefield_item()
+        elif killer.is_emplacement() and killer.turret_head_item():
+            ret['turret_head'] = killer.turret_head_item()
+    return ret
+
 # returns list of actions, where each action is a list arguments to call the server functions
 # destroy_object() and object_combat_updates().
 
@@ -179,8 +189,7 @@ def resolve(session, log_func = None):
         # (note: no update sent to client - we assume an immediate session change follows)
 
         if killer:
-            killer_info = {'team': 'player' if killer.owner is session.player else 'enemy',
-                           'spec': killer.spec.name, 'level': killer.level, 'id': killer.obj_id}
+            killer_info = get_killer_info(session, killer)
             killer_spell = killer.get_auto_spell()
             if killer_spell and killer_spell.get('kills_self', False):
                 # suicide unit

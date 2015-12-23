@@ -6424,6 +6424,28 @@ class Building(GameObject):
                 return True
         return False
 
+    def is_minefield(self):
+        return self.spec.equip_slots and ('mine' in self.spec.equip_slots)
+    def is_minefield_armed(self):
+        return Equipment.equip_has(self.equipment, ('mine',0))
+    def minefield_item(self): # note: returns spec name
+        item = Equipment.equip_get(self.equipment, ('mine',0))
+        if item: return item['spec']
+        if this.config and this.config['mine'] and len(this.config['mine']) > 0:
+            if isinstance(this.config['mine'], basestring):
+                return this.config['mine']
+            elif isinstance(this.config['mine'][0], basestring):
+                return this.config['mine'][0]
+            else:
+                return this.config['mine'][0]['spec']
+        return None
+    def is_emplacement(self):
+        return self.spec.equip_slots and ('turret_head' in self.spec.equip_slots)
+    def turret_head_item(self): # note: returns spec name
+        item = Equipment.equip_get(self.equipment, ('turret_head',0))
+        if item: return item['spec']
+        return None
+
     def is_repairing(self):
         return (self.repair_finish_time > 0)
 
