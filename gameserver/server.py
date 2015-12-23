@@ -20988,9 +20988,16 @@ class GAMEAPI(resource.Resource):
                             spellname = spellarg = None
                             if client_price and client_currency:
                                 # look for a zombie SKU slate order
-                                if ('type' in qs) and (qs['type'][-1] == OGPAPI.object_type('sku')):
-                                    spellname = qs['spellname'][-1]
-                                    assert url == OGPAPI_instance.get_object_endpoint({'type':OGPAPI.object_type('sku'), 'spellname': spellname})
+                                if ('type' in qs) and (qs['type'][0] == OGPAPI.object_type('sku')):
+                                    spellname = qs['spellname'][0]
+                                    url_props = {'type':OGPAPI.object_type('sku'), 'spellname': spellname}
+                                    if 'want_loot' in qs:
+                                        url_props['want_loot'] = qs['want_loot'][0]
+                                        spellarg = {'want_loot': bool(int(qs['want_loot'][0]))}
+                                    if url != OGPAPI_instance.get_object_endpoint(url_props):
+                                        gamesite.exception_log.event('fbpayment URL mismatch: got %s expected %s' % \
+                                                                     (url, OGPAPI_instance.get_object_endpoint(url_props)))
+                                        raise Exception('fbpayment URL mismatch')
 
                                 # look for an order that buys in-game currency directly on the OG currency object, like a payer promo
                                 elif url == str(OGPAPI_instance.get_object_endpoint({'type':OGPAPI.object_type('gamebucks')})) or \
