@@ -43,6 +43,7 @@ var spin_token_cookie_name = '$SPIN_TOKEN_COOKIE_NAME$';
 var spin_token_domain = '$SPIN_TOKEN_DOMAIN$';
 var spin_giveable_items = $SPIN_GIVEABLE_ITEMS$;
 var spin_regions = $SPIN_REGIONS$;
+var spin_direct_multiplex = $SPIN_DIRECT_MULTIPLEX$;
 var spin_ai_base_ids = $SPIN_AI_BASE_IDS$;
 var spin_log_bookmark = $SPIN_LOG_BOOKMARK$;
 var spin_log_bookmark_dirty = true;
@@ -1115,7 +1116,11 @@ var refresh_server_status_row = function(row, item) {
                 s = val;
                 var url = null;
                 if('game_ssl_port' in item && item['game_ssl_port'] > 0) {
-                    url = 'https://'+item['hostname']+':'+item['game_ssl_port'].toString()+'/ADMIN';
+                    if(spin_direct_multiplex) {
+                        url = spin_url.replace('PCHECK','ADMIN')+'?spin_game_server_port='+item['game_ssl_port'].toString();
+                    } else {
+                        url = 'https://'+item['hostname']+':'+item['game_ssl_port'].toString()+'/ADMIN';
+                    }
                 } else if('game_http_port' in item && item['game_http_port'] > 0) {
                     url = 'http://'+item['hostname']+':'+item['game_http_port'].toString()+'/ADMIN';
                 }
