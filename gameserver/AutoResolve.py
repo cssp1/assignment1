@@ -67,12 +67,15 @@ def compute_dps(shooter, target, session):
 
     return damage
 
-# return two lists of arguments to call the server functions destroy_object()
-# and object_combat_updates(), respectively.
+# returns list of actions, where each action is a list arguments to call the server functions
+# destroy_object() and object_combat_updates().
 
 def resolve(session, log_func = None):
-    objects_destroyed = []
-    combat_updates = []
+    actions = []
+    def objects_destroyed(arg):
+        actions.append((arg, None))
+    def combat_updates(arg):
+        actions.append((None, arg))
 
     shooter_list = []
     target_list = []
@@ -163,22 +166,24 @@ def resolve(session, log_func = None):
         if killer:
             killer_info = {'team': 'player' if killer.owner is session.player else 'enemy',
                            'spec': killer.spec.name, 'level': killer.level, 'id': killer.obj_id}
-            if killer.is_mobile():
-                killer_spell = killer.get_auto_spell()
-                if killer_spell and killer_spell.get('kills_self', False):
-                    # suicide unit
-                    shooter_list.remove(killer)
+            killer_spell = killer.get_auto_spell()
+            if killer_spell and killer_spell.get('kills_self', False):
+                # suicide unit
+                shooter_list.remove(killer)
+                if killer in target_list:
                     target_list.remove(killer)
-                    kill_list = filter(lambda x: x[1] != killer.obj_id, kill_list) # remove it from kill_list
-                    objects_destroyed.append([killer.obj_id, [killer.x, killer.y], killer_info])
+                kill_list = filter(lambda x: x[1] != killer.obj_id, kill_list) # remove it from kill_list
+                if killer.is_mobile():
+                    objects_destroyed([killer.obj_id, [killer.x, killer.y], killer_info])
+                elif killer.is_building():
+                    combat_updates([killer.obj_id, killer.spec.name, None, 0, None, killer_info, None])
         else:
             killer_info = None
 
         if next.is_mobile():
-            objects_destroyed.append([next.obj_id, [next.x, next.y], killer_info])
+            objects_destroyed([next.obj_id, [next.x, next.y], killer_info])
         elif next.is_building():
-            new_hp = 0
-            combat_updates.append([next.obj_id, next.spec.name, None, new_hp, None, killer_info, None])
+            combat_updates([next.obj_id, next.spec.name, None, 0, None, killer_info, None])
 
         # the opposing team doesn't suffer a death, but we need to
         # subtract HP from its most vulnerable target for the time taken during the kill
@@ -206,6 +211,6 @@ def resolve(session, log_func = None):
                 log_func('remaining damage: %s %s L%d HP %d -> %d' % \
                          (('player' if obj.owner is session.player else 'enemy'), obj.spec.name, obj.level,
                           obj.hp, cur_hp))
-            combat_updates.append([obj.obj_id, obj.spec.name, None, cur_hp, None, None, None])
+            combat_updates([obj.obj_id, obj.spec.name, None, cur_hp, None, None, None])
 
-    return objects_destroyed, combat_updates
+    return actions

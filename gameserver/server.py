@@ -21154,11 +21154,12 @@ class GAMEAPI(resource.Resource):
         resolve_iter = 0
 
         while True: # iterate, because object destruction can spawn new objects (security teams)
-            objects_destroyed, combat_updates = AutoResolve.resolve(session, log_func = log_func)
-            if gamedata['server'].get('log_auto_resolve', 0) >= 2:
-                gamesite.exception_log.event(server_time, "player %d at %s auto-resolve iter %d destroys: %r ... updates: %r" % (session.player.user_id, session.viewing_base.base_id, resolve_iter, objects_destroyed, combat_updates))
+            action_list = AutoResolve.resolve(session, log_func = log_func)
 
-            if not objects_destroyed and not combat_updates:
+            if gamedata['server'].get('log_auto_resolve', 0) >= 2:
+                gamesite.exception_log.event(server_time, "player %d at %s auto-resolve iter %d destroys: %r ... updates: %r" % (session.player.user_id, session.viewing_base.base_id, resolve_iter, [x[0] for x in action_list if x[0]], [x[1] for x in action_list if x[1]]))
+
+            if not action_list:
                 break # nothing happened
 
             resolve_iter += 1
@@ -21166,14 +21167,18 @@ class GAMEAPI(resource.Resource):
             # compare number of objects before and after submitting
             # the changes, to pick up new security team objects
             num_before = session.num_objects()
-            for args in objects_destroyed:
-                self.destroy_object(session, retmsg, *args)
-            self.object_combat_updates(session, retmsg, combat_updates)
+            destroyed_count = 0
+            for objects_destroyed_arg, combat_updates_arg in action_list:
+                if objects_destroyed_arg:
+                    self.destroy_object(session, retmsg, *objects_destroyed_arg)
+                    destroyed_count += 1
+                if combat_updates_arg:
+                    self.object_combat_updates(session, retmsg, [combat_updates_arg,])
 
             # check for security team spawning
             num_after = session.num_objects()
 
-            if num_after <= num_before - len(objects_destroyed):
+            if num_after <= num_before - destroyed_count:
                 break # nothing new spawned
 
     def object_combat_updates(self, session, retmsg, arg):
