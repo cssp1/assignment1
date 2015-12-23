@@ -38,11 +38,11 @@ action = iptables[name=SSH, port=ssh, protocol=tcp]',
     source => 'http://mirror.centos.org/centos/RPM-GPG-KEY-CentOS-5' }
 
   # add mongodb repo address
-  rpmkey { '7F0CEB10':
+  rpmkey { 'EA312927':
     ensure => present,
-    source => 'https://docs.mongodb.org/10gen-gpg-key.asc' }
-  yumrepo { 'mongodb.org':
-    baseurl => 'http://downloads-distro.mongodb.org/repo/redhat/os/x86_64/',
+    source => 'https://www.mongodb.org/static/pgp/server-3.2.asc' }
+  yumrepo { 'mongodb-org-3.2':
+    baseurl => 'https://repo.mongodb.org/yum/amazon/2013.03/mongodb-org/3.2/x86_64/',
     enabled => 1,
     gpgcheck => 1,
   }
