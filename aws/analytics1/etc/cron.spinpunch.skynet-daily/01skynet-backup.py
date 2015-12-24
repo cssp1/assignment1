@@ -1,47 +1,17 @@
 #!/usr/bin/python
 
-# Copyright (c) 2015 Battlehouse Inc. All rights reserved.
-# Use of this source code is governed by an MIT-style license that can be
-# found in the LICENSE file.
-
 # this is a raw standalone script that does not depend on a game SVN checkout
-
-# RESTORE INSTRUCTIONS
-
-# 1. get Tim Kay's aws script (from game/aws/aws)
-# 2. put an IAM key with spinpunch-backups read access in ~/.awssecret and chmod 0700
-# 3. download the files, (PUT THEM ON FAST SSD DRIVE!) e.g.:
-#      for F in `~/aws ls -1 spinpunch-backups/battlefrontmars-player-data-20140926/`; do if [ `echo $F | grep mongo` ]; then ~/aws get --progress spinpunch-backups/$F $F; fi; done
-# 4. untar
-#      for F in *.tar.gz; do tar zxvf $F; done
-# 5. start MongoDB with auth=false and with bind_ip=127.0.0.1
-# 6. restore admin database
-#      mongorestore --drop admin
-# 7. restore game databases
-#      for F in mfprod*; do mongorestore --authenticationDatabase admin -u root -p [password] --drop $F; done
-# 8. restart MongoDB with auth=true and bind_ip off
-# 9. if moving to new ephemeral storage, check that the SCRATCH_DIR exists!
-
-# script to "catch up" new facebook_id_map entries to avoid losing accounts:
-# grep created_new_account longs/20140528-metrics.json > /tmp/z
-# out = open('/tmp/cmds', 'w')
-# for line in open('/tmp/z'):
-#    data = json.loads(line)
-#    print >> out, 'var user_id = %d, fb_id = "%s"; db.mf_facebook_id_map.save({_id:fb_id, user_id:NumberInt(user_id)});' % (data['user_id'], data['social_id'][2:] if data['social_id'].startswith('fb') else data['social_id'])
-#  to check for data loss:
-#    print >> out, 'var user_id = %d, fb_id = "%s"; printjson(db.mf_facebook_id_map.findOne({_id:fb_id}));' % (data['user_id'], data['social_id'][2:])
-
 
 import sys, os, time, socket, getopt, subprocess
 import boto.s3.connection
 import boto.s3.key
 
 ### HOST-SPECIFIC PARAMETERS
-SCRATCH_DIR = '/media/ephemeral0/temp'
-mongo_root_password_filename = 'mfprod-mongo-root-password'
+SCRATCH_DIR = '/media/ephemeral0a/backup-scratch'
+mongo_root_password_filename = 'analytics1-mongo-root-password'
 backup_bucket = 'spinpunch-backups'
-backup_obj_prefix = 'marsfrontier-player-data-$DATE/'
-backup_databases = None # or None for all
+backup_obj_prefix = 'skynet/$DATE-'
+backup_databases = ['skynet'] # or None for all
 ###
 
 time_now = int(time.time())
@@ -106,7 +76,7 @@ if __name__ == '__main__':
                                                                            '-d', database,
                                                                            '-o', '.'], stdout=open('/dev/null','w'))
 
-            if 0: # CPIO cannot handle files >8GB :P
+            if 0: # CPIO cannot handle files >4GB :P
                 zip_file = 'mongodb-%s.cpio.gz' % database
                 zip_cmd = 'find %s | cpio -oL --quiet | gzip -c > %s' % (database, zip_file)
             else:
@@ -133,7 +103,6 @@ if __name__ == '__main__':
         if not dry_run:
             cmd = "db.runCommand({logRotate:1}); "+cmd
         logpath = subprocess.Popen(mongo_cmd + ['admin', '--quiet', '--eval', cmd], stdout=subprocess.PIPE).stdout.read().strip()
-        assert logpath
         if verbose: print 'cleaning up log files:', logpath+'.*'
         if not dry_run:
             subprocess.check_call('/bin/rm -f %s' % (logpath+'.*'), shell=True)
