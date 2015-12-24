@@ -141,6 +141,10 @@
     ],
 
     "buy_gamebucks_sku_kind": [
+        // flash sales (slates available for all currencies)
+        [{"predicate": "AURA_ACTIVE", "aura_name": "flash_sale", "match_data": {"kind": "FLASH50"}}, "FLASH50"],
+        [{"predicate": "AURA_ACTIVE", "aura_name": "flash_sale", "match_data": {"kind": "FLASH25"}}, "FLASH25"],
+
         [{"predicate": "AND", "subpredicates": [{"predicate": "FRAME_PLATFORM", "platform": "fb"}, {"predicate": "LIBRARY", "name": "fbpayments_D2SALE_in_effect"}]}, "D2SALE"],
         [{"predicate": "ALWAYS_TRUE"}, "D2"]
     ],

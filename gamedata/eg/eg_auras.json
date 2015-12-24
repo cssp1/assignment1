@@ -202,6 +202,17 @@
         "on_click": {"consequent": "INVOKE_BUY_GAMEBUCKS_DIALOG"}
         // effects happen via AURA_(IN)ACTIVE predicates
     },
+    "item_bundles": {
+        "name": "item_bundles",
+        // note: data attributes "kind" and "duration" are mandatory for metrics logging. "tag" is optional.
+        "icon": "gamebucks_inventory_icon",
+        "client": 0, "server": 0,
+        "help": 1, "cancelable": 0, "limited": 0,
+        "ui_name": "Special Offer", "show": 1, "name_color": [0,1,0.25,1],
+        "ui_description": "Get FREE items with %gamebucks purchases. Act quickly, this offer ends soon!",
+        "on_click": {"consequent": "INVOKE_BUY_GAMEBUCKS_DIALOG"}
+        // effects happen via AURA_(IN)ACTIVE predicates
+    },
     "generic_sale": {
         "name": "generic_sale",
         "icon": "gamebucks_inventory_icon",
