@@ -20097,7 +20097,8 @@ class GAMEAPI(resource.Resource):
                 session.player.inventory_log_event('5131_item_trashed', remove_specname, -remove_item.get('stack',1), remove_item.get('expire_time',-1), level=remove_item.get('level',1), reason='removed')
             else:
                 # note: pass inflated max_usable_inventory here as "buffer" space, since we checked for space above
-                assert session.player.inventory_add_item(remove_item, max_usable_inventory + inventory_buffer) == 1
+                # in over-full warehouse situtations, we don't want this to fail, so pass -1 instead of the true slot count
+                assert session.player.inventory_add_item(remove_item, -1 if inventory_buffer >= 1 else (max_usable_inventory + inventory_buffer)) == 1
                 # no need to log - player already had item
             if 'on_unequip' in remove_spec['equip']:
                 session.execute_consequent_safe(remove_spec['equip']['on_unequip'], session.player, retmsg, reason='on_unequip')
