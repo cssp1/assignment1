@@ -1,7 +1,7 @@
 #!/bin/bash
 
-AWSHOST="example.amazonaws.com"
-AWSKEY="$HOME/.ssh/example.pem"
+AWSHOST="ec2-54-80-125-20.compute-1.amazonaws.com"
+AWSKEY="$HOME/.ssh/bfmprod.pem"
 AWSCRED_KEYID="none" # optional: for per-host IAM keys
 AWSCRED_SECRET="none"
 AWS_CRON_SNS_TOPIC="arn:aws:sns:us-east-1:147976285850:spinpunch-technical"
