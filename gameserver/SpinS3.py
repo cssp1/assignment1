@@ -82,7 +82,7 @@ def retry_logic(func_name, bucket, filename, policy_404, func, *args, **kwargs):
                 raise last_err # abort immediately
         except OpenSSL.SSL.SysCallError as e:
             last_err = S3Exception(e, 'OpenSSL.SSL.SysCallError: %r' % e, func_name, bucket, filename, attempt)
-            if e.args == (errno.EPIPE, 'EPIPE'):
+            if e.args in ((errno.EPIPE, 'EPIPE'), (errno.ECONNRESET, 'ECONNRESET')):
                 pass # retry
             else:
                 raise last_err # abort immediately
