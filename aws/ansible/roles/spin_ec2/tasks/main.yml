@@ -1,0 +1,67 @@
+---
+
+# FAIL2BAN
+# set up fail2ban to stop SSH brute-force attacks
+- name: Copy fail2ban config file
+  copy: src=jail.local dest=/etc/fail2ban/jail.local owner=root group=root mode=0644
+
+- name: Install fail2ban
+  yum: name=fail2ban state=latest
+
+- name: Run fail2ban
+  service: name=fail2ban enabled=yes state=started
+
+# CONFIGS/SCRIPTS
+- name: Copy terminal tool config files
+  copy: src={{ item }} dest=/home/{{ ansible_ssh_user }}/{{ item }} owner={{ ansible_ssh_user }} group={{ ansible_ssh_user }} mode=0644
+  with_items:
+    - .bashrc
+    - .bash_profile
+    - .screenrc
+    - .dir_colors
+    - .nanorc
+    - .nano
+
+- name: Copy custom /usr/local/bin scripts
+  copy: src={{ item }} dest=/usr/local/bin/{{ item }} owner=root group=root mode=0755
+  with_items:
+    - ec2-send-memory-metrics.py
+    - cron-mail-to-sns.py
+
+# YUM REPOS
+- name: Import CentOS 5 RPM public key
+  rpm_key: state=present key=http://mirror.centos.org/centos/RPM-GPG-KEY-CentOS-5
+
+- name: Import MongoDB RPM public key
+  rpm_key: state=present key=https://www.mongodb.org/static/pgp/server-3.2.asc  
+
+- name: Add MongoDB RPM repo
+  copy: src=mongodb-org-3.2.repo dest=/etc/yum.repos.d/mongodb-org-3.2.repo owner=root group=root mode=0644
+
+# YUM PACKAGES
+- name: Get latest yum updates
+  yum: name=* state=latest
+  
+- name: Install common yum packages
+  yum: state=latest name=nscd,aws-cli,git,xfsprogs,strace,patch,screen
+
+# EC2 SELF-AWARENESS
+- name: Gather EC2 facts
+  action: ec2_facts
+  ignore_errors: True
+
+- name: Create /root/.aws
+  file: path=/root/.aws state=directory owner=root group=root mode=0700
+- name: Create ~/.aws
+  file: path=/home/{{ ansible_ssh_user }}/.aws state=directory owner={{ ansible_ssh_user }} group={{ ansible_ssh_user }} mode=0700
+
+- name: Set up /root/.aws/credentials with proper default region
+  template: src=aws_credentials dest=/root/.aws/credentials owner=root group=root mode=0600
+- name: Set up /home/{{ ansible_ssh_user }}/.aws/credentials with proper default region
+  template: src=aws_credentials dest=/home/{{ ansible_ssh_user }}/.aws/credentials owner={{ ansible_ssh_user }} group={{ ansible_ssh_user }} mode=0600
+
+# CRON MAIL-TO-SNS SETUP
+- name: Install python-boto
+  yum: name=python-boto state=latest
+- name: Set up /etc/sysconfig/crond to use cron-mail-to-sns.py
+  template: src=sysconfig_crond dest=/etc/sysconfig/crond owner=root group=root mode=0600
