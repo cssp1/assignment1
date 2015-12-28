@@ -2009,6 +2009,9 @@ class User:
                         metric_event_coded(session.user.user_id, '1000_billed', {'Billing Amount': usd_equivalent,
                                                                                  'Billing Description': descr,
                                                                                  'country_tier': session.player.country_tier,
+                                                                                 'last_purchase_time': session.player.history.get('last_purchase_time',-1),
+                                                                                 'prev_largest_purchase': session.player.history.get('largest_purchase',0),
+                                                                                 'num_purchases': session.player.history.get('num_purchases',0),
                                                                                  'currency': paid_currency,
                                                                                  'currency_amount': user_facing_amount,
                                                                                  'tax_amount': tax_amount,
@@ -2027,6 +2030,9 @@ class User:
                                                                  'Billing Description': descr,
                                                                  'summary': session.player.get_denormalized_summary_props('brief'),
                                                                  'country_tier': session.player.country_tier,
+                                                                 'last_purchase_time': session.player.history.get('last_purchase_time',-1),
+                                                                 'prev_largest_purchase': session.player.history.get('largest_purchase',0),
+                                                                 'num_purchases': session.player.history.get('num_purchases',0),
                                                                  'currency': paid_currency,
                                                                  'currency_amount': user_facing_amount,
                                                                  'tax_amount': tax_amount,
@@ -14540,6 +14546,9 @@ class Store(object):
                                                                  'currency': currency,
                                                                  'currency_amount': credits_amount,
                                                                  'country_tier': session.player.country_tier,
+                                                                 'last_purchase_time': session.player.history.get('last_purchase_time',-1),
+                                                                 'prev_largest_purchase': session.player.history.get('largest_purchase',0),
+                                                                 'num_purchases': session.player.history.get('num_purchases',0),
                                                                  'order_id': order_id})
 
         gamesite.credits_log.event(server_time, {'user_id':session.user.user_id,
@@ -14551,6 +14560,9 @@ class Store(object):
                                                  'currency_amount': credits_amount,
                                                  'summary': session.player.get_denormalized_summary_props('brief'),
                                                  'country_tier': session.player.country_tier,
+                                                 'last_purchase_time': session.player.history.get('last_purchase_time',-1),
+                                                 'prev_largest_purchase': session.player.history.get('largest_purchase',0),
+                                                 'num_purchases': session.player.history.get('num_purchases',0),
                                                  'order_id': order_id})
 
         session.activity_classifier.spent_money(dollar_amount, descr)
