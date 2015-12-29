@@ -15189,15 +15189,17 @@ class Store(object):
                                            'gamebucks': bucks,
                                            'currency': currency, 'currency_price': amount_willing_to_pay,
                                            'usd_equivalent': usd_equivalent,
+                                           'last_purchase_time': session.player.history.get('last_purchase_time',-1),
+                                           'prev_largest_purchase': session.player.history.get('largest_purchase',0),
+                                           'num_purchases': session.player.history.get('num_purchases',0),
                                            'gift_order': gift_order,
                                            'gui_version': Predicates.eval_cond_or_literal(session.player.get_any_abtest_value('buy_gamebucks_dialog_version', gamedata['store'].get('buy_gamebucks_dialog_version',1)), session, session.player)
                                            }
                 for aura in session.player.player_auras:
-                    if aura['spec'] == 'flash_sale' and aura.get('end_time', -1) > server_time:
-                        purchase_ui_event_props['flash_sale_kind'] = aura['data']['kind']
-                        purchase_ui_event_props['flash_sale_duration'] = aura['data']['duration']
-                        if 'tag' in aura['data']:
-                            purchase_ui_event_props['flash_sale_tag'] = aura['data']['tag']
+                    if aura['spec'] in ('flash_sale','item_bundles') and aura.get('end_time', -1) > server_time:
+                        for FIELD in ('kind', 'duration', 'tag'):
+                            if FIELD in aura['data']:
+                                purchase_ui_event_props['flash_sale_'+FIELD] = aura['data'][FIELD]
                 gamesite.purchase_ui_log.event(server_time, purchase_ui_event_props)
 
         elif spellname.startswith("BUY_PROTECTION"):

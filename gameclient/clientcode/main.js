@@ -35743,14 +35743,14 @@ function purchase_ui_event(event_name, extra_props) {
 
     // look for an active flash sale
     var aura = goog.array.find(player.player_auras, function(a) {
-        return a['spec'] === 'flash_sale' && a['end_time'] > server_time;
+        return goog.array.contains(['flash_sale', 'item_bundles'], a['spec']) && a['end_time'] > server_time;
     });
-    if(aura) {
-        props['flash_sale_kind'] = aura['data']['kind'];
-        props['flash_sale_duration'] = aura['data']['duration'];
-        if('tag' in aura['data']) {
-            props['flash_sale_tag'] = aura['data']['tag'];
-        }
+    if(aura && ('data' in aura)) {
+        goog.array.forEach(['kind','duration','tag'], function(field) {
+            if(field in aura['data']) {
+                props['flash_sale_'+field] = aura['data'][field];
+            }
+        });
     }
 
     if(extra_props) {
