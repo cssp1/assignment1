@@ -36772,8 +36772,14 @@ function update_buy_gamebucks_sku23(dialog) {
                 _order = null;
             }
 
+            // should match Store.get_description() results
+            var descr = spname;
+            var extra_descr = buy_gamebucks_sku2_metrics_description(spell, _spellarg);
+            if(extra_descr) {
+                descr += ','+extra_descr;
+            }
             purchase_ui_event('4440_buy_gamebucks_init_payment', {'gui_version': dialog.user_data['ver'],
-                                                                  'sku': spname,
+                                                                  'sku': descr,
                                                                   'gamebucks': _alloy_qty,
                                                                   'currency': _payment_currency,
                                                                   'currency_price': _payment_price});
@@ -36842,6 +36848,15 @@ function buy_gamebucks_sku2_item_list(spell, spellarg) {
         return session.get_loot_items(player, gamedata['loot_tables_client'][spell['loot_table']]['loot']).item_list;
     }
     return [];
+}
+function buy_gamebucks_sku2_metrics_description(spell, spellarg) {
+    if('loot_table' in spell && (!spellarg || spellarg['want_loot'])) {
+        var loot_table = gamedata['loot_tables_client'][spell['loot_table']];
+        if('metrics_description' in loot_table) {
+            return eval_cond_or_literal(loot_table['metrics_description'], player, null);
+        }
+    }
+    return null;
 }
 
 // return ui_warning attached to this SKU
