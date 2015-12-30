@@ -21166,7 +21166,12 @@ function update_region_map(dialog) {
         } else {
             alpha = Math.max(0, 1 - (elapsed - hold_time)/fade_time);
         }
-        goog.array.forEach(original_text[0], function(ablock) { ablock.props.alpha = alpha; });
+        goog.array.forEach(original_text[0], function(ablock) {
+            ablock.props.alpha = alpha;
+            if(alpha <= 0) {
+                ablock.props.onclick = null;
+            }
+        });
         return original_text;
     });
 
@@ -45171,8 +45176,6 @@ function handle_server_message(data) {
         }
     } else if(msg == "REGION_MAP_ATTACK_START" || msg == "REGION_MAP_ATTACK_COMPLETE" || msg == "REGION_MAP_ATTACK_DIVERT") {
         var region_id = data[1], feature = data[2], attacker_id = data[3], defender_id = data[4], summary = data[5], pcache_data = data[6];
-
-        if(typeof feature === 'string') { return; } // XXXXXX legacy compatibility - this parameter used to be base_id
 
         if(session.region.data && session.region.data['id'] == region_id) {
             if(feature && ('base_map_loc' in feature)) { // note: exclude features where all we know is the lock state (regional map isn't loaded)
