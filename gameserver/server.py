@@ -3459,14 +3459,13 @@ class Session(object):
                 return
             elif val.get('purchase_ui_event', False):
                 # write to purchase_ui log instead of main metrics log
-                if gamedata['server'].get('log_purchase_ui',False):
-                    val['user_id'] = player.user_id
-                    val['event_name'] = event_name
-                    assert ('alloy' not in val['event_name']) # don't record previous-generation events
-                    val['code'] = int(event_name[0:4])
-                    del val['purchase_ui_event']
-                    gamesite.purchase_ui_log.event(server_time, val)
-                    return
+                val['user_id'] = player.user_id
+                val['event_name'] = event_name
+                assert ('alloy' not in val['event_name']) # don't record previous-generation events
+                val['code'] = int(event_name[0:4])
+                del val['purchase_ui_event']
+                gamesite.purchase_ui_log.event(server_time, val)
+                return
         metric_event_coded(player.user_id, event_name, val)
 
     def debug_log_action(self, reason):
@@ -15179,7 +15178,7 @@ class Store(object):
 
             session.deferred_player_state_update = True
 
-            if gamedata['server'].get('log_purchase_ui',False):
+            if 1:
                 # the other purchase_ui_log events are all client-side, but we have to do this on the server
                 # because Facebook's credit API callback is unreliable :(
                 purchase_ui_event_props = {'code':4450, 'event_name': '4450_buy_gamebucks_payment_complete',

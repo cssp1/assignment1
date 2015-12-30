@@ -18185,7 +18185,7 @@ function invoke_insufficient_alloy_message(reason, amount, order) {
         }; })(dialog, reason, amount, order);
     dialog.widgets['close_button'].onclick = close_parent_dialog;
 
-    metric_event('4400_insufficient_gamebucks_message', {'purchase_ui_event': true, 'client_time': Math.floor(client_time), 'method': reason});
+    purchase_ui_event('4400_insufficient_gamebucks_message', {'method': reason});
     return dialog;
 }
 
@@ -35739,6 +35739,9 @@ player.gift_orders_enabled = function() {
     @param {string} event_name
     @param {Object=} extra_props */
 function purchase_ui_event(event_name, extra_props) {
+    // filter down to important events
+    if(!goog.array.contains(['4440_buy_gamebucks_init_payment'], event_name)) { return; }
+
     var props = {'purchase_ui_event': true, 'api':SPay.api, 'client_time': Math.floor(client_time)};
 
     // look for an active flash sale
@@ -36056,11 +36059,10 @@ function buy_gamebucks_dialog_select(dialog, num) {
             (function (_i, _alloy_qty, _payment_currency, _payment_price) { return function(w) {
                 var dialog = w.parent;
                 var _spellname = dialog.user_data['spell_list'][_i];
-                metric_event('4430_buy_gamebucks_select_qty', {'purchase_ui_event': true, 'client_time': Math.floor(client_time),
-                                                               'sku': _spellname,
-                                                               'gamebucks': _alloy_qty,
-                                                               'currency': _payment_currency,
-                                                               'currency_price': _payment_price});
+                purchase_ui_event('4430_buy_gamebucks_select_qty', {'sku': _spellname,
+                                                                    'gamebucks': _alloy_qty,
+                                                                    'currency': _payment_currency,
+                                                                    'currency_price': _payment_price});
 
                 buy_gamebucks_dialog_select(dialog, _i);
             }; })(i, alloy_qty, payment_currency, payment_price);
@@ -36390,7 +36392,7 @@ function invoke_buy_gamebucks_dialog23(ver, reason, amount, order, options) {
         dialog.widgets['scroll_right'].state = (dialog.user_data['scroll_goal'] >= dialog.user_data['scroll_limits'][1] ? 'disabled' : 'normal');
         if(incr !== 0 && !dialog.user_data['scrolled']) {
             dialog.user_data['scrolled'] = true;
-            metric_event('4431_buy_gamebucks_dialog_scroll', {'gui_version': dialog.user_data['ver'], 'api':SPay.api, 'purchase_ui_event': true, 'client_time': Math.floor(client_time)});
+            purchase_ui_event('4431_buy_gamebucks_dialog_scroll', {'gui_version': dialog.user_data['ver']});
         }
     }; };
 
@@ -36779,6 +36781,7 @@ function update_buy_gamebucks_sku23(dialog) {
                 descr += ','+extra_descr;
             }
             purchase_ui_event('4440_buy_gamebucks_init_payment', {'gui_version': dialog.user_data['ver'],
+                                                                  'method': dialog.parent.user_data['dialog'],
                                                                   'sku': descr,
                                                                   'gamebucks': _alloy_qty,
                                                                   'currency': _payment_currency,
