@@ -37253,11 +37253,15 @@ function invoke_new_store_dialog() {
         d.user_data['category'] = cat;
         d.widgets['icon'].asset = cat['icon'];
         d.widgets['label'].str =  cat['ui_name'];
-        d.widgets['bg'].onclick = function(w) {
+        d.widgets['bg'].onclick = (function (_cat) { return function(w) {
             var d = w.parent;
             close_parent_dialog(w.parent);
-            invoke_new_store_category(d.user_data['category']);
-        };
+            if('link' in _cat && _cat['link'] === 'buy_gamebucks_dialog') {
+                invoke_buy_gamebucks_dialog('new_store_category', -1, null);
+            } else {
+                invoke_new_store_category(d.user_data['category']);
+            }
+        }; })(cat);
         d.widgets['jewel'].user_data['count'] = 0;
         d.widgets['jewel'].ondraw = update_notification_jewel;
         d.ondraw = update_new_store_category_label;
