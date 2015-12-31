@@ -1,0 +1,2 @@
+# send cron errors via SNS instead of system mail
+CRONDARGS=" -m '/usr/local/bin/cron-mail-to-sns.py {{ cron_mail_sns_topic }}'"

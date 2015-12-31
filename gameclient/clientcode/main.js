@@ -18185,7 +18185,7 @@ function invoke_insufficient_alloy_message(reason, amount, order) {
         }; })(dialog, reason, amount, order);
     dialog.widgets['close_button'].onclick = close_parent_dialog;
 
-    metric_event('4400_insufficient_gamebucks_message', {'purchase_ui_event': true, 'client_time': Math.floor(client_time), 'method': reason});
+    purchase_ui_event('4400_insufficient_gamebucks_message', {'method': reason});
     return dialog;
 }
 
@@ -21166,7 +21166,12 @@ function update_region_map(dialog) {
         } else {
             alpha = Math.max(0, 1 - (elapsed - hold_time)/fade_time);
         }
-        goog.array.forEach(original_text[0], function(ablock) { ablock.props.alpha = alpha; });
+        goog.array.forEach(original_text[0], function(ablock) {
+            ablock.props.alpha = alpha;
+            if(alpha <= 0) {
+                ablock.props.onclick = null;
+            }
+        });
         return original_text;
     });
 
@@ -35739,18 +35744,21 @@ player.gift_orders_enabled = function() {
     @param {string} event_name
     @param {Object=} extra_props */
 function purchase_ui_event(event_name, extra_props) {
+    // filter down to important events
+    if(!goog.array.contains(['4440_buy_gamebucks_init_payment'], event_name)) { return; }
+
     var props = {'purchase_ui_event': true, 'api':SPay.api, 'client_time': Math.floor(client_time)};
 
     // look for an active flash sale
     var aura = goog.array.find(player.player_auras, function(a) {
-        return a['spec'] === 'flash_sale' && a['end_time'] > server_time;
+        return goog.array.contains(['flash_sale', 'item_bundles'], a['spec']) && a['end_time'] > server_time;
     });
-    if(aura) {
-        props['flash_sale_kind'] = aura['data']['kind'];
-        props['flash_sale_duration'] = aura['data']['duration'];
-        if('tag' in aura['data']) {
-            props['flash_sale_tag'] = aura['data']['tag'];
-        }
+    if(aura && ('data' in aura)) {
+        goog.array.forEach(['kind','duration','tag'], function(field) {
+            if(field in aura['data']) {
+                props['flash_sale_'+field] = aura['data'][field];
+            }
+        });
     }
 
     if(extra_props) {
@@ -36056,11 +36064,10 @@ function buy_gamebucks_dialog_select(dialog, num) {
             (function (_i, _alloy_qty, _payment_currency, _payment_price) { return function(w) {
                 var dialog = w.parent;
                 var _spellname = dialog.user_data['spell_list'][_i];
-                metric_event('4430_buy_gamebucks_select_qty', {'purchase_ui_event': true, 'client_time': Math.floor(client_time),
-                                                               'sku': _spellname,
-                                                               'gamebucks': _alloy_qty,
-                                                               'currency': _payment_currency,
-                                                               'currency_price': _payment_price});
+                purchase_ui_event('4430_buy_gamebucks_select_qty', {'sku': _spellname,
+                                                                    'gamebucks': _alloy_qty,
+                                                                    'currency': _payment_currency,
+                                                                    'currency_price': _payment_price});
 
                 buy_gamebucks_dialog_select(dialog, _i);
             }; })(i, alloy_qty, payment_currency, payment_price);
@@ -36390,7 +36397,7 @@ function invoke_buy_gamebucks_dialog23(ver, reason, amount, order, options) {
         dialog.widgets['scroll_right'].state = (dialog.user_data['scroll_goal'] >= dialog.user_data['scroll_limits'][1] ? 'disabled' : 'normal');
         if(incr !== 0 && !dialog.user_data['scrolled']) {
             dialog.user_data['scrolled'] = true;
-            metric_event('4431_buy_gamebucks_dialog_scroll', {'gui_version': dialog.user_data['ver'], 'api':SPay.api, 'purchase_ui_event': true, 'client_time': Math.floor(client_time)});
+            purchase_ui_event('4431_buy_gamebucks_dialog_scroll', {'gui_version': dialog.user_data['ver']});
         }
     }; };
 
@@ -36772,8 +36779,15 @@ function update_buy_gamebucks_sku23(dialog) {
                 _order = null;
             }
 
+            // should match Store.get_description() results
+            var descr = spname;
+            var extra_descr = buy_gamebucks_sku2_metrics_description(spell, _spellarg);
+            if(extra_descr) {
+                descr += ','+extra_descr;
+            }
             purchase_ui_event('4440_buy_gamebucks_init_payment', {'gui_version': dialog.user_data['ver'],
-                                                                  'sku': spname,
+                                                                  'method': dialog.parent.user_data['dialog'],
+                                                                  'sku': descr,
                                                                   'gamebucks': _alloy_qty,
                                                                   'currency': _payment_currency,
                                                                   'currency_price': _payment_price});
@@ -36842,6 +36856,15 @@ function buy_gamebucks_sku2_item_list(spell, spellarg) {
         return session.get_loot_items(player, gamedata['loot_tables_client'][spell['loot_table']]['loot']).item_list;
     }
     return [];
+}
+function buy_gamebucks_sku2_metrics_description(spell, spellarg) {
+    if('loot_table' in spell && (!spellarg || spellarg['want_loot'])) {
+        var loot_table = gamedata['loot_tables_client'][spell['loot_table']];
+        if('metrics_description' in loot_table) {
+            return eval_cond_or_literal(loot_table['metrics_description'], player, null);
+        }
+    }
+    return null;
 }
 
 // return ui_warning attached to this SKU
@@ -37230,11 +37253,15 @@ function invoke_new_store_dialog() {
         d.user_data['category'] = cat;
         d.widgets['icon'].asset = cat['icon'];
         d.widgets['label'].str =  cat['ui_name'];
-        d.widgets['bg'].onclick = function(w) {
+        d.widgets['bg'].onclick = (function (_cat) { return function(w) {
             var d = w.parent;
             close_parent_dialog(w.parent);
-            invoke_new_store_category(d.user_data['category']);
-        };
+            if('link' in _cat && _cat['link'] === 'buy_gamebucks_dialog') {
+                invoke_buy_gamebucks_dialog('new_store_category', -1, null);
+            } else {
+                invoke_new_store_category(d.user_data['category']);
+            }
+        }; })(cat);
         d.widgets['jewel'].user_data['count'] = 0;
         d.widgets['jewel'].ondraw = update_notification_jewel;
         d.ondraw = update_new_store_category_label;
@@ -45153,8 +45180,6 @@ function handle_server_message(data) {
         }
     } else if(msg == "REGION_MAP_ATTACK_START" || msg == "REGION_MAP_ATTACK_COMPLETE" || msg == "REGION_MAP_ATTACK_DIVERT") {
         var region_id = data[1], feature = data[2], attacker_id = data[3], defender_id = data[4], summary = data[5], pcache_data = data[6];
-
-        if(typeof feature === 'string') { return; } // XXXXXX legacy compatibility - this parameter used to be base_id
 
         if(session.region.data && session.region.data['id'] == region_id) {
             if(feature && ('base_map_loc' in feature)) { // note: exclude features where all we know is the lock state (regional map isn't loaded)

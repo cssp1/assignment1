@@ -47,7 +47,7 @@
          "skus": [{"spell":"GROW_BASE_PERIMETER1",
                    "show_if": {"predicate": "OR", "subpredicates": [ {"predicate": "AND", "subpredicates": [ { "predicate": "FRAME_PLATFORM", "platform": "kg"}, { "predicate": "BUILDING_LEVEL", "building_type": "toc", "trigger_level": 3} ] } , {"predicate": "FRAME_PLATFORM", "platform": "fb" } ] }
                   },
-                  {"spell": "BUY_PROTECTION1"},{"spell": "BUY_PROTECTION7"},{"spell": "BUY_PROTECTION28"}]}
+                  {"spell": "BUY_PROTECTION1"},{"spell": "BUY_PROTECTION7"},{"spell": "BUY_PROTECTION28"}]},
 
         // {"name": "specials", "ui_name": "Specials", "icon": "inventory_random",
         //  "record_feature_use": "store_specials_wk%WEEK",
@@ -60,6 +60,8 @@
         //      {"spell": "BUY_RANDOM_ITEM", "ui_new_store_enterkey_priority": 10}
         // ]}
 
+        {"name": "gamebucks", "ui_name": "Buy Gold", "icon": "inventory_gold_icon", // XXX note: not hooked up to A/B test for gamebucks_name/icon
+         "skus": [], "link": "buy_gamebucks_dialog"} // hard-coded link to buy_gamebucks_dialog
     ],
 
     // exchange rates for translating FB credit prices to gamebucks
@@ -141,6 +143,10 @@
     ],
 
     "buy_gamebucks_sku_kind": [
+        // flash sales (slates available for all currencies)
+        [{"predicate": "AURA_ACTIVE", "aura_name": "flash_sale", "match_data": {"kind": "FLASH50"}}, "FLASH50"],
+        [{"predicate": "AURA_ACTIVE", "aura_name": "flash_sale", "match_data": {"kind": "FLASH25"}}, "FLASH25"],
+
         [{"predicate": "AND", "subpredicates": [{"predicate": "FRAME_PLATFORM", "platform": "fb"}, {"predicate": "LIBRARY", "name": "fbpayments_D2SALE_in_effect"}]}, "D2SALE"],
         [{"predicate": "ALWAYS_TRUE"}, "D2"]
     ],

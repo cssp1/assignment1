@@ -27,6 +27,7 @@ function usage {
     echo "  diff - show differences"
     echo "  commit [MESSAGE] - make a commit"
     echo "  push - (Git only) send commits to origin"
+    echo "  clean - perform garbage collection maintenance"
     return 1
 }
 
@@ -76,6 +77,9 @@ function do_diff_svn {
 }
 function do_commit_svn {
     (cd "$ROOT" && svn ci -m "$1")
+}
+function do_clean_svn {
+    (cd "$ROOT" && svn cleanup)
 }
 
 # synchronize SVN repository with Git repository by pulling in deltas since last sync
@@ -174,6 +178,12 @@ function do_push_git {
         (cd $dir && git push)
     done
 }
+function do_clean_git {
+    for dir in $GIT_DIRS; do
+        echo "Cleaning up game-${dir}..."
+        (cd $dir && git gc --auto)
+    done
+}
 
 if [ $# == 0 ] || [ "$1" == "help" ] ; then
     usage
@@ -198,7 +208,10 @@ else
             version)
                 do_version_git $@
                 ;;
-        git-version)
+	    clean)
+		do_clean_git $@
+		;;
+            git-version)
                 do_version_git $@
                 ;;
             stat)
@@ -252,6 +265,9 @@ else
             git-sync)
                 do_git_sync_svn $@
                 ;;
+	    clean)
+		do_clean_svn $@
+		;;
             *)
                 usage
                 ;;

@@ -30,6 +30,9 @@ purchase_ui_schema = {
                ('currency_price', 'FLOAT4'),
                ('currency', 'VARCHAR(64)'),
                ('usd_receipts_cents', 'INT4'),
+               ('last_purchase_time', 'INT8'),
+               ('prev_largest_usd_receipts_cents', 'INT'),
+               ('num_purchases', 'INT4'),
 
                ('flash_sale_kind', 'VARCHAR(64)'),
                ('flash_sale_duration', 'INT4'),
@@ -109,15 +112,19 @@ if __name__ == '__main__':
                 keyvals.append(('gui_version', gui_version))
 
             for FIELD in ('client_time', 'sku', 'method', 'gamebucks', 'currency_price', 'currency',
+                          'last_purchase_time','num_purchases',
                           'flash_sale_kind', 'flash_sale_duration', 'flash_sale_tag', 'max_inventory', 'cur_inventory'):
                 if FIELD in row:
                     keyvals.append((FIELD, row[FIELD]))
 
             if 'usd_equivalent' in row:
                 if row['usd_equivalent'] is not None:
-                    keyvals.append(('usd_receipts_cents', int(100*row['usd_equivalent'])))
+                    keyvals.append(('usd_receipts_cents', int(100*row['usd_equivalent']+0.5)))
                 elif row['event_name'] == '4450_buy_gamebucks_payment_complete' and row['currency'] == 'kgcredits': # bad legacy data
                     keyvals.append(('usd_receipts_cents', int(0.07*row['currency_price'])))
+
+            if 'prev_largest_purchase' in row:
+                keyvals.append(('prev_largest_usd_receipts_cents', int(100*row['prev_largest_purchase']+0.5)))
 
             sql_util.do_insert(cur, purchase_ui_table, keyvals)
 

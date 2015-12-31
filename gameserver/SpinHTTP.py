@@ -63,7 +63,7 @@ def set_access_control_headers_for_cdn(request, max_age):
 
 import SpinSignature
 
-private_ip_re = re.compile('(^127\.0\.0\.1)|(^10\.)|(^172\.1[6-9]\.)|(^172\.2[0-9]\.)|(^172\.3[0-1]\.)|(^192\.168\.)')
+private_ip_re = re.compile('(^127\.0\.0\.1)|(^10\.)|(^172\.1[6-9]\.)|(^172\.2[0-9]\.)|(^172\.3[0-1]\.)|(^192\.168\.)|(^unknown)')
 
 def validate_proxy_headers(request, proxy_secret):
     # validate the signature applied by proxyserver's add_proxy_headers()

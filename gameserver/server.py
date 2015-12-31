@@ -2009,6 +2009,9 @@ class User:
                         metric_event_coded(session.user.user_id, '1000_billed', {'Billing Amount': usd_equivalent,
                                                                                  'Billing Description': descr,
                                                                                  'country_tier': session.player.country_tier,
+                                                                                 'last_purchase_time': session.player.history.get('last_purchase_time',-1),
+                                                                                 'prev_largest_purchase': session.player.history.get('largest_purchase',0),
+                                                                                 'num_purchases': session.player.history.get('num_purchases',0),
                                                                                  'currency': paid_currency,
                                                                                  'currency_amount': user_facing_amount,
                                                                                  'tax_amount': tax_amount,
@@ -2027,6 +2030,9 @@ class User:
                                                                  'Billing Description': descr,
                                                                  'summary': session.player.get_denormalized_summary_props('brief'),
                                                                  'country_tier': session.player.country_tier,
+                                                                 'last_purchase_time': session.player.history.get('last_purchase_time',-1),
+                                                                 'prev_largest_purchase': session.player.history.get('largest_purchase',0),
+                                                                 'num_purchases': session.player.history.get('num_purchases',0),
                                                                  'currency': paid_currency,
                                                                  'currency_amount': user_facing_amount,
                                                                  'tax_amount': tax_amount,
@@ -3453,14 +3459,13 @@ class Session(object):
                 return
             elif val.get('purchase_ui_event', False):
                 # write to purchase_ui log instead of main metrics log
-                if gamedata['server'].get('log_purchase_ui',False):
-                    val['user_id'] = player.user_id
-                    val['event_name'] = event_name
-                    assert ('alloy' not in val['event_name']) # don't record previous-generation events
-                    val['code'] = int(event_name[0:4])
-                    del val['purchase_ui_event']
-                    gamesite.purchase_ui_log.event(server_time, val)
-                    return
+                val['user_id'] = player.user_id
+                val['event_name'] = event_name
+                assert ('alloy' not in val['event_name']) # don't record previous-generation events
+                val['code'] = int(event_name[0:4])
+                del val['purchase_ui_event']
+                gamesite.purchase_ui_log.event(server_time, val)
+                return
         metric_event_coded(player.user_id, event_name, val)
 
     def debug_log_action(self, reason):
@@ -11097,7 +11102,13 @@ class LivePlayer(Player):
             self.resources.gain_gamebucks(quest.reward_gamebucks, reason='quest_reward')
 
         if hasattr(quest, "reward_consequent"):
-            session.execute_consequent_safe(quest.reward_consequent, self, retmsg, reason='give_quest_rewards')
+            # awkward - needs to pass same parameters as the on_login_pre_hello consequent
+            snap = self.resources.calc_snapshot()
+            session.execute_consequent_safe(quest.reward_consequent, self, retmsg,
+                                            {'max_inventory': snap.max_inventory(), 'cur_inventory': snap.cur_inventory(),
+                                             'largest_purchase': self.history.get('largest_purchase', 0),
+                                             'largest_purchase_gamebucks': self.history.get('largest_purchase_gamebucks', 0)},
+                                            reason='give_quest_rewards')
 
         new_objects = []
 
@@ -14595,6 +14606,9 @@ class Store(object):
                                                                  'currency': currency,
                                                                  'currency_amount': credits_amount,
                                                                  'country_tier': session.player.country_tier,
+                                                                 'last_purchase_time': session.player.history.get('last_purchase_time',-1),
+                                                                 'prev_largest_purchase': session.player.history.get('largest_purchase',0),
+                                                                 'num_purchases': session.player.history.get('num_purchases',0),
                                                                  'order_id': order_id})
 
         gamesite.credits_log.event(server_time, {'user_id':session.user.user_id,
@@ -14606,6 +14620,9 @@ class Store(object):
                                                  'currency_amount': credits_amount,
                                                  'summary': session.player.get_denormalized_summary_props('brief'),
                                                  'country_tier': session.player.country_tier,
+                                                 'last_purchase_time': session.player.history.get('last_purchase_time',-1),
+                                                 'prev_largest_purchase': session.player.history.get('largest_purchase',0),
+                                                 'num_purchases': session.player.history.get('num_purchases',0),
                                                  'order_id': order_id})
 
         session.activity_classifier.spent_money(dollar_amount, descr)
@@ -15065,29 +15082,9 @@ class Store(object):
                             want_loot = False
 
             session.player.resources.gain_gamebucks(bucks, reason='payment')
+            session.setvalue_player_metric('gamebucks_balance', session.player.resources.gamebucks, bucket=True, bucket_size=15*60)
+
             session.setmax_player_metric('largest_purchase_gamebucks', bucks)
-            metric_event_coded(session.user.user_id, '5090_purchase_gamebucks', {'amount_added':bucks,
-                                                                                 'sku': spellname,
-                                                                                 'currency': currency,
-                                                                                 record_price_type: amount_willing_to_pay})
-            if gamedata['server'].get('log_purchase_ui',False):
-                # the other purchase_ui_log events are all client-side, but we have to do this on the server
-                # because Facebook's credit API callback is unreliable :(
-                purchase_ui_event_props = {'code':4450, 'event_name': '4450_buy_gamebucks_payment_complete',
-                                           'user_id': session.player.user_id, 'sku': spellname, 'api': currency.split(':')[0],
-                                           'gamebucks': bucks,
-                                           'currency': currency, 'currency_price': amount_willing_to_pay,
-                                           'usd_equivalent': usd_equivalent,
-                                           'gift_order': gift_order,
-                                           'gui_version': Predicates.eval_cond_or_literal(session.player.get_any_abtest_value('buy_gamebucks_dialog_version', gamedata['store'].get('buy_gamebucks_dialog_version',1)), session, session.player)
-                                           }
-                for aura in session.player.player_auras:
-                    if aura['spec'] == 'flash_sale' and aura.get('end_time', -1) > server_time:
-                        purchase_ui_event_props['flash_sale_kind'] = aura['data']['kind']
-                        purchase_ui_event_props['flash_sale_duration'] = aura['data']['duration']
-                        if 'tag' in aura['data']:
-                            purchase_ui_event_props['flash_sale_tag'] = aura['data']['tag']
-                gamesite.purchase_ui_log.event(server_time, purchase_ui_event_props)
 
             session.increment_player_metric('gamebucks_purchased', bucks)
             session.increment_player_metric(record_spend_type+'_spent_on_gamebucks', record_amount)
@@ -15240,8 +15237,30 @@ class Store(object):
                 else:
                     session.spawn_new_units_for_player(session.player, retmsg, spell['give_units'])
 
-            session.setvalue_player_metric('gamebucks_balance', session.player.resources.gamebucks, bucket=True, bucket_size=15*60)
             session.deferred_player_state_update = True
+
+            if 1:
+                # the other purchase_ui_log events are all client-side, but we have to do this on the server
+                # because Facebook's credit API callback is unreliable :(
+                purchase_ui_event_props = {'code':4450, 'event_name': '4450_buy_gamebucks_payment_complete',
+                                           'user_id': session.player.user_id,
+                                           'sku': Store.get_description(session, unit_id, spellname, spellarg, price_description),
+                                           'api': currency.split(':')[0],
+                                           'gamebucks': bucks,
+                                           'currency': currency, 'currency_price': amount_willing_to_pay,
+                                           'usd_equivalent': usd_equivalent,
+                                           'last_purchase_time': session.player.history.get('last_purchase_time',-1),
+                                           'prev_largest_purchase': session.player.history.get('largest_purchase',0),
+                                           'num_purchases': session.player.history.get('num_purchases',0),
+                                           'gift_order': gift_order,
+                                           'gui_version': Predicates.eval_cond_or_literal(session.player.get_any_abtest_value('buy_gamebucks_dialog_version', gamedata['store'].get('buy_gamebucks_dialog_version',1)), session, session.player)
+                                           }
+                for aura in session.player.player_auras:
+                    if aura['spec'] in ('flash_sale','item_bundles') and aura.get('end_time', -1) > server_time:
+                        for FIELD in ('kind', 'duration', 'tag'):
+                            if FIELD in aura['data']:
+                                purchase_ui_event_props['flash_sale_'+FIELD] = aura['data'][FIELD]
+                gamesite.purchase_ui_log.event(server_time, purchase_ui_event_props)
 
         elif spellname.startswith("BUY_PROTECTION"):
             assert gameapi.execute_spell(session, retmsg, spellname, None, reason = 'purchased_protection')
@@ -20088,7 +20107,8 @@ class GAMEAPI(resource.Resource):
                 session.player.inventory_log_event('5131_item_trashed', remove_specname, -remove_item.get('stack',1), remove_item.get('expire_time',-1), level=remove_item.get('level',1), reason='removed')
             else:
                 # note: pass inflated max_usable_inventory here as "buffer" space, since we checked for space above
-                assert session.player.inventory_add_item(remove_item, max_usable_inventory + inventory_buffer) == 1
+                # in over-full warehouse situtations, we don't want this to fail, so pass -1 instead of the true slot count
+                assert session.player.inventory_add_item(remove_item, -1 if inventory_buffer >= 1 else (max_usable_inventory + inventory_buffer)) == 1
                 # no need to log - player already had item
             if 'on_unequip' in remove_spec['equip']:
                 session.execute_consequent_safe(remove_spec['equip']['on_unequip'], session.player, retmsg, reason='on_unequip')
@@ -20998,9 +21018,16 @@ class GAMEAPI(resource.Resource):
                             spellname = spellarg = None
                             if client_price and client_currency:
                                 # look for a zombie SKU slate order
-                                if ('type' in qs) and (qs['type'][-1] == OGPAPI.object_type('sku')):
-                                    spellname = qs['spellname'][-1]
-                                    assert url == OGPAPI_instance.get_object_endpoint({'type':OGPAPI.object_type('sku'), 'spellname': spellname})
+                                if ('type' in qs) and (qs['type'][0] == OGPAPI.object_type('sku')):
+                                    spellname = qs['spellname'][0]
+                                    url_props = {'type':OGPAPI.object_type('sku'), 'spellname': spellname}
+                                    if 'want_loot' in qs:
+                                        url_props['want_loot'] = qs['want_loot'][0]
+                                        spellarg = {'want_loot': bool(int(qs['want_loot'][0]))}
+                                    if url != OGPAPI_instance.get_object_endpoint(url_props):
+                                        gamesite.exception_log.event('fbpayment URL mismatch: got %s expected %s' % \
+                                                                     (url, OGPAPI_instance.get_object_endpoint(url_props)))
+                                        raise Exception('fbpayment URL mismatch')
 
                                 # look for an order that buys in-game currency directly on the OG currency object, like a payer promo
                                 elif url == str(OGPAPI_instance.get_object_endpoint({'type':OGPAPI.object_type('gamebucks')})) or \

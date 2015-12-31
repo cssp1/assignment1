@@ -98,7 +98,7 @@ class MetricEventConsequent(Consequent):
                 return # already sent
             session.sent_metrics[self.tag] = True
         props = copy.deepcopy(self.props)
-        for k in props.iterkeys():
+        for k in props.keys():
             # context variable
             if type(props[k]) in (str,unicode) and len(props[k]) >= 1 and props[k][0] == '$':
                 context_key = props[k][1:]

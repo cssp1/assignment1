@@ -155,11 +155,13 @@ def __fb_api_requests(url, url_params, post_params, upload_files, add_access_tok
             r = None
 
             if verbose:
-                print method, "'"+url+"'",
+                verbose_url = url
+                if url_params:
+                    verbose_url += '?'+urllib.urlencode(url_params)
+                print method, "'"+verbose_url+"'",
                 if post_params:
-                    print ' '.join([" -F '%s=%s'" % (k,v) for k,v in post_params.iteritems()])
-                else:
-                    print
+                    print ' '.join([" -F '%s=%s'" % (k,v) for k,v in post_params.iteritems()]),
+                print
 
             if method == 'POST' and dry_run and (not read_only):
                 if verbose: print '(dry run, skipping)'
@@ -291,7 +293,7 @@ def _fb_api_paged(url, url_params, post_params, dict_paging, ignore_errors = Fal
         if ('paging' in result) and ('next' in result['paging']):
             # somehow the JSON encoding of [] gets screwed up in the "next" URL, so use cursor "after" instead
             if ('cursors' in result['paging']) and ('after' in result['paging']['cursors']):
-                url_params = url_params.copy()
+                url_params = url_params.copy() if url_params else {}
                 url_params['after'] = result['paging']['cursors']['after']
             else:
                 url = result['paging']['next']
@@ -361,7 +363,7 @@ def fb_api_batch(base_url, batch, limit = 50, read_only = False, ignore_errors =
 # FACEBOOK INTERFACE
 
 # fields we want to read back from the FB API on customaudiences objects
-CUSTOM_AUDIENCE_FIELDS='id,account_id,approximate_count,data_source,delivery_status,lookalike_audience_ids,lookalike_spec,name,permission_for_actions,operation_status,time_updated,subtype'
+CUSTOM_AUDIENCE_FIELDS='id,account_id,approximate_count,data_source,delivery_status,lookalike_audience_ids,lookalike_spec,name,permission_for_actions,operation_status,time_updated,retention_days,subtype'
 
 def custom_audiences_pull(db, ad_account_id):
     db.fb_custom_audiences.create_index('name')
@@ -382,7 +384,9 @@ def _custom_audience_create(db, ad_account_id, props):
         return None
 
 def custom_audience_create(db, ad_account_id, name, description = None):
-    props = {'name': name}
+    props = {'name': name,
+             'subtype': 'CUSTOM',
+             'retention_days': 180}
     if description: props['description'] = description
     return _custom_audience_create(db, ad_account_id, props)
 
@@ -424,30 +428,30 @@ def custom_audience_add(audience_id, app_id_facebook_id_list):
         added += _custom_audience_add(audience_id, batch)
     return added
 
-ADGROUP_FIELDS = 'name,campaign_id,created_time,failed_delivery_checks,adgroup_status,bid_type,bid_info'
-def adgroup_add_skynet_fields(x):
+AD_FIELDS = 'name,adset_id,created_time,failed_delivery_checks,configured_status,effective_status,bid_amount'
+def ad_add_skynet_fields(x):
     stgt, tgt = decode_adgroup_name(standin_spin_params, x['name'])
     if stgt is not None:
         x[spin_field('stgt')] = stgt
         x[spin_field('dtgt')] = stgt_to_dtgt(stgt)
     return x
 
-def adgroups_pull(db, campaign_id_list = None, ad_account_id = None, match_status = None):
-    query = {'fields': ADGROUP_FIELDS}
+def ads_pull(db, campaign_id_list = None, ad_account_id = None, match_status = None):
+    query = {'fields': AD_FIELDS}
     if match_status:
         assert type(match_status) is list
-        query['adgroup_status'] = SpinJSON.dumps(map(adgroup_encode_status, match_status))
+        query['effective_status'] = SpinJSON.dumps(map(adgroup_encode_status, match_status))
 
     if campaign_id_list is not None:
-         by_campaign = [[update_fields_by_id(db.fb_adgroups, mongo_enc(adgroup_add_skynet_fields(x))) for x in \
-                         fb_api(SpinFacebook.versioned_graph_endpoint('adgroup', id+'/adgroups'),
+         by_campaign = [[update_fields_by_id(db.fb_adgroups, mongo_enc(ad_add_skynet_fields(x))) for x in \
+                         fb_api(SpinFacebook.versioned_graph_endpoint('ad', id+'/ads'),
                                 url_params = query,
                                 is_paged=True)] for id in campaign_id_list]
          return sum(by_campaign, []) # return raw list of ads
     else:
         assert ad_account_id
-        return [update_fields_by_id(db.fb_adgroups, mongo_enc(adgroup_add_skynet_fields(x))) for x in \
-                fb_api(SpinFacebook.versioned_graph_endpoint('adgroup', 'act_'+ad_account_id+'/adgroups'), url_params = query, is_paged = True)]
+        return [update_fields_by_id(db.fb_adgroups, mongo_enc(ad_add_skynet_fields(x))) for x in \
+                fb_api(SpinFacebook.versioned_graph_endpoint('ad', 'act_'+ad_account_id+'/ads'), url_params = query, is_paged = True)]
 
 def adgroup_decode_status(adgroup):
     STATUS = {
@@ -463,7 +467,7 @@ def adgroup_decode_status(adgroup):
         9: 'adgroup_paused',
         10: 'campaign_group_paused'
         }
-    s = adgroup.get('adgroup_status', adgroup.get('ad_status','UNKNOWN'))
+    s = adgroup.get('effective_status', 'UNKNOWN')
     if type(s) is int:
         return STATUS[s].lower()
     else:
@@ -472,7 +476,7 @@ def adgroup_encode_status(s): return s.upper()
 
 def adgroup_update_status_batch_element(adgroup, new_status = None, new_name = None):
     props = {}
-    if new_status: props['adgroup_status'] = adgroup_encode_status(new_status)
+    if new_status: props['status'] = adgroup_encode_status(new_status)
     if new_name: props['name'] = new_name
     return (adgroup['id'], props)
 def adgroup_update_status_batch(db, arglist):
@@ -509,7 +513,7 @@ def encode_bid_type(t):
     return 'ABSOLUTE_OCPM' if t.startswith('oCPM') else BID_TYPE_CODES[t]
 
 def adgroup_get_bid(adgroup):
-    if ('max_bid' in adgroup) and (bid_type_equals(adgroup['bid_type'], 'CPC') or bid_type_equals(adgroup['bid_type'], 'CPM')):
+    if ('max_bid' in adgroup) and ('bid_type' in adgroup) and (bid_type_equals(adgroup['bid_type'], 'CPC') or bid_type_equals(adgroup['bid_type'], 'CPM')):
         ret = adgroup['max_bid']
     else:
         # API is really inconsistent with how it returns these
@@ -520,9 +524,9 @@ def adgroup_get_bid(adgroup):
 def adgroup_set_bid(adgroup, new_bid, o_bid_type = None):
     if o_bid_type:
         return {'bid_info':{o_bid_type:new_bid}}
-    elif bid_type_equals(adgroup['bid_type'], 'CPC'):
+    elif ('bid_type' in adgroup) and bid_type_equals(adgroup['bid_type'], 'CPC'):
         return {'bid_info':{'CLICKS':new_bid}}
-    elif bid_type_equals(adgroup['bid_type'], 'CPM'):
+    elif ('bid_type' in adgroup) and bid_type_equals(adgroup['bid_type'], 'CPM'):
 #        return {'max_bid': new_bid}
         return {'bid_info':{'IMPRESSIONS':new_bid}}
     else:
@@ -621,7 +625,7 @@ def _adstats_pull(db, adgroup_list, time_range = None):
     for adgroup, x in zip(adgroup_list,
                           fb_api_batch(SpinFacebook.versioned_graph_endpoint('adinsights', ''),
                                        [{'method':'GET', 'relative_url':adgroup['id']+'/insights'+query}
-                                        for adgroup in adgroup_list], read_only = True)):
+                                        for adgroup in adgroup_list], limit = 10, read_only = True)):
         if not x['data']:
             # this means the ad had no delivery
             results.append(None)
@@ -629,7 +633,7 @@ def _adstats_pull(db, adgroup_list, time_range = None):
 
         x = x['data'][0]
         # make sure we got data for the right ad
-        assert str(x['adgroup_id']) == str(adgroup['id'])
+        assert str(x['ad_id']) == str(adgroup['id'])
 
         if time_range:
             # make sure we got the right time range
@@ -640,7 +644,7 @@ def _adstats_pull(db, adgroup_list, time_range = None):
                parsed_end_time != time_range[1]:
                 raise Exception('asked for time_range %r %r %r but got %r (parsed %r %r %r %r)' % \
                                 (time_range, SpinFacebook.unparse_fb_time(time_range[0]), SpinFacebook.unparse_fb_time(time_range[1]),
-                                 x['adgroup_id'], parsed_start_time, parsed_end_time, x['date_start'], x['date_stop']))
+                                 x['ad_id'], parsed_start_time, parsed_end_time, x['date_start'], x['date_stop']))
 
         # Old API returned "spent" cents, new API returns "spend" dollars - convert back to cents
         if 'spend' in x:
@@ -783,9 +787,8 @@ def adstats_record(db, adgroup_list, time_range):
                'start_time':time_range[0], 'end_time':time_range[1],
                'adgroup_id': str(adgroup['id']),
                # deliberately denormalize name, dtgt, campaign_id, and created_time into here so we can pull historical stats without relying on the source adgroups still being in the database
-               'adgroup_name': adgroup['name'], 'dtgt': stgt_to_dtgt(stgt), 'campaign_id': str(stat['campaign_id']), 'created_time': adgroup['created_time'],
-               'adgroup_status': adgroup_decode_status(adgroup), 'bid': adgroup_get_bid(adgroup), 'bid_type': decode_bid_type(adgroup['bid_type']),
-               'raw_bid_type': adgroup['bid_type'], 'raw_bid_info': adgroup['bid_info'] # might be unnecessary
+               'adgroup_name': adgroup['name'], 'dtgt': stgt_to_dtgt(stgt), 'campaign_id': str(stat['adset_id']), 'created_time': adgroup['created_time'],
+               'status': adgroup_decode_status(adgroup), 'bid': adgroup_get_bid(adgroup)
                }
 
         # copy the adstat counters and fields we want to store
@@ -960,7 +963,7 @@ def adstats_analyze(db, min_clicks = 0, stgt_filter = None, group_by = None,
         # could make this more efficient by incorporating adgroup_query and filtering on dtgt
         adgroup_list = adstats_record_get_live_adgroups(db, adgroup_dtgt_filter_query(stgt_to_dtgt(stgt_filter)) if stgt_filter else {}, time_range)
     else:
-        adgroup_query = {'adgroup_status': {'$ne':'DELETED'}}
+        adgroup_query = {'status': {'$ne':'DELETED'}}
         if stgt_filter: # optimize adgroup query to only match tgt_filter
             adgroup_query.update(adgroup_dtgt_filter_query(stgt_to_dtgt(stgt_filter), dtgt_key = spin_field('dtgt')))
         if verbose: print "ADGROUP QUERY:", adgroup_query
@@ -1398,7 +1401,7 @@ def adstats_analyze(db, min_clicks = 0, stgt_filter = None, group_by = None,
                     if tactical_update(db, stgt_filter = action['stgt_filter'], coeff = action['coeff'], safe = 0) > 0:
                         needs_control_pass = True
                 elif action['action'] == 'delete':
-                    qs = {'adgroup_status': {'$ne':'DELETED'}}
+                    qs = {'status': {'$ne':'DELETED'}}
                     qs.update(adgroup_dtgt_filter_query(stgt_to_dtgt(action['stgt_filter']), dtgt_key = spin_field('dtgt')))
                     my_updates = [adgroup_update_status_batch_element(adgroup, new_status = 'deleted') for adgroup in \
                                   db.fb_adgroups.find(qs)]
@@ -1430,13 +1433,15 @@ class ANSIColor:
     @classmethod
     def yellow(self, x): return self.YELLOW+x+self.ENDC
 
+ADIMAGE_FIELDS='id,name,account_id,created_time,creatives,hash,height,original_height,original_width,permalink_url,status,updated_time,url,url_128,width'
 def adimages_pull(db, ad_account_id):
     [update_fields_by_id(db.fb_adimages, mongo_enc(x), primary_key = 'hash') for x in \
-     fb_api(SpinFacebook.versioned_graph_endpoint('adimage', 'act_'+ad_account_id+'/adimages'), is_paged = True, dict_paging = True)]
+     fb_api(SpinFacebook.versioned_graph_endpoint('adimage', 'act_'+ad_account_id+'/adimages') + '?fields='+ADIMAGE_FIELDS, is_paged = True, dict_paging = False)]
 
+ADCREATIVE_FIELDS='id,adlabels,body,call_to_action_type,image_crops,image_hash,image_url,link_og_id,link_url,name,object_id,object_url,object_story_id,object_story_spec,object_type,run_status,thumbnail_url,title,url_tags'
 def adcreatives_pull(db, ad_account_id):
     [update_fields_by_id(db.fb_adcreatives, mongo_enc(x)) for x in \
-     fb_api(SpinFacebook.versioned_graph_endpoint('adcreative', 'act_'+ad_account_id+'/adcreatives'), is_paged = True)]
+     fb_api(SpinFacebook.versioned_graph_endpoint('adcreative', 'act_'+ad_account_id+'/adcreatives') + '?fields='+ADCREATIVE_FIELDS, is_paged = True)]
 
 def _adimage_upload(db, ad_account_id, filename):
     base = os.path.basename(filename)
@@ -1911,16 +1916,16 @@ def adcampaigns_pull(db, ad_account_id):
     # /act_{ad_account_id}/adcampaigns
     # with the flag include_deleted. Instead, you must make an HTTP GET call and specify the field campaign_status=['DELETED']
     [update_fields_by_id(db.fb_adcampaigns, mongo_enc(x)) for x in \
-     fb_api(SpinFacebook.versioned_graph_endpoint('adcampaign', 'act_'+ad_account_id+'/adcampaigns'),
-            url_params = {'fields':'id,name,account_id,campaign_group_id,campaign_status,daily_budget,lifetime_budget,targeting,bid_type,bid_info',
-                          'campaign_status':SpinJSON.dumps(['ACTIVE','ARCHIVED','PAUSED'])},
+     fb_api(SpinFacebook.versioned_graph_endpoint('adset', 'act_'+ad_account_id+'/adsets'),
+            url_params = {'fields':'id,adlabels,adset_schedule,name,account_id,campaign_id,created_time,end_time,frequency_cap,frequency_cap_reset_period,frequency_control_specs,lifetime_frequency_cap,optimization_goal,promoted_object,rf_prediction_id,configured_status,effective_status,pacing_type,daily_budget,lifetime_budget,targeting,bid_amount,billing_event',
+                          'status':SpinJSON.dumps(['ACTIVE','ARCHIVED','PAUSED'])},
             is_paged = True)]
 
 CAMPAIGN_STATUS_CODES = {'active':'ACTIVE', 'paused':'PAUSED', 'archived': 'ARCHIVED', 'deleted':'DELETED'}
 
 def adcampaign_make(db, name, ad_account_id, campaign_group_id, app_id, app_namespace, conversion_pixels, tgt, bid):
     params = {'name':name, 'daily_budget':NEW_CAMPAIGN_BUDGET, 'campaign_status':CAMPAIGN_STATUS_CODES['active'],
-              'bid_type': encode_bid_type(tgt['bid_type']),
+              #'bid_type': encode_bid_type(tgt['bid_type']),
               'promoted_object': SpinJSON.dumps({'application_id': app_id, 'object_store_url':'https://www.facebook.com/games/'+app_namespace}),
               'targeting': SpinJSON.dumps(adgroup_targeting(db, tgt)),
               'campaign_group_id': campaign_group_id, 'redownload':1}
@@ -1960,16 +1965,16 @@ def adcampaigns_set_daily_budget(db, campaign_name, new_daily_budget):
     return adcampaigns_modify(db, campaign_name, {'daily_budget': new_daily_budget})
 
 def adcampaigns_garbage_collect(db):
-    campaign_ids = set(str(x['id']) for x in db.fb_adcampaigns.find({'campaign_status':{'$ne':CAMPAIGN_STATUS_CODES['deleted']}}))
-    used_campaign_ids = set(str(x['_id']) for x in db.fb_adgroups.aggregate([{'$match':{'adgroup_status':{'$ne':'DELETED'}}},
-                                                                             {'$group':{'_id':'$campaign_id'}}]))
+    campaign_ids = set(str(x['id']) for x in db.fb_adcampaigns.find({'configured_status':{'$ne':CAMPAIGN_STATUS_CODES['deleted']}}))
+    used_campaign_ids = set(str(x['_id']) for x in db.fb_adgroups.aggregate([{'$match':{'configured_status':{'$ne':'DELETED'}}},
+                                                                             {'$group':{'_id':'$adset_id'}}]))
     unused_campaign_ids = list(campaign_ids.difference(used_campaign_ids))
     print len(campaign_ids), 'campaigns', len(used_campaign_ids), 'used', len(unused_campaign_ids), 'unused'
     if unused_campaign_ids:
         for campaign_id, result in zip(unused_campaign_ids,
-                                       fb_api_batch(SpinFacebook.versioned_graph_endpoint('adcampaign', ''),
+                                       fb_api_batch(SpinFacebook.versioned_graph_endpoint('adset', ''),
                                                     [{'method':'POST', 'relative_url': campaign_id,
-                                                      'body': urllib.urlencode({'campaign_status':CAMPAIGN_STATUS_CODES['deleted']})} for \
+                                                      'body': urllib.urlencode({'status':CAMPAIGN_STATUS_CODES['deleted']})} for \
                                                      campaign_id in unused_campaign_ids])):
             if result:
                 db.fb_adcampaigns.with_options(write_concern = pymongo.write_concern.WriteConcern(w=0)).delete_one({'_id':campaign_id})
@@ -2305,7 +2310,7 @@ def control_ad_campaign(db, spin_params, campaign_name, campaign_data, do_reache
                                                                                                                    'log_bid_shade': math.log(params['tactical_bid_shade']),
                                                                                                                    }, upsert=True)
 
-    if enable_bid_updates:
+    if False and enable_bid_updates: # per-adgroup bidding was removed in API v2.4
         # Update bids on existing ads
         bid_updates = []
 
@@ -2616,10 +2621,10 @@ if __name__ == '__main__':
     elif mode == 'adgroups-pull':
         db.fb_adgroups.drop()
         for ad_account_id in set(x['ad_account_id'] for x in GAMES.itervalues() if x['ad_account_id']):
-            adgroups_pull(db, ad_account_id = ad_account_id,
-                          match_status = ['pending_review','active','paused','archived','adgroup_paused','campaign_paused','campaign_group_paused']) # pull non-deleted ads on all campaigns
+            ads_pull(db, ad_account_id = ad_account_id,
+                     match_status = ['pending_review','active','paused','archived']) # pull non-deleted ads on all campaigns
         if verbose:
-            print 'found', db.fb_adgroups.find().count(), 'adgroups'
+            print 'found', db.fb_adgroups.find().count(), 'ads'
 
     elif mode == 'adgroups-drop':
         db.fb_adgroups.drop()
@@ -2673,7 +2678,7 @@ if __name__ == '__main__':
             # pull all active ads regardless of campaign
             adgroup_list = []
             for ad_account_id in set(x['ad_account_id'] for x in GAMES.itervalues() if x['ad_account_id']):
-                adgroup_list += adgroups_pull(db, ad_account_id = ad_account_id, match_status=MATCH_STATUS)
+                adgroup_list += ads_pull(db, ad_account_id = ad_account_id, match_status=MATCH_STATUS)
             # adgroup_list = db.fb_adgroups.find() # optional
 
             adgroup_list = filter(lambda x: (adgroup_decode_status(x) in MATCH_STATUS) and (not adgroup_name_is_bad(x['name'])), adgroup_list)
@@ -2690,9 +2695,8 @@ if __name__ == '__main__':
             for adgroup in adgroup_list:
                 # remember adgroup
                 update = adgroup.copy()
-                update['_id'] = update['id']
                 update['expire_time'] = expire_time
-                db.recent_adgroups.update_one({'_id':update['_id']}, {'$set':update}, upsert=True)
+                db.recent_adgroups.update_one({'_id':update['id']}, {'$set':update}, upsert=True)
 
             # add any remembered adgroups that we don't already have in the list
             previous = list(db.recent_adgroups.find({'_id':{'$nin':[x['id'] for x in adgroup_list]}}))
@@ -2732,6 +2736,8 @@ if __name__ == '__main__':
         for ad_account_id in set(x['ad_account_id'] for x in GAMES.itervalues() if x['ad_account_id']):
             adimages_pull(db, ad_account_id)
         dump_table(db.fb_adimages)
+    elif mode == 'adimages-list':
+        dump_table(db.fb_adimages)
     elif mode == 'adimage-get-hash':
         print adimage_get_hash(db, GAMES[cmd_game_id]['ad_account_id'], image_file)
 
@@ -2761,7 +2767,7 @@ if __name__ == '__main__':
         elif mode.endswith('pause'):
             ignore_status = ['DELETED','ARCHIVED','ADGROUP_PAUSED','PAUSED']
 
-        qs = {'adgroup_status': {'$nin':ignore_status}}
+        qs = {'status': {'$nin':ignore_status}}
 
         if stgt_filter:
             qs.update(adgroup_dtgt_filter_query(stgt_to_dtgt(stgt_filter), dtgt_key = spin_field('dtgt')))
@@ -2815,7 +2821,7 @@ if __name__ == '__main__':
         adgroup_update_status_batch(db, status_updates)
 
     elif mode == 'adgroup-count':
-        qs = {'adgroup_status': {'$ne':'DELETED'}}
+        qs = {'status': {'$ne':'DELETED'}}
         if stgt_filter:
             qs.update(adgroup_dtgt_filter_query(stgt_to_dtgt(stgt_filter), dtgt_key = spin_field('dtgt')))
         print 'filter', qs

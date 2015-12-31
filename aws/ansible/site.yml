@@ -1,0 +1,7 @@
+---
+
+- hosts: gamemaster
+  sudo: True
+  gather_facts: False
+  roles:
+    - spin_ec2

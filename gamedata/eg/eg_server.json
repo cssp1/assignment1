@@ -223,7 +223,6 @@
     "log_fbpayments": 1, // log intensity for FB Payments API
     "log_fb_open_graph": false, // write FB open graph HTTP interaction to exceptions.txt
     "log_fb_achievements": false, // write FB Achievements API interaction to exceptions.txt
-    "log_purchase_ui": true, // write purchase_ui events to purchase_ui_log
 
     "log_ladder_pvp": 1, // log intensity level for ladder PvP activity
 

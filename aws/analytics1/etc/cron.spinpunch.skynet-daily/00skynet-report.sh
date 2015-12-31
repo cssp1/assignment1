@@ -16,6 +16,7 @@ GAME_DIR=/home/ec2-user/thunderrun
 (cd $GAME_DIR/gameserver && ./skynet_summary_to_sql.py -q > /dev/null)
 #(cd $GAME_DIR/gameserver && ./mysql.py skynet < cross_promo_views.sql > /dev/null)
 (cd $GAME_DIR/gameserver && ./cross_promo_summary_to_sql.py -q > /dev/null)
+(cd $GAME_DIR/gameserver && ./title_summary_to_sql.py -q > /dev/null)
 
 QUERY_DATE_RANGE=`date +%m/%d/%Y -d "today -7 days"`-`date +%m/%d/%Y -d "today"`
 FILENAME_DATE_RANGE=`date +%Y%m%d -d "today -7 days"`-`date +%Y%m%d -d "today - 1 day"`
