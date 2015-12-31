@@ -11047,7 +11047,13 @@ class LivePlayer(Player):
             self.resources.gain_gamebucks(quest.reward_gamebucks, reason='quest_reward')
 
         if hasattr(quest, "reward_consequent"):
-            session.execute_consequent_safe(quest.reward_consequent, self, retmsg, reason='give_quest_rewards')
+            # awkward - needs to pass same parameters as the on_login_pre_hello consequent
+            snap = self.resources.calc_snapshot()
+            session.execute_consequent_safe(quest.reward_consequent, self, retmsg,
+                                            {'max_inventory': snap.max_inventory(), 'cur_inventory': snap.cur_inventory(),
+                                             'largest_purchase': self.history.get('largest_purchase', 0),
+                                             'largest_purchase_gamebucks': self.history.get('largest_purchase_gamebucks', 0)},
+                                            reason='give_quest_rewards')
 
         new_objects = []
 
