@@ -6,7 +6,7 @@
 
 import SpinConfig # for API version settings
 import SpinJSON
-import base64, hmac, hashlib, time, calendar
+import base64, hmac, hashlib, time, calendar, os
 
 #
 # FACEBOOK API tools
@@ -91,8 +91,12 @@ def order_data_decode(data):
 # please keep in sync with gameclient/clientcode/SPFB.js
 
 def api_version_string(feature):
+    env_override = os.getenv('SPIN_FACEBOOK_API_VERSION')
     api_versions = SpinConfig.config.get('facebook_api_versions', {})
-    if api_versions and (feature in api_versions):
+
+    if env_override:
+        sver = env_override
+    elif api_versions and (feature in api_versions):
         sver = api_versions[feature]
     elif api_versions and ('default' in api_versions):
         sver = api_versions['default']
@@ -101,8 +105,12 @@ def api_version_string(feature):
     return (sver + '/') if sver else ''
 
 def api_version_number(feature):
+    env_override = os.getenv('SPIN_FACEBOOK_API_VERSION')
     api_versions = SpinConfig.config.get('facebook_api_versions', {})
-    if api_versions and (feature in api_versions):
+
+    if env_override:
+        return float(env_override[1:])
+    elif api_versions and (feature in api_versions):
         ver = float(api_versions[feature][1:])
     elif api_versions and ('default' in api_versions):
         ver = float(api_versions['default'][1:])
