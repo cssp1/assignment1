@@ -363,7 +363,7 @@ def fb_api_batch(base_url, batch, limit = 50, read_only = False, ignore_errors =
 # FACEBOOK INTERFACE
 
 # fields we want to read back from the FB API on customaudiences objects
-CUSTOM_AUDIENCE_FIELDS='id,account_id,approximate_count,data_source,delivery_status,lookalike_audience_ids,lookalike_spec,name,permission_for_actions,operation_status,time_updated,subtype'
+CUSTOM_AUDIENCE_FIELDS='id,account_id,approximate_count,data_source,delivery_status,lookalike_audience_ids,lookalike_spec,name,permission_for_actions,operation_status,time_updated,retention_days,subtype'
 
 def custom_audiences_pull(db, ad_account_id):
     db.fb_custom_audiences.create_index('name')
@@ -384,7 +384,9 @@ def _custom_audience_create(db, ad_account_id, props):
         return None
 
 def custom_audience_create(db, ad_account_id, name, description = None):
-    props = {'name': name}
+    props = {'name': name,
+             'subtype': 'CUSTOM',
+             'retention_days': 180}
     if description: props['description'] = description
     return _custom_audience_create(db, ad_account_id, props)
 
