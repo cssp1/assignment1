@@ -8376,7 +8376,11 @@ class Player(AbstractPlayer):
         map_squads = dict([(int(data['base_id'].split('_')[1]), data) for data in map_squad_data])
         map_objects_by_squad = {}
         for entry in map_object_data:
-            squad_id = entry.get('squad_id',0)
+            # note: in case of a corrupted map object with no squad_id, default to a mobile ID so that
+            # we don't try to return BASE_DEFENDERS (0) to base!
+            squad_id = entry.get('squad_id',None)
+            if (squad_id is None) or (not SQUAD_IDS.is_mobile_squad_id(squad_id)):
+                squad_id = 1 # default "could be valid" mobile squad id
             if (squad_id not in map_objects_by_squad): map_objects_by_squad[squad_id] = []
             map_objects_by_squad[squad_id].append(entry)
 
