@@ -59,7 +59,7 @@ def retry_logic(func_name, bucket, filename, policy_404, func, *args, **kwargs):
             return response
 
         except requests.exceptions.HTTPError as e:
-            last_err = S3Exception(e, 'requests.exceptions.HTTPError: %r' % e, func_name, bucket, filename, attempt)
+            last_err = S3Exception(e, 'requests.exceptions.HTTPError: %r Headers %r Content %r' % (e, e.response.headers, e.response.content), func_name, bucket, filename, attempt)
             if e.response.status_code in (500, 503):
                 pass # retry on 500 Internal Server Error or 503 Service Unavailable
             else:
