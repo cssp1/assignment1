@@ -491,6 +491,8 @@ def adgroup_update_status_batch(db, arglist):
 def adgroup_update_status(db, adgroup, *args, **kwargs):
     adgroup_update_status_batch(db, [adgroup_update_status_batch_element(adgroup, *args, **kwargs)])
 
+# XXX all of the bid functions/parameters need to be updated for the v2.5+ API
+
 BID_INFO_CODES = {
     'ACTION': 55, 'REACH': 44, 'CLICK': 1
 }
@@ -512,79 +514,50 @@ def decode_bid_type(c):
 def encode_bid_type(t):
     return 'ABSOLUTE_OCPM' if t.startswith('oCPM') else BID_TYPE_CODES[t]
 
-def adgroup_get_bid(adgroup):
-    if ('max_bid' in adgroup) and ('bid_type' in adgroup) and (bid_type_equals(adgroup['bid_type'], 'CPC') or bid_type_equals(adgroup['bid_type'], 'CPM')):
-        ret = adgroup['max_bid']
-    else:
-        # API is really inconsistent with how it returns these
-        ret = max(adgroup['bid_info'].get("clicks",0), adgroup['bid_info'].get("CLICKS",0), adgroup['bid_info'].get(str(BID_INFO_CODES['CLICK']),0),
-                  adgroup['bid_info'].get("impressions",0), adgroup['bid_info'].get("IMPRESSIONS",0),
-                  adgroup['bid_info'].get("actions",0), adgroup['bid_info'].get("ACTIONS",0), adgroup['bid_info'].get(str(BID_INFO_CODES['ACTION']),0))
-    return ret
-def adgroup_set_bid(adgroup, new_bid, o_bid_type = None):
-    if o_bid_type:
-        return {'bid_info':{o_bid_type:new_bid}}
-    elif ('bid_type' in adgroup) and bid_type_equals(adgroup['bid_type'], 'CPC'):
-        return {'bid_info':{'CLICKS':new_bid}}
-    elif ('bid_type' in adgroup) and bid_type_equals(adgroup['bid_type'], 'CPM'):
-#        return {'max_bid': new_bid}
-        return {'bid_info':{'IMPRESSIONS':new_bid}}
-    else:
-        # auto-detect whether we are bidding for clicks or actions
-        assert 'bid_info' in adgroup
-        if max(adgroup['bid_info'].get("actions",0),adgroup['bid_info'].get("ACTIONS",0),adgroup['bid_info'].get(str(BID_INFO_CODES['ACTION']),0)) > \
-           max(adgroup['bid_info'].get("clicks",0),adgroup['bid_info'].get("CLICKS",0),adgroup['bid_info'].get(str(BID_INFO_CODES['CLICK']),0)):
-            o_bid_type = 'ACTIONS'
-        else:
-            o_bid_type = 'CLICKS'
-
-#        return {'bid_info':{str(BID_INFO_CODES[o_bid_type]):new_bid}}
-        return {'bid_info':{o_bid_type:new_bid}}
+def adgroup_get_bid(adgroup): return adgroup['bid_amount']
 
 def adgroup_encode_bid(bid_type, bid, app_id, conversion_pixels):
     ret = {}
     if bid_type == 'CPA' or bid_type.startswith('oCPM'):
         if bid_type == 'CPA' or bid_type == 'oCPM_INSTALL':
-            ret['conversion_specs'] = SpinJSON.dumps([{"action.type":["app_install"],"application":app_id}])
-            o_bid_type = 'ACTIONS'
+            ret['billing_event'] = 'APP_INSTALLS'
+            ret['optimization_goal'] = 'APP_INSTALLS'
         elif bid_type == 'oCPM_CLICK':
-            o_bid_type = 'CLICKS'
+            ret['billing_event'] = 'LINK_CLICKS'
+            ret['optimization_goal'] = 'LINK_CLICKS'
         else:
-            o_bid_type = 'ACTIONS'
-            event = '_'.join(bid_type.split('_')[1:])
-            assert event in conversion_pixels
-            ret['conversion_specs'] = SpinJSON.dumps([{"action.type":'offsite_conversion','offsite_pixel':int(conversion_pixels[event]['id'])}])
+            raise Exception('offsite conversions not implemented for v2.5+ API')
+            #event = '_'.join(bid_type.split('_')[1:])
+            #assert event in conversion_pixels
+            #ret['conversion_specs'] = SpinJSON.dumps([{"action.type":'offsite_conversion','offsite_pixel':int(conversion_pixels[event]['id'])}])
     elif bid_type == 'CPC':
-        o_bid_type = 'CLICKS'
+        ret['billing_event'] = 'LINK_CLICKS'
+        ret['optimization_goal'] = 'LINK_CLICKS'
     elif bid_type == 'CPM':
-        o_bid_type = 'IMPRESSIONS'
+        ret['billing_event'] = 'IMPRESSIONS'
+        ret['optimization_goal'] = 'IMPRESSIONS'
     else:
         raise Exception('unhandled bid_type '+bid_type)
-
-    bid_dic = adgroup_set_bid(ret, bid, o_bid_type = o_bid_type)
-    if 'max_bid' in bid_dic:
-        ret['max_bid'] = bid_dic['max_bid']
-    else:
-        ret['bid_info'] = SpinJSON.dumps(bid_dic['bid_info'])
+    ret['bid_amount'] = bid
     return ret
 
 def adcampaign_update_bid(db, adcampaign, new_bid):
     if not fb_api(SpinFacebook.versioned_graph_endpoint('adcampaign', adcampaign['id']),
-                  post_params = {'bid_info': SpinJSON.dumps(adgroup_set_bid(adcampaign, new_bid)['bid_info'])}):
+                  post_params = {'bid_amount': new_bid}):
         return False
-    db.fb_adcampaigns.update_one({'_id':adcampaign['id']}, {'$set': adgroup_set_bid(adcampaign, new_bid)}, upsert = False)
+    db.fb_adcampaigns.update_one({'_id':adcampaign['id']}, {'$set': {'bid_amount': new_bid}}, upsert = False)
     return True
 
 def adgroup_update_bid(db, adgroup, new_bid):
-    if not fb_api(SpinFacebook.versioned_graph_endpoint('adgroup', adgroup['id']), post_params = adgroup_set_bid(adgroup, new_bid)):
+    if not fb_api(SpinFacebook.versioned_graph_endpoint('adgroup', adgroup['id']), post_params = {'bid_amount': new_bid}):
         return False
-    db.fb_adgroups.update_one({'_id':adgroup['id']}, {'$set': adgroup_set_bid(adgroup, new_bid)}, upsert = False)
+    db.fb_adgroups.update_one({'_id':adgroup['id']}, {'$set':  {'bid_amount': new_bid}}, upsert = False)
     return True
 def adgroup_update_bid_batch_send(adgroup, new_bid):
-    return {'method': 'POST', 'relative_url': adgroup['id'], 'body': urllib.urlencode(adgroup_set_bid(adgroup, new_bid))}
+    return {'method': 'POST', 'relative_url': adgroup['id'], 'body': urllib.urlencode({'bid_amount': new_bid})}
 def adgroup_update_bid_batch_receive(db, adgroup, new_bid, result):
     if result:
-        db.fb_adgroups.with_options(write_concern = pymongo.write_concern.WriteConcern(w=0)).update_one({'_id':adgroup['id']}, {'$set': adgroup_set_bid(adgroup, new_bid)}, upsert = False)
+        db.fb_adgroups.with_options(write_concern = pymongo.write_concern.WriteConcern(w=0)).update_one({'_id':adgroup['id']}, {'$set': {'bid_amount': new_bid}}, upsert = False)
     return result
 
 # format of bid_updates is [(adgroup0, bid0), (adgroup1, bid1), ...]
@@ -1480,6 +1453,7 @@ def _page_feed_post_make(db, page_id, page_token, link, caption, title, body, im
                                                 'value': {'link':link,
                                                           'link_title':title}}),
               'message': body,
+              'link': link,
               'picture': adimage_get_s3_url(db, image),
               'published': 'false'
               }
@@ -1591,13 +1565,13 @@ def adcreative_make_batch_element(db, ad_account_id, fb_campaign_name, campaign_
             creative['link_url'] = link_url
             creative['page_types'] = SpinJSON.dumps(['rightcolumn'])
         elif ad_type in (4,32,432):
-            creative['actor_name'] = title_text # but this gets ignored
+            #creative['actor_name'] = title_text # but this gets ignored
             creative['object_story_id'] = page_post_id
             creative['url_tags'] = link_qs
             #creative['link_url'] = link_url
             #creative['mobile_store'] = 'fb_canvas'
-            if 'app_icon' in game_data:
-                creative['actor_image_hash'] = adimage_get_hash(db, ad_account_id, os.path.join(asset_path, game_data['app_icon'])) # this gets ignored too
+            #if 'app_icon' in game_data:
+            #    creative['actor_image_hash'] = adimage_get_hash(db, ad_account_id, os.path.join(asset_path, game_data['app_icon'])) # this gets ignored too
 
         if ad_type == 1 and link_destination == 'app':
             # assert image is 871x627
@@ -1856,12 +1830,12 @@ def adgroup_create_batch_element(db, campaign_id, campaign_name, creative_id, tg
         raise Exception('probable typo - ad version %s not present in campaign name %s' % (tgt['version'], campaign_name))
 
     adgroup = {'name': name,
-               'campaign_id': campaign_id,
+               'adset_id': campaign_id,
                'creative': SpinJSON.dumps({'creative_id':creative_id}),
                'tracking_specs': SpinJSON.dumps([{'action.type':'offsite_conversion','offsite_pixel':int(pixel['id'])} for pixel in conversion_pixels.itervalues()]),
-               #'objective': 'PAGE_LIKES' if tgt.get('destination',None)=='app_page' else ('CANVAS_APP_ENGAGEMENT' if tgt.get('include_already_connected_to_game',False) else 'CANVAS_APP_INSTALLS'),
+               #'objective': 'PAGE_LIKES' if tgt.get('destination',None)=='app_page' else ('LINK_CLICKS' if tgt.get('include_already_connected_to_game',False) else 'CANVAS_APP_INSTALLS'),
                'redownload':1,
-               'fields': ADGROUP_FIELDS
+               'fields': AD_FIELDS
                }
     #adgroup.update(adgroup_encode_bid(tgt['bid_type'], bid, game_data['app_id'], conversion_pixels))
 
@@ -1869,13 +1843,13 @@ def adgroup_create_batch_element(db, campaign_id, campaign_name, creative_id, tg
 
 def adgroup_create_batch(db, ad_account_id, arglist):
     ret = []
-    result_list = fb_api_batch(SpinFacebook.versioned_graph_endpoint('adgroup', ''),
-                               [{'method':'POST', 'relative_url': 'act_'+ad_account_id+'/adgroups',
+    result_list = fb_api_batch(SpinFacebook.versioned_graph_endpoint('ad', ''),
+                               [{'method':'POST', 'relative_url': 'act_'+ad_account_id+'/ads',
                                  'body': urllib.urlencode(adgroup_create_batch_element(db, *args)) } for args in arglist])
     for result in result_list:
         if result:
-            assert 'data' in result and 'adgroups' in result['data'] and len(result['data']['adgroups']) == 1
-            adgroup = result['data']['adgroups'][result['data']['adgroups'].keys()[0]]
+            assert 'data' in result and 'ads' in result['data'] and len(result['data']['ads']) == 1
+            adgroup = result['data']['ads'][result['data']['ads'].keys()[0]]
             update_fields_by_id(db.fb_adgroups, mongo_enc(adgroup_add_skynet_fields(adgroup)))
             r = adgroup
         else:
@@ -1924,17 +1898,16 @@ def adcampaigns_pull(db, ad_account_id):
 CAMPAIGN_STATUS_CODES = {'active':'ACTIVE', 'paused':'PAUSED', 'archived': 'ARCHIVED', 'deleted':'DELETED'}
 
 def adcampaign_make(db, name, ad_account_id, campaign_group_id, app_id, app_namespace, conversion_pixels, tgt, bid):
-    params = {'name':name, 'daily_budget':NEW_CAMPAIGN_BUDGET, 'campaign_status':CAMPAIGN_STATUS_CODES['active'],
-              #'bid_type': encode_bid_type(tgt['bid_type']),
+    params = {'name':name, 'daily_budget':NEW_CAMPAIGN_BUDGET, 'status':CAMPAIGN_STATUS_CODES['active'],
               'promoted_object': SpinJSON.dumps({'application_id': app_id, 'object_store_url':'https://www.facebook.com/games/'+app_namespace}),
               'targeting': SpinJSON.dumps(adgroup_targeting(db, tgt)),
-              'campaign_group_id': campaign_group_id, 'redownload':1}
+              'campaign_id': campaign_group_id, 'redownload':1}
     params.update(adgroup_encode_bid(tgt['bid_type'], bid, app_id, conversion_pixels))
 
-    result = fb_api(SpinFacebook.versioned_graph_endpoint('adcampaign', 'act_'+ad_account_id+'/adcampaigns'),
+    result = fb_api(SpinFacebook.versioned_graph_endpoint('adset', 'act_'+ad_account_id+'/adsets'),
                     post_params = params)
     if not result or ('id' not in result): return False
-    campaign = result['data']['campaigns'][result['id']]
+    campaign = result['data']['adsets'][result['id']]
     if 'account_id' in campaign: campaign['account_id'] = str(campaign['account_id']) # FB sometimes returns these as numbers :P
     update_fields_by_id(db.fb_adcampaigns, mongo_enc(campaign))
     return campaign
@@ -1942,18 +1915,18 @@ def adcampaign_make(db, name, ad_account_id, campaign_group_id, app_id, app_name
 def adcampaigns_modify(db, campaign_name, pprops):
     props = pprops.copy(); props['redownload'] = 1
     if campaign_name == '*ARCHIVED*':
-        query = {'campaign_status':'ARCHIVED'} # operate on all archived campaigns
+        query = {'status':'ARCHIVED'} # operate on all archived campaigns
     else:
         query = {'name':{'$regex':campaign_name}}
     campaigns = list(db.fb_adcampaigns.find(query))
-    results = fb_api_batch(SpinFacebook.versioned_graph_endpoint('adcampaign', ''),
+    results = fb_api_batch(SpinFacebook.versioned_graph_endpoint('adset', ''),
                            [{'method':'POST', 'relative_url': camp['id'],
                              'body': urllib.urlencode(props) } \
                             for camp in campaigns])
     count = 0
     for camp, result in zip(campaigns, results):
         if result:
-            if pprops.get('campaign_group_status',None) == 'DELETED':
+            if pprops.get('effective_status',None) == 'DELETED':
                 if result['success']:
                     db.fb_adcampaigns.delete_one({'_id':camp['_id']})
             else:
@@ -2170,7 +2143,7 @@ def control_ad_campaign(db, spin_params, campaign_name, campaign_data, do_reache
             fb_campaign = fb_campaign_list[0]
 
             # check bid on existing campaign
-            if enable_bid_updates and ('bid_info' in fb_campaign):
+            if enable_bid_updates and ('bid_amount' in fb_campaign):
                 cur_bid = adgroup_get_bid(fb_campaign)
                 if campaign_bid >= 0 and cur_bid != campaign_bid and (abs(cur_bid-campaign_bid)/float(cur_bid) > 0.04): # ignore very small deltas
                     print "    changing campaign bid from", cur_bid, "to", campaign_bid
