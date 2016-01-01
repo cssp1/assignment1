@@ -206,20 +206,20 @@ def chat_abuse_violate(control_args, ui_context, channel_name, message_id):
         ui_actions.append("Player is currently muted, perhaps because of a recent violation. No action taken against the player.")
 
     elif active_stacks == 0:
-        message_body = "Hello! You were recently reported for violating our %s. A support agent reviewed this report and confirmed your message was offensive:\n\n%s\n\nThis message is to serve as a warning, and a notification that you are receiving a temporary mute from in-game chat. Any future offenses may result in a longer temporary or permanent mute from chat. Thanks in advance for your understanding." % (ui_policy_link, ui_player_context)
+        message_body = "Hello! You were recently reported for violating our %s. A support agent reviewed this report and confirmed your message was offensive or spam:\n\n%s\n\nThis message is to serve as a warning, and a notification that you are receiving a temporary mute from in-game chat. Any future offenses may result in a longer temporary or permanent mute from chat. Thanks in advance for your understanding." % (ui_policy_link, ui_player_context)
         add_stack = True
         temporary_mute_duration = 24*3600
     elif active_stacks == 1:
-        message_body = "You were recently reported again for violating our %s. A support agent reviewed this report and confirmed your message was offensive:\n\n%s\n\nThis message is to serve as a 2nd warning, and a notification that you are receiving a temporary mute from in-game chat. Any future offenses may result in a longer temporary or permanent mute from chat. Thanks in advance for your understanding." % (ui_policy_link, ui_player_context)
+        message_body = "You were recently reported again for violating our %s. A support agent reviewed this report and confirmed your message was offensive or spam:\n\n%s\n\nThis message is to serve as a 2nd warning, and a notification that you are receiving a temporary mute from in-game chat. Any future offenses may result in a longer temporary or permanent mute from chat. Thanks in advance for your understanding." % (ui_policy_link, ui_player_context)
         add_stack = True
         temporary_mute_duration = 48*3600
     elif active_stacks == 2:
-        message_body = "You were recently reported again for violating our %s. A support agent reviewed this report and confirmed your message was offensive:\n\n%s\n\nThis message is to serve as a 3rd warning, and a notification that you are receiving a temporary mute from in-game chat. Any future offenses will result in a permanent chat mute without further warning. Thanks in advance for your understanding." % (ui_policy_link, ui_player_context)
+        message_body = "You were recently reported again for violating our %s. A support agent reviewed this report and confirmed your message was offensive or spam:\n\n%s\n\nThis message is to serve as a 3rd warning, and a notification that you are receiving a temporary mute from in-game chat. Any future offenses will result in a permanent chat mute without further warning. Thanks in advance for your understanding." % (ui_policy_link, ui_player_context)
         add_stack = True
         temporary_mute_duration = 72*3600
     elif active_stacks >= 3:
         if active_stacks == 3:
-            alt_message_body = "Hello! This message is to inform you that your account has been muted from in-game chat due to offensive chat violations on a related game account (ID: %d). If you feel this ban may have been made in error, please submit a ticket to our Customer Support team. Thanks in advance for your understanding." % int(control_args['user_id'])
+            alt_message_body = "Hello! This message is to inform you that your account has been muted from in-game chat due to chat violations on a related game account (ID: %d). If you feel this ban may have been made in error, please submit a ticket to our Customer Support team. Thanks in advance for your understanding." % int(control_args['user_id'])
         add_stack = (active_stacks < 4)
         permanent_mute = True
         permanent_mute_alts = True
