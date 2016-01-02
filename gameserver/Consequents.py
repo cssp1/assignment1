@@ -50,7 +50,7 @@ class PlayerHistoryConsequent(Consequent):
         self.key = key
 
         # if "value" starts with "$" then it's a reference to a context variable
-        if type(value) in (str,unicode) and len(value) >= 1 and value[0] == '$':
+        if isinstance(value, basestring) and len(value) >= 1 and value[0] == '$':
             self.value = None
             self.value_from_context = value[1:]
         else: # otherwise it's a literal value
@@ -97,15 +97,33 @@ class MetricEventConsequent(Consequent):
             if session.sent_metrics.get(self.tag, False):
                 return # already sent
             session.sent_metrics[self.tag] = True
+
+        # prepare properties
         props = copy.deepcopy(self.props)
         for k in props.keys():
-            # context variable
-            if type(props[k]) in (str,unicode) and len(props[k]) >= 1 and props[k][0] == '$':
+            # special cases
+
+            # grab a piece of data off an aura
+            if isinstance(props[k], dict) and '$aura_data' in props[k]:
+                aura_specname = props[k]['$aura_data']['spec']
+                aura_dataname = props[k]['$aura_data']['data']
+                aura = None
+                for a in player.player_auras:
+                    if a['spec'] == aura_specname:
+                        aura = a; break
+                if aura:
+                    props[k] = aura.get('data', {}).get(aura_dataname)
+                else:
+                    del props[k] # silently drop the property
+
+            # context variables
+            elif isinstance(props[k], basestring) and len(props[k]) >= 1 and props[k][0] == '$':
                 context_key = props[k][1:]
                 if context and (context_key in context):
                     props[k] = context[context_key]
                 else:
                     del props[k]
+
         if self.summary_key:
             props[self.summary_key] = player.get_denormalized_summary_props('brief')
         session.metric_event_coded(player, self.event_name, props)
@@ -254,10 +272,7 @@ class ApplyAuraConsequent(Consequent):
         self.duration_from_event = data.get('aura_duration_from_event', None)
         self.strength = data.get('aura_strength',1)
         self.level = data.get('aura_level',1)
-        if 'aura_data' in data:
-            self.aura_data = copy.deepcopy(data['aura_data'])
-        else:
-            self.aura_data = None
+        self.aura_data = data.get('aura_data', None)
         self.stack = data.get('stack',-1)
         self.stack_decay = data.get('stack_decay', None)
         if self.stack_decay:
@@ -303,7 +318,14 @@ class ApplyAuraConsequent(Consequent):
                 # override with the context value
                 stack = context.get(self.stack_from_context, stack)
 
-        if session.player.apply_aura(self.name, strength = self.strength, duration = duration, stack = stack, level = self.level, data = self.aura_data, ignore_limit = True):
+        if self.aura_data:
+            instance_data = copy.deepcopy(self.aura_data)
+            for k in instance_data.keys():
+                if instance_data[k] == '$duration': # dynamic replacement
+                    instance_data[k] = duration
+        else:
+            instance_data = None
+        if session.player.apply_aura(self.name, strength = self.strength, duration = duration, stack = stack, level = self.level, data = instance_data, ignore_limit = True):
             session.player.stattab.send_update(session, retmsg)
             spec = session.player.get_abtest_aura(self.name)
             if ('on_apply' in spec):
