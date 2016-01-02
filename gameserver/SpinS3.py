@@ -62,6 +62,8 @@ def retry_logic(func_name, bucket, filename, policy_404, func, *args, **kwargs):
             last_err = S3Exception(e, 'requests.exceptions.HTTPError: %r Headers %r Content %r' % (e, e.response.headers, e.response.content), func_name, bucket, filename, attempt)
             if e.response.status_code in (500, 503):
                 pass # retry on 500 Internal Server Error or 503 Service Unavailable
+            elif e.response.status_code == 400 and e.response.content and ('RequestTimeout' in e.response.content):
+                pass # retry on <Error><Code>RequestTimeout</Code><Message>Your socket connection to the server was not read from or written to within the timeout period. Idle connections will be closed.</Message>
             else:
                 raise last_err # abort immediately
 
