@@ -605,8 +605,6 @@ def _adstats_pull(db, adgroup_list, time_range = None):
             continue
 
         x = x['data'][0]
-        # make sure we got data for the right ad
-        assert str(x['ad_id']) == str(adgroup['id'])
 
         if time_range:
             # make sure we got the right time range
@@ -617,7 +615,7 @@ def _adstats_pull(db, adgroup_list, time_range = None):
                parsed_end_time != time_range[1]:
                 raise Exception('asked for time_range %r %r %r but got %r (parsed %r %r %r %r)' % \
                                 (time_range, SpinFacebook.unparse_fb_time(time_range[0]), SpinFacebook.unparse_fb_time(time_range[1]),
-                                 x['ad_id'], parsed_start_time, parsed_end_time, x['date_start'], x['date_stop']))
+                                 str(adgroup['id']), parsed_start_time, parsed_end_time, x['date_start'], x['date_stop']))
 
         # Old API returned "spent" cents, new API returns "spend" dollars - convert back to cents
         if 'spend' in x:
@@ -639,9 +637,8 @@ def _adstats_pull(db, adgroup_list, time_range = None):
             update_fields_by_id(db.fb_adstats, mongo_enc(x), primary_key = spin_field('adgroup_id'))
 
             # record time series in at_time table
-            x['time'] = time_range[1]
-            x['_id'] = x['id']
-            db.fb_adstats_at_time.update_one({'_id':x['_id']}, mongo_enc(x), upsert=True)
+            #x['time'] = time_range[1]
+            #db.fb_adstats_at_time.update_one({'_id':x['_id']}, mongo_enc(x), upsert=True)
 
         results.append(x)
 
@@ -760,14 +757,19 @@ def adstats_record(db, adgroup_list, time_range):
                'start_time':time_range[0], 'end_time':time_range[1],
                'adgroup_id': str(adgroup['id']),
                # deliberately denormalize name, dtgt, campaign_id, and created_time into here so we can pull historical stats without relying on the source adgroups still being in the database
-               'adgroup_name': adgroup['name'], 'dtgt': stgt_to_dtgt(stgt), 'campaign_id': str(stat['adset_id']), 'created_time': adgroup['created_time'],
+               'adgroup_name': adgroup['name'], 'dtgt': stgt_to_dtgt(stgt), 'campaign_id': str(adgroup['adset_id']), 'created_time': adgroup['created_time'],
                'status': adgroup_decode_status(adgroup), 'bid': adgroup_get_bid(adgroup)
                }
 
         # copy the adstat counters and fields we want to store
+        if 'clicks' not in obj:
+            # oh dear, Facebook made click counting really complicated now
+            obj['clicks'] = sum((obj.get(CLICK_TYPE, 0) for CLICK_TYPE in ('website_clicks','app_store_clicks','call_to_action_clicks','inline_link_clicks','deeplink_clicks')),
+                                0)
+
         for FIELD in ADSTATS_COUNTERS:
             if FIELD in stat:
-                if type(stat[FIELD]) in (str, unicode):
+                if isinstance(stat[FIELD], basestring):
                     obj[FIELD] = float(stat[FIELD]) if '.' in stat[FIELD] else int(stat[FIELD])
                 else:
                     assert type(stat[FIELD]) in (int, long, float)
