@@ -1482,6 +1482,11 @@ def page_feed_post_make(db, page_id, page_token, link, caption, title, body, ima
         db.fb_page_feed.with_options(write_concern = pymongo.write_concern.WriteConcern(w=0)).replace_one({'_id':entry['_id']}, entry, upsert=True)
         return entry['id']
 
+def call_to_action_type(tgt):
+    if tgt.get('include_already_connected_to_game',False) or tgt['bid_type'] in ('oCPM_CLICK', 'CPC'):
+        return 'OPEN_LINK' # since the optimization goal is LINK_CLICKS, not CANVAS_APP_*
+    return 'PLAY_GAME'
+
 def adcreative_make_batch_element(db, ad_account_id, fb_campaign_name, campaign_name, tgt, spin_atgt):
     # this just got REALLY complicated for app ads:
     # https://developers.facebook.com/docs/reference/ads-api/mobile-app-ads/
@@ -1511,15 +1516,15 @@ def adcreative_make_batch_element(db, ad_account_id, fb_campaign_name, campaign_
     if link_destination == 'app':
         base_link_url = 'https://apps.facebook.com/'+game_data['namespace']+'/'
         link_url = base_link_url + '?' + link_qs
-        creative['call_to_action_type'] = 'PLAY_GAME'
+        #creative['call_to_action_type'] = call_to_action_type(tgt)
     elif link_destination == 'appcenter':
         # use cookie reflection to ensure query params survive the bounce
         base_link_url = 'http://'+game_data['host']+'/'
-        link_url = base_link_url + '?' + link_qs+'&spin_rfl='+urllib.quote('http://facebook.com/appcenter/'+game_data['namespace']+'?fb_source=ad&oauthstate='+fb_campaign_name)
+        link_url = base_link_url + '?' + link_qs+'&spin_rfl='+urllib.quote('https://facebook.com/appcenter/'+game_data['namespace']+'?fb_source=ad&oauthstate='+fb_campaign_name)
     elif link_destination == 'app_page':
         base_link_url = 'https://www.facebook.com/'+game_data['page_id']+'/'
         link_url = base_link_url + '?' + link_qs
-        creative['call_to_action_type'] = 'OPEN_LINK' # 'PLAY_GAME'
+        #creative['call_to_action_type'] = 'OPEN_LINK' # 'PLAY_GAME'
         caption_text = game_data['app_name']
     else:
         raise Exception('unknown link destination type '+link_destination)
@@ -1534,21 +1539,6 @@ def adcreative_make_batch_element(db, ad_account_id, fb_campaign_name, campaign_
         image_file = os.path.join(asset_path, 'image_'+tgt['image']+'.jpg')
         if ad_type == 1:
             image_hash = adimage_get_hash(db, ad_account_id, image_file)
-
-        if ad_type in (4,32,432):
-            link_url_template = base_link_url
-
-            if 0:
-                # (old) BUG: https://developers.facebook.com/bugs/520919191353148/
-                # Facebook docs SAY that the adcreative's url_tags will be appended to the link,
-                # but in practice it does not seem to work!
-                # UPDATE: This seems to have been fixed as of 20140707
-                link_url_template = link_url # use the entire link here so that the destination URL will be correct even without url_tags
-
-
-            page_post_id = page_feed_post_make(db, game_data['page_id'], game_data['page_token'],
-                                               link_url_template, caption_text, title_text, body_text, tgt['image'],
-                                               creative.get('call_to_action_type','OPEN_LINK'))
 
     # March 2014 migration note - FB is deprecating Type 4 (right-hand-side) app install ads.
     # I think we can replace these with either Type 1 domain ads OR Type 32 app install ads,
@@ -1566,12 +1556,32 @@ def adcreative_make_batch_element(db, ad_account_id, fb_campaign_name, campaign_
             creative['page_types'] = SpinJSON.dumps(['rightcolumn'])
         elif ad_type in (4,32,432):
             #creative['actor_name'] = title_text # but this gets ignored
-            creative['object_story_id'] = page_post_id
+
+            if 0: # out-of-line creation
+                page_post_id = page_feed_post_make(db, game_data['page_id'], game_data['page_token'],
+                                                   base_link_url, caption_text, title_text, body_text, tgt['image'],
+                                                   call_to_action_type(tgt))
+                creative['object_story_id'] = page_post_id
+            else: # inline creation
+                creative['object_story_spec'] = SpinJSON.dumps({'page_id': game_data['page_id'],
+                                                                'link_data': {
+                    'call_to_action': {'type': call_to_action_type(tgt),
+                                       'value': {'link':base_link_url,
+                                                 'link_title':title_text}},
+                    'message': body_text,
+                    'name': title_text,
+                    'link': base_link_url,
+                    'caption': game_data['app_name'],
+                    'picture': adimage_get_s3_url(db, tgt['image']),
+                    }
+                                                                })
+
             creative['url_tags'] = link_qs
             #creative['link_url'] = link_url
             #creative['mobile_store'] = 'fb_canvas'
             #if 'app_icon' in game_data:
             #    creative['actor_image_hash'] = adimage_get_hash(db, ad_account_id, os.path.join(asset_path, game_data['app_icon'])) # this gets ignored too
+            creative['object_store_url'] = 'https://apps.facebook.com/'+game_data['namespace']+'/'
 
         if ad_type == 1 and link_destination == 'app':
             # assert image is 871x627
@@ -1850,7 +1860,7 @@ def adgroup_create_batch(db, ad_account_id, arglist):
         if result:
             assert 'data' in result and 'ads' in result['data'] and len(result['data']['ads']) == 1
             adgroup = result['data']['ads'][result['data']['ads'].keys()[0]]
-            update_fields_by_id(db.fb_adgroups, mongo_enc(adgroup_add_skynet_fields(adgroup)))
+            update_fields_by_id(db.fb_adgroups, mongo_enc(ad_add_skynet_fields(adgroup)))
             r = adgroup
         else:
             r = False
@@ -1899,9 +1909,10 @@ CAMPAIGN_STATUS_CODES = {'active':'ACTIVE', 'paused':'PAUSED', 'archived': 'ARCH
 
 def adcampaign_make(db, name, ad_account_id, campaign_group_id, app_id, app_namespace, conversion_pixels, tgt, bid):
     params = {'name':name, 'daily_budget':NEW_CAMPAIGN_BUDGET, 'status':CAMPAIGN_STATUS_CODES['active'],
-              'promoted_object': SpinJSON.dumps({'application_id': app_id, 'object_store_url':'https://www.facebook.com/games/'+app_namespace}),
               'targeting': SpinJSON.dumps(adgroup_targeting(db, tgt)),
               'campaign_id': campaign_group_id, 'redownload':1}
+    if call_to_action_type(tgt) == 'PLAY_GAME':
+        params['promoted_object'] = SpinJSON.dumps({'application_id': app_id, 'object_store_url':'https://apps.facebook.com/'+app_namespace+'/'})
     params.update(adgroup_encode_bid(tgt['bid_type'], bid, app_id, conversion_pixels))
 
     result = fb_api(SpinFacebook.versioned_graph_endpoint('adset', 'act_'+ad_account_id+'/adsets'),
@@ -2175,9 +2186,9 @@ def control_ad_campaign(db, spin_params, campaign_name, campaign_data, do_reache
     status_updates = []
 
     # Scan current ad groups
-    # note! FB API can return adgroup campaign_id inconsistently as integer or string!
-    cur_adgroup_list = sorted(list(db.fb_adgroups.find({'campaign_id':{'$in':[int(fb_campaign['id']),
-                                                                              str(fb_campaign['id'])]}})), key = lambda x: x['name'])
+    # note! FB API can return adset_id inconsistently as integer or string!
+    cur_adgroup_list = sorted(list(db.fb_adgroups.find({'adset_id':{'$in':[int(fb_campaign['id']),
+                                                                           str(fb_campaign['id'])]}})), key = lambda x: x['name'])
 
     for adgroup in cur_adgroup_list:
         if adgroup_name_is_bad(adgroup['name']): continue # skip bad ads
