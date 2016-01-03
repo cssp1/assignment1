@@ -50,7 +50,7 @@
     "ui_precious": 1, // require confirmation to delete
     "icon": "inventory_ops_needs",
     "store_icon": "resource_icon_ops_needs",
-    "max_stack": 999999,
+    "max_stack": 99999999,
     "rarity": 2,
     "use": { "spellname": "CLIENT_CONSEQUENT", "spellarg": {"consequent": "INVOKE_STORE_DIALOG", "category": "event_prizes" } },
 
