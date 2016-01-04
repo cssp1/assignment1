@@ -36869,10 +36869,14 @@ function buy_gamebucks_sku2_metrics_description(spell, spellarg) {
 
 // return ui_warning attached to this SKU
 function buy_gamebucks_sku2_ui_warning(spell, spellarg) {
+    var ret = null;
     if('loot_table' in spell && (!spellarg || spellarg['want_loot'])) {
-        return eval_cond_or_literal(gamedata['loot_tables_client'][spell['loot_table']]['ui_warning'] || null, player, null);
+        ret = eval_cond_or_literal(gamedata['loot_tables_client'][spell['loot_table']]['ui_warning'] || null, player, null);
     }
-    return null;
+    if(!ret && 'ui_bonus' in spell) {
+        ret = spell['ui_bonus'];
+    }
+    return ret;
 }
 
 // merge identical successive entries in an item list, even if this would violate the max stack size

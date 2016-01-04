@@ -7428,7 +7428,7 @@
                               "gradient": "vinout", "gradient_midpoint": 0.25, "alpha": 0.5 },
 
             "name": { "kind": "TextField",
-                      "xy": [72,22], "dimensions": [118, 56],
+                      "xy": [72,23], "dimensions": [118, 56],
                       "text_size_nobonus": 21, "text_size_nobonus_big": 19,
                       "text_size_withbonus": 21, "text_size_withbonus_big": 19,
                       "text_style": "bold", "drop_shadow": 2,
@@ -7469,7 +7469,7 @@
             "expire_time": { "kind": "TextField", "show": 1,
                              "xy": [72,48], "dimensions": [118, 46],
                              "ui_name": "Ending in %togo",
-                             "text_size": 12, "text_style": "normal", "drop_shadow": 1,
+                             "text_size": 12, "text_style": "thick", "drop_shadow": 1,
                              "text_color": [1,0,0,1],
                              "text_hjustify": "right", "text_vjustify": "top" },
 
@@ -7501,8 +7501,7 @@
                                "text_size": 16, "text_style": "bold", "ui_tooltip": "", "tooltip_delay": 0 }, // PRICE
 
             "warning_text": { "kind": "TextField",
-                              //"xy": [13,277], "dimensions": [184,28], "text_size": 13, "text_hjustify": "center",
-                              "xy": [72,5], "dimensions": [118,28], "text_size": 11, "text_hjustify": "right",
+                              "xy": [72,5], "dimensions": [118,28], "text_size": 11, "text_style": "bold", "text_hjustify": "right",
                               "text_color": [1,1,0,1], "drop_shadow": 1
                             },
 
