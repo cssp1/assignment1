@@ -938,7 +938,7 @@ def adstats_analyze(db, min_clicks = 0, stgt_filter = None, group_by = None,
         # could make this more efficient by incorporating adgroup_query and filtering on dtgt
         adgroup_list = adstats_record_get_live_adgroups(db, adgroup_dtgt_filter_query(stgt_to_dtgt(stgt_filter)) if stgt_filter else {}, time_range)
     else:
-        adgroup_query = {'status': {'$ne':'DELETED'}}
+        adgroup_query = {'configured_status': {'$ne':'DELETED'}}
         if stgt_filter: # optimize adgroup query to only match tgt_filter
             adgroup_query.update(adgroup_dtgt_filter_query(stgt_to_dtgt(stgt_filter), dtgt_key = spin_field('dtgt')))
         if verbose: print "ADGROUP QUERY:", adgroup_query
@@ -1376,7 +1376,7 @@ def adstats_analyze(db, min_clicks = 0, stgt_filter = None, group_by = None,
                     if tactical_update(db, stgt_filter = action['stgt_filter'], coeff = action['coeff'], safe = 0) > 0:
                         needs_control_pass = True
                 elif action['action'] == 'delete':
-                    qs = {'status': {'$ne':'DELETED'}}
+                    qs = {'configured_status': {'$ne':'DELETED'}}
                     qs.update(adgroup_dtgt_filter_query(stgt_to_dtgt(action['stgt_filter']), dtgt_key = spin_field('dtgt')))
                     my_updates = [adgroup_update_status_batch_element(adgroup, new_status = 'deleted') for adgroup in \
                                   db.fb_adgroups.find(qs)]
@@ -1904,7 +1904,7 @@ def adcampaigns_pull(db, ad_account_id):
     [update_fields_by_id(db.fb_adcampaigns, mongo_enc(x)) for x in \
      fb_api(SpinFacebook.versioned_graph_endpoint('adset', 'act_'+ad_account_id+'/adsets'),
             url_params = {'fields':'id,adlabels,adset_schedule,name,account_id,campaign_id,created_time,end_time,frequency_cap,frequency_cap_reset_period,frequency_control_specs,lifetime_frequency_cap,optimization_goal,promoted_object,rf_prediction_id,configured_status,effective_status,pacing_type,daily_budget,lifetime_budget,targeting,bid_amount,billing_event',
-                          'status':SpinJSON.dumps(['ACTIVE','ARCHIVED','PAUSED'])},
+                          'configured_status':SpinJSON.dumps(['ACTIVE','ARCHIVED','PAUSED'])},
             is_paged = True)]
 
 CAMPAIGN_STATUS_CODES = {'active':'ACTIVE', 'paused':'PAUSED', 'archived': 'ARCHIVED', 'deleted':'DELETED'}
@@ -1928,7 +1928,7 @@ def adcampaign_make(db, name, ad_account_id, campaign_group_id, app_id, app_name
 def adcampaigns_modify(db, campaign_name, pprops):
     props = pprops.copy(); props['redownload'] = 1
     if campaign_name == '*ARCHIVED*':
-        query = {'status':'ARCHIVED'} # operate on all archived campaigns
+        query = {'configured_status':'ARCHIVED'} # operate on all archived campaigns
     else:
         query = {'name':{'$regex':campaign_name}}
     campaigns = list(db.fb_adcampaigns.find(query))
@@ -2753,7 +2753,7 @@ if __name__ == '__main__':
         elif mode.endswith('pause'):
             ignore_status = ['DELETED','ARCHIVED','ADGROUP_PAUSED','PAUSED']
 
-        qs = {'status': {'$nin':ignore_status}}
+        qs = {'configured_status': {'$nin':ignore_status}}
 
         if stgt_filter:
             qs.update(adgroup_dtgt_filter_query(stgt_to_dtgt(stgt_filter), dtgt_key = spin_field('dtgt')))
@@ -2807,7 +2807,7 @@ if __name__ == '__main__':
         adgroup_update_status_batch(db, status_updates)
 
     elif mode == 'adgroup-count':
-        qs = {'status': {'$ne':'DELETED'}}
+        qs = {'configured_status': {'$ne':'DELETED'}}
         if stgt_filter:
             qs.update(adgroup_dtgt_filter_query(stgt_to_dtgt(stgt_filter), dtgt_key = spin_field('dtgt')))
         print 'filter', qs
