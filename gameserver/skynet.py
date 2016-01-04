@@ -486,6 +486,9 @@ def adgroup_update_status_batch(db, arglist):
                                           'body': urllib.urlencode(new_props)} for adgroup_id, new_props in arglist])):
         adgroup_id, new_props = arg
         if result:
+            if 'status' in new_props:
+                new_props['configured_status'] = new_props['status']
+                del new_props['status']
             db.fb_adgroups.update_one({'_id':adgroup_id}, {'$set': new_props}, upsert = False)
 
 def adgroup_update_status(db, adgroup, *args, **kwargs):
