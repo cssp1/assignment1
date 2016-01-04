@@ -12,6 +12,7 @@ from urllib import urlencode
 import requests
 import AtomicFileWrite
 import OpenSSL.SSL
+import ssl
 
 class S3Exception(Exception):
     def __init__(self, wrapped, ui_msg, op, bucket, filename, attempt_num):
@@ -73,18 +74,24 @@ def retry_logic(func_name, bucket, filename, policy_404, func, *args, **kwargs):
         except requests.exceptions.ConnectionError as e:
             last_err = S3Exception(e, 'requests.exceptions.ConnectionError: %r' % e, func_name, bucket, filename, attempt)
             pass # retry
+
+        except OpenSSL.SSL.SysCallError as e:
+            last_err = S3Exception(e, 'OpenSSL.SSL.SysCallError: %r' % e, func_name, bucket, filename, attempt)
+            if e.args in ((errno.EPIPE, 'EPIPE'), (errno.ECONNRESET, 'ECONNRESET')):
+                pass # retry
+            else:
+                raise last_err # abort immediately
+
+        except ssl.SSLError as e:
+            last_err = S3Exception(e, 'ssl.SSLError: %r' % e, func_name, bucket, filename, attempt)
+            pass # retry
+
         except socket.timeout as e:
             last_err = S3Exception(e, 'socket.timeout', func_name, bucket, filename, attempt)
             pass # retry
         except socket.error as e:
             last_err = S3Exception(e, 'socket.error: %r %s' % (e, errno.errorcode.get(e.errno,'Unknown')), func_name, bucket, filename, attempt)
             if e.errno == errno.ECONNRESET:
-                pass # retry
-            else:
-                raise last_err # abort immediately
-        except OpenSSL.SSL.SysCallError as e:
-            last_err = S3Exception(e, 'OpenSSL.SSL.SysCallError: %r' % e, func_name, bucket, filename, attempt)
-            if e.args in ((errno.EPIPE, 'EPIPE'), (errno.ECONNRESET, 'ECONNRESET')):
                 pass # retry
             else:
                 raise last_err # abort immediately
