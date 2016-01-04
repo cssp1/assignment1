@@ -9149,7 +9149,7 @@ class Player(AbstractPlayer):
 
     # Return the event_schedule entry for an event in progress
     def get_event_schedule(self, event_kind, event_name, ref_time, ignore_activation):
-        assert event_kind in ('current_event', 'current_event_store', 'facebook_sale',
+        assert event_kind in ('current_event', 'current_event_store', 'facebook_sale', 'bargain_sale',
                               'current_trophy_pve_challenge', 'current_trophy_pvp_challenge',
                               'current_stat_tournament')
         assert ref_time is not None
