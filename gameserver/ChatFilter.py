@@ -24,6 +24,7 @@ class ChatFilter(object):
 
         # substitute for spacing between letters
         leet_speak_space = config['leet_speak'].get('letter_space',None)
+        self.leet_speak = config['leet_speak']
 
         # ensure it includes the whitespace_marker_pattern, if one exists
         if self.space_marker_pattern:
@@ -40,8 +41,8 @@ class ChatFilter(object):
         for word in config['bad_words']:
             pat = word_space
             for c in word:
-                if c in config['leet_speak']:
-                    pat += '['+c+config['leet_speak'][c]+']'
+                if c in self.leet_speak:
+                    pat += '['+c+self.leet_speak[c]+']'
                 else:
                     pat += c
                 pat += word_space
