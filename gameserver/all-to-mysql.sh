@@ -69,6 +69,7 @@ if [[ "$FREQ" == "daily" ]]; then
   run_it ./damage_protection_to_sql.py -q --prune
   run_it ./ladder_pvp_to_sql.py -q --prune
   run_it ./chat_to_sql.py -q --prune
+  run_it ./chat_reports_to_sql.py -q --prune
   run_it ./inventory_to_sql.py -q --prune
   run_it ./unit_donation_to_sql.py -q --prune
   run_it ./fishing_to_sql.py -q --prune
