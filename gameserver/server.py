@@ -10910,6 +10910,8 @@ class Player(AbstractPlayer):
         if self.developer: ret['developer'] = self.developer # also insert "developer" flag here in case ETL scripts want to ignore these
         return ret
 
+    def alt_record_attack(self, other): pass
+
 # these are proxy "stubs" that represent players OTHER than the one playing the game
 # (e.g., other players whose bases you visit or attack)
 
