@@ -25,6 +25,7 @@ if sys.platform == 'linux2':
 
 from twisted.python import log, failure
 from twisted.internet import reactor, task, defer, protocol
+import twisted.internet.utils
 from twisted.web import server, resource, http
 import twisted.web.error
 
@@ -3794,6 +3795,13 @@ class Session(object):
         ui_context = '\n'.join(ui_context_list)
         gamesite.nosql_client.chat_report(channel, self.user.user_id, self.user.get_chat_name(self.player),
                                           target_uid, target_chat_name, server_time, context_time, found_message_id, ui_context, reason = 'do_chat_report2')
+        if 'chat_report_recipients' in SpinConfig.config:
+            twisted.internet.utils.getProcessValue('./SpinReminders.py',
+                                                   args = ['--from', '%s server' % SpinConfig.game_id_long(),
+                                                           '--subject', '%s Chat Report (see PCHECK)' % SpinConfig.game_id_long().upper(),
+                                                           '--body', ui_context.encode('utf-8'),
+                                                           '--recipients', SpinJSON.dumps(SpinConfig.config['chat_report_recipients'])],
+                                                   env = os.environ)
 
     def do_chat_send(self, channel, text, retmsg = None, bypass_gag = False, props = None):
         assert channel
