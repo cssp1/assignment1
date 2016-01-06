@@ -20361,6 +20361,7 @@ class GAMEAPI(resource.Resource):
                     return False
                 else:
                     session.player.alt_record_attack(session.viewing_player)
+                    session.viewing_player.alt_record_attack(session.player)
 
                 state = gamesite.lock_client.player_lock_acquire_attack(session.viewing_user.user_id, session.viewing_player.generation, owner_id=session.player.user_id)
                 if state == -Player.LockState.logged_in:
