@@ -796,9 +796,9 @@ class NoSQLClient (object):
             self.seen_chat_reports = True
         return coll
     # note: the "time" of a chat report is the time the target said the objectionable thing. "report_time" is when it was reported, "resolution_time" is when it was resolved.
-    def chat_report(self, channel, reporter_id, reporter_ui_name, target_id, target_ui_name, report_time, target_time, message_id, context, reason=''):
-        return self.instrument('chat_report(%s)'%reason, self._chat_report, (channel, reporter_id, reporter_ui_name, target_id, target_ui_name, report_time, target_time, message_id, context))
-    def _chat_report(self, channel, reporter_id, reporter_ui_name, target_id, target_ui_name, report_time, target_time, message_id, context):
+    def chat_report(self, channel, reporter_id, reporter_ui_name, target_id, target_ui_name, report_time, target_time, message_id, context, confidence=None, source=None, reason=''):
+        return self.instrument('chat_report(%s)'%reason, self._chat_report, (channel, reporter_id, reporter_ui_name, target_id, target_ui_name, report_time, target_time, message_id, context, confidence, source))
+    def _chat_report(self, channel, reporter_id, reporter_ui_name, target_id, target_ui_name, report_time, target_time, message_id, context, confidence, source):
         props = {'millitime':datetime.datetime.utcfromtimestamp(float(target_time)),
                  'report_time': report_time,
                  'channel': channel, 'reporter_id': reporter_id, 'target_id': target_id,
@@ -809,6 +809,8 @@ class NoSQLClient (object):
             assert isinstance(context, basestring)
             context = unicode(context)
             props['context'] = context
+        if confidence is not None: props['confidence'] = confidence
+        if source is not None: props['source'] = source
         self.chat_reports_table().with_options(write_concern = pymongo.write_concern.WriteConcern(w=0)).insert_one(props)
 
     def chat_reports_get(self, start_time, end_time, reason=''):
@@ -821,6 +823,12 @@ class NoSQLClient (object):
         report_list = self.instrument('chat_report_get_one(%s)'%reason, self._chat_reports_query, (qs,))
         if len(report_list) != 1: raise Exception('cannot find report: %r' % id)
         return report_list[0]
+    def chat_report_get_one_by_message_id(self, message_id, reason=''):
+        qs = {'message_id': self.encode_object_id(message_id)}
+        report_list = self.instrument('chat_report_get_one_by_message_id(%s)'%reason, self._chat_reports_query, (qs,))
+        if len(report_list) > 0:
+            return report_list[0]
+        return None
     def decode_chat_report(self, row):
         row['id'] = self.decode_object_id(row['_id']); del row['_id'] # convert native ObjectID to string
         if 'millitime' in row: # convert datetime.datetime to UNIX timestamp
@@ -850,6 +858,16 @@ class NoSQLClient (object):
         later_resolved_reports = self.instrument('chat_report_is_obsolete(%s)'%reason, self._chat_reports_query, (qs, 1))
         return len(later_resolved_reports) > 0
 
+    def chat_monitor_bookmarks_table(self): return self._table('chat_monitor_bookmarks')
+    def chat_monitor_bookmark_get(self, key): return self.instrument('chat_monitor_bookmark_get', self._chat_monitor_bookmark_get, (key,))
+    def chat_monitor_bookmark_set(self, key, val): return self.instrument('chat_monitor_bookmark_set', self._chat_monitor_bookmark_set, (key,val))
+    def _chat_monitor_bookmark_get(self, key):
+        row = self.chat_monitor_bookmarks_table().find_one({'_id':key})
+        if row:
+            return row['bookmark']
+        return None
+    def _chat_monitor_bookmark_set(self, key, val):
+        self.chat_monitor_bookmarks_table().with_options(write_concern = pymongo.write_concern.WriteConcern(w=0)).insert_one({'_id':key, 'bookmark':val})
 
     ###### PLAYER ALIAS UNIQUE RESERVATIONS ######
 
