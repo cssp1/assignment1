@@ -11,7 +11,6 @@ import SpinConfig
 import SpinJSON
 import SpinNoSQL
 import SpinSQLUtil
-import SpinETL
 import SpinSingletonProcess
 import MySQLdb
 

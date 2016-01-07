@@ -123,7 +123,7 @@ if __name__ == '__main__':
             if verbose:
                 print 'Running ChatMom on', len(unknown), 'strings...',
                 sys.stdout.flush()
-            unknown_probs = get_likelihoods([row['text'] for row in unknown])
+            unknown_probs = get_likelihoods([r['text'] for r in unknown])
             if verbose:
                 print
                 #print unknown_probs

@@ -1003,7 +1003,7 @@ if __name__ == '__main__':
             ui_priority = data['map_ui_priority'][diff]
             default_ui_priority = {'mf':300}.get(game_id,100)
             if ui_priority != default_ui_priority:
-                raise Exception('event %s should have map_ui_priority = %d' % (data['event_name'], default_priority))
+                raise Exception('event %s should have map_ui_priority = %d' % (data['event_name'], default_ui_priority))
 
             if len(data['difficulties']) > 1:
                 # ensure difficulties appear in correct order
