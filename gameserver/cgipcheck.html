@@ -1346,7 +1346,7 @@ var refresh_chat_report_row = function(row, item, time_now) {
     } else if(item['source'] === 'rule') {
         reporter_ui_name = '<i>ChatFilter rule</i>';
     } else {
-        reporter_ui_name = 'player %reporter_id <b>%ui_name</b>'.replace('%reporter_id', item['reporter_id'].toString()).replace(item['reporter_ui_name'] || 'unknown');
+        reporter_ui_name = 'player %reporter_id <b>%ui_name</b>'.replace('%reporter_id', item['reporter_id'].toString()).replace('%ui_name', item['reporter_ui_name'] || 'unknown');
     }
     var s = '%abstime (%relhoursh ago), player %target_id <b>%target_ui_name</b> said in channel <tt>%channel</tt>:<br><pre>%context</pre>and was reported by %reporter_ui_name at %report_time';
     s = s.replace('%abstime', pretty_print_ts(item['time']));
