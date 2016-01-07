@@ -867,7 +867,7 @@ class NoSQLClient (object):
             return row['bookmark']
         return None
     def _chat_monitor_bookmark_set(self, key, val):
-        self.chat_monitor_bookmarks_table().with_options(write_concern = pymongo.write_concern.WriteConcern(w=0)).insert_one({'_id':key, 'bookmark':val})
+        self.chat_monitor_bookmarks_table().update_one({'_id':key}, {'$set': {'bookmark':val}}, upsert=True)
 
     ###### PLAYER ALIAS UNIQUE RESERVATIONS ######
 
