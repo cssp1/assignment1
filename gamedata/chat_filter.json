@@ -28,7 +28,7 @@
 
     // not necessarily in any order
     "bad_words": [
-        "arse","ass","assed","asses","asshole","assholes","anus",
+        "arse","ass","assed","asses","asshole","assholes",
         "bloody","bollocks",
         "bastard","bastards",
         "bitch","biatch","bitches","bitched","bitching","bullshit",
@@ -48,7 +48,6 @@
         "nigga","nigger","niggers",
         "nipple", "nipples",
         "penis", "penises",
-        "piss","pisses","pissed",
         "prick","pricks",
         "puss","pusses","pussy","pussys","pussies",
         "puto","puta","putang",
