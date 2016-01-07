@@ -248,7 +248,7 @@ def chat_abuse_violate(control_args, ui_context, channel_name, message_id):
 
     return "Player had %d offense(s) before this. Took actions:\n\n- %s" % (active_stacks, "\n- ".join(ui_actions))
 
-def filter_chat_report_list(reports):
+def filter_chat_report_list_for_enforcement(reports):
     # clean up a list of chat reports and return only the ones still eligible for enforcement
     # in addition to filtering reports that are already resolved, we also need to avoid "double jeopardy"
     # (report -> violate -> report again -> violate again) by ignoring any reports that refer to things
@@ -262,6 +262,9 @@ def filter_chat_report_list(reports):
                   (not x.get('resolved')) and # unresolved
                   (x['time'] > latest_violations.get(x['target_id'],-1)), # no later violation
                   reports)
+
+def filter_chat_report_list_drop_automated(reports):
+    return filter(lambda x: x.get('source') not in ('rule','ml'), reports)
 
 def do_action(path, method, args, spin_token_data, nosql_client):
     try:
@@ -415,8 +418,18 @@ def do_action(path, method, args, spin_token_data, nosql_client):
                 result = {'result': list(nosql_client.chat_buffer_table().find(qs, {'_id':0,'channel':1,'sender':1,'text':1,'time':1}).sort([('time',-1)]).limit(1000))}
             elif method == 'get_reports':
                 report_list = list(nosql_client.chat_reports_get(args['start_time'], args['end_time']))
-                if args.get('filter') == 'unresolved':
-                    report_list = filter_chat_report_list(report_list)
+                show_automated = False
+                if 'filter' in args:
+                    filters = args['filter'].split(',')
+                else:
+                    filters = []
+                for f in filters:
+                    if f == 'unresolved':
+                        report_list = filter_chat_report_list_for_enforcement(report_list)
+                    elif f == 'automated':
+                        show_automated = True
+                if not show_automated:
+                    report_list = filter_chat_report_list_drop_automated(report_list)
                 result = {'result': report_list }
             elif method == 'resolve_report':
                 assert args['action'] in ('ignore', 'violate')

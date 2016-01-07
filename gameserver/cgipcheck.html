@@ -1280,11 +1280,16 @@ var refresh_chat = function() {
     if(!chat_pending) {
         $('#chat_table').empty();
         chat_pending = true;
+        $('#chat_show_automated').attr('disabled', true);
         $('#chat_status_loading')[0].innerHTML = 'Loading...';
         var time_now = (new Date()).getTime()/1000;
-
-        send_request('chat', 'get_reports', {'start_time':time_now - 2*86400, 'end_time':time_now, 'filter': 'unresolved'}, function(result) {
+        var filter = 'unresolved';
+        if($("#chat_show_automated")[0].checked) {
+            filter += ',automated';
+        }
+        send_request('chat', 'get_reports', {'start_time':time_now - 2*86400, 'end_time':time_now, 'filter': filter}, function(result) {
             chat_pending = false;
+            $('#chat_show_automated').removeAttr('disabled');
             cur_chat_reports = result;
             cur_chat_report_rows = {};
             var time_now = (new Date()).getTime()/1000;
@@ -1334,8 +1339,16 @@ var prettify_context = function(sender_ui_name, text) {
 var refresh_chat_report_row = function(row, item, time_now) {
     row.empty();
     var target_ui_name = (item['target_ui_name'] || 'unknown');
-    var reporter_ui_name = (item['reporter_ui_name'] || 'unknown');
-    var s = '%abstime (%relhoursh ago), player %target_id <b>%target_ui_name</b> said in channel <tt>%channel</tt>:<br><pre>%context</pre>and was reported by player %reporter_id <b>%reporter_ui_name</b> at %report_time';
+    var reporter_ui_name;
+    console.log(item);
+    if(item['source'] === 'ml') {
+        reporter_ui_name = '<i>ChatMom ML model (confidence <b>%conf</b>)</i>'.replace('%conf', item['confidence'].toFixed(3));
+    } else if(item['source'] === 'rule') {
+        reporter_ui_name = '<i>ChatFilter rule</i>';
+    } else {
+        reporter_ui_name = 'player %reporter_id <b>%ui_name</b>'.replace('%reporter_id', item['reporter_id'].toString()).replace(item['reporter_ui_name'] || 'unknown');
+    }
+    var s = '%abstime (%relhoursh ago), player %target_id <b>%target_ui_name</b> said in channel <tt>%channel</tt>:<br><pre>%context</pre>and was reported by %reporter_ui_name at %report_time';
     s = s.replace('%abstime', pretty_print_ts(item['time']));
     s = s.replace('%relhours', ((time_now - item['time'])/3600.0).toFixed(1));
     s = s.replace('%target_id', item['target_id'].toString());
@@ -1788,6 +1801,8 @@ Status: <span id="payment_status"></span>
 <div id="mode_chat">
 <div id="chat_status" style="position:relative;">
 <div id="chat_status_loading">STATUS</div>
+<p>
+<label><input id="chat_show_automated" type="checkbox" style="height:initial;" onclick="refresh_chat();">Show automated reports</label>
 <p>
 <table id="chat_table" width="100%" style="font-size:12px;font-family:sans-serif;"></table>
 <br>
