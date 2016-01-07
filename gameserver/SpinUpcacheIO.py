@@ -7,6 +7,7 @@
 # I/O library for working with upcache both locally and in S3
 
 import SpinJSON
+import SpinS3
 import FastGzipFile
 import os, subprocess, time
 
@@ -119,7 +120,7 @@ class S3Reader(Reader):
 
             except GeneratorExit:
                 raise
-            except Exception as e:
+            except Exception:
                 # received bad data
                 unzipper.terminate()
                 unzipper = None
