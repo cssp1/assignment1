@@ -327,7 +327,7 @@ class S3 (object):
     # synchronous PUT from disk file
     # optionally override timeout for slow/big streaming uploads
     def put_file(self, bucket, filename, source_filename, streaming = True, timeout = S3_REQUEST_TIMEOUT, **kwargs):
-        fd = open(source_filename)
+        fd = open(source_filename, 'rb')
         if not streaming:
             buf = self.PutBuf()
             while True:
