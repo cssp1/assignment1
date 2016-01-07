@@ -196,7 +196,7 @@ with tf.Graph().as_default():
 
         # Initialize all variables
         if FLAGS.resume:
-            ckpt = tf.train.get_checkpoint_state(os.path.abspath(os.path.join(home_dir, "runs", FLAGS.resume, "checkpoints")))
+            ckpt = tf.train.get_checkpoint_state(os.path.join(home_dir, "runs", FLAGS.resume, "checkpoints"))
             if not (ckpt and ckpt.model_checkpoint_path):
                 raise Exception("checkpoint not found: {}".format(FLAGS.resume))
             saver.restore(sess, ckpt.model_checkpoint_path)

@@ -17,8 +17,11 @@ time_now = int(time.time())
 
 def get_likelihoods(strings):
     "Run the machine-learning model on a list of strings, returning a list of badness probabilities"
-    proc = subprocess.Popen(['ChatMom/train.py', '--resume=good', '--infer=-', '--quiet=1'],
-                            env=os.environ, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    env = os.environ.copy()
+    # find libraries in gameserver directory :(
+    env['PYTHONPATH'] = env.get('PYTHONPATH','')+':'+os.path.dirname(__file__)
+    proc = subprocess.Popen(['ChatMom/train.py', '--resume=good', '--infer=-', '--quiet=1', '--parallel=1'],
+                            env=env, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     blob = ('\n'.join(strings + [''])).encode('utf-8')
     stdoutdata, stderrdata = proc.communicate(input=blob)
     if proc.returncode != 0:
