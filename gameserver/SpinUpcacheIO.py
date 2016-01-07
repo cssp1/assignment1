@@ -80,7 +80,6 @@ class S3Reader(Reader):
 
         skip = 0
         fail_count = 0
-        MAX_FAILS = 3
 
         start_time = time.time()
         busy_time = 0.0
@@ -91,10 +90,12 @@ class S3Reader(Reader):
             unzipper = subprocess.Popen(['gunzip', '-c', '-'],
                                         stdin=fd.fileno(),
                                         stdout=subprocess.PIPE)
+
             entry = 0
             restart = False
 
             try:
+                line = ''
                 for line in unzipper.stdout.xreadlines():
                     if entry < skip:
                         entry += 1; continue
@@ -113,15 +114,18 @@ class S3Reader(Reader):
                     busy_end = time.time()
                     busy_time += (busy_end - busy_start)
 
+                if unzipper.returncode != 0:
+                    raise Exception('unclean exit from unzipper')
+
             except GeneratorExit:
                 raise
-            except:
+            except Exception as e:
                 # received bad data
                 unzipper.terminate()
                 unzipper = None
                 fd = None
                 fail_count += 1
-                if fail_count >= MAX_FAILS:
+                if fail_count >= SpinS3.MAX_RETRIES:
                     debug = open('/tmp/upcacheIO-fail2-%s-%d-%d.json' % (filename,skip,os.getpid()), 'w')
                     debug.write(line)
                     debug.close()
@@ -130,6 +134,7 @@ class S3Reader(Reader):
                     restart = True
 
             if restart:
+                time.sleep(SpinS3.RETRY_DELAY)
                 continue # try again from BEGIN
 
             # success!
