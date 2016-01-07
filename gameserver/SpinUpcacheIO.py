@@ -10,6 +10,7 @@ import SpinJSON
 import SpinS3
 import FastGzipFile
 import sys, os, subprocess, time
+import cStringIO
 
 # WRITER is in dump_userdb.py
 
@@ -93,12 +94,15 @@ class S3Reader(Reader):
                                         stdout=subprocess.PIPE)
             stdoutdata, stderrdata = unzipper.communicate(input = buf)
 
+            # try to be more memory-efficient
+            buf = None
+
             entry = 0
             restart = False
 
             try:
                 line = ''
-                for line in stdoutdata.split('\n'):
+                for line in cStringIO.StringIO(stdoutdata):
                     if entry < skip:
                         entry += 1; continue
 
