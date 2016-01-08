@@ -8590,7 +8590,7 @@
                                "text_hjustify": "right" },
 
             "upgrade_button": { "kind": "ActionButton", "xy": [550,365], "dimensions": [134,28],
-                                "bg_image": "menu_button_134px", "ui_name": "More Info", // "ui_name": "Upgrade (+%d Slot%plural)",
+                                "bg_image": "menu_button_134px", "ui_name": "Upgrade", // "ui_name": "Upgrade (+%d Slot%plural)",
                                 "text_size": 13, "text_style": "bold"},
 
             "overstuffed_warning": { "kind": "TextField", "xy": [340,326], "dimensions": [663,28], "text_size": 13,

@@ -39112,7 +39112,8 @@ function get_requirements_help(kind, arg, options) {
         var warehouse = find_object_by_type(gamedata['inventory_building']);
         if(warehouse) {
             if(warehouse.level < warehouse.get_max_ui_level()) {
-                verb = 'upgrade'; target = warehouse; ui_arg_s = warehouse.spec['ui_name'];
+                verb = (kind === 'inventory_space_need' ? 'upgrade_or_discard_items' : 'upgrade');
+                target = warehouse; ui_arg_s = warehouse.spec['ui_name'];
             } else {
                 verb = 'discard_items'; target = warehouse; ui_arg_s = warehouse.spec['ui_name'];
             }
@@ -39325,7 +39326,7 @@ function get_requirements_help(kind, arg, options) {
                 invoke_repair_dialog();
             }
         }; })(target);
-    } else if(verb == 'discard_items') {
+    } else if(verb == 'discard_items' || verb == 'upgrade_or_discard_items') {
         help_function = (function (_target) { return function() {
             if(!player.warehouse_is_busy()) {
                 invoke_inventory_dialog();

@@ -1267,6 +1267,9 @@
             "upgrade": { "ui_title": "%s is full",
                          "ui_description": "Discard inventory items or upgrade our %s."
                        },
+            "upgrade_or_discard_items": { "ui_title": "%s is full",
+                                          "ui_description": "Discard inventory items or upgrade our %s."
+                                        },
             "discard_items": { "ui_title": "%s is full",
                                "ui_description": "Discard inventory items to make room."
                              }
