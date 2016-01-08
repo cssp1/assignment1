@@ -153,6 +153,19 @@ def get_grid_bounds(xy, gridsize):
     return [[xy[0]-half[0], xy[0]+half[0]+extra[0]],
             [xy[1]-half[1], xy[1]+half[1]+extra[1]]]
 
+def weighted_random_choice(groups, weights, r):
+    """Given parallel arrays of groups and relative weights, and 0 <= r < 1, return a random
+    element of groups chosen according to the weights."""
+    breakpoints = []
+    bp = 0.0
+    for w in weights:
+        bp += w
+        breakpoints.append(bp)
+
+    r = r * breakpoints[-1]
+    return groups[min(bisect.bisect(breakpoints, r), len(breakpoints)-1)]
+
+
 # valid characters in alliance string fields
 name_chars_simple = map(chr, xrange(ord('a'),ord('z')+1)) + \
                     map(chr, xrange(ord('A'),ord('Z')+1))
@@ -2577,6 +2590,7 @@ class PlayerTable:
               ('idle_check', lambda s: s.serialize(), lambda player, observer, data: IdleCheck.IdleCheck(gamedata['server']['idle_check'], data, server_time)),
               ('creation_time', None, None),
               ('lottery_slate', None, None),
+              ('lottery_slate_weights', None, None),
               ('ladder_match', None, None),
               ('ladder_match_history', None, None),
 
@@ -7702,6 +7716,7 @@ class Player(AbstractPlayer):
         # dictionary {"slot0": {"spec":"foo"}, "slot1": ... }
         # must NOT be alterable by user action unless 1) scan is conducted or 2) reseed cooldown time passes
         self.lottery_slate = None
+        self.lottery_slate_weights = None
 
         # PvP ladder rival, must not be alterable unless 1) attack is made or 2) time passes or 3) player pays (and waits) to switch
         self.ladder_match = None
@@ -11827,22 +11842,7 @@ class LivePlayer(Player):
                         continue
                 else:
                     # assign randomly, with optional weighing
-                    breakpoints = []
-                    bp = 0.0
-                    for group in groups:
-                        if group not in data['groups']:
-                            raise Exception('group %r not found in %r' % (group, data))
-                        weight = data['groups'][group].get('weight', 1.0/len(groups))
-                        bp += weight
-                        breakpoints.append(bp)
-
-                    r = random.random()
-                    groupnum = 0
-                    while groupnum < len(groups)-1 and r >= breakpoints[groupnum]:
-                        groupnum += 1
-
-                    #groupnum = int(random.random()*len(groups))
-                    group = groups[groupnum]
+                    group = weighted_random_choice(groups, [data['groups'][g].get('weight',1) for g in groups], random.random())
 
                 want_tests = []
                 want_cohorts = []
@@ -12315,8 +12315,20 @@ class LivePlayer(Player):
         if force or (self.lottery_slate is None) or (len(self.lottery_slate) != len(slot_tables)) or \
            (not self.cooldown_active('lottery_reseed')):
 
+            new_slate = dict((slot_name, session.get_loot_items(self, tab, -1, -1)) for slot_name, tab in slot_tables.iteritems())
+            weights = self.get_any_abtest_value('lottery_slot_weights', gamedata.get('lottery_slot_weights', None))
+
+            if weights:
+                for slot_name in slot_tables:
+                    assert slot_name in weights # sanity check
+                new_weights = copy.deepcopy(weights)
+            else:
+                new_weights = None
+
+            # update atomically, in case there was an exception above
+            self.lottery_slate = new_slate
+            self.lottery_slate_weights = new_weights
             self.cooldown_trigger('lottery_reseed', gamedata['lottery_reseed_cooldown'])
-            self.lottery_slate = dict((slot_name, session.get_loot_items(self, tab, -1, -1)) for slot_name, tab in slot_tables.iteritems())
 
     # get the current lottery slate
     def get_lottery_slate(self, session):
@@ -20189,8 +20201,15 @@ class GAMEAPI(resource.Resource):
 
         if success:
             slate = session.player.get_lottery_slate(session)
+            if session.player.lottery_slate_weights:
+                weight_dict = session.player.lottery_slate_weights
+            else:
+                weight_dict = dict((slot_name, 1) for slot_name in slate)
+
             slot_names = sorted(slate.keys())
-            which_slot = slot_names[int(random.random() * len(slot_names))]
+            weight_array = [weight_dict[slot_name] for slot_name in slot_names]
+            which_slot = weighted_random_choice(slot_names, weight_array, random.random())
+
             loot = slate[which_slot]
 
             assert len(loot) == 1
