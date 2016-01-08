@@ -23083,6 +23083,7 @@ function invoke_inventory_dialog(force) {
     dialog.widgets['close_button'].onclick = close_parent_dialog;
     init_inventory_grid(dialog);
     dialog.ondraw = update_inventory_grid;
+    update_inventory_header_buttons(dialog, find_object_by_type(gamedata['inventory_building']), 'inventory');
     return dialog;
 }
 
@@ -24983,6 +24984,28 @@ function update_unit_donation_dialog(dialog) {
     dialog.widgets['pending_rect'].show = dialog.widgets['pending_text'].show = dialog.widgets['pending_spinner'].show = pending;
 }
 
+function update_inventory_header_buttons(dialog, obj, cur_mode) {
+    var lottery_spell = gamedata['spells']['LOTTERY_SCAN'];
+    var can_show = (('show_if' in lottery_spell ? read_predicate(lottery_spell['show_if']).is_satisfied(player) : true) &&
+                    ('requires' in lottery_spell ? read_predicate(lottery_spell['requires']).is_satisfied(player) : true));
+
+    if(can_show && obj && obj.is_warehouse() && obj.is_lottery_building()) {
+        dialog.widgets['inventory_toggle'].show =
+            dialog.widgets['lottery_toggle'].show = true;
+        dialog.widgets['inventory_toggle'].state = (cur_mode === 'inventory' ? 'active' : 'normal');
+        dialog.widgets['lottery_toggle'].state = (cur_mode === 'lottery' ? 'active' : 'normal');
+        dialog.widgets['inventory_toggle'].onclick = (cur_mode === 'inventory' ? null : function(w) { invoke_inventory_dialog(); });
+        dialog.widgets['lottery_toggle'].onclick = (cur_mode === 'lottery' ? null : (function (_obj) {
+            return function(w) {
+                invoke_lottery_dialog(_obj);
+            }; })(obj) );
+        dialog.widgets['lottery_toggle'].str = lottery_spell['ui_name'];
+    } else {
+        dialog.widgets['inventory_toggle'].show =
+            dialog.widgets['lottery_toggle'].show = false;
+    }
+}
+
 var lottery_slate_receivers = [];
 function get_lottery_slate(scanner, callback) {
     lottery_slate_receivers.push(callback);
@@ -25005,6 +25028,7 @@ function invoke_lottery_dialog(scanner) {
     dialog.widgets['title'].str = gamedata['spells']['LOTTERY_SCAN']['ui_name'];
     lottery_dialog_refresh_slate(dialog);
     dialog.ondraw = update_lottery_dialog;
+    update_inventory_header_buttons(dialog, scanner, 'lottery');
     return dialog;
 }
 

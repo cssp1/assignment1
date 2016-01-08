@@ -8548,8 +8548,14 @@
             "sunken": {"kind": "StaticImage", "xy":[36,66], "dimensions":[665,344], "asset": "dialog_sunken_resizable", "bg_image_resizable": 1 },
             "title": { "kind": "TextField", "xy": [37,14], "dimensions": [221, 41], "text_size": 30, "text_style": "thick",
                        "text_hjustify": "left", "ui_name": "Warehouse" },
+
+            "lottery_toggle": { "kind": "ActionButton", "xy": [412,22], "dimensions": [136,32], "text_size": 13, "text_style": "bold",
+                                "bg_image": "menu_button_136px", "state": "normal", "ui_name": "" }, // from LOTTERY_SCAN spell ui_name
+            "inventory_toggle": { "kind": "ActionButton", "xy": [556,22], "dimensions": [136,32], "text_size": 13, "text_style": "bold",
+                                  "bg_image": "menu_button_136px", "state": "normal", "ui_name": "Inventory" },
+
             "close_button": { "kind": "ActionButton", "xy": [706,1], "dimensions": [19,22], "bg_image": "close_button_small", "push_bg_image": 1 },
-            "topbar": { "kind": "SolidRect", "xy": [37,68], "dimensions": [663,32], "color": [0,0,0,0.4] },
+            "topbar": { "kind": "SolidRect", "xy": [37,68], "dimensions": [663,32], "color": [0,0,0,0.25] },
             "section": { "kind": "TextField", "xy": [37,68], "dimensions": [663,32], "text_size": 13, "ui_name": "Items",
                          "text_color": [0.66,0.66,0.66,1], "text_hjustify": "center", "text_vjustify": "center" },
 
@@ -8735,25 +8741,31 @@
     },
 
     "lottery_dialog": {
-        "dimensions": [736,436],
+        "dimensions": [736,423],
         "default_button": "lottery_button",
         "widgets": {
             "glow": { "show": 0, "kind":"StaticImage","xy":[-30,-30],"dimensions":[796,496],"bg_image_resizable":1,"asset":"dialog_glow_resizable", "composite_mode": "lighter",
                       //"sound": "success_sound_exploding_glass_01",
                       "fade":1, "duration": 1.5, "fade_peak": 0.2, "delay": -0.2},
-            "bg": { "kind":"StaticImage", "xy":[0,0], "dimensions": [736,436], "transparent_to_mouse":0, "asset": "dialog_resizable", "bg_image_resizable": 1},
+            "bg": { "kind":"StaticImage", "xy":[0,0], "dimensions": [736,423], "transparent_to_mouse":0, "asset": "dialog_resizable", "bg_image_resizable": 1},
             "title": { "kind": "TextField", "xy": [39,14], "dimensions": [221, 41], "text_size": 30, "text_style": "thick",
                        "text_hjustify": "left" },
+
+            "lottery_toggle": { "kind": "ActionButton", "xy": [412,22], "dimensions": [136,32], "text_size": 13, "text_style": "bold",
+                                "bg_image": "menu_button_136px", "state": "normal", "ui_name": "" }, // from LOTTERY_SCAN spell ui_name
+            "inventory_toggle": { "kind": "ActionButton", "xy": [556,22], "dimensions": [136,32], "text_size": 13, "text_style": "bold",
+                                  "bg_image": "menu_button_136px", "state": "normal", "ui_name": "Inventory" },
+
             "close_button": { "kind": "ActionButton", "xy": [706,1], "dimensions": [19,22], "bg_image": "close_button_small", "push_bg_image": 1 },
 
-            "sunken": {"kind": "StaticImage", "xy":[39,70], "dimensions":[659,357], "bg_image_resizable": 1, "asset": "dialog_sunken_resizable" },
-            "topbar": { "kind": "SolidRect", "xy": [41,72], "dimensions":[655,33], "color": [0,0,0,0.25] },
-            "topbar_text": { "kind": "TextField", "xy": [237,72], "dimensions": [419, 33], "text_size": 13,
+            "sunken": {"kind": "StaticImage", "xy":[36,66], "dimensions":[665,344], "bg_image_resizable": 1, "asset": "dialog_sunken_resizable" },
+            "topbar": { "kind": "SolidRect", "xy": [37,68], "dimensions":[663,32], "color": [0,0,0,0.25] },
+            "topbar_text": { "kind": "TextField", "xy": [237,68], "dimensions": [419, 32], "text_size": 13,
                              "text_style": "thick", "text_hjustify": "center",
                              "ui_name": "Claim one random choice from these items:" },
 
-            "sunken_left":{"kind":"StaticImage","xy":[50,91],"dimensions":[153,315],"asset":"dialog_sunken_resizable","bg_image_resizable":1},
-            "sidebar_splash":{"kind":"StaticImage","xy":[54,96],"dimensions":[143,303],"asset":"dialog_sidebar_valentina"},
+            "sunken_left":{"kind":"StaticImage","xy":[50,84],"dimensions":[153,315],"asset":"dialog_sunken_resizable","bg_image_resizable":1},
+            "sidebar_splash":{"kind":"StaticImage","xy":[54,89],"dimensions":[143,303],"asset":"dialog_sidebar_valentina"},
 
             "charges": { "kind": "RichTextField", "xy": [236,360], "dimensions": [420,33], "text_size": 13,
                          "text_hjustify": "center", "text_vjustify": "center", "text_offset":[0,1]
