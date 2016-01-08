@@ -418,6 +418,33 @@ InvokeBuyGamebucksConsequent.prototype.execute = function(state) {
 
 /** @constructor
   * @extends Consequent */
+function InvokeLotteryConsequent(data) {
+    goog.base(this, data);
+    this.reason = data['reason'] || 'INVOKE_LOTTERY_DIALOG';
+}
+goog.inherits(InvokeLotteryConsequent, Consequent);
+InvokeLotteryConsequent.prototype.execute = function(state) {
+    var cb = (function (_this) { return function() {
+        var scanner = null;
+        for(var id in session.cur_objects.objects) {
+            var obj = session.cur_objects.objects[id];
+            if(obj.team === 'player' && obj.is_building() && obj.is_lottery_building() && !obj.is_under_construction()) {
+                var state = player.get_lottery_state(/** @type {!Building} */ (obj));
+                if(state.can_scan) {
+                    scanner = obj;
+                    break;
+                }
+            }
+        }
+        if(scanner) {
+            invoke_lottery_dialog(scanner);
+        }
+    }; })(this);
+    notification_queue.push(cb);
+};
+
+/** @constructor
+  * @extends Consequent */
 function InvokeUpgradeConsequent(data) {
     goog.base(this, data);
     this.tech = data['tech'] || null;
@@ -771,6 +798,7 @@ function read_consequent(data) {
     else if(kind === 'INVOKE_MISSIONS_DIALOG') { return new InvokeMissionsDialogConsequent(data); }
     else if(kind === 'INVOKE_STORE_DIALOG') { return new InvokeStoreConsequent(data); }
     else if(kind === 'INVOKE_BUY_GAMEBUCKS_DIALOG') { return new InvokeBuyGamebucksConsequent(data); }
+    else if(kind === 'INVOKE_LOTTERY_DIALOG') { return new InvokeLotteryConsequent(data); }
     else if(kind === 'INVOKE_UPGRADE_DIALOG') { return new InvokeUpgradeConsequent(data); }
     else if(kind === 'INVOKE_BUILD_DIALOG') { return new InvokeBuildDialogConsequent(data); }
     else if(kind === 'INVOKE_CRAFTING_DIALOG') { return new InvokeCraftingConsequent(data); }
