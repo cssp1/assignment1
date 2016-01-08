@@ -20221,6 +20221,7 @@ class GAMEAPI(resource.Resource):
 
             session.player.reseed_lottery(session, force = True)
             session.increment_player_metric('lottery_scans', 1, time_series = False)
+            session.increment_player_metric('lottery_scans_'+source, 1, time_series = False)
 
         else: # failure
             which_slot = -1
