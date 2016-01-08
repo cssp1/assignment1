@@ -23,6 +23,18 @@ goog.require('ModChain');
 // player.has_item, player.has_item_equipped,
 // pretty_print_number, pretty_print_qty_brief, invoke_inventory_context (XXX which should be moved into here)
 
+/** Check if two items represent the same thing
+    @return {boolean} */
+ItemDisplay.same_item = function(a, b) {
+    var a_level = ('level' in a ? a['level'] : 1);
+    var b_level = ('level' in b ? b['level'] : 1);
+    var a_stack = ('stack' in a ? a['stack'] : 1);
+    var b_stack = ('stack' in b ? b['stack'] : 1);
+    return (a['spec'] === b['spec'] &&
+            a_level === b_level &&
+            a_stack === b_stack);
+};
+
 /** return gamedata spec for an item by specname, defaulting to unknown_item if not found
     @param {string} specname */
 ItemDisplay.get_inventory_item_spec = function(specname) {
@@ -508,7 +520,7 @@ ItemDisplay.attach_inventory_item_tooltip = function(widget, item, context_paren
             if(_context_parent.user_data['context']) {
                 // do not switch if context for this item is already up
                 if(_context_parent.user_data['context'].user_data['slot'] === _slot &&
-                   _context_parent.user_data['context'].user_data['item'] === _item) {
+                   ItemDisplay.same_item(_context_parent.user_data['context'].user_data['item'],  _item)) {
                     return;
                 }
             }
@@ -525,6 +537,11 @@ ItemDisplay.attach_inventory_item_tooltip = function(widget, item, context_paren
             }
         };
     })(widget.get_address(), item, context_parent);
+
+    // trigger tooltip immediately if mouse is there already
+    if(widget.mouse_enter_time > 0) {
+        widget.onenter(widget);
+    }
 };
 
 /** Undoes the above
