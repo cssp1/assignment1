@@ -35,7 +35,7 @@ def get_likelihoods(strings):
     return map(float, stdoutdata.split('\n')[:-1])
 
 def make_reports(verbose, dry_run, nosql_client, row_confidence_list, reason):
-    sent_count = 0
+    sent = []
     for row, confidence in row_confidence_list:
         skip = False
 
@@ -54,8 +54,8 @@ def make_reports(verbose, dry_run, nosql_client, row_confidence_list, reason):
             nosql_client.chat_report(row['channel'], -1, 'ChatMom', row['sender']['user_id'], row['sender']['chat_name'],
                                      time_now, row['time'], row['id'], '*** '+row['text']+' ***',
                                      confidence = confidence, source = reason)
-        sent_count += 1
-    return sent_count
+        sent.append(row)
+    return sent
 
 if __name__ == '__main__':
     game_id = SpinConfig.game()
@@ -140,15 +140,13 @@ if __name__ == '__main__':
                         print ('ML flag (%.3f): %s: %s' % (prob, row['sender']['chat_name'], row['text'])).encode('utf-8')
                     flagged_ml.append((row,prob))
 
-        sent_count = 0
-        sent_count += make_reports(verbose, dry_run, nosql_client, flagged_rule, 'rule')
-        sent_count += make_reports(verbose, dry_run, nosql_client, flagged_ml, 'ml')
+        sent = make_reports(verbose, dry_run, nosql_client, flagged_rule, 'rule') + \
+               make_reports(verbose, dry_run, nosql_client, flagged_ml, 'ml')
 
         if not dry_run:
             nosql_client.chat_monitor_bookmark_set('ALL', end_time)
-        if sent_count > 0 and 'chat_report_recipients' in SpinConfig.config:
+        if sent and ('chat_report_recipients' in SpinConfig.config):
             SpinReminders.send_reminders('chat_monitor.py', SpinConfig.config['chat_report_recipients'],
                                          '%s Chat Report (see [PCHECK](https://%sprod.spinpunch.com/PCHECK) )' % (SpinConfig.game_id_long().upper(), SpinConfig.game()),
-                                         'ChatMom reported %d possible instance(s) of abuse' % sent_count,
+                                         'ChatMom reported %d possible instance(s) of abuse:\n%s' % (len(sent), '\n'.join('***'+x['text']+'***' for x in sent)),
                                          dry_run = dry_run)
-
