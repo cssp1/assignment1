@@ -8748,6 +8748,9 @@
 
             "sunken": {"kind": "StaticImage", "xy":[39,70], "dimensions":[659,357], "bg_image_resizable": 1, "asset": "dialog_sunken_resizable" },
             "topbar": { "kind": "SolidRect", "xy": [41,72], "dimensions":[655,33], "color": [0,0,0,0.25] },
+            "topbar_text": { "kind": "TextField", "xy": [237,72], "dimensions": [419, 33], "text_size": 13,
+                             "text_style": "thick", "text_hjustify": "center",
+                             "ui_name": "Claim one random choice from these items:" },
 
             "sunken_left":{"kind":"StaticImage","xy":[50,91],"dimensions":[153,315],"asset":"dialog_sunken_resizable","bg_image_resizable":1},
             "sidebar_splash":{"kind":"StaticImage","xy":[54,96],"dimensions":[143,303],"asset":"dialog_sidebar_valentina"},
@@ -8759,8 +8762,17 @@
 
             "sunken2": {"kind": "StaticImage", "xy":[237,112], "dimensions":[419,166], "bg_image_resizable": 1, "asset": "dialog_sunken_resizable" },
 
+            "goodies_rarity": { "kind": "StaticImage", "xy": [254,118], "dimensions": [80,80], "show": 0,
+                                "pulse_period_normal": 3.25, "pulse_period_scanning": 0.5, "pulse_amplitude": 0.3,
+                                "asset": "dialog_glow_thin_resizable",
+                                //"asset_rarity2": "dialog_glow_thin_rare",
+                                "asset_rarity3": "dialog_glow_thin_epic",
+                                "asset_rarity4": "dialog_glow_thin_legendary",
+                                "bg_image_resizable": 1, "composite_mode": "lighter",
+                                "array": [5,2], "array_offset":[75,75] },
+
             "goodies": { "show":0, "kind": "Dialog", "dialog": "item_display", "xy": [269,133], "dimensions": [50,50],
-                         "pulse_period_normal": 3.25, "pulse_period_scanning": 0.5, "pulse_amplitude": 0.33,
+                         "pulse_period_normal": 3.25, "pulse_period_scanning": 0.5, "pulse_amplitude": 0.0,
                          // permutation period
                          "randomize_period_normal": -1, "randomize_period_scanning": -1,
                          "array": [5,2], "array_offset":[75,75] },

@@ -25164,6 +25164,20 @@ function update_lottery_dialog(dialog) {
                 var alpha = (1-amp) + amp * Math.sin((client_time/period + phase)*2*Math.PI);
                 dialog.widgets[wname].widgets['item'].alpha = alpha;
                 to_randomize.push(slot_name);
+
+                var rarity_wname = SPUI.get_array_widget_name('goodies_rarity', dialog.data['widgets']['goodies_rarity']['array'], [x,y]);
+                var spec = ItemDisplay.get_inventory_item_spec(item['spec']);
+                var rarity = ('rarity' in spec ? spec['rarity'] : 1);
+                if('asset_rarity'+rarity.toString() in dialog.data['widgets']['goodies_rarity']) {
+                    dialog.widgets[rarity_wname].show = true;
+                    dialog.widgets[rarity_wname].asset = dialog.data['widgets']['goodies_rarity']['asset_rarity'+rarity.toString()];
+                    var amp2 = dialog.data['widgets']['goodies_rarity']['pulse_amplitude'];
+                    var period2 = dialog.data['widgets']['goodies_rarity'][dialog.user_data['scan_pending'] > 0 ? 'pulse_period_scanning': 'pulse_period_normal'];
+                    var alpha2 = (1-amp2) + amp2 * Math.sin((client_time/period2 + phase)*2*Math.PI);
+                    dialog.widgets[rarity_wname].alpha = alpha2;
+                } else {
+                    dialog.widgets[rarity_wname].show = false;
+                }
             } else {
                 dialog.widgets[wname].show = false;
             }
