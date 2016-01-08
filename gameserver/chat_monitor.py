@@ -27,7 +27,7 @@ def get_likelihoods(strings):
     stdoutdata, stderrdata = proc.communicate(input=blob)
     if proc.returncode != 0:
         msg = 'ChatMom execution failed:\n%s' % (stderrdata)
-        if 1:
+        if 0:
             raise Exception(msg)
         else: # return all zeroes
             sys.stderr.write(msg)
@@ -62,8 +62,8 @@ if __name__ == '__main__':
     verbose = True
     dry_run = False
     incremental = True
-    lookback = 8*3600 # look back this far in time
-    prob_threshold = 0.75 # minimum probability for a machine-learning flag to cause a report
+    lookback = 2*3600 # look back this far in time
+    prob_threshold = 0.9 # minimum probability for a machine-learning flag to cause a report
 
     opts, args = getopt.gnu_getopt(sys.argv[1:], 'g:q', ['dry-run','lookback=','incremental=','threshold='])
 

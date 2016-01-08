@@ -16,9 +16,11 @@
 # XXX enable manually 35 * * * * ec2-user run-parts /etc/cron.spinpunch.skynet-hourly
 
 # run metrics cache updates
-
 # every other hour at 0:05, 2:05, 4:05, ...
 # XXX enable manually 5 0,2,4,6,8,10,12,14,16,18,20,22 * * * ec2-user run-parts /etc/cron.spinpunch.highfreq
+
+# run chat monitor every 15 minutes
+0,15,30,45 * * * * ec2-user run-parts /etc/cron.spinpunch.chat
 
 # send memory statistics to CloudWatch every minute
 * * * * * ec2-user /usr/local/bin/ec2-send-memory-metrics.py
