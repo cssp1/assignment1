@@ -38,7 +38,7 @@
     "rarity": 2,
     "ui_precious": 1, // require confirmation to delete
     "fungible": 1, // allows infinite stacking, and special "take" behavior (adds directly to balance instead of going into inventory)
-    "resource": "gamebucks" // if item is "fungible", MUST be one of "gamebucks", "iron", "water", or "lottery_ticket"
+    "resource": "gamebucks"
 },
 
 "token": {
@@ -130,13 +130,14 @@
                   "predicate": "AND", "subpredicates": [{"predicate": "HAS_ATTACKED"}, {"predicate": "NOT", "subpredicates": [{"predicate": "HOME_BASE"}]}] }
 },
 
-"sensor_charge": {
-    "name": "sensor_charge",
-    "ui_name": "Sensor Charge",
-    "ui_description": "Activate to add charges to your Long-Range Scanner.",
-    "icon": "inventory_sensor_charge",
-    "max_stack": 1, // ensure that they get used immediately rather than stacking in inventory
-    "fungible": 1, "resource": "lottery_ticket"
+"lottery_scan": {
+    "name": "lottery_scan",
+    "ui_name": "FREE War Chest Play", "name_color": [1,1,0],
+    "ui_description": "Gives you a free chance at more War Chest loot.",
+    "icon": "inventory_random_offer_A",
+    "max_stack": 99,
+    "fungible": 1, "resource": "lottery_scans",
+    "force_duration": 3600 // never last more than 1 hour
 },
 
 // this is for showcase dialogs only

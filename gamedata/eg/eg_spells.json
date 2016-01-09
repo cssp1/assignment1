@@ -396,9 +396,20 @@
         "activation": "instant"
     },
     "LOTTERY_SCAN": {
-        "ui_name": "Scan Region",
-        "ui_tooltip_busy": "Speed Up to access",
-        "activation": "popup"
+        "ui_name": "War Chest",
+        "ui_verb": "Claim",
+        "ui_verb_pending": "Claiming...",
+        "ui_verb_paid": "Play Again",
+        "ui_tooltip_busy": "Warehouse is busy. Speed Up to access.",
+        "ui_tooltip_inventory_full": "War Chest requires at least one open Warehouse slot",
+        "ui_tooltip_on_cooldown": "Your next FREE War Chest ready in %s",
+        "ui_tooltip_remaining": "Commander, your daily FREE War Chest is ready to claim",
+        "ui_tooltip_aura": "%d FREE War Chest play remaining",
+        "ui_tooltip_aura_plural": "%d FREE War Chest plays remaining",
+        "paid": 1, "price_formula": "constant", "currency": "gamebucks", "price": 55,
+        "activation": "instant",
+        "show_if": {"predicate": "PLAYER_HISTORY", "key": "items_activated", "method": ">=", "value": 1}, // definitely don't even show it before activate_an_item is done, otherwise this might break tutorial
+        "requires": {"predicate": "BUILDING_LEVEL", "building_type": "toc", "trigger_level": 2}
     },
     "CHANGE_REGION": {
         "ui_name": "Relocate Base",
