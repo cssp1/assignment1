@@ -5690,7 +5690,7 @@
 
             "input_bg": { "kind": "StaticImage", "xy": [8,42], "dimensions": [297,28], "asset": "chat_input", "bg_image_resizable": 1 },
             "input": { "kind": "TextInput", "xy": [15,44], "dimensions": [285,26], "text_size": 13, "text_hjustify": "left",
-                       "text_color": [1,1,1,1], "ui_name": "Click here and type to chat",
+                       "text_color": [1,1,1,1], "ui_name": "Click here and type to chat", "blank_on_enter": true,
                        "fade_unless_hover": 0.001 }
         }
     },

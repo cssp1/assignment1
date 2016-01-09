@@ -816,6 +816,12 @@
     "loading_screen_beta": "BETA",
     "loading_screen_loading": "Loading art (%pct%)...",
 
+    "chat_filter_warning": { "ui_title": "Warning: Chat Policy",
+                             "ui_description": "This is a public chat room. Your message is at risk for violating our community [color=#ffff00][u][url=https://spinpunch.zendesk.com/entries/88917453-What-is-the-Chat-Abuse-policy-]Chat Abuse Policy[/url][/u][/color]:\n\n- No swearing or other inappropriate language.\n- No offensive comments about sex, race, religion, or nationality.\n- No spam.\n\nPlayers who abuse this policy may lose access to public chat rooms temporarily or permanently.",
+                             "ui_button": "Understood",
+                             "ui_ignore": "Don't show this warning again"
+                           },
+
     "report_confirm": { "ui_title": "Report Chat Abuse",
                         "ui_description": "Report %target for this chat message?\n\n\"%context\"",
                         "ui_button": "Report"

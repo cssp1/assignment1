@@ -14909,6 +14909,20 @@ function init_chat_frame() {
     dialog.widgets['input'].ontextready = function(w, str) {
         if(!str) { return; }
 
+        var channel = dialog.widgets['tabs'+dialog.user_data['cur_tab']].user_data['channel_name'];
+        if(goog.array.contains(['GLOBAL','REGION'], channel) &&
+           ChatFilter.is_bad(str)) {
+            var after_warn = (function (_w) { return function() {
+                // restore keyboard focus after warning closes
+                _w.has_typed = true;
+                SPUI.set_keyboard_focus(_w);
+            }; })(w);
+            if(invoke_chat_filter_warning(after_warn)) {
+                // restore the text that was typed, but don't send the message
+                w.set_str(str);
+                return;
+            }
+        }
         var encoded_str = SPHTTP.wrap_string(str);
         send_to_server.func(["CHAT_SEND", dialog.widgets['tabs'+dialog.user_data['cur_tab']].user_data['channel_name'], encoded_str]);
         dialog.widgets['tabs'+dialog.user_data['cur_tab']].widgets['output'].scroll_to_bottom();
@@ -14964,6 +14978,33 @@ function chat_frame_size(dialog, big, forced) {
         dialog.widgets['grow_bg'].fade_unless_hover = dialog.data['widgets']['grow_bg']['fade_unless_hover'];
     }
 };
+
+/** Warn player that they are sending a message that could get them violated.
+ @return {boolean} if the warning was shown (rather than muted by player preference) */
+function invoke_chat_filter_warning(cb) {
+    // don't bother elder players (created before Jan 9, 2016)
+    if(player.preferences['chat_filter_warning_seen'] ||
+       player.creation_time < 1452328211 ||
+       !gamedata['strings']['chat_filter_warning']) {
+        return false;
+    }
+    var s = gamedata['strings']['chat_filter_warning'];
+    var dialog = invoke_child_message_dialog(s['ui_title'],
+                                             s['ui_description'],
+                                             {'dialog': 'message_dialog_big',
+                                              'use_bbcode': true,
+                                              'ok_button_ui_name': s['ui_button'],
+                                              'on_ok': cb
+                                             });
+    dialog.widgets['ignore_button'].show = true;
+    dialog.widgets['ignore_button'].str = s['ui_ignore'];
+    dialog.widgets['ignore_button'].onclick = function(w) {
+        w.state = (w.state == 'active' ? 'normal' : 'active');
+        player.preferences['chat_filter_warning_seen'] = (w.state == 'active' ? 1 : 0);
+        send_to_server.func(["UPDATE_PREFERENCES", player.preferences]);
+    };
+    return true;
+}
 
 /** @constructor
     @param {number} user_id of offender
