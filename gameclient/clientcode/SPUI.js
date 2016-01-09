@@ -2930,6 +2930,7 @@ SPUI.ProgressBar.prototype.on_mouseup = function(uv, offset, button) {
   */
 SPUI.TextInput = function(data) {
     goog.base(this, data);
+    // XXX note: blank_on_enter is only used for chat frame- maybe remove this option?
     this.blank_on_enter = ('blank_on_enter' in data ? data['blank_on_enter'] : true);
     this.max_chars = data['max_chars'] || 1000;
     this.multiline = ('multiline' in data ? data['multiline'] : false);
@@ -2987,18 +2988,20 @@ SPUI.TextInput.prototype.onkeydown = function(code) {
         }
         return true;
     } else if(code === 13) { // enter
-        if(this.ontextready) {
-            this.ontextready(this, this.str);
-        }
+        var str = this.str;
         if(this.blank_on_enter) {
-            this.str = '';
-            this.left_char = 0;
+            this.clear();
+        }
+        if(this.ontextready) {
+            this.ontextready(this, str);
         }
         return true;
     }
 
     return false;
 };
+SPUI.TextInput.prototype.clear = function() { this.str = ''; this.left_char = 0; };
+SPUI.TextInput.prototype.set_str = function(s) { this.str = s; this.reset_left_char(); };
 SPUI.TextInput.prototype.onkeypress = function(code, c) {
     if(this.state == 'disabled') { return true; }
 
