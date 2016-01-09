@@ -3251,6 +3251,7 @@ class Session(object):
         self.deferred_mailbox_update = False
         self.deferred_power_change = False
         self.deferred_player_state_update = False
+        self.deferred_player_auras_update = False
         self.deferred_player_cooldowns_update = False
         self.deferred_donated_units_update = False
         self.deferred_object_state_updates = set()
@@ -11281,14 +11282,12 @@ class LivePlayer(Player):
                     admin_stats.econ_flow_res(self, 'item', 'fungible', gained_res)
                     count += gained
                     stack -= gained
-                elif spec['resource'] == 'lottery_ticket':
-                    lottery_building = self.find_lottery_building()
-                    if lottery_building:
-                        # XXX how to notify the client?
-                        lottery_building.contents += stack
-                        count += stack
-                        stack = 0
-                    break
+                elif spec['resource'] == 'lottery_scans':
+                    if expire_time < 0 or expire_time > server_time:
+                        self.do_apply_aura('lottery_scans', stack = stack,
+                                           duration = (expire_time - server_time) if expire_time > 0 else -1,
+                                           ignore_limit = True)
+                    count += stack; stack = 0
                 else:
                     gamesite.exception_log.event(server_time, 'unhandled fungible resource'+spec['resource'])
                     break
@@ -14847,7 +14846,7 @@ class Store(object):
             assert aura
             aura['end_time'] = server_time - 1
             session.player.prune_player_auras()
-            retmsg.append(["PLAYER_AURAS_UPDATE", session.player.player_auras])
+            session.deferred_player_auras_update = True
             session.increment_player_metric('player_aura_speedups_purchased', 1, time_series = False)
             session.increment_player_metric(record_spend_type+'_spent_on_player_aura_speedups', record_amount)
 
@@ -15092,7 +15091,11 @@ class Store(object):
 
                         if bypass_pred and ((bypass_pred in (1,True)) or Predicates.read_predicate(bypass_pred).is_satisfied2(session, session.player, {})):
                             # go directly into inventory
-                            for item in items: session.player.inventory_add_item(item, -1)
+                            for item in items:
+                                session.player.inventory_add_item(item, -1)
+                                spec = gamedata['items'].get(item['spec'])
+                                if spec and spec.get('fungible') and spec['resource'] == 'lottery_scans':
+                                    session.deferred_player_auras_update = True
                             session.player.send_inventory_update(retmsg)
                             discovered_where = 'inventory'
 
@@ -16665,7 +16668,7 @@ class GAMEAPI(resource.Resource):
                 session.loot['hive_kill_points'] = max(1, int(gamedata['regions'][session.viewing_base.base_region].get('hive_kill_point_scale',1)*session.loot['hive_kill_points']))
 
             if mutated_auras:
-                retmsg.append(["PLAYER_AURAS_UPDATE", session.player.player_auras])
+                session.deferred_player_auras_update = True
 
             if (session.viewing_player.is_ai() or session.incoming_attack_data) and (outcome == 'victory'):
                 session.user.repopulate_ai_list(session)
@@ -20167,7 +20170,7 @@ class GAMEAPI(resource.Resource):
 
     def do_lottery_scan(self, session, retmsg, scanner, spellname, source):
         # how we are getting permission to scan
-        assert source in ('cooldown', 'contents', 'paid')
+        assert source in ('cooldown', 'contents', 'paid', 'aura')
         spell = session.player.get_abtest_spell(spellname)
         success = True
 
@@ -20184,12 +20187,21 @@ class GAMEAPI(resource.Resource):
                 retmsg.append(["ERROR", "REQUIREMENTS_NOT_SATISFIED", spell[PRED]])
                 success = False
 
+        aura = None
+
         if source == 'cooldown':
             if session.player.cooldown_active('lottery_free'):
                 retmsg.append(["ERROR", "CANNOT_SCAN_ON_COOLDOWN"])
                 success = False
         elif source == 'contents':
             if scanner.contents < 1:
+                retmsg.append(["ERROR", "CANNOT_SCAN_NO_CHARGES"])
+                success = False
+        elif source == 'aura':
+            for a in session.player.player_auras:
+                if a['spec'] == 'lottery_scans' and ('end_time' not in a or a['end_time'] > server_time):
+                    aura = a; break
+            if (not aura) or (aura.get('stack',1) < 1):
                 retmsg.append(["ERROR", "CANNOT_SCAN_NO_CHARGES"])
                 success = False
 
@@ -20215,7 +20227,12 @@ class GAMEAPI(resource.Resource):
             assert len(loot) == 1
             item = loot[0]
             stack_to_add = item.get('stack',1)
+            spec = gamedata['items'].get(item['spec'])
+            if spec and spec.get('fungible') and spec['resource'] == 'lottery_scans':
+                session.deferred_player_auras_update = True
+
             assert session.player.inventory_add_item(item, snapshot.max_usable_inventory()) == stack_to_add
+
             # item gets mutated by add_item() - restore the original stack here
             item['stack'] = stack_to_add
             session.player.inventory_log_event('5125_item_obtained', item['spec'], stack_to_add, item.get('expire_time',-1), level=item.get('level',None), reason='lottery')
@@ -20237,6 +20254,11 @@ class GAMEAPI(resource.Resource):
             elif source == 'contents':
                 scanner.contents -= 1
                 session.deferred_object_state_updates.add(scanner)
+            elif source == 'aura':
+                aura['stack'] = aura.get('stack',1) - 1
+                if aura['stack'] <= 0: aura['end_time'] = server_time - 1
+                session.player.prune_player_auras()
+                session.deferred_player_auras_update = True
 
             session.player.reseed_lottery(session, force = True)
             session.increment_player_metric('lottery_scans', 1, time_series = False)
@@ -20913,7 +20935,7 @@ class GAMEAPI(resource.Resource):
                     if end_time > server_time:
                         if session.player.apply_aura(msg['aura_name'], strength = msg.get('aura_strength',1), level = msg.get('aura_level',1), data = msg.get('aura_data',None),
                                                      duration = end_time - server_time, ignore_limit = True):
-                            retmsg.append(["PLAYER_AURAS_UPDATE", session.player.player_auras])
+                            session.deferred_player_auras_update = True
                     to_ack.append(msg['msg_id'])
 
                 elif msg['type'] == 'chat_report':
@@ -22120,6 +22142,10 @@ class GAMEAPI(resource.Resource):
         if session.deferred_player_state_update:
             session.deferred_player_state_update = False
             retmsg.append(["PLAYER_STATE_UPDATE", session.player.resources.calc_snapshot().serialize()])
+
+        if session.deferred_player_auras_update:
+            session.deferred_player_auras_update = False
+            retmsg.append(["PLAYER_AURAS_UPDATE", session.player.player_auras])
 
         if session.deferred_player_cooldowns_update:
             session.deferred_player_cooldowns_update = False
@@ -25073,19 +25099,16 @@ class GAMEAPI(resource.Resource):
                     else:
                         retmsg.append(["ERROR", "STORAGE_LIMIT", spec['resource']])
 
-                elif spec['resource'] == 'lottery_ticket':
-                    if not session.home_base:
-                        retmsg.append(["ERROR", "CANNOT_CAST_SPELL_OUTSIDE_HOME_BASE"])
-                    else:
-                        scanner = session.player.find_lottery_building()
-                        if not scanner:
-                            retmsg.append(["ERROR", "CANNOT_SCAN_NO_BUILDING"])
-                        else:
-                            success = True
-                            used_count = item.get('stack',1)
-                            scanner.contents += used_count
-                            session.player.inventory_remove_stack(item, '5130_item_activated', reason='lottery')
-                            retmsg.append(["OBJECT_STATE_UPDATE2", scanner.serialize_state()])
+                elif spec['resource'] == 'lottery_scans':
+                    used_count = item.get('stack',1)
+                    if item.get('expire_time',-1) < 0 or item.get('expire_time',-1) > server_time:
+                        assert session.player.do_apply_aura('lottery_scans', stack = used_count,
+                                                            duration = (item['expire_time'] - server_time) if item.get('expire_time',-1) > 0 else -1,
+                                                            ignore_limit = True)
+                    success = True
+                    session.player.inventory_remove_stack(item, '5130_item_activated', reason='lottery')
+                    session.deferred_player_auras_update = True
+
                 else:
                     raise Exception('unhandled fungible resource '+spec['resource'])
 
@@ -25246,11 +25269,9 @@ class GAMEAPI(resource.Resource):
                             if spec.get('fungible',False):
                                 # if we successfully take a fungible item, which adds to resources directly,
                                 # then we'll need to send an update of that
-                                if spec['resource'] == 'lottery_ticket':
+                                if spec['resource'] == 'lottery_scans':
                                     need_lottery_update = True
-                                    scanner = session.player.find_lottery_building()
-                                    if scanner:
-                                        session.deferred_object_state_updates.add(scanner)
+                                    session.deferred_player_auras_update = True
                                 else:
                                     need_resource_update = True
 
@@ -25323,6 +25344,7 @@ class GAMEAPI(resource.Resource):
                 session.player.send_inventory_update(retmsg)
                 if need_resource_update:
                     retmsg.append(["PLAYER_STATE_UPDATE", session.player.resources.calc_snapshot().serialize()])
+
             retmsg.append(["MAIL_TAKE_ATTACHMENTS_RESULT", msg_id, client_index, success, need_resource_update or need_lottery_update, mail if mail else None])
             if need_space:
                 retmsg.append(["ERROR", "INVENTORY_LIMIT"])
@@ -25351,7 +25373,12 @@ class GAMEAPI(resource.Resource):
                 for item in to_take:
                     full_stack = item.get('stack',1)
                     item_spec = gamedata['items'].get(item['spec'],{})
+
                     taken = session.player.inventory_add_item(item, res.max_usable_inventory())
+
+                    if taken > 0 and item_spec.get('fungible',False) and item_spec['resource'] == 'lottery_scans':
+                        session.deferred_player_auras_update = True
+
                     if taken >= full_stack:
                         session.player.loot_buffer.remove(item)
                     elif taken > 0:
@@ -25608,7 +25635,7 @@ class GAMEAPI(resource.Resource):
 
             elif spellname == "LOTTERY_SCAN":
                 source = spellargs[0]
-                assert source in ('cooldown','contents') # cannot use "paid" here!
+                assert source in ('cooldown','contents','aura') # cannot use "paid" here!
                 if (session.viewing_base is not session.player.my_home) or (object.owner is not session.player):
                     retmsg.append(["ERROR", "CANNOT_CAST_SPELL_OUTSIDE_HOME_BASE"])
                     return

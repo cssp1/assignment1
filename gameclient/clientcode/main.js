@@ -6423,6 +6423,15 @@ player.get_lottery_state = function(scanner) {
         ret.can_scan = true;
         ret.on_cooldown = true;
         ret.next_scan_method = 'paid';
+
+        // check for aura scans
+        var aura = goog.array.find(player.player_auras, function(a) {
+            return (a['spec'] == 'lottery_scans') && (!('end_time' in a) || (server_time < a['end_time']));
+        });
+        if(aura) {
+            ret.num_scans += ('stack' in aura ? aura['stack'] : 1);
+            ret.next_scan_method = 'aura';
+        }
     }
 
     if(player.lottery_is_busy(scanner)) {
@@ -7425,7 +7434,7 @@ function get_alliance_logo_asset(logo) {
     @param {!Object} resource_state
     @return {boolean} */
 function fungible_inventory_item_can_fit(spec, stack, resource_state) {
-    if(spec['resource'] == 'gamebucks') {
+    if(spec['resource'] == 'gamebucks' || spec['resource'] == 'lottery_scans') {
         return true;
     } else if(spec['resource'] in resource_state) {
         if(stack + resource_state[spec['resource']][1] <= resource_state[spec['resource']][0]) {
@@ -25169,6 +25178,8 @@ function update_lottery_dialog(dialog) {
 
     if(state.next_scan_method == 'cooldown' || state.next_scan_method == 'contents') {
         dialog.widgets['charges'].set_text_bbcode(gamedata['spells']['LOTTERY_SCAN']['ui_tooltip_remaining'].replace('%d', pretty_print_number(state.num_scans)));
+    } else if(state.next_scan_method == 'aura') {
+        dialog.widgets['charges'].set_text_bbcode(gamedata['spells']['LOTTERY_SCAN'][state.num_scans == 1 ? 'ui_tooltip_aura' : 'ui_tooltip_aura_plural'].replace('%d', pretty_print_number(state.num_scans)));
     } else if(state.next_scan_method == 'paid') {
         dialog.widgets['charges'].set_text_bbcode(gamedata['spells']['LOTTERY_SCAN']['ui_tooltip_on_cooldown'].replace('%s', '[color=#ffff00]'+pretty_print_time(player.cooldown_togo('lottery_free'))+'[/color]'));
     } else {
@@ -25277,7 +25288,7 @@ function update_lottery_dialog_buttons(dialog, lottery_dialog) {
 
     var spellarg = state.next_scan_method;
     var display_price;
-    if(state.next_scan_method == 'contents' || state.next_scan_method == 'cooldown') {
+    if(state.next_scan_method == 'contents' || state.next_scan_method == 'cooldown' || state.next_scan_method == 'aura') {
         // free version
         display_price = 0;
     }else {
@@ -25296,7 +25307,7 @@ function update_lottery_dialog_buttons(dialog, lottery_dialog) {
         dialog.widgets['lottery_button'].tooltip.str = null;
         dialog.widgets['lottery_price_display'].str = Store.display_user_currency_price(display_price); // PRICE
         dialog.widgets['lottery_price_display'].tooltip.str = null; // this tends to show through item_discovered Store.display_user_currency_price_tooltip(display_price); // PRICE
-        dialog.widgets['lottery_button'].str = gamedata['spells']['LOTTERY_SCAN'][(state.next_scan_method == 'paid' ? 'ui_verb_paid' : 'ui_verb')];
+        dialog.widgets['lottery_button'].str = gamedata['spells']['LOTTERY_SCAN'][((state.next_scan_method == 'paid' || state.next_scan_method == 'aura') ? 'ui_verb_paid' : 'ui_verb')];
 
         if(!state.can_scan) {
             dialog.widgets['lottery_button'].state = 'disabled_clickable';
@@ -25304,7 +25315,7 @@ function update_lottery_dialog_buttons(dialog, lottery_dialog) {
             dialog.widgets['lottery_button'].tooltip.text_color = SPUI.error_text_color;
             dialog.widgets['lottery_price_display'].onclick =
                 dialog.widgets['lottery_button'].onclick = state.fail_helper;
-        } else if(state.next_scan_method == 'contents' || state.next_scan_method == 'cooldown') {
+        } else if(state.next_scan_method == 'contents' || state.next_scan_method == 'cooldown' || state.next_scan_method == 'aura') {
             dialog.widgets['lottery_price_display'].onclick =
                 dialog.widgets['lottery_button'].onclick = (function (_lottery_dialog, _spellarg) { return function(w) {
                     _lottery_dialog.user_data['scan_pending'] = client_time;
@@ -25315,6 +25326,20 @@ function update_lottery_dialog_buttons(dialog, lottery_dialog) {
                     }
 
                     send_to_server.func(["CAST_SPELL", _lottery_dialog.user_data['scanner'].id, "LOTTERY_SCAN", _spellarg]);
+
+                    // client-side predict aura update
+                    if(_spellarg == 'aura') {
+                        var aura = goog.array.find(player.player_auras, function(a) {
+                            return (a['spec'] == 'lottery_scans') && (!('end_time' in a) || (server_time < a['end_time']));
+                        });
+                        if(aura) {
+                            aura['stack'] = ('stack' in aura ? aura['stack'] - 1 : 0);
+                            if(aura['stack'] <= 0) {
+                                aura['end_time'] = server_time - 1;
+                            }
+                        }
+                    }
+
                     lottery_dialog_refresh_slate(_lottery_dialog);
                     if(w.parent !== _lottery_dialog) {
                         close_dialog(w.parent);
