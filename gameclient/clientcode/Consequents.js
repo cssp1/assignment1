@@ -421,6 +421,7 @@ InvokeBuyGamebucksConsequent.prototype.execute = function(state) {
 function InvokeLotteryConsequent(data) {
     goog.base(this, data);
     this.reason = data['reason'] || 'INVOKE_LOTTERY_DIALOG';
+    this.force = ('force' in data? data['force'] : false);
 }
 goog.inherits(InvokeLotteryConsequent, Consequent);
 InvokeLotteryConsequent.prototype.execute = function(state) {
@@ -430,7 +431,7 @@ InvokeLotteryConsequent.prototype.execute = function(state) {
             var obj = session.cur_objects.objects[id];
             if(obj.team === 'player' && obj.is_building() && obj.is_lottery_building() && !obj.is_under_construction()) {
                 var state = player.get_lottery_state(/** @type {!Building} */ (obj));
-                if(state.can_scan) {
+                if(this.force || state.can_scan) {
                     scanner = obj;
                     break;
                 }
