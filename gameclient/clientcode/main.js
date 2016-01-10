@@ -34726,8 +34726,10 @@ function update_daily_tip_pageable(dialog) {
 }
 
 /** @param {string} tipname
-    @param {boolean=} skip_notification_queue */
-function invoke_daily_tip(tipname, skip_notification_queue) {
+    @param {boolean=} skip_notification_queue
+    @param {?Object=} notification_params
+*/
+function invoke_daily_tip(tipname, skip_notification_queue, notification_params) {
     var tip = null;
     for(var i = 0; i < gamedata['daily_tips'].length; i++) {
         var t = gamedata['daily_tips'][i];
@@ -34802,15 +34804,15 @@ function invoke_daily_tip(tipname, skip_notification_queue) {
         apply_dialog_hacks(dialog, _tip);
     }; })(tip, img);
 
-    img.onload = (function (cb, _skip_notification_queue) {
+    img.onload = (function (cb, _skip_notification_queue, _notification_params) {
         return function() {
             if (!_skip_notification_queue) {
-                notification_queue.push(cb);
+                notification_queue.push(cb, _notification_params);
             } else {
                 cb();
             }
         };
-    })(complete_cb, skip_notification_queue || false);
+    })(complete_cb, skip_notification_queue || false, notification_params || null);
     img.crossOrigin = 'Anonymous';
     img.src = GameArt.art_url('art/daily_tips/'+tip['image'], false);
 }

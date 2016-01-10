@@ -616,10 +616,11 @@ function DisplayDailyTipConsequent(data) {
     goog.base(this, data);
     this.name = data['name'] || null;
     this.skip_notification_queue = data['skip_notification_queue'] || null;
+    this.notification_params = data['notification_params'] || null;
 }
 goog.inherits(DisplayDailyTipConsequent, Consequent);
 DisplayDailyTipConsequent.prototype.execute = function(state) {
-    invoke_daily_tip(this.name, this.skip_notification_queue);
+    invoke_daily_tip(this.name, this.skip_notification_queue, this.notification_params);
 };
 
 /** @constructor
