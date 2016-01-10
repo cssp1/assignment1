@@ -188,12 +188,13 @@ ItemDisplay.add_inventory_item_effect = function(widget, str, color) {
 /** return displayable name for item of given spec
     @param {Object} spec
     @param {?number=} level
+    @param {?number=} stack
     @returns {string} */
-ItemDisplay.get_inventory_item_ui_name = function(spec, level) {
+ItemDisplay.get_inventory_item_ui_name = function(spec, level, stack) {
     if(spec['fungible'] && spec['resource'] == 'gamebucks') {
         return Store.gamebucks_ui_name();
     } else {
-        var ret = spec['ui_name'];
+        var ret = spec[((stack && stack > 1 && ('ui_name_plural' in spec)) ? 'ui_name_plural' : 'ui_name')];
         if(level) { ret += ' L'+level.toString(); }
         return ret;
     }
@@ -214,12 +215,18 @@ ItemDisplay.strip_inventory_item_ui_name_level_suffix = function(ui_name) {
 /** return displayable name for item of given spec, using "ui_name_long" if available
     @param {Object} spec
     @param {?number=} level
+    @param {?number=} stack
     @returns {string} */
-ItemDisplay.get_inventory_item_ui_name_long = function(spec, level) {
+ItemDisplay.get_inventory_item_ui_name_long = function(spec, level, stack) {
     if(spec['fungible'] && spec['resource'] == 'gamebucks') {
         return Store.gamebucks_ui_name();
     } else {
-        var ret = spec['ui_name_long'] || spec['ui_name'];
+        var ret;
+        if('ui_name_long' in spec) {
+            ret = spec[((stack && stack > 1 && ('ui_name_long_plural' in spec)) ? 'ui_name_long_plural' : 'ui_name_long')];
+        } else {
+            ret = spec[((stack && stack > 1 && ('ui_name_plural' in spec)) ? 'ui_name_plural' : 'ui_name')];
+        }
         if(level) { ret += ' L'+level.toString(); }
         return ret;
     }

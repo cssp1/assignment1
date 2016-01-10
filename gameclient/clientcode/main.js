@@ -37050,7 +37050,7 @@ function update_buy_gamebucks_sku2_attachments(dialog, spell, spellarg) {
                 }
             }
             attach.widgets['quantity'].str = ui_quantity;
-            attach.widgets['name'].str = ('ui_name' in item ? item['ui_name'] : ItemDisplay.get_inventory_item_ui_name(item_spec, (item_level > 1 ? item_level : null)));
+            attach.widgets['name'].str = ('ui_name' in item ? item['ui_name'] : ItemDisplay.get_inventory_item_ui_name(item_spec, (item_level > 1 ? item_level : null), stack));
             attach.widgets['name'].clip_to = attach.widgets['name'].data[(ui_quantity ? 'clip_to' : 'clip_to_no_qty')];
 
             // pass through clicks to purchase the SKU
