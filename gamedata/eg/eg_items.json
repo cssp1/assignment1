@@ -132,9 +132,10 @@
 
 "lottery_scan": {
     "name": "lottery_scan",
-    "ui_name": "FREE War Chest Play", "name_color": [1,1,0],
+    "ui_name": "Free War Chest Play", "ui_name_plural": "Free War Chest Plays", "name_color": [1,0.75,0],
     "ui_description": "Gives you a free chance at more War Chest loot.",
     "icon": "inventory_random_offer_A",
+    "rarity": 2,
     "max_stack": 99,
     "fungible": 1, "resource": "lottery_scans",
     "force_duration": 3600 // never last more than 1 hour

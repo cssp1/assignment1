@@ -229,7 +229,7 @@
         "icon": "inventory_random_offer_A",
         "client": 0, "server": 0,
         "help": 1, "cancelable": 0, "limited": 0,
-        "ui_name": "War Chest", "show": 1, "name_color": [1,1,0,1],
+        "ui_name": "War Chest", "show": 1, "name_color": [1,0.75,0],
         "ui_description": "You have %stack FREE War Chest play. Act quickly, this offer ends soon.\n\n[b]Click to play now[/b]",
         "ui_description_plural": "You have %stack FREE War Chest plays. Act quickly, this offer ends soon.\n\n[b]Click to play now[/b]",
         "on_click": {"consequent": "INVOKE_LOTTERY_DIALOG", "force": 1}
