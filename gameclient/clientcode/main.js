@@ -12215,6 +12215,8 @@ function update_aura_bar(dialog) {
     }
 
     var aura_index = 0;
+    var dialog_width = 0;
+
     for(var i = first_aura; i < dialog.data['widgets']['aura_icon']['array'][0]; i++) {
         // skip expired/hidden auras
         while((aura_index < player.player_auras.length) &&
@@ -12302,6 +12304,7 @@ function update_aura_bar(dialog) {
             }
 
             aura_index += 1;
+            dialog_width = Math.max(dialog_width, dialog.widgets['aura_icon'+i].xy[0] + dialog.widgets['aura_icon'+i].wh[0]);
         } else {
             dialog.widgets['aura_glow'+i].show =
                 dialog.widgets['aura_slot'+i].show =
@@ -12311,6 +12314,9 @@ function update_aura_bar(dialog) {
                 dialog.widgets['aura_timer'+i].show = false;
         }
     }
+
+    // elongate size to match max aura dimension
+    dialog.wh = [Math.max(dialog.data['dimensions'][0], dialog_width), dialog.data['dimensions'][1]];
 }
 
 // call an AI attack. If there is an on_visit message associated with
