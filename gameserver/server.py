@@ -11430,7 +11430,14 @@ class LivePlayer(Player):
                    'subject': tip['ui_subject'],
                    'body': tip['ui_body']}
             if 'attachments' in tip:
-                msg['attachments'] = tip['attachments']
+                msg['attachments'] = []
+                for a in tip['attachments']:
+                    attachment = copy.deepcopy(a)
+                    if 'item_duration' in attachment:
+                        attachment['expire_time'] = session.get_item_spec_forced_expiration(gamedata['items'][attachment['spec']],
+                                                                                            prev_expire_time = attachment['item_duration'] + server_time)
+                        del attachment['item_duration']
+                    msg['attachments'].append(attachment)
             if 'on_send' in tip:
                session.execute_consequent_safe(tip['on_send'], self, retmsg,
                                                context = {'home_region': self.home_region},
