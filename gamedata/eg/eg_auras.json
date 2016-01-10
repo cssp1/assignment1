@@ -232,7 +232,7 @@
         "ui_name": "War Chest", "show": 1, "name_color": [1,0.75,0],
         "ui_description": "You have %stack FREE War Chest play. Act quickly, this offer ends soon.\n\n[b]Click to play now[/b]",
         "ui_description_plural": "You have %stack FREE War Chest plays. Act quickly, this offer ends soon.\n\n[b]Click to play now[/b]",
-        "on_click": {"consequent": "INVOKE_LOTTERY_DIALOG", "force": 1}
+        "on_click": {"consequent": "INVOKE_LOTTERY_DIALOG", "force": 1, "reason": "aura_click"}
         // effects happen via server decrementing the stacks
     },
 

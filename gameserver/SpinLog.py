@@ -310,6 +310,7 @@ def LotteryLogFilter(child):
                          allow = ['1630_lottery_scan_free',
                                   '1631_lottery_scan_paid',
                                   '1632_lottery_no_space_help',
+                                  '1633_lottery_dialog_open',
                                   ])
 def AchievementsLogFilter(child):
     return JSONLogFilter(child,

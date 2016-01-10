@@ -19713,7 +19713,7 @@ function invoke_building_context_menu(mouse_xy) {
                                                              null // SPUI.make_colorv([0,0,1])
                                                              : SPUI.disabled_text_color),
                                                 onclick: (state.can_scan ?
-                                                          (function (_obj) { return function() { invoke_lottery_dialog(_obj); }; })(obj) : state.fail_helper)
+                                                          (function (_obj) { return function() { invoke_lottery_dialog(_obj, 'building_context'); }; })(obj) : state.fail_helper)
                                                }));
         }
 
@@ -25053,7 +25053,7 @@ function update_inventory_header_buttons(dialog, obj, cur_mode) {
         dialog.widgets['inventory_toggle'].onclick = (cur_mode === 'inventory' ? null : function(w) { invoke_inventory_dialog(); });
         dialog.widgets['lottery_toggle'].onclick = (cur_mode === 'lottery' ? null : (function (_obj) {
             return function(w) {
-                invoke_lottery_dialog(_obj);
+                invoke_lottery_dialog(_obj, 'inventory_dialog_header_button');
             }; })(obj) );
         dialog.widgets['lottery_toggle'].str = lottery_spell['ui_name'];
     } else {
@@ -25068,7 +25068,7 @@ function get_lottery_slate(scanner, callback) {
     send_to_server.func(["CAST_SPELL", scanner.id, "LOTTERY_GET_SLATE"]);
 }
 
-function invoke_lottery_dialog(scanner) {
+function invoke_lottery_dialog(scanner, reason) {
     var dialog = new SPUI.Dialog(gamedata['dialogs']['lottery_dialog']);
     dialog.user_data['dialog'] = 'lottery_dialog';
     dialog.user_data['scanner'] = scanner;
@@ -25085,6 +25085,7 @@ function invoke_lottery_dialog(scanner) {
     lottery_dialog_refresh_slate(dialog);
     dialog.ondraw = update_lottery_dialog;
     update_inventory_header_buttons(dialog, scanner, 'lottery');
+    metric_event('1633_lottery_dialog_open', {'method': reason, 'sum': player.get_denormalized_summary_props('brief')});
     return dialog;
 }
 

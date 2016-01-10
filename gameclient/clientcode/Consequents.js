@@ -438,7 +438,7 @@ InvokeLotteryConsequent.prototype.execute = function(state) {
             }
         }
         if(scanner) {
-            invoke_lottery_dialog(scanner);
+            invoke_lottery_dialog(scanner, _this.reason);
         }
     }; })(this);
     notification_queue.push(cb);
