@@ -8539,7 +8539,7 @@
     "inventory_dialog": {
         "bg_image": "",
         "dimensions": [736,423],
-        "default_button": "close_button",
+        "default_button": "upgrade_button",
         "clip_children": 0,
         "widgets": {
             "glow": { "show": 0, "kind":"StaticImage","xy":[-30,-30],"dimensions":[796,483],"bg_image_resizable":1,"asset":"dialog_glow_resizable", "composite_mode": "lighter",
