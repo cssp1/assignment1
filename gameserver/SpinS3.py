@@ -293,13 +293,15 @@ class S3 (object):
     def get_slurp(self, bucket, filename, query = None):
         response = retry_logic('get_slurp', bucket, filename, Policy404.RAISE,
                                self.do_get_slurp, bucket, filename, query)
+        return response.content
+
+    def do_get_slurp(self, bucket, filename, query):
+        url, headers = self.get_request(bucket, filename, query = query)
+        response = self.requests_session.get(url, headers=headers, timeout = S3_REQUEST_TIMEOUT)
         buf = response.content
         if 'Content-Length' in response.headers:
             assert len(buf) == int(response.headers['Content-Length'])
-        return buf
-    def do_get_slurp(self, bucket, filename, query):
-        url, headers = self.get_request(bucket, filename, query = query)
-        return self.requests_session.get(url, headers=headers, timeout = S3_REQUEST_TIMEOUT)
+        return response
 
     # synchronous DELETE
     def delete(self, bucket, filename):
