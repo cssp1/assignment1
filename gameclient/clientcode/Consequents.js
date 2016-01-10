@@ -431,7 +431,7 @@ InvokeLotteryConsequent.prototype.execute = function(state) {
             var obj = session.cur_objects.objects[id];
             if(obj.team === 'player' && obj.is_building() && obj.is_lottery_building() && !obj.is_under_construction()) {
                 var state = player.get_lottery_state(/** @type {!Building} */ (obj));
-                if(this.force || state.can_scan) {
+                if(_this.force || state.can_scan) {
                     scanner = obj;
                     break;
                 }
