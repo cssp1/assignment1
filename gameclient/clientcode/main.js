@@ -36458,7 +36458,7 @@ function invoke_buy_gamebucks_dialog23(ver, reason, amount, order, options) {
 
             // always add a NON-bundled version of any loot-table-bearing SKU
             if(item_list && item_list.length > 0) {
-                spell_list.push({'spellname': spellname, 'spellarg': {'want_loot':false}, 'expect_loot': null})
+                spell_list.push({'spellname': spellname, 'spellarg': {'want_loot':false}, 'expect_loot': null});
             }
         }
     }
@@ -36548,17 +36548,38 @@ function invoke_buy_gamebucks_dialog23(ver, reason, amount, order, options) {
         dialog.widgets['trialpay_button'].onclick = function(w) { Store.trialpay_invoke(); };
     }
 
-    // highlight the first loot-bearing offer for >= 1000 Gamebucks, or the first loot-bearing offer as a fallback
-    var to_highlight = null;
-    for(var h = 0; h < spell_list.length; h++) {
-        var s = spell_list[h];
+    // highlight priority
+    // 3. leftmost loot-bearing offer with a ui_warning (since that usually means it's attractive)
+    // 2. leftmost loot-bearing offer for >= 1000 Gamebucks
+    // 1. leftmost loot-bearing offer
+    var highlight_priority = function(s) {
         if(s['expect_loot']) {
-            to_highlight = s;
-            if(gamedata['spells'][s['spellname']]['quantity'] >= 1000) {
-                break;
+            if(buy_gamebucks_sku2_ui_warning(gamedata['spells'][s['spellname']], s['spellarg'])) {
+                return 3;
+            } else if(gamedata['spells'][s['spellname']]['quantity'] >= 1000) {
+                return 2;
+            } else {
+                return 1;
             }
+        } else {
+            return 0;
         }
-    }
+    };
+    var highlight_list = goog.array.clone(spell_list);
+    highlight_list.sort(function(a, b) {
+        var a_prio = highlight_priority(a), b_prio = highlight_priority(b);
+        if(a_prio > b_prio) {
+            return -1;
+        } else if(a_prio < b_prio) {
+            return 1;
+        } else if(spell_list.indexOf(a) < spell_list.indexOf(b)) {
+            return -1;
+        } else {
+            return 1;
+        }
+    });
+    var to_highlight = (highlight_list.length > 0 && highlight_priority(highlight_list[0]) > 0) ? highlight_list[0] : null;
+
     if(to_highlight && (highlight_only || !session.buy_gamebucks_sku_highlight_shown)) {
         session.buy_gamebucks_sku_highlight_shown = true; // only show once
         if(highlight_only) {
