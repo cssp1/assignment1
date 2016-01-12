@@ -2345,7 +2345,7 @@ function calculate_battle_outcome() {
         // don't end the battle if the player has usable combat items
         if(defeat) {
             goog.array.forEach(session.home_equip_items, function(entry) {
-                if(inventory_item_is_usable_in_combat(ItemDisplay.get_inventory_item_spec(entry['item']['spec']), session)) {
+                if(inventory_item_is_usable_in_combat(ItemDisplay.get_inventory_item_spec(entry['item']['spec']), session) >= UsableInCombat.USABLE_MISSILE) {
                     defeat = false;
                 }
             });
@@ -2353,7 +2353,7 @@ function calculate_battle_outcome() {
         if(defeat) {
             for(var i = 0; i < player.inventory.length; i++) {
                 var item = player.inventory[i];
-                if(inventory_item_is_usable_in_combat(ItemDisplay.get_inventory_item_spec(item['spec']), session)) {
+                if(inventory_item_is_usable_in_combat(ItemDisplay.get_inventory_item_spec(item['spec']), session) >= UsableInCombat.USABLE_MISSILE) {
                     defeat = false;
                     break;
                 }
@@ -13727,12 +13727,23 @@ function invoke_combat_item_bar() {
     return dialog;
 }
 
-// Determine if an item of this spec can be used during the current
-// combat session. Does not check the "requires" predicate - returns
-// true if item could potentially be used as long as "requires" is
-// also satisfied.
+/** return values from inventory_item_is_usable_in_combat()
+    @enum {number} */
+var UsableInCombat = {
+    NOT_USABLE : 0,
+    USABLE_BOOST : 1, // aura applier (low priority)
+    USABLE_MISSILE : 2 // missile (high priority)
+};
+
+/** Determine if an item of this spec can be used during the current
+    combat session. Does not check the "requires" predicate - returns
+    true if item could potentially be used as long as "requires" is
+    also satisfied.
+    @param {!Object} spec
+    @param {!Object} session
+    @return {UsableInCombat} */
 function inventory_item_is_usable_in_combat(spec, session) {
-    if(!('use' in spec)) { return false; } // item does not have a "use" action
+    if(!('use' in spec)) { return UsableInCombat.NOT_USABLE; } // item does not have a "use" action
 
     // case 1) - recursively search "requires" predicate for HAS_ATTACKED and HOME_BASE predicates
     if('requires' in spec) {
@@ -13762,7 +13773,7 @@ function inventory_item_is_usable_in_combat(spec, session) {
         // item has HAS_ATTACKED predicate, and either does NOT have a HOME_BASE predicate, or session.home_base satisfies it
         // actually, let's show the item in this case, but have the red requirement tooltip to teach player that it can only be used offensively
         if(requires_has_attacked === true /* && (requires_home_base === null || requires_home_base === !!session.home_base) */) {
-            return true;
+            return UsableInCombat.USABLE_MISSILE;
         }
     }
 
@@ -13774,32 +13785,40 @@ function inventory_item_is_usable_in_combat(spec, session) {
             var spell = gamedata['spells'][use['spellname']];
             if(goog.array.contains(['projectile_attack','instant_repair','instant_combat_repair'], spell['code'])) {
                 // hide projectile_attack items if the current climate has an exclude_missiles flag
-                if(spell['code'] == 'projectile_attack' && session.viewing_base.base_climate_data['exclude_missiles']) { continue; }
-                return true;
+                if(spell['code'] == 'projectile_attack' && session.viewing_base.base_climate_data['exclude_missiles']) {
+                    return UsableInCombat.NOT_USABLE;
+                }
+                return UsableInCombat.USABLE_MISSILE;
             }
         }
     }
 
-    return false;
+    // case 3) boost consumables (but note, missiles can also have APPLY_AURA in their uselist, so finish checking case 2) first)
+    for(var m = 0; m < uselist.length; m++) {
+        var use = uselist[m];
+        if('spellname' in use) {
+            if(use['spellname'] == 'APPLY_AURA') { return UsableInCombat.USABLE_BOOST; }
+        }
+    }
+
+    return UsableInCombat.NOT_USABLE;
 }
 
 function update_combat_item_bar(dialog) {
     var indices_by_spec = {};
-    var item_list = [], slot_list = [], stack_count_list = [];
+    var entry_list = [];
 
     var add_item = function(item, i) { // "i" is integer for ordinary inventory items, and {'obj_id':..., 'slot_type':..., 'slot_index':...} for equipped items
-        if(inventory_item_is_usable_in_combat(ItemDisplay.get_inventory_item_spec(item['spec']), session)) {
+        if(inventory_item_is_usable_in_combat(ItemDisplay.get_inventory_item_spec(item['spec']), session) != UsableInCombat.NOT_USABLE) {
             if(item['spec'] in indices_by_spec) {
                 // group with items of identical specs
                 // note: the 'pending'/'pending_time' flags will only be taken from the first item
                 // this assumes that items get "used" in the order they are listed in player.inventory
                 var index = indices_by_spec[item['spec']];
-                stack_count_list[index] += (item['stack']||1);
+                entry_list[index]['stack'] += (item['stack']||1);
             } else {
-                indices_by_spec[item['spec']] = item_list.length;
-                item_list.push(item);
-                slot_list.push(i);
-                stack_count_list.push(item['stack']||1);
+                indices_by_spec[item['spec']] = entry_list.length;
+                entry_list.push({'item': item, 'slot': i, 'stack': (item['stack']||1)});
             }
         }
     }
@@ -13810,11 +13829,46 @@ function update_combat_item_bar(dialog) {
         add_item(entry['item'], entry);
     });
 
-    dialog.user_data['item_list'] = item_list;
-    dialog.user_data['slot_list'] = slot_list;
-    dialog.user_data['stack_count_list'] = stack_count_list;
+    entry_list.sort(function(a,b) {
+        var a_prio = inventory_item_is_usable_in_combat(ItemDisplay.get_inventory_item_spec(a['item']['spec']), session);
+        var b_prio = inventory_item_is_usable_in_combat(ItemDisplay.get_inventory_item_spec(b['item']['spec']), session);
+        // priority first
+        if(a_prio > b_prio) {
+            return -1;
+        } else if(a_prio < b_prio) {
+            return 1;
+            // items equipped to buildings first
+        } else if(typeof(a['slot']) === 'object' && typeof(b['slot']) !== 'object') {
+            return -1;
+        } else if(typeof(a['slot']) !== 'object' && typeof(b['slot']) === 'object') {
+            return 1;
+            // sort by building then slot number
+        } else if(typeof(a['slot']) === 'object') {
+            if(a['slot']['obj_id'] < b['slot']['obj_id']) {
+                return -1;
+            } else if(a['slot']['obj_id'] > b['slot']['obj_id']) {
+                return 1;
+            } else if(a['slot']['slot_index'] < b['slot']['slot_index']) {
+                return -1;
+            } else if(a['slot']['slot_index'] > b['slot']['slot_index']) {
+                return 1;
+            }
+            // sort by slot number
+        } else if(typeof(a['slot']) !== 'object') {
+            if(a['slot'] < b['slot']) {
+                return -1;
+            } else {
+                return 1;
+            }
+        }
+        return 0;
+    });
 
-    if(item_list.length < 1) { // no combat items
+    dialog.user_data['item_list'] = goog.array.map(entry_list, function(entry) { return entry['item']; });
+    dialog.user_data['slot_list'] = goog.array.map(entry_list, function(entry) { return entry['slot']; });
+    dialog.user_data['stack_count_list'] = goog.array.map(entry_list, function(entry) { return entry['stack']; });
+
+    if(entry_list.length < 1) { // no combat items
         dialog.show = false;
         return;
     } else {
@@ -13824,7 +13878,7 @@ function update_combat_item_bar(dialog) {
     dialog.xy = vec_copy(dialog.data['xy']);
 
     // show as many rows as will fit
-    var show_rows = Math.max(1, Math.min(item_list.length, Math.min(dialog.data['widgets']['item']['array'][1], Math.floor((canvas_height - dialog.xy[1] - dialog.data['dimensions'][1] - dialog.data['widgets']['item']['array_offset'][1])/dialog.data['widgets']['item']['array_offset'][1]))));
+    var show_rows = Math.max(1, Math.min(entry_list.length, Math.min(dialog.data['widgets']['item']['array'][1], Math.floor((canvas_height - dialog.xy[1] - dialog.data['dimensions'][1] - dialog.data['widgets']['item']['array_offset'][1])/dialog.data['widgets']['item']['array_offset'][1]))));
     dialog.user_data['show_rows'] = show_rows;
 
     dialog.wh = [dialog.data['dimensions'][0],
@@ -13832,7 +13886,7 @@ function update_combat_item_bar(dialog) {
     dialog.widgets['bgrect'].wh = [dialog.data['widgets']['bgrect']['dimensions'][0],
                                    dialog.data['widgets']['bgrect']['dimensions'][1] + (show_rows - 1) * dialog.data['widgets']['item']['array_offset'][1]];
 
-    var max_scroll = Math.max(0, item_list.length - show_rows); // Math.floor((item_list.length - 1) / show_rows);
+    var max_scroll = Math.max(0, entry_list.length - show_rows);
     dialog.user_data['scroll_pos'] = Math.min(dialog.user_data['scroll_pos'], max_scroll)
     dialog.user_data['scroll_pos'] = Math.max(dialog.user_data['scroll_pos'], 0);
     dialog.widgets['scroll_left'].widgets['scroll_left'].state = (dialog.user_data['scroll_pos'] > 0 ? 'normal' : 'disabled');
