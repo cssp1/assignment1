@@ -4742,15 +4742,19 @@ class Session(object):
         if attack_warning_time <= 0:
             self.deploy_ai_attack(retmsg)
 
-    def deploy_ai_attack(self, retmsg):
+    def deploy_ai_attack(self, retmsg, force = False):
         assert self.home_base
         if not self.incoming_attack_pending():
             return
 
         # dump loot buffer
         if self.player.loot_buffer:
-            self.player.loot_buffer_release('deploy_ai_attack')
-            retmsg.append(["LOOT_BUFFER_UPDATE", self.player.loot_buffer, False])
+            if force:
+                self.player.loot_buffer_release('deploy_ai_attack')
+                retmsg.append(["LOOT_BUFFER_UPDATE", self.player.loot_buffer, False])
+            else:
+                retmsg.append(["ERROR", "CANNOT_SPY_LOOT_BUFFER_NOT_EMPTY"])
+                return
 
         if gamedata['server']['log_ai_attacks'] and (self.incoming_attack_type != 'tutorial'):
             gamesite.exception_log.event(server_time, 'AI attack on player %d: %s' % \
@@ -16938,6 +16942,15 @@ class GAMEAPI(resource.Resource):
                     retmsg.append(["ERROR", "CANNOT_SPY_INVALID_AI"])
                     cannot_spy = True
 
+        # check for uncollected loot when leaving home base
+        if dest_base or (dest_user is not session.user):
+            # for safety, abort the session change instead of dumping buffered loot
+            if session.player.loot_buffer:
+                retmsg.append(["ERROR", "CANNOT_SPY_LOOT_BUFFER_NOT_EMPTY"])
+                cannot_spy = True
+            # dump buffered loot when leaving home base
+            # session.player.loot_buffer_release('change_session_complete')
+
         # check for map violations
 
         if (not cannot_spy) and \
@@ -17440,11 +17453,6 @@ class GAMEAPI(resource.Resource):
 
         change_retmsg.append(["BASE_POWER_UPDATE", power_state])
         change_retmsg.append(["BASE_SIZE_UPDATE", session.viewing_base.base_size])
-
-        if not session.home_base:
-            # dump buffered loot when leaving home base
-            # note: this means if you end an attack by visiting somewhere that isn't home base, you'll lose the loot
-            session.player.loot_buffer_release('change_session_complete')
 
         change_retmsg.append(["LOOT_BUFFER_UPDATE", session.player.loot_buffer, False])
         change_retmsg.append(["DONATED_UNITS_UPDATE", session.player.donated_units])
@@ -27297,7 +27305,7 @@ class GameSite(server.Site):
                 if gamedata['server']['log_ai_attack_overdue'] and session.incoming_attack_type != 'tutorial':
                     gamesite.exception_log.event(server_time, 'deploying overdue AI attack (%s) on player %d' % \
                                                  (str(session.incoming_attack_type), session.player.user_id))
-                session.deploy_ai_attack(session.outgoing_messages)
+                session.deploy_ai_attack(session.outgoing_messages, force = True)
                 session.queue_flush_outgoing_messages()
 
             elif session.incoming_attack_wave_time > 0 and (server_time >= session.incoming_attack_wave_time):
