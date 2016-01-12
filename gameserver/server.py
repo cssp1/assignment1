@@ -3767,6 +3767,9 @@ class Session(object):
             self.do_chat_send('DEVELOPER', '(%s) REPORTED user %d' % (self.user.country, target_uid))
 
     def do_chat_report2(self, target_uid, channel, context_time, target_message_id):
+        # ignore chat reports in prison region channels
+        if channel.startswith('r:prison'): return
+
         # check cooldown
         if not self.player.is_developer():
             cdname = 'chat_report:%d' % target_uid

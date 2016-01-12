@@ -6,7 +6,7 @@
 
 # run periodically to scan chat logs for inappropriate messages not already reported
 
-import sys, os, time, getopt, subprocess
+import sys, os, time, getopt, subprocess, re
 import SpinConfig
 import SpinJSON
 import SpinNoSQL
@@ -95,7 +95,7 @@ if __name__ == '__main__':
             print 'start_time', start_time, 'end_time', end_time
 
         qs = {'time':{'$gt':start_time, '$lte': end_time},
-              '$or':[{'channel':{'$regex':'r:.*'}},
+              '$or':[{'channel':{'$regex':'r:.*', '$not': re.compile(r'r:prison.*')}},
                      {'channel':{'$in':['global_english','global_t123']}}]
               }
 
