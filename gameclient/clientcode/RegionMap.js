@@ -966,7 +966,7 @@ RegionMap.RegionMap.prototype.make_bookmark_button = function(feature) {
                 if(_feature['base_type'] == 'quarry') {
                     bm_name = gamedata['strings']['regional_map']['quarry'].replace('%s',_feature['base_ui_name']);
                 } else if(_feature['base_landlord_id'] && PlayerCache.query_sync(_feature['base_landlord_id'])) {
-                    bm_name = _this.pcache_to_name(PlayerCache.query_sync(_feature['base_landlord_id']), 0);
+                    bm_name = _this.pcache_to_name(PlayerCache.query_sync(_feature['base_landlord_id']), 0, true);
                 } else if(_feature['base_ui_name']) {
                     bm_name = _feature['base_ui_name'];
                 } else {
@@ -1370,7 +1370,8 @@ RegionMap.RegionMap.update_feature_popup = function(dialog) {
                 ui.widgets['portrait_pending'].show = true;
             } else {
                 ui.widgets['portrait_pending'].show = false;
-                ui.widgets['name'].str = mapwidget.pcache_to_name(info, 0);
+                // don't show player level on quarries
+                ui.widgets['name'].str = mapwidget.pcache_to_name(info, 0, (feature['base_type'] !== 'quarry'));
                 ui.widgets['portrait'].onclick = (function (_info) { return function(w) {
                     PlayerInfoDialog.invoke(_info['user_id']);
                 }; })(info);
@@ -1413,13 +1414,8 @@ RegionMap.RegionMap.update_feature_popup = function(dialog) {
                 }
             }
         }
-        var RICHNESS = gamedata['strings']['regional_map']['richness'];
-        var rich_str = '?';
-        for(var r = 0; r < RICHNESS.length; r++) {
-            if(feature['base_richness'] >= RICHNESS[r][0]) {
-                rich_str = RICHNESS[r][1];
-            } else { break; }
-        }
+
+        var rich_str = quarry_richness_ui_str(feature['base_richness']);
 
         ui.widgets['qstat'].state = fullness_state;
 
@@ -2022,12 +2018,12 @@ RegionMap.RegionMap.prototype.sort_features_for_draw = function(roi, feature_lis
 // convert PlayerCache entry to the most specific name we can
 /** @param {Object} info
     @param {number} abbreviate (0 = full name, 1 = strip title, 2 = strip title and level) */
-RegionMap.RegionMap.prototype.pcache_to_name = function(info, abbreviate) {
+RegionMap.RegionMap.prototype.pcache_to_name = function(info, abbreviate, show_level) {
     var name = PlayerCache._get_ui_name(info) || gamedata['strings']['regional_map']['unknown_name'];
     if(abbreviate >= 1) {
         name = PlayerCache.strip_title_prefix(name);
     }
-    if(abbreviate < 2 && ('player_level' in info)) {
+    if(show_level && abbreviate < 2 && ('player_level' in info)) {
         name += ' L'+info['player_level'].toString();
     }
     return name;
@@ -2366,7 +2362,12 @@ RegionMap.RegionMap.prototype.draw_feature = function(feature) {
             if(!label && ('base_landlord_id' in feature)) {
                 var info = PlayerCache.query_sync_fetch(feature['base_landlord_id']);
                 if(info) {
-                    label = this.pcache_to_name(info, (this.zoom < gamedata['territory']['abbreviate_labels_below_zoom'] ? 2 : 1));
+                    // quarries show the size of the quarry instead of the owner's level
+                    var show_level = (feature['base_type'] !== 'quarry');
+                    label = this.pcache_to_name(info, (this.zoom < gamedata['territory']['abbreviate_labels_below_zoom'] ? 2 : 1), show_level);
+                    if(feature['base_type'] === 'quarry') {
+                        label += ' ('+quarry_richness_ui_str(feature['base_richness'])+')';
+                    }
                 } else {
                     label = gamedata['strings']['regional_map']['loading'];
                 }

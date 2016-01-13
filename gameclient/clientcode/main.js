@@ -7428,6 +7428,22 @@ function get_alliance_logo_asset(logo) {
     return 'inventory_unknown';
 }
 
+/** Return S,M,L,XL designation for the given quarry richness level
+    @param {number} richness
+    @return {string} */
+function quarry_richness_ui_str(richness) {
+    var table = gamedata['strings']['regional_map']['richness'];
+    var rich_str = '?';
+    for(var r = 0; r < table.length; r++) {
+        if(richness >= table[r][0]) {
+                rich_str = table[r][1];
+        } else {
+            break;
+       }
+    }
+    return rich_str;
+}
+
 /** fungible items go immediately into resource storage. Check if there is enough room.
     @param {!Object} spec
     @param {number} stack
@@ -20934,14 +20950,7 @@ function update_region_map_feature_list_element(dialog, i, feature) {
         dialog.widgets['icon'].widgets['frame'].onclick = onclick;
         dialog.widgets['name'].str = (feature['base_ui_name'] ? feature['base_ui_name'] : gamedata['strings']['regional_map']['unknown_base']);
         dialog.widgets['qicon'].bg_image = 'resource_icon_'+feature['base_icon'];
-        var RICHNESS = gamedata['strings']['regional_map']['richness'];
-        var rich_str = '?';
-        for(var r = 0; r < RICHNESS.length; r++) {
-            if(feature['base_richness'] >= RICHNESS[r][0]) {
-                rich_str = RICHNESS[r][1];
-            } else { break; }
-        }
-        dialog.widgets['qsize'].str = rich_str;
+        dialog.widgets['qsize'].str = quarry_richness_ui_str(feature['base_richness']);
     } else {
         throw Error('unhandled base_type '+feature['base_type']);
     }
@@ -34395,13 +34404,8 @@ function map_dialog_change_page(dialog, chapter, page) {
                         } else { break; }
                     }
                 }
-                var RICHNESS = gamedata['strings']['regional_map']['richness'];
-                var rich_str = '?';
-                for(var r = 0; r < RICHNESS.length; r++) {
-                    if(quarry['base_richness'] >= RICHNESS[r][0]) {
-                        rich_str = RICHNESS[r][1];
-                    } else { break; }
-                }
+
+                var rich_str = quarry_richness_ui_str(quarry['base_richness']);
 
                 dialog.widgets['row_qstat'+row].show = true;
                 dialog.widgets['row_qstat'+row].state = fullness_state;
