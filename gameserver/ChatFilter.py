@@ -179,7 +179,7 @@ class ChatFilter(object):
     def is_diacritic(self, codepoint):
         # see http://www.unicode.org/reports/tr44/tr44-4.html#General_Category_Values
         if codepoint < 0x80: return False # ASCII stuff is OK
-        if codepoint == 0x61f: return False # Arabic question mark is OK
+        if codepoint in (0xbf, 0xa1, 0x61f): return False # Spanish/Arabic question/exclamation marks are OK
         return unicodedata.category(unichr(codepoint)) in ('Mn','Po')
 
         # see https://en.wikipedia.org/wiki/Arabic_(Unicode_block)
@@ -199,8 +199,8 @@ if __name__ == '__main__':
         'u r a sh it': 'u r a *****',
         'f u c k off': '******* off',
         'azzhole': '*******',
-        'a z z hole': '***** hole',
-        'a z z h ole': '***** h ole',
+        'a z z hole': '**********',
+        'a z z h ole': '***********',
         }
     for input, expect in TESTS.iteritems():
         censor_result = cf.censor(input)
@@ -233,4 +233,6 @@ if __name__ == '__main__':
     assert not cf.is_ugly(u'abc\u0627\u0651\u0627\u0651')
     assert not cf.is_ugly(u'asdf    fd     dfsdf  _____|||  b asdfasdf!!')
     assert not cf.is_ugly(u'\u0647\u064a \u0627\u0644\u062e\u0631\u064a\u0637\u0629 \u062f\u064a \u0645\u0641\u064a\u0647\u0627\u0634 \u062d\u062f \u0646\u0647\u062c\u0645 \u0639\u0644\u064a\u0647 \u0646\u062c\u064a\u0628 \u0645\u0646\u0647 \u0645\u0648\u0627\u0631\u062f \u064a\u0627 \u062c\u0645\u0627\u0639\u0629 \u0643\u0644\u0647\u0645 \u0623\u0635\u062f\u0642\u0627\u0621 \u064a\u0639\u0646\u064a\u061f\u061f\u061f\u061f\u061f')
+    assert not cf.is_ugly('u\xbf\xbf\xbf\xbf\xbf')
+    assert not cf.is_ugly(u'hola a todos espero ser de utilidad entro paar aportar lo mio\xa1\xa1\xa1')
     print 'OK'
