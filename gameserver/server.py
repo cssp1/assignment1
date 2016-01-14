@@ -4145,8 +4145,8 @@ class Session(object):
     def spawn_new_units_for_player(self, player, retmsg, units, temporary = False,
                                    limit_break = False,
                                    limit_reduce_qty = False,
-                                   xyloc = None, xyscatter = None):
-        new_objects = spawn_units(player, self.viewing_base if temporary else player.my_home, units, temporary = temporary, limit_break = limit_break, limit_reduce_qty = limit_reduce_qty, xyloc = xyloc, xyscatter = xyscatter, observer = self.player)
+                                   xyloc = None, xyscatter = None, persist = False):
+        new_objects = spawn_units(player, self.viewing_base if temporary else player.my_home, units, temporary = temporary, limit_break = limit_break, limit_reduce_qty = limit_reduce_qty, xyloc = xyloc, xyscatter = xyscatter, observer = self.player, persist = persist)
         for obj in new_objects:
             if (not temporary) and (player is self.player):
                 player.send_army_update_one(obj, retmsg)
@@ -4188,7 +4188,7 @@ class Session(object):
 
         return taken_objects
 
-    def spawn_security_team(self, player, retmsg, source_obj, xyloc, unit_dic, spread):
+    def spawn_security_team(self, player, retmsg, source_obj, xyloc, unit_dic, spread, persist):
         if source_obj.is_mobile():
             event_name = '3971_security_team_spawned_from_unit'
             if spread < 0: spread = 0
@@ -4198,7 +4198,7 @@ class Session(object):
             if spread < 0: spread = 1
             scatter = [spread*gamedata['guard_deploy_spread']*source_obj.spec.unit_collision_gridsize[0]//2,
                        spread*gamedata['guard_deploy_spread']*source_obj.spec.unit_collision_gridsize[1]//2]
-        units = self.spawn_new_units_for_player(player, retmsg, unit_dic, temporary = True, xyloc = xyloc, xyscatter = scatter)
+        units = self.spawn_new_units_for_player(player, retmsg, unit_dic, temporary = True, xyloc = xyloc, xyscatter = scatter, persist = persist)
         self.log_attack_units(player.user_id, units, event_name,
                               props = {'source_obj_specname': source_obj.spec.name,
                                        'source_obj_level': source_obj.level})
@@ -7391,7 +7391,7 @@ def get_spawn_location_for_unit(specname, base):
 def spawn_units(owner, base, units, temporary = False,
                 limit_break = False, # if true, give full quantity of units even if it breaks space limit
                 limit_reduce_qty = False, # if true, reduce quantity of units to fit in unit space
-                xyloc = None, xyscatter = None, observer = None):
+                xyloc = None, xyscatter = None, observer = None, persist = False):
     if not observer: observer = owner
     if temporary: assert xyloc
 
@@ -7478,8 +7478,8 @@ def spawn_units(owner, base, units, temporary = False,
                 cur_space_usage['ALL'] += space
                 cur_space_usage[str(destination_squad)] += space
 
-            # global setting
-            persist_temporary_units = gamedata.get('persist_temporary_units', False)
+            # global setting, can be over-ridden by parameter
+            persist_temporary_units = persist or gamedata.get('persist_temporary_units', False)
 
             # per-base setting
             if base.base_type == 'hive':

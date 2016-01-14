@@ -133,8 +133,9 @@ class SpawnSecurityTeamConsequent(Consequent):
         Consequent.__init__(self, data)
         self.units = data['units']
         self.spread = data.get('spread',-1)
+        self.persist = data.get('persist',False)
     def execute(self, session, player, retmsg, context=None):
-        session.spawn_security_team(player, retmsg, context['source_obj'], context['xy'], self.units, self.spread)
+        session.spawn_security_team(player, retmsg, context['source_obj'], context['xy'], self.units, self.spread, self.persist)
 
 class DisplayMessageConsequent(Consequent):
     def __init__(self, data):
