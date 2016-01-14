@@ -1325,6 +1325,7 @@
         "on_destroy_widget": "Yes",
         "security_team": "Spawns %units",
         "security_team_unit": "%qtyx %name",
+        "security_team_persist": "(persistent)",
 
         // these BBCode strings are used to assemble ui_text for modstat effects of items and auras
         "effect": "%affected: [color=#00ff00]%stat %delta[/color]",
