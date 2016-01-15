@@ -226,6 +226,7 @@
         "default": "[color=#ffff00][player=%sender_id]%sender_name%tag[/player]:[/color] %body",
 
         // over-writes messages that caused chat abuse violations (note: limited to only %sender_name)
+        "abuse_warned": "[color=#808080]%sender_name: (abusive message - player warned)[/color]",
         "abuse_violated": "[color=#808080]%sender_name: (abusive message - player muted)[/color]",
 
         // chat messages sent by current turf winners

@@ -13699,12 +13699,12 @@ class CONTROLAPI(resource.Resource):
                 session.chat_recv(channel, None, {'chat_name':'System', 'type':'system', 'time': server_time, 'facebook_id':'-1', 'user_id':-1}, body)
 
     # one server gets this request, and then it goes out to all local sessions and other servers via broadcast
-    def handle_censor_chat_message(self, request, channel = None, message_id = None, target_user_id = None):
+    def handle_censor_chat_message(self, request, channel = None, message_id = None, target_user_id = None, new_type = None):
         assert channel and message_id
         if target_user_id: target_user_id = int(target_user_id)
         gamesite.chat_mgr.send(channel, None,
                                {'time': server_time,
-                                'type': 'message_hide', 'new_type': 'abuse_violated',
+                                'type': 'message_hide', 'new_type': (new_type or 'abuse_violated'),
                                 'chat_name': 'System', 'user_id': -1,
                                 'target_user_id': target_user_id,
                                 'target_message_id': message_id}, '', log = True)
