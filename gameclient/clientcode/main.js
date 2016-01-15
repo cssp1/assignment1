@@ -1836,7 +1836,8 @@ GameObject.prototype.cast_client_spell = function(spell_name, spell, target, loc
             // note: use both muzzle_flash and impact, because impact location is the object's own location
             var vfx = spell['visual_effect'] || spell['muzzle_flash_effect'] || spell['impact_visual_effect'] || null;
             if(vfx) {
-                SPFX.add_visual_effect_at_time(impact_pos, 0, [0,1,0], client_time, this.get_leveled_quantity(vfx), true, null);
+                var vfx_props = {'dest': null}; // special case: inhibit PhantomUnits from spawning (since this is a self-destruct, not an offensive shot)
+                SPFX.add_visual_effect_at_time(impact_pos, 0, [0,1,0], client_time, this.get_leveled_quantity(vfx), true, vfx_props);
             }
         } else if(code === 'projectile_attack') {
             // make sure we are in range
@@ -8705,7 +8706,7 @@ Mobile.prototype.run_control = function() {
 
     } else if(this.control_state === control_states.CONTROL_MOVING) {
         var maxvel = this.combat_stats.maxvel; // this.get_leveled_quantity(this.spec['maxvel']);
-        if(this.dest === null) { throw Error('dest must be non-null here'); }
+        if(this.dest === null) { throw Error('dest must be non-null here '+this.spec['name']+' '+this.id); }
 
         // update pos
         if(this.next_pos[0] != this.pos[0] || this.next_pos[1] != this.pos[1]) {
@@ -10165,7 +10166,8 @@ function log_exception(e, where) {
     }
 
     // show in JS console
-    console.log('Exception thrown in '+where+':\n'+msg);
+    var ui_tick = (session.combat_engine ? session.combat_engine.cur_tick.get() : -1);
+    console.log('Exception thrown in '+where+' at tick '+ui_tick.toString()+':\n'+msg);
 
     if(player.is_developer()) {
         window.alert('SpinPunch CLIENT EXCEPTION in \"'+where+'\" (check JS Console for more detail):\n'+msg);

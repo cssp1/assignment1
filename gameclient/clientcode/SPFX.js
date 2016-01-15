@@ -1726,6 +1726,8 @@ SPFX.PhantomUnit = function(pos, altitude, orient, when, data, instance_data) {
     } else if('path' in instance_data) {
         path = /** @type {!Array.<!Array.<number>>} */ (instance_data['path']);
         dest = path[path.length - 1];
+    } else {
+        throw Error('PhantomUnit requires one of dest, heading, or path in instance data');
     }
 
     this.obj.ai_dest = dest;
@@ -1939,6 +1941,9 @@ SPFX._add_visual_effect = function(pos, altitude, orient, when, data, allow_soun
             return null;
         }
     } else if(effect_type === 'phantom_unit') {
+        if(instance_data && ('dest' in instance_data) && instance_data['dest'] === null) {
+            return null; // inhibit spawning
+        }
         return SPFX.add_phantom(new SPFX.PhantomUnit(pos, altitude, orient, when, data, instance_data));
     } else {
         console.log('unhandled visual effect type "'+effect_type+'"!');
