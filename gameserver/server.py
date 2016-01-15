@@ -3817,7 +3817,7 @@ class Session(object):
         if 'chat_report_recipients' in SpinConfig.config:
             d = twisted.internet.utils.getProcessValue('./SpinReminders.py',
                                                        args = ['--from', '%s server' % SpinConfig.game_id_long(),
-                                                               '--subject', '%s Chat Report (see PCHECK)' % SpinConfig.game_id_long().upper(),
+                                                               '--subject', '%s Player Chat Report (see [PCHECK](https://%sprod.spinpunch.com/PCHECK) )' % (SpinConfig.game_id_long().upper(), SpinConfig.game()),
                                                                '--body', ui_context.encode('utf-8'),
                                                                '--recipients', SpinJSON.dumps(SpinConfig.config['chat_report_recipients'])],
                                                        env = os.environ)

@@ -147,6 +147,6 @@ if __name__ == '__main__':
             nosql_client.chat_monitor_bookmark_set('ALL', end_time)
         if sent and ('chat_report_recipients' in SpinConfig.config):
             SpinReminders.send_reminders('chat_monitor.py', SpinConfig.config['chat_report_recipients'],
-                                         '%s Chat Report (see [PCHECK](https://%sprod.spinpunch.com/PCHECK) )' % (SpinConfig.game_id_long().upper(), SpinConfig.game()),
+                                         '%s Automated Chat Report (see [PCHECK](https://%sprod.spinpunch.com/PCHECK) )' % (SpinConfig.game_id_long().upper(), SpinConfig.game()),
                                          'ChatMom reported %d possible instance(s) of abuse:\n%s' % (len(sent), '\n'.join('***'+x['text']+'***' for x in sent)),
                                          dry_run = dry_run)
