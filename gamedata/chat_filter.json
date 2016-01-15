@@ -65,6 +65,7 @@
         //"vagina",
         //"wank","wanks","wanker","wankers","wetback",
         "concha",
-        "pula","pizda"
+        // "pula", - innocent in Tagalog, offensive in Romanian :(
+        "pizda"
     ]
 }
