@@ -7331,7 +7331,7 @@
 
             "redeem_gift_card_warning": { "show": 0, "kind": "TextField", "text_size": 13, "text_color": [0.75,0.75,0.75,1],
                                           "xy":[44,435], "dimensions":[484,32], "text_hjustify": "right",
-                                          "ui_name": "Bonus %s not available with use of Facebook Gift Cards" },
+                                          "ui_name": "Sales and bonus %s not available with use of Facebook Gift Cards" },
 
             "redeem_gift_card_icon": { "show": 0, "kind": "StaticImage", "xy":[540,435], "dimensions":[32,32], "asset": "facebook_icon"},
             "redeem_gift_card_button": { "show": 0, "kind": "ActionButton", "xy": [578,435], "dimensions": [134,28], "text_offset": [0,1],
@@ -7381,7 +7381,7 @@
 
             "redeem_gift_card_warning": { "show": 0, "kind": "TextField", "text_size": 13, "text_color": [0.75,0.75,0.75,1],
                                           "xy":[44,380], "dimensions":[496,32], "text_hjustify": "right",
-                                          "ui_name": "Bonus %s not available with use of Facebook Gift Cards" },
+                                          "ui_name": "Sales and bonus %s not available with use of Facebook Gift Cards" },
 
             "redeem_gift_card_icon": { "show": 0, "kind": "StaticImage", "xy":[558,380], "dimensions":[32,32], "asset": "facebook_icon"},
             "redeem_gift_card_button": { "show": 0, "kind": "ActionButton", "xy": [597,380], "dimensions": [134,28], "text_offset": [0,1],
