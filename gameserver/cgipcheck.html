@@ -332,8 +332,11 @@ var method_chat_gag = function(duration) {
     var ident = get_ident();
     var ui_reason = check_ui_reason($("#chat_reason")[0].value);
     if(ident && ui_reason) {
-        if(duration < 0) { duration = -1; }
-        send_request('player', 'chat_gag', $.extend(ident, {'duration': duration.toString(), 'ui_reason':ui_reason}), function(result) { alert("Success!"); });
+        var args = $.extend(ident, {'ui_reason':ui_reason});
+        if(duration > 0) {
+            args['duration'] = duration;
+        }
+        send_request('player', 'chat_gag', args, function(result) { alert("Success!"); });
     }
 };
 var method_chat_ungag = function() {

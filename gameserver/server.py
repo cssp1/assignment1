@@ -990,7 +990,7 @@ class UserTable:
               ('devicePixelRatio', None),
               ('age_group', None),
               ('preferences', None),
-              ('chat_gagged', int),
+              ('chat_gagged', int), # read-only for legacy data
               ('chat_mod', None),
               ('developer', None),
               ]
@@ -1225,6 +1225,7 @@ class User:
 
         # note: None or False or < 1 is "not gagged"
         # True or 1 is "permanently (and silently) gagged"
+        # OBSOLETE - read-only for legacy data. Replaced by chat_gagged player aura.
         self.chat_gagged = None
 
         # 1 if player can moderate (gag) chat
@@ -1294,7 +1295,6 @@ class User:
 
     def chat_can_interact(self):
         if not self.active_session: return False
-        if self.chat_gagged: return False
         return True
 
     def is_friends_with(self, social_id):
@@ -11930,6 +11930,11 @@ class LivePlayer(Player):
             if self.tech.get(key, 0) < start_level:
                 self.tech[key] = start_level
 
+        # migrate old user chat_gagged flag to player aura
+        if session.user.chat_gagged:
+            if self.apply_aura('chat_gagged', duration = -1, ignore_limit = True):
+                session.user.chat_gagged = None
+
         # establish default non-auto-unit control setting on elder accounts
         if SpinConfig.game() == 'mf' and \
            Predicates.read_predicate({'predicate': 'NOT', 'subpredicates': [{'predicate':'LIBRARY', 'name': 'after_T117_merge'}]}).is_satisfied(self, None):
@@ -17665,7 +17670,6 @@ class GAMEAPI(resource.Resource):
                       'facebook_id', 'kg_id', 'ag_id',
                       'facebook_name', 'facebook_first_name', # remove later
                       'alliance_id'] # note: alliance_id is cached, not ground truth
-            if session.user.is_chat_mod(): fields.append('chat_gagged')
 
         result = gamesite.pcache_client.player_cache_lookup_batch(user_ids, fields = fields, reason = reason)
 
