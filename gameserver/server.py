@@ -9682,6 +9682,22 @@ class Player(AbstractPlayer):
         if self.is_same_alliance(other_player_id): return True
         return False
 
+    def can_spy_on_home(self, self_user, dest_player, dest_social_id, new_ladder_state, new_deployable_squads):
+        if (dest_player is self) or dest_player.is_ai(): return (True, None)
+        if new_ladder_state or self.can_take_ladder_revenge(dest_player): return (True, None)
+        if self.is_legacy_pvp_player() and (not dest_player.is_legacy_pvp_player()):
+            if (not self.can_spy_despite_map_violation(self_user, dest_player.user_id, dest_social_id)):
+                return (False, "CANNOT_SPY_MAP_THEM")
+        elif (not self.is_legacy_pvp_player()) and dest_player.is_legacy_pvp_player():
+            if (not self.can_spy_despite_map_violation(self_user, dest_player.user_id, dest_social_id)):
+                return (False, "CANNOT_SPY_MAP_YOU")
+        elif (not self.is_legacy_pvp_player()) and (not dest_player.is_legacy_pvp_player()) and \
+             ((len(new_deployable_squads) < 1) or (len(new_deployable_squads) == 1 and new_deployable_squads.values()[0]['squad_id']==SQUAD_IDS.BASE_DEFENDERS)):
+            # cannot use session.using_squad_deployment() because we haven't set session.deployable_squads yet
+            if (not self.can_spy_despite_map_violation(self_user, dest_player.user_id, dest_social_id)):
+                return (False, "CANNOT_SPY_MAP_BOTH")
+        return (True, None)
+
     def can_take_ladder_revenge(self, other_player):
         return self.is_ladder_player() and other_player.is_ladder_player() and (not other_player.is_ai()) and \
                self.cooldown_active('revenge_defender:%d' % other_player.user_id) and \
@@ -9706,6 +9722,45 @@ class Player(AbstractPlayer):
            ('ladder_on_map_if_defender' in gamedata['regions'][self.home_region]) and \
            (not Predicates.read_predicate(gamedata['regions'][self.home_region]['ladder_on_map_if_defender']).is_satisfied(other_player, None)): return False
         return True
+
+    def get_pvp_balance(self, other_player, base):
+        if other_player.is_ai(): return None
+        my_level = self.resources.player_level
+        his_level = other_player.resources.player_level
+
+        my_level_range = self.attackable_level_range()
+
+        if gamedata['prevent_same_alliance_attacks'] and \
+           self.is_same_alliance(other_player.user_id):
+            return 'same_alliance'
+
+        elif (base is not other_player.my_home):
+            # quarry/squad - no limit
+            return None
+
+        elif (self.home_region in gamedata['regions']) and (not gamedata['regions'][self.home_region].get('enable_pvp_level_gap', True)):
+            # region has no limits
+            return None
+
+        elif (gamedata['matchmaking']['revenge_time'] > 0) and self.cooldown_active('revenge_defender:%d' % other_player.user_id):
+            # revenge - no limit
+            return None
+
+        elif (my_level_range[0]>=0) and (his_level < my_level_range[0]):
+            # we are much stronger
+            return 'player'
+
+        elif (my_level_range[1]>=0) and (his_level > my_level_range[1]):
+            # we are much weaker - prevent attack
+            return 'enemy_strict'
+
+        elif my_level < other_player.attackable_level_range()[0]:
+            # we are much weaker - allow attack, but warn
+            return 'enemy'
+
+        else:
+            # equal strength
+            return None
 
     def ladder_point_decay_check(self, session, retmsg, base_damage = None, base_repair_time = None):
         if base_damage is not None: assert base_repair_time is not None # must be given together
@@ -16962,22 +17017,11 @@ class GAMEAPI(resource.Resource):
         # check for map violations
 
         if (not cannot_spy) and \
-           (not dest_base_id) and dest_player and dest_user and (dest_player is not session.player) and (not dest_player.is_ai()) and \
-           ((not new_ladder_state) and (not session.player.can_take_ladder_revenge(dest_player))):
-            if session.player.is_legacy_pvp_player() and (not dest_player.is_legacy_pvp_player()):
-                if (not session.player.can_spy_despite_map_violation(session.user, dest_player.user_id, dest_user.social_id)):
-                    retmsg.append(["ERROR", "CANNOT_SPY_MAP_THEM"])
-                    cannot_spy = True
-            elif (not session.player.is_legacy_pvp_player()) and dest_player.is_legacy_pvp_player():
-                if (not session.player.can_spy_despite_map_violation(session.user, dest_player.user_id, dest_user.social_id)):
-                    retmsg.append(["ERROR", "CANNOT_SPY_MAP_YOU"])
-                    cannot_spy = True
-            elif (not session.player.is_legacy_pvp_player()) and (not dest_player.is_legacy_pvp_player()) and \
-                 ((len(new_deployable_squads) < 1) or (len(new_deployable_squads) == 1 and new_deployable_squads.values()[0]['squad_id']==SQUAD_IDS.BASE_DEFENDERS)):
-                # cannot use session.using_squad_deployment() because we haven't set session.deployable_squads yet
-                if (not session.player.can_spy_despite_map_violation(session.user, dest_player.user_id, dest_user.social_id)):
-                    retmsg.append(["ERROR", "CANNOT_SPY_MAP_BOTH"])
-                    cannot_spy = True
+           (not dest_base_id) and dest_player and dest_user:
+            map_ok, map_violation_error = session.player.can_spy_on_home(session.user, dest_player, dest_user.social_id, new_ladder_state, new_deployable_squads)
+            if not map_ok:
+                retmsg.append(["ERROR", map_violation_error])
+                cannot_spy = True
 
         # in NoSQL-land when spying on a friendly squad or quarry, grab the lock immediately so that we can mutate objects we own
         if dest_base and (dest_base.base_type in ('squad','quarry')) and (dest_base.base_landlord_id == session.player.user_id) \
@@ -17167,58 +17211,11 @@ class GAMEAPI(resource.Resource):
                     break
             session.defender_protection_expired_at = session.viewing_player.resources.protection_end_time if (not session.viewing_player.is_ai()) else -1
 
+            session.pvp_balance = session.player.get_pvp_balance(session.viewing_player, session.viewing_base)
+
             if session.viewing_player.is_ai():
-                session.pvp_balance = None
                 spyee_lock_state = Player.LockState.open
-                if 0:
-                    gamesite.exception_log.event(server_time, 'spy %d (L%d) on AI %d (L%d)' % (session.user.user_id,
-                                                                                               session.player.resources.player_level,
-                                                                                               session.viewing_user.user_id,
-                                                                                               session.viewing_player.resources.player_level))
             else:
-                my_level = session.player.resources.player_level
-                his_level = session.viewing_player.resources.player_level
-
-                if 0:
-                    gamesite.exception_log.event(server_time, 'spy %d (L%d) on %d (L%d) %s gap %d' % \
-                                                 (session.user.user_id,
-                                                  session.player.resources.player_level,
-                                                  session.viewing_user.user_id,
-                                                  session.viewing_player.resources.player_level,
-                                                  'friend' if session.viewing_user.is_friends_with(session.user.social_id) else 'stranger',
-                                                  my_level - his_level
-                                                  ))
-
-                my_level_range = session.player.attackable_level_range()
-
-                if (session.viewing_base is not session.viewing_player.my_home):
-                    # quarry/squad - no limit
-                    session.pvp_balance = None
-
-                elif (session.player.home_region in gamedata['regions']) and (not gamedata['regions'][session.player.home_region].get('enable_pvp_level_gap', True)):
-                    # region has no limits
-                    session.pvp_balance = None
-
-                elif (gamedata['matchmaking']['revenge_time'] > 0) and session.player.cooldown_active('revenge_defender:%d' % session.viewing_player.user_id):
-                    # revenge - no limit
-                    session.pvp_balance = None
-
-                elif (my_level_range[0]>=0) and (his_level < my_level_range[0]):
-                    # we are much stronger
-                    session.pvp_balance = 'player'
-
-                elif (my_level_range[1]>=0) and (his_level > my_level_range[1]):
-                    # we are much weaker - prevent attack
-                    session.pvp_balance = 'enemy_strict'
-
-                elif my_level < session.viewing_player.attackable_level_range()[0]:
-                    # we are much weaker - allow attack, but warn
-                    session.pvp_balance = 'enemy'
-
-                else:
-                    # equal strength
-                    session.pvp_balance = None
-
                 # do this here so we send an up-to-date guess about lock state to the client upon Spying
                 session.viewing_player.bust_expired_locks()
                 spyee_lock_state = gamesite.lock_client.player_lock_get_state_batch([session.viewing_user.user_id], reason = 'spy')[0][0]
@@ -17234,12 +17231,6 @@ class GAMEAPI(resource.Resource):
                                                             'defender_res': session.viewing_player.resources.get_fungible_amounts(),
                                                             'battle_streak_ladder': session.player.cooldown_active('battle_streak_ladder'),
                                                             'ladder_state': session.ladder_state})
-
-        if gamedata['prevent_same_alliance_attacks'] and \
-           (session.viewing_player is not session.player) and \
-           session.viewing_player.is_human() and \
-           session.player.is_same_alliance(session.viewing_player.user_id):
-            session.pvp_balance = 'same_alliance'
 
         # add relevant objects into the session
         session.deferred_object_state_updates = set() # no need to send anymore
@@ -20294,6 +20285,226 @@ class GAMEAPI(resource.Resource):
 
         return True
 
+    def instant_attack(self, my_session, retmsg, spellargs):
+        dest_user_id = spellargs[0]
+        assert dest_user_id != my_session.user.user_id
+        assert not my_session.visit_base_in_progress
+        assert not my_session.complete_attack_in_progress
+        their_session = get_session_by_user_id(dest_user_id)
+        if not their_session:
+            retmsg.append(["ERROR", "HARMLESS_RACE_CONDITION"])
+            return defer.succeed(False)
+        d = make_deferred('instant_attack')
+        d.addCallback(lambda _: self.do_instant_attack(my_session, their_session, their_session.player.my_home))
+        their_session.after_async_request(d)
+        return d
+
+    def do_instant_attack(self, my_session, their_session, base):
+        ladder_state = None
+        dest_feature = SessionChangeNew.query_dest_feature(my_session.player, base.base_id)
+        if not dest_feature or dest_feature['base_landlord_id'] != their_session.player.user_id:
+            my_session.send(["ERROR", "CANNOT_SPY_BASE_NOT_FOUND", base.base_id, 'do_instant_attack'])
+            return
+        deployable_squads = SessionChangeNew.query_deployable_squads(my_session.player, dest_feature)
+        if len(deployable_squads) < 1:
+            my_session.send(["ERROR", "CANNOT_SPY_NO_NEARBY_SQUADS"])
+            return
+        map_ok, map_violation_error = my_session.player.can_spy_on_home(my_session.user, their_session.player, their_session.user.social_id, ladder_state, deployable_squads)
+        if not map_ok:
+            my_session.send(["ERROR", map_violation_error])
+            return
+        pvp_balance = my_session.player.get_pvp_balance(their_session.player, base)
+        attack_ok, attack_error = self.can_attack(my_session.player, their_session.player, base, pvp_balance, deployable_squads, ladder_state)
+        if not attack_ok:
+            my_session.send(["ERROR", attack_error])
+            return
+
+        self.init_attack(my_session, my_session.player, their_session.player, base, ladder_state)
+        gamesite.exception_log.event(server_time, 'HERE! %r' % deployable_squads)
+        my_session.deferred_history_update = True
+
+    def can_attack(self, player, other_player, base, pvp_balance, deployable_squads, ladder_state):
+        if server_time < player.get_repeat_attack_cooldown_expire_time(other_player.user_id, base.base_id):
+            return (False, "CANNOT_ATTACK_REPEAT_ATTACK_COOLDOWN")
+
+        if pvp_balance == 'same_alliance':
+            return (False, "CANNOT_ATTACK_SAME_ALLIANCE")
+
+        if base is not other_player.my_home:
+            # quarry reinforcement or attack
+
+            # check control limit before attacking unowned quarry
+            if (other_player is not player) and (base.base_type == 'quarry') and \
+               base.base_region and gamedata['regions'][base.base_region].get('limit_quarry_control',True):
+                if player.num_quarries_controlled() >= player.stattab.quarry_control_limit:
+                    return (False, "CANNOT_ATTACK_QUARRY_LIMIT_REACHED")
+
+        elif other_player.is_human():
+            # attack against a human home base
+
+            if pvp_balance == 'player':
+                return (False, "CANNOT_ATTACK_WEAKER_PLAYER")
+
+            elif pvp_balance == 'enemy_strict':
+                return (False, "CANNOT_ATTACK_STRONGER_PLAYER")
+
+            if player.isolate_pvp and (not other_player.isolate_pvp):
+                return (False, "CANNOT_ATTACK_YOU_ARE_ISOLATED")
+
+            if (not player.isolate_pvp) and other_player.isolate_pvp:
+                return (False, "CANNOT_ATTACK_THEY_ARE_ISOLATED")
+
+            if other_player.has_damage_protection():
+                return (False, "CANNOT_ATTACK_PLAYER_UNDER_PROTECTION")
+
+            # check for PvP ability
+            if (not player.is_pvp_player()):
+                return (False, "CANNOT_ATTACK_NOPVP_YOU")
+
+            elif (not other_player.is_pvp_player()):
+                return (False, "CANNOT_ATTACK_NOPVP_THEM")
+
+            # check for ladder/nonladder firewall violations
+            if len(deployable_squads) == 1 and deployable_squads.values()[0]['squad_id'] == SQUAD_IDS.BASE_DEFENDERS:
+                if player.is_ladder_player():
+                    if (not other_player.is_ladder_player()):
+                        return (False, "CANNOT_ATTACK_LADDER_YOU")
+                    elif (not ladder_state):
+                        return (False, "CANNOT_ATTACK_LADDER_YOU")
+                else:
+                    if other_player.is_ladder_player():
+                        return (False, "CANNOT_ATTACK_LADDER_THEM")
+
+                # check for map/legacy firewall violations
+                if (not ladder_state):
+                    if (not other_player.is_legacy_pvp_player()):
+                        return (False, "CANNOT_ATTACK_MAP_THEM")
+                    elif (not player.is_legacy_pvp_player()):
+                        return (False, "CANNOT_ATTACK_MAP_YOU")
+
+            if player.stattab.sandstorm_max:
+                return (False, "CANNOT_ATTACK_SANDSTORM_MAX")
+
+            if player.is_alt_account_unattackable(other_player) and gamedata['prevent_alt_attacks']:
+                return (False, "CANNOT_ATTACK_ALT_ACCOUNT")
+
+        return (True, None)
+
+    def is_protection_eligible(self, session, attacker, attacker_user, defender, defender_user, base, ladder_state):
+        if defender.is_ai() or (base is not defender.my_home): return False
+
+        if attacker.home_region and (attacker.home_region in gamedata['regions']) and \
+           ('enable_battle_protection_if' in gamedata['regions'][attacker.home_region]) and \
+           (not Predicates.read_predicate(gamedata['regions'][attacker.home_region]['enable_battle_protection_if']).is_satisfied(defender, None)):
+            return False # turned off for this region and this defender
+
+        if gamedata['server']['global_protection_cooldown'] > 0 and defender.cooldown_active('global_protection'):
+            return False # turned off by cooldown
+
+        if ('enable_protection_if' in gamedata['server']) and (not Predicates.read_predicate(gamedata['server']['enable_protection_if']).is_satisfied(defender, None)):
+            return False # turned off by predicate
+
+        protect_facebook_friends = defender.get_any_abtest_value('protect_facebook_friends', gamedata['server']['protect_facebook_friends'])
+        protect_same_ip = defender.get_any_abtest_value('protect_same_ip', gamedata['server']['protect_same_ip'])
+        protect_same_alliance = defender.get_any_abtest_value('protect_same_alliance', gamedata['server']['protect_same_alliance'])
+
+        is_same_ip = ((defender_user.last_login_ip == attacker_user.last_login_ip) and (attacker_user.last_login_ip != 'unknown'))
+
+        # have these two players exchanged DP too much recently?
+        max_player_stacks = Predicates.eval_cond_or_literal(gamedata['server']['protection_fatigue_stacks'], session, defender)
+        is_fatigued = gamedata['server']['enable_protection_fatigue'] and \
+                      (attacker.cooldown_active('protection_fatigue:%d'%defender.user_id) >= max_player_stacks or \
+                       (gamedata['server']['bidirectional_protection_fatigue'] and defender.cooldown_active('protection_fatigue:%d'%attacker.user_id) >= gamedata['server']['protection_fatigue_stacks']))
+
+        # are these two players in the same alliance, or have these two players recently exchanged too much DP with members of each others' alliances?
+        max_alliance_stacks = Predicates.eval_cond_or_literal(gamedata['server']['alliance_protection_fatigue_stacks'], session, defender)
+        if gamedata['server']['alliance_stickiness'] > 0:
+            is_same_alliance, my_alliances, other_alliances = attacker.is_same_alliance_sticky(defender)
+            if gamedata['server']['enable_protection_fatigue'] and gamedata['server']['enable_alliance_protection_fatigue'] and (not is_same_alliance):
+                for aid in my_alliances.union(other_alliances):
+                    if attacker.cooldown_active('protection_fatigue:a%d'%aid) >= max_alliance_stacks or \
+                       (gamedata['server']['bidirectional_protection_fatigue'] and defender.cooldown_active('protection_fatigue:a%d'%aid) >= gamedata['server']['alliance_protection_fatigue_stacks']):
+                        is_fatigued = True
+                        break
+        else:
+            is_same_alliance = attacker.is_same_alliance(defender.user_id)
+
+        # always enable protection for non-secure testing. Otherwise perform checks.
+        if (not spin_secure_mode) or \
+           ((not attacker.is_alt_account_unprotectable(defender)) and \
+            (not is_fatigued) and \
+            (protect_same_ip or (not is_same_ip)) and \
+            (protect_same_alliance or (not is_same_alliance)) and \
+            (protect_facebook_friends or (not attacker_user.is_friends_with(defender_user.social_id)))):
+
+            # if the last attack was a long time ago, don't count it for purposes of the protection attack counter
+            if (server_time - defender.protection_attack_time) >= defender.get_any_abtest_value('protection_backoff_time', gamedata['server']['protection_backoff_time']):
+                defender.protection_attack_count = 0
+
+            defender.protection_attack_count += 1 # XXX mutation
+            defender.protection_attack_time = server_time
+
+            if ladder_state:
+                # for ladder battles, enable directly
+                return True
+            else:
+                # for non-ladder battles, wait for N attacks
+                if defender.protection_attack_count >= defender.get_any_abtest_value('protection_attacks', gamedata['server']['protection_attacks']):
+                    return True
+        else:
+            # AI players, and Facebook friends, do not receive attack protection
+            if (not protect_same_ip) and is_same_ip and (not attacker_user.is_friends_with(defender_user.social_id)):
+                if gamedata['server']['log_alt_accounts'] >= 1:
+                    gamesite.exception_log.event(server_time, 'denying protection to same-ip attack: %d vs. %d (%s) friends %d' % \
+                                                 (attacker_user.user_id, defender_user.user_id, attacker_user.last_login_ip, int(attacker_user.is_friends_with(defender_user.social_id))))
+            elif (not protect_same_alliance) and is_same_alliance and (not attacker_user.is_friends_with(defender_user.social_id)):
+                if gamedata['server']['log_alt_accounts'] >= 1:
+                    gamesite.exception_log.event(server_time, 'denying protection to same-alliance attack: %d vs. %d (%s) friends %d' % \
+                                                 (attacker_user.user_id, defender_user.user_id, attacker_user.last_login_ip, int(attacker_user.is_friends_with(defender_user.social_id))))
+            elif attacker.is_alt_account_unprotectable(defender):
+                if gamedata['server']['log_alt_accounts'] >= 1:
+                    gamesite.exception_log.event(server_time, 'denying protection to known alt account: %d vs. %d' % (attacker_user.user_id, defender_user.user_id))
+
+        return False
+
+    def init_attack(self, session, attacker, defender, base, ladder_state):
+        # perform all necessary mutations at the start of an offensive attack
+        # note: assumes all necessary locks are already taken
+        if defender.is_human() and base is defender.my_home:
+            defender.record_protection_event('3885_i_got_attacked',
+                                             {'prev_end_time': defender.resources.protection_end_time,
+                                              'attacker_id': attacker.user_id,
+                                              'ladder': bool(ladder_state)})
+            attacker.alt_record_attack(defender)
+
+        base.base_last_attack_time = server_time
+        base.base_times_attacked += 1
+        attacker.attack_cooldown_start = server_time
+
+        if gamedata['server'].get('track_battle_streaks',0) > 0:
+            cd_list = ['battle_streak']
+            if ladder_state:
+                cd_list.append('battle_streak_ladder')
+            for cd in cd_list:
+                attacker.cooldown_trigger(cd, gamedata['server']['track_battle_streaks'], add_stack = 1)
+
+        if defender.is_human() and \
+           ((base is defender.my_home) or \
+            (base.base_type == 'quarry' and gamedata['territory']['quarries_affect_protection']) or \
+            (base.base_type == 'squad' and gamedata['territory']['squads_affect_protection'])):
+            # remove the protection timer of the player making the attack
+            attacker.set_protection_end_time(session, -1,
+                                             '3884_protection_removed' if attacker.has_damage_protection() else None,
+                                             {'defender_id':defender.user_id})
+            record_player_metric(attacker, dict_setmax, 'last_pvp_aggression_time', server_time, time_series = False)
+
+        record_player_metric(attacker, dict_increment, 'attacks_launched', 1, time_series = False)
+        record_player_metric(attacker, dict_increment, 'attacks_launched_vs_'+defender.ai_or_human(), 1, time_series = False)
+
+        if defender.is_human() and attacker.cooldown_active('revenge_defender:%d' % defender.user_id):
+            record_player_metric(attacker, dict_increment, 'revenge_attacks_launched_vs_'+defender.ai_or_human(), 1, time_series = False)
+            record_player_metric(defender, dict_increment, 'revenge_attacks_suffered', 1, time_series = False)
+
     # deploy units against a foreign (human or AI) player
     # returns true if successful
     def do_attack(self, session, retmsg, spellargs):
@@ -20317,44 +20528,13 @@ class GAMEAPI(resource.Resource):
         if not session.has_attacked:
             # first deployment - check for permission to attack, and acquire locks
 
-            # look up AI base or hive
-            if (session.viewing_base is session.viewing_player.my_home) and \
-               session.viewing_player.is_ai():
-                ai_data = gamedata['ai_bases']['bases'].get(str(session.viewing_player.user_id), None)
-            elif session.viewing_base.base_type == 'hive':
-                ai_data = gamedata['hives']['templates'].get(session.viewing_base.base_template, None)
-            else:
-                ai_data = None
-
-            if server_time < session.player.get_repeat_attack_cooldown_expire_time(session.viewing_player.user_id, session.viewing_base.base_id):
-                retmsg.append(["ERROR", "CANNOT_ATTACK_REPEAT_ATTACK_COOLDOWN"])
+            attack_ok, attack_error_message = self.can_attack(session.player, session.viewing_player, session.viewing_base, session.pvp_balance, session.deployable_squads, session.ladder_state)
+            if not attack_ok:
+                retmsg.append(["ERROR", attack_error_message])
                 return False
 
-            if session.pvp_balance == 'same_alliance':
-                    retmsg.append(["ERROR", "CANNOT_ATTACK_SAME_ALLIANCE"])
-                    return False
-
+            # get all necessary locks
             if session.viewing_base is not session.viewing_player.my_home:
-                # quarry reinforcement or attack
-
-                # check control limit before attacking unowned quarry
-                if (session.viewing_player is not session.player) and (session.viewing_base.base_type == 'quarry') and \
-                   session.viewing_base.base_region and gamedata['regions'][session.viewing_base.base_region].get('limit_quarry_control',True):
-                    if session.player.num_quarries_controlled() >= session.player.stattab.quarry_control_limit:
-                        retmsg.append(["ERROR", "CANNOT_ATTACK_QUARRY_LIMIT_REACHED"])
-                        return False
-
-                if (gamesite.nosql_client and session.player.home_region):
-                    # nosql path
-                    pass
-                else:
-                    if (not session.player.travel_satisfied(session.viewing_base)):
-                        retmsg.append(["ERROR", "CANNOT_DEPLOY_TRAVEL_NOT_ARRIVED"])
-                        return False
-                    else:
-                        session.player.travel_deploy_at(session.viewing_base.base_id)
-                        retmsg.append(["PLAYER_TRAVEL_UPDATE", session.player.travel_state])
-
                 lock_errors = []
                 state = session.acquire_base(errors = lock_errors)
                 if state != Player.LockState.being_attacked:
@@ -20368,69 +20548,6 @@ class GAMEAPI(resource.Resource):
                                               msg = "REGION_MAP_ATTACK_START")
 
             elif session.viewing_player.is_human():
-                # attack against a human home base
-
-                if session.pvp_balance == 'player':
-                    retmsg.append(["ERROR", "CANNOT_ATTACK_WEAKER_PLAYER"])
-                    return False
-                elif session.pvp_balance == 'enemy_strict':
-                    retmsg.append(["ERROR", "CANNOT_ATTACK_STRONGER_PLAYER"])
-                    return False
-
-                if session.player.isolate_pvp and (not session.viewing_player.isolate_pvp):
-                    retmsg.append(["ERROR", "CANNOT_ATTACK_YOU_ARE_ISOLATED"])
-                    return False
-
-                if (not session.player.isolate_pvp) and session.viewing_player.isolate_pvp:
-                    retmsg.append(["ERROR", "CANNOT_ATTACK_THEY_ARE_ISOLATED"])
-                    return False
-
-                if session.viewing_player.has_damage_protection():
-                    retmsg.append(["ERROR", "CANNOT_ATTACK_PLAYER_UNDER_PROTECTION"])
-                    return False
-
-                # check for PvP ability
-                if (not session.player.is_pvp_player()):
-                    retmsg.append(["ERROR", "CANNOT_ATTACK_NOPVP_YOU"])
-                    return False
-                elif (not session.viewing_player.is_pvp_player()):
-                    retmsg.append(["ERROR", "CANNOT_ATTACK_NOPVP_THEM"])
-                    return False
-
-                # check for ladder/nonladder firewall violations
-                if (not session.using_squad_deployment()):
-                    if session.player.is_ladder_player():
-                        if (not session.viewing_player.is_ladder_player()):
-                            retmsg.append(["ERROR", "CANNOT_ATTACK_LADDER_YOU"])
-                            return False
-                        elif (not session.is_ladder_battle()):
-                            retmsg.append(["ERROR", "CANNOT_ATTACK_LADDER_YOU"])
-                            return False
-                    else:
-                        if session.viewing_player.is_ladder_player():
-                            retmsg.append(["ERROR", "CANNOT_ATTACK_LADDER_THEM"])
-                            return False
-
-                # check for map/legacy firewall violations
-                if (not session.using_squad_deployment()) and (not session.is_ladder_battle()):
-                    if (not session.viewing_player.is_legacy_pvp_player()):
-                        retmsg.append(["ERROR", "CANNOT_ATTACK_MAP_THEM"])
-                        return False
-                    elif (not session.player.is_legacy_pvp_player()):
-                        retmsg.append(["ERROR", "CANNOT_ATTACK_MAP_YOU"])
-                        return False
-
-                if session.player.stattab.sandstorm_max:
-                    retmsg.append(["ERROR", "CANNOT_ATTACK_SANDSTORM_MAX"])
-                    return False
-
-                if session.player.is_alt_account_unattackable(session.viewing_player) and gamedata['prevent_alt_attacks']:
-                    retmsg.append(["ERROR", "CANNOT_ATTACK_ALT_ACCOUNT"])
-                    return False
-                else:
-                    session.player.alt_record_attack(session.viewing_player)
-                    session.viewing_player.alt_record_attack(session.player)
-
                 state = gamesite.lock_client.player_lock_acquire_attack(session.viewing_user.user_id, session.viewing_player.generation, owner_id=session.player.user_id)
                 if state == -Player.LockState.logged_in:
                     retmsg.append(["ERROR", "CANNOT_ATTACK_PLAYER_WHILE_LOGGED_IN", 1])
@@ -20443,7 +20560,7 @@ class GAMEAPI(resource.Resource):
                 state = session.do_acquire_base(session.viewing_player, session.viewing_player.my_home, session.deployable_squads, session.defending_squads, errors = lock_errors)
                 if state != Player.LockState.being_attacked:
                     gamesite.lock_client.player_lock_release(session.viewing_user.user_id, session.viewing_player.generation, Player.LockState.being_attacked,
-                                                           expected_owner_id = session.player.user_id)
+                                                             expected_owner_id = session.player.user_id)
                     retmsg.append(["ERROR", lock_errors[0], "attack_home"])
                     return False
 
@@ -20453,20 +20570,11 @@ class GAMEAPI(resource.Resource):
                 # then set the flag, because we have exclusive write permission now
                 session.viewing_player.has_write_lock = True
 
-                if session.is_ladder_battle() and gamedata['server']['log_ladder_pvp'] >= 2:
-                    gamesite.exception_log.event(server_time, 'ladder attack START: ' + session.format_ladder_state())
-
-                session.viewing_player.record_protection_event('3885_i_got_attacked',
-                                                               {'prev_end_time': session.viewing_player.resources.protection_end_time,
-                                                                'attacker_id':session.player.user_id,
-                                                                'ladder':session.is_ladder_battle()})
+            if session.viewing_player is not session.player:
+                self.init_attack(session, session.player, session.viewing_player, session.viewing_base, session.ladder_state)
 
             session.has_attacked = True
             session.debug_log_action('do_attack')
-
-            session.viewing_base.base_last_attack_time = server_time
-            session.viewing_base.base_times_attacked += 1
-            session.player.attack_cooldown_start = server_time
 
             session.deployed_units = {}
             session.deployed_donated_units = {}
@@ -20476,22 +20584,20 @@ class GAMEAPI(resource.Resource):
                                                if (obj.owner is session.player) and obj.is_mobile()])
             session.deployed_donated_unit_space = 0
 
-            event_props = {'attacker_user_id': session.user.user_id,
-                           'attacker_level': session.player.resources.player_level,
-                           'attacker_deployable_squads': session.deployable_squads.copy(),
-                           'base_id': session.viewing_base.base_id,
-                           'starting_base_damage': session.starting_base_damage,
-                           'opponent_user_id':session.viewing_user.user_id,
-                           'opponent_level':session.viewing_player.resources.player_level,
-                           'opponent_type':session.viewing_player.ai_or_human()}
-
             # open attack log
             if session.viewing_player is session.player:
                 # reinforcement
                 session.open_attack_log(-1,-1)
             else:
                 session.open_attack_log(session.user.user_id, session.viewing_user.user_id, base_id = session.viewing_base.base_id if (session.viewing_base is not session.viewing_player.my_home) else None)
-                session.attack_event(session.user.user_id, '3820_battle_start', event_props.copy())
+                session.attack_event(session.user.user_id, '3820_battle_start', {'attacker_user_id': session.user.user_id,
+                                                                                 'attacker_level': session.player.resources.player_level,
+                                                                                 'attacker_deployable_squads': session.deployable_squads.copy(),
+                                                                                 'base_id': session.viewing_base.base_id,
+                                                                                 'starting_base_damage': session.starting_base_damage,
+                                                                                 'opponent_user_id':session.viewing_user.user_id,
+                                                                                 'opponent_level':session.viewing_player.resources.player_level,
+                                                                                 'opponent_type':session.viewing_player.ai_or_human()})
                 if session.is_ladder_battle() and ((not session.using_squad_deployment()) or gamedata['server'].get('log_ladder_pvp_on_map',False)):
                     session.player.record_ladder_pvp_event('3305_ladder_attack_start', {'defender_id': session.viewing_player.user_id,
                                                                                         'attacker_pts': session.player.ladder_points(),
@@ -20506,22 +20612,13 @@ class GAMEAPI(resource.Resource):
                 if session.damage_log: session.damage_log.init_multi(session.iter_objects())
                 if session.player.player_auras: session.attack_event(session.user.user_id, '3901_player_auras', {'player_auras':copy.copy(session.player.player_auras)})
 
-                session.increment_player_metric('attacks_launched', 1, time_series = False)
-                session.increment_player_metric('attacks_launched_vs_'+session.viewing_player.ai_or_human(), 1, time_series = False)
-
-                if session.viewing_player.is_human() and session.player.cooldown_active('revenge_defender:%d' % session.viewing_player.user_id):
-                    session.increment_player_metric('revenge_attacks_launched_vs_'+session.viewing_player.ai_or_human(), 1, time_series = False)
-                    record_player_metric(session.viewing_player, dict_increment, 'revenge_attacks_suffered', 1, time_series = False)
-
-                if session.viewing_player.is_human() and \
-                   ((session.viewing_base is session.viewing_player.my_home) or \
-                    (session.viewing_base.base_type == 'quarry' and gamedata['territory']['quarries_affect_protection']) or \
-                    (session.viewing_base.base_type == 'squad' and gamedata['territory']['squads_affect_protection'])):
-                    # remove the protection timer of the player making the attack
-                    session.player.set_protection_end_time(session, -1,
-                                                           '3884_protection_removed' if session.player.has_damage_protection() else None,
-                                                           {'defender_id':session.viewing_player.user_id})
-                    session.setmax_player_metric('last_pvp_aggression_time', server_time, time_series = False)
+            # look up AI base or hive
+            if (session.viewing_base is session.viewing_player.my_home) and session.viewing_player.is_ai():
+                ai_data = gamedata['ai_bases']['bases'].get(str(session.viewing_player.user_id), None)
+            elif session.viewing_base.base_type == 'hive':
+                ai_data = gamedata['hives']['templates'].get(session.viewing_base.base_template, None)
+            else:
+                ai_data = None
 
             if session.player.tutorial_state != "COMPLETE":
                 attack_time = gamedata['tutorial_attack_time']
@@ -20561,97 +20658,9 @@ class GAMEAPI(resource.Resource):
             # if available, set protection_eligible True
             # after the battle, we'll calculate the exact amount of time based on damage done
 
-            session.protection_eligible = False
-
-            enable_protection = session.viewing_player.is_human() and (session.viewing_base is session.viewing_player.my_home)
-
-            if session.player.home_region and (session.player.home_region in gamedata['regions']) and \
-               ('enable_battle_protection_if' in gamedata['regions'][session.player.home_region]) and \
-               (not Predicates.read_predicate(gamedata['regions'][session.player.home_region]['enable_battle_protection_if']).is_satisfied(session.viewing_player, None)):
-                enable_protection = False # turned off for this region and this defender
-
-            if gamedata['server']['global_protection_cooldown'] > 0 and session.viewing_player.cooldown_active('global_protection'):
-                enable_protection = False # turned off by cooldown
-
-            if ('enable_protection_if' in gamedata['server']) and (not Predicates.read_predicate(gamedata['server']['enable_protection_if']).is_satisfied(session.viewing_player, None)):
-                enable_protection = False # turned off by predicate
-
-            if enable_protection:
-                protect_facebook_friends = session.viewing_player.get_any_abtest_value('protect_facebook_friends', gamedata['server']['protect_facebook_friends'])
-                protect_same_ip = session.viewing_player.get_any_abtest_value('protect_same_ip', gamedata['server']['protect_same_ip'])
-                protect_same_alliance = session.viewing_player.get_any_abtest_value('protect_same_alliance', gamedata['server']['protect_same_alliance'])
-
-                is_same_ip = ((session.viewing_user.last_login_ip == session.user.last_login_ip) and (session.user.last_login_ip != 'unknown'))
-
-                # have these two players exchanged DP too much recently?
-                max_player_stacks = Predicates.eval_cond_or_literal(gamedata['server']['protection_fatigue_stacks'], session, session.viewing_player)
-                is_fatigued = gamedata['server']['enable_protection_fatigue'] and \
-                              (session.player.cooldown_active('protection_fatigue:%d'%session.viewing_player.user_id) >= max_player_stacks or \
-                               (gamedata['server']['bidirectional_protection_fatigue'] and session.viewing_player.cooldown_active('protection_fatigue:%d'%session.player.user_id) >= gamedata['server']['protection_fatigue_stacks']))
-
-                # are these two players in the same alliance, or have these two players recently exchanged too much DP with members of each others' alliances?
-                max_alliance_stacks = Predicates.eval_cond_or_literal(gamedata['server']['alliance_protection_fatigue_stacks'], session, session.viewing_player)
-                if gamedata['server']['alliance_stickiness'] > 0:
-                    is_same_alliance, my_alliances, other_alliances = session.player.is_same_alliance_sticky(session.viewing_player)
-                    if gamedata['server']['enable_protection_fatigue'] and gamedata['server']['enable_alliance_protection_fatigue'] and (not is_same_alliance):
-                        for aid in my_alliances.union(other_alliances):
-                            if session.player.cooldown_active('protection_fatigue:a%d'%aid) >= max_alliance_stacks or \
-                               (gamedata['server']['bidirectional_protection_fatigue'] and session.viewing_player.cooldown_active('protection_fatigue:a%d'%aid) >= gamedata['server']['alliance_protection_fatigue_stacks']):
-                                is_fatigued = True
-                                break
-                else:
-                    is_same_alliance = session.player.is_same_alliance(session.viewing_player.user_id)
-
-                # always enable protection for non-secure testing. Otherwise perform checks.
-                if (not spin_secure_mode) or \
-                   ((not session.player.is_alt_account_unprotectable(session.viewing_player)) and \
-                    (not is_fatigued) and \
-                    (protect_same_ip or (not is_same_ip)) and \
-                    (protect_same_alliance or (not is_same_alliance)) and \
-                    (protect_facebook_friends or (not session.user.is_friends_with(session.viewing_user.social_id)))):
-
-                    # if the last attack was a long time ago, don't count it for purposes of the protection attack counter
-                    if (server_time - session.viewing_player.protection_attack_time) >= session.viewing_player.get_any_abtest_value('protection_backoff_time', gamedata['server']['protection_backoff_time']):
-                        session.viewing_player.protection_attack_count = 0
-
-                    session.viewing_player.protection_attack_count += 1
-                    session.viewing_player.protection_attack_time = server_time
-
-                    if session.is_ladder_battle():
-                        # for ladder battles, enable directly
-                        session.protection_eligible = True
-                    else:
-                        # for non-ladder battles, wait for N attacks
-                        if session.viewing_player.protection_attack_count >= session.viewing_player.get_any_abtest_value('protection_attacks', gamedata['server']['protection_attacks']):
-                            # trigger the protection timer (exact amount computed on battle end)
-                            session.protection_eligible = True
-                        else:
-                            session.protection_eligible = False
-
-                else:
-                    # AI players, and Facebook friends, do not receive attack protection
-                    if (not protect_same_ip) and is_same_ip and (not session.user.is_friends_with(session.viewing_user.social_id)):
-                        if gamedata['server']['log_alt_accounts'] >= 1:
-                            gamesite.exception_log.event(server_time, 'denying protection to same-ip attack: %d vs. %d (%s) friends %d' % \
-                                                         (session.user.user_id, session.viewing_user.user_id, session.user.last_login_ip, int(session.user.is_friends_with(session.viewing_user.social_id))))
-                    elif (not protect_same_alliance) and is_same_alliance and (not session.user.is_friends_with(session.viewing_user.social_id)):
-                        if gamedata['server']['log_alt_accounts'] >= 1:
-                            gamesite.exception_log.event(server_time, 'denying protection to same-alliance attack: %d vs. %d (%s) friends %d' % \
-                                                         (session.user.user_id, session.viewing_user.user_id, session.user.last_login_ip, int(session.user.is_friends_with(session.viewing_user.social_id))))
-                    elif session.player.is_alt_account_unprotectable(session.viewing_player):
-                        if gamedata['server']['log_alt_accounts'] >= 1:
-                            gamesite.exception_log.event(server_time, 'denying protection to known alt account: %d vs. %d' % (session.user.user_id, session.viewing_user.user_id))
-
-                    session.protection_eligible = False
-            else:
-                session.protection_eligible = False
-
-            if gamedata['server'].get('track_battle_streaks',0) > 0:
-                cd_list = ['battle_streak']
-                if session.is_ladder_battle():
-                    cd_list.append('battle_streak_ladder')
-                for cd in cd_list:
-                    session.player.cooldown_trigger(cd, gamedata['server']['track_battle_streaks'], add_stack = 1)
+            session.protection_eligible = self.is_protection_eligible(session, session.player, session.user,
+                                                                      session.viewing_player, session.viewing_user,
+                                                                      session.viewing_base, session.ladder_state)
 
             if ai_data and ('on_attack' in ai_data):
                 session.execute_consequent_safe(ai_data['on_attack'], session.player, retmsg, reason='on_attack')
@@ -25614,6 +25623,12 @@ class GAMEAPI(resource.Resource):
 
             elif spellname == "DEPLOY_UNITS":
                 self.do_attack(session, retmsg, spellargs)
+
+            elif spellname == "INSTANT_ATTACK":
+                if not session.player.is_cheater:
+                    retmsg.append(["ERROR", "DISALLOWED_IN_SECURE_MODE"])
+                else:
+                    return session.start_async_request(self.instant_attack(session, retmsg, spellargs))
 
             elif spellname == "CONFIG_SET":
                 if object not in session.player.home_base_iter():
