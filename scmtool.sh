@@ -208,9 +208,9 @@ else
             version)
                 do_version_git $@
                 ;;
-	    clean)
-		do_clean_git $@
-		;;
+        clean)
+        do_clean_git $@
+        ;;
             git-version)
                 do_version_git $@
                 ;;
@@ -265,9 +265,9 @@ else
             git-sync)
                 do_git_sync_svn $@
                 ;;
-	    clean)
-		do_clean_svn $@
-		;;
+        clean)
+        do_clean_svn $@
+        ;;
             *)
                 usage
                 ;;

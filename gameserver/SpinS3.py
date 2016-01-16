@@ -12,6 +12,7 @@ from urllib import urlencode
 import requests
 import AtomicFileWrite
 import OpenSSL.SSL
+import ssl
 
 class S3Exception(Exception):
     def __init__(self, wrapped, ui_msg, op, bucket, filename, attempt_num):
@@ -59,9 +60,11 @@ def retry_logic(func_name, bucket, filename, policy_404, func, *args, **kwargs):
             return response
 
         except requests.exceptions.HTTPError as e:
-            last_err = S3Exception(e, 'requests.exceptions.HTTPError: %r' % e, func_name, bucket, filename, attempt)
+            last_err = S3Exception(e, 'requests.exceptions.HTTPError: %r Headers %r Content %r' % (e, e.response.headers, e.response.content), func_name, bucket, filename, attempt)
             if e.response.status_code in (500, 503):
                 pass # retry on 500 Internal Server Error or 503 Service Unavailable
+            elif e.response.status_code == 400 and e.response.content and ('RequestTimeout' in e.response.content):
+                pass # retry on <Error><Code>RequestTimeout</Code><Message>Your socket connection to the server was not read from or written to within the timeout period. Idle connections will be closed.</Message>
             else:
                 raise last_err # abort immediately
 
@@ -71,18 +74,24 @@ def retry_logic(func_name, bucket, filename, policy_404, func, *args, **kwargs):
         except requests.exceptions.ConnectionError as e:
             last_err = S3Exception(e, 'requests.exceptions.ConnectionError: %r' % e, func_name, bucket, filename, attempt)
             pass # retry
+
+        except OpenSSL.SSL.SysCallError as e:
+            last_err = S3Exception(e, 'OpenSSL.SSL.SysCallError: %r' % e, func_name, bucket, filename, attempt)
+            if e.args in ((errno.EPIPE, 'EPIPE'), (errno.ECONNRESET, 'ECONNRESET')):
+                pass # retry
+            else:
+                raise last_err # abort immediately
+
+        except ssl.SSLError as e:
+            last_err = S3Exception(e, 'ssl.SSLError: %r' % e, func_name, bucket, filename, attempt)
+            pass # retry
+
         except socket.timeout as e:
             last_err = S3Exception(e, 'socket.timeout', func_name, bucket, filename, attempt)
             pass # retry
         except socket.error as e:
             last_err = S3Exception(e, 'socket.error: %r %s' % (e, errno.errorcode.get(e.errno,'Unknown')), func_name, bucket, filename, attempt)
             if e.errno == errno.ECONNRESET:
-                pass # retry
-            else:
-                raise last_err # abort immediately
-        except OpenSSL.SSL.SysCallError as e:
-            last_err = S3Exception(e, 'OpenSSL.SSL.SysCallError: %r' % e, func_name, bucket, filename, attempt)
-            if e.args in ((errno.EPIPE, 'EPIPE'), (errno.ECONNRESET, 'ECONNRESET')):
                 pass # retry
             else:
                 raise last_err # abort immediately
@@ -284,13 +293,15 @@ class S3 (object):
     def get_slurp(self, bucket, filename, query = None):
         response = retry_logic('get_slurp', bucket, filename, Policy404.RAISE,
                                self.do_get_slurp, bucket, filename, query)
+        return response.content
+
+    def do_get_slurp(self, bucket, filename, query):
+        url, headers = self.get_request(bucket, filename, query = query)
+        response = self.requests_session.get(url, headers=headers, timeout = S3_REQUEST_TIMEOUT)
         buf = response.content
         if 'Content-Length' in response.headers:
             assert len(buf) == int(response.headers['Content-Length'])
-        return buf
-    def do_get_slurp(self, bucket, filename, query):
-        url, headers = self.get_request(bucket, filename, query = query)
-        return self.requests_session.get(url, headers=headers, timeout = S3_REQUEST_TIMEOUT)
+        return response
 
     # synchronous DELETE
     def delete(self, bucket, filename):
@@ -318,7 +329,7 @@ class S3 (object):
     # synchronous PUT from disk file
     # optionally override timeout for slow/big streaming uploads
     def put_file(self, bucket, filename, source_filename, streaming = True, timeout = S3_REQUEST_TIMEOUT, **kwargs):
-        fd = open(source_filename)
+        fd = open(source_filename, 'rb')
         if not streaming:
             buf = self.PutBuf()
             while True:

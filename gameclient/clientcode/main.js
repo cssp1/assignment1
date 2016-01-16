@@ -1836,7 +1836,8 @@ GameObject.prototype.cast_client_spell = function(spell_name, spell, target, loc
             // note: use both muzzle_flash and impact, because impact location is the object's own location
             var vfx = spell['visual_effect'] || spell['muzzle_flash_effect'] || spell['impact_visual_effect'] || null;
             if(vfx) {
-                SPFX.add_visual_effect_at_time(impact_pos, 0, [0,1,0], client_time, this.get_leveled_quantity(vfx), true, null);
+                var vfx_props = {'dest': null}; // special case: inhibit PhantomUnits from spawning (since this is a self-destruct, not an offensive shot)
+                SPFX.add_visual_effect_at_time(impact_pos, 0, [0,1,0], client_time, this.get_leveled_quantity(vfx), true, vfx_props);
             }
         } else if(code === 'projectile_attack') {
             // make sure we are in range
@@ -2345,7 +2346,7 @@ function calculate_battle_outcome() {
         // don't end the battle if the player has usable combat items
         if(defeat) {
             goog.array.forEach(session.home_equip_items, function(entry) {
-                if(inventory_item_is_usable_in_combat(ItemDisplay.get_inventory_item_spec(entry['item']['spec']), session)) {
+                if(inventory_item_is_usable_in_combat(ItemDisplay.get_inventory_item_spec(entry['item']['spec']), session) >= UsableInCombat.USABLE_MISSILE) {
                     defeat = false;
                 }
             });
@@ -2353,7 +2354,7 @@ function calculate_battle_outcome() {
         if(defeat) {
             for(var i = 0; i < player.inventory.length; i++) {
                 var item = player.inventory[i];
-                if(inventory_item_is_usable_in_combat(ItemDisplay.get_inventory_item_spec(item['spec']), session)) {
+                if(inventory_item_is_usable_in_combat(ItemDisplay.get_inventory_item_spec(item['spec']), session) >= UsableInCombat.USABLE_MISSILE) {
                     defeat = false;
                     break;
                 }
@@ -6423,6 +6424,15 @@ player.get_lottery_state = function(scanner) {
         ret.can_scan = true;
         ret.on_cooldown = true;
         ret.next_scan_method = 'paid';
+
+        // check for aura scans
+        var aura = goog.array.find(player.player_auras, function(a) {
+            return (a['spec'] == 'lottery_scans') && (!('end_time' in a) || (server_time < a['end_time']));
+        });
+        if(aura) {
+            ret.num_scans += ('stack' in aura ? aura['stack'] : 1);
+            ret.next_scan_method = 'aura';
+        }
     }
 
     if(player.lottery_is_busy(scanner)) {
@@ -7419,13 +7429,29 @@ function get_alliance_logo_asset(logo) {
     return 'inventory_unknown';
 }
 
+/** Return S,M,L,XL designation for the given quarry richness level
+    @param {number} richness
+    @return {string} */
+function quarry_richness_ui_str(richness) {
+    var table = gamedata['strings']['regional_map']['richness'];
+    var rich_str = '?';
+    for(var r = 0; r < table.length; r++) {
+        if(richness >= table[r][0]) {
+                rich_str = table[r][1];
+        } else {
+            break;
+       }
+    }
+    return rich_str;
+}
+
 /** fungible items go immediately into resource storage. Check if there is enough room.
     @param {!Object} spec
     @param {number} stack
     @param {!Object} resource_state
     @return {boolean} */
 function fungible_inventory_item_can_fit(spec, stack, resource_state) {
-    if(spec['resource'] == 'gamebucks') {
+    if(spec['resource'] == 'gamebucks' || spec['resource'] == 'lottery_scans') {
         return true;
     } else if(spec['resource'] in resource_state) {
         if(stack + resource_state[spec['resource']][1] <= resource_state[spec['resource']][0]) {
@@ -8680,7 +8706,7 @@ Mobile.prototype.run_control = function() {
 
     } else if(this.control_state === control_states.CONTROL_MOVING) {
         var maxvel = this.combat_stats.maxvel; // this.get_leveled_quantity(this.spec['maxvel']);
-        if(this.dest === null) { throw Error('dest must be non-null here'); }
+        if(this.dest === null) { throw Error('dest must be non-null here '+this.spec['name']+' '+this.id); }
 
         // update pos
         if(this.next_pos[0] != this.pos[0] || this.next_pos[1] != this.pos[1]) {
@@ -10140,7 +10166,8 @@ function log_exception(e, where) {
     }
 
     // show in JS console
-    console.log('Exception thrown in '+where+':\n'+msg);
+    var ui_tick = (session.combat_engine ? session.combat_engine.cur_tick.get() : -1);
+    console.log('Exception thrown in '+where+' at tick '+ui_tick.toString()+':\n'+msg);
 
     if(player.is_developer()) {
         window.alert('SpinPunch CLIENT EXCEPTION in \"'+where+'\" (check JS Console for more detail):\n'+msg);
@@ -12206,6 +12233,8 @@ function update_aura_bar(dialog) {
     }
 
     var aura_index = 0;
+    var dialog_width = 0;
+
     for(var i = first_aura; i < dialog.data['widgets']['aura_icon']['array'][0]; i++) {
         // skip expired/hidden auras
         while((aura_index < player.player_auras.length) &&
@@ -12293,6 +12322,7 @@ function update_aura_bar(dialog) {
             }
 
             aura_index += 1;
+            dialog_width = Math.max(dialog_width, dialog.widgets['aura_icon'+i].xy[0] + dialog.widgets['aura_icon'+i].wh[0]);
         } else {
             dialog.widgets['aura_glow'+i].show =
                 dialog.widgets['aura_slot'+i].show =
@@ -12302,6 +12332,9 @@ function update_aura_bar(dialog) {
                 dialog.widgets['aura_timer'+i].show = false;
         }
     }
+
+    // elongate size to match max aura dimension
+    dialog.wh = [Math.max(dialog.data['dimensions'][0], dialog_width), dialog.data['dimensions'][1]];
 }
 
 // call an AI attack. If there is an on_visit message associated with
@@ -13712,12 +13745,23 @@ function invoke_combat_item_bar() {
     return dialog;
 }
 
-// Determine if an item of this spec can be used during the current
-// combat session. Does not check the "requires" predicate - returns
-// true if item could potentially be used as long as "requires" is
-// also satisfied.
+/** return values from inventory_item_is_usable_in_combat()
+    @enum {number} */
+var UsableInCombat = {
+    NOT_USABLE : 0,
+    USABLE_BOOST : 1, // aura applier (low priority)
+    USABLE_MISSILE : 2 // missile (high priority)
+};
+
+/** Determine if an item of this spec can be used during the current
+    combat session. Does not check the "requires" predicate - returns
+    true if item could potentially be used as long as "requires" is
+    also satisfied.
+    @param {!Object} spec
+    @param {!Object} session
+    @return {UsableInCombat} */
 function inventory_item_is_usable_in_combat(spec, session) {
-    if(!('use' in spec)) { return false; } // item does not have a "use" action
+    if(!('use' in spec)) { return UsableInCombat.NOT_USABLE; } // item does not have a "use" action
 
     // case 1) - recursively search "requires" predicate for HAS_ATTACKED and HOME_BASE predicates
     if('requires' in spec) {
@@ -13747,7 +13791,7 @@ function inventory_item_is_usable_in_combat(spec, session) {
         // item has HAS_ATTACKED predicate, and either does NOT have a HOME_BASE predicate, or session.home_base satisfies it
         // actually, let's show the item in this case, but have the red requirement tooltip to teach player that it can only be used offensively
         if(requires_has_attacked === true /* && (requires_home_base === null || requires_home_base === !!session.home_base) */) {
-            return true;
+            return UsableInCombat.USABLE_MISSILE;
         }
     }
 
@@ -13759,32 +13803,40 @@ function inventory_item_is_usable_in_combat(spec, session) {
             var spell = gamedata['spells'][use['spellname']];
             if(goog.array.contains(['projectile_attack','instant_repair','instant_combat_repair'], spell['code'])) {
                 // hide projectile_attack items if the current climate has an exclude_missiles flag
-                if(spell['code'] == 'projectile_attack' && session.viewing_base.base_climate_data['exclude_missiles']) { continue; }
-                return true;
+                if(spell['code'] == 'projectile_attack' && session.viewing_base.base_climate_data['exclude_missiles']) {
+                    return UsableInCombat.NOT_USABLE;
+                }
+                return UsableInCombat.USABLE_MISSILE;
             }
         }
     }
 
-    return false;
+    // case 3) boost consumables (but note, missiles can also have APPLY_AURA in their uselist, so finish checking case 2) first)
+    for(var m = 0; m < uselist.length; m++) {
+        var use = uselist[m];
+        if('spellname' in use) {
+            if(use['spellname'] == 'APPLY_AURA') { return UsableInCombat.USABLE_BOOST; }
+        }
+    }
+
+    return UsableInCombat.NOT_USABLE;
 }
 
 function update_combat_item_bar(dialog) {
     var indices_by_spec = {};
-    var item_list = [], slot_list = [], stack_count_list = [];
+    var entry_list = [];
 
     var add_item = function(item, i) { // "i" is integer for ordinary inventory items, and {'obj_id':..., 'slot_type':..., 'slot_index':...} for equipped items
-        if(inventory_item_is_usable_in_combat(ItemDisplay.get_inventory_item_spec(item['spec']), session)) {
+        if(inventory_item_is_usable_in_combat(ItemDisplay.get_inventory_item_spec(item['spec']), session) != UsableInCombat.NOT_USABLE) {
             if(item['spec'] in indices_by_spec) {
                 // group with items of identical specs
                 // note: the 'pending'/'pending_time' flags will only be taken from the first item
                 // this assumes that items get "used" in the order they are listed in player.inventory
                 var index = indices_by_spec[item['spec']];
-                stack_count_list[index] += (item['stack']||1);
+                entry_list[index]['stack'] += (item['stack']||1);
             } else {
-                indices_by_spec[item['spec']] = item_list.length;
-                item_list.push(item);
-                slot_list.push(i);
-                stack_count_list.push(item['stack']||1);
+                indices_by_spec[item['spec']] = entry_list.length;
+                entry_list.push({'item': item, 'slot': i, 'stack': (item['stack']||1)});
             }
         }
     }
@@ -13795,11 +13847,46 @@ function update_combat_item_bar(dialog) {
         add_item(entry['item'], entry);
     });
 
-    dialog.user_data['item_list'] = item_list;
-    dialog.user_data['slot_list'] = slot_list;
-    dialog.user_data['stack_count_list'] = stack_count_list;
+    entry_list.sort(function(a,b) {
+        var a_prio = inventory_item_is_usable_in_combat(ItemDisplay.get_inventory_item_spec(a['item']['spec']), session);
+        var b_prio = inventory_item_is_usable_in_combat(ItemDisplay.get_inventory_item_spec(b['item']['spec']), session);
+        // priority first
+        if(a_prio > b_prio) {
+            return -1;
+        } else if(a_prio < b_prio) {
+            return 1;
+            // items equipped to buildings first
+        } else if(typeof(a['slot']) === 'object' && typeof(b['slot']) !== 'object') {
+            return -1;
+        } else if(typeof(a['slot']) !== 'object' && typeof(b['slot']) === 'object') {
+            return 1;
+            // sort by building then slot number
+        } else if(typeof(a['slot']) === 'object') {
+            if(a['slot']['obj_id'] < b['slot']['obj_id']) {
+                return -1;
+            } else if(a['slot']['obj_id'] > b['slot']['obj_id']) {
+                return 1;
+            } else if(a['slot']['slot_index'] < b['slot']['slot_index']) {
+                return -1;
+            } else if(a['slot']['slot_index'] > b['slot']['slot_index']) {
+                return 1;
+            }
+            // sort by slot number
+        } else if(typeof(a['slot']) !== 'object') {
+            if(a['slot'] < b['slot']) {
+                return -1;
+            } else {
+                return 1;
+            }
+        }
+        return 0;
+    });
 
-    if(item_list.length < 1) { // no combat items
+    dialog.user_data['item_list'] = goog.array.map(entry_list, function(entry) { return entry['item']; });
+    dialog.user_data['slot_list'] = goog.array.map(entry_list, function(entry) { return entry['slot']; });
+    dialog.user_data['stack_count_list'] = goog.array.map(entry_list, function(entry) { return entry['stack']; });
+
+    if(entry_list.length < 1) { // no combat items
         dialog.show = false;
         return;
     } else {
@@ -13809,7 +13896,7 @@ function update_combat_item_bar(dialog) {
     dialog.xy = vec_copy(dialog.data['xy']);
 
     // show as many rows as will fit
-    var show_rows = Math.max(1, Math.min(item_list.length, Math.min(dialog.data['widgets']['item']['array'][1], Math.floor((canvas_height - dialog.xy[1] - dialog.data['dimensions'][1] - dialog.data['widgets']['item']['array_offset'][1])/dialog.data['widgets']['item']['array_offset'][1]))));
+    var show_rows = Math.max(1, Math.min(entry_list.length, Math.min(dialog.data['widgets']['item']['array'][1], Math.floor((canvas_height - dialog.xy[1] - dialog.data['dimensions'][1] - dialog.data['widgets']['item']['array_offset'][1])/dialog.data['widgets']['item']['array_offset'][1]))));
     dialog.user_data['show_rows'] = show_rows;
 
     dialog.wh = [dialog.data['dimensions'][0],
@@ -13817,7 +13904,7 @@ function update_combat_item_bar(dialog) {
     dialog.widgets['bgrect'].wh = [dialog.data['widgets']['bgrect']['dimensions'][0],
                                    dialog.data['widgets']['bgrect']['dimensions'][1] + (show_rows - 1) * dialog.data['widgets']['item']['array_offset'][1]];
 
-    var max_scroll = Math.max(0, item_list.length - show_rows); // Math.floor((item_list.length - 1) / show_rows);
+    var max_scroll = Math.max(0, entry_list.length - show_rows);
     dialog.user_data['scroll_pos'] = Math.min(dialog.user_data['scroll_pos'], max_scroll)
     dialog.user_data['scroll_pos'] = Math.max(dialog.user_data['scroll_pos'], 0);
     dialog.widgets['scroll_left'].widgets['scroll_left'].state = (dialog.user_data['scroll_pos'] > 0 ? 'normal' : 'disabled');
@@ -14909,6 +14996,20 @@ function init_chat_frame() {
     dialog.widgets['input'].ontextready = function(w, str) {
         if(!str) { return; }
 
+        var channel = dialog.widgets['tabs'+dialog.user_data['cur_tab']].user_data['channel_name'];
+        if(goog.array.contains(['GLOBAL','REGION'], channel) &&
+           ChatFilter.is_bad(str)) {
+            var after_warn = (function (_w) { return function() {
+                // restore keyboard focus after warning closes
+                _w.has_typed = true;
+                SPUI.set_keyboard_focus(_w);
+            }; })(w);
+            if(invoke_chat_filter_warning(after_warn)) {
+                // restore the text that was typed, but don't send the message
+                w.set_str(str);
+                return;
+            }
+        }
         var encoded_str = SPHTTP.wrap_string(str);
         send_to_server.func(["CHAT_SEND", dialog.widgets['tabs'+dialog.user_data['cur_tab']].user_data['channel_name'], encoded_str]);
         dialog.widgets['tabs'+dialog.user_data['cur_tab']].widgets['output'].scroll_to_bottom();
@@ -14964,6 +15065,33 @@ function chat_frame_size(dialog, big, forced) {
         dialog.widgets['grow_bg'].fade_unless_hover = dialog.data['widgets']['grow_bg']['fade_unless_hover'];
     }
 };
+
+/** Warn player that they are sending a message that could get them violated.
+ @return {boolean} if the warning was shown (rather than muted by player preference) */
+function invoke_chat_filter_warning(cb) {
+    // don't bother elder players (created before Jan 9, 2016)
+    if(player.preferences['chat_filter_warning_seen'] ||
+       player.creation_time < 1452328211 ||
+       !gamedata['strings']['chat_filter_warning']) {
+        return false;
+    }
+    var s = gamedata['strings']['chat_filter_warning'];
+    var dialog = invoke_child_message_dialog(s['ui_title'],
+                                             s['ui_description'],
+                                             {'dialog': 'message_dialog_big',
+                                              'use_bbcode': true,
+                                              'ok_button_ui_name': s['ui_button'],
+                                              'on_ok': cb
+                                             });
+    dialog.widgets['ignore_button'].show = true;
+    dialog.widgets['ignore_button'].str = s['ui_ignore'];
+    dialog.widgets['ignore_button'].onclick = function(w) {
+        w.state = (w.state == 'active' ? 'normal' : 'active');
+        player.preferences['chat_filter_warning_seen'] = (w.state == 'active' ? 1 : 0);
+        send_to_server.func(["UPDATE_PREFERENCES", player.preferences]);
+    };
+    return true;
+}
 
 /** @constructor
     @param {number} user_id of offender
@@ -19657,7 +19785,7 @@ function invoke_building_context_menu(mouse_xy) {
                                                              null // SPUI.make_colorv([0,0,1])
                                                              : SPUI.disabled_text_color),
                                                 onclick: (state.can_scan ?
-                                                          (function (_obj) { return function() { invoke_lottery_dialog(_obj); }; })(obj) : state.fail_helper)
+                                                          (function (_obj) { return function() { invoke_lottery_dialog(_obj, 'building_context'); }; })(obj) : state.fail_helper)
                                                }));
         }
 
@@ -20824,14 +20952,7 @@ function update_region_map_feature_list_element(dialog, i, feature) {
         dialog.widgets['icon'].widgets['frame'].onclick = onclick;
         dialog.widgets['name'].str = (feature['base_ui_name'] ? feature['base_ui_name'] : gamedata['strings']['regional_map']['unknown_base']);
         dialog.widgets['qicon'].bg_image = 'resource_icon_'+feature['base_icon'];
-        var RICHNESS = gamedata['strings']['regional_map']['richness'];
-        var rich_str = '?';
-        for(var r = 0; r < RICHNESS.length; r++) {
-            if(feature['base_richness'] >= RICHNESS[r][0]) {
-                rich_str = RICHNESS[r][1];
-            } else { break; }
-        }
-        dialog.widgets['qsize'].str = rich_str;
+        dialog.widgets['qsize'].str = quarry_richness_ui_str(feature['base_richness']);
     } else {
         throw Error('unhandled base_type '+feature['base_type']);
     }
@@ -23083,6 +23204,7 @@ function invoke_inventory_dialog(force) {
     dialog.widgets['close_button'].onclick = close_parent_dialog;
     init_inventory_grid(dialog);
     dialog.ondraw = update_inventory_grid;
+    update_inventory_header_buttons(dialog, find_object_by_type(gamedata['inventory_building']), 'inventory');
     return dialog;
 }
 
@@ -24983,13 +25105,35 @@ function update_unit_donation_dialog(dialog) {
     dialog.widgets['pending_rect'].show = dialog.widgets['pending_text'].show = dialog.widgets['pending_spinner'].show = pending;
 }
 
+function update_inventory_header_buttons(dialog, obj, cur_mode) {
+    var lottery_spell = gamedata['spells']['LOTTERY_SCAN'];
+    var can_show = (('show_if' in lottery_spell ? read_predicate(lottery_spell['show_if']).is_satisfied(player) : true) &&
+                    ('requires' in lottery_spell ? read_predicate(lottery_spell['requires']).is_satisfied(player) : true));
+
+    if(can_show && obj && obj.is_warehouse() && obj.is_lottery_building()) {
+        dialog.widgets['inventory_toggle'].show =
+            dialog.widgets['lottery_toggle'].show = true;
+        dialog.widgets['inventory_toggle'].state = (cur_mode === 'inventory' ? 'active' : 'normal');
+        dialog.widgets['lottery_toggle'].state = (cur_mode === 'lottery' ? 'active' : 'normal');
+        dialog.widgets['inventory_toggle'].onclick = (cur_mode === 'inventory' ? null : function(w) { invoke_inventory_dialog(); });
+        dialog.widgets['lottery_toggle'].onclick = (cur_mode === 'lottery' ? null : (function (_obj) {
+            return function(w) {
+                invoke_lottery_dialog(_obj, 'inventory_dialog_header_button');
+            }; })(obj) );
+        dialog.widgets['lottery_toggle'].str = lottery_spell['ui_name'];
+    } else {
+        dialog.widgets['inventory_toggle'].show =
+            dialog.widgets['lottery_toggle'].show = false;
+    }
+}
+
 var lottery_slate_receivers = [];
 function get_lottery_slate(scanner, callback) {
     lottery_slate_receivers.push(callback);
     send_to_server.func(["CAST_SPELL", scanner.id, "LOTTERY_GET_SLATE"]);
 }
 
-function invoke_lottery_dialog(scanner) {
+function invoke_lottery_dialog(scanner, reason) {
     var dialog = new SPUI.Dialog(gamedata['dialogs']['lottery_dialog']);
     dialog.user_data['dialog'] = 'lottery_dialog';
     dialog.user_data['scanner'] = scanner;
@@ -25005,6 +25149,8 @@ function invoke_lottery_dialog(scanner) {
     dialog.widgets['title'].str = gamedata['spells']['LOTTERY_SCAN']['ui_name'];
     lottery_dialog_refresh_slate(dialog);
     dialog.ondraw = update_lottery_dialog;
+    update_inventory_header_buttons(dialog, scanner, 'lottery');
+    metric_event('1633_lottery_dialog_open', {'method': reason, 'sum': player.get_denormalized_summary_props('brief')});
     return dialog;
 }
 
@@ -25104,6 +25250,8 @@ function update_lottery_dialog(dialog) {
 
     if(state.next_scan_method == 'cooldown' || state.next_scan_method == 'contents') {
         dialog.widgets['charges'].set_text_bbcode(gamedata['spells']['LOTTERY_SCAN']['ui_tooltip_remaining'].replace('%d', pretty_print_number(state.num_scans)));
+    } else if(state.next_scan_method == 'aura') {
+        dialog.widgets['charges'].set_text_bbcode(gamedata['spells']['LOTTERY_SCAN'][state.num_scans == 1 ? 'ui_tooltip_aura' : 'ui_tooltip_aura_plural'].replace('%d', pretty_print_number(state.num_scans)));
     } else if(state.next_scan_method == 'paid') {
         dialog.widgets['charges'].set_text_bbcode(gamedata['spells']['LOTTERY_SCAN']['ui_tooltip_on_cooldown'].replace('%s', '[color=#ffff00]'+pretty_print_time(player.cooldown_togo('lottery_free'))+'[/color]'));
     } else {
@@ -25164,6 +25312,20 @@ function update_lottery_dialog(dialog) {
                 var alpha = (1-amp) + amp * Math.sin((client_time/period + phase)*2*Math.PI);
                 dialog.widgets[wname].widgets['item'].alpha = alpha;
                 to_randomize.push(slot_name);
+
+                var rarity_wname = SPUI.get_array_widget_name('goodies_rarity', dialog.data['widgets']['goodies_rarity']['array'], [x,y]);
+                var spec = ItemDisplay.get_inventory_item_spec(item['spec']);
+                var rarity = ('rarity' in spec ? spec['rarity'] : 1);
+                if('asset_rarity'+rarity.toString() in dialog.data['widgets']['goodies_rarity']) {
+                    dialog.widgets[rarity_wname].show = true;
+                    dialog.widgets[rarity_wname].asset = dialog.data['widgets']['goodies_rarity']['asset_rarity'+rarity.toString()];
+                    var amp2 = dialog.data['widgets']['goodies_rarity']['pulse_amplitude'];
+                    var period2 = dialog.data['widgets']['goodies_rarity'][dialog.user_data['scan_pending'] > 0 ? 'pulse_period_scanning': 'pulse_period_normal'];
+                    var alpha2 = (1-amp2) + amp2 * Math.sin((client_time/period2 + phase)*2*Math.PI);
+                    dialog.widgets[rarity_wname].alpha = alpha2;
+                } else {
+                    dialog.widgets[rarity_wname].show = false;
+                }
             } else {
                 dialog.widgets[wname].show = false;
             }
@@ -25198,7 +25360,7 @@ function update_lottery_dialog_buttons(dialog, lottery_dialog) {
 
     var spellarg = state.next_scan_method;
     var display_price;
-    if(state.next_scan_method == 'contents' || state.next_scan_method == 'cooldown') {
+    if(state.next_scan_method == 'contents' || state.next_scan_method == 'cooldown' || state.next_scan_method == 'aura') {
         // free version
         display_price = 0;
     }else {
@@ -25217,7 +25379,7 @@ function update_lottery_dialog_buttons(dialog, lottery_dialog) {
         dialog.widgets['lottery_button'].tooltip.str = null;
         dialog.widgets['lottery_price_display'].str = Store.display_user_currency_price(display_price); // PRICE
         dialog.widgets['lottery_price_display'].tooltip.str = null; // this tends to show through item_discovered Store.display_user_currency_price_tooltip(display_price); // PRICE
-        dialog.widgets['lottery_button'].str = gamedata['spells']['LOTTERY_SCAN'][(state.next_scan_method == 'paid' ? 'ui_verb_paid' : 'ui_verb')];
+        dialog.widgets['lottery_button'].str = gamedata['spells']['LOTTERY_SCAN'][((state.next_scan_method == 'paid' || state.next_scan_method == 'aura') ? 'ui_verb_paid' : 'ui_verb')];
 
         if(!state.can_scan) {
             dialog.widgets['lottery_button'].state = 'disabled_clickable';
@@ -25225,7 +25387,7 @@ function update_lottery_dialog_buttons(dialog, lottery_dialog) {
             dialog.widgets['lottery_button'].tooltip.text_color = SPUI.error_text_color;
             dialog.widgets['lottery_price_display'].onclick =
                 dialog.widgets['lottery_button'].onclick = state.fail_helper;
-        } else if(state.next_scan_method == 'contents' || state.next_scan_method == 'cooldown') {
+        } else if(state.next_scan_method == 'contents' || state.next_scan_method == 'cooldown' || state.next_scan_method == 'aura') {
             dialog.widgets['lottery_price_display'].onclick =
                 dialog.widgets['lottery_button'].onclick = (function (_lottery_dialog, _spellarg) { return function(w) {
                     _lottery_dialog.user_data['scan_pending'] = client_time;
@@ -25236,6 +25398,20 @@ function update_lottery_dialog_buttons(dialog, lottery_dialog) {
                     }
 
                     send_to_server.func(["CAST_SPELL", _lottery_dialog.user_data['scanner'].id, "LOTTERY_SCAN", _spellarg]);
+
+                    // client-side predict aura update
+                    if(_spellarg == 'aura') {
+                        var aura = goog.array.find(player.player_auras, function(a) {
+                            return (a['spec'] == 'lottery_scans') && (!('end_time' in a) || (server_time < a['end_time']));
+                        });
+                        if(aura) {
+                            aura['stack'] = ('stack' in aura ? aura['stack'] - 1 : 0);
+                            if(aura['stack'] <= 0) {
+                                aura['end_time'] = server_time - 1;
+                            }
+                        }
+                    }
+
                     lottery_dialog_refresh_slate(_lottery_dialog);
                     if(w.parent !== _lottery_dialog) {
                         close_dialog(w.parent);
@@ -34230,13 +34406,8 @@ function map_dialog_change_page(dialog, chapter, page) {
                         } else { break; }
                     }
                 }
-                var RICHNESS = gamedata['strings']['regional_map']['richness'];
-                var rich_str = '?';
-                for(var r = 0; r < RICHNESS.length; r++) {
-                    if(quarry['base_richness'] >= RICHNESS[r][0]) {
-                        rich_str = RICHNESS[r][1];
-                    } else { break; }
-                }
+
+                var rich_str = quarry_richness_ui_str(quarry['base_richness']);
 
                 dialog.widgets['row_qstat'+row].show = true;
                 dialog.widgets['row_qstat'+row].state = fullness_state;
@@ -34615,8 +34786,10 @@ function update_daily_tip_pageable(dialog) {
 }
 
 /** @param {string} tipname
-    @param {boolean=} skip_notification_queue */
-function invoke_daily_tip(tipname, skip_notification_queue) {
+    @param {boolean=} skip_notification_queue
+    @param {?Object=} notification_params
+*/
+function invoke_daily_tip(tipname, skip_notification_queue, notification_params) {
     var tip = null;
     for(var i = 0; i < gamedata['daily_tips'].length; i++) {
         var t = gamedata['daily_tips'][i];
@@ -34691,15 +34864,15 @@ function invoke_daily_tip(tipname, skip_notification_queue) {
         apply_dialog_hacks(dialog, _tip);
     }; })(tip, img);
 
-    img.onload = (function (cb, _skip_notification_queue) {
+    img.onload = (function (cb, _skip_notification_queue, _notification_params) {
         return function() {
             if (!_skip_notification_queue) {
-                notification_queue.push(cb);
+                notification_queue.push(cb, _notification_params);
             } else {
                 cb();
             }
         };
-    })(complete_cb, skip_notification_queue || false);
+    })(complete_cb, skip_notification_queue || false, notification_params || null);
     img.crossOrigin = 'Anonymous';
     img.src = GameArt.art_url('art/daily_tips/'+tip['image'], false);
 }
@@ -34967,7 +35140,7 @@ player.event_list_cache_index = null;
     @param {number} ref_time
     @param {boolean} ignore_activation */
 player.get_event_schedule = function(event_kind, event_name, ref_time, ignore_activation) {
-    if(!goog.array.contains(['current_event','current_event_store','facebook_sale',
+    if(!goog.array.contains(['current_event','current_event_store','facebook_sale','bargain_sale',
                              'current_stat_tournament',
                              'current_trophy_pve_challenge','current_trophy_pvp_challenge'], event_kind)) {
         throw Error('unhandled event_kind '+event_kind);
@@ -36345,7 +36518,7 @@ function invoke_buy_gamebucks_dialog23(ver, reason, amount, order, options) {
 
             // always add a NON-bundled version of any loot-table-bearing SKU
             if(item_list && item_list.length > 0) {
-                spell_list.push({'spellname': spellname, 'spellarg': {'want_loot':false}, 'expect_loot': null})
+                spell_list.push({'spellname': spellname, 'spellarg': {'want_loot':false}, 'expect_loot': null});
             }
         }
     }
@@ -36435,17 +36608,38 @@ function invoke_buy_gamebucks_dialog23(ver, reason, amount, order, options) {
         dialog.widgets['trialpay_button'].onclick = function(w) { Store.trialpay_invoke(); };
     }
 
-    // highlight the first loot-bearing offer for >= 1000 Gamebucks, or the first loot-bearing offer as a fallback
-    var to_highlight = null;
-    for(var h = 0; h < spell_list.length; h++) {
-        var s = spell_list[h];
+    // highlight priority
+    // 3. leftmost loot-bearing offer with a ui_warning (since that usually means it's attractive)
+    // 2. leftmost loot-bearing offer for >= 1000 Gamebucks
+    // 1. leftmost loot-bearing offer
+    var highlight_priority = function(s) {
         if(s['expect_loot']) {
-            to_highlight = s;
-            if(gamedata['spells'][s['spellname']]['quantity'] >= 1000) {
-                break;
+            if(buy_gamebucks_sku2_ui_warning(gamedata['spells'][s['spellname']], s['spellarg'])) {
+                return 3;
+            } else if(gamedata['spells'][s['spellname']]['quantity'] >= 1000) {
+                return 2;
+            } else {
+                return 1;
             }
+        } else {
+            return 0;
         }
-    }
+    };
+    var highlight_list = goog.array.clone(spell_list);
+    highlight_list.sort(function(a, b) {
+        var a_prio = highlight_priority(a), b_prio = highlight_priority(b);
+        if(a_prio > b_prio) {
+            return -1;
+        } else if(a_prio < b_prio) {
+            return 1;
+        } else if(spell_list.indexOf(a) < spell_list.indexOf(b)) {
+            return -1;
+        } else {
+            return 1;
+        }
+    });
+    var to_highlight = (highlight_list.length > 0 && highlight_priority(highlight_list[0]) > 0) ? highlight_list[0] : null;
+
     if(to_highlight && (highlight_only || !session.buy_gamebucks_sku_highlight_shown)) {
         session.buy_gamebucks_sku_highlight_shown = true; // only show once
         if(highlight_only) {
@@ -36869,10 +37063,14 @@ function buy_gamebucks_sku2_metrics_description(spell, spellarg) {
 
 // return ui_warning attached to this SKU
 function buy_gamebucks_sku2_ui_warning(spell, spellarg) {
+    var ret = null;
     if('loot_table' in spell && (!spellarg || spellarg['want_loot'])) {
-        return eval_cond_or_literal(gamedata['loot_tables_client'][spell['loot_table']]['ui_warning'] || null, player, null);
+        ret = eval_cond_or_literal(gamedata['loot_tables_client'][spell['loot_table']]['ui_warning'] || null, player, null);
     }
-    return null;
+    if(!ret && 'ui_bonus' in spell) {
+        ret = spell['ui_bonus'];
+    }
+    return ret;
 }
 
 // merge identical successive entries in an item list, even if this would violate the max stack size
@@ -36936,7 +37134,7 @@ function update_buy_gamebucks_sku2_attachments(dialog, spell, spellarg) {
                 }
             }
             attach.widgets['quantity'].str = ui_quantity;
-            attach.widgets['name'].str = ('ui_name' in item ? item['ui_name'] : ItemDisplay.get_inventory_item_ui_name(item_spec, (item_level > 1 ? item_level : null)));
+            attach.widgets['name'].str = ('ui_name' in item ? item['ui_name'] : ItemDisplay.get_inventory_item_ui_name(item_spec, (item_level > 1 ? item_level : null), stack));
             attach.widgets['name'].clip_to = attach.widgets['name'].data[(ui_quantity ? 'clip_to' : 'clip_to_no_qty')];
 
             // pass through clicks to purchase the SKU
@@ -39108,7 +39306,8 @@ function get_requirements_help(kind, arg, options) {
         var warehouse = find_object_by_type(gamedata['inventory_building']);
         if(warehouse) {
             if(warehouse.level < warehouse.get_max_ui_level()) {
-                verb = 'upgrade'; target = warehouse; ui_arg_s = warehouse.spec['ui_name'];
+                verb = (kind === 'inventory_space_need' ? 'upgrade_or_discard_items' : 'upgrade');
+                target = warehouse; ui_arg_s = warehouse.spec['ui_name'];
             } else {
                 verb = 'discard_items'; target = warehouse; ui_arg_s = warehouse.spec['ui_name'];
             }
@@ -39321,7 +39520,7 @@ function get_requirements_help(kind, arg, options) {
                 invoke_repair_dialog();
             }
         }; })(target);
-    } else if(verb == 'discard_items') {
+    } else if(verb == 'discard_items' || verb == 'upgrade_or_discard_items') {
         help_function = (function (_target) { return function() {
             if(!player.warehouse_is_busy()) {
                 invoke_inventory_dialog();

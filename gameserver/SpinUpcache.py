@@ -151,7 +151,7 @@ def get_csv_fields(gamedata):
           "browser_supports_audio_wav", "browser_supports_audio_mp3", "browser_supports_audio_aac", "browser_supports_audio_context",
           "friends_in_game", "initial_friends_in_game", ] + \
           ['likes_'+x for x in SpinConfig.FACEBOOK_GAME_FAN_PAGES.iterkeys()] + \
-          ["timezone", "chat_gagged", "last_fb_notification_time",
+          ["timezone", "last_fb_notification_time",
           ] + RETENTION_FIELDS + SPEND_FIELDS + VISITS_FIELDS + BROWSER_CAP_FIELDS + FEATURE_USE_FIELDS + get_quest_fields(gamedata) + get_unit_fields(gamedata) + get_item_fields(gamedata) + get_viral_fields(gamedata) + get_fb_notification_fields(gamedata) + ALL_ABTESTS
     FIELDS += TimeSeriesCSVWriter.TIME_CURRENT_FIELDS
     return FIELDS

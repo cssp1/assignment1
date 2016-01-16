@@ -496,51 +496,34 @@ class HandleAuraActive(Handler):
         return False
 
 class HandleChatGag(Handler):
+    need_user = False
     def __init__(self, *args, **kwargs):
         Handler.__init__(self, *args, **kwargs)
         if 'duration' in self.args:
-            self.need_user = False
-    def do_exec_online(self, session, retmsg):
-        if 'duration' in self.args:
-            # new-style gag
-            if session.player.apply_aura('chat_gagged', duration = int(self.args['duration']), ignore_limit = True):
-                session.player.stattab.send_update(session, session.outgoing_messages)
+            self.duration = int(self.args['duration'])
         else:
-            # old-style gag
-            session.user.chat_gagged = True
-            self.gamesite.pcache_client.player_cache_update(self.user_id, {'chat_gagged': session.user.chat_gagged})
-            # when applying a permanent chat gag, remove any existing temporary gag auras
-            for aura_name in HandleChatUngag.AURAS:
-                session.player.remove_aura(session, session.outgoing_messages, aura_name, force = True)
+            self.duration = -1
+    def do_exec_online(self, session, retmsg):
+        if session.player.apply_aura('chat_gagged', duration = self.duration, ignore_limit = True):
+            session.player.stattab.send_update(session, session.outgoing_messages)
         return ReturnValue(result = 'ok')
     def do_exec_offline(self, user, player):
-        if 'duration' in self.args:
-            duration = int(self.args['duration'])
-            # new-style gag
-            player['player_auras'] = filter(lambda x: x['spec'] != 'chat_gagged', player.get('player_auras',[]))
-            new_aura = {'spec':'chat_gagged', 'start_time': self.time_now}
-            if duration > 0:
-                new_aura['end_time'] = self.time_now + duration
-            player['player_auras'].append(new_aura)
-        else:
-            # old-style gag
-            user['chat_gagged'] = True
-            self.gamesite.pcache_client.player_cache_update(self.user_id, {'chat_gagged': user['chat_gagged']})
-            # when applying a permanent gag, remove any temporary gag auras
-            player['player_auras'] = filter(lambda x: x['spec'] not in HandleChatUngag.AURAS, player.get('player_auras',[]))
+        player['player_auras'] = filter(lambda x: x['spec'] != 'chat_gagged', player.get('player_auras',[]))
+        new_aura = {'spec':'chat_gagged', 'start_time': self.time_now}
+        if self.duration > 0:
+            new_aura['end_time'] = self.time_now + self.duration
+        player['player_auras'].append(new_aura)
         return ReturnValue(result = 'ok')
+
 class HandleChatUngag(Handler):
     AURAS = ('chat_gagged', 'chat_warned')
+    need_user = False
     def do_exec_online(self, session, retmsg):
         for aura_name in self.AURAS:
             session.player.remove_aura(session, session.outgoing_messages, aura_name, force = True)
-        session.user.chat_gagged = False
-        self.gamesite.pcache_client.player_cache_update(self.user_id, {'chat_gagged': session.user.chat_gagged})
         return ReturnValue(result = 'ok')
     def do_exec_offline(self, user, player):
-        user['chat_gagged'] = False
         player['player_auras'] = filter(lambda x: x['spec'] not in self.AURAS, player.get('player_auras',[]))
-        self.gamesite.pcache_client.player_cache_update(self.user_id, {'chat_gagged': user['chat_gagged']})
         return ReturnValue(result = 'ok')
 
 class MessageSender(Handler):

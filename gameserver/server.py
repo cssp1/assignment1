@@ -25,6 +25,7 @@ if sys.platform == 'linux2':
 
 from twisted.python import log, failure
 from twisted.internet import reactor, task, defer, protocol
+import twisted.internet.utils
 from twisted.web import server, resource, http
 import twisted.web.error
 
@@ -151,6 +152,19 @@ def get_grid_bounds(xy, gridsize):
              1 if (gridsize[1]&1) else 0]
     return [[xy[0]-half[0], xy[0]+half[0]+extra[0]],
             [xy[1]-half[1], xy[1]+half[1]+extra[1]]]
+
+def weighted_random_choice(groups, weights, r):
+    """Given parallel arrays of groups and relative weights, and 0 <= r < 1, return a random
+    element of groups chosen according to the weights."""
+    breakpoints = []
+    bp = 0.0
+    for w in weights:
+        bp += w
+        breakpoints.append(bp)
+
+    r = r * breakpoints[-1]
+    return groups[min(bisect.bisect(breakpoints, r), len(breakpoints)-1)]
+
 
 # valid characters in alliance string fields
 name_chars_simple = map(chr, xrange(ord('a'),ord('z')+1)) + \
@@ -976,7 +990,7 @@ class UserTable:
               ('devicePixelRatio', None),
               ('age_group', None),
               ('preferences', None),
-              ('chat_gagged', int),
+              ('chat_gagged', int), # read-only for legacy data
               ('chat_mod', None),
               ('developer', None),
               ]
@@ -1211,6 +1225,7 @@ class User:
 
         # note: None or False or < 1 is "not gagged"
         # True or 1 is "permanently (and silently) gagged"
+        # OBSOLETE - read-only for legacy data. Replaced by chat_gagged player aura.
         self.chat_gagged = None
 
         # 1 if player can moderate (gag) chat
@@ -1280,7 +1295,6 @@ class User:
 
     def chat_can_interact(self):
         if not self.active_session: return False
-        if self.chat_gagged: return False
         return True
 
     def is_friends_with(self, social_id):
@@ -2576,6 +2590,7 @@ class PlayerTable:
               ('idle_check', lambda s: s.serialize(), lambda player, observer, data: IdleCheck.IdleCheck(gamedata['server']['idle_check'], data, server_time)),
               ('creation_time', None, None),
               ('lottery_slate', None, None),
+              ('lottery_slate_weights', None, None),
               ('ladder_match', None, None),
               ('ladder_match_history', None, None),
 
@@ -3236,6 +3251,7 @@ class Session(object):
         self.deferred_mailbox_update = False
         self.deferred_power_change = False
         self.deferred_player_state_update = False
+        self.deferred_player_auras_update = False
         self.deferred_player_cooldowns_update = False
         self.deferred_donated_units_update = False
         self.deferred_object_state_updates = set()
@@ -3751,6 +3767,9 @@ class Session(object):
             self.do_chat_send('DEVELOPER', '(%s) REPORTED user %d' % (self.user.country, target_uid))
 
     def do_chat_report2(self, target_uid, channel, context_time, target_message_id):
+        # ignore chat reports in prison region channels
+        if channel.startswith('r:prison'): return
+
         # check cooldown
         if not self.player.is_developer():
             cdname = 'chat_report:%d' % target_uid
@@ -3793,7 +3812,16 @@ class Session(object):
 
         ui_context = '\n'.join(ui_context_list)
         gamesite.nosql_client.chat_report(channel, self.user.user_id, self.user.get_chat_name(self.player),
-                                          target_uid, target_chat_name, server_time, context_time, found_message_id, ui_context, reason = 'do_chat_report2')
+                                          target_uid, target_chat_name, server_time, context_time, found_message_id, ui_context,
+                                          source = 'player', reason = 'do_chat_report2')
+        if 'chat_report_recipients' in SpinConfig.config:
+            d = twisted.internet.utils.getProcessValue('./SpinReminders.py',
+                                                       args = ['--from', '%s server' % SpinConfig.game_id_long(),
+                                                               '--subject', '%s Player Chat Report (see [PCHECK](https://%sprod.spinpunch.com/PCHECK) )' % (SpinConfig.game_id_long().upper(), SpinConfig.game()),
+                                                               '--body', ui_context.encode('utf-8'),
+                                                               '--recipients', SpinJSON.dumps(SpinConfig.config['chat_report_recipients'])],
+                                                       env = os.environ)
+            d.addErrback(report_and_absorb_deferred_failure, self)
 
     def do_chat_send(self, channel, text, retmsg = None, bypass_gag = False, props = None):
         assert channel
@@ -4117,8 +4145,8 @@ class Session(object):
     def spawn_new_units_for_player(self, player, retmsg, units, temporary = False,
                                    limit_break = False,
                                    limit_reduce_qty = False,
-                                   xyloc = None, xyscatter = None):
-        new_objects = spawn_units(player, self.viewing_base if temporary else player.my_home, units, temporary = temporary, limit_break = limit_break, limit_reduce_qty = limit_reduce_qty, xyloc = xyloc, xyscatter = xyscatter, observer = self.player)
+                                   xyloc = None, xyscatter = None, persist = False):
+        new_objects = spawn_units(player, self.viewing_base if temporary else player.my_home, units, temporary = temporary, limit_break = limit_break, limit_reduce_qty = limit_reduce_qty, xyloc = xyloc, xyscatter = xyscatter, observer = self.player, persist = persist)
         for obj in new_objects:
             if (not temporary) and (player is self.player):
                 player.send_army_update_one(obj, retmsg)
@@ -4160,7 +4188,7 @@ class Session(object):
 
         return taken_objects
 
-    def spawn_security_team(self, player, retmsg, source_obj, xyloc, unit_dic, spread):
+    def spawn_security_team(self, player, retmsg, source_obj, xyloc, unit_dic, spread, persist):
         if source_obj.is_mobile():
             event_name = '3971_security_team_spawned_from_unit'
             if spread < 0: spread = 0
@@ -4170,7 +4198,7 @@ class Session(object):
             if spread < 0: spread = 1
             scatter = [spread*gamedata['guard_deploy_spread']*source_obj.spec.unit_collision_gridsize[0]//2,
                        spread*gamedata['guard_deploy_spread']*source_obj.spec.unit_collision_gridsize[1]//2]
-        units = self.spawn_new_units_for_player(player, retmsg, unit_dic, temporary = True, xyloc = xyloc, xyscatter = scatter)
+        units = self.spawn_new_units_for_player(player, retmsg, unit_dic, temporary = True, xyloc = xyloc, xyscatter = scatter, persist = persist)
         self.log_attack_units(player.user_id, units, event_name,
                               props = {'source_obj_specname': source_obj.spec.name,
                                        'source_obj_level': source_obj.level})
@@ -4717,15 +4745,19 @@ class Session(object):
         if attack_warning_time <= 0:
             self.deploy_ai_attack(retmsg)
 
-    def deploy_ai_attack(self, retmsg):
+    def deploy_ai_attack(self, retmsg, force = False):
         assert self.home_base
         if not self.incoming_attack_pending():
             return
 
         # dump loot buffer
         if self.player.loot_buffer:
-            self.player.loot_buffer_release('deploy_ai_attack')
-            retmsg.append(["LOOT_BUFFER_UPDATE", self.player.loot_buffer, False])
+            if force:
+                self.player.loot_buffer_release('deploy_ai_attack')
+                retmsg.append(["LOOT_BUFFER_UPDATE", self.player.loot_buffer, False])
+            else:
+                retmsg.append(["ERROR", "CANNOT_SPY_LOOT_BUFFER_NOT_EMPTY"])
+                return
 
         if gamedata['server']['log_ai_attacks'] and (self.incoming_attack_type != 'tutorial'):
             gamesite.exception_log.event(server_time, 'AI attack on player %d: %s' % \
@@ -7359,7 +7391,7 @@ def get_spawn_location_for_unit(specname, base):
 def spawn_units(owner, base, units, temporary = False,
                 limit_break = False, # if true, give full quantity of units even if it breaks space limit
                 limit_reduce_qty = False, # if true, reduce quantity of units to fit in unit space
-                xyloc = None, xyscatter = None, observer = None):
+                xyloc = None, xyscatter = None, observer = None, persist = False):
     if not observer: observer = owner
     if temporary: assert xyloc
 
@@ -7446,8 +7478,8 @@ def spawn_units(owner, base, units, temporary = False,
                 cur_space_usage['ALL'] += space
                 cur_space_usage[str(destination_squad)] += space
 
-            # global setting
-            persist_temporary_units = gamedata.get('persist_temporary_units', False)
+            # global setting, can be over-ridden by parameter
+            persist_temporary_units = persist or gamedata.get('persist_temporary_units', False)
 
             # per-base setting
             if base.base_type == 'hive':
@@ -7692,6 +7724,7 @@ class Player(AbstractPlayer):
         # dictionary {"slot0": {"spec":"foo"}, "slot1": ... }
         # must NOT be alterable by user action unless 1) scan is conducted or 2) reseed cooldown time passes
         self.lottery_slate = None
+        self.lottery_slate_weights = None
 
         # PvP ladder rival, must not be alterable unless 1) attack is made or 2) time passes or 3) player pays (and waits) to switch
         self.ladder_match = None
@@ -8376,7 +8409,11 @@ class Player(AbstractPlayer):
         map_squads = dict([(int(data['base_id'].split('_')[1]), data) for data in map_squad_data])
         map_objects_by_squad = {}
         for entry in map_object_data:
-            squad_id = entry.get('squad_id',0)
+            # note: in case of a corrupted map object with no squad_id, default to a mobile ID so that
+            # we don't try to return BASE_DEFENDERS (0) to base!
+            squad_id = entry.get('squad_id',None)
+            if (squad_id is None) or (not SQUAD_IDS.is_mobile_squad_id(squad_id)):
+                squad_id = 1 # default "could be valid" mobile squad id
             if (squad_id not in map_objects_by_squad): map_objects_by_squad[squad_id] = []
             map_objects_by_squad[squad_id].append(entry)
 
@@ -9145,7 +9182,7 @@ class Player(AbstractPlayer):
 
     # Return the event_schedule entry for an event in progress
     def get_event_schedule(self, event_kind, event_name, ref_time, ignore_activation):
-        assert event_kind in ('current_event', 'current_event_store', 'facebook_sale',
+        assert event_kind in ('current_event', 'current_event_store', 'facebook_sale', 'bargain_sale',
                               'current_trophy_pve_challenge', 'current_trophy_pvp_challenge',
                               'current_stat_tournament')
         assert ref_time is not None
@@ -10953,6 +10990,8 @@ class Player(AbstractPlayer):
         if self.developer: ret['developer'] = self.developer # also insert "developer" flag here in case ETL scripts want to ignore these
         return ret
 
+    def alt_record_attack(self, other): pass
+
 # these are proxy "stubs" that represent players OTHER than the one playing the game
 # (e.g., other players whose bases you visit or attack)
 
@@ -11305,14 +11344,12 @@ class LivePlayer(Player):
                     admin_stats.econ_flow_res(self, 'item', 'fungible', gained_res)
                     count += gained
                     stack -= gained
-                elif spec['resource'] == 'lottery_ticket':
-                    lottery_building = self.find_lottery_building()
-                    if lottery_building:
-                        # XXX how to notify the client?
-                        lottery_building.contents += stack
-                        count += stack
-                        stack = 0
-                    break
+                elif spec['resource'] == 'lottery_scans':
+                    if expire_time < 0 or expire_time > server_time:
+                        self.do_apply_aura('lottery_scans', stack = stack,
+                                           duration = (expire_time - server_time) if expire_time > 0 else -1,
+                                           ignore_limit = True)
+                    count += stack; stack = 0
                 else:
                     gamesite.exception_log.event(server_time, 'unhandled fungible resource'+spec['resource'])
                     break
@@ -11455,7 +11492,14 @@ class LivePlayer(Player):
                    'subject': tip['ui_subject'],
                    'body': tip['ui_body']}
             if 'attachments' in tip:
-                msg['attachments'] = tip['attachments']
+                msg['attachments'] = []
+                for a in tip['attachments']:
+                    attachment = copy.deepcopy(a)
+                    if 'item_duration' in attachment:
+                        attachment['expire_time'] = session.get_item_spec_forced_expiration(gamedata['items'][attachment['spec']],
+                                                                                            prev_expire_time = attachment['item_duration'] + server_time)
+                        del attachment['item_duration']
+                    msg['attachments'].append(attachment)
             if 'on_send' in tip:
                session.execute_consequent_safe(tip['on_send'], self, retmsg,
                                                context = {'home_region': self.home_region},
@@ -11866,22 +11910,7 @@ class LivePlayer(Player):
                         continue
                 else:
                     # assign randomly, with optional weighing
-                    breakpoints = []
-                    bp = 0.0
-                    for group in groups:
-                        if group not in data['groups']:
-                            raise Exception('group %r not found in %r' % (group, data))
-                        weight = data['groups'][group].get('weight', 1.0/len(groups))
-                        bp += weight
-                        breakpoints.append(bp)
-
-                    r = random.random()
-                    groupnum = 0
-                    while groupnum < len(groups)-1 and r >= breakpoints[groupnum]:
-                        groupnum += 1
-
-                    #groupnum = int(random.random()*len(groups))
-                    group = groups[groupnum]
+                    group = weighted_random_choice(groups, [data['groups'][g].get('weight',1) for g in groups], random.random())
 
                 want_tests = []
                 want_cohorts = []
@@ -11955,6 +11984,11 @@ class LivePlayer(Player):
         for key, start_level in gamedata['starting_conditions']['tech'].iteritems():
             if self.tech.get(key, 0) < start_level:
                 self.tech[key] = start_level
+
+        # migrate old user chat_gagged flag to player aura
+        if session.user.chat_gagged:
+            if self.apply_aura('chat_gagged', duration = -1, ignore_limit = True):
+                session.user.chat_gagged = None
 
         # establish default non-auto-unit control setting on elder accounts
         if SpinConfig.game() == 'mf' and \
@@ -12354,8 +12388,20 @@ class LivePlayer(Player):
         if force or (self.lottery_slate is None) or (len(self.lottery_slate) != len(slot_tables)) or \
            (not self.cooldown_active('lottery_reseed')):
 
+            new_slate = dict((slot_name, session.get_loot_items(self, tab, -1, -1)) for slot_name, tab in slot_tables.iteritems())
+            weights = self.get_any_abtest_value('lottery_slot_weights', gamedata.get('lottery_slot_weights', None))
+
+            if weights:
+                for slot_name in slot_tables:
+                    assert slot_name in weights # sanity check
+                new_weights = copy.deepcopy(weights)
+            else:
+                new_weights = None
+
+            # update atomically, in case there was an exception above
+            self.lottery_slate = new_slate
+            self.lottery_slate_weights = new_weights
             self.cooldown_trigger('lottery_reseed', gamedata['lottery_reseed_cooldown'])
-            self.lottery_slate = dict((slot_name, session.get_loot_items(self, tab, -1, -1)) for slot_name, tab in slot_tables.iteritems())
 
     # get the current lottery slate
     def get_lottery_slate(self, session):
@@ -13708,12 +13754,12 @@ class CONTROLAPI(resource.Resource):
                 session.chat_recv(channel, None, {'chat_name':'System', 'type':'system', 'time': server_time, 'facebook_id':'-1', 'user_id':-1}, body)
 
     # one server gets this request, and then it goes out to all local sessions and other servers via broadcast
-    def handle_censor_chat_message(self, request, channel = None, message_id = None, target_user_id = None):
+    def handle_censor_chat_message(self, request, channel = None, message_id = None, target_user_id = None, new_type = None):
         assert channel and message_id
         if target_user_id: target_user_id = int(target_user_id)
         gamesite.chat_mgr.send(channel, None,
                                {'time': server_time,
-                                'type': 'message_hide', 'new_type': 'abuse_violated',
+                                'type': 'message_hide', 'new_type': (new_type or 'abuse_violated'),
                                 'chat_name': 'System', 'user_id': -1,
                                 'target_user_id': target_user_id,
                                 'target_message_id': message_id}, '', log = True)
@@ -14874,7 +14920,7 @@ class Store(object):
             assert aura
             aura['end_time'] = server_time - 1
             session.player.prune_player_auras()
-            retmsg.append(["PLAYER_AURAS_UPDATE", session.player.player_auras])
+            session.deferred_player_auras_update = True
             session.increment_player_metric('player_aura_speedups_purchased', 1, time_series = False)
             session.increment_player_metric(record_spend_type+'_spent_on_player_aura_speedups', record_amount)
 
@@ -15119,7 +15165,11 @@ class Store(object):
 
                         if bypass_pred and ((bypass_pred in (1,True)) or Predicates.read_predicate(bypass_pred).is_satisfied2(session, session.player, {})):
                             # go directly into inventory
-                            for item in items: session.player.inventory_add_item(item, -1)
+                            for item in items:
+                                session.player.inventory_add_item(item, -1)
+                                spec = gamedata['items'].get(item['spec'])
+                                if spec and spec.get('fungible') and spec['resource'] == 'lottery_scans':
+                                    session.deferred_player_auras_update = True
                             session.player.send_inventory_update(retmsg)
                             discovered_where = 'inventory'
 
@@ -16692,7 +16742,7 @@ class GAMEAPI(resource.Resource):
                 session.loot['hive_kill_points'] = max(1, int(gamedata['regions'][session.viewing_base.base_region].get('hive_kill_point_scale',1)*session.loot['hive_kill_points']))
 
             if mutated_auras:
-                retmsg.append(["PLAYER_AURAS_UPDATE", session.player.player_auras])
+                session.deferred_player_auras_update = True
 
             if (session.viewing_player.is_ai() or session.incoming_attack_data) and (outcome == 'victory'):
                 session.user.repopulate_ai_list(session)
@@ -16954,6 +17004,15 @@ class GAMEAPI(resource.Resource):
                 if (not Predicates.read_predicate(template['activation']).is_satisfied(session.player,None)):
                     retmsg.append(["ERROR", "CANNOT_SPY_INVALID_AI"])
                     cannot_spy = True
+
+        # check for uncollected loot when leaving home base
+        if dest_base or (dest_user is not session.user):
+            # for safety, abort the session change instead of dumping buffered loot
+            if session.player.loot_buffer:
+                retmsg.append(["ERROR", "CANNOT_SPY_LOOT_BUFFER_NOT_EMPTY"])
+                cannot_spy = True
+            # dump buffered loot when leaving home base
+            # session.player.loot_buffer_release('change_session_complete')
 
         # check for map violations
 
@@ -17394,11 +17453,6 @@ class GAMEAPI(resource.Resource):
         change_retmsg.append(["BASE_POWER_UPDATE", power_state])
         change_retmsg.append(["BASE_SIZE_UPDATE", session.viewing_base.base_size])
 
-        if not session.home_base:
-            # dump buffered loot when leaving home base
-            # note: this means if you end an attack by visiting somewhere that isn't home base, you'll lose the loot
-            session.player.loot_buffer_release('change_session_complete')
-
         change_retmsg.append(["LOOT_BUFFER_UPDATE", session.player.loot_buffer, False])
         change_retmsg.append(["DONATED_UNITS_UPDATE", session.player.donated_units])
 
@@ -17607,7 +17661,6 @@ class GAMEAPI(resource.Resource):
                       'facebook_id', 'kg_id', 'ag_id',
                       'facebook_name', 'facebook_first_name', # remove later
                       'alliance_id'] # note: alliance_id is cached, not ground truth
-            if session.user.is_chat_mod(): fields.append('chat_gagged')
 
         result = gamesite.pcache_client.player_cache_lookup_batch(user_ids, fields = fields, reason = reason)
 
@@ -20130,7 +20183,7 @@ class GAMEAPI(resource.Resource):
 
     def do_lottery_scan(self, session, retmsg, scanner, spellname, source):
         # how we are getting permission to scan
-        assert source in ('cooldown', 'contents', 'paid')
+        assert source in ('cooldown', 'contents', 'paid', 'aura')
         spell = session.player.get_abtest_spell(spellname)
         success = True
 
@@ -20147,12 +20200,21 @@ class GAMEAPI(resource.Resource):
                 retmsg.append(["ERROR", "REQUIREMENTS_NOT_SATISFIED", spell[PRED]])
                 success = False
 
+        aura = None
+
         if source == 'cooldown':
             if session.player.cooldown_active('lottery_free'):
                 retmsg.append(["ERROR", "CANNOT_SCAN_ON_COOLDOWN"])
                 success = False
         elif source == 'contents':
             if scanner.contents < 1:
+                retmsg.append(["ERROR", "CANNOT_SCAN_NO_CHARGES"])
+                success = False
+        elif source == 'aura':
+            for a in session.player.player_auras:
+                if a['spec'] == 'lottery_scans' and ('end_time' not in a or a['end_time'] > server_time):
+                    aura = a; break
+            if (not aura) or (aura.get('stack',1) < 1):
                 retmsg.append(["ERROR", "CANNOT_SCAN_NO_CHARGES"])
                 success = False
 
@@ -20164,14 +20226,26 @@ class GAMEAPI(resource.Resource):
 
         if success:
             slate = session.player.get_lottery_slate(session)
+            if session.player.lottery_slate_weights:
+                weight_dict = session.player.lottery_slate_weights
+            else:
+                weight_dict = dict((slot_name, 1) for slot_name in slate)
+
             slot_names = sorted(slate.keys())
-            which_slot = slot_names[int(random.random() * len(slot_names))]
+            weight_array = [weight_dict[slot_name] for slot_name in slot_names]
+            which_slot = weighted_random_choice(slot_names, weight_array, random.random())
+
             loot = slate[which_slot]
 
             assert len(loot) == 1
             item = loot[0]
             stack_to_add = item.get('stack',1)
+            spec = gamedata['items'].get(item['spec'])
+            if spec and spec.get('fungible') and spec['resource'] == 'lottery_scans':
+                session.deferred_player_auras_update = True
+
             assert session.player.inventory_add_item(item, snapshot.max_usable_inventory()) == stack_to_add
+
             # item gets mutated by add_item() - restore the original stack here
             item['stack'] = stack_to_add
             session.player.inventory_log_event('5125_item_obtained', item['spec'], stack_to_add, item.get('expire_time',-1), level=item.get('level',None), reason='lottery')
@@ -20193,9 +20267,15 @@ class GAMEAPI(resource.Resource):
             elif source == 'contents':
                 scanner.contents -= 1
                 session.deferred_object_state_updates.add(scanner)
+            elif source == 'aura':
+                aura['stack'] = aura.get('stack',1) - 1
+                if aura['stack'] <= 0: aura['end_time'] = server_time - 1
+                session.player.prune_player_auras()
+                session.deferred_player_auras_update = True
 
             session.player.reseed_lottery(session, force = True)
             session.increment_player_metric('lottery_scans', 1, time_series = False)
+            session.increment_player_metric('lottery_scans_'+source, 1, time_series = False)
 
         else: # failure
             which_slot = -1
@@ -20886,7 +20966,7 @@ class GAMEAPI(resource.Resource):
                     if end_time > server_time:
                         if session.player.apply_aura(msg['aura_name'], strength = msg.get('aura_strength',1), level = msg.get('aura_level',1), data = msg.get('aura_data',None),
                                                      duration = end_time - server_time, ignore_limit = True):
-                            retmsg.append(["PLAYER_AURAS_UPDATE", session.player.player_auras])
+                            session.deferred_player_auras_update = True
                     to_ack.append(msg['msg_id'])
 
                 elif msg['type'] == 'chat_report':
@@ -22093,6 +22173,10 @@ class GAMEAPI(resource.Resource):
         if session.deferred_player_state_update:
             session.deferred_player_state_update = False
             retmsg.append(["PLAYER_STATE_UPDATE", session.player.resources.calc_snapshot().serialize()])
+
+        if session.deferred_player_auras_update:
+            session.deferred_player_auras_update = False
+            retmsg.append(["PLAYER_AURAS_UPDATE", session.player.player_auras])
 
         if session.deferred_player_cooldowns_update:
             session.deferred_player_cooldowns_update = False
@@ -25046,19 +25130,16 @@ class GAMEAPI(resource.Resource):
                     else:
                         retmsg.append(["ERROR", "STORAGE_LIMIT", spec['resource']])
 
-                elif spec['resource'] == 'lottery_ticket':
-                    if not session.home_base:
-                        retmsg.append(["ERROR", "CANNOT_CAST_SPELL_OUTSIDE_HOME_BASE"])
-                    else:
-                        scanner = session.player.find_lottery_building()
-                        if not scanner:
-                            retmsg.append(["ERROR", "CANNOT_SCAN_NO_BUILDING"])
-                        else:
-                            success = True
-                            used_count = item.get('stack',1)
-                            scanner.contents += used_count
-                            session.player.inventory_remove_stack(item, '5130_item_activated', reason='lottery')
-                            retmsg.append(["OBJECT_STATE_UPDATE2", scanner.serialize_state()])
+                elif spec['resource'] == 'lottery_scans':
+                    used_count = item.get('stack',1)
+                    if item.get('expire_time',-1) < 0 or item.get('expire_time',-1) > server_time:
+                        assert session.player.do_apply_aura('lottery_scans', stack = used_count,
+                                                            duration = (item['expire_time'] - server_time) if item.get('expire_time',-1) > 0 else -1,
+                                                            ignore_limit = True)
+                    success = True
+                    session.player.inventory_remove_stack(item, '5130_item_activated', reason='lottery')
+                    session.deferred_player_auras_update = True
+
                 else:
                     raise Exception('unhandled fungible resource '+spec['resource'])
 
@@ -25219,11 +25300,9 @@ class GAMEAPI(resource.Resource):
                             if spec.get('fungible',False):
                                 # if we successfully take a fungible item, which adds to resources directly,
                                 # then we'll need to send an update of that
-                                if spec['resource'] == 'lottery_ticket':
+                                if spec['resource'] == 'lottery_scans':
                                     need_lottery_update = True
-                                    scanner = session.player.find_lottery_building()
-                                    if scanner:
-                                        session.deferred_object_state_updates.add(scanner)
+                                    session.deferred_player_auras_update = True
                                 else:
                                     need_resource_update = True
 
@@ -25296,6 +25375,7 @@ class GAMEAPI(resource.Resource):
                 session.player.send_inventory_update(retmsg)
                 if need_resource_update:
                     retmsg.append(["PLAYER_STATE_UPDATE", session.player.resources.calc_snapshot().serialize()])
+
             retmsg.append(["MAIL_TAKE_ATTACHMENTS_RESULT", msg_id, client_index, success, need_resource_update or need_lottery_update, mail if mail else None])
             if need_space:
                 retmsg.append(["ERROR", "INVENTORY_LIMIT"])
@@ -25324,7 +25404,12 @@ class GAMEAPI(resource.Resource):
                 for item in to_take:
                     full_stack = item.get('stack',1)
                     item_spec = gamedata['items'].get(item['spec'],{})
+
                     taken = session.player.inventory_add_item(item, res.max_usable_inventory())
+
+                    if taken > 0 and item_spec.get('fungible',False) and item_spec['resource'] == 'lottery_scans':
+                        session.deferred_player_auras_update = True
+
                     if taken >= full_stack:
                         session.player.loot_buffer.remove(item)
                     elif taken > 0:
@@ -25587,7 +25672,7 @@ class GAMEAPI(resource.Resource):
 
             elif spellname == "LOTTERY_SCAN":
                 source = spellargs[0]
-                assert source in ('cooldown','contents') # cannot use "paid" here!
+                assert source in ('cooldown','contents','aura') # cannot use "paid" here!
                 if (session.viewing_base is not session.player.my_home) or (object.owner is not session.player):
                     retmsg.append(["ERROR", "CANNOT_CAST_SPELL_OUTSIDE_HOME_BASE"])
                     return
@@ -27242,7 +27327,7 @@ class GameSite(server.Site):
                 if gamedata['server']['log_ai_attack_overdue'] and session.incoming_attack_type != 'tutorial':
                     gamesite.exception_log.event(server_time, 'deploying overdue AI attack (%s) on player %d' % \
                                                  (str(session.incoming_attack_type), session.player.user_id))
-                session.deploy_ai_attack(session.outgoing_messages)
+                session.deploy_ai_attack(session.outgoing_messages, force = True)
                 session.queue_flush_outgoing_messages()
 
             elif session.incoming_attack_wave_time > 0 and (server_time >= session.incoming_attack_wave_time):

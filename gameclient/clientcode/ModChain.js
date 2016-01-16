@@ -207,6 +207,9 @@ ModChain.display_value_on_destroy = function(value, context) {
                 units.push(gamedata['strings']['modstats']['security_team_unit'].replace('%qty', val['units'][specname].toString()).replace('%name', gamedata['units'][specname]['ui_name']));
             }
             v = gamedata['strings']['modstats']['security_team'].replace('%units', units.join(', '));
+            if(val['persist']) {
+                v += ' '+gamedata['strings']['modstats']['security_team_persist'];
+            }
         } else {
             throw Error('unhandled on_destroy consequent '+(val['consequent']||'UNKNOWN').toString());
         }

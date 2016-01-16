@@ -5690,7 +5690,7 @@
 
             "input_bg": { "kind": "StaticImage", "xy": [8,42], "dimensions": [297,28], "asset": "chat_input", "bg_image_resizable": 1 },
             "input": { "kind": "TextInput", "xy": [15,44], "dimensions": [285,26], "text_size": 13, "text_hjustify": "left",
-                       "text_color": [1,1,1,1], "ui_name": "Click here and type to chat",
+                       "text_color": [1,1,1,1], "ui_name": "Click here and type to chat", "blank_on_enter": true,
                        "fade_unless_hover": 0.001 }
         }
     },
@@ -7331,7 +7331,7 @@
 
             "redeem_gift_card_warning": { "show": 0, "kind": "TextField", "text_size": 13, "text_color": [0.75,0.75,0.75,1],
                                           "xy":[44,435], "dimensions":[484,32], "text_hjustify": "right",
-                                          "ui_name": "Bonus %s not available with use of Facebook Gift Cards" },
+                                          "ui_name": "Sales and bonus %s not available with use of Facebook Gift Cards" },
 
             "redeem_gift_card_icon": { "show": 0, "kind": "StaticImage", "xy":[540,435], "dimensions":[32,32], "asset": "facebook_icon"},
             "redeem_gift_card_button": { "show": 0, "kind": "ActionButton", "xy": [578,435], "dimensions": [134,28], "text_offset": [0,1],
@@ -7381,7 +7381,7 @@
 
             "redeem_gift_card_warning": { "show": 0, "kind": "TextField", "text_size": 13, "text_color": [0.75,0.75,0.75,1],
                                           "xy":[44,380], "dimensions":[496,32], "text_hjustify": "right",
-                                          "ui_name": "Bonus %s not available with use of Facebook Gift Cards" },
+                                          "ui_name": "Sales and bonus %s not available with use of Facebook Gift Cards" },
 
             "redeem_gift_card_icon": { "show": 0, "kind": "StaticImage", "xy":[558,380], "dimensions":[32,32], "asset": "facebook_icon"},
             "redeem_gift_card_button": { "show": 0, "kind": "ActionButton", "xy": [597,380], "dimensions": [134,28], "text_offset": [0,1],
@@ -7428,7 +7428,7 @@
                               "gradient": "vinout", "gradient_midpoint": 0.25, "alpha": 0.5 },
 
             "name": { "kind": "TextField",
-                      "xy": [72,22], "dimensions": [118, 56],
+                      "xy": [72,23], "dimensions": [118, 56],
                       "text_size_nobonus": 21, "text_size_nobonus_big": 19,
                       "text_size_withbonus": 21, "text_size_withbonus_big": 19,
                       "text_style": "bold", "drop_shadow": 2,
@@ -7469,7 +7469,7 @@
             "expire_time": { "kind": "TextField", "show": 1,
                              "xy": [72,48], "dimensions": [118, 46],
                              "ui_name": "Ending in %togo",
-                             "text_size": 12, "text_style": "normal", "drop_shadow": 1,
+                             "text_size": 12, "text_style": "thick", "drop_shadow": 1,
                              "text_color": [1,0,0,1],
                              "text_hjustify": "right", "text_vjustify": "top" },
 
@@ -7501,8 +7501,7 @@
                                "text_size": 16, "text_style": "bold", "ui_tooltip": "", "tooltip_delay": 0 }, // PRICE
 
             "warning_text": { "kind": "TextField",
-                              //"xy": [13,277], "dimensions": [184,28], "text_size": 13, "text_hjustify": "center",
-                              "xy": [72,5], "dimensions": [118,28], "text_size": 11, "text_hjustify": "right",
+                              "xy": [72,5], "dimensions": [118,28], "text_size": 11, "text_style": "bold", "text_hjustify": "right",
                               "text_color": [1,1,0,1], "drop_shadow": 1
                             },
 
@@ -8540,7 +8539,7 @@
     "inventory_dialog": {
         "bg_image": "",
         "dimensions": [736,423],
-        "default_button": "close_button",
+        "default_button": "upgrade_button",
         "clip_children": 0,
         "widgets": {
             "glow": { "show": 0, "kind":"StaticImage","xy":[-30,-30],"dimensions":[796,483],"bg_image_resizable":1,"asset":"dialog_glow_resizable", "composite_mode": "lighter",
@@ -8549,8 +8548,14 @@
             "sunken": {"kind": "StaticImage", "xy":[36,66], "dimensions":[665,344], "asset": "dialog_sunken_resizable", "bg_image_resizable": 1 },
             "title": { "kind": "TextField", "xy": [37,14], "dimensions": [221, 41], "text_size": 30, "text_style": "thick",
                        "text_hjustify": "left", "ui_name": "Warehouse" },
+
+            "lottery_toggle": { "kind": "ActionButton", "xy": [412,22], "dimensions": [136,32], "text_size": 13, "text_style": "bold",
+                                "bg_image": "menu_button_136px", "state": "normal", "ui_name": "" }, // from LOTTERY_SCAN spell ui_name
+            "inventory_toggle": { "kind": "ActionButton", "xy": [556,22], "dimensions": [136,32], "text_size": 13, "text_style": "bold",
+                                  "bg_image": "menu_button_136px", "state": "normal", "ui_name": "Inventory" },
+
             "close_button": { "kind": "ActionButton", "xy": [706,1], "dimensions": [19,22], "bg_image": "close_button_small", "push_bg_image": 1 },
-            "topbar": { "kind": "SolidRect", "xy": [37,68], "dimensions": [663,32], "color": [0,0,0,0.4] },
+            "topbar": { "kind": "SolidRect", "xy": [37,68], "dimensions": [663,32], "color": [0,0,0,0.25] },
             "section": { "kind": "TextField", "xy": [37,68], "dimensions": [663,32], "text_size": 13, "ui_name": "Items",
                          "text_color": [0.66,0.66,0.66,1], "text_hjustify": "center", "text_vjustify": "center" },
 
@@ -8591,7 +8596,7 @@
                                "text_hjustify": "right" },
 
             "upgrade_button": { "kind": "ActionButton", "xy": [550,365], "dimensions": [134,28],
-                                "bg_image": "menu_button_134px", "ui_name": "More Info", // "ui_name": "Upgrade (+%d Slot%plural)",
+                                "bg_image": "menu_button_134px", "ui_name": "Upgrade", // "ui_name": "Upgrade (+%d Slot%plural)",
                                 "text_size": 13, "text_style": "bold"},
 
             "overstuffed_warning": { "kind": "TextField", "xy": [340,326], "dimensions": [663,28], "text_size": 13,
@@ -8736,22 +8741,31 @@
     },
 
     "lottery_dialog": {
-        "dimensions": [736,436],
+        "dimensions": [736,423],
         "default_button": "lottery_button",
         "widgets": {
             "glow": { "show": 0, "kind":"StaticImage","xy":[-30,-30],"dimensions":[796,496],"bg_image_resizable":1,"asset":"dialog_glow_resizable", "composite_mode": "lighter",
                       //"sound": "success_sound_exploding_glass_01",
                       "fade":1, "duration": 1.5, "fade_peak": 0.2, "delay": -0.2},
-            "bg": { "kind":"StaticImage", "xy":[0,0], "dimensions": [736,436], "transparent_to_mouse":0, "asset": "dialog_resizable", "bg_image_resizable": 1},
+            "bg": { "kind":"StaticImage", "xy":[0,0], "dimensions": [736,423], "transparent_to_mouse":0, "asset": "dialog_resizable", "bg_image_resizable": 1},
             "title": { "kind": "TextField", "xy": [39,14], "dimensions": [221, 41], "text_size": 30, "text_style": "thick",
                        "text_hjustify": "left" },
+
+            "lottery_toggle": { "kind": "ActionButton", "xy": [412,22], "dimensions": [136,32], "text_size": 13, "text_style": "bold",
+                                "bg_image": "menu_button_136px", "state": "normal", "ui_name": "" }, // from LOTTERY_SCAN spell ui_name
+            "inventory_toggle": { "kind": "ActionButton", "xy": [556,22], "dimensions": [136,32], "text_size": 13, "text_style": "bold",
+                                  "bg_image": "menu_button_136px", "state": "normal", "ui_name": "Inventory" },
+
             "close_button": { "kind": "ActionButton", "xy": [706,1], "dimensions": [19,22], "bg_image": "close_button_small", "push_bg_image": 1 },
 
-            "sunken": {"kind": "StaticImage", "xy":[39,70], "dimensions":[659,357], "bg_image_resizable": 1, "asset": "dialog_sunken_resizable" },
-            "topbar": { "kind": "SolidRect", "xy": [41,72], "dimensions":[655,33], "color": [0,0,0,0.25] },
+            "sunken": {"kind": "StaticImage", "xy":[36,66], "dimensions":[665,344], "bg_image_resizable": 1, "asset": "dialog_sunken_resizable" },
+            "topbar": { "kind": "SolidRect", "xy": [37,68], "dimensions":[663,32], "color": [0,0,0,0.25] },
+            "topbar_text": { "kind": "TextField", "xy": [237,68], "dimensions": [419, 32], "text_size": 13,
+                             "text_style": "thick", "text_hjustify": "center",
+                             "ui_name": "Claim one random choice from these items:" },
 
-            "sunken_left":{"kind":"StaticImage","xy":[50,91],"dimensions":[153,315],"asset":"dialog_sunken_resizable","bg_image_resizable":1},
-            "sidebar_splash":{"kind":"StaticImage","xy":[54,96],"dimensions":[143,303],"asset":"dialog_sidebar_valentina"},
+            "sunken_left":{"kind":"StaticImage","xy":[50,84],"dimensions":[153,315],"asset":"dialog_sunken_resizable","bg_image_resizable":1},
+            "sidebar_splash":{"kind":"StaticImage","xy":[54,89],"dimensions":[143,303],"asset":"dialog_sidebar_valentina"},
 
             "charges": { "kind": "RichTextField", "xy": [236,360], "dimensions": [420,33], "text_size": 13,
                          "text_hjustify": "center", "text_vjustify": "center", "text_offset":[0,1]
@@ -8760,8 +8774,17 @@
 
             "sunken2": {"kind": "StaticImage", "xy":[237,112], "dimensions":[419,166], "bg_image_resizable": 1, "asset": "dialog_sunken_resizable" },
 
+            "goodies_rarity": { "kind": "StaticImage", "xy": [254,118], "dimensions": [80,80], "show": 0,
+                                "pulse_period_normal": 3.25, "pulse_period_scanning": 0.5, "pulse_amplitude": 0.3,
+                                "asset": "dialog_glow_thin_resizable",
+                                //"asset_rarity2": "dialog_glow_thin_rare",
+                                "asset_rarity3": "dialog_glow_thin_epic",
+                                "asset_rarity4": "dialog_glow_thin_legendary",
+                                "bg_image_resizable": 1, "composite_mode": "lighter",
+                                "array": [5,2], "array_offset":[75,75] },
+
             "goodies": { "show":0, "kind": "Dialog", "dialog": "item_display", "xy": [269,133], "dimensions": [50,50],
-                         "pulse_period_normal": 3.25, "pulse_period_scanning": 0.5, "pulse_amplitude": 0.33,
+                         "pulse_period_normal": 3.25, "pulse_period_scanning": 0.5, "pulse_amplitude": 0.0,
                          // permutation period
                          "randomize_period_normal": -1, "randomize_period_scanning": -1,
                          "array": [5,2], "array_offset":[75,75] },

@@ -9,6 +9,7 @@ YUMPACKAGES+=" mongodb-org mongodb-org-server mongodb-org-shell mongodb-org-tool
 YUMPACKAGES+=" java-1.8.0-openjdk-headless" # Google Closure Compiler now requires at least Java 7
 YUMPACKAGES+=" python27-devel python27-pip"
 YUMPACKAGES+=" python27-boto python27-imaging python27-imaging-devel python27-numpy python27-simplejson"
+YUMPACKAGES+=" libstdc++48" # for TensorFlow
 
 echo "SETUP(remote): Installing additional packages..."
 sudo yum -y -q install $YUMPACKAGES
@@ -57,6 +58,7 @@ echo "pip install --upgrade pymongo" # note: we now require post-3.0 API
 echo "pip install --upgrade psycopg2 txpostgres" # replace system psycopg2 with newer version necessary for txpostgres
 echo "pip install --upgrade pyxDamerauLevenshtein"
 echo "pip install --upgrade asana" # for Ship Schedule integration
+echo "pip install --upgrade tensorflow"
 
 echo "MISSING: /etc/cron.spinpunch.mysql-daily/99-report-slow-queries.sh email"
 echo "MISSING: compile/install ujson library (python setup.py build; sudo python setup.py install)"

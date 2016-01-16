@@ -105,7 +105,7 @@ if __name__ == '__main__':
     sys.stdout = codecs.getwriter('utf8')(sys.stdout)
 
     opts, args = getopt.gnu_getopt(sys.argv[1:], 'g:', ['bloat', 'abtests', 'get', 'put', 'get-user', 'put-user', 'stdio', 'stdin', 'stdout',
-                                                      'ban', 'ban-days=', 'unban', 'gag', 'ungag', 'isolate', 'unisolate', 'make-chat-mod', 'unmake-chat-mod',
+                                                      'ban', 'ban-days=', 'unban', 'isolate', 'unisolate', 'make-chat-mod', 'unmake-chat-mod',
                                                       'db-host=', 'db-port=', 'db-secret=', 'live',
                                                       's3', 's3-key-file=', 's3-userdb-bucket=', 's3-playerdb-bucket=',
                                                       'user-id=', 'facebook-id=', 'game-id=',
@@ -139,8 +139,6 @@ if __name__ == '__main__':
     do_ban = False
     ban_days = 365*2
     do_unban = False
-    do_gag = False
-    do_ungag = False
     do_make_chat_mod = False
     do_unmake_chat_mod = False
     do_isolate = False
@@ -181,10 +179,6 @@ if __name__ == '__main__':
             do_isolate = True
         elif key == '--unisolate':
             do_unisolate = True
-        elif key == '--gag':
-            do_gag = True
-        elif key == '--ungag':
-            do_ungag = True
         elif key == '--make-chat-mod':
             do_make_chat_mod = True
         elif key == '--unmake-chat-mod':
@@ -287,15 +281,13 @@ if __name__ == '__main__':
         print '    --unban                       unban player'
         print '    --isolate                     enable "cheater" isolated PvP mode (player cannot PvP except against other cheaters)'
         print '    --unisolate                   disable isolated PvP mode'
-        print '    --gag                         do not allow player to talk in chat'
-        print '    --ungag                       allow player to chat again'
         print '    --make-chat-mod               allow player to moderate chat (mute/unmute other players)'
         print '    --unmake-chat-mod             remove permission to moderate chat'
         print '    --send-message --message-sender SENDER --message-subject SUBJECT --message-body BODY send an in-game message'
 
         sys.exit(1)
 
-    need_lock = (give_alloy > 0) or (give_protection_time > 0) or do_put or do_ban or do_unban or do_gag or do_ungag or do_make_chat_mod or do_unmake_chat_mod or do_isolate or do_unisolate or do_put_user
+    need_lock = (give_alloy > 0) or (give_protection_time > 0) or do_put or do_ban or do_unban or do_make_chat_mod or do_unmake_chat_mod or do_isolate or do_unisolate or do_put_user
     locked = False
 
     db_client = None
@@ -499,9 +491,6 @@ if __name__ == '__main__':
         if player.get('login_pardoned_until', -1) > time_now:
             print fmt % ('Pardoned for:', '%.1f hrs' % ( (player['login_pardoned_until']-time_now)/3600.0))
 
-        if user.get('chat_gagged',0):
-            print fmt % ('GAGGED - player cannot talk in chat (permanently - user.chat_gagged)', '')
-
         for aura in player.get('player_auras',[]):
             ui_duration = ui_end_time(aura.get('end_time',-1), time_now)
             if not ui_duration: continue
@@ -640,12 +629,6 @@ if __name__ == '__main__':
             if do_unisolate:
                 player['isolate_pvp'] = 0
                 print 'Unisolated player from making PvP attacks'
-            if do_gag:
-                user['chat_gagged'] = 1
-                print 'Gagged user, chat disabled'
-            if do_ungag:
-                user['chat_gagged'] = 0
-                print 'Ungagged user, chat enabled'
             if do_make_chat_mod:
                 user['chat_mod'] = 1
                 print 'User can now moderate chat'

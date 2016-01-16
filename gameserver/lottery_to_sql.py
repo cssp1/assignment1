@@ -22,6 +22,7 @@ def lottery_schema(sql_util):
                        ('user_id', 'INT4 NOT NULL')] + \
                       sql_util.summary_in_dimensions() + \
                       [('event_name', 'VARCHAR(128) NOT NULL'),
+                       ('method', 'VARCHAR(32)'),
                        ('slot', 'VARCHAR(32)'),
                        # properties of the reward item
                        ('spec', 'VARCHAR(255)'),
@@ -108,7 +109,9 @@ if __name__ == '__main__':
             keyvals = [('time',row['time']),
                        ('user_id',row['user_id']),
                        ('event_name', row['event_name']),
-                       ('slot', row.get('slot',None))]
+                       ('method', row.get('method',None)),
+                       ('slot', row.get('slot',None)),
+                       ]
             if 'sum' in row:
                 keyvals += sql_util.parse_brief_summary(row['sum'])
 

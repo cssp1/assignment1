@@ -209,7 +209,7 @@ if __name__ == '__main__':
         # note: upsert into ai_analytics_tag_info
         if len(analytics_tag_info) > 0:
             cur.executemany("DELETE FROM "+sql_util.sym(ai_analytics_tag_info_table)+" WHERE analytics_tag = %s AND start_time >= %s",
-                            [(k, info['start_time']) for k, info in analytics_tag_info.iteritems() if info['start_time'] is not None])
+                            [(k, inf['start_time']) for k, inf in analytics_tag_info.iteritems() if inf['start_time'] is not None])
 
             if verbose: print 'replacing ai_analytics_tag_info:\n', '\n'.join('%s start >= %d, start_end_times %r' % (k, info['start_time'], info['start_end_times']) for k, info in analytics_tag_info.iteritems() if info['start_time'] is not None)
             sql_util.do_insert_batch(cur, ai_analytics_tag_info_table, [(('analytics_tag',entry['analytics_tag']),

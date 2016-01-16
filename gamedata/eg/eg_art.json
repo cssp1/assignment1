@@ -187,6 +187,9 @@
                                                          "load_priority": 5 } } },
 
     "dialog_glow_thin_resizable": { "states": { "normal": { "images": ["art/ui/dialog_glow_small.jpg"], "style": "corners", "corner_width": 21, "dimensions": [63,63], "load_priority": 5 } } },
+    "dialog_glow_thin_rare": { "states": { "normal": { "images": ["art/ui/dialog_glow_small.jpg"], "style": "corners", "corner_width": 21, "tint": [0,0.7,2], "dimensions": [63,63], "load_priority": 5 } } },
+    "dialog_glow_thin_epic": { "states": { "normal": { "images": ["art/ui/dialog_glow_small.jpg"], "style": "corners", "corner_width": 21, "tint": [0.5,0,1.8], "dimensions": [63,63], "load_priority": 5 } } },
+    "dialog_glow_thin_legendary": { "states": { "normal": { "images": ["art/ui/dialog_glow_small.jpg"], "style": "corners", "corner_width": 21, "tint": [1.2,0.7,1], "dimensions": [63,63], "load_priority": 5 } } },
     "dialog_glow_thinner": { "states": { "normal": { "images": ["art/ui/dialog_glow_smaller_white.jpg"], "style": "corners", "corner_width": 14, "dimensions": [42,42], "load_priority": 1 } } },
 
     "dialog_resizable": { "states": { "normal": { "images": ["art/ui/menu_buttons13.png"], "origins": [152,572], "dimensions": [48,48],

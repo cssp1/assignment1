@@ -38,7 +38,7 @@
     "rarity": 2,
     "ui_precious": 1, // require confirmation to delete
     "fungible": 1, // allows infinite stacking, and special "take" behavior (adds directly to balance instead of going into inventory)
-    "resource": "gamebucks" // if item is "fungible", MUST be one of "gamebucks", "iron", "water", or "lottery_ticket"
+    "resource": "gamebucks"
 },
 
 "token": {
@@ -50,7 +50,7 @@
     "ui_precious": 1, // require confirmation to delete
     "icon": "inventory_ops_needs",
     "store_icon": "resource_icon_ops_needs",
-    "max_stack": 999999,
+    "max_stack": 99999999,
     "rarity": 2,
     "use": { "spellname": "CLIENT_CONSEQUENT", "spellarg": {"consequent": "INVOKE_STORE_DIALOG", "category": "event_prizes" } },
 
@@ -130,13 +130,15 @@
                   "predicate": "AND", "subpredicates": [{"predicate": "HAS_ATTACKED"}, {"predicate": "NOT", "subpredicates": [{"predicate": "HOME_BASE"}]}] }
 },
 
-"sensor_charge": {
-    "name": "sensor_charge",
-    "ui_name": "Sensor Charge",
-    "ui_description": "Activate to add charges to your Long-Range Scanner.",
-    "icon": "inventory_sensor_charge",
-    "max_stack": 1, // ensure that they get used immediately rather than stacking in inventory
-    "fungible": 1, "resource": "lottery_ticket"
+"lottery_scan": {
+    "name": "lottery_scan",
+    "ui_name": "Free War Chest Play", "ui_name_plural": "Free War Chest Plays", "name_color": [1,0.75,0],
+    "ui_description": "Gives you a free chance at more War Chest loot.",
+    "icon": "inventory_random_offer_A",
+    "rarity": 2,
+    "max_stack": 99,
+    "fungible": 1, "resource": "lottery_scans",
+    "force_duration": 3600 // never last more than 1 hour
 },
 
 // this is for showcase dialogs only

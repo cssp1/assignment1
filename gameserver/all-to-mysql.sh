@@ -69,11 +69,11 @@ if [[ "$FREQ" == "daily" ]]; then
   run_it ./damage_protection_to_sql.py -q --prune
   run_it ./ladder_pvp_to_sql.py -q --prune
   run_it ./chat_to_sql.py -q --prune
+  run_it ./chat_reports_to_sql.py -q --prune
   run_it ./inventory_to_sql.py -q --prune
   run_it ./unit_donation_to_sql.py -q --prune
   run_it ./fishing_to_sql.py -q --prune
   run_it ./quests_to_sql.py -q --prune
-  run_it ./lottery_to_sql.py -q --prune
   run_it ./achievements_to_sql.py -q --prune
   run_it ./login_flow_to_sql.py -q --prune
   run_it ./login_sources_to_sql.py -q --prune
@@ -109,6 +109,7 @@ elif [[ "$FREQ" == "hourly" ]]; then
   run_it ./policy_bot_to_sql.py -q --prune
   run_it ./sessions_to_sql.py -q --prune
   run_it ./purchase_ui_to_sql.py -q
+  run_it ./lottery_to_sql.py -q --prune
 
   # END hourly
 

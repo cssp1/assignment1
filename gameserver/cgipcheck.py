@@ -137,21 +137,22 @@ def run_shell_command(argv, ignore_stderr = False):
          raise Exception(err or out)
      return out
 
-CHAT_ABUSE_MEMORY_DURATION = 365*86400
+CHAT_ABUSE_MEMORY_DURATION = 30*86400
+CHAT_ABUSE_MEMORY_COOLDOWN_NAME = 'chat_abuse_violation'
 
 def chat_abuse_clear(control_args):
     check_stacks_args = control_args.copy()
-    check_stacks_args.update({'method': 'cooldown_active', 'name': 'chat_abuse_violation'})
+    check_stacks_args.update({'method': 'cooldown_active', 'name': CHAT_ABUSE_MEMORY_COOLDOWN_NAME})
     active_stacks = max(do_CONTROLAPI_checked(check_stacks_args), 0)
 
     if active_stacks > 0:
         new_stacks = max(0, active_stacks - 1)
         clear_cd_args = control_args.copy()
-        clear_cd_args.update({'method':'clear_cooldown', 'name': 'chat_abuse_violation'})
+        clear_cd_args.update({'method':'clear_cooldown', 'name': CHAT_ABUSE_MEMORY_COOLDOWN_NAME})
         assert do_CONTROLAPI_checked(clear_cd_args) == 'ok'
         if new_stacks > 0:
             add_stack_args = control_args.copy()
-            add_stack_args.update({'method': 'trigger_cooldown', 'name': 'chat_abuse_violation', 'add_stack': new_stacks, 'duration': CHAT_ABUSE_MEMORY_DURATION})
+            add_stack_args.update({'method': 'trigger_cooldown', 'name': CHAT_ABUSE_MEMORY_COOLDOWN_NAME, 'add_stack': new_stacks, 'duration': CHAT_ABUSE_MEMORY_DURATION})
             assert do_CONTROLAPI_checked(add_stack_args) == 'ok'
     else:
         new_stacks = 0
@@ -176,17 +177,18 @@ def chat_abuse_violate(control_args, ui_context, channel_name, message_id):
 
     # query current repeat-offender stacks and gag status
     check_args = control_args.copy()
-    check_args.update({'method': 'player_batch', 'batch': SpinJSON.dumps([{'method': 'cooldown_active', 'args': {'name': 'chat_abuse_violation'}},
+    check_args.update({'method': 'player_batch', 'batch': SpinJSON.dumps([{'method': 'cooldown_active', 'args': {'name': CHAT_ABUSE_MEMORY_COOLDOWN_NAME}},
                                                                           {'method': 'aura_active', 'args': {'aura_name': 'chat_gagged'}}])})
     check_result = do_CONTROLAPI_checked(check_args)
     active_stacks = max(check_result[0], 0)
     is_gagged_now = bool(check_result[1])
 
     # for policy see https://sites.google.com/a/spinpunch.com/support/about-zendesk/chat-moderation-process
-    # active_stacks 0 -> message and 24h mute
-    # active_stacks 1 -> message and 48h mute
-    # active_stacks 2 -> message and 72h mute
-    # active_stacks 3 -> no message, permanent mute, also mute alts.
+    # active_stacks 0 -> warning message only.
+    # active_stacks 1 -> message and 24h mute
+    # active_stacks 2 -> message and 48h mute
+    # active_stacks 3 -> message and 72h mute
+    # active_stacks 4 -> permanent mute, also mute alts.
     ui_policy_link = '[color=#ffff00][u][url=https://spinpunch.zendesk.com/entries/88917453-What-is-the-Chat-Abuse-policy-]chat abuse policy[/url][/u][/color]'
     ui_player_context = '[color=#ff0000]'+bbcode_quote(ui_context)+'[/color]'
     ui_actions = []
@@ -198,7 +200,9 @@ def chat_abuse_violate(control_args, ui_context, channel_name, message_id):
     permanent_mute_alts = False
 
     if message_id and channel_name:
-        censor_args = {'method': 'censor_chat_message', 'channel': channel_name, 'target_user_id': control_args['user_id'], 'message_id': message_id}
+        new_type = ('abuse_violated' if active_stacks >= 1 else 'abuse_warned')
+        censor_args = {'method': 'censor_chat_message', 'channel': channel_name, 'target_user_id': control_args['user_id'],
+                       'message_id': message_id, 'new_type': new_type}
         assert do_CONTROLAPI_checked(censor_args) == 'ok'
         ui_actions.append("Hid this chat message from other players")
 
@@ -206,27 +210,31 @@ def chat_abuse_violate(control_args, ui_context, channel_name, message_id):
         ui_actions.append("Player is currently muted, perhaps because of a recent violation. No action taken against the player.")
 
     elif active_stacks == 0:
-        message_body = "Hello! You were recently reported for violating our %s. A support agent reviewed this report and confirmed your message was offensive:\n\n%s\n\nThis message is to serve as a warning, and a notification that you are receiving a temporary mute from in-game chat. Any future offenses may result in a longer temporary or permanent mute from chat. Thanks in advance for your understanding." % (ui_policy_link, ui_player_context)
+        message_body = "Hello! You were reported for violating our %s. A support agent reviewed this report and confirmed your message was offensive or spam:\n\n%s\n\nThis message is to serve as a warning, and a notification that any future offenses may result in a temporary or permanent mute from public chat rooms. Thanks in advance for your understanding." % (ui_policy_link, ui_player_context)
+        add_stack = True
+    elif active_stacks == 1:
+        message_body = "You were reported again for violating our %s. A support agent reviewed this report and confirmed your message was offensive or spam:\n\n%s\n\nThis message is to serve as a 2nd warning, and a notification that you are receiving a temporary mute from public chat rooms. Any future offenses may result in a longer temporary or permanent mute from chat. Thanks in advance for your understanding." % (ui_policy_link, ui_player_context)
         add_stack = True
         temporary_mute_duration = 24*3600
-    elif active_stacks == 1:
-        message_body = "You were recently reported again for violating our %s. A support agent reviewed this report and confirmed your message was offensive:\n\n%s\n\nThis message is to serve as a 2nd warning, and a notification that you are receiving a temporary mute from in-game chat. Any future offenses may result in a longer temporary or permanent mute from chat. Thanks in advance for your understanding." % (ui_policy_link, ui_player_context)
+    elif active_stacks == 2:
+        message_body = "You were reported again for violating our %s. A support agent reviewed this report and confirmed your message was offensive or spam:\n\n%s\n\nThis message is to serve as a 3rd warning, and a notification that you are receiving a temporary mute from public chat rooms. Any future offenses may result in a longer temporary or permanent mute from chat. Thanks in advance for your understanding." % (ui_policy_link, ui_player_context)
         add_stack = True
         temporary_mute_duration = 48*3600
-    elif active_stacks == 2:
-        message_body = "You were recently reported again for violating our %s. A support agent reviewed this report and confirmed your message was offensive:\n\n%s\n\nThis message is to serve as a 3rd warning, and a notification that you are receiving a temporary mute from in-game chat. Any future offenses will result in a permanent chat mute without further warning. Thanks in advance for your understanding." % (ui_policy_link, ui_player_context)
+    elif active_stacks == 3:
+        message_body = "You were reported again for violating our %s. A support agent reviewed this report and confirmed your message was offensive or spam:\n\n%s\n\nThis message is to serve as a 4th warning, and a notification that you are receiving a temporary mute from public chat rooms. Any future offenses will result in a permanent chat mute without further warning. Thanks in advance for your understanding." % (ui_policy_link, ui_player_context)
         add_stack = True
         temporary_mute_duration = 72*3600
-    elif active_stacks >= 3:
-        if active_stacks == 3:
-            alt_message_body = "Hello! This message is to inform you that your account has been muted from in-game chat due to offensive chat violations on a related game account (ID: %d). If you feel this ban may have been made in error, please submit a ticket to our Customer Support team. Thanks in advance for your understanding." % int(control_args['user_id'])
-        add_stack = (active_stacks < 4)
+    elif active_stacks >= 4:
+        if active_stacks == 4:
+            message_body = "You were reported again for violating our %s. A support agent reviewed this report and confirmed your message was offensive or spam:\n\n%s\n\nSince this is your 5th offense, you have been muted permanently from public chat rooms." % (ui_policy_link, ui_player_context)
+            alt_message_body = "Hello! This message is to inform you that your account has been muted from public chat rooms due to chat violations on a related game account (ID: %d). If you feel this ban may have been made in error, please submit a ticket to our Customer Support team. Thanks in advance for your understanding." % int(control_args['user_id'])
+        add_stack = (active_stacks < 5)
         permanent_mute = True
         permanent_mute_alts = True
 
     batch = []
     if add_stack:
-        batch.append({'method': 'trigger_cooldown', 'args':{'name': 'chat_abuse_violation', 'add_stack': 1, 'duration': CHAT_ABUSE_MEMORY_DURATION, 'spin_user': spin_user}})
+        batch.append({'method': 'trigger_cooldown', 'args':{'name': CHAT_ABUSE_MEMORY_COOLDOWN_NAME, 'add_stack': 1, 'duration': CHAT_ABUSE_MEMORY_DURATION, 'spin_user': spin_user}})
         ui_actions.append("Offense count increased to %d" % (active_stacks + 1))
     if message_body:
         batch.append({'method': 'send_message', 'args':{'message_subject': 'Chat Warning', 'message_body': message_body, 'ui_reason': ui_reason, 'spin_user': spin_user}})
@@ -248,7 +256,7 @@ def chat_abuse_violate(control_args, ui_context, channel_name, message_id):
 
     return "Player had %d offense(s) before this. Took actions:\n\n- %s" % (active_stacks, "\n- ".join(ui_actions))
 
-def filter_chat_report_list(reports):
+def filter_chat_report_list_for_enforcement(reports):
     # clean up a list of chat reports and return only the ones still eligible for enforcement
     # in addition to filtering reports that are already resolved, we also need to avoid "double jeopardy"
     # (report -> violate -> report again -> violate again) by ignoring any reports that refer to things
@@ -262,6 +270,9 @@ def filter_chat_report_list(reports):
                   (not x.get('resolved')) and # unresolved
                   (x['time'] > latest_violations.get(x['target_id'],-1)), # no later violation
                   reports)
+
+def filter_chat_report_list_drop_automated(reports):
+    return filter(lambda x: x.get('source') not in ('rule','ml'), reports)
 
 def do_action(path, method, args, spin_token_data, nosql_client):
     try:
@@ -415,8 +426,18 @@ def do_action(path, method, args, spin_token_data, nosql_client):
                 result = {'result': list(nosql_client.chat_buffer_table().find(qs, {'_id':0,'channel':1,'sender':1,'text':1,'time':1}).sort([('time',-1)]).limit(1000))}
             elif method == 'get_reports':
                 report_list = list(nosql_client.chat_reports_get(args['start_time'], args['end_time']))
-                if args.get('filter') == 'unresolved':
-                    report_list = filter_chat_report_list(report_list)
+                show_automated = False
+                if 'filter' in args:
+                    filters = args['filter'].split(',')
+                else:
+                    filters = []
+                for f in filters:
+                    if f == 'unresolved':
+                        report_list = filter_chat_report_list_for_enforcement(report_list)
+                    elif f == 'automated':
+                        show_automated = True
+                if not show_automated:
+                    report_list = filter_chat_report_list_drop_automated(report_list)
                 result = {'result': report_list }
             elif method == 'resolve_report':
                 assert args['action'] in ('ignore', 'violate')

@@ -7,8 +7,10 @@
 # I/O library for working with upcache both locally and in S3
 
 import SpinJSON
+import SpinS3
 import FastGzipFile
-import os, subprocess, time
+import sys, os, subprocess, time
+import cStringIO
 
 # WRITER is in dump_userdb.py
 
@@ -80,22 +82,27 @@ class S3Reader(Reader):
 
         skip = 0
         fail_count = 0
-        MAX_FAILS = 3
 
         start_time = time.time()
         busy_time = 0.0
 
         while True:
             # BEGIN open S3 connection
-            fd = self.s3.get_open(self.bucket, filename, allow_keepalive = False)
+            buf = self.s3.get_slurp(self.bucket, filename)
             unzipper = subprocess.Popen(['gunzip', '-c', '-'],
-                                        stdin=fd.fileno(),
+                                        stdin=subprocess.PIPE,
                                         stdout=subprocess.PIPE)
+            stdoutdata, stderrdata = unzipper.communicate(input = buf)
+
+            # try to be more memory-efficient
+            buf = None
+
             entry = 0
             restart = False
 
             try:
-                for line in unzipper.stdout.xreadlines():
+                line = ''
+                for line in cStringIO.StringIO(stdoutdata):
                     if entry < skip:
                         entry += 1; continue
 
@@ -113,15 +120,20 @@ class S3Reader(Reader):
                     busy_end = time.time()
                     busy_time += (busy_end - busy_start)
 
+                if unzipper.returncode != 0:
+                    raise Exception('unclean exit from unzipper: %r' % stderrdata)
+
             except GeneratorExit:
                 raise
-            except:
+            except Exception as e:
                 # received bad data
+                if self.verbose:
+                    sys.stderr.write('SpinUpcacheIO problem! %r\n' % e)
+
                 unzipper.terminate()
                 unzipper = None
-                fd = None
                 fail_count += 1
-                if fail_count >= MAX_FAILS:
+                if fail_count >= SpinS3.MAX_RETRIES:
                     debug = open('/tmp/upcacheIO-fail2-%s-%d-%d.json' % (filename,skip,os.getpid()), 'w')
                     debug.write(line)
                     debug.close()
@@ -130,6 +142,7 @@ class S3Reader(Reader):
                     restart = True
 
             if restart:
+                time.sleep(SpinS3.RETRY_DELAY)
                 continue # try again from BEGIN
 
             # success!

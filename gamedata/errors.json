@@ -94,6 +94,7 @@
     "CANNOT_SPY_MAP_BOTH": { "ui_title": "Cannot scout this player", "ui_name": "You may only spy on bases next to your deployed battalions, and the home bases of your social-network friends and alliancemates." },
 
     "CANNOT_SPY_BASE_NOT_FOUND": { "ui_title": "Target Not Found", "ui_name": "The base or battalion you were attempting to spy on (ID %d) was not found.\n\nIt may have moved, expired, or been destroyed by another player." },
+    "CANNOT_SPY_LOOT_BUFFER_NOT_EMPTY": { "ui_title": "Uncollected Loot", "ui_name": "You must store or abandon your loot before leaving home base or starting another battle." },
     "CANNOT_ATTACK_PLAYER_WHILE_LOGGED_IN" : { "ui_name": "Cannot attack this base because the player is currently at home" },
     "CANNOT_ATTACK_PLAYER_WHILE_ALREADY_UNDER_ATTACK" : { "ui_name": "Cannot attack this home base because the player is currently under attack" },
     "CANNOT_ATTACK_BASE_WHILE_ALREADY_UNDER_ATTACK" : { "ui_title": "Target evaded you!", "ui_name": "Cannot start attack because another player just arrived here." },

@@ -226,6 +226,7 @@
         "default": "[color=#ffff00][player=%sender_id]%sender_name%tag[/player]:[/color] %body",
 
         // over-writes messages that caused chat abuse violations (note: limited to only %sender_name)
+        "abuse_warned": "[color=#808080]%sender_name: (abusive message - player warned)[/color]",
         "abuse_violated": "[color=#808080]%sender_name: (abusive message - player muted)[/color]",
 
         // chat messages sent by current turf winners
@@ -816,6 +817,12 @@
     "loading_screen_beta": "BETA",
     "loading_screen_loading": "Loading art (%pct%)...",
 
+    "chat_filter_warning": { "ui_title": "Warning: Chat Policy",
+                             "ui_description": "This is a public chat room. Your message is at risk for violating our community [color=#ffff00][u][url=https://spinpunch.zendesk.com/entries/88917453-What-is-the-Chat-Abuse-policy-]Chat Abuse Policy[/url][/u][/color]:\n\n- No swearing or other inappropriate language.\n- No offensive comments about sex, race, religion, or nationality.\n- No spam.\n\nPlayers who abuse this policy may lose access to public chat rooms temporarily or permanently.",
+                             "ui_button": "Understood",
+                             "ui_ignore": "Don't show this warning again"
+                           },
+
     "report_confirm": { "ui_title": "Report Chat Abuse",
                         "ui_description": "Report %target for this chat message?\n\n\"%context\"",
                         "ui_button": "Report"
@@ -1267,6 +1274,9 @@
             "upgrade": { "ui_title": "%s is full",
                          "ui_description": "Discard inventory items or upgrade our %s."
                        },
+            "upgrade_or_discard_items": { "ui_title": "%s is full",
+                                          "ui_description": "Discard inventory items or upgrade our %s."
+                                        },
             "discard_items": { "ui_title": "%s is full",
                                "ui_description": "Discard inventory items to make room."
                              }
@@ -1316,6 +1326,7 @@
         "on_destroy_widget": "Yes",
         "security_team": "Spawns %units",
         "security_team_unit": "%qtyx %name",
+        "security_team_persist": "(persistent)",
 
         // these BBCode strings are used to assemble ui_text for modstat effects of items and auras
         "effect": "%affected: [color=#00ff00]%stat %delta[/color]",
