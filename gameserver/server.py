@@ -20314,7 +20314,7 @@ class GAMEAPI(resource.Resource):
             my_session.send(["ERROR", map_violation_error])
             return
         pvp_balance = my_session.player.get_pvp_balance(their_session.player, base)
-        attack_ok, attack_error = self.can_attack(my_session.player, their_session.player, base, pvp_balance, deployable_squads)
+        attack_ok, attack_error = self.can_attack(my_session.player, their_session.player, base, pvp_balance, deployable_squads, ladder_state)
         if not attack_ok:
             my_session.send(["ERROR", attack_error])
             return
@@ -20323,7 +20323,7 @@ class GAMEAPI(resource.Resource):
         gamesite.exception_log.event(server_time, 'HERE! %r' % deployable_squads)
         my_session.deferred_history_update = True
 
-    def can_attack(self, player, other_player, base, pvp_balance, deployable_squads):
+    def can_attack(self, player, other_player, base, pvp_balance, deployable_squads, ladder_state):
         if server_time < player.get_repeat_attack_cooldown_expire_time(other_player.user_id, base.base_id):
             return (False, "CANNOT_ATTACK_REPEAT_ATTACK_COOLDOWN")
 
@@ -20528,7 +20528,7 @@ class GAMEAPI(resource.Resource):
         if not session.has_attacked:
             # first deployment - check for permission to attack, and acquire locks
 
-            attack_ok, attack_error_message = self.can_attack(session.player, session.viewing_player, session.viewing_base, session.pvp_balance, session.deployable_squads)
+            attack_ok, attack_error_message = self.can_attack(session.player, session.viewing_player, session.viewing_base, session.pvp_balance, session.deployable_squads, session.ladder_state)
             if not attack_ok:
                 retmsg.append(["ERROR", attack_error_message])
                 return False
