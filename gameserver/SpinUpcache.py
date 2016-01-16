@@ -825,7 +825,7 @@ class TimeSeriesCSVWriter(object):
         #age = 11*self.DAY
 
         if user_ver < 2:
-            # resolution is limited to days because we only have old money_spent_by_day and logins_by_day fields for old users
+            # resolution is limited to days because we only have old money_spent_by_day fields for old users
             age_days = age/self.DAY
             cum = {'user_id': obj['user_id'], 'history_version':user_ver,
                    self.TIME_RES_NAME: 0, 'money_spent': 0.0, 'logged_in_times': 0}
@@ -836,8 +836,6 @@ class TimeSeriesCSVWriter(object):
                     self.writer.writerow(cum)
                 if 'money_spent_by_day' in obj:
                     cum['money_spent'] += obj['money_spent_by_day'].get(str(day), 0)
-                if 'logins_by_day' in obj:
-                    cum['logged_in_times'] += obj['logins_by_day'].get(str(day), 0)
             return
 
         # only include fields where the user history_version is recent enough
@@ -1388,7 +1386,7 @@ def update_upcache_entry(user_id, driver, entry, time_now, gamedata, user_mtime 
 
                 # copy these fields directly, omitting if absent in playerdb file
                 for field in ['money_spent_by_day',
-                              'logins_by_day', 'sessions',
+                              'sessions',
                               # 'activity', 'purchase_ui_log', # removed for bloating
                               'friends_in_game', 'initial_friends_in_game',
                               'time_of_first_purchase', 'last_purchase_time',
@@ -1622,7 +1620,7 @@ def update_upcache_entry(user_id, driver, entry, time_now, gamedata, user_mtime 
                     if days_old >= threshold:
                         if day <= threshold:
                             obj['spend_%dd' % threshold] += amount
-        if 'logins_by_day' in obj:
+        if 0: # XXX 'logins_by_day' removed - port this to 'sessions'
             for strday, amount in obj['logins_by_day'].iteritems():
                 day = int(strday)
                 for threshold in DAY_MARKS:

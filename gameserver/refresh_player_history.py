@@ -4,7 +4,7 @@
 # Use of this source code is governed by an MIT-style license that can be
 # found in the LICENSE file.
 
-# reconstruct missing logins_by_day, spent_by_day, and sessions fields for
+# reconstruct missing spent_by_day, and sessions fields for
 # player.history based on metrics log
 
 try: import simplejson as json
@@ -180,17 +180,7 @@ if __name__ == "__main__":
                     spent_at_time[atkey] = spent_at_time.get(atkey,0.0) + purchase[1]
 
 
-            logins_by_day = {}
-            if user_id in logins:
-                login_list = logins[user_id]
-                for login in login_list:
-                    daynum = int((login - account_creation_time)/(60*60*24))
-                    key = str(daynum)
-                    if key not in logins_by_day:
-                        logins_by_day[key] = 0
-                    logins_by_day[key] += 1
-
-            #print 'user', user_id, 'spent_by_day', spent_by_day, 'logins_by_day', logins_by_day, 'sessions', sessions[user_id]
+            #print 'user', user_id, 'spent_by_day', spent_by_day, 'sessions', sessions[user_id]
 
             if 0:
                 if 'money_spent_at_time' in player['history']:
@@ -205,7 +195,6 @@ if __name__ == "__main__":
                 os.utime(user_filename, None) # update mtime so dump_userdb will refresh upcache
                 player['history']['money_spent_by_day'] = spent_by_day
                 player['history']['money_spent_at_time'] = spent_at_time
-                player['history']['logins_by_day'] = logins_by_day
                 player['history']['sessions'] = sessions[user_id]
                 generation += 1
                 player['generation'] = generation

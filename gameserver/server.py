@@ -12231,7 +12231,7 @@ class LivePlayer(Player):
                         self.resources.gain_res({res: -1 * (snap.cur_res(res) - snap.max_res(res))}, reason = 'storage_limit', break_limit = True)
 
         # get rid of bloated obsolete history fields
-        BLOAT = ['purchase_ui_log', 'resources_harvested_at_time', 'resources_looted_at_time', 'stored_iron_at_time', 'stored_water_at_time',
+        BLOAT = ['logins_by_day', 'purchase_ui_log', 'resources_harvested_at_time', 'resources_looted_at_time', 'stored_iron_at_time', 'stored_water_at_time',
                  'units_manufactured_at_time', 'units_killed_at_time', 'units_lost_at_time', 'items_looted_at_time',
                  'resources_stolen_at_time', 'attacks_launched_at_time', 'attacks_launched_vs_human_at_time', 'attacks_launched_vs_ai_at_time', 'attacks_suffered_at_time',
                  'revenge_attacks_launched_vs_human_at_time', 'revenge_attacks_suffered_at_time']
@@ -22758,13 +22758,6 @@ class GAMEAPI(resource.Resource):
                                                        'largest_purchase': session.player.history.get('largest_purchase', 0),
                                                        'largest_purchase_gamebucks': session.player.history.get('largest_purchase_gamebucks', 0)},
                                             reason='on_login_pre_hello')
-
-        # add to list of days since account creation on which this user logged in
-        # player.history['logins_by_day'] = {"0":5, "2":1, "3":1, ...}
-        if 'logins_by_day' not in player.history:
-            player.history['logins_by_day'] = {}
-        this_day = int((server_time - user.account_creation_time)/(60*60*24))
-        dict_increment(player.history['logins_by_day'], str(this_day), 1)
 
         admin_stats.add_visit(user.user_id, not is_returning_user, is_paying_user)
 
