@@ -569,20 +569,13 @@ PlayerInfoDialog.invoke_profile_tab = function(parent) {
 
     var show_coords = gamedata['enable_region_map'] && gamedata['territory']['show_coords_in_player_info'] && (session.region.data && session.region.data['storage'] == 'nosql' && session.region.map_enabled());
     dialog.widgets['battle_count_label'].show = dialog.widgets['battle_count'].show =
-        dialog.widgets['battle_age_label'].show = dialog.widgets['battle_age'].show = !show_coords;
+        dialog.widgets['battle_age_label'].show = dialog.widgets['battle_age'].show = false; // no longer supported
     dialog.widgets['home_region_label'].show = dialog.widgets['home_region_value'].show =
         dialog.widgets['home_base_loc_label'].show = dialog.widgets['home_base_loc_value'].show = show_coords;
 
     if(show_coords) {
         // these are set from update_player_info_profile_tab
         dialog.widgets['spy_button'].state = 'disabled';
-    } else {
-        dialog.widgets['battle_count'].str = (('battle_count' in knowledge) ? knowledge['battle_count'].toString() : '-');
-        if(('last_battle_time' in knowledge) && (knowledge['last_battle_time'] > 0)) {
-            dialog.widgets['battle_age'].str = dialog.data['widgets']['battle_age']['ui_name'].replace('%s', pretty_print_time(server_time - knowledge['last_battle_time']));
-        } else {
-            dialog.widgets['battle_age'].str = '-';
-        }
     }
 
     dialog.widgets['alliance'].onclick = null;

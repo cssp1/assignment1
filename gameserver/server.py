@@ -1518,14 +1518,11 @@ class User:
             friend_name = base['ui_name']
             friend_level = base['resources']['player_level']
 
-            session.send([["ADD_FRIEND", id, -1, # AI
-                           friend_name,
-                           friend_level,
-                           session.player.get_battle_data_for_client(id),
-                           False, False, -1, [{'user_id': id,
-                                               'social_id': 'ai',
-                                               'ui_name': friend_name,
-                                               'player_level': friend_level
+            session.send([["ADD_FRIEND", id, False,
+                           [{'user_id': id,
+                             'social_id': 'ai',
+                             'ui_name': friend_name,
+                             'player_level': friend_level
                 }]]])
 
 
@@ -1572,12 +1569,8 @@ class User:
 
             self.client_social_friends.add(friend_id)
 
-            session.send([["ADD_FRIEND", friend_id, friend_props.get('facebook_id',None), pcache_get_ui_name(friend_props), # human
-                           friend_props.get('player_level',1),
-                           session.player.get_battle_data_for_client(friend_id),
-                           not session.player.cooldown_active('send_gift:'+str(friend_id)),
+            session.send([["ADD_FRIEND", friend_id,
                            True, # is a real Facebook friend (not a stranger)
-                           conceal_protection_time(friend_props.get('protection_end_time',-1)),
                            [friend_props]
                            ]])
 

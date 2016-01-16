@@ -7372,10 +7372,8 @@ function home_base_id(user_id) { return 'h' + user_id.toString(); }
 // to differentiate, use is_ai() and is_real_friend
 
 /** @constructor */
-function Friend(user_id, battle_count, last_battle_time, is_real_friend, info) {
+function Friend(user_id, is_real_friend, info) {
     this.user_id = user_id;
-    this.battle_count = battle_count;
-    this.last_battle_time = last_battle_time;
     this.is_real_friend = !!is_real_friend;
 
     // store some PlayerCache properties to preserve them even across a clear()
@@ -17194,14 +17192,17 @@ function update_attack_button_dialog(dialog) {
                               (!session.is_quarry() || gamedata['territory']['quarries_affect_protection'])) {
                         // warn player that attacking another human will disable your own protection timer
                         invoke_attack_through_protection_message(cb);
+
+                    // warn player about to attack a Facebook friend for the first time (obsolete)
+                    /*
                     } else if(session.viewing_friend != null &&
                               !session.viewing_friend.is_ai() &&
                               session.viewing_friend.is_real_friend &&
                               session.viewing_user_id != session.user_id &&
                               session.viewing_base.base_type == 'home' &&
                               session.viewing_friend.battle_count < 1) {
-                        // warn player about to attack a Facebook friend for the first time
                         invoke_attack_friend_message(cb);
+                    */
                     } else if(session.viewing_user_id == session.user_id) {
                         // warn player that donated units are given permanently
                         invoke_attack_reinforce_message(cb);
@@ -34228,7 +34229,7 @@ function map_dialog_change_page(dialog, chapter, page) {
                 if(('show_if' in ai_base) && !read_predicate(ai_base['show_if']).is_satisfied(player, null)) { return; }
                 // create a fake Friend entry for the AI
                 var info = {'social_id': 'ai', 'ui_name': ai_base['ui_name'], 'player_level': ai_base['resources']['player_level']};
-                item_list.push(new Friend(parseInt(sid,10), 0, -1, false, info));
+                item_list.push(new Friend(parseInt(sid,10), false, info));
             });
         } else {
             // first filter the list of friends down to those who should appear on this page
@@ -34309,22 +34310,16 @@ function map_dialog_change_page(dialog, chapter, page) {
             }
             return 0;
         };
-        var compare_by_battle_count = function(a,b) {
-            if(a.battle_count > b.battle_count) {
-                return -1;
-            } else if(a.battle_count < b.battle_count) {
+        var compare_by_player_level = function(a,b) {
+            if(a.get_player_level() < b.get_player_level()) {
                 return 1;
+            } else if(a.get_player_level() > b.get_player_level()) {
+                return -1;
             } else {
-                if(a.get_player_level() < b.get_player_level()) {
-                    return 1;
-                } else if(a.get_player_level() > b.get_player_level()) {
-                    return -1;
-                } else {
-                    return 0;
-                }
+                return 0;
             }
         };
-        item_list.sort(goog.array.contains(['computers','hitlist'], chapter) ? compare_by_ai_level : compare_by_battle_count);
+        item_list.sort(goog.array.contains(['computers','hitlist'], chapter) ? compare_by_ai_level : compare_by_player_level);
     }
 
 
@@ -44823,11 +44818,11 @@ function handle_server_message(data) {
         SPFX.add(new SPFX.CombatText(vec_add(pos, off), 0, str, clr, null, 3.0,
                                      { drop_shadow: true, font_size: 20, text_style: 'thick' }));
     } else if(msg == "ADD_FRIEND") {
-        var user_id = data[1]; var unused_facebook_id = data[2]; var unused_ui_name = data[3];
-        var unused_player_level = data[4], battle_data = data[5], unused_giftable = data[6], is_real_friend = data[7], unused_protection_end_time = data[8];
-        var pcache_data = data[9];
+        var user_id = data[1];
+        var is_real_friend = data[2]
+        var pcache_data = data[3];
         if(pcache_data) { PlayerCache.update_batch(pcache_data); }
-        var friend = new Friend(user_id, battle_data['count'] || 0, battle_data['last_time'] || -1, is_real_friend, pcache_data[0]);
+        var friend = new Friend(user_id, is_real_friend, pcache_data[0]);
         player.friends.push(friend);
         if(session.home_base) {
             if(desktop_dialogs['desktop_bottom'] && desktop_dialogs['desktop_bottom'].widgets['friend_bar']) {
