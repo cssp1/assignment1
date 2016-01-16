@@ -10447,8 +10447,8 @@ class Player(AbstractPlayer):
 
         dict_increment(hist, 'count', 1)
 
-        # note: victory/defeat and defense_victory/defense_defeat are used to create exceptions to the PvP level gap restriction
-        if (summary.get('base_type','home') == 'home') or gamedata['territory']['quarries_affect_pvp_level_exception']:
+        # update victory/defeat and defense_victory/defense_defeat counters
+        if (summary.get('base_type','home') == 'home'):
             dict_increment(hist, summary[myrole+'_outcome'], 1)
             if myrole == 'defender':
                 dict_increment(hist, 'defense_'+summary[myrole+'_outcome'], 1)
