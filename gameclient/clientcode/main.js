@@ -21336,10 +21336,9 @@ function region_map_finder_update(dialog, kind, state) {
             dialog.widgets[kind+'_spinner'].show = true;
             if(dialog.user_data['recent_attacker_ids'] === null) {
                 dialog.user_data['recent_attacker_ids'] = {'pending':1};
-                query_battle_history(null, session.user_id, (function (_dialog) { return function(sumlist) {
+                query_recent_attackers((function (_dialog) { return function(attacker_id_list) {
                     _dialog.user_data['recent_attacker_ids'] = {};
-                    goog.array.forEach(sumlist, function(summary) {
-                        var other_id = ((summary['attacker_id'] == session.user_id) ? summary['defender_id'] : summary['attacker_id']);
+                    goog.array.forEach(attacker_id_list, function(other_id) {
                         if(other_id && !is_ai_user_id_range(other_id)) {
                             _dialog.user_data['recent_attacker_ids'][other_id] = 1;
                         }
@@ -25567,12 +25566,20 @@ function invoke_battle_history_dialog(from_id, user_id, name, level, zoom_from_w
     return dialog;
 };
 
-var battle_history_receivers = {};
+var battle_history_receiver = new goog.events.EventTarget();
 function query_battle_history(target, source, callback) {
     last_query_tag += 1;
     var tag = 'qbh'+last_query_tag.toString();
-    battle_history_receivers[tag] = callback;
+    // need this adaptor to pull the .result property out of the event object
+    battle_history_receiver.listenOnce(tag, (function (_cb) { return function(event) { _cb(event.result); }; })(callback));
     send_to_server.func(["QUERY_BATTLE_HISTORY", target, source, tag]);
+}
+function query_recent_attackers(callback) {
+    last_query_tag += 1;
+    var tag = 'qra'+last_query_tag.toString();
+    // need this adaptor to pull the .result property out of the event object
+    battle_history_receiver.listenOnce(tag, (function (_cb) { return function(event) { _cb(event.result); }; })(callback));
+    send_to_server.func(["QUERY_RECENT_ATTACKERS", tag]);
 }
 
 function receive_battle_history_result(dialog, sumlist) {
@@ -45250,15 +45257,11 @@ function handle_server_message(data) {
 
     } else if(msg == "NEW_BATTLE_HISTORIES") {
         player.new_battle_histories = data[1];
-    } else if(msg == "QUERY_BATTLE_HISTORY_RESULT") {
+    } else if(msg == "QUERY_BATTLE_HISTORY_RESULT" || msg == "QUERY_RECENT_ATTACKERS_RESULT") {
         var tag = data[1], result = data[2], pcache_data = data[3];
         // stick pcache_data into PlayerCache
-        PlayerCache.update_batch(pcache_data);
-        if(tag in battle_history_receivers) {
-            var cb = battle_history_receivers[tag];
-            delete battle_history_receivers[tag];
-            cb(data[2]);
-        }
+        if(pcache_data) { PlayerCache.update_batch(pcache_data); }
+        battle_history_receiver.dispatchEvent({type: tag, result: result});
     } else if(msg == "GET_BATTLE_LOG3_RESULT") {
         var tag = data[1], result = data[2];
         if(tag in battle_log_receivers) {

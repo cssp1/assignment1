@@ -17422,6 +17422,28 @@ class GAMEAPI(resource.Resource):
 
         return defer.succeed(not cannot_spy) # success
 
+    def query_recent_attackers(self, session, retmsg, arg):
+        tag = arg[1]
+
+        if gamedata['server'].get('battle_history_source','playerdb') == 'nosql':
+            # get summary data from database
+            summaries = gamesite.nosql_client.battles_get(session.user.user_id, -1, time_range = [server_time - gamedata['server'].get('nosql_recent_attackers_time_limit',7*86400), server_time],
+                                                          limit = gamedata['server'].get('nosql_battle_history_limit',50),
+                                                          fields = ('attacker_id','attacker_type','defender_id'), reason = 'query_recent_attackers')
+        else:
+            # query ALL opponents
+            summaries = sum([entry.get('summary',[]) for entry in session.player.battle_history.itervalues()], [])
+
+        attacker_id_set = set()
+
+        for s in summaries:
+            if 'attacker_id' in s and \
+               s.get('defender_id') == session.user.user_id and \
+               s.get('attacker_type') == 'human': # check for home base attack?
+                attacker_id_set.add(s['attacker_id'])
+
+        retmsg.append(["QUERY_RECENT_ATTACKERS_RESULT", tag, list(attacker_id_set), None])
+
     def query_battle_history(self, session, retmsg, arg):
         target = arg[1] # look up battles against this player (-1 for anyone)
         source = arg[2] # from the perspective of this player
@@ -17469,7 +17491,7 @@ class GAMEAPI(resource.Resource):
                     summaries = battle_history[key].get('summary',[])
 
         ret = []
-        pcache_data = []
+        pcache_data = None
         latest_returned_time = -1 # timestamp of most recent battle summary returned
 
         if summaries:
@@ -24189,6 +24211,8 @@ class GAMEAPI(resource.Resource):
             assert type(arg[1]) == dict
             session.player.player_preferences = arg[1]
 
+        elif arg[0] == "QUERY_RECENT_ATTACKERS":
+            self.query_recent_attackers(session, retmsg, arg)
         elif arg[0] == "QUERY_BATTLE_HISTORY":
             self.query_battle_history(session, retmsg, arg)
         elif arg[0] == "GET_BATTLE_LOG3":
