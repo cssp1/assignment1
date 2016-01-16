@@ -197,7 +197,7 @@
         "icon": "gamebucks_inventory_icon",
         "client": 0, "server": 0,
         "help": 1, "cancelable": 0, "limited": 0,
-        "ui_name": "Limited-time Sale", "show": 1, "name_color": [0,1,0.25,1],
+        "ui_name": "Limited-time Sale", "show": 1, "show_in_battle_log": 0, "name_color": [0,1,0.25,1],
         "ui_description": "Up to %oneminuspct% off %gamebucks purchases. Act quickly, this offer ends soon!",
         "on_click": {"consequent": "INVOKE_BUY_GAMEBUCKS_DIALOG"}
         // effects happen via AURA_(IN)ACTIVE predicates
@@ -208,7 +208,7 @@
         "icon": "gamebucks_inventory_icon",
         "client": 0, "server": 0,
         "help": 1, "cancelable": 0, "limited": 0,
-        "ui_name": "Special Offer", "show": 1, "name_color": [0,1,0.25,1],
+        "ui_name": "Special Offer", "show": 1, "show_in_battle_log": 0, "name_color": [0,1,0.25,1],
         "ui_description": "Get FREE items with %gamebucks purchases. Act quickly, this offer ends soon!",
         "on_click": {"consequent": "INVOKE_BUY_GAMEBUCKS_DIALOG"}
         // effects happen via AURA_(IN)ACTIVE predicates
@@ -218,7 +218,7 @@
         "icon": "gamebucks_inventory_icon",
         "client": 0, "server": 0,
         "help": 1, "cancelable": 0, "limited": 0,
-        "ui_name": "Facebook Sale", "show": 1, "name_color": [0,1,0.25,1],
+        "ui_name": "Facebook Sale", "show": 1, "show_in_battle_log": 0, "name_color": [0,1,0.25,1],
         "ui_description": "More FREE bonus %gamebucks with purchases from the Buy %gamebucks menu. Act quickly, this offer ends soon!",
         "on_click": {"consequent": "INVOKE_BUY_GAMEBUCKS_DIALOG"}
         // no effects, for GUI only
@@ -229,7 +229,7 @@
         "icon": "inventory_random_offer_A",
         "client": 0, "server": 0,
         "help": 1, "cancelable": 0, "limited": 0,
-        "ui_name": "War Chest", "show": 1, "name_color": [1,0.75,0],
+        "ui_name": "War Chest", "show": 1, "show_in_battle_log": 0, "name_color": [1,0.75,0],
         "ui_description": "You have %stack FREE War Chest play. Act quickly, this offer ends soon.\n\n[b]Click to play now[/b]",
         "ui_description_plural": "You have %stack FREE War Chest plays. Act quickly, this offer ends soon.\n\n[b]Click to play now[/b]",
         "on_click": {"consequent": "INVOKE_LOTTERY_DIALOG", "force": 1, "reason": "aura_click"}
