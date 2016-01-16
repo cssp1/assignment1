@@ -171,7 +171,9 @@ def bbcode_quote(s):
             r += c
     return r
 
-def chat_abuse_violate(control_args, ui_context, channel_name, message_id):
+def chat_abuse_violate(control_args, action, ui_context, channel_name, message_id):
+    assert action in ('violate','warn')
+
     ui_reason = 'The player said: "%s"' % ui_context
     spin_user = control_args['spin_user']
 
@@ -200,7 +202,7 @@ def chat_abuse_violate(control_args, ui_context, channel_name, message_id):
     permanent_mute_alts = False
 
     if message_id and channel_name:
-        new_type = ('abuse_violated' if active_stacks >= 1 else 'abuse_warned')
+        new_type = ('abuse_violated' if (action == 'violate' and active_stacks >= 1) else 'abuse_warned')
         censor_args = {'method': 'censor_chat_message', 'channel': channel_name, 'target_user_id': control_args['user_id'],
                        'message_id': message_id, 'new_type': new_type}
         assert do_CONTROLAPI_checked(censor_args) == 'ok'
@@ -209,6 +211,8 @@ def chat_abuse_violate(control_args, ui_context, channel_name, message_id):
     if is_gagged_now:
         ui_actions.append("Player is currently muted, perhaps because of a recent violation. No action taken against the player.")
 
+    elif action == 'warn':
+        message_body = "Hello! You were reported for violating our %s. A support agent reviewed this report and confirmed your message was offensive or spam:\n\n%s\n\nThis message is to serve as a warning, and a notification that any future offenses may result in a temporary or permanent mute from public chat rooms. Thanks in advance for your understanding." % (ui_policy_link, ui_player_context)
     elif active_stacks == 0:
         message_body = "Hello! You were reported for violating our %s. A support agent reviewed this report and confirmed your message was offensive or spam:\n\n%s\n\nThis message is to serve as a warning, and a notification that any future offenses may result in a temporary or permanent mute from public chat rooms. Thanks in advance for your understanding." % (ui_policy_link, ui_player_context)
         add_stack = True
@@ -263,7 +267,7 @@ def filter_chat_report_list_for_enforcement(reports):
     # said before a player's latest violation
     latest_violations = {}
     for report in reports:
-        if report.get('resolved', False) and report.get('resolution', None) == 'violate' and ('resolution_time' in report):
+        if report.get('resolved', False) and report.get('resolution', None) != 'ignore' and ('resolution_time' in report):
             latest_violations[report['target_id']] = max(latest_violations.get(report['target_id'],-1), report['resolution_time'])
 
     return filter(lambda x:
@@ -299,7 +303,7 @@ def do_action(path, method, args, spin_token_data, nosql_client):
                 result = {'result':do_lookup(control_args)}
             # chat abuse handling doesn't map 1-to-1 with CONTROLAPI calls, so handle them specially
             elif method == 'chat_abuse_violate':
-                result = {'result':chat_abuse_violate(control_args, control_args['ui_player_reason'], None, None)}
+                result = {'result':chat_abuse_violate(control_args, 'violate', control_args['ui_player_reason'], None, None)}
             elif method == 'chat_abuse_clear':
                 result = {'result':chat_abuse_clear(control_args)}
             elif method in ('give_item','send_message','chat_gag','chat_ungag','chat_block','chat_unblock','apply_aura','remove_aura','get_raw_player','ban','unban',
@@ -440,12 +444,12 @@ def do_action(path, method, args, spin_token_data, nosql_client):
                     report_list = filter_chat_report_list_drop_automated(report_list)
                 result = {'result': report_list }
             elif method == 'resolve_report':
-                assert args['action'] in ('ignore', 'violate')
+                assert args['action'] in ('ignore', 'violate', 'warn')
                 do_log = True
                 if args['action'] == 'ignore':
                     result = {'result': nosql_client.chat_report_resolve(args['id'], 'ignore', time_now)}
-                elif args['action'] == 'violate':
-                    if not nosql_client.chat_report_resolve(args['id'], 'violate', time_now): # start here to avoid race condition
+                elif args['action'] in ('violate','warn'):
+                    if not nosql_client.chat_report_resolve(args['id'], args['action'], time_now): # start here to avoid race condition
                         result = {'result': 'This report has already been resolved, perhaps by another PCHECK user.'}
                     # query for the report so we can get the context and time
                     target_report = nosql_client.chat_report_get_one(args['id'])
@@ -454,10 +458,11 @@ def do_action(path, method, args, spin_token_data, nosql_client):
                     else:
                         control_args = args.copy()
                         control_args['user_id'] = args['user_id'] # trusting the client - but they have the power to violate anyone anyway.
+                        del control_args['action']
                         if 'spin_token' in control_args: # do not pass credentials along
                             del control_args['spin_token']
                         control_args['spin_user'] = spin_token_data['spin_user']
-                        violate_result = chat_abuse_violate(control_args, target_report['context'], target_report['channel'], target_report.get('message_id',None))
+                        violate_result = chat_abuse_violate(control_args, args['action'], target_report['context'], target_report['channel'], target_report.get('message_id',None))
                         result = {'result': violate_result}
             elif method == 'translate':
                 # use Google Translate API conventions

@@ -843,18 +843,18 @@ class NoSQLClient (object):
         return [self.decode_chat_report(x) for x in cursor]
 
     def chat_report_resolve(self, id, resolution, resolution_time, reason=''):
-        assert resolution in ('ignore','violate')
+        assert resolution in ('ignore','violate','warn')
         return self.instrument('chat_report_resolve(%s)'%reason, self._chat_report_resolve, (id, resolution, resolution_time))
     def _chat_report_resolve(self, id, resolution, resolution_time):
         return self.chat_reports_table().update_one({'_id': self.encode_object_id(id), 'resolved': False},
                                                     {'$set': {'resolved': True, 'resolution': resolution, 'resolution_time': resolution_time}}).matched_count > 0
 
-    # check if a chat report is obsolete - i.e. there exists a later resolved-violated chat report on the same player
+    # check if a chat report is obsolete - i.e. there exists a later resolved (not ignored) chat report on the same player
     def chat_report_is_obsolete(self, target_report, reason=''):
         # look for any later resolved-violated chat report on the same player
         qs = {'_id': {'$ne': self.encode_object_id(target_report['id'])},
               'millitime':{'$gte':datetime.datetime.utcfromtimestamp(float(target_report['time'] - 5))}, # add fudge margin
-              'resolved': True, 'resolution': 'violate', 'target_id': target_report['target_id']}
+              'resolved': True, 'resolution': {'$ne':'ignore'}, 'target_id': target_report['target_id']}
         later_resolved_reports = self.instrument('chat_report_is_obsolete(%s)'%reason, self._chat_reports_query, (qs, 1))
         return len(later_resolved_reports) > 0
 

@@ -10,7 +10,7 @@ echo -n "" > "$OUT_BAD"
 for GAME in $GAMES; do
     echo "SELECT ch.text
 FROM ${GAME}_upcache.${GAME}_chat ch, ${GAME}_upcache.${GAME}_chat_reports rep
-WHERE rep.resolution = 'violate'
+WHERE rep.resolution IN ('violate','warn')
 AND ch._id = rep.message_id
 AND (rep.channel LIKE 'r:%' OR rep.channel IN ('global_english','global_t123'))" | ./mysql.py >> "$OUT_BAD"
 done

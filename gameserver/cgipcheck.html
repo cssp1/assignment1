@@ -1367,14 +1367,16 @@ var refresh_chat_report_row = function(row, item, time_now) {
     var button_div = $('<div>').css("float","right");
     var btn_list = [];
     if($GOOGLE_TRANSLATE_ENABLED$) {
-        btn_list.push({'action':'translate','ui_name': 'Google Translate','color':'#ffffd0'});
+        btn_list.push({'action':'translate','ui_name': 'Translate','color':'#ffffd0'});
     }
     btn_list.push({'action':'ignore','ui_name':'Ignore','color':'#d0d0d0'});
+    btn_list.push({'action':'warn','ui_name':'Send Warning','color':'#d0d000'});
     btn_list.push({'action':'violate','ui_name':'Add Offense','color':'#ff8080'});
     $.each(btn_list,
            function(index, btn) {
                var button = $('<button>', {html: btn['ui_name']}).addClass('spin_button');
                button.css("background-color", btn['color']);
+               button.css("width", "110px");
                button.click((function (_row, _item, _action) { return function() {
                    if(_action === 'translate') {
                        translate_chat_report(_item);
@@ -1406,7 +1408,7 @@ var resolve_chat_report = function(row, item, action) {
                          row.empty();
                          cur_chat_reports = cur_chat_reports.filter(function(other) { return other['id'] !== _item['id']; });
 
-                         if(_action == 'violate') {
+                         if(_action !== 'ignore') {
                              display_response("Success!\n"+result.toString());
 
                              // clear unresolved reports that refer to things said before this violation
@@ -1805,7 +1807,7 @@ Status: <span id="payment_status"></span>
 <div id="chat_status" style="position:relative;">
 <div id="chat_status_loading">STATUS</div>
 <p>
-<label><input id="chat_show_automated" type="checkbox" style="height:initial;" onclick="refresh_chat();">Show automated reports</label>
+<label><input id="chat_show_automated" type="checkbox" checked="1" style="height:initial;" onclick="refresh_chat();">Show automated reports</label>
 <p>
 <table id="chat_table" width="100%" style="font-size:12px;font-family:sans-serif;"></table>
 <br>
