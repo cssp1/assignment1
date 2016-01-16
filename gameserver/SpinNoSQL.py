@@ -721,17 +721,16 @@ class NoSQLClient (object):
         assert 'involved_players' in summary
         self.battles_table().with_options(write_concern = pymongo.write_concern.WriteConcern(w=0)).insert_one(summary)
         if '_id' in summary: del summary['_id'] # don't mutate it
-    def battles_get(self, player_id_A, player_id_B, time_range = None, fields = None, limit = -1, reason=''):
-        # player_id_A must be valid. player_id_B can be -1 for all
-        # battles involving player_id_A, or valid for all battles
-        # involving this pair of players.
-        return self.instrument('battles_get(%s)'%reason, self._battles_get, (player_id_A, player_id_B, time_range, fields, limit))
-    def _battles_get(self, player_id_A, player_id_B, time_range, fields, limit):
-        qs = {'$and': [{'involved_players': player_id_A}]}
+    def battles_get(self, player_id_A, player_id_B, time_range = None, fields = None, limit = -1, streaming = False, reason=''):
+        # player_id_A and player_id_B can be -1 for any player, or a valid ID to constrain to battles involving that player.
+        return self.instrument('battles_get(%s)'%reason, self._battles_get, (player_id_A, player_id_B, time_range, fields, limit, streaming))
+    def _battles_get(self, player_id_A, player_id_B, time_range, fields, limit, streaming):
+        qs = {'$and': []}
+        for player_id in (player_id_A, player_id_B):
+            if player_id > 0:
+                qs['$and'].append({'involved_players': player_id})
         if time_range:
             qs['$and'].append({'time': {'$gte':time_range[0], '$lt':time_range[1]}})
-        if player_id_B > 0:
-            qs['$and'].append({'involved_players': player_id_B})
         q_fields = {'_id':0} # don't rely on MongoDB _ids for battles
         if fields:
             for f in fields:
@@ -740,11 +739,9 @@ class NoSQLClient (object):
         cursor = cursor.sort([('time',pymongo.DESCENDING)]) # most recent first
         if limit > 0:
             cursor = cursor.limit(limit)
-        return [self.decode_battle_summary(x) for x in cursor]
-    def decode_battle_summary(self, row):
-        if '_id' in row:
-            row['id'] = self.decode_object_id(row['_id']); del row['_id'] # convert native ObjectID to string
-        return row
+        if not streaming:
+            cursor = list(cursor)
+        return cursor
 
     ###### CHAT BUFFER ######
 
