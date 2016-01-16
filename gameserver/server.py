@@ -10462,13 +10462,6 @@ class Player(AbstractPlayer):
                                                                             'trophies_pve':gamedata['trophy_display_offset']['pve'],
                                                                             'trophies_pvv':gamedata['trophy_display_offset'].get('pvv',0)},
                                                                            reason = reason)
-    def count_battles_since(self, t):
-        count = 0
-        for v in self.battle_history.itervalues():
-            for summary in v.get('summary',[]):
-                if summary.get('time',-1) > t:
-                    count += 1
-        return count
 
     # after a battle, stick the summary info into self.battle_history and increment history/time series counters
     # works for both attacking and defending
@@ -11023,14 +11016,6 @@ class LivePlayer(Player):
 
     def unit_repair_send(self, retmsg):
         retmsg.append(["UNIT_REPAIR_UPDATE", self.unit_repair_queue])
-
-    # return the subset of player battle history data that the client expects on ADD_FRIEND
-    def get_battle_data_for_client(self, opponent_id):
-        key = str(opponent_id)
-        if self.battle_history.has_key(key):
-            hist = self.battle_history[key]
-            return {'count':hist.get('count',0), 'last_time':hist.get('last_time',-1), 'attack_cooldown_expire': self.get_repeat_attack_cooldown_expire_time(opponent_id, home_base_id(opponent_id)) }
-        return {}
 
     def spawn_deposits(self, seed):
         if self.tutorial_state != "COMPLETE":
@@ -11830,66 +11815,9 @@ class LivePlayer(Player):
                         if not Predicates.read_predicate(data['eligible']).is_satisfied2(session,self,None):
                             #print 'FAILED PREDICATE', data['eligible'], self.price_region
                             continue
-                    elif data['eligible'].startswith('browser_name:'):
-                        name = data['eligible'].split(':')[1]
-                        if user.browser_name != name:
-                            continue
-                    elif data['eligible'] == 'chrome_18+_on_windows':
-                        if not ((user.browser_os == "Windows") and (user.browser_name == "Chrome") and (user.browser_version >= 18)):
-                            continue
-                    elif data['eligible'] == 'tier4_10days_old':
-                        if not user.country: continue
-                        if SpinConfig.country_tier_map.get(user.country, 4) != 4: continue
-                        if (server_time - user.account_creation_time) < (10*24*60*60): continue
-                    elif data['eligible'] == 'non_tier4':
-                        if not user.country: continue
-                        if SpinConfig.country_tier_map.get(user.country, 4) == 4: continue
-                    elif data['eligible'] == 'motion_cannon_upgrade':
-                        continue
-                    elif data['eligible'] == 'repair_bay_cohort':
-                        if 'T029_repair_bay' in self.abtests: continue # don't overlap with new cohort
-                        if (not user.locale) or (user.locale == 'en_US'): continue
-                        if self.history.get('attacks_launched_vs_human',0) < 5: continue
-                    elif data['eligible'] == 'highend_unit_cohort':
-                        continue
-                    elif data['eligible'] == 'repair_bay2_cohort':
-                        if ('T029_repair_bay' in self.abtests) or ('T029B_repair_bay_elder' in self.abtests): continue # don't overlap with old cohorts
-                        # apply to all new users, but only Canadian old users
-                        if not is_first_visit:
-                            if (not user.country) or (user.country != 'ca'): continue
-
-                    elif data['eligible'] == 'soundfx_cohort':
-                        # apply to ALL new users, and ONLY existing users in the limited non-en_ PvP groups
-                        if not is_first_visit:
-                            if (not user.locale) or (user.locale.startswith('en_')): continue
-                            if self.history.get('attacks_launched_vs_human',0) < 5: continue
-                    elif data['eligible'] == 'leaderboard_cohort':
-                        if (not user.locale) or (user.locale.startswith('en_')): continue
-                        #if (not user.country) or (user.country not in ['de','ph']): continue
-                        if self.history.get('attacks_launched_vs_human',0) < 2: continue
-
-                    elif data['eligible'] == 'no_free_rover_speedup_elder':
-                        # apply to ALL new users, and ONLY non-en_ existing users, and don't touch whales
-                        if ('T033_no_free_rover_speedup' in self.abtests) or ('T033B_no_free_rover_speedup_elder' in self.abtests): continue
-                        if not is_first_visit:
-                            if (not user.locale) or (user.locale.startswith('en_')): continue
-                            if self.history.get('money_spent',0) >= 50.0: continue
-                    elif data['eligible'] == 'new_ai_base_cohort':
-                        # apply to ALL new users
-                        if not is_first_visit:
-                            # don't touch whales
-                            if self.history.get('money_spent',0) >= 50.0: continue
-
-                            # DO touch Cerberus farmers
-                            is_farmer = False
-                            if self.battle_history.has_key('1007') and self.battle_history['1007'].get('count',0) > 200:
-                                is_farmer = True
-
-                            # do NOT touch en_* locale users
-                            if (not is_farmer) and ((not user.locale) or (user.locale.startswith('en_'))): continue
-
                     else:
-                        raise Exception('unhandled "eligible" value %s' % data['eligible'])
+                        gamesite.exception_log.event(server_time, 'unhandled "eligible" value %r' % data['eligible'])
+                        continue
 
                 groups = sorted(data['groups'].keys())
 
@@ -12796,39 +12724,23 @@ class LivePlayer(Player):
         waves = [dict([(data[kind],qty) for kind, qty in sz.iteritems() if qty>0]) for sz in wave_size]
         return waves
 
+    # unused for now
     def get_repeat_attack_cooldown_expire_time(self, victim_id, victim_base_id):
         # only applies to legacy PvP
         if self.is_ladder_player() or (not self.is_legacy_pvp_player()): return 0
 
         ai_or_human = 'ai' if is_ai_user_id_range(victim_id) else 'human'
 
-        # does not apply to squad PvP attacks
-        if ((not self.is_legacy_pvp_player()) and (ai_or_human == 'human')): return 0
-
         config = self.get_any_abtest_value('repeat_attack_cooldown', gamedata['repeat_attack_cooldown'])[ai_or_human]
 
         if config['base'] <= 0: return 0
         if victim_id == self.user_id: return 0
-        if victim_base_id != home_base_id(victim_id): return 0 # no cooldown for quarry attacks
+        if victim_base_id != home_base_id(victim_id): return 0 # no cooldown for quarry/squad attacks
 
         last_time = -1 # time of very last attack
         last_count = 0 # number of attacks within cooldown reset time
 
-        key = str(victim_id)
-        if key in self.battle_history:
-            hist = self.battle_history[key]
-            if 'summary' in hist:
-                sumlist = hist['summary']
-                for i in xrange(len(sumlist)-1, -1, -1):
-                    summary = sumlist[i]
-                    if 'time' in summary:
-                        if (server_time - summary['time']) < config['reset']:
-                            if summary.get('attacker_id',-1) == self.user_id and \
-                               summary.get('base_id', home_base_id(victim_id)) == victim_base_id:
-                                last_count += 1
-                                last_time = max(last_time, summary['time'])
-                        else:
-                            break
+        # XXX calculate based on player.cooldowns
 
         last_count -= config['freebies']
 
@@ -17308,7 +17220,7 @@ class GAMEAPI(resource.Resource):
                        session.pvp_balance,
                        spyee_lock_state,
                        session.viewing_player.isolate_pvp,
-                       session.player.get_repeat_attack_cooldown_expire_time(session.viewing_player.user_id, session.viewing_base.base_id),
+                       0, # repeat_attack_cooldown expire time - obsolete
                        session.viewing_base.deployment_buffer,
                        session.viewing_base.base_id,
                        session.viewing_base.base_landlord_id,
@@ -17582,7 +17494,7 @@ class GAMEAPI(resource.Resource):
         # update battle_history_seen
         if source == session.user.user_id:
             session.player.battle_history_seen = max(session.player.battle_history_seen, latest_returned_time)
-            retmsg.append(["NEW_BATTLE_HISTORIES", session.player.count_battles_since(session.player.battle_history_seen)])
+            retmsg.append(["NEW_BATTLE_HISTORIES", 0])
 
         retmsg.append(["QUERY_BATTLE_HISTORY_RESULT", tag, ret, pcache_data])
 
@@ -20981,7 +20893,7 @@ class GAMEAPI(resource.Resource):
                         ret['was_attacked'] = False # disable this for now, let the client do it
 
                     session.player.append_battle_summary(session, summary['attacker_id'], summary)
-                    retmsg.append(["NEW_BATTLE_HISTORIES", session.player.count_battles_since(session.player.battle_history_seen)])
+                    retmsg.append(["NEW_BATTLE_HISTORIES", 1])
 
                     to_ack.append(msg['msg_id'])
 

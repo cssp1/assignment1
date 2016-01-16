@@ -25717,7 +25717,6 @@ function battle_history_change_page(dialog, chapter, page) {
             var at_my_home = (summary['base_type'] == 'home' && summary['base_id'] == ('h'+session.user_id.toString()));
             var ladder_state = summary['ladder_state'] || null;
             var user_id = summary[opprole+'_id'];
-            var fbid = summary[opprole+'_facebook_id'];
             var time_ago = server_time - summary['time'];
 
             // portrait
@@ -25967,7 +25966,7 @@ function invoke_battle_log_dialog(from_id, user_id, opprole, summary) {
             dialog.widgets['outcome'].str += '\n(' + gamedata['strings']['battle_end']['ladder'][(star_count==1? 'stars_singular':'stars_plural')].replace('%s', star_count.toString()) + ')';
         }
     }
-    dialog.widgets['message_button'].show = (!!summary['facebook_friends'] && (spin_frame_platform == 'fb'));
+    dialog.widgets['message_button'].show = (!!summary['facebook_friends'] && (spin_frame_platform == 'fb') && summary[opprole+'_facebook_id']);
     dialog.widgets['message_button'].onclick = (function(_uid, _fbid) { return function() {
         invoke_facebook_message_dialog(_fbid, _uid);
     } })(summary[opprole+'_id'], summary[opprole+'_facebook_id']);
