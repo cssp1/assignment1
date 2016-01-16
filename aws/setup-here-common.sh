@@ -13,7 +13,9 @@ GAME_ID_LONG="" # only for "prod" server type
 
 SCRIPT_DIR=`dirname $0`
 SSHDEST="ec2-user@$AWSHOST"
-SSHARGS="-i $AWSKEY"
+SSHARGS=("-i" "$AWSKEY")
+# if necessary - SSH jump host
+#SSHARGS+=("-o" "ProxyCommand=ssh my.jumphost.com nc -w 120 %h %p")
 
 echo "Building overlay tarball..."
 (cd "${SCRIPT_DIR}/${KIND}" && sudo tar zcvf "/tmp/overlay-${KIND}.tar.gz" .)
@@ -36,12 +38,12 @@ FILESTOGO+=" ${SCRIPT_DIR}/setup-there-common.sh \
 FILESTOGO+=" /tmp/overlay-${KIND}.tar.gz"
 
 echo "Copying files to cloud host..."
-scp -r $SSHARGS $FILESTOGO $SSHDEST:/home/ec2-user
+scp -r "${SSHARGS[@]}" $FILESTOGO $SSHDEST:/home/ec2-user
 
 # fix some permissions
 sudo sh -c 'chmod 0600 /etc/ssh/ssh_host_*_key'
 
 echo "Running setup script on cloud host..."
-ssh $SSHARGS -t $SSHDEST "/home/ec2-user/setup-there-common.sh ${AWSCRED_KEYID} ${AWSCRED_SECRET} ${AWS_CRON_SNS_TOPIC} && chmod +x /home/ec2-user/setup-there-${KIND}.sh && /home/ec2-user/setup-there-${KIND}.sh ${GAME_ID} ${GAME_ID_LONG} ${ART_CDN_HOST}"
+ssh "${SSHARGS[@]}" -t $SSHDEST "/home/ec2-user/setup-there-common.sh ${AWSCRED_KEYID} ${AWSCRED_SECRET} ${AWS_CRON_SNS_TOPIC} && chmod +x /home/ec2-user/setup-there-${KIND}.sh && /home/ec2-user/setup-there-${KIND}.sh ${GAME_ID} ${GAME_ID_LONG}"
 
 sudo rm -f "/tmp/overlay-${KIND}.tar.gz"
