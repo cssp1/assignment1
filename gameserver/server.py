@@ -17441,12 +17441,23 @@ class GAMEAPI(resource.Resource):
             else:
                 battle_history = None # not found
 
-        ret = []
-        pcache_data = []
+        summaries = []
 
-        latest_returned_time = -1
+        BATTLE_FIELDS = ('time', 'duration', 'ladder_state',
+                         'attacker_id', 'defender_id', 'base_id', 'base_ui_name', 'base_map_loc', 'base_type',
+                         'attacker_alliance_id', 'attacker_alliance_ui_name', 'attacker_alliance_chat_tag',
+                         'defender_alliance_id', 'defender_alliance_ui_name', 'defender_alliance_chat_tag',
+                         'facebook_friends',
+                         'attacker_name', 'defender_name',
+                         'attacker_level', 'defender_level',
+                         'base_damage', 'loot', 'attacker_outcome', 'defender_outcome', 'prot_time')
 
-        if battle_history:
+        if gamedata['server'].get('battle_history_source','playerdb') == 'nosql':
+            # get summary data from database
+            summaries = gamesite.nosql_client.battles_get(source, target, time_range = None,
+                                                          limit = gamedata['server'].get('nosql_battle_history_limit',50),
+                                                          fields = BATTLE_FIELDS, reason = 'query_battle_history')
+        elif battle_history:
             # pull summary data out of player.battle_history
             if target < 0:
                 # query ALL opponents
@@ -17456,40 +17467,20 @@ class GAMEAPI(resource.Resource):
                 key = str(target)
                 if key in battle_history:
                     summaries = battle_history[key].get('summary',[])
-                else:
-                    summaries = []
 
+        ret = []
+        pcache_data = []
+        latest_returned_time = -1 # timestamp of most recent battle summary returned
 
-            if len(summaries) > 0:
-                # old entries are missing Facebook ID info and can't be used :(
-                summaries = filter(lambda s: 'attacker_facebook_id' in s, summaries)
-                # perform player cache lookup
-                qmap = dict([(s['attacker_id'] if s['attacker_id'] != session.user.user_id else s['defender_id'], None) for s in summaries])
-                qlist = qmap.keys()
+        if summaries:
+            # perform player cache lookups
+            qset = set((s['attacker_id'] if s['attacker_id'] != session.user.user_id else s['defender_id']) for s in summaries)
+            if qset:
+                pcache_data = self.do_query_player_cache(session, list(qset), reason = 'query_battle_history')
 
-                if len(qlist) > 0:
-                    pcache_data = self.do_query_player_cache(session, qlist, reason = 'query_battle_history')
-                    for i in xrange(len(qlist)):
-                        qmap[qlist[i]] = pcache_data[i]
-
-                for s in summaries:
-                    r = {}
-                    for field in ('time', 'duration', 'ladder_state',
-                                  'attacker_id', 'defender_id', 'base_id', 'base_ui_name', 'base_map_loc', 'base_type',
-                                  'attacker_facebook_id', 'defender_facebook_id',
-                                  'attacker_alliance_id', 'attacker_alliance_ui_name', 'attacker_alliance_chat_tag',
-                                  'defender_alliance_id', 'defender_alliance_ui_name', 'defender_alliance_chat_tag',
-                                  'facebook_friends',
-                                  'attacker_name', 'defender_name',
-                                  'attacker_level', 'defender_level',
-                                  'base_damage', 'loot', 'attacker_outcome', 'defender_outcome', 'prot_time'):
-                        r[field] = s.get(field, None)
-                    latest_returned_time = max(latest_returned_time, r.get('time',-1))
-                    other_id = s['attacker_id'] if s['attacker_id'] != session.user.user_id else s['defender_id']
-                    #qentry = qmap.get(other_id, None)
-                    #if qentry: r['protection_end_time'] = qentry.get('protection_end_time', -1)
-                    r['attack_cooldown_expire'] = session.player.get_repeat_attack_cooldown_expire_time(other_id, r['base_id'] if 'base_id' in r else home_base_id(other_id))
-                    ret.append(r)
+            # extract the fields we want from the summaries
+            ret = [dict((k,s[k]) for k in BATTLE_FIELDS if k in s) for s in summaries]
+            latest_returned_time = max(s.get('time',-1) for s in summaries)
 
         # update battle_history_seen
         if source == session.user.user_id:
