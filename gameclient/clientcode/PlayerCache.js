@@ -134,20 +134,21 @@ PlayerCache.launch_batch_queries = function(time, force) {
 };
 
 // get a client-side PlayerCache entry representing what we know about an AI
-PlayerCache._get_client_ai_entry = function(user_id) {
+PlayerCache.obsolete_ai_entry_warned = false;
+PlayerCache.get_client_ai_entry = function(user_id) {
     if(user_id.toString() in gamedata['ai_bases_client']['bases']) {
         var base = gamedata['ai_bases_client']['bases'][user_id.toString()];
         return {'user_id': user_id,
                 'player_level': base['resources']['player_level'],
                 'ui_name': base['ui_name'],
                 'social_id': 'ai'};
+    } else { // obsolete AI
+        if(!PlayerCache.obsolete_ai_entry_warned) {
+            PlayerCache.obsolete_ai_entry_warned = true;
+            console.log('PlayerCache.get_ai_entry: '+user_id.toString()+' not found');
+        }
+        return {'user_id': user_id, 'ui_name': '???', 'social_id': 'ai'};
     }
-    return null; // no fallback
-};
-PlayerCache.get_client_ai_entry = function(user_id) {
-    var ret = PlayerCache._get_client_ai_entry(user_id);
-    if(!ret) { throw Error('PlayerCache.get_ai_entry: '+user_id.toString()+' not found'); }
-    return ret;
 };
 
 // operates on an individual entry
