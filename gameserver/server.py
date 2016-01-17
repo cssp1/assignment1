@@ -17524,33 +17524,33 @@ class GAMEAPI(resource.Resource):
                                                                        reason = 'query_battle_history(cold)')
                 if cold_d is None: # can happen if db is down
                     # return hot query only
-                    result_d = defer.succeed((hot_summaries, hot_is_final, False))
+                    result_d = defer.succeed((hot_summaries, hot_is_final, 'partial'))
                 else:
                     # reformat results from raw summary list to (summaries, is_final, is_error)
-                    cold_d.addCallback(lambda cold_summaries, cold_limit=cold_limit: (cold_summaries, len(cold_summaries) < cold_limit, False))
+                    cold_d.addCallback(lambda cold_summaries, cold_limit=cold_limit: (cold_summaries, len(cold_summaries) < cold_limit, None))
 
                     # merge hot and cold summaries, in descending time order
                     def merge_hot_and_cold(cold_result, hot_summaries, hot_is_final):
                         cold_summaries, cold_is_final, cold_is_error = cold_result
                         #gamesite.exception_log.event(server_time, 'COLD %r final %r' % ([x['time'] for x in cold_summaries], cold_is_final))
                         #gamesite.exception_log.event(server_time, 'FINAL %r final %r' % ([x['time'] for x in (hot_summaries+cold_summaries)], cold_is_final and hot_is_final))
-                        return (hot_summaries + cold_summaries, cold_is_final and hot_is_final, False)
+                        return (hot_summaries + cold_summaries, cold_is_final and hot_is_final, None)
                     cold_d.addCallback(merge_hot_and_cold, hot_summaries, hot_is_final)
 
                     # if cold query fails, just return the hot results as if the cold query never happened
                     cold_d.addErrback(report_and_reraise_deferred_failure, session)
-                    cold_d.addErrback(lambda _, hot_summaries=hot_summaries, hot_is_final=hot_is_final: (hot_summaries, hot_is_final, False))
+                    cold_d.addErrback(lambda _, hot_summaries=hot_summaries, hot_is_final=hot_is_final: (hot_summaries, hot_is_final, 'partial'))
 
                     result_d = cold_d
 
             else:
                 # return hot query only
-                result_d = defer.succeed((hot_summaries, hot_is_final, False))
+                result_d = defer.succeed((hot_summaries, hot_is_final, None))
 
         elif battle_history:
             # pull summary data out of player.battle_history
             is_final = True
-            is_error = False
+            is_error = None
 
             if target < 0:
                 # query ALL opponents
@@ -17574,13 +17574,13 @@ class GAMEAPI(resource.Resource):
 
         else:
             is_final = True
-            is_error = False
+            is_error = None
             summaries = []
             result_d = defer.succeed((summaries, is_final, is_error))
 
         # on async failure, replace summaries/is_final with blank data, then respond to client
         result_d.addErrback(report_and_reraise_deferred_failure, session)
-        result_d.addErrback(lambda _: ([], True, True)) # return blank (summaries, is_final, is_error)
+        result_d.addErrback(lambda _: ([], True, 'offline')) # return blank (summaries, is_final, is_error)
         result_d.addCallback(self.query_battle_history_complete, session, tag, source)
         result_d.addErrback(report_and_absorb_deferred_failure, session)
         return None # note: asynchronous with other session traffic!
@@ -17588,6 +17588,7 @@ class GAMEAPI(resource.Resource):
     def query_battle_history_complete(self, summaries_is_final_is_error, session, tag, source):
         if session.logout_in_progress: return
         summaries, is_final, is_error = summaries_is_final_is_error
+        assert is_error in (None, 'partial', 'offline') # "partial" means we have some data, "offline" means none
         ret = []
         pcache_data = None
         latest_returned_time = -1 # timestamp of most recent battle summary returned

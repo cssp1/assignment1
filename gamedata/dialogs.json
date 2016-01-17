@@ -6333,6 +6333,8 @@
                                     "text_size": 13, "text_style": "bold",
                                     "array": [1,5], "array_offset": [0,56] },
 
+            "partial_error": { "show": 0, "kind": "TextField", "xy": [56,383], "dimensions": [622,19], "text_size": 13, "text_hjustify": "right", "ui_name": "Battle database under maintenance. Some older battles not shown.", "text_color": [0.5,0.5,0.5,1]},
+
             "loading_rect": { "kind": "SolidRect", "xy": [205,150], "dimensions": [336,128], "color":[0,0,0,0.33] },
             "loading_spinner": { "kind": "StaticImage", "xy":[305,204], "dimensions":[16,16], "asset":"loading_spinner" },
             "loading_text": { "kind": "TextField", "xy": [0,0], "dimensions": [736,423], "text_size": 13, "text_style": "bold", "text_color":[1,1,1,1],

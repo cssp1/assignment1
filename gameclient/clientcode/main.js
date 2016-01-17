@@ -25568,7 +25568,7 @@ function battle_history_change_chapter(dialog, chapter) {
     dialog.user_data['pending'] = false;
     dialog.user_data['sumlist'] = null;
     dialog.user_data['sumlist_is_final'] = true;
-    dialog.user_data['sumlist_is_error'] = false;
+    dialog.user_data['sumlist_is_error'] = null;
     dialog.user_data['first_on_page'] = -1;
 
     // if player is on the map, query the map so that feature status is accurate
@@ -25601,7 +25601,7 @@ function battle_history_oldest(dialog) {
 function send_battle_history_query(dialog) {
     dialog.user_data['pending'] = true;
     dialog.user_data['sumlist_is_final'] = false;
-    dialog.user_data['sumlist_is_error'] = false;
+    dialog.user_data['sumlist_is_error'] = null;
     var oldest = battle_history_oldest(dialog);
     var time_range = (oldest > 0 ? [-1, oldest] : null);
     query_battle_history(dialog.user_data['user_id'], dialog.user_data['from_id'], dialog.user_data['chapter'],
@@ -25903,7 +25903,7 @@ function battle_history_change_page(dialog, page) {
 
 function update_battle_history_dialog(dialog) {
 
-    if(dialog.user_data['sumlist_is_error']) {
+    if(dialog.user_data['sumlist_is_error'] === 'offline') {
         dialog.widgets['loading_spinner'].show = false;
         dialog.widgets['loading_rect'].show =
             dialog.widgets['loading_text'].show = true;
@@ -25923,6 +25923,7 @@ function update_battle_history_dialog(dialog) {
             dialog.widgets['loading_spinner'].show =
             dialog.widgets['loading_text'].show = false;
     }
+    dialog.widgets['partial_error'].show = (dialog.user_data['sumlist_is_error'] === 'partial');
 
     var row;
     for(row = 0; row < dialog.data['widgets']['row_name']['array'][1]; row++) {
