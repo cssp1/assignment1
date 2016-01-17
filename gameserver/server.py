@@ -17560,6 +17560,8 @@ class GAMEAPI(resource.Resource):
                 key = str(target)
                 if key in battle_history:
                     summaries = battle_history[key].get('summary',[])
+                else:
+                    summaries = []
 
             if time_range:
                 summaries = filter(lambda x: x['time'] >= time_range[0] and x['time'] < time_range[1], summaries)
