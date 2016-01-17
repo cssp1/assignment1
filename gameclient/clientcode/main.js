@@ -25568,11 +25568,19 @@ function battle_history_change_chapter(dialog, chapter) {
     dialog.user_data['pending'] = false;
     dialog.user_data['sumlist'] = null;
     dialog.user_data['sumlist_is_final'] = true;
+    dialog.user_data['sumlist_is_error'] = false;
     dialog.user_data['first_on_page'] = -1;
 
     // if player is on the map, query the map so that feature status is accurate
     if(session.region.map_enabled()) {
-        session.region.call_when_fresh(goog.partial(send_battle_history_query, dialog));
+        dialog.user_data['pending'] = true;
+        dialog.widgets['single_player_button'].show =
+            dialog.widgets['multiplayer_button'].show = false;
+        session.region.call_when_fresh((function(_dialog) { return function() {
+            dialog.widgets['single_player_button'].show =
+                dialog.widgets['multiplayer_button'].show = true;
+            send_battle_history_query(_dialog); // still pending
+        }; })(dialog));
     } else {
         send_battle_history_query(dialog);
     }
@@ -25593,6 +25601,7 @@ function battle_history_oldest(dialog) {
 function send_battle_history_query(dialog) {
     dialog.user_data['pending'] = true;
     dialog.user_data['sumlist_is_final'] = false;
+    dialog.user_data['sumlist_is_error'] = false;
     var oldest = battle_history_oldest(dialog);
     var time_range = (oldest > 0 ? [-1, oldest] : null);
     query_battle_history(dialog.user_data['user_id'], dialog.user_data['from_id'], dialog.user_data['chapter'],
@@ -25605,7 +25614,7 @@ function query_battle_history(target, source, ai_or_human, time_range, callback)
     last_query_tag += 1;
     var tag = 'qbh'+last_query_tag.toString();
     // need this adaptor to pull the .result property out of the event object
-    battle_history_receiver.listenOnce(tag, (function (_cb) { return function(event) { _cb(event.result, event.is_final); }; })(callback));
+    battle_history_receiver.listenOnce(tag, (function (_cb) { return function(event) { _cb(event.result, event.is_final, event.is_error); }; })(callback));
     send_to_server.func(["QUERY_BATTLE_HISTORY", target, source, tag, ai_or_human, time_range]);
 }
 function query_recent_attackers(callback) {
@@ -25616,7 +25625,7 @@ function query_recent_attackers(callback) {
     send_to_server.func(["QUERY_RECENT_ATTACKERS", tag]);
 }
 
-function receive_battle_history_result(dialog, q_chapter, q_time_range, sumlist, is_final) {
+function receive_battle_history_result(dialog, q_chapter, q_time_range, sumlist, is_final, is_error) {
     if(q_chapter != dialog.user_data['chapter']) { return; } // wrong chapter
     var oldest = battle_history_oldest(dialog);
     if((oldest < 0 && q_time_range) || (oldest > 0 && (!q_time_range || q_time_range[0] != -1 || q_time_range[1] != oldest))) {
@@ -25637,6 +25646,8 @@ function receive_battle_history_result(dialog, q_chapter, q_time_range, sumlist,
     };
     sumlist.sort(compare_by_time);
     dialog.user_data['sumlist_is_final'] = is_final;
+    dialog.user_data['sumlist_is_error'] = is_error;
+
     if(dialog.user_data['sumlist'] !== null) {
         dialog.user_data['sumlist'] = dialog.user_data['sumlist'].concat(sumlist);
         battle_history_change_page(dialog, dialog.user_data['page']);
@@ -25655,7 +25666,10 @@ function battle_history_change_page(dialog, page) {
     // need to get more from server?
     // note: send query on the page before the data ends, so we never show an incomplete page, unless it's the final one.
     if(chapter_pages > 0 && page >= (chapter_pages-2) &&
-       dialog.user_data['sumlist'] !== null && !dialog.user_data['sumlist_is_final'] && !dialog.user_data['pending']) {
+       dialog.user_data['sumlist'] !== null &&
+       !dialog.user_data['sumlist_is_final'] &&
+       !dialog.user_data['sumlist_is_error'] &&
+       !dialog.user_data['pending']) {
         send_battle_history_query(dialog);
     }
 
@@ -25889,23 +25903,31 @@ function battle_history_change_page(dialog, page) {
 
 function update_battle_history_dialog(dialog) {
 
-    if(dialog.user_data['sumlist'] !== null && dialog.user_data['sumlist'].length === 0) {
+    if(dialog.user_data['sumlist_is_error']) {
+        dialog.widgets['loading_spinner'].show = false;
+        dialog.widgets['loading_rect'].show =
+            dialog.widgets['loading_text'].show = true;
+        dialog.widgets['loading_text'].str = dialog.data['widgets']['loading_text']['ui_name_error'];
+    } else if(dialog.user_data['sumlist'] !== null && dialog.user_data['sumlist'].length === 0) {
+        dialog.widgets['loading_spinner'].show = false;
         dialog.widgets['loading_rect'].show =
             dialog.widgets['loading_text'].show = true;
         dialog.widgets['loading_text'].str = dialog.data['widgets']['loading_text']['ui_name_empty'];
     } else if(dialog.user_data['pending']) {
         dialog.widgets['loading_rect'].show =
+            dialog.widgets['loading_spinner'].show =
             dialog.widgets['loading_text'].show = true;
         dialog.widgets['loading_text'].str = dialog.data['widgets']['loading_text']['ui_name'];
     } else {
         dialog.widgets['loading_rect'].show =
+            dialog.widgets['loading_spinner'].show =
             dialog.widgets['loading_text'].show = false;
     }
 
     var row;
     for(row = 0; row < dialog.data['widgets']['row_name']['array'][1]; row++) {
         var index = dialog.user_data['first_on_page'] + row;
-        if(!dialog.user_data['sumlist'] || index >= dialog.user_data['sumlist'].length) {
+        if(index < 0 || !dialog.user_data['sumlist'] || index >= dialog.user_data['sumlist'].length) {
             break;
         }
         var summary = dialog.user_data['sumlist'][index];
@@ -45298,10 +45320,10 @@ function handle_server_message(data) {
     } else if(msg == "NEW_BATTLE_HISTORIES") {
         player.new_battle_histories = data[1];
     } else if(msg == "QUERY_BATTLE_HISTORY_RESULT" || msg == "QUERY_RECENT_ATTACKERS_RESULT") {
-        var tag = data[1], result = data[2], pcache_data = data[3], is_final = (data.length >= 5 ? data[4] : true);
+        var tag = data[1], result = data[2], pcache_data = data[3], is_final = (data.length >= 5 ? data[4] : true), is_error = (data.length >= 6 ? data[5] : false);
         // stick pcache_data into PlayerCache
         if(pcache_data) { PlayerCache.update_batch(pcache_data); }
-        battle_history_receiver.dispatchEvent({type: tag, result: result, is_final: is_final});
+        battle_history_receiver.dispatchEvent({type: tag, result: result, is_final: is_final, is_error: is_error});
     } else if(msg == "GET_BATTLE_LOG3_RESULT") {
         var tag = data[1], result = data[2];
         if(tag in battle_log_receivers) {

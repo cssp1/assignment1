@@ -448,7 +448,7 @@ def update_server_time():
 # utilities for inserting into Deferred callback chains
 def _report_deferred_failure(fail, session):
     gamesite.exception_log.event(server_time, 'async exception on player %d: %s' % \
-                                 (session.user.user_id, fail.getTraceback()))
+                                 (session.user.user_id, fail.getTraceback().strip()))
 def report_and_reraise_deferred_failure(fail, session):
     _report_deferred_failure(fail, session)
     return fail
@@ -17445,6 +17445,16 @@ class GAMEAPI(resource.Resource):
 
         retmsg.append(["QUERY_RECENT_ATTACKERS_RESULT", tag, list(attacker_id_set), None])
 
+    # fields we care about for battle history (summary) queries
+    BATTLE_HISTORY_FIELDS = ('time', 'duration', 'ladder_state',
+                             'attacker_id', 'defender_id', 'base_id', 'base_ui_name', 'base_map_loc', 'base_type',
+                             'attacker_alliance_id', 'attacker_alliance_ui_name', 'attacker_alliance_chat_tag',
+                             'defender_alliance_id', 'defender_alliance_ui_name', 'defender_alliance_chat_tag',
+                             'facebook_friends',
+                             'attacker_name', 'defender_name',
+                             'attacker_level', 'defender_level',
+                             'base_damage', 'loot', 'attacker_outcome', 'defender_outcome', 'prot_time')
+
     def query_battle_history(self, session, retmsg, arg):
         target = arg[1] # look up battles against this player (-1 for anyone)
         source = arg[2] # from the perspective of this player
@@ -17469,33 +17479,27 @@ class GAMEAPI(resource.Resource):
             else:
                 battle_history = None # not found
 
-        summaries = []
-        is_final = True # tells the client that there are no more battles earlier than this query
-
-        BATTLE_FIELDS = ('time', 'duration', 'ladder_state',
-                         'attacker_id', 'defender_id', 'base_id', 'base_ui_name', 'base_map_loc', 'base_type',
-                         'attacker_alliance_id', 'attacker_alliance_ui_name', 'attacker_alliance_chat_tag',
-                         'defender_alliance_id', 'defender_alliance_ui_name', 'defender_alliance_chat_tag',
-                         'facebook_friends',
-                         'attacker_name', 'defender_name',
-                         'attacker_level', 'defender_level',
-                         'base_damage', 'loot', 'attacker_outcome', 'defender_outcome', 'prot_time')
-
         if gamedata['server'].get('battle_history_source','playerdb') == 'nosql':
             # get summary data from database
             # XXX need token-based paging to avoid infinite re-query if more than "limit" battles happen within one second
-            limit = gamedata['server'].get('nosql_battle_history_limit',12) # XXXXXX for testing
+            limit = gamedata['server'].get('nosql_battle_history_limit',50)
             summaries = gamesite.nosql_client.battles_get(source, target,
                                                           limit = limit,
                                                           ai_or_human = {'any': SpinNoSQL.NoSQLClient.BATTLES_ALL,
                                                                          'ai': SpinNoSQL.NoSQLClient.BATTLES_AI_ONLY,
                                                                          'human': SpinNoSQL.NoSQLClient.BATTLES_HUMAN_ONLY}[ai_or_human],
                                                           time_range = time_range,
-                                                          fields = BATTLE_FIELDS, reason = 'query_battle_history')
-            is_final = len(summaries) < limit # nothing more to query
+                                                          fields = self.BATTLE_HISTORY_FIELDS, reason = 'query_battle_history')
+            # is_final is true if there are no more battles earlier than this to query
+            is_final = len(summaries) < limit
+            is_error = False
+            result_d = defer.succeed((summaries, is_final, is_error))
 
         elif battle_history:
             # pull summary data out of player.battle_history
+            is_final = True
+            is_error = False
+
             if target < 0:
                 # query ALL opponents
                 summaries = sum([entry.get('summary',[]) for entry in battle_history.itervalues()], [])
@@ -17514,27 +17518,45 @@ class GAMEAPI(resource.Resource):
             elif ai_or_human == 'human':
                 # list AI ladder battles here
                 summaries = filter(lambda x: (x.get('attacker_type')=='human' and x.get('defender_type')=='human') or x.get('ladder_state'), summaries)
+            result_d = defer.succeed((summaries, is_final, is_error))
 
+        else:
+            is_final = True
+            is_error = False
+            summaries = []
+            result_d = defer.succeed((summaries, is_final, is_error))
+
+        # on async failure, replace summaries/is_final with blank data, then respond to client
+        result_d.addErrback(report_and_reraise_deferred_failure, session)
+        result_d.addErrback(lambda _: ([], True, True)) # return blank (summaries, is_final, is_error)
+        result_d.addCallback(self.query_battle_history_complete, session, tag, source)
+        result_d.addErrback(report_and_absorb_deferred_failure, session)
+        return None # note: asynchronous with other session traffic!
+
+    def query_battle_history_complete(self, summaries_is_final_is_error, session, tag, source):
+        if session.logout_in_progress: return
+        summaries, is_final, is_error = summaries_is_final_is_error
         ret = []
         pcache_data = None
         latest_returned_time = -1 # timestamp of most recent battle summary returned
 
         if summaries:
+
             # perform player cache lookups
             qset = set((s['attacker_id'] if s['attacker_id'] != session.user.user_id else s['defender_id']) for s in summaries)
             if qset:
                 pcache_data = self.do_query_player_cache(session, list(qset), reason = 'query_battle_history')
 
             # extract the fields we want from the summaries
-            ret = [dict((k,s[k]) for k in BATTLE_FIELDS if k in s) for s in summaries]
+            ret = [dict((k,s[k]) for k in self.BATTLE_HISTORY_FIELDS if k in s) for s in summaries]
             latest_returned_time = max(s.get('time',-1) for s in summaries)
 
         # update battle_history_seen
         if source == session.user.user_id:
             session.player.battle_history_seen = max(session.player.battle_history_seen, latest_returned_time)
-            retmsg.append(["NEW_BATTLE_HISTORIES", 0])
+            session.send([["NEW_BATTLE_HISTORIES", 0]])
 
-        retmsg.append(["QUERY_BATTLE_HISTORY_RESULT", tag, ret, pcache_data, is_final])
+        session.send([["QUERY_BATTLE_HISTORY_RESULT", tag, ret, pcache_data, is_final, is_error]], flush_now = True)
 
     def query_achievements(self, session, retmsg, arg):
         id = arg[1]; tag = arg[2]
@@ -24239,7 +24261,7 @@ class GAMEAPI(resource.Resource):
         elif arg[0] == "QUERY_RECENT_ATTACKERS":
             self.query_recent_attackers(session, retmsg, arg)
         elif arg[0] == "QUERY_BATTLE_HISTORY":
-            self.query_battle_history(session, retmsg, arg)
+            return self.query_battle_history(session, retmsg, arg)
         elif arg[0] == "GET_BATTLE_LOG3":
             return self.get_battle_log3(session, retmsg, arg)
         elif arg[0] == "QUERY_ACHIEVEMENTS":

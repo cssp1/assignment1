@@ -6334,8 +6334,10 @@
                                     "array": [1,5], "array_offset": [0,56] },
 
             "loading_rect": { "kind": "SolidRect", "xy": [205,150], "dimensions": [336,128], "color":[0,0,0,0.33] },
-            "loading_text": { "kind": "TextField", "xy": [0,0], "dimensions": [736,423], "text_size": 30, "text_style": "bold", "text_color":[1,1,1,1],
-                              "ui_name": "Loading...", "ui_name_empty": "No Records" }
+            "loading_spinner": { "kind": "StaticImage", "xy":[305,204], "dimensions":[16,16], "asset":"loading_spinner" },
+            "loading_text": { "kind": "TextField", "xy": [0,0], "dimensions": [736,423], "text_size": 13, "text_style": "bold", "text_color":[1,1,1,1],
+                              "ui_name": "Loading...", "ui_name_empty": "No Battles Found",
+                              "ui_name_error": "Battle database temporarily offline.\nPlease check back later." }
 
         }
     },
