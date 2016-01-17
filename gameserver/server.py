@@ -67,6 +67,7 @@ import SpinSignature
 import SpinNoSQLId
 import SpinNoSQL
 import SpinNoSQLLog
+import SpinSQLBattles
 import Scores2
 import CustomerSupport
 import ActivityClassifier
@@ -827,7 +828,7 @@ class IOSlaveIOSystem (IOSystem):
             raise Exception('number of ioslaves (%d) does not match optimum for SpinUserDB (%d)' % (num_slaves, optimal_num))
     def start(self):
         for port in xrange(self.port_range[0], self.port_range[1]+1):
-            client = ioslave.IOClient(port, self.secret, log_exception_func = lambda x: gamesite.exception_log.event(server_time, x))
+            client = ioslave.IOClient(port, self.secret, log_exception_func = gamesite.log_exception_func)
             self.clients.append(client)
             gamesite.exception_log.event(server_time, repr(client) + ' started')
     def overloaded(self):
@@ -17479,21 +17480,72 @@ class GAMEAPI(resource.Resource):
             else:
                 battle_history = None # not found
 
-        if gamedata['server'].get('battle_history_source','playerdb') == 'nosql':
+        if gamedata['server'].get('battle_history_source','playerdb') in ('nosql','nosql/sql'):
             # get summary data from database
             # XXX need token-based paging to avoid infinite re-query if more than "limit" battles happen within one second
-            limit = gamedata['server'].get('nosql_battle_history_limit',50)
-            summaries = gamesite.nosql_client.battles_get(source, target,
-                                                          limit = limit,
-                                                          ai_or_human = {'any': SpinNoSQL.NoSQLClient.BATTLES_ALL,
-                                                                         'ai': SpinNoSQL.NoSQLClient.BATTLES_AI_ONLY,
-                                                                         'human': SpinNoSQL.NoSQLClient.BATTLES_HUMAN_ONLY}[ai_or_human],
-                                                          time_range = time_range,
-                                                          fields = self.BATTLE_HISTORY_FIELDS, reason = 'query_battle_history')
+
+            # use "hot" MongoDB and/or "cold" PostgreSQL database depending on how far back in time we want to go
+
+            # to ensure we don't miss any battles, we always do the hot query, and then also do the cold query
+            # if the hot query is exhaustive.
+
+            # hot query
+            hot_limit = gamedata['server'].get('nosql_battle_history_limit',50)
+            hot_summaries = gamesite.nosql_client.battles_get(source, target, limit = hot_limit,
+                                                              ai_or_human = {'any': SpinNoSQL.NoSQLClient.BATTLES_ALL,
+                                                                             'ai': SpinNoSQL.NoSQLClient.BATTLES_AI_ONLY,
+                                                                             'human': SpinNoSQL.NoSQLClient.BATTLES_HUMAN_ONLY}[ai_or_human],
+                                                              time_range = time_range,
+                                                              fields = self.BATTLE_HISTORY_FIELDS,
+                                                              reason = 'query_battle_history(hot)')
             # is_final is true if there are no more battles earlier than this to query
-            is_final = len(summaries) < limit
-            is_error = False
-            result_d = defer.succeed((summaries, is_final, is_error))
+            hot_is_final = len(hot_summaries) < hot_limit
+            #gamesite.exception_log.event(server_time, 'HOT %r final %r' % ([x['time'] for x in hot_summaries], hot_is_final))
+
+            # do we also need to do a cold query?
+            if hot_is_final and \
+               gamedata['server'].get('battle_history_source','playerdb') == 'nosql/sql' and \
+               gamesite.sql_battles_client:
+                # cold query
+                cold_limit = gamedata['server'].get('sql_battle_history_limit',25)
+                cold_time_range = [-1, server_time]
+                if time_range and time_range[0] > 0:
+                    cold_time_range[0] = time_range[0]
+                if time_range and time_range[1] > 0:
+                    cold_time_range[1] = time_range[1]
+                # don't overlap with hot data
+                if hot_summaries:
+                    cold_time_range[1] = min(cold_time_range[1], min(x['time'] for x in hot_summaries))
+                cold_d = gamesite.sql_battles_client.battles_get_async(source, target, limit = cold_limit,
+                                                                       ai_or_human = {'any': SpinSQLBattles.SQLBattlesClient.BATTLES_ALL,
+                                                                                      'ai': SpinSQLBattles.SQLBattlesClient.BATTLES_AI_ONLY,
+                                                                                      'human': SpinSQLBattles.SQLBattlesClient.BATTLES_HUMAN_ONLY}[ai_or_human],
+                                                                       time_range = cold_time_range,
+                                                                       reason = 'query_battle_history(cold)')
+                if cold_d is None: # can happen if db is down
+                    # return hot query only
+                    result_d = defer.succeed((hot_summaries, hot_is_final, False))
+                else:
+                    # reformat results from raw summary list to (summaries, is_final, is_error)
+                    cold_d.addCallback(lambda cold_summaries, cold_limit=cold_limit: (cold_summaries, len(cold_summaries) < cold_limit, False))
+
+                    # merge hot and cold summaries, in descending time order
+                    def merge_hot_and_cold(cold_result, hot_summaries, hot_is_final):
+                        cold_summaries, cold_is_final, cold_is_error = cold_result
+                        #gamesite.exception_log.event(server_time, 'COLD %r final %r' % ([x['time'] for x in cold_summaries], cold_is_final))
+                        #gamesite.exception_log.event(server_time, 'FINAL %r final %r' % ([x['time'] for x in (hot_summaries+cold_summaries)], cold_is_final and hot_is_final))
+                        return (hot_summaries + cold_summaries, cold_is_final and hot_is_final, False)
+                    cold_d.addCallback(merge_hot_and_cold, hot_summaries, hot_is_final)
+
+                    # if cold query fails, just return the hot results as if the cold query never happened
+                    cold_d.addErrback(report_and_reraise_deferred_failure, session)
+                    cold_d.addErrback(lambda _, hot_summaries=hot_summaries, hot_is_final=hot_is_final: (hot_summaries, hot_is_final, False))
+
+                    result_d = cold_d
+
+            else:
+                # return hot query only
+                result_d = defer.succeed((hot_summaries, hot_is_final, False))
 
         elif battle_history:
             # pull summary data out of player.battle_history
@@ -26996,16 +27048,31 @@ class GameSite(server.Site):
                 client.close_connection_aggressively()
             return d
 
+    def log_exception_func(self, x): self.exception_log.event(server_time, x)
+
     def sql_init(self):
         self.sql_scores2_client = None
         if ((game_id+'_scores2') in SpinConfig.config.get('pgsql_servers',{})):
             import AsyncPostgres
             self.sql_scores2_client = Scores2.SQLScores2(AsyncPostgres.AsyncPostgres(SpinConfig.get_pgsql_config(game_id+'_scores2'),
                                                                                      verbosity = 0,
-                                                                                     log_exception_func = lambda x: self.exception_log.event(server_time, x)))
+                                                                                     log_exception_func = self.log_exception_func))
+        self.sql_battles_client = None
+        if ((game_id+'_battles') in SpinConfig.config.get('pgsql_servers',{})):
+            import AsyncPostgres
+            if self.sql_scores2_client and \
+               SpinConfig.get_pgsql_config(game_id+'_battles') == self.sql_scores2_client.sql_client.dbconfig:
+                # re-use same connection
+                pg = self.sql_scores2_client.sql_client
+            else:
+                pg = AsyncPostgres.AsyncPostgres(SpinConfig.get_pgsql_config(game_id+'_battles'),
+                                                 verbosity = 0,
+                                                 log_exception_func = self.log_exception_func)
+            self.sql_battles_client = SpinSQLBattles.SQLBattlesClient(pg)
+
     def sql_shutdown(self):
-        if self.sql_scores2_client:
-            self.sql_scores2_client = None
+        self.sql_scores2_client = None
+        self.sql_battles_client = None
 
     def nosql_init(self, is_startup = False):
         if self.nosql_client: return
@@ -27022,7 +27089,7 @@ class GameSite(server.Site):
                                                       map_update_hook = self.gameapi.broadcast_map_update,
                                                       identity = spin_server_name,
                                                       max_retries = -1, # never give up
-                                                      log_exception_func = lambda x: self.exception_log.event(server_time, x),
+                                                      log_exception_func = self.log_exception_func,
                                                       latency_func = admin_stats.record_latency)
         except Exception as e:
             if is_startup:
