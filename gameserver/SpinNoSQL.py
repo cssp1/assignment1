@@ -726,6 +726,8 @@ class NoSQLClient (object):
     BATTLES_ALL = 0
     BATTLES_AI_ONLY = 1
     BATTLES_HUMAN_ONLY = 2
+    # XXXXXX time_range-based paging with limit means that some battles could be dropped (if several occur in the same second
+    # and the limit gets hit part-way through). Might need GUID-based paging.
     def battles_get(self, player_id_A, player_id_B, time_range = None, ai_or_human = BATTLES_ALL, fields = None, limit = -1, streaming = False, reason=''):
         # player_id_A and player_id_B can be -1 for any player, or a valid ID to constrain to battles involving that player.
         return self.instrument('battles_get(%s)'%reason, self._battles_get, (player_id_A, player_id_B, time_range, ai_or_human, fields, limit, streaming))

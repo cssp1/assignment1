@@ -25565,7 +25565,9 @@ function battle_history_change_chapter(dialog, chapter) {
     dialog.widgets['multiplayer_button'].state = (chapter === 'human' ? 'active' : 'normal');
 
     dialog.user_data['page'] = -1;
+    dialog.user_data['pending'] = false;
     dialog.user_data['sumlist'] = null;
+    dialog.user_data['sumlist_is_final'] = true;
     dialog.user_data['first_on_page'] = -1;
 
     // if player is on the map, query the map so that feature status is accurate
@@ -25577,18 +25579,34 @@ function battle_history_change_chapter(dialog, chapter) {
     battle_history_change_page(dialog, 0);
 }
 
+/** Return timestamp of oldest battle summary in the dialog's sumlist, or -1 if no summaries exist */
+function battle_history_oldest(dialog) {
+    var oldest = -1;
+    if(dialog.user_data['sumlist'] !== null) {
+        oldest = goog.array.reduce(dialog.user_data['sumlist'], function(oldest, s) {
+            return (oldest > 0 ? Math.min(oldest, s['time']) : s['time']);
+        }, oldest);
+    }
+    return oldest;
+}
+
 function send_battle_history_query(dialog) {
+    dialog.user_data['pending'] = true;
+    dialog.user_data['sumlist_is_final'] = false;
+    var oldest = battle_history_oldest(dialog);
+    var time_range = (oldest > 0 ? [-1, oldest] : null);
     query_battle_history(dialog.user_data['user_id'], dialog.user_data['from_id'], dialog.user_data['chapter'],
-                         goog.partial(receive_battle_history_result, dialog, dialog.user_data['chapter']));
+                         time_range,
+                         goog.partial(receive_battle_history_result, dialog, dialog.user_data['chapter'], time_range));
 }
 
 var battle_history_receiver = new goog.events.EventTarget();
-function query_battle_history(target, source, ai_or_human, callback) {
+function query_battle_history(target, source, ai_or_human, time_range, callback) {
     last_query_tag += 1;
     var tag = 'qbh'+last_query_tag.toString();
     // need this adaptor to pull the .result property out of the event object
-    battle_history_receiver.listenOnce(tag, (function (_cb) { return function(event) { _cb(event.result); }; })(callback));
-    send_to_server.func(["QUERY_BATTLE_HISTORY", target, source, tag, ai_or_human]);
+    battle_history_receiver.listenOnce(tag, (function (_cb) { return function(event) { _cb(event.result, event.is_final); }; })(callback));
+    send_to_server.func(["QUERY_BATTLE_HISTORY", target, source, tag, ai_or_human, time_range]);
 }
 function query_recent_attackers(callback) {
     last_query_tag += 1;
@@ -25598,8 +25616,14 @@ function query_recent_attackers(callback) {
     send_to_server.func(["QUERY_RECENT_ATTACKERS", tag]);
 }
 
-function receive_battle_history_result(dialog, q_chapter, sumlist) {
+function receive_battle_history_result(dialog, q_chapter, q_time_range, sumlist, is_final) {
     if(q_chapter != dialog.user_data['chapter']) { return; } // wrong chapter
+    var oldest = battle_history_oldest(dialog);
+    if((oldest < 0 && q_time_range) || (oldest > 0 && (!q_time_range || q_time_range[0] != -1 || q_time_range[1] != oldest))) {
+        return; // not adjacent to current sumlist
+    }
+
+    dialog.user_data['pending'] = false;
 
     // sort summaries by age
     var compare_by_time = function (a,b) {
@@ -25612,8 +25636,14 @@ function receive_battle_history_result(dialog, q_chapter, sumlist) {
         }
     };
     sumlist.sort(compare_by_time);
-    dialog.user_data['sumlist'] = sumlist;
-    battle_history_change_page(dialog, 0);
+    dialog.user_data['sumlist_is_final'] = is_final;
+    if(dialog.user_data['sumlist'] !== null) {
+        dialog.user_data['sumlist'] = dialog.user_data['sumlist'].concat(sumlist);
+        battle_history_change_page(dialog, dialog.user_data['page']);
+    } else {
+        dialog.user_data['sumlist'] = sumlist;
+        battle_history_change_page(dialog, 0);
+    }
 };
 
 function battle_history_change_page(dialog, page) {
@@ -25621,6 +25651,14 @@ function battle_history_change_page(dialog, page) {
     var rows_per_page = dialog.data['widgets']['row_name']['array'][1];
     var chapter_battles = (dialog.user_data['sumlist'] !== null ? dialog.user_data['sumlist'].length : 0)
     var chapter_pages = Math.floor((chapter_battles+rows_per_page-1)/rows_per_page);
+
+    // need to get more from server?
+    // note: send query on the page before the data ends, so we never show an incomplete page, unless it's the final one.
+    if(chapter_pages > 0 && page >= (chapter_pages-2) &&
+       dialog.user_data['sumlist'] !== null && !dialog.user_data['sumlist_is_final'] && !dialog.user_data['pending']) {
+        send_battle_history_query(dialog);
+    }
+
     dialog.user_data['page'] = page = (chapter_battles == 0 ? 0 : clamp(page, 0, chapter_pages-1));
 
     if(chapter_battles > 0) {
@@ -25629,7 +25667,7 @@ function battle_history_change_page(dialog, page) {
         var last_on_page = (page+1)*rows_per_page - 1;
         last_on_page = Math.max(0, Math.min(last_on_page, chapter_battles-1));
         dialog.widgets['scroll_text'].show = true;
-        dialog.widgets['scroll_text'].str = dialog.data['widgets']['scroll_text']['ui_name'].replace('%d1',(first_on_page+1).toString()).replace('%d2',(last_on_page+1).toString()).replace('%d3',chapter_battles.toString());
+        dialog.widgets['scroll_text'].str = dialog.data['widgets']['scroll_text']['ui_name'].replace('%d1',(first_on_page+1).toString()).replace('%d2',(last_on_page+1).toString()).replace('%d3',chapter_battles.toString() + (dialog.user_data['sumlist_is_final'] ? '' : '+'));
 
         for(var i = first_on_page; i <= last_on_page; i++) {
             var summary = dialog.user_data['sumlist'][i];
@@ -25659,7 +25697,7 @@ function battle_history_change_page(dialog, page) {
             dialog.widgets['row_portrait'+row].onclick =
                 dialog.widgets['row_name'+row].onclick =
                 (function (_uid) { return function() {
-                    PlayerInfoDialog.invoke(_uid);
+                    if(!is_ai_user_id_range(_uid)) { PlayerInfoDialog.invoke(_uid); }
                 }; })(user_id);
 
             // name/level
@@ -25809,20 +25847,9 @@ function battle_history_change_page(dialog, page) {
             row += 1;
         }
 
-        dialog.widgets['loading_rect'].show =
-            dialog.widgets['loading_text'].show = false;
     } else {
         // no battles to show - loading or empty
         dialog.user_data['first_on_page'] = -1;
-
-        dialog.widgets['loading_rect'].show =
-            dialog.widgets['loading_text'].show = true;
-        if(dialog.user_data['sumlist'] !== null) {
-            dialog.widgets['loading_text'].str = dialog.data['widgets']['loading_text']['ui_name_empty'];
-        } else {
-            dialog.widgets['loading_text'].str = dialog.data['widgets']['loading_text']['ui_name'];
-        }
-
         dialog.widgets['scroll_text'].show = false;
     }
 
@@ -25847,7 +25874,8 @@ function battle_history_change_page(dialog, page) {
         dialog.widgets['scroll_left'].state = 'disabled';
     }
 
-    if(page < (chapter_pages-1)) {
+    var last_showable_page = (dialog.user_data['sumlist_is_final'] ? (chapter_pages-1): (chapter_pages-2));
+    if(page < last_showable_page) { // || (dialog.user_data['sumlist'] !== null && !dialog.user_data['sumlist_is_final'])) {
         dialog.widgets['scroll_right'].state = 'normal';
     } else {
         dialog.widgets['scroll_right'].state = 'disabled';
@@ -25860,6 +25888,20 @@ function battle_history_change_page(dialog, page) {
 };
 
 function update_battle_history_dialog(dialog) {
+
+    if(dialog.user_data['sumlist'] !== null && dialog.user_data['sumlist'].length === 0) {
+        dialog.widgets['loading_rect'].show =
+            dialog.widgets['loading_text'].show = true;
+        dialog.widgets['loading_text'].str = dialog.data['widgets']['loading_text']['ui_name_empty'];
+    } else if(dialog.user_data['pending']) {
+        dialog.widgets['loading_rect'].show =
+            dialog.widgets['loading_text'].show = true;
+        dialog.widgets['loading_text'].str = dialog.data['widgets']['loading_text']['ui_name'];
+    } else {
+        dialog.widgets['loading_rect'].show =
+            dialog.widgets['loading_text'].show = false;
+    }
+
     var row;
     for(row = 0; row < dialog.data['widgets']['row_name']['array'][1]; row++) {
         var index = dialog.user_data['first_on_page'] + row;
@@ -45256,10 +45298,10 @@ function handle_server_message(data) {
     } else if(msg == "NEW_BATTLE_HISTORIES") {
         player.new_battle_histories = data[1];
     } else if(msg == "QUERY_BATTLE_HISTORY_RESULT" || msg == "QUERY_RECENT_ATTACKERS_RESULT") {
-        var tag = data[1], result = data[2], pcache_data = data[3];
+        var tag = data[1], result = data[2], pcache_data = data[3], is_final = (data.length >= 5 ? data[4] : true);
         // stick pcache_data into PlayerCache
         if(pcache_data) { PlayerCache.update_batch(pcache_data); }
-        battle_history_receiver.dispatchEvent({type: tag, result: result});
+        battle_history_receiver.dispatchEvent({type: tag, result: result, is_final: is_final});
     } else if(msg == "GET_BATTLE_LOG3_RESULT") {
         var tag = data[1], result = data[2];
         if(tag in battle_log_receivers) {

@@ -17451,6 +17451,9 @@ class GAMEAPI(resource.Resource):
         tag = arg[3]
         ai_or_human = arg[4]
         assert ai_or_human in ('any','ai','human')
+        time_range = arg[5]
+        if time_range:
+            assert isinstance(time_range, list) and len(time_range) == 2 and all(isinstance(x, (int,float)) for x in time_range)
 
         if source == session.user.user_id:
             # get any pending updates
@@ -17467,6 +17470,7 @@ class GAMEAPI(resource.Resource):
                 battle_history = None # not found
 
         summaries = []
+        is_final = True # tells the client that there are no more battles earlier than this query
 
         BATTLE_FIELDS = ('time', 'duration', 'ladder_state',
                          'attacker_id', 'defender_id', 'base_id', 'base_ui_name', 'base_map_loc', 'base_type',
@@ -17479,12 +17483,17 @@ class GAMEAPI(resource.Resource):
 
         if gamedata['server'].get('battle_history_source','playerdb') == 'nosql':
             # get summary data from database
-            summaries = gamesite.nosql_client.battles_get(source, target, time_range = None,
-                                                          limit = gamedata['server'].get('nosql_battle_history_limit',50),
+            # XXX need token-based paging to avoid infinite re-query if more than "limit" battles happen within one second
+            limit = gamedata['server'].get('nosql_battle_history_limit',12) # XXXXXX for testing
+            summaries = gamesite.nosql_client.battles_get(source, target,
+                                                          limit = limit,
                                                           ai_or_human = {'any': SpinNoSQL.NoSQLClient.BATTLES_ALL,
                                                                          'ai': SpinNoSQL.NoSQLClient.BATTLES_AI_ONLY,
                                                                          'human': SpinNoSQL.NoSQLClient.BATTLES_HUMAN_ONLY}[ai_or_human],
+                                                          time_range = time_range,
                                                           fields = BATTLE_FIELDS, reason = 'query_battle_history')
+            is_final = len(summaries) < limit # nothing more to query
+
         elif battle_history:
             # pull summary data out of player.battle_history
             if target < 0:
@@ -17495,6 +17504,10 @@ class GAMEAPI(resource.Resource):
                 key = str(target)
                 if key in battle_history:
                     summaries = battle_history[key].get('summary',[])
+
+            if time_range:
+                summaries = filter(lambda x: x['time'] >= time_range[0] and x['time'] < time_range[1], summaries)
+
             if ai_or_human == 'ai':
                 # do not list AI ladder battles here
                 summaries = filter(lambda x: (x.get('attacker_type')=='ai' or x.get('defender_type')=='ai') and (not x.get('ladder_state')), summaries)
@@ -17521,7 +17534,7 @@ class GAMEAPI(resource.Resource):
             session.player.battle_history_seen = max(session.player.battle_history_seen, latest_returned_time)
             retmsg.append(["NEW_BATTLE_HISTORIES", 0])
 
-        retmsg.append(["QUERY_BATTLE_HISTORY_RESULT", tag, ret, pcache_data])
+        retmsg.append(["QUERY_BATTLE_HISTORY_RESULT", tag, ret, pcache_data, is_final])
 
     def query_achievements(self, session, retmsg, arg):
         id = arg[1]; tag = arg[2]
