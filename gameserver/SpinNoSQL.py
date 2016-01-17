@@ -721,16 +721,30 @@ class NoSQLClient (object):
         assert 'involved_players' in summary
         self.battles_table().with_options(write_concern = pymongo.write_concern.WriteConcern(w=0)).insert_one(summary)
         if '_id' in summary: del summary['_id'] # don't mutate it
-    def battles_get(self, player_id_A, player_id_B, time_range = None, fields = None, limit = -1, streaming = False, reason=''):
+
+    # constants for ai_or_human parameter
+    BATTLES_ALL = 0
+    BATTLES_AI_ONLY = 1
+    BATTLES_HUMAN_ONLY = 2
+    def battles_get(self, player_id_A, player_id_B, time_range = None, ai_or_human = BATTLES_ALL, fields = None, limit = -1, streaming = False, reason=''):
         # player_id_A and player_id_B can be -1 for any player, or a valid ID to constrain to battles involving that player.
-        return self.instrument('battles_get(%s)'%reason, self._battles_get, (player_id_A, player_id_B, time_range, fields, limit, streaming))
-    def _battles_get(self, player_id_A, player_id_B, time_range, fields, limit, streaming):
+        return self.instrument('battles_get(%s)'%reason, self._battles_get, (player_id_A, player_id_B, time_range, ai_or_human, fields, limit, streaming))
+    def _battles_get(self, player_id_A, player_id_B, time_range, ai_or_human, fields, limit, streaming):
         qs = {'$and': []}
         for player_id in (player_id_A, player_id_B):
             if player_id > 0:
                 qs['$and'].append({'involved_players': player_id})
         if time_range:
             qs['$and'].append({'time': {'$gte':time_range[0], '$lt':time_range[1]}})
+
+        # type filter
+        if ai_or_human == self.BATTLES_AI_ONLY:
+            qs['$and'].append({'$or':[{'attacker_type':'ai'},{'defender_type':'ai'}]})
+            qs['$and'].append({'$or':[{'ladder_state':{'$exists':False}},{'ladder_state':None}]}) # do not list AI ladder battles here
+        elif ai_or_human == self.BATTLES_HUMAN_ONLY:
+            qs['$and'].append({'$or':[{'$and':[{'attacker_type':'human'},{'defender_type':'human'}]},
+                                      {'$and':[{'ladder_state':{'$exists':True}},{'ladder_state':{'$ne':None}}]}]}) # list AI ladder battles here
+
         q_fields = {'_id':0} # don't rely on MongoDB _ids for battles
         if fields:
             for f in fields:

@@ -25525,7 +25525,7 @@ function invoke_battle_history_dialog(from_id, user_id, name, level, zoom_from_w
     dialog.user_data['user_id'] = user_id;
     dialog.user_data['sumlist'] = null;
     dialog.user_data['sums_on_page'] = [];
-    dialog.user_data['chapter'] = ((user_id > 0 && is_ai_user_id_range(user_id)) ? 'ai' : 'human');
+    dialog.user_data['chapter'] = null;
     dialog.user_data['page'] = -1;
 
     install_child_dialog(dialog);
@@ -25535,8 +25535,8 @@ function invoke_battle_history_dialog(from_id, user_id, name, level, zoom_from_w
     dialog.widgets['single_player_button'].show = (user_id <= 0);
     dialog.widgets['multiplayer_button'].show = (user_id <= 0);
 
-    dialog.widgets['single_player_button'].onclick = function(w) { battle_history_change_page(w.parent, 'ai', 0); };
-    dialog.widgets['multiplayer_button'].onclick = function(w) { battle_history_change_page(w.parent, 'human', 0); };
+    dialog.widgets['single_player_button'].onclick = function(w) { battle_history_change_chapter(w.parent, 'ai'); };
+    dialog.widgets['multiplayer_button'].onclick = function(w) { battle_history_change_chapter(w.parent, 'human'); };
 
     dialog.widgets['close_button'].onclick = close_parent_dialog;
     var dev_str = (from_id != session.user_id ? ' (DEV As '+from_id.toString()+') ' : '');
@@ -25545,34 +25545,50 @@ function invoke_battle_history_dialog(from_id, user_id, name, level, zoom_from_w
     } else {
         dialog.widgets['title'].str = dialog.data['widgets']['title']['ui_name_all'] + dev_str;
     }
-    battle_history_change_page(dialog, dialog.user_data['chapter'], 0);
-
-    var recv_history_cb = (function (_dialog) { return function(data) { receive_battle_history_result(_dialog, data); }; })(dialog);
-    var get_history_cb = (function (_user_id, _from_id, _cb) { return function() { query_battle_history(_user_id, _from_id, _cb); }; })(user_id, from_id, recv_history_cb);
 
     dialog.widgets['column_header_time'].show = !!gamedata['client']['battle_history_time_column'];
     dialog.widgets['column_header_location'].show = !!gamedata['client']['battle_history_location_column'];
     dialog.widgets['column_header_outcome'].show = !dialog.widgets['column_header_location'].show;
     dialog.widgets['column_header_status'].str = dialog.data['widgets']['column_header_status'][(gamedata['client']['battle_history_location_column'] ? 'ui_name' : 'ui_name_loot')];
 
-    // if player is on the map, query quarries so that depletion status is accurate
-    if(session.region.map_enabled()) {
-        session.region.call_when_fresh(get_history_cb);
-    } else {
-        get_history_cb();
-    }
+    battle_history_change_chapter(dialog, ((user_id > 0 && is_ai_user_id_range(user_id)) ? 'ai' : 'human'));
 
     dialog.ondraw = update_battle_history_dialog;
     return dialog;
 };
 
+function battle_history_change_chapter(dialog, chapter) {
+    if(dialog.user_data['chapter'] === chapter) { return; }
+
+    dialog.user_data['chapter'] = chapter;
+    dialog.widgets['single_player_button'].state = (chapter === 'ai' ? 'active' : 'normal');
+    dialog.widgets['multiplayer_button'].state = (chapter === 'human' ? 'active' : 'normal');
+
+    dialog.user_data['page'] = -1;
+    dialog.user_data['sumlist'] = null;
+    dialog.user_data['sums_on_page'] = [];
+
+    // if player is on the map, query the map so that feature status is accurate
+    if(session.region.map_enabled()) {
+        session.region.call_when_fresh(goog.partial(send_battle_history_query, dialog));
+    } else {
+        send_battle_history_query(dialog);
+    }
+    battle_history_change_page(dialog, 0);
+}
+
+function send_battle_history_query(dialog) {
+    query_battle_history(dialog.user_data['user_id'], dialog.user_data['from_id'], dialog.user_data['chapter'],
+                         goog.partial(receive_battle_history_result, dialog, dialog.user_data['chapter']));
+}
+
 var battle_history_receiver = new goog.events.EventTarget();
-function query_battle_history(target, source, callback) {
+function query_battle_history(target, source, ai_or_human, callback) {
     last_query_tag += 1;
     var tag = 'qbh'+last_query_tag.toString();
     // need this adaptor to pull the .result property out of the event object
     battle_history_receiver.listenOnce(tag, (function (_cb) { return function(event) { _cb(event.result); }; })(callback));
-    send_to_server.func(["QUERY_BATTLE_HISTORY", target, source, tag]);
+    send_to_server.func(["QUERY_BATTLE_HISTORY", target, source, tag, ai_or_human]);
 }
 function query_recent_attackers(callback) {
     last_query_tag += 1;
@@ -25582,10 +25598,8 @@ function query_recent_attackers(callback) {
     send_to_server.func(["QUERY_RECENT_ATTACKERS", tag]);
 }
 
-function receive_battle_history_result(dialog, sumlist) {
-    dialog.widgets['loading_rect'].show =
-        dialog.widgets['loading_text'].show = false;
-    dialog.widgets['scroll_text'].show = true;
+function receive_battle_history_result(dialog, q_chapter, sumlist) {
+    if(q_chapter != dialog.user_data['chapter']) { return; } // wrong chapter
 
     // sort summaries by age
     var compare_by_time = function (a,b) {
@@ -25599,99 +25613,14 @@ function receive_battle_history_result(dialog, sumlist) {
     };
     sumlist.sort(compare_by_time);
     dialog.user_data['sumlist'] = sumlist;
-    battle_history_change_page(dialog, dialog.user_data['chapter'], 0);
+    battle_history_change_page(dialog, 0);
 };
 
-function update_battle_history_dialog(dialog) {
-    var row;
-    for(row = 0; row < dialog.user_data['sums_on_page'].length; row++) {
-        var summary = dialog.user_data['sums_on_page'][row];
+function battle_history_change_page(dialog, page) {
+    var filtered_list = dialog.user_data['sumlist'] || []; // null sentinel
 
-        var user_id = summary[(summary['attacker_id'] == dialog.user_data['from_id'] ? 'defender' : 'attacker')+'_id'];
-        var info = PlayerCache.query_sync(user_id) || {};
-        var prot_end_time = (info && ('protection_end_time' in info) ? info['protection_end_time'] : -1);
-        var is_protected = (prot_end_time == 1 || prot_end_time > server_time || (info && info['LOCK_STATE']));
-        var on_cooldown = ('attack_cooldown_expire' in summary && summary['attack_cooldown_expire'] > server_time);
-
-        if(gamedata['client']['battle_history_show_attackability']) {
-            dialog.widgets['row_prot'+row].show = is_protected;
-            dialog.widgets['row_cooldown'+row].show = (!is_protected && on_cooldown);
-            if(dialog.widgets['row_cooldown'+row].show) {
-                dialog.widgets['row_cooldown'+row].str = dialog.data['widgets']['row_cooldown']['ui_name'].replace('%s', pretty_print_time_brief(summary['attack_cooldown_expire'] - server_time));
-            }
-        } else {
-            dialog.widgets['row_prot'+row].show = dialog.widgets['row_cooldown'+row].show = false;
-        }
-
-        // Revenge button
-        if(!user_id || is_ai_user_id_range(user_id)) {
-            dialog.widgets['row_revenge_button'+row].show = false;
-        } else if(session.region && session.region.data && session.region.data['storage'] == 'nosql' && session.region.map_enabled()) {
-            dialog.widgets['row_revenge_button'+row].show = false;
-            if(info && info['home_region'] == session.region.data['id'] && info['home_base_loc']) {
-                dialog.widgets['row_revenge_button'+row].show = true;
-                dialog.widgets['row_revenge_button'+row].state = 'normal';
-                dialog.widgets['row_revenge_button'+row].str = dialog.data['widgets']['row_revenge_button']['ui_name_find_on_map'];
-                dialog.widgets['row_revenge_button'+row].onclick = (function (_loc) { return function(w) {
-                    change_selection_ui(null);
-                    invoke_region_map(_loc);
-                }; })(info['home_base_loc']);
-            }
-        } else {
-
-            // only say "Revenge" if we can actually do a revenge attack
-            var can_revenge = (player.cooldown_active('revenge_defender:'+user_id.toString()) && !is_protected && !on_cooldown);
-            if(can_revenge) {
-                dialog.widgets['row_revenge_button'+row].show = true;
-                dialog.widgets['row_revenge_button'+row].bg_image = dialog.data['widgets']['row_revenge_button']['bg_image'+(can_revenge?'':'_spy')];
-                dialog.widgets['row_revenge_button'+row].str = dialog.data['widgets']['row_revenge_button']['ui_name'+(can_revenge?'':'_spy')];
-                dialog.widgets['row_revenge_button'+row].state = (can_revenge ? 'attack' : 'normal');
-
-                dialog.widgets['row_revenge_button'+row].onclick = (function (_uid) { return function(w) {
-                    change_selection(null);
-                    visit_base(_uid);
-                }; })(user_id);
-            } else {
-                dialog.widgets['row_revenge_button'+row].show = false;
-            }
-        }
-    }
-
-    while(row < 5) {
-        dialog.widgets['row_prot'+row].show =
-            dialog.widgets['row_cooldown'+row].show =
-            dialog.widgets['row_revenge_button'+row].show = false;
-        row += 1;
-    }
-
-    // zoom effect
-    animate_dialog_zoom_effect(dialog, dialog.user_data['zoom_from_widget']);
-};
-
-function battle_history_change_page(dialog, chapter, page) {
-    dialog.user_data['chapter'] = chapter;
-
-    dialog.widgets['single_player_button'].state = (chapter === 'ai' ? 'active' : 'normal');
-    dialog.widgets['multiplayer_button'].state = (chapter === 'human' ? 'active' : 'normal');
-
-    var sumlist = dialog.user_data['sumlist'];
-
-    // sentinel
-    if(sumlist === null) { sumlist = []; }
-
-    var filtered_list = [];
-    for(var i = 0; i < sumlist.length; i++) {
-        var sum = sumlist[i];
-        var battle_type = ((is_ai_user_id_range(sum['attacker_id']) || is_ai_user_id_range(sum['defender_id'])) ? 'ai' : 'human');
-        if('ladder_state' in sum && sum['ladder_state']) { battle_type = 'human'; } // list ladder battles vs ai on Multiplayer
-        if(battle_type == dialog.user_data['chapter']) {
-            filtered_list.push(sum);
-        }
-    }
-
-    // similar to Map dialog change page
     var row = 0;
-    var rows_per_page = 5;
+    var rows_per_page = dialog.data['widgets']['row_name']['array'][1];
     var chapter_battles = filtered_list.length;
     var chapter_pages = Math.floor((chapter_battles+rows_per_page-1)/rows_per_page);
     dialog.user_data['page'] = page = (chapter_battles == 0 ? 0 : clamp(page, 0, chapter_pages-1));
@@ -25702,6 +25631,7 @@ function battle_history_change_page(dialog, chapter, page) {
         var first_on_page = page * rows_per_page;
         var last_on_page = (page+1)*rows_per_page - 1;
         last_on_page = Math.max(0, Math.min(last_on_page, chapter_battles-1));
+        dialog.widgets['scroll_text'].show = true;
         dialog.widgets['scroll_text'].str = dialog.data['widgets']['scroll_text']['ui_name'].replace('%d1',(first_on_page+1).toString()).replace('%d2',(last_on_page+1).toString()).replace('%d3',chapter_battles.toString());
 
         for(var i = first_on_page; i <= last_on_page; i++) {
@@ -25886,7 +25816,7 @@ function battle_history_change_page(dialog, chapter, page) {
         dialog.widgets['loading_rect'].show =
             dialog.widgets['loading_text'].show = false;
     } else {
-        // no battles to show
+        // no battles to show - loading or empty
         dialog.widgets['loading_rect'].show =
             dialog.widgets['loading_text'].show = true;
         if(dialog.user_data['sumlist'] != null) {
@@ -25895,7 +25825,7 @@ function battle_history_change_page(dialog, chapter, page) {
             dialog.widgets['loading_text'].str = dialog.data['widgets']['loading_text']['ui_name'];
         }
 
-        dialog.widgets['scroll_text'].str = dialog.data['widgets']['scroll_text']['ui_name'].replace('%d1',(0).toString()).replace('%d2',(0).toString()).replace('%d3',(0).toString());
+        dialog.widgets['scroll_text'].show = false;
     }
 
     // clear out empty rows
@@ -25925,10 +25855,76 @@ function battle_history_change_page(dialog, chapter, page) {
         dialog.widgets['scroll_right'].state = 'disabled';
     }
 
-    dialog.widgets['scroll_left'].onclick = function(w) { var _dialog = w.parent; battle_history_change_page(_dialog, _dialog.user_data['chapter'], _dialog.user_data['page']-1); };
-    dialog.widgets['scroll_right'].onclick = function(w) { var _dialog = w.parent; battle_history_change_page(_dialog, _dialog.user_data['chapter'], _dialog.user_data['page']+1); };
+    dialog.widgets['scroll_left'].onclick = function(w) { var _dialog = w.parent; battle_history_change_page(_dialog, _dialog.user_data['page']-1); };
+    dialog.widgets['scroll_right'].onclick = function(w) { var _dialog = w.parent; battle_history_change_page(_dialog, _dialog.user_data['page']+1); };
 
     return dialog;
+};
+
+function update_battle_history_dialog(dialog) {
+    var row;
+    for(row = 0; row < dialog.user_data['sums_on_page'].length; row++) {
+        var summary = dialog.user_data['sums_on_page'][row];
+
+        var user_id = summary[(summary['attacker_id'] == dialog.user_data['from_id'] ? 'defender' : 'attacker')+'_id'];
+        var info = PlayerCache.query_sync(user_id) || {};
+        var prot_end_time = (info && ('protection_end_time' in info) ? info['protection_end_time'] : -1);
+        var is_protected = (prot_end_time == 1 || prot_end_time > server_time || (info && info['LOCK_STATE']));
+        var on_cooldown = ('attack_cooldown_expire' in summary && summary['attack_cooldown_expire'] > server_time);
+
+        if(gamedata['client']['battle_history_show_attackability']) {
+            dialog.widgets['row_prot'+row].show = is_protected;
+            dialog.widgets['row_cooldown'+row].show = (!is_protected && on_cooldown);
+            if(dialog.widgets['row_cooldown'+row].show) {
+                dialog.widgets['row_cooldown'+row].str = dialog.data['widgets']['row_cooldown']['ui_name'].replace('%s', pretty_print_time_brief(summary['attack_cooldown_expire'] - server_time));
+            }
+        } else {
+            dialog.widgets['row_prot'+row].show = dialog.widgets['row_cooldown'+row].show = false;
+        }
+
+        // Revenge button
+        if(!user_id || is_ai_user_id_range(user_id)) {
+            dialog.widgets['row_revenge_button'+row].show = false;
+        } else if(session.region && session.region.data && session.region.data['storage'] == 'nosql' && session.region.map_enabled()) {
+            dialog.widgets['row_revenge_button'+row].show = false;
+            if(info && info['home_region'] == session.region.data['id'] && info['home_base_loc']) {
+                dialog.widgets['row_revenge_button'+row].show = true;
+                dialog.widgets['row_revenge_button'+row].state = 'normal';
+                dialog.widgets['row_revenge_button'+row].str = dialog.data['widgets']['row_revenge_button']['ui_name_find_on_map'];
+                dialog.widgets['row_revenge_button'+row].onclick = (function (_loc) { return function(w) {
+                    change_selection_ui(null);
+                    invoke_region_map(_loc);
+                }; })(info['home_base_loc']);
+            }
+        } else {
+
+            // only say "Revenge" if we can actually do a revenge attack
+            var can_revenge = (player.cooldown_active('revenge_defender:'+user_id.toString()) && !is_protected && !on_cooldown);
+            if(can_revenge) {
+                dialog.widgets['row_revenge_button'+row].show = true;
+                dialog.widgets['row_revenge_button'+row].bg_image = dialog.data['widgets']['row_revenge_button']['bg_image'+(can_revenge?'':'_spy')];
+                dialog.widgets['row_revenge_button'+row].str = dialog.data['widgets']['row_revenge_button']['ui_name'+(can_revenge?'':'_spy')];
+                dialog.widgets['row_revenge_button'+row].state = (can_revenge ? 'attack' : 'normal');
+
+                dialog.widgets['row_revenge_button'+row].onclick = (function (_uid) { return function(w) {
+                    change_selection(null);
+                    visit_base(_uid);
+                }; })(user_id);
+            } else {
+                dialog.widgets['row_revenge_button'+row].show = false;
+            }
+        }
+    }
+
+    while(row < 5) {
+        dialog.widgets['row_prot'+row].show =
+            dialog.widgets['row_cooldown'+row].show =
+            dialog.widgets['row_revenge_button'+row].show = false;
+        row += 1;
+    }
+
+    // zoom effect
+    animate_dialog_zoom_effect(dialog, dialog.user_data['zoom_from_widget']);
 };
 
 function invoke_battle_log_dialog(from_id, user_id, opprole, summary) {

@@ -17429,6 +17429,7 @@ class GAMEAPI(resource.Resource):
             # get summary data from database
             summaries = gamesite.nosql_client.battles_get(session.user.user_id, -1, time_range = [server_time - gamedata['server'].get('nosql_recent_attackers_time_limit',7*86400), server_time],
                                                           limit = gamedata['server'].get('nosql_battle_history_limit',50),
+                                                          ai_or_human = SpinNoSQL.NoSQLClient.BATTLES_HUMAN_ONLY,
                                                           fields = ('attacker_id','attacker_type','defender_id'), reason = 'query_recent_attackers')
         else:
             # query ALL opponents
@@ -17448,6 +17449,8 @@ class GAMEAPI(resource.Resource):
         target = arg[1] # look up battles against this player (-1 for anyone)
         source = arg[2] # from the perspective of this player
         tag = arg[3]
+        ai_or_human = arg[4]
+        assert ai_or_human in ('any','ai','human')
 
         if source == session.user.user_id:
             # get any pending updates
@@ -17478,6 +17481,9 @@ class GAMEAPI(resource.Resource):
             # get summary data from database
             summaries = gamesite.nosql_client.battles_get(source, target, time_range = None,
                                                           limit = gamedata['server'].get('nosql_battle_history_limit',50),
+                                                          ai_or_human = {'any': SpinNoSQL.NoSQLClient.BATTLES_ALL,
+                                                                         'ai': SpinNoSQL.NoSQLClient.BATTLES_AI_ONLY,
+                                                                         'human': SpinNoSQL.NoSQLClient.BATTLES_HUMAN_ONLY}[ai_or_human],
                                                           fields = BATTLE_FIELDS, reason = 'query_battle_history')
         elif battle_history:
             # pull summary data out of player.battle_history
@@ -17489,6 +17495,12 @@ class GAMEAPI(resource.Resource):
                 key = str(target)
                 if key in battle_history:
                     summaries = battle_history[key].get('summary',[])
+            if ai_or_human == 'ai':
+                # do not list AI ladder battles here
+                summaries = filter(lambda x: (x.get('attacker_type')=='ai' or x.get('defender_type')=='ai') and (not x.get('ladder_state')), summaries)
+            elif ai_or_human == 'human':
+                # list AI ladder battles here
+                summaries = filter(lambda x: (x.get('attacker_type')=='human' and x.get('defender_type')=='human') or x.get('ladder_state'), summaries)
 
         ret = []
         pcache_data = None

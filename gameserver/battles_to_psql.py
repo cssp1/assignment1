@@ -30,6 +30,7 @@ def battles_schema(sql_util):
                         ('time', 'INT8 NOT NULL'),
                         ('involved_player0', 'INT4'),
                         ('involved_player1', 'INT4'),
+                        ('is_ai', 'boolean'),
                         ('summary', 'jsonb NOT NULL'),
                         ],
              'indices': { 'by_time': {'keys': [('time','ASC')]},
@@ -117,11 +118,11 @@ if __name__ == '__main__':
                 player1 = row['involved_players'][1]
 
             assert ('_id' not in row) # don't rely on MongoDB object IDs
-
             keyvals = [('log_id', make_log_id(row)),
                        ('time', row['time']),
                        ('involved_player0', player0),
                        ('involved_player1', player1),
+                       ('is_ai', (row.get('attacker_type') == 'ai' or row.get('defender_type') == 'ai') and (not row.get('ladder_state'))),
                        ('summary', SpinJSON.dumps(row))]
 
             batch.append(keyvals)
