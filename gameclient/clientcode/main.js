@@ -25524,7 +25524,7 @@ function invoke_battle_history_dialog(from_id, user_id, name, level, zoom_from_w
     dialog.user_data['from_id'] = from_id;
     dialog.user_data['user_id'] = user_id;
     dialog.user_data['sumlist'] = null;
-    dialog.user_data['sums_on_page'] = [];
+    dialog.user_data['first_on_page'] = []; // index of first shown summary in sumlist
     dialog.user_data['chapter'] = null;
     dialog.user_data['page'] = -1;
 
@@ -25566,7 +25566,7 @@ function battle_history_change_chapter(dialog, chapter) {
 
     dialog.user_data['page'] = -1;
     dialog.user_data['sumlist'] = null;
-    dialog.user_data['sums_on_page'] = [];
+    dialog.user_data['first_on_page'] = -1;
 
     // if player is on the map, query the map so that feature status is accurate
     if(session.region.map_enabled()) {
@@ -25617,26 +25617,22 @@ function receive_battle_history_result(dialog, q_chapter, sumlist) {
 };
 
 function battle_history_change_page(dialog, page) {
-    var filtered_list = dialog.user_data['sumlist'] || []; // null sentinel
-
     var row = 0;
     var rows_per_page = dialog.data['widgets']['row_name']['array'][1];
-    var chapter_battles = filtered_list.length;
+    var chapter_battles = (dialog.user_data['sumlist'] !== null ? dialog.user_data['sumlist'].length : 0)
     var chapter_pages = Math.floor((chapter_battles+rows_per_page-1)/rows_per_page);
     dialog.user_data['page'] = page = (chapter_battles == 0 ? 0 : clamp(page, 0, chapter_pages-1));
-    dialog.user_data['sums_on_page'] = [];
 
     if(chapter_battles > 0) {
         // show battles!
-        var first_on_page = page * rows_per_page;
+        var first_on_page = dialog.user_data['first_on_page'] = page * rows_per_page;
         var last_on_page = (page+1)*rows_per_page - 1;
         last_on_page = Math.max(0, Math.min(last_on_page, chapter_battles-1));
         dialog.widgets['scroll_text'].show = true;
         dialog.widgets['scroll_text'].str = dialog.data['widgets']['scroll_text']['ui_name'].replace('%d1',(first_on_page+1).toString()).replace('%d2',(last_on_page+1).toString()).replace('%d3',chapter_battles.toString());
 
         for(var i = first_on_page; i <= last_on_page; i++) {
-            var summary = filtered_list[i];
-            dialog.user_data['sums_on_page'].push(summary);
+            var summary = dialog.user_data['sumlist'][i];
 
             var myrole, opprole;
             if(summary['attacker_id'] == dialog.user_data['from_id']) {
@@ -25817,9 +25813,11 @@ function battle_history_change_page(dialog, page) {
             dialog.widgets['loading_text'].show = false;
     } else {
         // no battles to show - loading or empty
+        dialog.user_data['first_on_page'] = -1;
+
         dialog.widgets['loading_rect'].show =
             dialog.widgets['loading_text'].show = true;
-        if(dialog.user_data['sumlist'] != null) {
+        if(dialog.user_data['sumlist'] !== null) {
             dialog.widgets['loading_text'].str = dialog.data['widgets']['loading_text']['ui_name_empty'];
         } else {
             dialog.widgets['loading_text'].str = dialog.data['widgets']['loading_text']['ui_name'];
@@ -25863,8 +25861,12 @@ function battle_history_change_page(dialog, page) {
 
 function update_battle_history_dialog(dialog) {
     var row;
-    for(row = 0; row < dialog.user_data['sums_on_page'].length; row++) {
-        var summary = dialog.user_data['sums_on_page'][row];
+    for(row = 0; row < dialog.data['widgets']['row_name']['array'][1]; row++) {
+        var index = dialog.user_data['first_on_page'] + row;
+        if(!dialog.user_data['sumlist'] || index >= dialog.user_data['sumlist'].length) {
+            break;
+        }
+        var summary = dialog.user_data['sumlist'][index];
 
         var user_id = summary[(summary['attacker_id'] == dialog.user_data['from_id'] ? 'defender' : 'attacker')+'_id'];
         var info = PlayerCache.query_sync(user_id) || {};
