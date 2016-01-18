@@ -1284,15 +1284,20 @@ var refresh_chat = function() {
         $('#chat_table').empty();
         chat_pending = true;
         $('#chat_show_automated').attr('disabled', true);
+        $('#chat_show_tier34').attr('disabled', true);
         $('#chat_status_loading')[0].innerHTML = 'Loading...';
         var time_now = (new Date()).getTime()/1000;
         var filter = 'unresolved';
         if($("#chat_show_automated")[0].checked) {
             filter += ',automated';
         }
+        if(! $("#chat_show_tier34")[0].checked) {
+            filter += ',tier12';
+        }
         send_request('chat', 'get_reports', {'start_time':time_now - 2*86400, 'end_time':time_now, 'filter': filter}, function(result) {
             chat_pending = false;
             $('#chat_show_automated').removeAttr('disabled');
+            $('#chat_show_tier34').removeAttr('disabled');
             cur_chat_reports = result;
             cur_chat_report_rows = {};
             var time_now = (new Date()).getTime()/1000;
@@ -1808,6 +1813,7 @@ Status: <span id="payment_status"></span>
 <div id="chat_status_loading">STATUS</div>
 <p>
 <label><input id="chat_show_automated" type="checkbox" checked="1" style="height:initial;" onclick="refresh_chat();">Show automated reports</label>
+<label><input id="chat_show_tier34" type="checkbox" style="height:initial;" onclick="refresh_chat();">Show Tier 3/4 channels</label>
 <p>
 <table id="chat_table" width="100%" style="font-size:12px;font-family:sans-serif;"></table>
 <br>

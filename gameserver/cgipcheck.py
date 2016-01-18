@@ -278,6 +278,9 @@ def filter_chat_report_list_for_enforcement(reports):
 def filter_chat_report_list_drop_automated(reports):
     return filter(lambda x: x.get('source') not in ('rule','ml'), reports)
 
+def filter_chat_report_list_drop_tier34(reports):
+    return filter(lambda x: x.get('channel').startswith('r:') or x.get('channel') in ('global_english','global_t123'), reports)
+
 def do_action(path, method, args, spin_token_data, nosql_client):
     try:
         do_log = False
@@ -431,15 +434,21 @@ def do_action(path, method, args, spin_token_data, nosql_client):
             elif method == 'get_reports':
                 report_list = list(nosql_client.chat_reports_get(args['start_time'], args['end_time']))
                 show_automated = False
+                show_resolved = True
+                show_tier34 = True
                 if 'filter' in args:
                     filters = args['filter'].split(',')
                 else:
                     filters = []
                 for f in filters:
-                    if f == 'unresolved':
-                        report_list = filter_chat_report_list_for_enforcement(report_list)
-                    elif f == 'automated':
-                        show_automated = True
+                    if f == 'unresolved': show_resolved = False
+                    elif f == 'automated': show_automated = True
+                    elif f == 'tier12': show_tier34 = False
+
+                if not show_resolved: # always do this first, since it needs access to all reports
+                    report_list = filter_chat_report_list_for_enforcement(report_list)
+                if not show_tier34:
+                    report_list = filter_chat_report_list_drop_tier34(report_list)
                 if not show_automated:
                     report_list = filter_chat_report_list_drop_automated(report_list)
                 result = {'result': report_list }
