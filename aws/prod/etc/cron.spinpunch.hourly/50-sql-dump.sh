@@ -12,3 +12,4 @@ fi
 
 cd $GAME_DIR/gameserver
 ./scores2_to_sql.py --mongo-drop ${FLAGS} -q
+./battles_to_psql.py ${FLAGS} -q
