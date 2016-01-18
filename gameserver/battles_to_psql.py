@@ -110,7 +110,7 @@ if __name__ == '__main__':
         if verbose: print 'SQL last time', start_time
 
         n_updated = 0
-        summaries = nosql_client.battles_get(-1, -1, time_range = [start_time+1, end_time], oldest_first = True, streaming = True)
+        summaries = nosql_client.battles_get(-1, -1, -1, -1, time_range = [start_time+1, end_time], oldest_first = True, streaming = True)
 
         if verbose: print 'found some battles...'
 

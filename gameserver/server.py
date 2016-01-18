@@ -17435,7 +17435,7 @@ class GAMEAPI(resource.Resource):
 
         if gamedata['server'].get('battle_history_source','nosql') in ('nosql','nosql/sql'):
             # get summary data from database
-            summaries = gamesite.nosql_client.battles_get(session.user.user_id, -1, time_range = [server_time - gamedata['server'].get('nosql_recent_attackers_time_limit',7*86400), server_time],
+            summaries = gamesite.nosql_client.battles_get(session.user.user_id, -1, -1, -1, time_range = [server_time - gamedata['server'].get('nosql_recent_attackers_time_limit',7*86400), server_time],
                                                           limit = gamedata['server'].get('nosql_battle_history_limit',50),
                                                           ai_or_human = SpinNoSQL.NoSQLClient.BATTLES_HUMAN_ONLY,
                                                           fields = ('attacker_id','attacker_type','defender_id'), reason = 'query_recent_attackers')
@@ -17465,30 +17465,42 @@ class GAMEAPI(resource.Resource):
 
     def query_battle_history(self, session, retmsg, arg):
         target = arg[1] # look up battles against this player (-1 for anyone)
-        source = arg[2] # from the perspective of this player
-        tag = arg[3]
-        ai_or_human = arg[4]
+        source = arg[2] # from the perspective of this player (-1 for anyone)
+        alliance_A = arg[3] # require involvement from this alliance
+        alliance_B = arg[4]
+        tag = arg[5]
+        ai_or_human = arg[6]
         assert ai_or_human in ('any','ai','human')
-        time_range = arg[5]
+        time_range = arg[7]
         if time_range:
             assert isinstance(time_range, list) and len(time_range) == 2 and all(isinstance(x, (int,float)) for x in time_range)
+
+        # sanity check
+        assert (source > 0) or (alliance_A > 0) or (alliance_B > 0)
+
+        # permission check
+        if (not session.player.is_developer()):
+            # no peeking at others' battle histories unless you are a developer
+            if (source > 0 and source != session.user.user_id) or \
+               ((alliance_A > 0 or alliance_B > 0) and (session.get_alliance_id(reason='query_battle_history') < 0 or session.alliance_id_cache not in (alliance_A, alliance_B))):
+                retmsg.append(["ERROR", "DISALLOWED_IN_SECURE_MODE"])
+                return
 
         # "nosql" for hot-only, "nosql/sql" for hot/cold, or "playerdb" (obsolete)
         battle_history_source = gamedata['server'].get('battle_history_source','nosql') # also update query_recent_attackers()!
 
-        if source == session.user.user_id:
-            # get any pending updates
-            self.do_receive_mail(session, retmsg)
-            battle_history = session.player.battle_history
-        else:
-            if (not session.player.is_developer()):
-                # no peeking at others' battle histories unless you are a developer
-                retmsg.append(["ERROR", "DISALLOWED_IN_SECURE_MODE"])
-                return
-            if source == session.viewing_user.user_id:
+        battle_history = None
+        if battle_history_source == 'playerdb':
+            if source == session.user.user_id:
+                # get any pending updates
+                self.do_receive_mail(session, retmsg)
+                battle_history = session.player.battle_history
+            elif source == session.viewing_user.user_id:
                 battle_history = session.viewing_player.battle_history
-            else:
-                battle_history = None # not found
+            elif (alliance_A > 0) or (alliance_B > 0):
+                # alliance queries not supported from playerdb
+                retmsg.append(["QUERY_BATTLE_HISTORY_RESULT", tag, [], None, True, 'offline'])
+                return
 
         if battle_history_source in ('nosql','nosql/sql'):
             # get summary data from database
@@ -17501,7 +17513,7 @@ class GAMEAPI(resource.Resource):
 
             # hot query
             hot_limit = gamedata['server'].get('nosql_battle_history_limit', 50 if time_range else 10) # optimize for fast first range-less query
-            hot_summaries = gamesite.nosql_client.battles_get(source, target, limit = hot_limit,
+            hot_summaries = gamesite.nosql_client.battles_get(source, target, alliance_A, alliance_B, limit = hot_limit,
                                                               ai_or_human = {'any': SpinNoSQL.NoSQLClient.BATTLES_ALL,
                                                                              'ai': SpinNoSQL.NoSQLClient.BATTLES_AI_ONLY,
                                                                              'human': SpinNoSQL.NoSQLClient.BATTLES_HUMAN_ONLY}[ai_or_human],
@@ -17526,7 +17538,7 @@ class GAMEAPI(resource.Resource):
                 # don't overlap with hot data
                 if hot_summaries:
                     cold_time_range[1] = min(cold_time_range[1], min(x['time'] for x in hot_summaries))
-                cold_d = gamesite.sql_battles_client.battles_get_async(source, target, limit = cold_limit,
+                cold_d = gamesite.sql_battles_client.battles_get_async(source, target, alliance_A, alliance_B, limit = cold_limit,
                                                                        ai_or_human = {'any': SpinSQLBattles.SQLBattlesClient.BATTLES_ALL,
                                                                                       'ai': SpinSQLBattles.SQLBattlesClient.BATTLES_AI_ONLY,
                                                                                       'human': SpinSQLBattles.SQLBattlesClient.BATTLES_HUMAN_ONLY}[ai_or_human],
@@ -17557,7 +17569,7 @@ class GAMEAPI(resource.Resource):
                 # return hot query only
                 result_d = defer.succeed((hot_summaries, hot_is_final, None))
 
-        elif battle_history:
+        elif battle_history_source == 'playerdb' and battle_history:
             # pull summary data out of player.battle_history
             is_final = True
             is_error = None
@@ -17593,7 +17605,7 @@ class GAMEAPI(resource.Resource):
         # on async failure, replace summaries/is_final with blank data, then respond to client
         result_d.addErrback(report_and_reraise_deferred_failure, session)
         result_d.addErrback(lambda _: ([], True, 'offline')) # return blank (summaries, is_final, is_error)
-        result_d.addCallback(self.query_battle_history_complete, session, tag, source)
+        result_d.addCallback(self.query_battle_history_complete, session, tag, source if (alliance_A <= 0 and alliance_B <= 0) else None)
         result_d.addErrback(report_and_absorb_deferred_failure, session)
         return None # note: asynchronous with other session traffic!
 
@@ -17617,7 +17629,7 @@ class GAMEAPI(resource.Resource):
             latest_returned_time = max(s.get('time',-1) for s in summaries)
 
         # update battle_history_seen
-        if source == session.user.user_id:
+        if source and source == session.user.user_id:
             session.player.battle_history_seen = max(session.player.battle_history_seen, latest_returned_time)
             session.send([["NEW_BATTLE_HISTORIES", 0]])
 

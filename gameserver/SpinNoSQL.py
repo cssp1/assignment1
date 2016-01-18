@@ -729,14 +729,18 @@ class NoSQLClient (object):
     BATTLES_HUMAN_ONLY = 2
     # XXXXXX time_range-based paging with limit means that some battles could be dropped (if several occur in the same second
     # and the limit gets hit part-way through). Might need GUID-based paging.
-    def battles_get(self, player_id_A, player_id_B, time_range = None, ai_or_human = BATTLES_ALL, fields = None, oldest_first = False, limit = -1, streaming = False, reason=''):
+    def battles_get(self, player_id_A, player_id_B, alliance_id_A, alliance_id_B, time_range = None, ai_or_human = BATTLES_ALL, fields = None, oldest_first = False, limit = -1, streaming = False, reason=''):
         # player_id_A and player_id_B can be -1 for any player, or a valid ID to constrain to battles involving that player.
-        return self.instrument('battles_get(%s)'%reason, self._battles_get, (player_id_A, player_id_B, time_range, ai_or_human, fields, oldest_first, limit, streaming))
-    def _battles_get(self, player_id_A, player_id_B, time_range, ai_or_human, fields, oldest_first, limit, streaming):
+        return self.instrument('battles_get(%s)'%reason, self._battles_get, (player_id_A, player_id_B, alliance_id_A, alliance_id_B, time_range, ai_or_human, fields, oldest_first, limit, streaming))
+    def _battles_get(self, player_id_A, player_id_B, alliance_id_A, alliance_id_B, time_range, ai_or_human, fields, oldest_first, limit, streaming):
         qs = {'$and': []}
         for player_id in (player_id_A, player_id_B):
             if player_id > 0:
                 qs['$and'].append({'involved_players': player_id})
+        for alliance_id in (alliance_id_A, alliance_id_B):
+            if alliance_id > 0:
+                qs['$and'].append({'involved_alliances': alliance_id})
+
         if time_range:
             qs['$and'].append({'time': {'$gte':time_range[0], '$lt':time_range[1]}})
 

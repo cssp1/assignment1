@@ -25604,18 +25604,19 @@ function send_battle_history_query(dialog) {
     dialog.user_data['sumlist_is_error'] = null;
     var oldest = battle_history_oldest(dialog);
     var time_range = (oldest > 0 ? [-1, oldest] : null);
-    query_battle_history(dialog.user_data['user_id'], dialog.user_data['from_id'], dialog.user_data['chapter'],
+    query_battle_history(dialog.user_data['user_id'], dialog.user_data['from_id'], -1, -1,
+                         dialog.user_data['chapter'],
                          time_range,
                          goog.partial(receive_battle_history_result, dialog, dialog.user_data['chapter'], time_range));
 }
 
 var battle_history_receiver = new goog.events.EventTarget();
-function query_battle_history(target, source, ai_or_human, time_range, callback) {
+function query_battle_history(target, source, alliance_A, alliance_B, ai_or_human, time_range, callback) {
     last_query_tag += 1;
     var tag = 'qbh'+last_query_tag.toString();
     // need this adaptor to pull the .result property out of the event object
     battle_history_receiver.listenOnce(tag, (function (_cb) { return function(event) { _cb(event.result, event.is_final, event.is_error); }; })(callback));
-    send_to_server.func(["QUERY_BATTLE_HISTORY", target, source, tag, ai_or_human, time_range]);
+    send_to_server.func(["QUERY_BATTLE_HISTORY", target, source, alliance_A, alliance_B, tag, ai_or_human, time_range]);
 }
 function query_recent_attackers(callback) {
     last_query_tag += 1;
