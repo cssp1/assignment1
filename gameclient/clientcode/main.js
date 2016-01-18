@@ -25719,6 +25719,7 @@ function battle_history_change_page(dialog, page) {
 
             // portrait
             dialog.widgets['row_portrait'+row].show = true;
+            dialog.widgets['row_portrait_outline'+row].show = (user_id === session.user_id || user_id === summary[myrole+'_id']);
             dialog.widgets['row_portrait'+row].set_user(user_id);
 
             dialog.widgets['row_portrait'+row].onclick =
@@ -25726,6 +25727,25 @@ function battle_history_change_page(dialog, page) {
                 (function (_uid) { return function() {
                     if(!is_ai_user_id_range(_uid)) { PlayerInfoDialog.invoke(_uid); }
                 }; })(user_id);
+            dialog.widgets['row_portrait'+row].tooltip.str = summary[opprole+'_name'] + (summary[opprole+'_alliance_chat_tag'] ? ' ['+summary[opprole+'_alliance_chat_tag']+']' : '')+ ' (L'+summary[opprole+'_level'].toString()+')';
+
+            // second portrait (for alliancemates)
+            dialog.widgets['row_portrait2'+row].show = (dialog.user_data['chapter'] === 'alliance');
+            dialog.widgets['row_portrait2_outline'+row].show = dialog.widgets['row_portrait2'+row].show;
+
+            if(dialog.widgets['row_portrait2'+row].show) {
+                dialog.widgets['row_portrait2'+row].set_user(summary[myrole+'_id']);
+                dialog.widgets['row_portrait2'+row].onclick = (function (_uid) { return function() {
+                    if(!is_ai_user_id_range(_uid)) { PlayerInfoDialog.invoke(_uid); }
+                }; })(summary[myrole+'_id']);
+                dialog.widgets['row_portrait2'+row].tooltip.str = summary[myrole+'_name'] + (summary[myrole+'_alliance_chat_tag'] ? ' ['+summary[myrole+'_alliance_chat_tag']+']' : '') + ' (L'+summary[myrole+'_level'].toString()+')';
+            }
+
+            // shift name/role to accommodate second portrait
+            goog.array.forEach(['row_portrait', 'row_name', 'row_role'], function(wname) {
+                dialog.widgets[wname+row].xy = vec_add(vec_add(dialog.data['widgets'][wname]['xy'], vec_scale(row, dialog.data['widgets'][wname]['array_offset'])),
+                                                       (dialog.widgets['row_portrait2'+row].show ? [dialog.data['widgets']['row_portrait2']['dimensions'][0], 0] : [0,0]));
+            });
 
             // name/level
             dialog.widgets['row_name'+row].show = true;
@@ -25898,6 +25918,9 @@ function battle_history_change_page(dialog, page) {
     // clear out empty rows
     while(row < rows_per_page) {
         dialog.widgets['row_portrait'+row].show =
+            dialog.widgets['row_portrait_outline'+row].show =
+            dialog.widgets['row_portrait2'+row].show =
+            dialog.widgets['row_portrait2_outline'+row].show =
             dialog.widgets['row_name'+row].show =
             dialog.widgets['row_role'+row].show =
             dialog.widgets['row_outcome'+row].show =

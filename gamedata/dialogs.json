@@ -6303,9 +6303,21 @@
             "scroll_right": { "kind": "ActionButton", "xy": [706,170], "dimensions": [22,100], "bg_image": "dialog_scroll_arrow_right" },
             "scroll_text": { "show": 0, "kind": "TextField", "xy": [56,383], "dimensions": [181,19], "text_size": 13, "text_hjustify": "left", "ui_name": "Showing %d1-%d2 of %d3", "text_color": [0.5,0.5,0.5,1]},
 
-            "row_portrait": {"kind": "FriendPortrait", "xy":[48,105], "dimensions": [50,50], "push_bg_image": 1, "array": [1,5], "array_offset": [0,56] },
-            "row_name": {"kind": "ActionButton", "xy":[110,112], "dimensions": [157,43],"text_size": 13,"text_style":"bold","text_hjustify":"left","text_vjustify":"top","array": [1,5], "array_offset": [0,56], "max_len": 20 },
-            "row_role": {"kind": "TextField", "xy":[110,129], "dimensions": [157,60],"text_size": 13,"text_hjustify":"left","text_vjustify":"top",
+            "row_portrait": {"kind": "FriendPortrait", "xy":[48,105], "dimensions": [50,50], "push_bg_image": 1, "array": [1,5], "array_offset": [0,56],
+                              "ui_tooltip": "", "tooltip_delay": 0},
+            "row_portrait_outline": { "kind": "SolidRect", "xy":[48,105], "dimensions":[50,50],
+                                      "color": [0,0,0,0], "outline_color": [0.5,0,0.5,1], "outline_width": 1,
+                                      "array": [1,5], "array_offset": [0,56]},
+            "row_portrait2": {"kind": "FriendPortrait", "xy":[48,105], "dimensions": [50,50], "push_bg_image": 1, "array": [1,5], "array_offset": [0,56],
+                              "ui_tooltip": "", "tooltip_delay": 0},
+            "row_portrait2_outline": { "kind": "SolidRect", "xy":[48,105], "dimensions":[50,50],
+                                       "color": [0,0,0,0], "outline_color": [0.5,0,0.5,1], "outline_width": 1,
+                                       "array": [1,5], "array_offset": [0,56]},
+
+            // note: code shifts row_portrait, row_name, and row_role rightward when row_portrait2 is visible
+
+            "row_name": {"kind": "ActionButton", "xy":[108,112], "dimensions": [157,43],"text_size": 13,"text_style":"bold","text_hjustify":"left","text_vjustify":"top","array": [1,5], "array_offset": [0,56], "max_len": 20 },
+            "row_role": {"kind": "TextField", "xy":[108,129], "dimensions": [157,60],"text_size": 13,"text_hjustify":"left","text_vjustify":"top",
                          "ui_name_defender": "Defender", "ui_name_attacker": "Attacker", "ui_name_time": "%s %d ago",
                          "text_color":[0.8,0.8,0.8,1], "text_color_defender": [0,0.8,0,1], "text_color_attacker": [1,0,0,1],
                          "array": [1,5], "array_offset": [0,56] },
