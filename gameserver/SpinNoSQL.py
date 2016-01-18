@@ -728,10 +728,10 @@ class NoSQLClient (object):
     BATTLES_HUMAN_ONLY = 2
     # XXXXXX time_range-based paging with limit means that some battles could be dropped (if several occur in the same second
     # and the limit gets hit part-way through). Might need GUID-based paging.
-    def battles_get(self, player_id_A, player_id_B, time_range = None, ai_or_human = BATTLES_ALL, fields = None, limit = -1, streaming = False, reason=''):
+    def battles_get(self, player_id_A, player_id_B, time_range = None, ai_or_human = BATTLES_ALL, fields = None, oldest_first = False, limit = -1, streaming = False, reason=''):
         # player_id_A and player_id_B can be -1 for any player, or a valid ID to constrain to battles involving that player.
-        return self.instrument('battles_get(%s)'%reason, self._battles_get, (player_id_A, player_id_B, time_range, ai_or_human, fields, limit, streaming))
-    def _battles_get(self, player_id_A, player_id_B, time_range, ai_or_human, fields, limit, streaming):
+        return self.instrument('battles_get(%s)'%reason, self._battles_get, (player_id_A, player_id_B, time_range, ai_or_human, fields, oldest_first, limit, streaming))
+    def _battles_get(self, player_id_A, player_id_B, time_range, ai_or_human, fields, oldest_first, limit, streaming):
         qs = {'$and': []}
         for player_id in (player_id_A, player_id_B):
             if player_id > 0:
@@ -752,7 +752,7 @@ class NoSQLClient (object):
             for f in fields:
                 q_fields[f] = 1
         cursor = self.battles_table().find(qs, q_fields)
-        cursor = cursor.sort([('time',pymongo.DESCENDING)]) # most recent first
+        cursor = cursor.sort([('time',pymongo.ASCENDING if oldest_first else pymongo.DESCENDING)])
         if limit > 0:
             cursor = cursor.limit(limit)
         if not streaming:
