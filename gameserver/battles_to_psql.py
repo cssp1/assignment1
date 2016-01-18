@@ -26,17 +26,17 @@ def make_log_id(s):
         return '%10d-%d-vs-%d-at-%s' % (s['time'], s['attacker_id'], s['defender_id'], s['base_id'])
 
 def battles_schema(sql_util):
-    return { 'fields': [('log_id', 'VARCHAR(64) NOT NULL'),
+    return { 'fields': [('battle_id', 'VARCHAR(64) NOT NULL'),
                         ('time', 'INT8 NOT NULL'),
                         ('involved_player0', 'INT4'),
                         ('involved_player1', 'INT4'),
                         ('involved_alliance0', 'INT4'),
                         ('involved_alliance1', 'INT4'),
-                        ('is_ai', 'boolean'),
+                        ('is_ai', 'boolean NOT NULL'),
                         ('summary', 'jsonb NOT NULL'),
                         ],
              'indices': { 'by_time': {'keys': [('time','ASC')]},
-                          'by_log_id': {'keys': [('log_id','ASC')], 'unique': True},
+                          'by_battle_id': {'keys': [('battle_id','ASC')], 'unique': True},
                           'by_player0_time': {'keys': [('involved_player0','ASC'),('time','ASC')], 'where': 'involved_player0 IS NOT NULL'},
                           'by_player1_time': {'keys': [('involved_player1','ASC'),('time','ASC')], 'where': 'involved_player1 IS NOT NULL'},
                           'by_alliance0_time': {'keys': [('involved_alliance0','ASC'),('time','ASC')], 'where': 'involved_alliance0 IS NOT NULL'},
@@ -107,7 +107,7 @@ if __name__ == '__main__':
         n_updated = 0
         summaries = nosql_client.battles_get(-1, -1, time_range = [start_time+1, end_time], oldest_first = True, streaming = True)
 
-        if verbose: print 'found', summaries.count(), 'battles...'
+        if verbose: print 'found some battles...'
 
         batch = []
         total = 0
@@ -129,7 +129,7 @@ if __name__ == '__main__':
                     alliance1 = row['involved_alliances'][1]
 
             assert ('_id' not in row) # don't rely on MongoDB object IDs
-            keyvals = [('log_id', make_log_id(row)),
+            keyvals = [('battle_id', row['battle_id']), # make_log_id(row)
                        ('time', row['time']),
                        ('involved_player0', player0),
                        ('involved_player1', player1),

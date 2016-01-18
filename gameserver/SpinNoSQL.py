@@ -748,17 +748,26 @@ class NoSQLClient (object):
             qs['$and'].append({'$or':[{'$and':[{'attacker_type':'human'},{'defender_type':'human'}]},
                                       {'$and':[{'ladder_state':{'$exists':True}},{'ladder_state':{'$ne':None}}]}]}) # list AI ladder battles here
 
-        q_fields = {'_id':0} # don't rely on MongoDB _ids for battles
+
         if fields:
+            q_fields = {'_id':1} # DO request _id so we can convert it to battle_id
             for f in fields:
                 q_fields[f] = 1
+        else:
+            q_fields = None
         cursor = self.battles_table().find(qs, q_fields)
         cursor = cursor.sort([('time',pymongo.ASCENDING if oldest_first else pymongo.DESCENDING)])
         if limit > 0:
             cursor = cursor.limit(limit)
+        cursor = (self.decode_battle(x) for x in cursor)
         if not streaming:
             cursor = list(cursor)
         return cursor
+    def decode_battle(self, row):
+        if '_id' in row:
+            row['battle_id'] = self.decode_object_id(row['_id'])
+            del row['_id']
+        return row
 
     ###### CHAT BUFFER ######
 
