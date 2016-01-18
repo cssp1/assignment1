@@ -17426,7 +17426,7 @@ class GAMEAPI(resource.Resource):
     def query_recent_attackers(self, session, retmsg, arg):
         tag = arg[1]
 
-        if gamedata['server'].get('battle_history_source','playerdb') == 'nosql':
+        if gamedata['server'].get('battle_history_source','nosql') in ('nosql','nosql/sql'):
             # get summary data from database
             summaries = gamesite.nosql_client.battles_get(session.user.user_id, -1, time_range = [server_time - gamedata['server'].get('nosql_recent_attackers_time_limit',7*86400), server_time],
                                                           limit = gamedata['server'].get('nosql_battle_history_limit',50),
@@ -17466,6 +17466,9 @@ class GAMEAPI(resource.Resource):
         if time_range:
             assert isinstance(time_range, list) and len(time_range) == 2 and all(isinstance(x, (int,float)) for x in time_range)
 
+        # "nosql" for hot-only, "nosql/sql" for hot/cold, or "playerdb" (obsolete)
+        battle_history_source = gamedata['server'].get('battle_history_source','nosql') # also update query_recent_attackers()!
+
         if source == session.user.user_id:
             # get any pending updates
             self.do_receive_mail(session, retmsg)
@@ -17480,7 +17483,7 @@ class GAMEAPI(resource.Resource):
             else:
                 battle_history = None # not found
 
-        if gamedata['server'].get('battle_history_source','playerdb') in ('nosql','nosql/sql'):
+        if battle_history_source in ('nosql','nosql/sql'):
             # get summary data from database
             # XXX need token-based paging to avoid infinite re-query if more than "limit" battles happen within one second
 
@@ -17490,7 +17493,7 @@ class GAMEAPI(resource.Resource):
             # if the hot query is exhaustive.
 
             # hot query
-            hot_limit = gamedata['server'].get('nosql_battle_history_limit',50)
+            hot_limit = gamedata['server'].get('nosql_battle_history_limit', 50 if time_range else 10) # optimize for fast first range-less query
             hot_summaries = gamesite.nosql_client.battles_get(source, target, limit = hot_limit,
                                                               ai_or_human = {'any': SpinNoSQL.NoSQLClient.BATTLES_ALL,
                                                                              'ai': SpinNoSQL.NoSQLClient.BATTLES_AI_ONLY,
@@ -17504,10 +17507,10 @@ class GAMEAPI(resource.Resource):
 
             # do we also need to do a cold query?
             if hot_is_final and \
-               gamedata['server'].get('battle_history_source','playerdb') == 'nosql/sql' and \
+               battle_history_source == 'nosql/sql' and \
                gamesite.sql_battles_client:
                 # cold query
-                cold_limit = gamedata['server'].get('sql_battle_history_limit',25)
+                cold_limit = gamedata['server'].get('sql_battle_history_limit', 50)
                 cold_time_range = [-1, server_time]
                 if time_range and time_range[0] > 0:
                     cold_time_range[0] = time_range[0]
