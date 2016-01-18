@@ -712,6 +712,7 @@ class NoSQLClient (object):
         if not self.seen_battles:
             coll.create_index([('time',pymongo.ASCENDING)])
             coll.create_index([('involved_players',pymongo.ASCENDING),('time',pymongo.ASCENDING)])
+            coll.create_index([('involved_alliances',pymongo.ASCENDING),('time',pymongo.ASCENDING)], sparse = True, background = True)
             self.seen_battles = True
         return coll
     def battle_record(self, summary, reason=''):

@@ -30,6 +30,8 @@ def battles_schema(sql_util):
                         ('time', 'INT8 NOT NULL'),
                         ('involved_player0', 'INT4'),
                         ('involved_player1', 'INT4'),
+                        ('involved_alliance0', 'INT4'),
+                        ('involved_alliance1', 'INT4'),
                         ('is_ai', 'boolean'),
                         ('summary', 'jsonb NOT NULL'),
                         ],
@@ -37,6 +39,8 @@ def battles_schema(sql_util):
                           'by_log_id': {'keys': [('log_id','ASC')], 'unique': True},
                           'by_player0_time': {'keys': [('involved_player0','ASC'),('time','ASC')], 'where': 'involved_player0 IS NOT NULL'},
                           'by_player1_time': {'keys': [('involved_player1','ASC'),('time','ASC')], 'where': 'involved_player1 IS NOT NULL'},
+                          'by_alliance0_time': {'keys': [('involved_alliance0','ASC'),('time','ASC')], 'where': 'involved_alliance0 IS NOT NULL'},
+                          'by_alliance1_time': {'keys': [('involved_alliance1','ASC'),('time','ASC')], 'where': 'involved_alliance1 IS NOT NULL'},
                           }
              }
 
@@ -117,11 +121,20 @@ if __name__ == '__main__':
             if len(row['involved_players']) >= 2:
                 player1 = row['involved_players'][1]
 
+            alliance0 = alliance1 = None
+            if 'involved_alliances' in row:
+                if len(row['involved_alliances']) >= 1:
+                    alliance0 = row['involved_alliances'][0]
+                if len(row['involved_alliances']) >= 2:
+                    alliance1 = row['involved_alliances'][1]
+
             assert ('_id' not in row) # don't rely on MongoDB object IDs
             keyvals = [('log_id', make_log_id(row)),
                        ('time', row['time']),
                        ('involved_player0', player0),
                        ('involved_player1', player1),
+                       ('involved_alliance0', alliance0),
+                       ('involved_alliance1', alliance1),
                        ('is_ai', (row.get('attacker_type') == 'ai' or row.get('defender_type') == 'ai') and (not row.get('ladder_state'))),
                        ('summary', SpinJSON.dumps(row))]
 

@@ -16026,6 +16026,12 @@ class GAMEAPI(resource.Resource):
             for role, id, cache in (('attacker', session.alliance_id_cache, session.alliance_info_cache),
                                     ('defender', session.viewing_alliance_id_cache, session.viewing_alliance_info_cache)):
                 if id >= 0 and cache:
+                    # update involved_alliances only for PvP battles
+                    if (not session.viewing_player.is_ai()) or session.is_ladder_battle():
+                        if 'involved_alliances' not in summary: summary['involved_alliances'] = []
+                        if id not in summary['involved_alliances']:
+                            summary['involved_alliances'].append(id)
+
                     for FIELD in ('id','ui_name','chat_tag'):
                         if FIELD in cache:
                             summary[role+'_alliance_'+FIELD] = cache[FIELD]
@@ -16610,6 +16616,7 @@ class GAMEAPI(resource.Resource):
                     # this is denormalized to show players historical data
                     for role, id, cache in (('defender', session.alliance_id_cache, session.alliance_info_cache),):
                         if id >= 0 and cache:
+                            # note: no involved_alliances here, since it's not PvP
                             for FIELD in ('id','ui_name','chat_tag'):
                                 if FIELD in cache:
                                     summary[role+'_alliance_'+FIELD] = cache[FIELD]
