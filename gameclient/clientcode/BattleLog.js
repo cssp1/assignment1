@@ -201,15 +201,52 @@ BattleLog.compress = function(metlist) {
 };
 
 
+/** Clean up a player ui_name for use in the battle log entries
+    @param {string} n
+    @param {boolean} is_ai
+    @param {boolean} is_viewer
+    @return {string} */
+BattleLog.format_name_for_display = function(n, is_ai, is_viewer) {
+    if(is_viewer) { return 'You'; }
+    var name_start = 0, name_end = 0;
+    // special handling for "Mr. Skilling" -> "Skilling" and "The Hammers" -> "The Hammers" (instead of "Hammers")
+    if(n.indexOf('Mr. ') == 0) {
+        name_start = 1; name_end = 1;
+    } else if(n.indexOf('The ') == 0) {
+        name_start = 0; name_end = 1;
+    } else if(!is_ai) {
+        // for player opponents, strip off the rank/title prefix
+        n = PlayerCache.strip_title_prefix(n);
+    }
+    var broken_name = n.split(' ');
+    return broken_name.slice(name_start, name_end+1).join(' ');
+};
+/** Make possessive version of a name
+    @param {string} name
+    @param {boolean} is_viewer
+    @return {string} */
+BattleLog.make_possessive = function(name, is_viewer) {
+    if(is_viewer) { return 'Your'; }
+    return name+(name[name.length-1] == 's' ? "'" : "'s");
+};
+
 // return an ARRAY OF PARAGRAPHS
 // each PARAGRAPH is an array of LINES
 // each LINE is an array of ABlocks
 
-BattleLog.parse = function(my_id, summary, metlist) {
+// note: for a third-party battle involving an alliancemate, "my_id"
+// refers to the alliancemate involved in the battle, who should be
+// considered the "good guy" (or -1 to favor neither participant).
+
+// viewer_id is the id of the player looking at the log (who should be
+// referred to as "You").
+
+BattleLog.parse = function(my_id, viewer_id, summary, metlist) {
     var ncells = ('base_ncells' in summary && summary['base_ncells'] ? summary['base_ncells'] : gamedata['map']['default_ncells']); // OK
     metlist = BattleLog.compress(metlist);
 
-    // get names for attacker and defender
+    // get names and possessives for attacker and defender
+
     var names = {}, poss = {};
     var myrole, opprole;
     if(my_id == summary['defender_id']) {
@@ -220,26 +257,13 @@ BattleLog.parse = function(my_id, summary, metlist) {
         opprole = 'defender';
     }
 
-    names[myrole] = names[my_id] = 'You';
-    poss[myrole] = poss[my_id] = 'Your';
+    names[myrole] = names[my_id] = BattleLog.format_name_for_display(summary[myrole+'_name'], is_ai_user_id_range(my_id), viewer_id === my_id);
+    poss[myrole] = poss[my_id] = BattleLog.make_possessive(names[myrole], viewer_id === my_id);
 
-    // special handling for "Mr. Skilling" -> "Skilling" and "The Hammers" -> "The Hammers" (instead of "Hammers")
-    if(1) {
-        var n = summary[opprole+'_name'];
-        var name_start = 0, name_end = 0;
-        if(n.indexOf('Mr. ') == 0) {
-            name_start = 1; name_end = 1;
-        } else if(n.indexOf('The ') == 0) {
-            name_start = 0; name_end = 1;
-        } else if(!is_ai_user_id_range(summary[opprole+'_id'])) {
-            // for player opponents, strip off the rank/title prefix
-            n = PlayerCache.strip_title_prefix(n);
-        }
-        var broken_name = n.split(' ');
-        names[opprole] = names[summary[opprole+'_id']] = broken_name.slice(name_start, name_end+1).join(' ');
-    }
+    names[opprole] = names[summary[opprole+'_id']] = BattleLog.format_name_for_display(summary[opprole+'_name'], is_ai_user_id_range(summary[opprole+'_id']), viewer_id === summary[opprole+'_id']);
+    poss[opprole] = poss[summary[opprole+'_id']] = BattleLog.make_possessive(names[opprole], viewer_id === summary[opprole+'_id']);
 
-    poss[opprole] = poss[summary[opprole+'_id']] = names[opprole]+(names[opprole][names[opprole].length-1] == 's' ? "'" : "'s");
+    console.log(names);
 
     var color_good = 'rgba(0,180,0,1)';
     var color_good_hi = 'rgba(100,255,100,1)';
@@ -352,7 +376,7 @@ BattleLog.parse = function(my_id, summary, metlist) {
             }
         } else if(met['event_name'] == '3910_unit_deployed') {
             var deploy;
-            if(met['user_id'] == my_id) {
+            if(met['user_id'] == viewer_id) {
                 deploy = 'deploy';
             } else {
                 deploy = 'deploys';
@@ -475,13 +499,13 @@ BattleLog.parse = function(my_id, summary, metlist) {
                 }
             }
             if(outcome == 'victory') {
-                if(my_id == summary['attacker_id']) {
+                if(viewer_id == summary['attacker_id']) {
                     tx += 'You are victorious!';
                 } else {
                     tx += 'Victory for '+names['attacker']+'!';
                 }
             } else {
-                if(my_id == summary['attacker_id']) {
+                if(viewer_id == summary['attacker_id']) {
                     tx += names['attacker']+' withdraw';
                 } else {
                     tx += names['attacker']+' withdraws';

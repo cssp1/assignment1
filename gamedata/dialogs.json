@@ -6278,12 +6278,15 @@
                        "text_hjustify": "left", "ui_name_all": "Battle History", "ui_name_vs": "Battle History vs %s" },
             "close_button": { "kind": "ActionButton", "xy": [706,1], "dimensions": [19,22], "bg_image": "close_button_small", "push_bg_image": 1 },
 
-            "single_player_button": { "kind": "ActionButton", "xy": [398,20], "dimensions": [136,32], "text_size": 13, "text_style": "bold",
+            "single_player_button": { "kind": "ActionButton", "xy": [254,20], "dimensions": [136,32], "text_size": 13, "text_style": "bold",
                                       "bg_image": "menu_button_136px", "state": "active", "ui_name": "Single Player",
                                       "ui_tooltip": "Show battles against computer opponents", "tooltip_delay": 0 },
-            "multiplayer_button": { "kind": "ActionButton", "xy": [542,20], "dimensions": [136,32], "text_size": 13, "text_style": "bold",
+            "multiplayer_button": { "kind": "ActionButton", "xy": [398,20], "dimensions": [136,32], "text_size": 13, "text_style": "bold",
                                     "bg_image": "menu_button_136px", "state": "normal", "ui_name": "Multiplayer",
                                     "ui_tooltip": "Show battles against human rivals", "tooltip_delay": 0 },
+            "alliance_button": { "kind": "ActionButton", "xy": [542,20], "dimensions": [136,32], "text_size": 13, "text_style": "bold",
+                                 "bg_image": "menu_button_136px", "state": "normal", "ui_name": "Alliance",
+                                 "ui_tooltip": "Show multiplayer battles involving your alliance", "tooltip_delay": 0 },
 
             "column_header_opponent": { "kind": "TextField", "xy": [67,79], "dimensions": [204,23],"text_size": 13, "text_style": "bold",
                                         "text_hjustify": "left", "ui_name": "Opponent" },

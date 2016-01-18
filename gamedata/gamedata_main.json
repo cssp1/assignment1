@@ -247,6 +247,7 @@
         "enable_alliances": 1,
         "enable_alliance_chat_tags": 1,
         "enable_alliance_role_gui": 1,
+        "enable_alliance_battle_history": 0,
 
         "default_chat_tab": [[{"predicate": "AND", "subpredicates": [
             {"predicate": "LIBRARY", "name": "quarry_requirement"},

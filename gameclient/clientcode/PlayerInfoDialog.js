@@ -584,7 +584,7 @@ PlayerInfoDialog.invoke_profile_tab = function(parent) {
         // looking at yourself
         dialog.widgets['spy_button'].show = false;
         dialog.widgets['friend_icon'].state = 'disabled';
-        dialog.widgets['battles_button'].onclick = function() { invoke_battle_history_dialog(session.user_id, -1, '', -1); };
+        dialog.widgets['battles_button'].onclick = function() { invoke_battle_history_dialog(session.user_id, -1, session.alliance_id, '', -1); };
     } else {
         dialog.widgets['spy_button'].onclick = (function(uid) { return function() {
             visit_base(uid);
@@ -598,13 +598,13 @@ PlayerInfoDialog.invoke_profile_tab = function(parent) {
 
         // see battles from MY perspective against this opponent
         dialog.widgets['battles_button'].onclick = (function(_uid, _name, _level) { return function() {
-            invoke_battle_history_dialog(session.user_id, _uid, _name, _level);
+            invoke_battle_history_dialog(session.user_id, _uid, -1, _name, _level);
         }; })(user_id, PlayerCache.get_ui_name(knowledge), knowledge['player_level'] || 1);
 
         // see all battles from OPPONENT'S perspective (developer only)
         dialog.widgets['dev_battles_button'].show = (player.is_developer() && (session.viewing_user_id == user_id));
         dialog.widgets['dev_battles_button'].onclick = (function(_uid) { return function() {
-            invoke_battle_history_dialog(_uid, -1, '(DEV-ALL)', -1);
+            invoke_battle_history_dialog(_uid, -1, -1, '(DEV-ALL)', -1);
         }; })(user_id);
     }
 
