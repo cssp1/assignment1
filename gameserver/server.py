@@ -4317,6 +4317,12 @@ class Session(object):
                     continue
                 item['expire_time'] = item_expire_time
 
+            # special case: token quantity boost
+            if item['spec'] == 'token':
+                stack_mult = player.stattab.get_player_stat('loot_factor_tokens')
+                if stack_mult != 1:
+                    item['stack'] = int(item.get('stack',1) * stack_mult + 0.5)
+
         for item in to_remove:
             loot.remove(item)
         return loot
@@ -9911,6 +9917,7 @@ class Player(AbstractPlayer):
                 'foreman_speed': ModChain.make_chain(1),
                 'loot_factor_pvp': ModChain.make_chain(1),
                 'loot_factor_pve': ModChain.make_chain(1),
+                'loot_factor_tokens': ModChain.make_chain(1),
                 'quarry_yield_bonus': ModChain.make_chain(1),
                 'turf_quarry_yield_bonus': ModChain.make_chain(1),
                 'travel_speed': ModChain.make_chain(1),

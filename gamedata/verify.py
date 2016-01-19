@@ -1295,7 +1295,7 @@ MODIFIABLE_STATS = {'unit/building': set(['max_hp', 'maxvel', 'weapon_damage', '
                                           'damage_taken', 'armor', 'unit_repair_speed', 'repair_speed', 'swamp_effects',
                                           'research_speed', 'crafting_speed', 'manufacture_speed', 'weapon', 'weapon_level', 'weapon_asset', 'permanent_auras', 'continuous_cast',
                                           'anti_air', 'anti_missile', 'resurrection', 'on_destroy', 'splash_range','effective_range','accuracy']),
-                    'player': set(['foreman_speed', 'loot_factor_pvp', 'loot_factor_pve', 'travel_speed', 'deployable_unit_space',
+                    'player': set(['foreman_speed', 'loot_factor_pvp', 'loot_factor_pve', 'loot_factor_tokens', 'travel_speed', 'deployable_unit_space',
                                    'chat_template', 'chat_gagged', 'quarry_yield_bonus', 'turf_quarry_yield_bonus',
                                    'combat_time_scale'])}
 
