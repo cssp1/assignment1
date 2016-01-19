@@ -51,6 +51,10 @@ if [[ "$FREQ" == "daily" ]]; then
   run_it ./battles_to_mysql.py -q --prune
   run_it ./battle_risk_reward_to_sql.py -q # requires battles, store (gamebucks), stats
 
+  # send SpinReminder notification
+  ./SpinReminders.py --from "all-to-mysql.sh" --subject "${GAME_ID} daily metrics" --body "new battle_risk_reward data available" \
+		     --recipients "`./SpinConfig.py --getvar server_status_recipients`"
+
   # things needed for analytics-views, with sessions last
   run_it ./metrics_to_mysql.py -q --prune
 
