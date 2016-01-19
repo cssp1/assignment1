@@ -6,6 +6,20 @@
 
 # dump battles (summaries) from MongoDB to PostgreSQL for warehousing
 
+# to backfill involved_alliances in old battles:
+#db.$GAME_ID_battles.find({'$and':[{'involved_alliances':{'$exists':false}},{'battle_type':'attack'},{'$or':[{'defender_is_ai':0},{'ladder_state'#:{'$ne':null}}]},{'$or':[{'attacker_alliance_id':{'$exists':1}},{'defender_alliance_id':{'$exists':1}}]}]}).snapshot().forEach(function(r) {
+#    var involved_alliances=[];
+#    if(r['attacker_alliance_id'] >0) {
+#        involved_alliances.push(r['attacker_alliance_id']);
+#    };
+#    if(r['defender_alliance_id']>0) {
+#        involved_alliances.push(r['defender_alliance_id']);
+#    };
+#    if(involved_alliances.length > 0) {
+#        db.$GAME_ID_battles.update({'_id':r['_id']}, {'$set':{'involved_alliances':involved_alliances}});
+#    }
+#});
+
 import sys, time, getopt
 import SpinConfig
 import SpinNoSQL
