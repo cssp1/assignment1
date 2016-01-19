@@ -3775,7 +3775,7 @@ class Session(object):
 
         # retrieve context
         context_list = gamesite.nosql_client.chat_get_context(channel, target_uid, context_time,
-                                                              gamedata.get('chat_report_context_time', 10),
+                                                              gamedata.get('chat_report_context_time', 120),
                                                               gamedata.get('chat_report_context_limit', 2), reason = 'do_chat_report2')
 
         ui_context_list = []
