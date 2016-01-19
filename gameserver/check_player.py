@@ -75,6 +75,133 @@ def ui_end_time(end_time, time_now, negate = False):
     else:
         return 'Never' if negate else 'Permanently'
 
+def get_recent_playtime(sessions, last_days):
+    begin_time = time_now - last_days*24*60*60
+    in_count = 0
+    in_time = 0
+    longest = -1
+    for i in xrange(len(sessions)-1, -1, -1):
+        s = sessions[i]
+        if s[0] < 0 or s[1] < 0: continue
+        if s[1] < begin_time:
+            break
+
+        login_time = max(begin_time, s[0])
+
+        in_count += 1
+        in_time += s[1]-login_time
+
+        if (s[1]-s[0]) > longest: # count full session
+            longest = s[1]-s[0]
+
+    in_hrs = float(in_time)/3600.0
+    in_pct = 100.0 * in_time / float(time_now - begin_time)
+
+    return '%.2f hrs in %d logins during last %d days: %.1f%%%s' % (in_hrs, in_count, last_days, in_pct, ' (longest session %.2f hrs)' % (longest/3600.0) if longest>0 else '')
+
+def get_recent_attackability(sessions, protection_history, last_days, verbose = False):
+    MAX_SESSION_LENGTH = 43200
+    MAX_PROTECTION_LENGTH = 30*24*60*60
+
+    begin_time = time_now - last_days*24*60*60
+
+
+    # compile all events affecting attackability into a time series
+    # (t, login_delta, protection_delta, reason)
+    # player is open to attack if cumulative sum of both deltas is 0
+
+    events = [(begin_time, 0, 0, 'BEGIN'), # sentinel markers
+              (time_now, 0, 0, 'END')]
+
+    # gather damage protection events
+    attacked = 0
+    dp_purchases = 0
+    dp_battle = 0
+
+    last_end_time = -1
+    for p in protection_history:
+        if p['time'] < MAX_PROTECTION_LENGTH: continue
+        if p['event'] == '3885_i_got_attacked':
+            if p['time'] >= begin_time:
+                attacked += 1
+        elif 'new_end_time' in p:
+            if last_end_time > 0 and last_end_time < p['time']:
+                events.append((last_end_time, 0, -1, 'PROT_EXPIRED'))
+                last_end_time = -1
+
+            if p['new_end_time'] > 0:
+                if last_end_time < 0:
+                    events.append((p['time'], 0, 1, p['event']))
+            elif p['new_end_time'] < 0:
+                if last_end_time > 0:
+                    events.append((p['time'], 0, -1, p['event']))
+            last_end_time = p['new_end_time']
+
+        if p['time'] >= begin_time:
+            if p['event'] == '3883_protection_from_spell':
+                dp_purchases += 1
+            elif p['event'] in ('3881_protection_from_ladder_battle',
+                                '3882_protection_from_nonladder_battle'):
+                dp_battle += 1
+
+    # final expiration event
+    if last_end_time > 0 and last_end_time < time_now:
+        events.append((last_end_time, 0, -1, 'PROT_EXPIRED'))
+
+    # gather sessions
+    for s in sessions:
+        if s[0] < begin_time - MAX_SESSION_LENGTH: continue
+        if s[0] > 0:
+            events.append((s[0], 1, 0, 'login'))
+        if s[1] > 0:
+            events.append((s[1], -1, 0, 'logout'))
+
+    events.sort()
+    if verbose: print events
+
+    login_accum = 0
+    prot_accum = 0
+    last_t = -1 # -1 until BEGIN marker is seen
+    time_open = 0
+    time_logged_in = 0
+    time_under_protection = 0
+    time_logged_in_and_under_protection = 0
+
+    for t, login_delta, prot_delta, reason in events:
+        if reason == 'BEGIN':
+            last_t = t
+
+        if last_t > 0:
+            if login_accum == 0 and prot_accum == 0:
+                if verbose: print t, login_accum, prot_accum, reason, 'OPEN', t-last_t
+                time_open += t - last_t
+            elif login_accum != 0 and prot_accum == 0:
+                if verbose: print t, login_accum, prot_accum, reason, 'LOGGED_IN', t-last_t
+                time_logged_in += t - last_t
+            elif login_accum == 0 and prot_accum != 0:
+                if verbose: print t, login_accum, prot_accum, reason, 'UNDER_PROTECTION', t-last_t
+                time_under_protection += t - last_t
+            else:
+                if verbose: print t, login_accum, prot_accum, reason, 'LOGGED_IN_UNDER_PROTECTION', t-last_t
+                time_logged_in_and_under_protection += t - last_t
+
+        login_accum += login_delta
+        prot_accum += prot_delta
+        if last_t > 0:
+            last_t = t
+        if reason == 'END': break
+
+    ret = [('Open to attack:', '%.2f hrs' % (float(time_open)/3600.0)),
+           ('Logged in, no DP:', '%.2f hrs' % (float(time_logged_in)/3600.0)),
+           ('Logged in, with DP:', '%.2f hrs' % (float(time_logged_in_and_under_protection)/3600.0)),
+           ('Logged out, with DP:', '%.2f hrs' % (float(time_under_protection)/3600.0)),
+           ('Times attacked:', '%d time(s)' % attacked)]
+    if dp_purchases > 0:
+        ret += [('DP from items/Store:', 'Obtained %d time(s)' % dp_purchases)]
+    if dp_battle > 0:
+        ret += [('DP from battles:', 'Obtained %d time(s)' % dp_battle)]
+    return ret
+
 def check_bloat(input, min_size = 1024, print_max = 20):
     sizes = []
     for key, val in input.iteritems():
@@ -442,31 +569,14 @@ if __name__ == '__main__':
 
         if 'sessions' in player['history']:
             sessions = player['history']['sessions']
-
-            LAST_DAYS = 2
-            begin_time = time_now - LAST_DAYS*24*60*60
-            in_count = 0
-            in_time = 0
-            longest = -1
-            for i in xrange(len(sessions)-1, -1, -1):
-                s = sessions[i]
-                if s[0] < 0 or s[1] < 0: continue
-                if s[1] < begin_time:
-                    break
-
-                login_time = max(begin_time, s[0])
-
-                in_count += 1
-                in_time += s[1]-login_time
-
-                if (s[1]-s[0]) > longest: # count full session
-                    longest = s[1]-s[0]
-
-            in_hrs = float(in_time)/3600.0
-            in_pct = 100.0 * in_time / float(time_now - begin_time)
-
             print fmt % ('Logins:', len(sessions))
-            print fmt % ('Recent play:', '%.2f hrs in %d logins during last %d days: %.1f%%%s' % (in_hrs, in_count, LAST_DAYS, in_pct, ' (longest session %.2f hrs)' % (longest/3600.0) if longest>0 else ''))
+            print fmt % ('Recent play:', get_recent_playtime(sessions, 2))
+            attackability = get_recent_attackability(sessions, player['history'].get('protection_history',[]), 2)
+            if attackability:
+                print fmt % ('---Attackability---', 'In last 2 days:')
+                for k, v in attackability:
+                    print fmt % (k,v)
+                print fmt % ('---Attackability---', '')
 
         prot = 0
         if player['resources']['protection_end_time'] > time_now:
@@ -638,7 +748,7 @@ if __name__ == '__main__':
             generation += 1
             player['generation'] = generation
             driver.sync_write_player(user_id, SpinJSON.dumps(player, pretty=True, newline=True, double_precision=5))
-            if do_put_user or do_gag or do_ungag or do_make_chat_mod or do_unmake_chat_mod:
+            if do_put_user or do_make_chat_mod or do_unmake_chat_mod:
                 driver.sync_write_user(user_id, SpinJSON.dumps(user, pretty=True, newline=True, double_precision=5))
             print 'Changes to user %d updated successfully!' % user_id
     finally:
