@@ -17440,7 +17440,7 @@ class GAMEAPI(resource.Resource):
     def query_recent_attackers(self, session, retmsg, arg):
         tag = arg[1]
 
-        if gamedata['server'].get('battle_history_source','nosql') in ('nosql','nosql/sql'):
+        if gamedata['server'].get('battle_history_source','nosql/sql') in ('nosql','nosql/sql'):
             # get summary data from database
             summaries = gamesite.nosql_client.battles_get(session.user.user_id, -1, -1, -1, time_range = [server_time - gamedata['server'].get('nosql_recent_attackers_time_limit',7*86400), server_time],
                                                           limit = gamedata['server'].get('nosql_battle_history_limit',50),
@@ -17494,7 +17494,7 @@ class GAMEAPI(resource.Resource):
                 return
 
         # "nosql" for hot-only, "nosql/sql" for hot/cold, or "playerdb" (obsolete)
-        battle_history_source = gamedata['server'].get('battle_history_source','nosql') # also update query_recent_attackers()!
+        battle_history_source = gamedata['server'].get('battle_history_source','nosql/sql') # also update query_recent_attackers()!
 
         battle_history = None
         if battle_history_source == 'playerdb':
