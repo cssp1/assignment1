@@ -6400,6 +6400,7 @@ player.lottery_is_busy = function(scanner) {
 player.get_lottery_state = function(scanner) {
     var ret = { num_scans: 0,
                 next_scan_method: null,
+                next_scan_free: false,
                 can_scan: false,
                 on_cooldown: false,
                 fail_ui_reason: null,
@@ -6432,6 +6433,9 @@ player.get_lottery_state = function(scanner) {
         if(aura) {
             ret.num_scans += ('stack' in aura ? aura['stack'] : 1);
             ret.next_scan_method = 'aura';
+            if(aura['data'] && aura['data']['free']) {
+                ret.next_scan_free = true;
+            }
         }
     }
 
@@ -25379,7 +25383,7 @@ function update_lottery_dialog_buttons(dialog, lottery_dialog) {
         dialog.widgets['lottery_button'].tooltip.str = null;
         dialog.widgets['lottery_price_display'].str = Store.display_user_currency_price(display_price); // PRICE
         dialog.widgets['lottery_price_display'].tooltip.str = null; // this tends to show through item_discovered Store.display_user_currency_price_tooltip(display_price); // PRICE
-        dialog.widgets['lottery_button'].str = gamedata['spells']['LOTTERY_SCAN'][((state.next_scan_method == 'paid' || state.next_scan_method == 'aura') ? 'ui_verb_paid' : 'ui_verb')];
+        dialog.widgets['lottery_button'].str = gamedata['spells']['LOTTERY_SCAN'][((state.next_scan_method == 'paid' || (state.next_scan_method == 'aura' && !state.next_scan_free)) ? 'ui_verb_paid' : 'ui_verb')];
 
         if(!state.can_scan) {
             dialog.widgets['lottery_button'].state = 'disabled_clickable';
