@@ -17624,10 +17624,19 @@ class GAMEAPI(resource.Resource):
         pcache_data = None
         latest_returned_time = -1 # timestamp of most recent battle summary returned
 
+        if not isinstance(summaries, list):
+            raise Exception('unexpected summaries: %r ' % summaries)
+
         if summaries:
 
             # perform player cache lookups
-            qset = set((s['attacker_id'] if s['attacker_id'] != session.user.user_id else s['defender_id']) for s in summaries)
+            qset = set()
+            for s in summaries:
+                if not isinstance(s, dict):
+                    raise Exception('unexpected summary: %r' % s)
+                for player_id in (s['attacker_id'], s['defender_id']):
+                    if player_id != session.user.user_id:
+                        qset.add(player_id)
             if qset:
                 pcache_data = self.do_query_player_cache(session, list(qset), reason = 'query_battle_history')
 

@@ -4,6 +4,7 @@
 # makes use of tables loaded by battles_to_psql.py
 
 import SpinSQLUtil
+import SpinJSON
 
 class SQLBattlesClient(object):
     def __init__(self, sql_client):
@@ -41,8 +42,18 @@ class SQLBattlesClient(object):
                                          ((' LIMIT %d' % limit) if limit > 0 else ''))
         if query:
             # extract raw list of summary columns
-            query.addCallback(lambda result: [row['summary'] for row in result])
+            query.addCallback(lambda result, self=self: [self.decode_summary(row['summary']) for row in result])
         return query
+
+    def decode_summary(self, raw_summary):
+        # older versions of the postgres libraries might return it as a string
+        if isinstance(raw_summary, basestring):
+            summary = SpinJSON.loads(raw_summary)
+        elif isinstance(raw_summary, dict):
+            summary = raw_summary
+        else:
+            raise Exception('unexpected summary type %r: %r' % (type(raw_summary), raw_summary))
+        return summary
 
 # TEST CODE
 
