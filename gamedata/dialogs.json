@@ -6316,7 +6316,9 @@
 
             // note: code shifts row_portrait, row_name, and row_role rightward when row_portrait2 is visible
 
-            "row_name": {"kind": "ActionButton", "xy":[108,112], "dimensions": [157,43],"text_size": 13,"text_style":"bold","text_hjustify":"left","text_vjustify":"top","array": [1,5], "array_offset": [0,56], "max_len": 20 },
+            "row_name": {"kind": "ActionButton", "xy":[108,112], "dimensions": [157,43],
+                         "clip_to": [108,112,190,43], "clip_to_alliance": [158,112,140,43],
+                         "text_size": 13,"text_style":"bold","text_hjustify":"left","text_vjustify":"top","array": [1,5], "array_offset": [0,56], "max_len": 20, "max_len_alliance": 15 },
             "row_role": {"kind": "TextField", "xy":[108,129], "dimensions": [157,60],"text_size": 13,"text_hjustify":"left","text_vjustify":"top",
                          "ui_name_defender": "Defender", "ui_name_attacker": "Attacker", "ui_name_time": "%s %d ago",
                          "text_color":[0.8,0.8,0.8,1], "text_color_defender": [0,0.8,0,1], "text_color_attacker": [1,0,0,1],

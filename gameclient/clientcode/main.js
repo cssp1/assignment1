@@ -25749,8 +25749,10 @@ function battle_history_change_page(dialog, page) {
 
             // name/level
             dialog.widgets['row_name'+row].show = true;
+            dialog.widgets['row_name'+row].clip_to = dialog.data['widgets']['row_name'][(dialog.user_data['chapter'] === 'alliance') ? 'clip_to_alliance' : 'clip_to'];
+
             var name_str = summary[opprole+'_name'];
-            var max_len = dialog.data['widgets']['row_name']['max_len'];
+            var max_len = dialog.data['widgets']['row_name'][(dialog.user_data['chapter'] === 'alliance') ? 'max_len_alliance' : 'max_len'];
             if(name_str.length >= max_len) {
                 name_str = name_str.slice(0, max_len)+'...';
             }
@@ -25990,7 +25992,7 @@ function update_battle_history_dialog(dialog) {
         var is_protected = (prot_end_time == 1 || prot_end_time > server_time || (info && info['LOCK_STATE']));
         var on_cooldown = ('attack_cooldown_expire' in summary && summary['attack_cooldown_expire'] > server_time);
 
-        if(gamedata['client']['battle_history_show_attackability']) {
+        if(gamedata['client']['battle_history_show_attackability'] && (dialog.user_data['chapter'] !== 'alliance')) {
             dialog.widgets['row_prot'+row].show = is_protected;
             dialog.widgets['row_cooldown'+row].show = (!is_protected && on_cooldown);
             if(dialog.widgets['row_cooldown'+row].show) {
