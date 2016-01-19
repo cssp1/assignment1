@@ -25749,7 +25749,8 @@ function battle_history_change_page(dialog, page) {
 
             // name/level
             dialog.widgets['row_name'+row].show = true;
-            dialog.widgets['row_name'+row].clip_to = dialog.data['widgets']['row_name'][(dialog.user_data['chapter'] === 'alliance') ? 'clip_to_alliance' : 'clip_to'];
+            var clip_to = dialog.data['widgets']['row_name'][(dialog.user_data['chapter'] === 'alliance') ? 'clip_to_alliance' : 'clip_to'];
+            dialog.widgets['row_name'+row].clip_to = [clip_to[0], clip_to[1] + row * dialog.data['widgets']['row_name']['array_offset'][1], clip_to[2], clip_to[3]];
 
             var name_str = summary[opprole+'_name'];
             var max_len = dialog.data['widgets']['row_name'][(dialog.user_data['chapter'] === 'alliance') ? 'max_len_alliance' : 'max_len'];
