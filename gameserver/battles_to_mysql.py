@@ -18,6 +18,7 @@ import SpinNoSQL
 import SpinSQLUtil
 import SpinSingletonProcess
 import MySQLdb
+import pymongo
 
 gamedata = None
 time_now = int(time.time())
@@ -261,7 +262,7 @@ if __name__ == '__main__':
 
         qs = {'time':{'$gt':start_time, '$lt': end_time}}
 
-        for row in nosql_client.battles_table().find(qs):
+        for row in nosql_client.battles_table().find(qs).sort([('time',pymongo.ASCENDING)]):
             battle_id = nosql_client.decode_object_id(row['_id'])
 
             # add redundant active_player/active_opponent fields
