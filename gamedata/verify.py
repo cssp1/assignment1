@@ -1112,6 +1112,11 @@ def check_item(itemname, spec):
                 elif spellname == 'CLIENT_CONSEQUENT':
                     error |= check_consequent(use['spellarg'], reason = 'item %s: use' % itemname, context = 'item')
 
+                # missiles
+                elif spellname in gamedata['spells'] and gamedata['spells'][spellname]['activation'] == 'targeted_area':
+                    if ('analytics_value' not in spec) and (gamedata['game_id'] in ('tr','dv')):
+                        error |= 1; print '%s: missile needs an "analytics_value"' % (itemname,)
+
             if 'consequent' in use:
                 error |= check_consequent(use, reason = 'item %s: use' % itemname, context = 'item')
 
