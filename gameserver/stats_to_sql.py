@@ -169,7 +169,7 @@ if __name__ == '__main__':
             if type(min_per_cred) is dict:
                 min_per_cred = min_per_cred['default']
             bucks_per_min = float(gamedata['store']['gamebucks_per_fbcredit'])/min_per_cred
-            cur.execute("CREATE FUNCTION time_price (amount INT8) RETURNS INT8 DETERMINISTIC RETURN IF(amount=0, 0, IF(amount>0,1,-1) * FLOOR(%f *ABS(amount)/60)+1)" % bucks_per_min)
+            cur.execute("CREATE FUNCTION time_price (amount INT8) RETURNS INT8 DETERMINISTIC RETURN IF(amount=0, 0, IF(amount>0,1,-1) * (FLOOR(%f *ABS(amount)/60)+1))" % bucks_per_min)
 
             # RESOURCE PRICING FORMULAS
             # $RES_price returns the gamebucks price of an amount of fungible resources (as sold in the Store)

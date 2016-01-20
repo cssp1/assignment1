@@ -228,7 +228,7 @@ if __name__ == '__main__':
         battle_items_table = cfg['table_prefix']+game_id+'_battle_items'
         battle_damage_table = cfg['table_prefix']+game_id+'_battle_damage'
 
-        nosql_client = SpinNoSQL.NoSQLClient(SpinConfig.get_mongodb_config(game_id))
+        nosql_client = SpinNoSQL.NoSQLClient(SpinConfig.get_mongodb_config((game_id+'test') if SpinConfig.config['game_id'].endswith('test') else game_id))
         cur = con.cursor(MySQLdb.cursors.DictCursor)
 
         for table, schema in ((battles_table, battles_schema(sql_util)),

@@ -298,8 +298,8 @@ if __name__ == '__main__':
 
                     cur.execute("INSERT INTO "+sql_util.sym(summary_table) + " " + \
                                 "SELECT %s*FLOOR((time-%s)/(1.0*%s)) + %s AS "+sql_util.sym(interval)+"," + \
-                                ("       frame_platform," if interval != 'hour' else "") + \
-                                ("       country_tier," if interval != 'hour' else "") + \
+                                ("      frame_platform," if interval != 'hour' else "") + \
+                                ("      country_tier," if interval != 'hour' else "") + \
                                 "       townhall_level," + \
                                 ("      "+sql_util.encode_spend_bracket("prev_receipts")+" AS spend_bracket," if interval != 'hour' else "") + \
                                 "       IF(battle_type='pvp',-1,opponent_id) AS opponent_id," + \

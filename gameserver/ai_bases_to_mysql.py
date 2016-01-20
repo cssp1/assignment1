@@ -10,7 +10,6 @@ import sys, time, getopt
 import SpinConfig
 import SpinUpcache
 import SpinJSON
-import SpinNoSQL
 import SpinSQLUtil
 import SpinSingletonProcess
 import MySQLdb
@@ -127,7 +126,6 @@ if __name__ == '__main__':
         ai_analytics_tag_info_table = cfg['table_prefix']+game_id+'_ai_analytics_tag_info'
         ai_analytics_tag_assignments_table = cfg['table_prefix']+game_id+'_ai_analytics_tag_assignments'
 
-        nosql_client = SpinNoSQL.NoSQLClient(SpinConfig.get_mongodb_config(game_id))
         cur = con.cursor(MySQLdb.cursors.DictCursor)
 
         # recreate AI bases and analytics tag tables

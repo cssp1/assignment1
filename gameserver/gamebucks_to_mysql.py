@@ -159,7 +159,7 @@ if __name__ == '__main__':
 
     with SpinSingletonProcess.SingletonProcess('gamebucks_to_mysql-%s' % game_id):
 
-        nosql_client = SpinNoSQL.NoSQLClient(SpinConfig.get_mongodb_config(game_id))
+        nosql_client = SpinNoSQL.NoSQLClient(SpinConfig.get_mongodb_config((game_id+'test') if SpinConfig.config['game_id'].endswith('test') else game_id))
 
         cur = con.cursor(MySQLdb.cursors.DictCursor)
         sql_util.ensure_table(cur, store_table, store_schema(sql_util))
