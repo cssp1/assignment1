@@ -7168,6 +7168,7 @@ player.equipped_item_iter = function(func) {
     var stop = false;
     goog.object.forEach(player.unit_equipment, function(equipment, specname) {
         goog.object.forEach(equipment, function(name_list, slot_type) {
+            if(slot_type === 'equip_pending') { return; } // special value
             goog.array.forEach(name_list, function(name, slot_index) { if(name) { stop |= func(player.decode_equipped_item(name), new UnitEquipSlotAddress(specname, slot_type, slot_index)); } });
         });
     });
