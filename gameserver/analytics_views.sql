@@ -233,8 +233,8 @@ RETURN IF(stack<=0, 0, FLOOR(stack *
           IF(specname LIKE 'boost_iron_%', iron_price(CAST(SUBSTRING_INDEX(SUBSTRING_INDEX(specname,'_',3),'_',-1) AS UNSIGNED)), -- iron/water resource boosts
           IF(specname LIKE 'boost_water_%', water_price(CAST(SUBSTRING_INDEX(SUBSTRING_INDEX(specname,'_',3),'_',-1) AS UNSIGNED)), -- iron/water resource boosts
            IF(specname LIKE 'mine_%', 5, -- landmines
-	   -- ONP/Solaron: should be ~0.04 for low-skill ultrafans, ~0.01 for high-skill non-payers
-	   -- (based on ratio of ONP earned per gamebuck loss incurred in typical AI battles)
+       -- ONP/Solaron: should be ~0.04 for low-skill ultrafans, ~0.01 for high-skill non-payers
+       -- (based on ratio of ONP earned per gamebuck loss incurred in typical AI battles)
             IF(specname = 'token', 0.02, -- ONP/Solaron (changed again 2016 Jan 19)
              IF(specname = 'gamebucks' OR specname = 'alloy', 1, -- gamebucks
         50)))))))))); -- anything else

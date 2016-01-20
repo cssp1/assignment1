@@ -53,7 +53,7 @@ if [[ "$FREQ" == "daily" ]]; then
 
   # send SpinReminder notification
   ./SpinReminders.py --from "all-to-mysql.sh" --subject "${GAME_ID} daily metrics" --body "new battle_risk_reward data available" \
-		     --recipients "`./SpinConfig.py --getvar server_status_recipients`"
+             --recipients "`./SpinConfig.py --getvar server_status_recipients`"
 
   # things needed for analytics-views, with sessions last
   run_it ./metrics_to_mysql.py -q --prune
