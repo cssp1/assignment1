@@ -2175,7 +2175,7 @@ function hurt_object(target, damage, vs_table, source) {
 
         // destruction of mobile units and buildings is handled differently
         if(target.is_mobile()) {
-            if('on_death_spell' in target.spec) {
+            if(('on_death_spell' in target.spec) && !target.combat_stats.disarmed) {
                 var death_spell_name = target.spec['on_death_spell'];
                 target.cast_client_spell(death_spell_name, gamedata['spells'][death_spell_name], target, null);
             } else {
