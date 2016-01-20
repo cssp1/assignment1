@@ -642,7 +642,7 @@
 
     "battle_log_max_summary_num": 50, // maximum number of battle summaries to keep in battle history (total, ALL opponents)
     "battle_log_max_summary_age": 2592000, // maximum age (seconds) of battle summaries to keep in battle history (30 days)
-    "battle_log_max_age": 2592000, // maximum age (seconds) to keep any playerdb battle history data at all (30 days)
+    "battle_log_max_age": -1, // maximum age (seconds) to keep any playerdb battle history data at all (2592000 = 30 days, -1 to disable)
 
     "repeat_attack_cooldown": {
         // "ai" for AI opponents, "human" for human opponents

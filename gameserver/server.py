@@ -7707,6 +7707,8 @@ class Player(AbstractPlayer):
         else:
             pass # carry over tests across developer restarts
 
+        # in-playerdb battle history
+        # obsolete now - replaced by SpinNoSQL battles table (and optionally cold SQL storage)
         self.battle_history = {} # dictionary { "1112": { "count": xx, "victory": yy, "defeat": zz } }
 
         # how many attacks occurred against this player since the last expiration of his protection timer
@@ -10488,30 +10490,31 @@ class Player(AbstractPlayer):
         opponent_type = 'ai' if summary.get(oprole+'_is_ai', False) else 'human'
 
         # create/update entry in self.battle_history
-        key = str(opponent_id)
-        if not self.battle_history.has_key(key):
-            self.battle_history[key] = {}
-        hist = self.battle_history[key]
-        hist['last_time'] = summary.get('time', server_time)
+        if gamedata['battle_log_max_age'] > 0:
+            key = str(opponent_id)
+            if not self.battle_history.has_key(key):
+                self.battle_history[key] = {}
+            hist = self.battle_history[key]
+            hist['last_time'] = summary.get('time', server_time)
 
-        dict_increment(hist, 'count', 1)
+            dict_increment(hist, 'count', 1)
 
-        # update victory/defeat and defense_victory/defense_defeat counters
-        if (summary.get('base_type','home') == 'home'):
-            dict_increment(hist, summary[myrole+'_outcome'], 1)
-            if myrole == 'defender':
-                dict_increment(hist, 'defense_'+summary[myrole+'_outcome'], 1)
+            # update victory/defeat and defense_victory/defense_defeat counters
+            if (summary.get('base_type','home') == 'home'):
+                dict_increment(hist, summary[myrole+'_outcome'], 1)
+                if myrole == 'defender':
+                    dict_increment(hist, 'defense_'+summary[myrole+'_outcome'], 1)
 
-        # append summary to self.battle_history.summary
-        if not hist.has_key('summary'):
-            hist['summary'] = []
-        sumlist = hist['summary']
-        # prune old entries
-        while len(sumlist) > gamedata['battle_log_max_summary_num']:
-            sumlist.pop(0)
-        while len(sumlist) > 0 and (server_time - sumlist[0]['time']) > gamedata['battle_log_max_summary_age']:
-            sumlist.pop(0)
-        sumlist.append(summary)
+            # append summary to self.battle_history.summary
+            if not hist.has_key('summary'):
+                hist['summary'] = []
+            sumlist = hist['summary']
+            # prune old entries
+            while len(sumlist) > gamedata['battle_log_max_summary_num']:
+                sumlist.pop(0)
+            while len(sumlist) > 0 and (server_time - sumlist[0]['time']) > gamedata['battle_log_max_summary_age']:
+                sumlist.pop(0)
+            sumlist.append(summary)
 
         # update history counters/time series
         if myrole == 'attacker':
@@ -11566,6 +11569,10 @@ class LivePlayer(Player):
         max_summary_num = gamedata['battle_log_max_summary_num']
         max_summary_age = gamedata['battle_log_max_summary_age']
         max_age = gamedata['battle_log_max_age']
+
+        if max_age < 0:
+            self.battle_history = {} # blow it away
+            return
 
         # compile list of all held summaries, sort by age
         all = []
