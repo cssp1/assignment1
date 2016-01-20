@@ -202,9 +202,9 @@ if __name__ == '__main__':
                     func = ""
                     for i in xrange(1, len(points)):
                         slope = float(points[i][1] - points[i - 1][1]) / (points[i][0] - points[i - 1][0])
-                        seg = "%f * (%f + %f * (amount - %f))" % (scale_factor, points[i-1][1], slope, points[i-1][0])
+                        seg = "%f * (%f + %f * (ABS(amount) - %f))" % (scale_factor, points[i-1][1], slope, points[i-1][0])
                         if i != len(points) - 1:
-                            seg = "IF(amount < %f,%s," % (points[i][0], seg)
+                            seg = "IF(ABS(amount) < %f,%s," % (points[i][0], seg)
                         func += seg
                     func += ")" * (len(points)-2)
                 else:
@@ -228,7 +228,7 @@ if __name__ == '__main__':
                     assert len(harvest_rate) == townhall_levels
                     for i in xrange(1,townhall_levels+1):
                         rate = harvest_rate[i-1]/3600.0
-                        seg = "time_price(amount/%f)" % rate
+                        seg = "time_price(ABS(amount)/%f)" % rate
                         if i != townhall_levels:
                             seg = "IF(townhall_level=%d, %s, " % (i, seg)
                         func += seg
