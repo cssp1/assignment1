@@ -247,6 +247,15 @@ if __name__ == '__main__':
                     cur.execute("DROP FUNCTION IF EXISTS "+sql_util.sym(FUNC))
                     cur.execute("CREATE FUNCTION "+sql_util.sym(FUNC)+" (amount INT8) RETURNS INT8 DETERMINISTIC RETURN 0")
 
+            # Special-case function for token (ONP) valuation, depending on player spend
+            # (empirically we find that spend correlates inversely with battle skill)
+            # gamebuck value of 1 token should be ~0.04 for low-skill ultrafans, ~0.01 for high-skill non-payers
+            # (this is based on ratio of tokens earned per gamebuck loss incurred in typical AI battles)
+            cur.execute("DROP FUNCTION IF EXISTS "+sql_util.sym('token_value'))
+            cur.execute("CREATE FUNCTION "+sql_util.sym('token_value')+" (amount INT8, prev_receipts FLOAT) "+\
+                        "RETURNS INT8 DETERMINISTIC RETURN "+\
+                        "GREATEST(1, CEIL(amount*IF(prev_receipts>=1000.0,0.04,IF(prev_receipts>=100.0,0.03,IF(prev_receipts>=10.0,0.02,0.01)))))")
+
             filterwarnings('error', category = MySQLdb.Warning)
             con.commit()
 

@@ -222,22 +222,22 @@ FROM $GAME_ID_credits credits;
 -- RETURNS INT DETERMINISTIC
 -- RETURN IF(amount=0, 0, IF(amount>0,1,-1) * FLOOR(20*ABS(amount)/3600)+1);
 
--- convert an item's value to gamebucks XXX not very accurate
-DROP FUNCTION IF EXISTS item_price;
-CREATE FUNCTION item_price (specname VARCHAR(128), stack INT)
+-- convert an item's value to gamebucks
+DROP FUNCTION IF EXISTS item_price; -- obsolete
+DROP FUNCTION IF EXISTS item_value;
+CREATE FUNCTION item_value (specname VARCHAR(128), stack INT, townhall_level INT, prev_receipts FLOAT)
 RETURNS INT DETERMINISTIC
-RETURN IF(stack<=0, 0, FLOOR(stack *
-       IFNULL((SELECT value_num from $GAME_ID_stats WHERE kind = 'item' AND spec = specname AND stat = 'analytics_value'), -- check for manual override
-        IF(specname LIKE 'tactical_%' OR specname LIKE '%_missile_%', 75, -- missiles
-         IF(specname LIKE 'boost_res3_%', res3_price(CAST(SUBSTRING_INDEX(SUBSTRING_INDEX(specname,'_',3),'_',-1) AS UNSIGNED)), -- res3 resource boosts
-          IF(specname LIKE 'boost_iron_%', iron_price(CAST(SUBSTRING_INDEX(SUBSTRING_INDEX(specname,'_',3),'_',-1) AS UNSIGNED)), -- iron/water resource boosts
-          IF(specname LIKE 'boost_water_%', water_price(CAST(SUBSTRING_INDEX(SUBSTRING_INDEX(specname,'_',3),'_',-1) AS UNSIGNED)), -- iron/water resource boosts
-           IF(specname LIKE 'mine_%', 5, -- landmines
-       -- ONP/Solaron: should be ~0.04 for low-skill ultrafans, ~0.01 for high-skill non-payers
-       -- (based on ratio of ONP earned per gamebuck loss incurred in typical AI battles)
-            IF(specname = 'token', 0.02, -- ONP/Solaron (changed again 2016 Jan 19)
-             IF(specname = 'gamebucks' OR specname = 'alloy', 1, -- gamebucks
-        50)))))))))); -- anything else
+RETURN CASE WHEN stack<=0 THEN 0 -- negative stack
+            WHEN specname='token' THEN token_value(stack, prev_receipts) -- special case for tokens
+	    WHEN specname LIKE 'boost_res3_%' THEN res3_value(CAST(SUBSTRING_INDEX(SUBSTRING_INDEX(specname,'_',3),'_',-1) AS UNSIGNED), townhall_level) -- res3 resource boosts
+	    WHEN specname LIKE 'boost_iron_%' THEN iron_value(CAST(SUBSTRING_INDEX(SUBSTRING_INDEX(specname,'_',3),'_',-1) AS UNSIGNED), townhall_level) -- iron/water resource 
+	    WHEN specname LIKE 'boost_water_%' THEN water_value(CAST(SUBSTRING_INDEX(SUBSTRING_INDEX(specname,'_',3),'_',-1) AS UNSIGNED), townhall_level) -- iron/water resource
+	    WHEN specname LIKE 'mine_%' THEN stack*5 -- landmines
+	    WHEN specname = 'gamebucks' OR specname = 'alloy' THEN stack
+	    WHEN EXISTS(SELECT value_num from $GAME_ID_stats WHERE kind = 'item' AND spec = specname AND stat = 'analytics_value') -- check for manual override
+	    	 THEN FLOOR(stack*(SELECT value_num from $GAME_ID_stats WHERE kind = 'item' AND spec = specname AND stat = 'analytics_value'))
+	    ELSE 0 -- anything else
+	    END;
 
 -- return the analytics_tag that was in effect for a given base_type, base_template, and (AI) user_id at time t
 DROP FUNCTION IF EXISTS get_analytics_tag;
