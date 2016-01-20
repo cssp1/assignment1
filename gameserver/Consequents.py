@@ -58,6 +58,8 @@ class PlayerHistoryConsequent(Consequent):
             self.value_from_context = None
 
         self.method = method
+        self.time_series = data.get('time_series', True)
+
     def execute(self, session, player, retmsg, context=None):
         if self.value_from_context:
             if context and (self.value_from_context in context):
@@ -68,11 +70,11 @@ class PlayerHistoryConsequent(Consequent):
             new_value = self.value
 
         if self.method == 'max':
-            session.deferred_history_update |= session.setmax_player_metric(self.key, new_value)
+            session.deferred_history_update |= session.setmax_player_metric(self.key, new_value, time_series = self.time_series)
         elif self.method == 'set':
-            session.deferred_history_update |= session.setvalue_player_metric(self.key, new_value)
+            session.deferred_history_update |= session.setvalue_player_metric(self.key, new_value, time_series = self.time_series)
         elif self.method == 'increment':
-            session.deferred_history_update |= session.increment_player_metric(self.key, new_value)
+            session.deferred_history_update |= session.increment_player_metric(self.key, new_value, time_series = self.time_series)
         else:
             raise Exception('unknown method '+self.method)
 
