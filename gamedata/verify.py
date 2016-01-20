@@ -64,70 +64,6 @@ def require_art_file(name):
 MAX_RESOURCE_COST = 34000000
 MAX_STORAGE = None
 
-# parse a single predicate for minimum CC level requirement
-def get_cc_requirement_predicate(pred):
-    if pred['predicate'] == 'BUILDING_LEVEL':
-        if pred['building_type'] == gamedata['townhall']:
-            if pred['trigger_level'] > len(gamedata['buildings'][gamedata['townhall']]['build_time']):
-                raise Exception('requirement of CC > max level '+repr(pred))
-            return pred['trigger_level']
-        else:
-            if pred['trigger_level'] > len(gamedata['buildings'][pred['building_type']]['requires']):
-                raise Exception('requirement of %s > max level: ' % pred['building_type'] + repr(pred))
-            return get_cc_requirement_predicate(gamedata['buildings'][pred['building_type']]['requires'][pred['trigger_level']-1])
-    elif pred['predicate'] == 'TECH_LEVEL':
-        return get_cc_requirement_predicate(gamedata['tech'][pred['tech']]['requires'][pred['min_level']-1])
-    elif pred['predicate'] == 'AND':
-        ls = [get_cc_requirement_predicate(subpred) for subpred in pred['subpredicates']]
-        if -1 in ls: return -1
-        return max(ls)
-    elif pred['predicate'] == 'ALWAYS_FALSE':
-        return -1
-    elif pred['predicate'] == 'LIBRARY':
-        return get_cc_requirement_predicate(gamedata['predicate_library'][pred['name']])
-    elif pred['predicate'] in ('ALWAYS_TRUE', 'ANY_ABTEST', 'OR', 'BUILDING_QUANTITY', 'HOME_REGION',
-                               'LADDER_PLAYER', 'PLAYER_HISTORY', 'ABSOLUTE_TIME', 'QUEST_COMPLETED', 'AURA_INACTIVE'):
-        pass
-    else:
-        raise Exception('unhandled upgrade requirement: %s' % repr(pred))
-    return 0
-
-# parse a predicate (list) for a minimum CC level requirement for level "level" of this object
-def get_cc_requirement(req, level):
-    if type(req) is not list: req = [req,]*level
-    cc_requirement = 0
-    for lev in xrange(1, level+1):
-        pred = req[lev-1]
-        pred_req = get_cc_requirement_predicate(pred)
-        if pred_req < 0: return -1
-        cc_requirement = max(cc_requirement, pred_req)
-    return cc_requirement
-
-# calculate max capacity of resource storage indexed by CC level
-def calc_max_storage_for_resource(gamedata, res):
-    ret = []
-    building_name = gamedata['resources'][res]['storage_building']
-
-    for cc_level in xrange(1, len(gamedata['buildings'][gamedata['townhall']]['build_time'])+1):
-        storage_spec = gamedata['buildings'][building_name]
-        num_storages = storage_spec['limit'][cc_level-1] if type(storage_spec['limit']) is list else storage_spec['limit']
-
-        storage_level = 1
-        while storage_level < len(storage_spec['build_time']):
-            if cc_level < get_cc_requirement(storage_spec['requires'], storage_level):
-                break
-            storage_level += 1
-
-        if 'storage_'+res in storage_spec:
-            ret.append(num_storages * storage_spec['storage_'+res][storage_level-1])
-        else:
-            ret.append(0)
-        #sys.stderr.write("HERE CC L%d num %d lev %d total %d\n" % (cc_level, num_storages, storage_level, ret[-1]))
-    return ret
-
-def calc_max_storage(gamedata):
-    return dict((resname, calc_max_storage_for_resource(gamedata, resname)) for resname in gamedata['resources'])
-
 def check_url(url, reason):
     if not url: return 0
 
@@ -266,7 +202,7 @@ def check_mandatory_fields(specname, spec, kind):
                 error |= 1; print 'gamedata.strings.modstats.stats is missing "%s"' % stat_key
 
     for lev in xrange(1,max_level+1):
-        cc_requirement = get_cc_requirement(spec['requires'], lev) if ('requires' in spec) else 0
+        cc_requirement = GameDataUtil.get_cc_requirement(gamedata, spec['requires'], lev) if ('requires' in spec) else 0
         if spec['name'] == gamedata['townhall']:
             cc_requirement = max(cc_requirement, lev-1)
         for res in gamedata['resources']:
@@ -613,7 +549,7 @@ def check_tech(specname, keyname, spec, maxlevel):
     # check resource requirement vs CC level
     if verbose:
         for lev in xrange(1,len(spec['research_time'])+1):
-            cc_requirement = get_cc_requirement(spec['requires'], lev) if ('requires' in spec) else 0
+            cc_requirement = GameDataUtil.get_cc_requirement(gamedata, spec['requires'], lev) if ('requires' in spec) else 0
             for res in gamedata['resources']:
                 cost = spec['cost_'+res][lev-1] if isinstance(spec['cost_'+res],list) else spec['cost_'+res]
                 if cost > MAX_RESOURCE_COST:
@@ -3364,7 +3300,7 @@ def main(args):
     gamedata['loading_screens'] = SpinJSON.load(open(args[8]))
 
     global MAX_STORAGE
-    MAX_STORAGE = calc_max_storage(gamedata)
+    MAX_STORAGE = dict((resname, GameDataUtil.calc_max_storage_for_resource(gamedata, resname)) for resname in gamedata['resources'])
 
     for name, data in gamedata['dialogs'].iteritems():
         error |= check_dialog('dialog:'+name, data)
