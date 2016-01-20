@@ -25893,7 +25893,7 @@ function battle_history_change_page(dialog, page) {
             }
 
             // View Log button (opprole is for Facebook messaging only)
-            var friendly_id = -1
+            var friendly_id = -1;
             if(summary['attacker_id'] == session.user_id) {
                 friendly_id = summary['attacker_id'];
             } else if(summary['defender_id'] == session.user_id) {
@@ -25902,12 +25902,14 @@ function battle_history_change_page(dialog, page) {
                 friendly_id = summary['attacker_id'];
             } else if(summary['defender_alliance_id'] > 0 && summary['defender_alliance_id'] == session.alliance_id) {
                 friendly_id = summary['defender_id'];
+            } else { // third-party log
+                friendly_id = dialog.user_data['from_id'];
             }
 
-            var callback = (function (_summary) { return function() {
+            var callback = (function (_summary, _friendly_id) { return function() {
                 player.record_feature_use('battle_log');
-                invoke_battle_log_dialog(_summary);
-            }; })(summary);
+                invoke_battle_log_dialog(_summary, _friendly_id);
+            }; })(summary, friendly_id);
 
             dialog.widgets['row_log_button'+row].show = (player.is_developer() || player.get_any_abtest_value('enable_battle_logs',true));
             dialog.widgets['row_log_button'+row].state = 'normal';
@@ -26052,13 +26054,12 @@ function update_battle_history_dialog(dialog) {
     animate_dialog_zoom_effect(dialog, dialog.user_data['zoom_from_widget']);
 };
 
-function invoke_battle_log_dialog(summary) {
+/** @param {!Object} summary
+    @param {number} friendly_id - the "good guy" in this battle - not necessarily the viewing player */
+function invoke_battle_log_dialog(summary, friendly_id) {
     var dialog = new SPUI.Dialog(gamedata['dialogs']['battle_log_dialog']);
     dialog.user_data['dialog'] = 'battle_log_dialog';
-    dialog.user_data['friendly_id'] = (summary['attacker_id'] === session.user_id ? session.user_id :
-                                       (summary['defender_id'] === session.user_id ? session.user_id :
-                                        (summary['attacker_alliance_id'] >= 0 && summary['attacker_alliance_id'] === session.alliance_id ? summary['attacker_id'] :
-                                         (summary['defender_alliance_id'] >= 0 && summary['defender_alliance_id'] === session.alliance_id ? summary['defender_id'] : -1))));
+    dialog.user_data['friendly_id'] = friendly_id;
     dialog.user_data['time'] = summary['time'];
     dialog.user_data['summary'] = summary;
     dialog.user_data['log'] = null;
