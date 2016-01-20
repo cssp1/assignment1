@@ -180,7 +180,7 @@ if __name__ == '__main__':
         if verbose:
             print 'total', total, 'battles'
 
-        if not dry_run and optimize:
+        if not dry_run and optimize and 0: # disable vacuum since there will be no garbage unless we starting pruning
             old = con.isolation_level
             con.set_isolation_level(0)
             try:
