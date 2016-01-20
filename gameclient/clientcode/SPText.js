@@ -222,12 +222,6 @@ SPText.cstring_to_ablocks_bbcode = function(str, props, plugins) {
                     code_stack.pop();
                     code_text_stack.pop();
                     insert_string = pretty_print_date(parseInt(arg,10)); // XXX imported from main.js
-                } else if(root === 'url') {
-                    // XXX not sure if this is safe to enable at this low level
-                    word_props.onclick = (function (_url) { return function(w, mloc) {
-                        var handle = window.open(_url, '_blank');
-                        if(handle) { handle.focus(); }
-                    }; })(arg);
                 } else if(plugins && (root in plugins)) {
                     // note: don't call the handler yet, because we need to wait until text is accumulated to the close of the block
                     // also note we need to add a *reference* to a state object, not a literal, since inner blocks are going to clone this.

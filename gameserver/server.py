@@ -24625,7 +24625,7 @@ class GAMEAPI(resource.Resource):
                                                    'from_name': msg['ui_from'].replace('%LEADER_NAME', session.user.get_chat_name(session.player)).replace('%LEADER_ROLE_NAME', my_role_info['ui_name']).replace('%ALLIANCE_NAME', alliance_display_name(info)),
                                                    'to': [invitee],
                                                    'subject': msg['ui_subject'],
-                                                   'body': msg['ui_body'].replace('%LEADER_NAME', session.user.get_chat_name(session.player)).replace('%LEADER_ROLE_NAME', my_role_info['ui_name']).replace('%ALLIANCE_NAME', alliance_display_name(info))
+                                                   'body': msg['ui_body'].replace('%LEADER_NAME', session.user.get_chat_name(session.player)).replace('%LEADER_ROLE_NAME', my_role_info['ui_name']).replace('%ALLIANCE_NAME', alliance_display_name(info)).replace('%ALLIANCE_ID', str(alliance_id))
                                                    }])
 
             retmsg.append(["ALLIANCE_INVITE_RESULT", alliance_id, invitee, success, tag])

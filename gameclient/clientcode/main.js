@@ -14737,6 +14737,8 @@ function change_chat_tab(dialog, new_tab) {
     }
 }
 
+// functions run when part of the chat message is clicked
+// user-typed messages
 var user_chat_bbcode_click_handlers = {
     'map_coords': { 'onclick': function(_srxy) {
         return function(w, mloc) {
@@ -14746,6 +14748,32 @@ var user_chat_bbcode_click_handlers = {
             invoke_find_on_map(region, [x,y]);
         }; } }
 };
+
+// server-controlled messages
+var system_chat_bbcode_click_handlers = {
+    'url': { 'onclick': function(_url) { return function(w, mloc) {
+        var handle = window.open(_url, '_blank');
+        if(handle) { handle.focus(); }
+    }; } },
+    'alliance': { 'onclick': function(salliance_id) { return function(w, mloc) {
+        var alliance_id = parseInt(salliance_id,10);
+        if(alliance_id >= 0) {
+            change_selection_ui(null); invoke_alliance_info(alliance_id);
+        }
+    }; } },
+    'achievement': {'onclick': function(player_and_name) { return function(w, mloc) {
+        var fields = player_and_name.split(':');
+        var player_id = parseInt(fields[0],10), name = fields[1];
+        if(name in gamedata['achievements']) {
+            var cheeve = gamedata['achievements'][name];
+            change_selection_ui(null);
+            PlayerInfoDialog.invoke(player_id,
+                                    (function (_cheeve) { return function(dialog) { PlayerInfoDialog.invoke_achievements_tab(dialog, _cheeve['category'], _cheeve['name']); }; })(cheeve)
+                                   );
+        }
+    }; } }
+};
+
 
 // Convert body string of user chat message to SPText.ABlock array.
 // Applies profanity filter and map coordinate detection.
@@ -18180,7 +18208,7 @@ function invoke_message_dialog(title_text, body_text, props) {
     }
 
     if(props['use_bbcode']) {
-        dialog.widgets['description_bbcode'].set_text_bbcode(body_text);
+        dialog.widgets['description_bbcode'].set_text_bbcode(body_text, {}, system_chat_bbcode_click_handlers);
         dialog.widgets['description_bbcode'].show = true;
         dialog.widgets['description'].show = false;
     } else {
@@ -18237,7 +18265,7 @@ function invoke_child_message_dialog(title_text, body_text, props) {
     }
 
     if(props['use_bbcode']) {
-        dialog.widgets['description_bbcode'].set_text_bbcode(body_text);
+        dialog.widgets['description_bbcode'].set_text_bbcode(body_text, {}, system_chat_bbcode_click_handlers);
         dialog.widgets['description_bbcode'].show = true;
         dialog.widgets['description'].show = false;
     } else {
@@ -22519,7 +22547,7 @@ function mail_dialog_select_mail(dialog, row) {
     dialog.widgets['body'].scroll_up_button = dialog.widgets['body_scroll_left'];
     dialog.widgets['body'].scroll_down_button = dialog.widgets['body_scroll_right'];
     dialog.widgets['body'].clear_text();
-    dialog.widgets['body'].append_text_with_linebreaking_bbcode(mail['body']);
+    dialog.widgets['body'].append_text_with_linebreaking_bbcode(mail['body'], {}, system_chat_bbcode_click_handlers);
 
     var scroller = function (incr) { return function(w) {
         var dialog = w.parent;
@@ -45200,40 +45228,22 @@ function handle_server_message(data) {
             }
             var alliance_id = ('alliance_id' in sender_info ? sender_info['alliance_id'] : -1);
 
-            // functions run when part of the chat message is clicked
-            var bbcode_click_handlers = {
-                'player': { 'onclick': (function (_report_args, _alliance_id) { return function (_suser_id, _ui_name) {
-                    return function(w, mloc) {
-                        if(!_suser_id) { return; }
-                        var _user_id = parseInt(_suser_id,10);
-                        if(!_user_id || is_ai_user_id_range(_user_id) || _user_id < 0) { return; }
+            var bbcode_click_handlers = goog.object.clone(system_chat_bbcode_click_handlers);
 
-                        // note: this might refer to a DIFFERENT player than the main message - if so, ignore report_args and alliance_id
-                        if(!_report_args || (_user_id !== _report_args.user_id)) {
-                            _alliance_id = -1;
-                            _report_args = null;
-                        }
-                        invoke_chat_player_context_menu(_user_id, _alliance_id, _ui_name, _report_args, mloc);
+            // special override for player names
+            bbcode_click_handlers['player'] = { 'onclick': (function (_report_args, _alliance_id) { return function (_suser_id, _ui_name) {
+                return function(w, mloc) {
+                    if(!_suser_id) { return; }
+                    var _user_id = parseInt(_suser_id,10);
+                    if(!_user_id || is_ai_user_id_range(_user_id) || _user_id < 0) { return; }
 
-                    }; }; })(report_args, alliance_id)},
-                'alliance': { 'onclick': function(salliance_id) { return function(w, mloc) {
-                    var alliance_id = parseInt(salliance_id,10);
-                    if(alliance_id >= 0) {
-                        change_selection_ui(null); invoke_alliance_info(alliance_id);
+                    // note: this might refer to a DIFFERENT player than the main message - if so, ignore report_args and alliance_id
+                    if(!_report_args || (_user_id !== _report_args.user_id)) {
+                        _alliance_id = -1;
+                        _report_args = null;
                     }
-                }; } },
-                'achievement': {'onclick': function(player_and_name) { return function(w, mloc) {
-                    var fields = player_and_name.split(':');
-                    var player_id = parseInt(fields[0],10), name = fields[1];
-                    if(name in gamedata['achievements']) {
-                        var cheeve = gamedata['achievements'][name];
-                        change_selection_ui(null);
-                        PlayerInfoDialog.invoke(player_id,
-                                                (function (_cheeve) { return function(dialog) { PlayerInfoDialog.invoke_achievements_tab(dialog, _cheeve['category'], _cheeve['name']); }; })(cheeve)
-                                               );
-                    }
-                }; } }
-            };
+                    invoke_chat_player_context_menu(_user_id, _alliance_id, _ui_name, _report_args, mloc);
+                }; }; })(report_args, alliance_id)};
 
             var base_props = {};
             if('time' in sender_info) {

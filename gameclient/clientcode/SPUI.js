@@ -1606,8 +1606,11 @@ SPUI.RichTextField.prototype.set_text_ablocks = function(ablocks) {
     this.sblines = this.rtxt = null;
     this.dims_dirty = true;
 };
-SPUI.RichTextField.prototype.set_text_bbcode = function(str) {
-    this.set_text_ablocks(str ? SPText.cstring_to_ablocks_bbcode(str) : null);
+/** @param {string} str
+    @param {Object|null=} props
+    @param {Object=} click_handlers */
+SPUI.RichTextField.prototype.set_text_bbcode = function(str, props, click_handlers) {
+    this.set_text_ablocks(str ? SPText.cstring_to_ablocks_bbcode(str, props, click_handlers) : null);
 };
 // clip text if it takes more than "max_lines" lines. If we truncate text, add "appendage" (bbcode) to the end, e.g. "... See More"
 SPUI.RichTextField.prototype.clip_to_max_lines = function(max_lines, appendage) {

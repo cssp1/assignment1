@@ -741,7 +741,7 @@
 
     "alliance_invite_mail": { "ui_subject": "Join our Clan?",
                               "ui_from": "%LEADER_NAME, %LEADER_ROLE_NAME, %ALLIANCE_NAME",
-                              "ui_body": "%LEADER_NAME, %LEADER_ROLE_NAME, invites you to join:\n\n%ALLIANCE_NAME\n\nSearch for us by name using the \"C\" button, then click Join!"},
+                              "ui_body": "%LEADER_NAME, %LEADER_ROLE_NAME, invites you to join:\n\n[color=#ffff00][u][alliance=%ALLIANCE_ID]%ALLIANCE_NAME[/alliance][/u][/color]\n\n[color=#ffff00][u][alliance=%ALLIANCE_ID]Click here[/alliance][/u][/color] to view us, then click Join!"},
     "alliance_kick_mail": { "ui_subject": "Kicked from Clan",
                             "ui_from": "%LEADER_NAME, %LEADER_ROLE_NAME, %ALLIANCE_NAME",
                             "duration": -1,
