@@ -14984,6 +14984,7 @@ function init_chat_frame() {
         tab.user_data['last_timestamp'] = 0;
         tab.user_data['unit_donation_requests'] = {};
         tab.user_data['chat_messages_by_id'] = {};
+        tab.user_data['earliest_id'] = null;
         var invert = !!tab.data['widgets']['output']['invert'];
         tab.widgets['output'].scroll_up_button = tab.widgets[(invert ? 'scroll_down' : 'scroll_up')];
         tab.widgets['output'].scroll_down_button = tab.widgets[(invert ? 'scroll_up' : 'scroll_down')];
@@ -45330,6 +45331,9 @@ function handle_server_message(data) {
                     node.on_destroy = (function (_tab, _chat_msg_id) { return function(_node) {
                         delete _tab.user_data['chat_messages_by_id'][_chat_msg_id];
                     }; })(tab, chat_msg_id);
+                    if(tab.user_data['earliest_id'] === null || chat_msg_id < tab.user_data['earliest_id']) {
+                        tab.user_data['earliest_id'] = chat_msg_id;
+                    }
                 }
             }
         }
