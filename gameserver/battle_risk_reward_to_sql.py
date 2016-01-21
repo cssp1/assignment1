@@ -223,18 +223,18 @@ if __name__ == '__main__':
             IFNULL((SELECT SUM(-1*item_value(items.item, items.stack, active_player_townhall_level, active_player_prev_receipts)) FROM $GAME_ID_battle_items items WHERE items.battle_id = battles.battle_id AND items.user_id = active_player_id),0) AS consumed_items_value,
 
             IFNULL(IF(active_player_id = attacker_id, `loot:iron`, -1*`loot:iron_lost`),0) AS loot_iron_amount,
-            iron_value(IFNULL(IF(active_player_id = attacker_id, `loot:iron`, -1*`loot:iron_lost`), 0), active_player_townhall_level) AS loot_iron_value,
+            iron_value(IFNULL(IF(active_player_id = attacker_id, `loot:iron`, -1*`loot:iron_lost`), 0), active_player_townhall_level, active_player_prev_receipts) AS loot_iron_value,
             IFNULL(IF(active_player_id = attacker_id, `loot:water`, -1*`loot:water_lost`),0) AS loot_water_amount,
-            water_value(IFNULL(IF(active_player_id = attacker_id, `loot:water`, -1*`loot:water_lost`), 0), active_player_townhall_level) AS loot_water_value,
+            water_value(IFNULL(IF(active_player_id = attacker_id, `loot:water`, -1*`loot:water_lost`), 0), active_player_townhall_level, active_player_prev_receipts) AS loot_water_value,
             IFNULL(IF(active_player_id = attacker_id, `loot:res3`, -1*`loot:res3_lost`),0) AS loot_res3_amount,
-            res3_value(IFNULL(IF(active_player_id = attacker_id, `loot:res3`, -1*`loot:res3_lost`),0), active_player_townhall_level) AS loot_res3_value,
+            res3_value(IFNULL(IF(active_player_id = attacker_id, `loot:res3`, -1*`loot:res3_lost`),0), active_player_townhall_level, active_player_prev_receipts) AS loot_res3_value,
 
             IFNULL((SELECT SUM(-1*damage.iron) FROM $GAME_ID_battle_damage damage WHERE damage.battle_id = battles.battle_id AND damage.user_id = active_player_id),0) AS damage_iron_amount,
-            iron_value(IFNULL((SELECT SUM(-1*damage.iron) FROM $GAME_ID_battle_damage damage WHERE damage.battle_id = battles.battle_id AND damage.user_id = active_player_id),0), active_player_townhall_level) AS damage_iron_value,
+            iron_value(IFNULL((SELECT SUM(-1*damage.iron) FROM $GAME_ID_battle_damage damage WHERE damage.battle_id = battles.battle_id AND damage.user_id = active_player_id),0), active_player_townhall_level, active_player_prev_receipts) AS damage_iron_value,
             IFNULL((SELECT SUM(-1*damage.water) FROM $GAME_ID_battle_damage damage WHERE damage.battle_id = battles.battle_id AND damage.user_id = active_player_id),0) AS damage_water_amount,
-            water_value(IFNULL((SELECT SUM(-1*damage.water) FROM $GAME_ID_battle_damage damage WHERE damage.battle_id = battles.battle_id AND damage.user_id = active_player_id),0), active_player_townhall_level) AS damage_water_value,
+            water_value(IFNULL((SELECT SUM(-1*damage.water) FROM $GAME_ID_battle_damage damage WHERE damage.battle_id = battles.battle_id AND damage.user_id = active_player_id),0), active_player_townhall_level, active_player_prev_receipts) AS damage_water_value,
             IFNULL((SELECT SUM(-1*damage.res3) FROM $GAME_ID_battle_damage damage WHERE damage.battle_id = battles.battle_id AND damage.user_id = active_player_id),0) AS damage_res3_amount,
-            res3_value(IFNULL((SELECT SUM(-1*damage.res3) FROM $GAME_ID_battle_damage damage WHERE damage.battle_id = battles.battle_id AND damage.user_id = active_player_id),0), active_player_townhall_level) AS damage_res3_value,
+            res3_value(IFNULL((SELECT SUM(-1*damage.res3) FROM $GAME_ID_battle_damage damage WHERE damage.battle_id = battles.battle_id AND damage.user_id = active_player_id),0), active_player_townhall_level, active_player_prev_receipts) AS damage_res3_value,
 
             -- note: value repair time for buildings 0.1x as much as repair time for units, because buildings can repair in parallel but units cannot.
             IFNULL((SELECT SUM(IF(damage.mobile,1,0.1)*damage.time) FROM $GAME_ID_battle_damage damage WHERE damage.battle_id = battles.battle_id AND damage.user_id = active_player_id),0) + duration AS damage_time_sec, -- include battle duration as damage time!

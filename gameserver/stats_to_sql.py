@@ -215,9 +215,9 @@ if __name__ == '__main__':
 
                 # VALUE formula
                 if res == 'res3':
-                    # computed as a multiple of the iron value
+                    # computed as a multiple of the iron value (at high prev_receipts)
                     res3_to_iron_ratio = float(get_parameter('resource_price_formula_scale', 'res3')) / float(get_parameter('resource_price_formula_scale', 'iron'))
-                    func = "%f * iron_value(amount, townhall_level)" % res3_to_iron_ratio
+                    func = "%f * iron_value(amount, townhall_level, 1000)" % res3_to_iron_ratio
                 elif res in ('iron','water'):
                     func = ""
                     townhall_spec = gamedata['buildings'][gamedata['townhall']]
@@ -238,7 +238,7 @@ if __name__ == '__main__':
                     raise Exception('value formula not implemented for resource '+res)
 
                 cur.execute("DROP FUNCTION IF EXISTS "+res+"_value")
-                cur.execute("CREATE FUNCTION "+res+"_value (amount INT8, townhall_level INT4) RETURNS INT8 DETERMINISTIC RETURN IF(amount=0, 0, IF(amount>0,1,-1) * GREATEST(1, CEIL("+func+")))")
+                cur.execute("CREATE FUNCTION "+res+"_value (amount INT8, townhall_level INT4, prev_receipts FLOAT) RETURNS INT8 DETERMINISTIC RETURN IF(amount=0, 0, IF(amount>0,1,-1) * GREATEST(1, CEIL("+func+")))")
 
             # some tables have res3 columns even if the game itself doesn't have res3.
             # Create a dummy function to satisfy queries.
@@ -252,7 +252,7 @@ if __name__ == '__main__':
             # gamebuck value of 1 token should be ~0.04 for low-skill ultrafans, ~0.01 for high-skill non-payers
             # (this is based on ratio of tokens earned per gamebuck loss incurred in typical AI battles)
             cur.execute("DROP FUNCTION IF EXISTS "+sql_util.sym('token_value'))
-            cur.execute("CREATE FUNCTION "+sql_util.sym('token_value')+" (amount INT8, prev_receipts FLOAT) "+\
+            cur.execute("CREATE FUNCTION "+sql_util.sym('token_value')+" (amount INT8, townhall_level INT4, prev_receipts FLOAT) "+\
                         "RETURNS INT8 DETERMINISTIC RETURN "+\
                         "GREATEST(1, CEIL(amount*IF(prev_receipts>=1000.0,0.04,IF(prev_receipts>=100.0,0.03,IF(prev_receipts>=10.0,0.02,0.01)))))")
 

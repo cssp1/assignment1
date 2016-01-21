@@ -228,10 +228,10 @@ DROP FUNCTION IF EXISTS item_value;
 CREATE FUNCTION item_value (specname VARCHAR(128), stack INT, townhall_level INT, prev_receipts FLOAT)
 RETURNS INT DETERMINISTIC
 RETURN CASE WHEN stack<=0 THEN 0 -- negative stack
-            WHEN specname='token' THEN token_value(stack, prev_receipts) -- special case for tokens
-	    WHEN specname LIKE 'boost_res3_%' THEN res3_value(CAST(SUBSTRING_INDEX(SUBSTRING_INDEX(specname,'_',3),'_',-1) AS UNSIGNED), townhall_level) -- res3 resource boosts
-	    WHEN specname LIKE 'boost_iron_%' THEN iron_value(CAST(SUBSTRING_INDEX(SUBSTRING_INDEX(specname,'_',3),'_',-1) AS UNSIGNED), townhall_level) -- iron/water resource 
-	    WHEN specname LIKE 'boost_water_%' THEN water_value(CAST(SUBSTRING_INDEX(SUBSTRING_INDEX(specname,'_',3),'_',-1) AS UNSIGNED), townhall_level) -- iron/water resource
+            WHEN specname='token' THEN token_value(stack, townhall_level, prev_receipts) -- special case for tokens
+	    WHEN specname LIKE 'boost_res3_%' THEN res3_value(CAST(SUBSTRING_INDEX(SUBSTRING_INDEX(specname,'_',3),'_',-1) AS UNSIGNED), townhall_level, prev_receipts) -- res3 resource boosts
+	    WHEN specname LIKE 'boost_iron_%' THEN iron_value(CAST(SUBSTRING_INDEX(SUBSTRING_INDEX(specname,'_',3),'_',-1) AS UNSIGNED), townhall_level, prev_receipts) -- iron/water resource 
+	    WHEN specname LIKE 'boost_water_%' THEN water_value(CAST(SUBSTRING_INDEX(SUBSTRING_INDEX(specname,'_',3),'_',-1) AS UNSIGNED), townhall_level, prev_receipts) -- iron/water resource
 	    WHEN specname LIKE 'mine_%' THEN stack*5 -- landmines
 	    WHEN specname = 'gamebucks' OR specname = 'alloy' THEN stack
 	    WHEN EXISTS(SELECT value_num from $GAME_ID_stats WHERE kind = 'item' AND spec = specname AND stat = 'analytics_value') -- check for manual override
