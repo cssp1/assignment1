@@ -25597,7 +25597,7 @@ function battle_history_change_chapter(dialog, chapter) {
     dialog.user_data['chapter'] = chapter;
     dialog.widgets['single_player_button'].state = (chapter === 'ai' ? 'active' : 'normal');
     dialog.widgets['multiplayer_button'].state = (chapter === 'human' ? 'active' : 'normal');
-    dialog.widgets['alliance_button'].state = (chapter === 'alliance' ? 'active' : 'normal');
+    dialog.widgets['alliance_button'].state = (chapter === 'alliance' ? 'active' : (dialog.user_data['from_alliance'] >= 0 ? 'normal' : 'disabled'));
 
     dialog.user_data['page'] = -1;
     dialog.user_data['pending'] = false;
@@ -25702,7 +25702,11 @@ function battle_history_change_page(dialog, page) {
 
     dialog.widgets['single_player_button'].show = dialog.user_data['enable_buttons'] && (dialog.user_data['user_id'] <= 0);
     dialog.widgets['multiplayer_button'].show = dialog.user_data['enable_buttons'] && (dialog.user_data['user_id'] <= 0);
-    dialog.widgets['alliance_button'].show = eval_cond_or_literal(gamedata['client']['enable_alliance_battle_history'], player, null) && dialog.user_data['enable_buttons'] && (dialog.user_data['user_id'] <= 0) && (dialog.user_data['from_alliance'] >= 0);
+    dialog.widgets['alliance_button'].show = eval_cond_or_literal(gamedata['client']['enable_alliance_battle_history'], player, null) && dialog.user_data['enable_buttons'] && (dialog.user_data['user_id'] <= 0) && (dialog.user_data['from_alliance'] >= 0 || dialog.user_data['from_id'] === session.user_id);
+    if(dialog.widgets['alliance_button'].show && dialog.user_data['from_alliance'] < 0) {
+        // for the player, who is not in an alliance
+        dialog.widgets['alliance_button'].tooltip.str = dialog.data['widgets']['alliance_button']['ui_tooltip_no_alliance'];
+    }
 
     // need to get more from server?
     // note: send query on the page before the data ends, so we never show an incomplete page, unless it's the final one.
